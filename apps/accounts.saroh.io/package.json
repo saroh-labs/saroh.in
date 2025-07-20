@@ -3,25 +3,28 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "db:gen": "prisma generate --schema=../../packages/database/prisma/schema.prisma",
-        "dev": "next dev && prisma generate",
+        "db:gen": "prisma generate --schema=./prisma/schema.prisma",
+        "dev": "next dev",
         "build": "next build",
         "start": "next start",
         "lint": "next lint",
-        "postinstall": "prisma generate --schema=../../packages/database/prisma/schema.prisma"
+        "postinstall": "prisma generate --schema=./prisma/schema.prisma"
     },
     "dependencies": {
+        "@prisma/client": "5.22.0",
         "@prisma/nextjs-monorepo-workaround-plugin": "catalog:prisma",
+        "@saroh/auth": "workspace:*",
+        "@saroh/ui": "workspace:*",
+        "better-auth": "^1.2.12",
         "next": "catalog:next15",
         "next-auth": "catalog:",
         "react": "catalog:react18",
         "react-dom": "catalog:react18",
-        "react-icons": "catalog:",
-        "@saroh/ui": "workspace:*",
-        "@saroh/auth": "workspace:*"
+        "react-icons": "catalog:"
     },
     "devDependencies": {
         "@saroh/database": "workspace:*",
+        "@saroh/eslint-config": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
         "@types/node": "catalog:",
         "@types/react": "catalog:react18",
@@ -30,9 +33,8 @@
         "eslint": "catalog:",
         "eslint-config-next": "catalog:",
         "postcss": "catalog:",
+        "prisma": "catalog:prisma",
         "tailwindcss": "catalog:",
-        "typescript": "catalog:",
-        "@saroh/eslint-config": "workspace:*",
-        "prisma": "catalog:prisma"
+        "typescript": "catalog:"
     }
 }

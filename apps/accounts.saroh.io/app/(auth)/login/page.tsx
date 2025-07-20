@@ -2,6 +2,7 @@
 import { LoginForm } from "@/components/auth/login-form";
 
 export default function LoginPage() {
+    // const {}=
     return <LoginForm />;
     // return (
     //     <div className="mx-5 border border-stone-200 py-10 sm:mx-auto sm:w-full sm:max-w-lg sm:rounded-lg sm:shadow-md dark:border-stone-700">

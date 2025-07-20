@@ -1,4 +1,5 @@
 "use client";
+import { authClient } from "@/lib/better-auth.client";
 import { Button } from "@saroh/ui/button";
 import {
     Card,
@@ -9,10 +10,10 @@ import {
 } from "@saroh/ui/card";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import { signIn } from "next-auth/react";
 import Link from "next/link";
 
 export function LoginForm() {
+    const { signIn } = authClient;
     return (
         <Card className="mx-auto max-w-sm">
             <CardHeader>
@@ -54,11 +55,15 @@ export function LoginForm() {
                     >
                         Login with Google
                     </Button> */}
-               
+
                     <Button
                         variant="outline"
                         className="w-full"
-                        onClick={() => signIn("github")}
+                        onClick={async () =>
+                            await signIn.social({
+                                provider: "github",
+                            })
+                        }
                     >
                         Login with Github
                     </Button>
