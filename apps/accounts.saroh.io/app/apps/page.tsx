@@ -1,5 +1,5 @@
 "use client";
-import { authClient } from "@/lib/better-auth.client";
+import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 

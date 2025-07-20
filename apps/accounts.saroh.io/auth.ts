@@ -1,1 +1,1 @@
-export { auth } from "./lib/better-auth";
+export { auth } from "./lib/auth";

@@ -48,23 +48,33 @@
 //         "/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)",
 //     ],
 // };
-import { auth } from "@/lib/better-auth";
-import { headers } from "next/headers";
+import { getSessionCookie } from "better-auth/cookies";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function middleware(request: NextRequest) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
+const protectedRoutes = ["/apps", "/"];
+export async function middleware(req: NextRequest) {
+    const { nextUrl } = req;
+    const sessionCookie = getSessionCookie(req);
 
-    if (!session) {
-        return NextResponse.redirect(new URL("/login", request.url));
+    const res = NextResponse.next();
+
+    const isLoggedIn = !!sessionCookie;
+    const isOnProtectedRoute = protectedRoutes.includes(nextUrl.pathname);
+    const isOnAuthRoute = nextUrl.pathname.startsWith("/login");
+
+    if (isOnProtectedRoute && !isLoggedIn) {
+        return NextResponse.redirect(new URL("/login", req.url));
     }
 
-    return NextResponse.next();
+    if (isOnAuthRoute && isLoggedIn) {
+        return NextResponse.redirect(new URL("/apps", req.url));
+    }
+
+    return res;
 }
 
 export const config = {
-    runtime: "nodejs",
-    matcher: ["/dashboard"], // Apply middleware to specific routes
+    matcher: [
+        "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    ],
 };

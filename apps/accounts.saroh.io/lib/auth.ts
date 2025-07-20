@@ -1,12 +1,23 @@
+import { PrismaClient } from "@prisma/client";
 // import prisma from "@/lib/prisma";
-// import { PrismaAdapter } from "@auth/prisma-adapter";
-// import NextAuth from "next-auth";
-// import authConfig from "./auth.config";
-// const VERCEL_DEPLOYMENT = !!process.env.VERCEL_URL;
+import { betterAuth } from "better-auth";
+import { prismaAdapter } from "better-auth/adapters/prisma";
 
-// export const { auth, handlers, signIn, signOut } = NextAuth({
-//     // providers: [GitHub, Google],
-//     adapter: PrismaAdapter(prisma),
-//     session: { strategy: "jwt" },
-//     ...authConfig,
-// });
+const prisma = new PrismaClient();
+
+export const auth = betterAuth({
+    database: prismaAdapter(prisma, {
+        provider: "postgresql",
+    }),
+    emailAndPassword: {
+        enabled: true,
+    },
+    socialProviders: {
+        github: {
+            clientId: process.env.AUTH_GITHUB_ID as string,
+            clientSecret: process.env.AUTH_GITHUB_SECRET as string,
+        },
+    },
+    plugins: [],
+    baseURL: process.env.BETTER_AUTH_URL as string,
+});

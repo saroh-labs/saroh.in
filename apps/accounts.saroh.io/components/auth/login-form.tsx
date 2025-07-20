@@ -1,5 +1,5 @@
 "use client";
-import { authClient } from "@/lib/better-auth.client";
+import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import {
     Card,
@@ -48,7 +48,7 @@ export function LoginForm() {
                     <Button type="submit" className="w-full">
                         Login
                     </Button>
-                  
+
                     <Button
                         variant="outline"
                         className="w-full"
