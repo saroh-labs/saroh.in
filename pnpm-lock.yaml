@@ -147,6 +147,15 @@ importers:
       better-auth:
         specifier: ^1.2.12
         version: 1.2.12
+      '@prisma/nextjs-monorepo-workaround-plugin':
+        specifier: catalog:prisma
+        version: 5.22.0
+      '@saroh/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@saroh/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       next:
         specifier: catalog:next15
         version: 15.0.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)

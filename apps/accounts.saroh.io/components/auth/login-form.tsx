@@ -48,14 +48,7 @@ export function LoginForm() {
                     <Button type="submit" className="w-full">
                         Login
                     </Button>
-                    {/* <Button
-                        variant="default"
-                        className="w-full"
-                        onClick={() => signIn("google")}
-                    >
-                        Login with Google
-                    </Button> */}
-
+                  
                     <Button
                         variant="outline"
                         className="w-full"
