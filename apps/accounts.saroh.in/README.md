@@ -1,36 +1,29 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# accounts.saroh.in
 
-## Getting Started
+Auth app for Saroh: login, sign up, forgot password, and reset password. Uses [better-auth](https://better-auth.com) with email/password and GitHub OAuth.
 
-First, run the development server:
+## Features
+
+-   **Login** – Email/password and GitHub OAuth
+-   **Sign up** – Email, name, password
+-   **Forgot password** – Request reset link by email
+-   **Reset password** – Set new password via link (token from email)
+-   Cross-subdomain cookies (`.saroh.in`), rate limiting, and better-auth plugins (admin, organization, 2FA, etc.)
+
+## Run locally
+
+From repo root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
+# or run only this app (see package.json for port)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Set `DATABASE_URL`, `BETTER_AUTH_URL`, `AUTH_GITHUB_ID`, and `AUTH_GITHUB_SECRET` in env.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Email (React Email + Nodemailer):** Password reset and verification emails use templates from `@saroh/emails` and are sent via Nodemailer when SMTP is configured. Set either:
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+-   **Generic SMTP:** `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and optionally `EMAIL_FROM`, `SMTP_SECURE`
+-   **Gmail (same as email.saroh.in):** `USER_ACCOUNT`, `USER_PASSWORD`, and optionally `SENDER_EMAIL_ID` or `EMAIL_FROM`
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
--   [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
--   [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+If no SMTP env is set, reset/verification links are logged to the console instead of sent.

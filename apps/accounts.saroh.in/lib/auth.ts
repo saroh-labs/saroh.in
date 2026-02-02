@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-// import prisma from "@/lib/prisma";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import {
@@ -13,6 +12,7 @@ import {
     twoFactor,
     username,
 } from "better-auth/plugins";
+import { sendPasswordResetEmail, sendVerificationEmail } from "./email";
 
 const prisma = new PrismaClient();
 
@@ -33,6 +33,14 @@ export const auth = betterAuth({
     }),
     emailAndPassword: {
         enabled: true,
+        sendResetPassword: async ({ user, url }) => {
+            void sendPasswordResetEmail(user.email, url);
+        },
+    },
+    emailVerification: {
+        sendVerificationEmail: async ({ user, url }) => {
+            void sendVerificationEmail(user.email, url);
+        },
     },
     socialProviders: {
         github: {

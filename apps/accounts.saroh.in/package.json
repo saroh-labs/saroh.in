@@ -13,9 +13,12 @@
     "dependencies": {
         "@prisma/client": "5.22.0",
         "@prisma/nextjs-monorepo-workaround-plugin": "catalog:prisma",
+        "@react-email/components": "^0.0.19",
         "@saroh/auth": "workspace:*",
+        "@saroh/emails": "workspace:*",
         "@saroh/ui": "workspace:*",
         "better-auth": "^1.2.12",
+        "nodemailer": "^6.9.13",
         "next": "catalog:next15",
         "next-auth": "catalog:",
         "react": "catalog:react18",
@@ -24,6 +27,7 @@
     },
     "devDependencies": {
         "@saroh/database": "workspace:*",
+        "@types/nodemailer": "^6.4.15",
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
         "@types/node": "catalog:",
