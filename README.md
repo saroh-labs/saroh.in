@@ -50,17 +50,17 @@ Open source platform to create blogs, portfolios, and Storefronts.
 
 ## `apps`:
 
--   **admin**: Admin dashboard for admin(Coming Soon). Link: [https://admin.saroh.io](https://admin.saroh.io)
--   **application**: Old application. Link: [https://app.saroh.io](https://app.saroh.io)
--   **auth** Authentication app for saroh, handles login, signup, forgot password, etc.(in-progress), Link: [https://auth.saroh.io](https://auth.saroh.io)
--   **chatbot**: Chatbot app for saroh, (Coming Soon), Link: [https://chatbot.saroh.io](https://chatbot.saroh.io)
--   **dashboard**: Dashboard for users to manage their blogs, portfolios, etc. This is the current application.(in-progress), Link: [https://dashboard.saroh.io](https://dashboard.saroh.io)
--   **docs**: Documentation app for saroh, (in-progress), Link: [https://docs.saroh.io](https://docs.saroh.io)
--   **ecom-templates**: E-commerce templates for saroh, (Coming Soon), Link: [https://templates.saroh.io](https://templates.saroh.io)
--   **email-service**: Email service for saroh, (Coming Soon), Link: [https://emails.saroh.io](https://emails.saroh.io)
+-   **admin**: Admin dashboard for admin(Coming Soon). Link: [https://admin.saroh.in](https://admin.saroh.in)
+-   **application**: Old application. Link: [https://app.saroh.in](https://app.saroh.in)
+-   **auth** Authentication app for saroh, handles login, signup, forgot password, etc.(in-progress), Link: [https://accounts.saroh.in](https://accounts.saroh.in)
+-   **chatbot**: Chatbot app for saroh, (Coming Soon), Link: [https://chatbot.saroh.in](https://chatbot.saroh.in)
+-   **dashboard**: Dashboard for users to manage their blogs, portfolios, etc. This is the current application.(in-progress), Link: [https://dashboard.saroh.in](https://dashboard.saroh.in)
+-   **docs**: Documentation app for saroh, (in-progress), Link: [https://docs.saroh.in](https://docs.saroh.in)
+-   **ecom-templates**: E-commerce templates for saroh, (Coming Soon), Link: [https://templates.saroh.in](https://templates.saroh.in)
+-   **email-service**: Email service for saroh, (Coming Soon), Link: [https://email.saroh.in](https://email.saroh.in)
 -   **sites**: Application to render users blogs, portfolios, etc. (Coming Soon), Link: [https://\*.saroh.site](https://*.saroh.site)
--   **ui**: UI components for saroh, (Coming Soon), Link: [https://ui.saroh.io](https://ui.saroh.io)
--   **web**: Saroh website(saroh.io), (Coming Soon), Link: [https://saroh.io](https://saroh.io)
+-   **ui**: UI components for saroh, (Coming Soon), Link: [https://ui.saroh.in](https://ui.saroh.in)
+-   **web**: Saroh website(saroh.in), (Coming Soon), Link: [https://saroh.in](https://saroh.in)
 
 ## `packages`:
 

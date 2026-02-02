@@ -31,7 +31,7 @@
 //         return;
 //     }
 
-//     if (!isLoggedIn) {
+
 //         return NextResponse.redirect(new URL("/login", nextUrl));
 //     }
 //     return;
