@@ -14,7 +14,13 @@ import {
 } from "better-auth/plugins";
 import { sendPasswordResetEmail, sendVerificationEmail } from "./email";
 
-const prisma = new PrismaClient();
+// prettier-ignore
+// Prisma 7 configuration
+const prismaConfig = {
+    datasourceUrl: process.env.DATABASE_URL,
+};
+
+const prisma = new PrismaClient(prismaConfig);
 
 export const auth = betterAuth({
     account: {

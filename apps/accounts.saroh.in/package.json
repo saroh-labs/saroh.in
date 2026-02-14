@@ -11,7 +11,7 @@
         "postinstall": "prisma generate --schema=./prisma/schema.prisma"
     },
     "dependencies": {
-        "@prisma/client": "5.22.0",
+        "@prisma/client": "catalog:prisma",
         "@prisma/nextjs-monorepo-workaround-plugin": "catalog:prisma",
         "@react-email/components": "^0.0.19",
         "@saroh/auth": "workspace:*",
@@ -19,10 +19,10 @@
         "@saroh/ui": "workspace:*",
         "better-auth": "^1.2.12",
         "nodemailer": "^6.9.13",
-        "next": "catalog:next15",
+        "next": "catalog:next16",
         "next-auth": "catalog:",
-        "react": "catalog:react18",
-        "react-dom": "catalog:react18",
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19",
         "react-icons": "catalog:"
     },
     "devDependencies": {
@@ -31,8 +31,8 @@
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
         "@types/node": "catalog:",
-        "@types/react": "catalog:react18",
-        "@types/react-dom": "catalog:react18",
+        "@types/react": "catalog:react19",
+        "@types/react-dom": "catalog:react19",
         "autoprefixer": "catalog:",
         "eslint": "catalog:",
         "eslint-config-next": "catalog:",

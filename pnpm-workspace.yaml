@@ -8,8 +8,8 @@ catalog:
     "@trpc/client": ^11.0.0.-rc.477
     "@trpc/react-query": ^11.0.0.-rc.477
     "@trpc/server": ^11.0.0.-rc.477
-    eslint: ^9.12.0
-    prettier: ^3.3.0
+    eslint: ^10.0.0
+    prettier: ^3.8.1
     tailwindcss: ^3.4.14
     zod: ^3.23.8
     "@types/node": ^20
@@ -18,7 +18,7 @@ catalog:
     typescript: ^5
     "next-auth": 5.0.0-beta.19
     "react-icons": ^5.2.1
-    eslint-config-next: ^15.0.3
+    eslint-config-next: ^16.1.6
     "@auth/prisma-adapter": ^2.2.0
     "@hookform/resolvers": ^3.6.0
     "lucide-react": ^0.394.0
@@ -35,15 +35,18 @@ catalogs:
         "@types/react-dom": 18.3.1
 
     react19:
-        react: 19.0.0-rc-66855b96-20241106
-        react-dom: 19.0.0-rc-66855b96-20241106
-        "@types/react": ^18
-        "@types/react-dom": ^18
+        react: 19.2.4
+        react-dom: 19.2.4
+        "@types/react": 19.2.14
+        "@types/react-dom": 19.2.3
 
     next15:
         next: 15.0.3
 
+    next16:
+        next: 16.1.6
+
     prisma:
-        prisma: 5.22.0
-        "@prisma/client": 5.22.0
-        "@prisma/nextjs-monorepo-workaround-plugin": 5.22.0
+        prisma: 7.4.0
+        "@prisma/client": 7.4.0
+        "@prisma/nextjs-monorepo-workaround-plugin": 7.4.0

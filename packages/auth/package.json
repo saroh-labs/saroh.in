@@ -18,16 +18,16 @@
     "dependencies": {
         "@auth/prisma-adapter": "catalog:",
         "@saroh/database": "workspace:*",
-        "next": "catalog:next15",
+        "next": "catalog:next16",
         "next-auth": "catalog:",
-        "react": "catalog:react18",
-        "react-dom": "catalog:react18"
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19"
     },
     "devDependencies": {
         "@types/node": "catalog:",
         "config": "^3.3.11",
-        "@types/react": "catalog:react18",
-        "@types/react-dom": "catalog:react18",
+        "@types/react": "catalog:react19",
+        "@types/react-dom": "catalog:react19",
         "eslint": "catalog:",
         "prisma": "catalog:prisma",
         "rimraf": "^5.0.7",

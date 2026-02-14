@@ -1,0 +1,3 @@
+# Exclude auth.ts due to prettier-plugin-tailwindcss bug
+# See: https://github.com/tailwindlabs/prettier-plugin-tailwindcss/issues
+apps/accounts.saroh.in/lib/auth.ts

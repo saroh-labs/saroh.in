@@ -9,15 +9,15 @@
         "lint": "next lint"
     },
     "dependencies": {
-        "react": "catalog:react18",
-        "react-dom": "catalog:react18",
-        "next": "catalog:next15"
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19",
+        "next": "catalog:next16"
     },
     "devDependencies": {
         "typescript": "catalog:",
         "@types/node": "catalog:",
-        "@types/react": "catalog:react18",
-        "@types/react-dom": "catalog:react18",
+        "@types/react": "catalog:react19",
+        "@types/react-dom": "catalog:react19",
         "postcss": "catalog:",
         "@saroh/eslint-config": "workspace:*",
         "tailwindcss": "catalog:",

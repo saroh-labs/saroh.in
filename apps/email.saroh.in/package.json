@@ -10,17 +10,17 @@
     },
     "dependencies": {
         "@react-email/components": "^0.0.19",
-        "next": "catalog:next15",
+        "next": "catalog:next16",
         "nodemailer": "^6.9.13",
-        "react": "catalog:react18",
-        "react-dom": "catalog:react18"
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19"
     },
     "devDependencies": {
         "@types/nodemailer": "^6.4.15",
         "@saroh/emails": "workspace:*",
         "@types/node": "catalog:",
-        "@types/react": "catalog:react18",
-        "@types/react-dom": "catalog:react18",
+        "@types/react": "catalog:react19",
+        "@types/react-dom": "catalog:react19",
         "@saroh/eslint-config": "workspace:*",
         "eslint": "catalog:",
         "eslint-config-next": "catalog:",

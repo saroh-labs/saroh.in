@@ -20,12 +20,12 @@
         "tailwind-merge": "^2.3.0"
     },
     "peerDependencies": {
-        "react": "catalog:react18"
+        "react": "catalog:react19"
     },
     "devDependencies": {
         "@types/node": "catalog:",
-        "@types/react": "catalog:react18",
-        "react": "catalog:react18",
+        "@types/react": "catalog:react19",
+        "react": "catalog:react19",
         "tsup": "^8.0.2",
         "typescript": "catalog:"
     },
