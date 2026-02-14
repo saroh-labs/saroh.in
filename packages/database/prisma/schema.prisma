@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Multi-Tenant SaaS Schema for Saroh.io
+// E-commerce + Blogs + Multi-Payment Providers
 
 datasource db {
   provider = "postgresql"
@@ -9,108 +9,629 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ============================================================================
+// USERS & AUTHENTICATION
+// ============================================================================
+
+// Global users (can own multiple stores)
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  // if you are using Github OAuth, you can get rid of the username attribute (that is for Twitter OAuth)
-  username      String?
-  gh_username   String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-  sites         Site[]
-  posts         Post[]
-}
+  id       String  @id @default(cuid())
+  email    String  @unique
+  password String? // For custom auth, null if OAuth
+  name     String?
+  image    String?
 
-model Account {
-  id                       String  @id @default(cuid())
-  userId                   String
-  type                     String
-  provider                 String
-  providerAccountId        String
-  refresh_token            String?
-  refresh_token_expires_in Int?
-  access_token             String?
-  expires_at               Int?
-  token_type               String?
-  scope                    String?
-  id_token                 String?
-  session_state            String?
-  oauth_token_secret       String?
-  oauth_token              String?
+  // From Better Auth
+  emailVerified Boolean @default(false)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Relations
+  stores       StoreOwner[] // Stores they own
+  workspaces   WorkspaceMember[] // Workspaces they're in
+  storeMembers StoreMembers[] // Staff positions
 
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-model Post {
-  id            String   @id @default(cuid())
-  title         String?  @db.Text
-  description   String?  @db.Text
-  content       String?
-  slug          String   @default(cuid())
-  image         String?
-  imageBlurhash String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  published     Boolean  @default(false)
-  site          Site?    @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  siteId        String?
-  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  userId        String?
-
-  @@unique([slug, siteId])
-  @@index([siteId])
-  @@index([userId])
-}
-
-model Site {
-  id            String   @id @default(cuid())
-  name          String?
-  description   String?  @db.Text
-  logo          String?  @db.Text
-  font          String   @default("font-cal")
-  image         String?
-  imageBlurhash String?
-  subdomain     String?  @unique
-  customDomain  String?  @unique
-  message404    String?  @db.Text
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  userId        String?
-  posts         Post[]
-
-  @@index([userId])
-}
-
-model Waitlist {
-  id        String   @id @default(cuid())
-  email     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+// Workspace: collection of stores (enterprise feature, Y2+)
+model Workspace {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  // Relations
+  stores  Store[]
+  members WorkspaceMember[]
+
+  createdAt DateTime @default(now())
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role String @default("MEMBER") // OWNER, ADMIN, MEMBER
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+}
+
+// ============================================================================
+// STORE (Multi-Tenant Root)
+// ============================================================================
+
+model Store {
+  id String @id @default(cuid())
+
+  // Basic info
+  name        String
+  slug        String  @unique
+  description String?
+  logo        String?
+
+  // Ownership
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+
+  // Relations
+  owners  StoreOwner[]
+  members StoreMembers[]
+
+  // Products & E-commerce
+  products   Product[]
+  categories Category[]
+  orders     Order[]
+  carts      Cart[]
+  customers  Customer[]
+  inventory  Inventory[]
+
+  // Blogs
+  posts          Post[]
+  postCategories PostCategory[]
+
+  // Payments & Integrations
+  paymentConfigs     StorePaymentConfig[]
+  transactions       Transaction[]
+  refunds            Refund[]
+  integrationSecrets IntegrationSecret[]
+
+  // Settings
+  settings      StoreSettings?
+  features      StoreFeatures?
+  customDomains CustomDomain[]
+  apiKeys       ApiKey[]
+
+  // Audit
+  auditLogs        AuditLog[]
+  secretAccessLogs SecretAccessLog[]
+
+  // Metadata
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  @@index([slug])
+  @@index([createdAt])
+}
+
+// Store owners
+model StoreOwner {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role String @default("OWNER") // OWNER, ADMIN
+
+  @@unique([storeId, userId])
+  @@index([storeId])
+}
+
+// Store members (staff/employees)
+model StoreMembers {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role        String // ADMIN, MANAGER, EDITOR, VIEWER
+  permissions Int    @default(0) // Bitmask for fine-grained perms
+
+  posts Post[] // Posts they authored
+
+  createdAt DateTime @default(now())
+
+  @@unique([storeId, userId])
+  @@index([storeId])
+}
+
+// ============================================================================
+// E-COMMERCE: PRODUCTS
+// ============================================================================
+
+model Product {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  name        String
+  slug        String
+  description String? @db.Text
+  image       String?
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  price    Decimal @db.Decimal(10, 2)
+  currency String  @default("USD")
+
+  status String @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+
+  // Relations
+  variants   ProductVariant[]
+  orderItems OrderItem[]
+  inventory  Inventory?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@index([categoryId])
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  sku   String
+  title String // e.g., "Red / Large"
+
+  price Decimal? @db.Decimal(10, 2)
+  image String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([productId, sku])
+}
+
+model Category {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  name     String
+  slug     String
+  parentId String?
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+}
+
+// Inventory tracking
+model Inventory {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  productId String  @unique
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  quantity      Int @default(0)
+  reserved      Int @default(0) // In pending orders
+  lowStockAlert Int @default(10)
+
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId])
+}
+
+// ============================================================================
+// E-COMMERCE: CUSTOMERS & CARTS
+// ============================================================================
+
+// Customers are store-specific
+// Email is unique PER STORE, not globally
+model Customer {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  email     String // NOT globally unique, unique per store
+  firstName String?
+  lastName  String?
+  phone     String?
+
+  // Address info
+  country String?
+  state   String?
+  city    String?
+  zipCode String?
+
+  orders Order[]
+  carts  Cart[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, email])
+  @@index([storeId])
+}
+
+model Cart {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Items stored as JSON for flexibility
+  items Json @default("[]") // [{ productId, variantId, quantity, price }]
+
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, customerId])
+  @@index([storeId])
+}
+
+// ============================================================================
+// E-COMMERCE: ORDERS
+// ============================================================================
+
+model Order {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  orderId    String // Store-specific order number (ORD-001, etc)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  // Pricing
+  subtotal Decimal @db.Decimal(12, 2)
+  tax      Decimal @default(0) @db.Decimal(12, 2)
+  shipping Decimal @default(0) @db.Decimal(12, 2)
+  discount Decimal @default(0) @db.Decimal(12, 2)
+  total    Decimal @db.Decimal(12, 2)
+
+  currency String @default("USD")
+
+  // Status
+  status        String @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+  paymentStatus String @default("UNPAID") // UNPAID, PAID, FAILED, REFUNDED
+
+  // Relations
+  items        OrderItem[]
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, orderId])
+  @@index([storeId])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity Int
+  price    Decimal @db.Decimal(10, 2)
+
+  @@index([orderId])
+}
+
+// ============================================================================
+// PAYMENTS & TRANSACTIONS
+// ============================================================================
+
+enum PaymentProvider {
+  STRIPE
+  RAZORPAY
+  CASHFREE
+  DODO
+}
+
+model StorePaymentConfig {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  provider PaymentProvider
+
+  // Encrypted secrets stored here
+  secretKeyEncrypted String
+  publicKeyEncrypted String?
+
+  isActive  Boolean @default(true)
+  isPrimary Boolean @default(false) // Default payment method
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, provider])
+  @@index([storeId])
+}
+
+model Transaction {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  // Provider reference
+  provider              PaymentProvider
+  providerTransactionId String
+
+  // Amount
+  amount   Decimal @db.Decimal(12, 2)
+  currency String
+
+  // Status
+  status       String // SUCCESS, FAILED, PENDING, REFUNDED
+  errorMessage String?
+
+  // Metadata
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  refund    Refund?
+
+  @@unique([provider, providerTransactionId])
+  @@index([storeId])
+  @@index([orderId])
+}
+
+model Refund {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  transactionId String      @unique
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+
+  amount Decimal @db.Decimal(12, 2)
+  reason String
+
+  status String @default("PENDING") // PENDING, COMPLETED, FAILED
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================================================
+// BLOGS
+// ============================================================================
+
+model Post {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  title   String
+  slug    String
+  excerpt String?
+  content String  @db.Text // Markdown or HTML
+
+  authorId String
+  author   StoreMembers @relation(fields: [authorId], references: [id])
+
+  categoryId String?
+  category   PostCategory? @relation(fields: [categoryId], references: [id])
+
+  featured Boolean @default(false)
+  image    String?
+
+  status      String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  publishedAt DateTime?
+
+  comments Comment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@index([authorId])
+}
+
+model PostCategory {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  name String
+  slug String
+
+  posts Post[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+}
+
+model Comment {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  parentId String?
+  parent   Comment?  @relation("CommentHierarchy", fields: [parentId], references: [id])
+  children Comment[] @relation("CommentHierarchy")
+
+  authorName  String
+  authorEmail String
+  content     String
+
+  approved Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+}
+
+// ============================================================================
+// INTEGRATIONS & SECRETS
+// ============================================================================
+
+model IntegrationSecret {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  key            String // STRIPE_SK, RAZORPAY_KEY, GMAIL_OAUTH, etc
+  valueEncrypted String // Encrypted with SECRETS_MASTER_KEY
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, key])
+  @@index([storeId])
+}
+
+// ============================================================================
+// STORE SETTINGS & FEATURES
+// ============================================================================
+
+model StoreSettings {
+  id      String @id @default(cuid())
+  storeId String @unique
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  // General
+  language String @default("en")
+  timezone String @default("UTC")
+  currency String @default("USD")
+
+  // Taxes
+  taxEnabled Boolean @default(false)
+  taxRate    Decimal @default(0) @db.Decimal(5, 2)
+
+  // Shipping
+  shippingEnabled       Boolean  @default(true)
+  freeShippingThreshold Decimal? @db.Decimal(10, 2)
+
+  // Theme
+  theme        String  @default("light") // light, dark, custom
+  primaryColor String?
+
+  updatedAt DateTime @updatedAt
+}
+
+model StoreFeatures {
+  id      String @id @default(cuid())
+  storeId String @unique
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  ecommerceEnabled    Boolean @default(true)
+  blogsEnabled        Boolean @default(false)
+  customDomainEnabled Boolean @default(false)
+  apiAccessEnabled    Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+}
+
+model CustomDomain {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  domain            String    @unique
+  verified          Boolean   @default(false)
+  verificationToken String?
+  verifiedAt        DateTime?
+
+  primary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([storeId])
+}
+
+model ApiKey {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  name   String
+  key    String @unique
+  secret String // Encrypted
+
+  permissions Json @default("{}") // {"orders:read": true, "products:write": false}
+
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([storeId])
+}
+
+// ============================================================================
+// AUDIT & LOGGING
+// ============================================================================
+
+model AuditLog {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  userId   String? // Who did it (null for system)
+  action   String // PRODUCT_CREATED, ORDER_UPDATED, etc
+  entity   String // Product, Order, etc
+  entityId String? // ID of affected entity
+
+  changes   Json? // Before/after values
+  ipAddress String?
+
+  createdAt DateTime @default(now())
+
+  @@index([storeId])
+  @@index([createdAt])
+}
+
+model SecretAccessLog {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  action    String // SECRET_ACCESSED, SECRET_CREATED, etc
+  secretKey String // STRIPE_SK, RAZORPAY_KEY, etc
+
+  actorType String // system, user
+  actorId   String?
+
+  status String // success, failed
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([storeId])
+  @@index([createdAt])
 }
