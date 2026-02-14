@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@saroh/database";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import {
@@ -14,14 +14,6 @@ import {
 } from "better-auth/plugins";
 import { sendPasswordResetEmail, sendVerificationEmail } from "./email";
 
-// prettier-ignore
-// Prisma 7 configuration
-const prismaConfig = {
-    datasourceUrl: process.env.DATABASE_URL,
-};
-
-const prisma = new PrismaClient(prismaConfig);
-
 export const auth = betterAuth({
     account: {
         accountLinking: {
@@ -29,10 +21,13 @@ export const auth = betterAuth({
         },
     },
     advanced: {
-        crossSubDomainCookies: {
-            enabled: true,
-            domain: ".saroh.in",
-        },
+        crossSubDomainCookies:
+            process.env.NODE_ENV === "production"
+                ? {
+                      enabled: true,
+                      domain: ".saroh.in",
+                  }
+                : { enabled: false },
     },
     database: prismaAdapter(prisma, {
         provider: "postgresql",

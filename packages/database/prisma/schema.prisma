@@ -105,7 +105,7 @@ model Store {
   settings      StoreSettings?
   features      StoreFeatures?
   customDomains CustomDomain[]
-  apiKeys       ApiKey[]
+  apiKeys       StoreApiKey[]
 
   // Audit
   auditLogs        AuditLog[]
@@ -574,7 +574,7 @@ model CustomDomain {
   @@index([storeId])
 }
 
-model ApiKey {
+model StoreApiKey {
   id      String @id @default(cuid())
   storeId String
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -591,6 +591,7 @@ model ApiKey {
   createdAt DateTime @default(now())
 
   @@index([storeId])
+  @@map("ApiKey")
 }
 
 // ============================================================================

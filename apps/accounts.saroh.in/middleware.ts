@@ -1,53 +1,60 @@
-// import { nextAuthInstance } from "@saroh/auth/auth";
-// import { NextResponse } from "next/server";
-// const { auth } = nextAuthInstance;
-// export default auth(async function (req) {
-//     // Your custom middleware logic goes here
-//     const { nextUrl } = req;
-//     const isLoggedIn = !!req.auth;
-//     const protectedRoutes = ["/", "/apps"];
-//     console.log(nextUrl.pathname);
-//     const path = nextUrl.pathname;
+import { getSessionCookie } from "better-auth/cookies";
+import { NextRequest, NextResponse } from "next/server";
 
-//     const authRoutes = ["/login"];
-//     const isProtectedRoute = protectedRoutes.includes(nextUrl.pathname);
-//     const isAuthRoute = authRoutes.includes(nextUrl.pathname);
-//     if (isAuthRoute) {
-//         if (isLoggedIn) {
-//             return NextResponse.redirect(new URL("/apps", nextUrl));
-//         }
-//         return;
-//     }
-//     if (isProtectedRoute) {
-//         if (isLoggedIn) {
-//             if (path === "/apps") {
-//                 return;
-//             }
-//             return NextResponse.redirect(new URL("/apps", nextUrl));
-//         }
-//         if (!isLoggedIn) {
-//             return NextResponse.redirect(new URL("/login", nextUrl));
-//         }
-//         return;
-//     }
+const protectedRoutes = new Set(["/apps", "/"]);
+const authRoutePrefixes = [
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+];
 
-//     if (!isLoggedIn) {
-//         return NextResponse.redirect(new URL("/login", nextUrl));
-//     }
-//     return;
-// });
-// export const config = {
-//     matcher: [
-//         /*
-//          * Match all paths except for:
-//          * 1. /api routes
-//          * 2. /_next (Next.js internals)
-//          * 3. /_static (inside /public)
-//          * 4. all root files inside /public (e.g. /favicon.ico)
-//          */
-//         "/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)",
-//     ],
-// };
+async function getSession(req: NextRequest) {
+    const cookie = req.headers.get("cookie") ?? "";
+    if (!cookie) return null;
+
+    const sessionUrl = new URL("/api/auth/get-session", req.url);
+    const response = await fetch(sessionUrl, {
+        method: "GET",
+        headers: { cookie },
+        cache: "no-store",
+    });
+
+    if (!response.ok) return null;
+    return (await response.json()) as { user?: unknown } | null;
+}
+
+export async function middleware(req: NextRequest) {
+    const { nextUrl } = req;
+    const sessionCookie = getSessionCookie(req);
+
+    const res = NextResponse.next();
+
+    const isLoggedIn = !!sessionCookie;
+    const isOnProtectedRoute = protectedRoutes.has(nextUrl.pathname);
+    const isOnAuthRoute = authRoutePrefixes.some((p) =>
+        nextUrl.pathname.startsWith(p),
+    );
+
+    if (isOnAuthRoute && sessionCookie) {
+        const session = await getSession(req);
+        if (session?.user) {
+            return NextResponse.redirect(new URL("/apps", req.url));
+        }
+    }
+
+    if (isOnProtectedRoute && !isLoggedIn) {
+        return NextResponse.redirect(new URL("/login", req.url));
+    }
+
+    return res;
+}
+
+export const config = {
+    matcher: [
+        "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    ],
+};
 import { getSessionCookie } from "better-auth/cookies";
 import { NextRequest, NextResponse } from "next/server";
 
