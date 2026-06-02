@@ -1,3 +1,4 @@
+import { AuthStatus } from "@saroh/auth/auth-status";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -16,7 +17,12 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={inter.className}>{children}</body>
+            <body className={inter.className}>
+                <header className="flex items-center justify-end border-b px-6 py-3">
+                    <AuthStatus />
+                </header>
+                {children}
+            </body>
         </html>
     );
 }

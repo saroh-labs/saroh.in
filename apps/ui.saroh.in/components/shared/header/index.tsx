@@ -1,3 +1,4 @@
+import { AuthStatus } from "@saroh/auth/auth-status";
 import Link from "next/link";
 import { SiGithub } from "react-icons/si";
 export default function Header() {
@@ -21,7 +22,8 @@ export default function Header() {
                         </Link>
                     ))}
                 </div>
-                <div>
+                <div className="flex items-center gap-4">
+                    <AuthStatus />
                     <Link
                         href="https://github.com/himohitmehta/saroh.io"
                         target="_blank"

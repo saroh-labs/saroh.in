@@ -881,6 +881,9 @@ importers:
 
   apps/templates.saroh.in:
     dependencies:
+      '@saroh/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       next:
         specifier: catalog:next16
         version: 16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -921,6 +924,9 @@ importers:
 
   apps/ui.saroh.in:
     dependencies:
+      '@saroh/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@saroh/charts':
         specifier: workspace:*
         version: link:../../packages/charts

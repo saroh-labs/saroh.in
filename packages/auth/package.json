@@ -68,6 +68,7 @@
             "require": "./dist/server.js"
         },
         "./client": "./src/client.ts",
+        "./auth-status": "./src/auth-status.tsx",
         "./middleware": "./src/middleware.ts",
         "./next": "./src/next.ts"
     }

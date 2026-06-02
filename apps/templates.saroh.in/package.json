@@ -9,6 +9,7 @@
         "lint": "next lint"
     },
     "dependencies": {
+        "@saroh/auth": "workspace:*",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
         "next": "catalog:next16"

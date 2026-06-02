@@ -9,6 +9,7 @@
         "lint": "next lint"
     },
     "dependencies": {
+        "@saroh/auth": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@saroh/charts": "workspace:*",
         "react-icons":"catalog:",
