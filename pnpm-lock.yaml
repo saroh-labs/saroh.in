@@ -211,6 +211,15 @@ importers:
 
   apps/admin.saroh.in:
     dependencies:
+      '@prisma/nextjs-monorepo-workaround-plugin':
+        specifier: catalog:prisma
+        version: 7.4.0
+      '@saroh/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@saroh/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       next:
         specifier: catalog:next16
         version: 16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

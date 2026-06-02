@@ -9,6 +9,9 @@
         "lint": "next lint"
     },
     "dependencies": {
+        "@prisma/nextjs-monorepo-workaround-plugin": "catalog:prisma",
+        "@saroh/auth": "workspace:*",
+        "@saroh/database": "workspace:*",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
         "next": "catalog:next16"
