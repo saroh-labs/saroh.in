@@ -9,7 +9,6 @@
         "lint": "next lint"
     },
     "dependencies": {
-        "@prisma/nextjs-monorepo-workaround-plugin": "catalog:prisma",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",

@@ -1,16 +1,11 @@
 /** @type {import('next').NextConfig} */
-const { PrismaPlugin } = require("@prisma/nextjs-monorepo-workaround-plugin");
-
 const nextConfig = {
 	transpilePackages: ["@saroh/auth", "@saroh/ui"],
+	// Prisma 7 uses the @prisma/adapter-pg driver adapter (no binary query
+	// engine), so the old webpack @prisma/nextjs-monorepo-workaround-plugin is
+	// unnecessary — externalizing the packages is enough, and lets the default
+	// Turbopack build work.
 	serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "prisma"],
-	webpack: (config, { isServer }) => {
-		if (isServer) {
-			config.plugins = [...config.plugins, new PrismaPlugin()];
-		}
-
-		return config;
-	},
 	reactStrictMode: false,
 	images: {
 		domains: [

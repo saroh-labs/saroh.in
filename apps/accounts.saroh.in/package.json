@@ -12,7 +12,6 @@
     },
     "dependencies": {
         "@prisma/client": "catalog:prisma",
-        "@prisma/nextjs-monorepo-workaround-plugin": "catalog:prisma",
         "@react-email/components": "^1.0.12",
         "@saroh/auth": "workspace:*",
         "@saroh/emails": "workspace:*",

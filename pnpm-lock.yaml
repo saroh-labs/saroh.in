@@ -62,9 +62,6 @@ catalogs:
     '@prisma/client':
       specifier: 7.4.0
       version: 7.4.0
-    '@prisma/nextjs-monorepo-workaround-plugin':
-      specifier: 7.4.0
-      version: 7.4.0
     prisma:
       specifier: 7.4.0
       version: 7.4.0
@@ -132,9 +129,6 @@ importers:
       '@prisma/client':
         specifier: catalog:prisma
         version: 7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
-      '@prisma/nextjs-monorepo-workaround-plugin':
-        specifier: catalog:prisma
-        version: 7.4.0
       '@react-email/components':
         specifier: ^1.0.12
         version: 1.0.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -211,9 +205,6 @@ importers:
 
   apps/admin.saroh.in:
     dependencies:
-      '@prisma/nextjs-monorepo-workaround-plugin':
-        specifier: catalog:prisma
-        version: 7.4.0
       '@saroh/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -363,9 +354,6 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.71.1(react@19.2.6))
-      '@prisma/nextjs-monorepo-workaround-plugin':
-        specifier: catalog:prisma
-        version: 7.4.0
       '@radix-ui/react-accordion':
         specifier: ^1.2.12
         version: 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -663,9 +651,6 @@ importers:
       '@prisma/client':
         specifier: catalog:prisma
         version: 7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3))(typescript@5.9.3)
-      '@prisma/nextjs-monorepo-workaround-plugin':
-        specifier: catalog:prisma
-        version: 7.4.0
       '@radix-ui/react-avatar':
         specifier: ^1.1.11
         version: 1.1.11(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -778,9 +763,6 @@ importers:
 
   apps/sites.saroh.in:
     dependencies:
-      '@prisma/nextjs-monorepo-workaround-plugin':
-        specifier: catalog:prisma
-        version: 7.4.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -3358,9 +3340,6 @@ packages:
 
   '@prisma/get-platform@7.8.0':
     resolution: {integrity: sha512-WlxgRGnolL8VH2EmkH1R/DkKNr/mVdS3G2h42IZFFZ3eUrH9OT6t73kIOSlkkrv50wG123Iq8d96ufv5LlZktw==}
-
-  '@prisma/nextjs-monorepo-workaround-plugin@7.4.0':
-    resolution: {integrity: sha512-OFEnv3buKl7rSwhQgeUhKLTJIksAPL1oPsRV8uDAWskQwjRSR1fLxcFn6DkpQOWH1STShD7NiubEhWuVIBBbBg==}
 
   '@prisma/query-plan-executor@7.2.0':
     resolution: {integrity: sha512-EOZmNzcV8uJ0mae3DhTsiHgoNCuu1J9mULQpGCh62zN3PxPTd+qI9tJvk5jOst8WHKQNwJWR3b39t0XvfBB0WQ==}
@@ -12956,8 +12935,6 @@ snapshots:
     dependencies:
       '@prisma/debug': 7.8.0
     optional: true
-
-  '@prisma/nextjs-monorepo-workaround-plugin@7.4.0': {}
 
   '@prisma/query-plan-executor@7.2.0': {}
 
