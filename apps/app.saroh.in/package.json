@@ -7,6 +7,7 @@
         "build": "next build",
         "start": "next start",
         "lint": "next lint",
+        "test": "vitest run",
         "postinstall": "prisma generate --schema=../../packages/database/prisma/schema.prisma"
     },
     "dependencies": {
@@ -80,6 +81,7 @@
         "prisma": "catalog:prisma",
         "tailwindcss": "catalog:",
         "tailwindcss-animate": "^1.0.7",
-        "typescript": "catalog:"
+        "typescript": "catalog:",
+        "vitest": "^3.2.4"
     }
 }
