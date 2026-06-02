@@ -2,7 +2,7 @@
 
 import { authClient } from "@saroh/auth/client";
 
-import { accountsLoginUrl } from "@/lib/session";
+import { accountsLoginUrl } from "@/lib/accounts";
 
 export function SignOutButton() {
     return (

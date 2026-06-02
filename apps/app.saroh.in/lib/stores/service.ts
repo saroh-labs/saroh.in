@@ -5,7 +5,13 @@ import {
     type StoreResult,
     updateStoreSchema,
 } from "./schema";
-import { isSlugAvailable, slugify } from "./slug";
+import { slugify } from "./slug";
+
+/** Store slugs are globally unique (Store.slug @unique). Server-only. */
+async function isSlugAvailable(slug: string): Promise<boolean> {
+    const existing = await prisma.store.findUnique({ where: { slug } });
+    return !existing;
+}
 
 /**
  * Store data layer. These take an explicit `userId` (resolved from the
