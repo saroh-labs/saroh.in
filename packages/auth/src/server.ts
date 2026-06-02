@@ -18,7 +18,9 @@ export interface CreateAuthOptions {
     sendResetPassword?: EmailSender;
 }
 
-function trustedOrigins(): string[] {
+/** The trusted `*.saroh.in` origins, shared by the betterAuth config and
+ *  api.saroh.in's CSRF origin check so the two never drift. */
+export function getTrustedOrigins(): string[] {
     const fromEnv = process.env.BETTER_AUTH_TRUSTED_ORIGINS;
     if (fromEnv) {
         return fromEnv
@@ -56,7 +58,7 @@ export function createAuth(opts: CreateAuthOptions = {}) {
     return betterAuth({
         secret,
         baseURL: process.env.BETTER_AUTH_URL,
-        trustedOrigins: trustedOrigins(),
+        trustedOrigins: getTrustedOrigins(),
         database: prismaAdapter(prisma, {
             provider: "postgresql",
         }),

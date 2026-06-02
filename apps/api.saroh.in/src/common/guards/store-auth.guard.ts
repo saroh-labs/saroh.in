@@ -18,15 +18,16 @@ export class StoreAccessGuard implements CanActivate {
             throw new ForbiddenException("x-store-id header is required");
         }
 
-        // Verify user exists (set by AuthGuard)
+        // Verify user exists (set by BetterAuthGuard)
         if (!request.user) {
             throw new ForbiddenException("User context not available");
         }
 
-        // Set store context on request
+        // Set store context on request. role/permissions arrive with the M2
+        // admin/organization plugins; default to a plain customer until then.
         const storeContext: StoreContext = {
             storeId: storeId as string,
-            userId: request.user.sub,
+            userId: request.user.id,
             role: request.user.role || "customer",
             permissions: request.user.permissions || [],
         };

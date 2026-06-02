@@ -12,7 +12,7 @@ import {
 import { IsOptional, IsString } from "class-validator";
 
 import { Store } from "../../common/decorators/store.decorator";
-import { AuthGuard } from "../../common/guards/auth.guard";
+import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { StoreAccessGuard } from "../../common/guards/store-auth.guard";
 import type { StoreContext } from "../../common/types/store-context";
 import { StoresService } from "./stores.service";
@@ -41,7 +41,7 @@ export class StoresController {
     constructor(private readonly storesService: StoresService) {}
 
     @Get(":id")
-    @UseGuards(AuthGuard, StoreAccessGuard)
+    @UseGuards(BetterAuthGuard, StoreAccessGuard)
     async getStore(
         @Param("id") id: string,
         @Store() storeContext: StoreContext,
@@ -58,14 +58,14 @@ export class StoresController {
     }
 
     @Get()
-    @UseGuards(AuthGuard)
+    @UseGuards(BetterAuthGuard)
     async getStores() {
         // TODO: Extract userId from request or JWT payload
         return this.storesService.getStoresByUser("user-id");
     }
 
     @Post()
-    @UseGuards(AuthGuard)
+    @UseGuards(BetterAuthGuard)
     @HttpCode(201)
     async createStore(@Body() createStoreDto: CreateStoreDto) {
         // TODO: Extract userId from JWT payload
@@ -73,7 +73,7 @@ export class StoresController {
     }
 
     @Put(":id")
-    @UseGuards(AuthGuard, StoreAccessGuard)
+    @UseGuards(BetterAuthGuard, StoreAccessGuard)
     async updateStore(
         @Param("id") id: string,
         @Body() updateStoreDto: UpdateStoreDto,
@@ -91,7 +91,7 @@ export class StoresController {
     }
 
     @Delete(":id")
-    @UseGuards(AuthGuard, StoreAccessGuard)
+    @UseGuards(BetterAuthGuard, StoreAccessGuard)
     @HttpCode(204)
     async deleteStore(
         @Param("id") id: string,

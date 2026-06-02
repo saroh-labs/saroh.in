@@ -1,7 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
-import { AuthModule } from "./modules/auth/auth.module";
 import { HealthModule } from "./modules/health/health.module";
 import { StoresModule } from "./modules/stores/stores.module";
 
@@ -12,7 +11,6 @@ import { StoresModule } from "./modules/stores/stores.module";
             envFilePath: [".env.local", ".env"],
         }),
         HealthModule,
-        AuthModule,
         StoresModule,
     ],
     controllers: [],
