@@ -3,6 +3,9 @@ import { PrismaPlugin } from "@prisma/nextjs-monorepo-workaround-plugin";
 
 const nextConfig = {
     turbopack: {}, // Silence webpack/turbopack config warning
+    // @saroh/auth/client ships as source (sidesteps a bundled-dts portability
+    // issue) so Next must transpile it, like the other workspace UI packages.
+    transpilePackages: ["@saroh/auth"],
     serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "prisma"],
     webpack: (config, { isServer }) => {
         if (isServer) {

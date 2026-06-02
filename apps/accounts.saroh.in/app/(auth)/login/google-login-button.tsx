@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { authClient } from "@/lib/auth.client";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SiGoogle } from "react-icons/si";
@@ -24,7 +24,10 @@ export default function GoogleLoginButton() {
             disabled={loading}
             onClick={() => {
                 setLoading(true);
-                signIn("google");
+                authClient.signIn.social({
+                    provider: "google",
+                    callbackURL: "/apps",
+                });
             }}
             className={`${
                 loading
