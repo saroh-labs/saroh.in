@@ -159,9 +159,6 @@ importers:
       next:
         specifier: catalog:next16
         version: 16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      next-auth:
-        specifier: 'catalog:'
-        version: 5.0.0-beta.19(next@16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@8.0.10)(react@19.2.4)
       nodemailer:
         specifier: ^8.0.10
         version: 8.0.10
@@ -201,10 +198,10 @@ importers:
         version: 10.4.24(postcss@8.5.6)
       eslint:
         specifier: 'catalog:'
-        version: 10.0.0(jiti@1.21.7)
+        version: 10.0.0(jiti@2.7.0)
       eslint-config-next:
         specifier: 'catalog:'
-        version: 16.1.6(eslint@10.0.0(jiti@1.21.7))(typescript@5.9.3)
+        version: 16.1.6(eslint@10.0.0(jiti@2.7.0))(typescript@5.9.3)
       postcss:
         specifier: 'catalog:'
         version: 8.5.6
@@ -244,10 +241,10 @@ importers:
         version: 19.2.3(@types/react@19.2.14)
       eslint:
         specifier: 'catalog:'
-        version: 10.0.0(jiti@2.7.0)
+        version: 10.0.0(jiti@1.21.7)
       eslint-config-next:
         specifier: 'catalog:'
-        version: 16.1.6(eslint@10.0.0(jiti@2.7.0))(typescript@5.9.3)
+        version: 16.1.6(eslint@10.0.0(jiti@1.21.7))(typescript@5.9.3)
       postcss:
         specifier: 'catalog:'
         version: 8.5.6
@@ -692,7 +689,7 @@ importers:
         version: 16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       next-auth:
         specifier: 'catalog:'
-        version: 5.0.0-beta.19(next@16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@8.0.10)(react@19.2.4)
+        version: 5.0.0-beta.19(next@16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)
       react:
         specifier: catalog:react19
         version: 19.2.4
@@ -759,7 +756,7 @@ importers:
         version: link:../../packages/ui
       next:
         specifier: ^16.2.6
-        version: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       nextra:
         specifier: ^4.6.1
         version: 4.6.1(next@16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
@@ -854,7 +851,7 @@ importers:
         version: link:../../packages/ui
       next:
         specifier: ^16.2.6
-        version: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       nextra:
         specifier: ^4.6.1
         version: 4.6.1(next@16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
@@ -942,7 +939,7 @@ importers:
         version: 1.4.4
       next:
         specifier: ^16.2.6
-        version: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        version: 16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -11386,7 +11383,7 @@ snapshots:
       package-manager-detector: 1.6.0
       tinyexec: 1.2.3
 
-  '@auth/core@0.32.0(nodemailer@8.0.10)':
+  '@auth/core@0.32.0':
     dependencies:
       '@panva/hkdf': 1.2.1
       '@types/cookie': 0.6.0
@@ -11395,8 +11392,6 @@ snapshots:
       oauth4webapi: 2.17.0
       preact: 10.11.3
       preact-render-to-string: 5.2.3(preact@10.11.3)
-    optionalDependencies:
-      nodemailer: 8.0.10
 
   '@auth/core@0.41.1':
     dependencies:
@@ -18548,7 +18543,7 @@ snapshots:
       '@next/eslint-plugin-next': 16.1.6
       eslint: 10.0.0(jiti@1.21.7)
       eslint-import-resolver-node: 0.3.10
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@10.0.0(jiti@1.21.7))
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@10.0.0(jiti@1.21.7)))(eslint@10.0.0(jiti@1.21.7))
       eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@10.0.0(jiti@1.21.7))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@10.0.0(jiti@1.21.7))
       eslint-plugin-react: 7.37.5(eslint@10.0.0(jiti@1.21.7))
@@ -18614,7 +18609,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@10.0.0(jiti@1.21.7)):
+  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@10.0.0(jiti@1.21.7)))(eslint@10.0.0(jiti@1.21.7)):
     dependencies:
       '@nolyfill/is-core-module': 1.0.39
       debug: 4.4.3
@@ -18665,13 +18660,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-module-utils@2.13.0(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@10.0.0(jiti@1.21.7)))(eslint@10.0.0(jiti@1.21.7)):
+  eslint-module-utils@2.13.0(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@10.0.0(jiti@1.21.7)))(eslint@10.0.0(jiti@1.21.7)))(eslint@10.0.0(jiti@1.21.7)):
     dependencies:
       debug: 3.2.7
     optionalDependencies:
       eslint: 10.0.0(jiti@1.21.7)
       eslint-import-resolver-node: 0.3.10
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@10.0.0(jiti@1.21.7))
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@10.0.0(jiti@1.21.7)))(eslint@10.0.0(jiti@1.21.7))
     transitivePeerDependencies:
       - supports-color
 
@@ -18760,7 +18755,7 @@ snapshots:
       doctrine: 2.1.0
       eslint: 10.0.0(jiti@1.21.7)
       eslint-import-resolver-node: 0.3.10
-      eslint-module-utils: 2.13.0(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@10.0.0(jiti@1.21.7)))(eslint@10.0.0(jiti@1.21.7))
+      eslint-module-utils: 2.13.0(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@10.0.0(jiti@1.21.7)))(eslint@10.0.0(jiti@1.21.7)))(eslint@10.0.0(jiti@1.21.7))
       hasown: 2.0.4
       is-core-module: 2.16.2
       is-glob: 4.0.3
@@ -21405,13 +21400,11 @@ snapshots:
       react-dom: 19.2.6(react@19.2.6)
       uuid: 8.3.2
 
-  next-auth@5.0.0-beta.19(next@16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@8.0.10)(react@19.2.4):
+  next-auth@5.0.0-beta.19(next@16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4):
     dependencies:
-      '@auth/core': 0.32.0(nodemailer@8.0.10)
+      '@auth/core': 0.32.0
       next: 16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
-    optionalDependencies:
-      nodemailer: 8.0.10
 
   next-mdx-remote@6.0.0(@types/react@19.2.14)(react@19.2.4):
     dependencies:
@@ -21527,6 +21520,7 @@ snapshots:
     transitivePeerDependencies:
       - '@babel/core'
       - babel-plugin-macros
+    optional: true
 
   next@16.2.6(react-dom@19.2.6(react@19.2.4))(react@19.2.4):
     dependencies:
@@ -21553,11 +21547,35 @@ snapshots:
       - babel-plugin-macros
     optional: true
 
+  next@16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+    dependencies:
+      '@next/env': 16.2.6
+      '@swc/helpers': 0.5.15
+      baseline-browser-mapping: 2.10.32
+      caniuse-lite: 1.0.30001793
+      postcss: 8.4.31
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
+      styled-jsx: 5.1.6(react@19.2.6)
+    optionalDependencies:
+      '@next/swc-darwin-arm64': 16.2.6
+      '@next/swc-darwin-x64': 16.2.6
+      '@next/swc-linux-arm64-gnu': 16.2.6
+      '@next/swc-linux-arm64-musl': 16.2.6
+      '@next/swc-linux-x64-gnu': 16.2.6
+      '@next/swc-linux-x64-musl': 16.2.6
+      '@next/swc-win32-arm64-msvc': 16.2.6
+      '@next/swc-win32-x64-msvc': 16.2.6
+      sharp: 0.34.5
+    transitivePeerDependencies:
+      - '@babel/core'
+      - babel-plugin-macros
+
   nextra-theme-docs@4.6.1(@types/react@19.2.14)(next@16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(nextra@4.6.1(next@16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(use-sync-external-store@1.6.0(react@19.2.6)):
     dependencies:
       '@headlessui/react': 2.2.10(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       clsx: 2.1.1
-      next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      next: 16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       next-themes: 0.4.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       nextra: 4.6.1(next@16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       react: 19.2.6
@@ -21592,7 +21610,7 @@ snapshots:
       mdast-util-gfm: 3.1.0
       mdast-util-to-hast: 13.2.1
       negotiator: 1.0.0
-      next: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      next: 16.2.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react: 19.2.6
       react-compiler-runtime: 19.1.0-rc.3(react@19.2.6)
       react-dom: 19.2.6(react@19.2.6)
@@ -23522,6 +23540,11 @@ snapshots:
     dependencies:
       client-only: 0.0.1
       react: 19.2.4
+
+  styled-jsx@5.1.6(react@19.2.6):
+    dependencies:
+      client-only: 0.0.1
+      react: 19.2.6
 
   stylis@4.4.0: {}
 

@@ -19,7 +19,6 @@
         "@saroh/ui": "workspace:*",
         "better-auth": "^1.6.11",
         "next": "catalog:next16",
-        "next-auth": "catalog:",
         "nodemailer": "^8.0.10",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
