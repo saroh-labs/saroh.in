@@ -48,3 +48,5 @@ internal-decision-docs
 dist
 
 .eslintcache
+# parallel subagent worktrees
+.claude/worktrees/
