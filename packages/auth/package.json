@@ -14,6 +14,7 @@
         "build": "tsup",
         "lint": "eslint src/",
         "dev": "tsup --watch",
+        "test": "vitest run",
         "check-types": "tsc --noEmit"
     },
     "dependencies": {
@@ -21,16 +22,21 @@
         "better-auth": "^1.6.11",
         "react": "catalog:react19"
     },
+    "peerDependencies": {
+        "next": "catalog:next16"
+    },
     "devDependencies": {
         "@saroh/tsconfig": "workspace:*",
         "@types/node": "catalog:",
         "@types/react": "catalog:react19",
+        "next": "catalog:next16",
         "eslint": "catalog:",
         "prisma": "catalog:prisma",
         "rimraf": "^6.1.3",
         "tsup": "^8.5.1",
         "tsx": "^4.22.3",
-        "typescript": "catalog:"
+        "typescript": "catalog:",
+        "vitest": "^3.2.4"
     },
     "author": "Mohit Mehta <himohitmehta>",
     "homepage": "https://saroh.in",
@@ -61,6 +67,8 @@
             "import": "./dist/server.mjs",
             "require": "./dist/server.js"
         },
-        "./client": "./src/client.ts"
+        "./client": "./src/client.ts",
+        "./middleware": "./src/middleware.ts",
+        "./next": "./src/next.ts"
     }
 }

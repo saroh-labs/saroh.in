@@ -2,6 +2,11 @@ import { prisma } from "@saroh/database";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 
+import { getTrustedOrigins } from "./origins";
+
+// Re-export so existing consumers (api) keep importing it from @saroh/auth.
+export { getTrustedOrigins, isTrustedOrigin } from "./origins";
+
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 /** Email delivery is injected by the consuming app (accounts sends real
@@ -16,30 +21,6 @@ type EmailSender = (args: {
 export interface CreateAuthOptions {
     sendVerificationEmail?: EmailSender;
     sendResetPassword?: EmailSender;
-}
-
-/** The trusted `*.saroh.in` origins, shared by the betterAuth config and
- *  api.saroh.in's CSRF origin check so the two never drift. */
-export function getTrustedOrigins(): string[] {
-    const fromEnv = process.env.BETTER_AUTH_TRUSTED_ORIGINS;
-    if (fromEnv) {
-        return fromEnv
-            .split(",")
-            .map((o) => o.trim())
-            .filter(Boolean);
-    }
-    return [
-        "https://accounts.saroh.in",
-        "https://api.saroh.in",
-        "https://app.saroh.in",
-        "https://admin.saroh.in",
-        "https://sites.saroh.in",
-        "https://templates.saroh.in",
-        "https://docs.saroh.in",
-        "https://help.saroh.in",
-        "https://ui.saroh.in",
-        "https://saroh.in",
-    ];
 }
 
 /**
