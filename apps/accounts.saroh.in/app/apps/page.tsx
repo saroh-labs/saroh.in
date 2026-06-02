@@ -10,34 +10,14 @@ const apps = [
         prodUrl: "https://admin.saroh.in",
     },
     {
-        name: "AI",
-        devUrl: "http://localhost:3002",
-        prodUrl: "https://ai.saroh.in",
-    },
-    {
         name: "Application",
         devUrl: "http://localhost:3003",
-        prodUrl: "https://application.saroh.in",
-    },
-    {
-        name: "Chatbot",
-        devUrl: "http://localhost:3004",
-        prodUrl: "https://chatbot.saroh.in",
-    },
-    {
-        name: "Dashboard",
-        devUrl: "http://localhost:3005",
-        prodUrl: "https://dashboard.saroh.in",
+        prodUrl: "https://app.saroh.in",
     },
     {
         name: "Docs",
         devUrl: "http://localhost:3006",
         prodUrl: "https://docs.saroh.in",
-    },
-    {
-        name: "Email",
-        devUrl: "http://localhost:3007",
-        prodUrl: "https://email.saroh.in",
     },
     {
         name: "Sites",

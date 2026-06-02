@@ -8,7 +8,7 @@
         "db:seed": "turbo run db:seed",
         "dev": "turbo run dev --concurrency 100",
         "dev:api-auth": "turbo run dev --filter=@saroh/api --filter=auth",
-        "dev:dashboard": "turbo run dev --filter=sites --filter=dashboard --filter=auth --filter=admin",
+        "dev:apps": "turbo run dev --filter=auth --filter=admin --filter=sites",
         "lint": "turbo run lint",
         "format": "prettier --write \"**/*.{js,jsx,ts,tsx,md}\""
     },

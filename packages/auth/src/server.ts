@@ -32,9 +32,13 @@ export function getTrustedOrigins(): string[] {
         "https://accounts.saroh.in",
         "https://api.saroh.in",
         "https://app.saroh.in",
-        "https://dashboard.saroh.in",
-        "https://sites.saroh.in",
         "https://admin.saroh.in",
+        "https://sites.saroh.in",
+        "https://templates.saroh.in",
+        "https://docs.saroh.in",
+        "https://help.saroh.in",
+        "https://ui.saroh.in",
+        "https://saroh.in",
     ];
 }
 
