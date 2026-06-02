@@ -52,8 +52,8 @@ function ResetPasswordFormInner() {
                 <CardHeader>
                     <CardTitle className="text-2xl">Link expired</CardTitle>
                     <CardDescription>
-                        This reset link is invalid or has expired. Request a
-                        new one.
+                        This reset link is invalid or has expired. Request a new
+                        one.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -76,13 +76,17 @@ function ResetPasswordFormInner() {
             setError("Password must be at least 8 characters");
             return;
         }
+        if (!token) {
+            setError("This reset link is missing a token.");
+            return;
+        }
         setIsLoading(true);
         const { error: err } = await resetPassword(
             { newPassword, token },
             {
                 onError: (ctx) =>
                     setError(ctx.error?.message ?? "Reset failed"),
-            }
+            },
         );
         setIsLoading(false);
         if (err) return;
@@ -119,7 +123,7 @@ function ResetPasswordFormInner() {
             <CardContent>
                 <form onSubmit={handleSubmit} className="grid gap-4">
                     {error && (
-                        <p className="text-sm text-destructive">{error}</p>
+                        <p className="text-destructive text-sm">{error}</p>
                     )}
                     <div className="grid gap-2">
                         <Label htmlFor="newPassword">New password</Label>
@@ -143,9 +147,7 @@ function ResetPasswordFormInner() {
                             type="password"
                             placeholder="Repeat password"
                             value={confirmPassword}
-                            onChange={(e) =>
-                                setConfirmPassword(e.target.value)
-                            }
+                            onChange={(e) => setConfirmPassword(e.target.value)}
                             required
                             minLength={8}
                             disabled={isLoading}
