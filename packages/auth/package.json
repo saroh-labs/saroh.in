@@ -24,16 +24,16 @@
         "react-dom": "catalog:react19"
     },
     "devDependencies": {
+        "@saroh/tsconfig": "workspace:*",
         "@types/node": "catalog:",
-        "config": "^3.3.11",
         "@types/react": "catalog:react19",
         "@types/react-dom": "catalog:react19",
+        "config": "^4.4.1",
         "eslint": "catalog:",
         "prisma": "catalog:prisma",
-        "rimraf": "^5.0.7",
-        "@saroh/tsconfig": "workspace:*",
-        "tsup": "^8.0.2",
-        "tsx": "^4.10.5",
+        "rimraf": "^6.1.3",
+        "tsup": "^8.5.1",
+        "tsx": "^4.22.3",
         "typescript": "catalog:"
     },
     "author": "Mohit Mehta <himohitmehta>",

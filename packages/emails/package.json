@@ -14,9 +14,9 @@
     "author": "",
     "license": "ISC",
     "dependencies": {
-        "@react-email/components": "^0.0.19",
-        "@types/nodemailer": "^6.4.15",
-        "nodemailer": "^6.9.13",
-        "react-email": "^2.1.4"
+        "@react-email/components": "^1.0.12",
+        "@types/nodemailer": "^8.0.0",
+        "nodemailer": "^8.0.10",
+        "react-email": "^6.5.0"
     }
 }

@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
-import { PrismaPlugin } from '@prisma/nextjs-monorepo-workaround-plugin';
+import { PrismaPlugin } from "@prisma/nextjs-monorepo-workaround-plugin";
 
 const nextConfig = {
+    turbopack: {}, // Silence webpack/turbopack config warning
     serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "prisma"],
     webpack: (config, { isServer }) => {
         if (isServer) {

@@ -9,19 +9,19 @@
         "lint": "next lint"
     },
     "dependencies": {
-        "@react-email/components": "^0.0.19",
+        "@react-email/components": "^1.0.12",
         "next": "catalog:next16",
-        "nodemailer": "^6.9.13",
+        "nodemailer": "^8.0.10",
         "react": "catalog:react19",
         "react-dom": "catalog:react19"
     },
     "devDependencies": {
-        "@types/nodemailer": "^6.4.15",
         "@saroh/emails": "workspace:*",
+        "@saroh/eslint-config": "workspace:*",
         "@types/node": "catalog:",
+        "@types/nodemailer": "^8.0.0",
         "@types/react": "catalog:react19",
         "@types/react-dom": "catalog:react19",
-        "@saroh/eslint-config": "workspace:*",
         "eslint": "catalog:",
         "eslint-config-next": "catalog:",
         "postcss": "catalog:",

@@ -24,7 +24,7 @@ async function getSession(req: NextRequest) {
     return (await response.json()) as { user?: unknown } | null;
 }
 
-export async function middleware(req: NextRequest) {
+export default async function proxy(req: NextRequest) {
     const { nextUrl } = req;
     const sessionCookie = getSessionCookie(req);
 
@@ -45,37 +45,6 @@ export async function middleware(req: NextRequest) {
 
     if (isOnProtectedRoute && !isLoggedIn) {
         return NextResponse.redirect(new URL("/login", req.url));
-    }
-
-    return res;
-}
-
-export const config = {
-    matcher: [
-        "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
-    ],
-};
-import { getSessionCookie } from "better-auth/cookies";
-import { NextRequest, NextResponse } from "next/server";
-
-const protectedRoutes = ["/apps", "/"];
-export async function middleware(req: NextRequest) {
-    const { nextUrl } = req;
-    const sessionCookie = getSessionCookie(req);
-
-    const res = NextResponse.next();
-
-    const isLoggedIn = !!sessionCookie;
-    const isOnProtectedRoute = protectedRoutes.includes(nextUrl.pathname);
-    const authRoutePrefixes = ["/login", "/signup", "/forgot-password", "/reset-password"];
-    const isOnAuthRoute = authRoutePrefixes.some((p) => nextUrl.pathname.startsWith(p));
-
-    if (isOnProtectedRoute && !isLoggedIn) {
-        return NextResponse.redirect(new URL("/login", req.url));
-    }
-
-    if (isOnAuthRoute && isLoggedIn) {
-        return NextResponse.redirect(new URL("/apps", req.url));
     }
 
     return res;

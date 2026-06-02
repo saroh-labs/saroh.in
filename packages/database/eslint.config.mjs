@@ -1,1 +1,1 @@
-export { default } from "config/eslint-preset";
+export { default } from "@saroh/eslint-config/base";

@@ -38,6 +38,9 @@ yarn-error.log*
 
 
 packages/database/dist
+packages/database/generated/prisma
+docs
+internal-decision-docs
 
 dist
 
