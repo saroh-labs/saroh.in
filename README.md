@@ -1,91 +1,101 @@
 # Saroh.io
 
-Open source platform to create blogs, portfolios, and Storefronts.
+Open-source, multi-tenant SaaS platform for creating **blogs, portfolios, and e-commerce storefronts**.
 
-## Tech Stack
+A pnpm + Turborepo monorepo: a set of Next.js apps and a NestJS API, all
+authenticating against a single Better Auth identity provider.
 
--   Next.js
--   React
--   TypeScript
--   Prisma
--   TailwindCSS
--   Shadcn UI
--   Vercel (for deployments and DNS management)
--   S3 for storage
--   My SQL database
--   React Email for creating email UI
--   Nodemailer for sending emails
--   Next-auth V5 for authentication
--   React Query for data fetching
--   React Hook Form for form handling
--   Zod for validation
--   Turbo repo for monorepo management
--   Aceternity UI for building marketing website
--   Stripe for subscription management
--   Nextra for documentation
--   React table for tables
--   Recharts for building charts
+> **Note:** an earlier version of this README described MySQL + NextAuth.
+> That was stale. The real stack is **PostgreSQL + Prisma 7 + Better Auth**,
+> documented below.
 
-## What will you learn from this project?
+## Tech stack
 
--   How to build a full stack application from scratch
--   How to use Next.js for building frontend applications
--   How to use Prisma for managing database schema
--   How to create Email templates and sending emails using nodemailer
--   How to use React Query for data fetching
--   How to use React Hook Form for form handling
--   How to create beautiful marketing websites using Aceternity UI
--   How to use Stripe for subscription management
--   How to use Nextra for documentation
--   How to use React table for displaying data in react
--   How to use Recharts for building beautiful dashboards
--   How to use Turbo repo for monorepo management
--   How to write backend logic
--   Using HTTP status codes, and HTTP request methods like: GET, POST, PUT, DELETE, PATCH.
--   How to build a chatbot using NextJS
--   How to use TailwindCSS for styling
--   and a lot more things as the project grows.
+- **Frontend:** Next.js 16, React 19, TypeScript 5, TailwindCSS 3, shadcn / Radix UI
+- **Backend:** NestJS 11 (`apps/api.saroh.in`)
+- **Database:** PostgreSQL (Neon) via **Prisma 7** with `@prisma/adapter-pg`
+- **Auth:** **Better Auth 1.6.x** (central identity provider) — _not NextAuth_
+- **Email:** React Email + Nodemailer (`@saroh/emails`)
+- **Storage:** AWS S3 / S3-compatible (DigitalOcean Spaces)
+- **Hosting:** Vercel
+- **Tooling:** pnpm 9.9, Turborepo 2.9
 
-# Folder structure:
+## Architecture
 
-## `apps`:
+Authentication is centralized: **`accounts.saroh.in`** is the single identity
+provider (Better Auth). Every other app consumes the Better Auth session;
+`api.saroh.in` validates sessions directly against the shared Postgres. In
+production the session cookie is scoped to `.saroh.in` so it works across all
+subdomains.
 
--   **admin**: Admin dashboard for admin(Coming Soon). Link: [https://admin.saroh.in](https://admin.saroh.in)
--   **application**: Old application. Link: [https://app.saroh.in](https://app.saroh.in)
--   **auth** Authentication app for saroh, handles login, signup, forgot password, etc.(in-progress), Link: [https://accounts.saroh.in](https://accounts.saroh.in)
--   **chatbot**: Chatbot app for saroh, (Coming Soon), Link: [https://chatbot.saroh.in](https://chatbot.saroh.in)
--   **dashboard**: Dashboard for users to manage their blogs, portfolios, etc. This is the current application.(in-progress), Link: [https://dashboard.saroh.in](https://dashboard.saroh.in)
--   **docs**: Documentation app for saroh, (in-progress), Link: [https://docs.saroh.in](https://docs.saroh.in)
--   **ecom-templates**: E-commerce templates for saroh, (Coming Soon), Link: [https://templates.saroh.in](https://templates.saroh.in)
--   **email-service**: Email service for saroh, (Coming Soon), Link: [https://email.saroh.in](https://email.saroh.in)
--   **sites**: Application to render users blogs, portfolios, etc. (Coming Soon), Link: [https://\*.saroh.site](https://*.saroh.site)
--   **ui**: UI components for saroh, (Coming Soon), Link: [https://ui.saroh.in](https://ui.saroh.in)
--   **web**: Saroh website(saroh.in), (Coming Soon), Link: [https://saroh.in](https://saroh.in)
+### Apps (`apps/*`) — 10 total
 
-## `packages`:
+| App | Domain | Role |
+|-----|--------|------|
+| `accounts.saroh.in` | accounts.saroh.in | **Central auth** — login, signup, verification, password reset, OAuth |
+| `api.saroh.in` | api.saroh.in | NestJS backend; validates Better Auth sessions against the shared DB |
+| `app.saroh.in` | app.saroh.in | Main product dashboard (migrating off NextAuth → accounts session) |
+| `admin.saroh.in` | admin.saroh.in | Platform admin (session-gated, allowlisted) |
+| `sites.saroh.in` | sites.saroh.in, `*.saroh.site`, custom domains | Public renderer for user blogs / portfolios / stores |
+| `templates.saroh.in` | templates.saroh.in | Showcase of available designs |
+| `ui.saroh.in` | ui.saroh.in | Design-system / component showcase |
+| `docs.saroh.in` | docs.saroh.in | Developer documentation (Nextra) |
+| `help.saroh.in` | help.saroh.in | End-user help guides (Nextra) |
+| `saroh.in` | saroh.in | Marketing site |
 
--   **auth**: Auth package for saroh to provide authentication services to all apps. Package: **(@saroh/auth)**
--   **charts**: Charts package for saroh to provide charts to all apps. Package: **(@saroh/charts)**
--   **chatbot**: Chatbot package for saroh to provide chatbot services to all apps. Package: **(@saroh/chatbot)**
--   **database**: Database package for saroh to provide database schema to all apps. Uses `Prisma` to handle database schema. Package: **(@saroh/database)**
--   **emails**: The email templates UI for saroh, based on `react-email`. Package: **(@saroh/email)**
--   **eslint-config-custom**: Custom eslint config for saroh
--   **tailwind-config**: Custom tailwind config for saroh
--   **templates**: Templates package for saroh to provide templates to all apps. Package: **(@saroh/templates)**
--   **tsconfig**: Custom tsconfig for saroh.
--   **ui**: UI package for saroh to provide UI components to all apps. Package: **(@saroh/ui)**
--   **utils**: Utils package for saroh to provide utility functions to all apps. Package: **(@saroh/utils)**
+### Shared packages (`packages/*`)
 
-We are just getting started and these are just a few things we have covered. This project will be updated regularly and I hope it will inspire you to learn more about full stack development. I will try to make it better and more helpful to everyone. I haven't planned of commercializing it yet, and I think even if someone learns from it and builds projects on top of it, that would be a great thing for me. More details will be added soon.
+- `@saroh/auth` — shared Better Auth config: server instance + browser client + Next.js middleware/session helpers
+- `@saroh/database` — Prisma schema + client (`@prisma/adapter-pg`)
+- `@saroh/ui` — shared UI components / design system
+- `@saroh/emails` — React Email templates (verification, password reset, …)
+- `@saroh/charts` — chart components
+- `@saroh/utils` — shared utilities
 
-### Terms of Use
+Tooling lives in `tooling/*` (eslint config, tailwind config, tsconfig).
 
-> **Please note**: this project is for educational purpose only and the code here is not 100% reliable for use in production. It can help you understand how to build something but it does guarantee that it will be safe to use in production.
+## Local setup
 
-> You can use it however you want to. You just have to let me know if you are using it or it helped you in any way possible. Using this is free of charge.
+```bash
+# 1. Install
+pnpm install
 
-> I will add more details and scope of the project and how to use.
+# 2. Configure env — copy the template and fill in real values
+cp .env.example .env
+# (each app may also read its own apps/<app>/.env)
 
-### Support the development
+# 3. Generate the Prisma client + sync the schema to your dev database
+pnpm --filter @saroh/database build
+pnpm --filter @saroh/database db:push
 
-Feel free to contact me on: <mohit@himohit.me> or <mohit@saroh.io>.
+# 4. Run apps (examples)
+pnpm dev                 # everything
+pnpm dev:api-auth        # api + accounts
+pnpm dev:apps            # accounts + admin + sites
+```
+
+## Environment & secrets
+
+- All `.env*` files are gitignored; only `.env.example` is committed. **Never
+  commit a real `.env`.**
+- If a real credential is ever exposed (e.g. a Neon `DATABASE_URL` pasted
+  somewhere shared), **rotate it immediately** in the provider dashboard — do
+  not just delete the file.
+- `BETTER_AUTH_SECRET` must be **identical** across `accounts`, `api`, and any
+  app that validates sessions, or cross-app login silently fails.
+
+## Auth: NextAuth → Better Auth migration status
+
+Better Auth is the target. Migration checklist:
+
+- [x] `@saroh/auth` provides the shared Better Auth server config + browser client
+- [x] `accounts.saroh.in` issues sessions (email/password + OAuth, verification, reset)
+- [x] `api.saroh.in` validates sessions against the shared Postgres
+- [x] `admin.saroh.in` gates on the accounts session
+- [ ] `app.saroh.in` still uses NextAuth v4 — migrate to the accounts session (see `docs/plans/`)
+- [ ] Remove the `next-auth` catalog entry once `app` is migrated
+- [ ] Advanced Better Auth plugins (org, 2FA, OTP, API keys, admin roles) — later milestone
+
+## License & contact
+
+Educational/open-source. Contact: <mohit@saroh.io>.

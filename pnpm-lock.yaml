@@ -1057,8 +1057,6 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/chatbot: {}
-
   packages/database:
     dependencies:
       '@prisma/adapter-pg':
