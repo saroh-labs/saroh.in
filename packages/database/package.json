@@ -25,10 +25,13 @@
         "postinstall": "prisma generate"
     },
     "dependencies": {
+        "@prisma/adapter-pg": "7.4.0",
         "@prisma/client": "catalog:prisma",
-        "@types/node": "catalog:"
+        "@types/node": "catalog:",
+        "pg": "^8.13.1"
     },
     "devDependencies": {
+        "@types/pg": "^8.11.10",
         "config": "^4.4.1",
         "eslint": "catalog:",
         "prisma": "catalog:prisma",

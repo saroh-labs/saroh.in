@@ -14,14 +14,15 @@ generator client {
 // ============================================================================
 
 // Global users (can own multiple stores)
-model User {
-  id       String  @id @default(cuid())
-  email    String  @unique
-  password String? // For custom auth, null if OAuth
-  name     String?
-  image    String?
 
-  // From Better Auth
+model User {
+  id    String  @id @default(cuid())
+  email String  @unique
+  name  String?
+  image String?
+
+  // Better Auth stores the email/password credential on the Account row,
+  // so the User table no longer carries a password column.
   emailVerified Boolean @default(false)
 
   // Relations
@@ -32,10 +33,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  sessions Session[]
+  accounts Account[]
+
   @@index([email])
 }
 
 // Workspace: collection of stores (enterprise feature, Y2+)
+
 model Workspace {
   id   String @id @default(cuid())
   name String
@@ -121,6 +126,7 @@ model Store {
 }
 
 // Store owners
+
 model StoreOwner {
   id      String @id @default(cuid())
   storeId String
@@ -136,6 +142,7 @@ model StoreOwner {
 }
 
 // Store members (staff/employees)
+
 model StoreMembers {
   id      String @id @default(cuid())
   storeId String
@@ -226,6 +233,7 @@ model Category {
 }
 
 // Inventory tracking
+
 model Inventory {
   id      String @id @default(cuid())
   storeId String
@@ -249,6 +257,7 @@ model Inventory {
 
 // Customers are store-specific
 // Email is unique PER STORE, not globally
+
 model Customer {
   id      String @id @default(cuid())
   storeId String
@@ -635,4 +644,49 @@ model SecretAccessLog {
 
   @@index([storeId])
   @@index([createdAt])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
 }
