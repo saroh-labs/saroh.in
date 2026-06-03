@@ -38,5 +38,11 @@
         "prettier-quick": "^0.0.5"
     },
     "packageManager": "pnpm@9.9.0",
-    "name": "saroh.in"
+    "name": "saroh.in",
+    "pnpm": {
+        "overrides": {
+            "nextra>zod": "4.3.0",
+            "nextra-theme-docs>zod": "4.3.0"
+        }
+    }
 }

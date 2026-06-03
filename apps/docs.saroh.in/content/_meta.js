@@ -1,0 +1,4 @@
+export default {
+	index: "Introduction to Saroh.io",
+	authentication: "Getting Started with Authentication",
+};

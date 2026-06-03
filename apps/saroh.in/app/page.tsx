@@ -4,7 +4,7 @@ import JoinWaitlist from "@/components/home/join-waitlist";
 import { SparklesPreview } from "@/components/home/sparkles-preview";
 import { SpotlightPreview } from "@/components/home/spotlight";
 
-export default function Page(): JSX.Element {
+export default function Page() {
 	return (
 		<main className="flex bg-neutral-950 min-h-screen flex-col items-center justify-between ">
 			{/* <NewHero /> */}
