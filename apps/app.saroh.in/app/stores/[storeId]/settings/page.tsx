@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { StoreSettingsForm } from "@/components/stores/store-settings-form";
 import { requireSession } from "@/lib/session";
-import { getStoreForOwner } from "@/lib/stores/service";
+import { getStore } from "@/lib/stores/service";
 
 export default async function StoreSettingsPage({
     params,
@@ -11,7 +11,7 @@ export default async function StoreSettingsPage({
 }) {
     const { storeId } = await params;
     const session = await requireSession();
-    const store = await getStoreForOwner(storeId, session.user.id);
+    const store = await getStore(storeId);
     if (!store) notFound();
 
     return (

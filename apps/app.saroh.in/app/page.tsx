@@ -5,11 +5,11 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { StoreCard } from "@/components/stores/store-card";
 import { StoresEmptyState } from "@/components/stores/stores-empty-state";
 import { requireSession } from "@/lib/session";
-import { listStoresForUser } from "@/lib/stores/service";
+import { listStores } from "@/lib/stores/service";
 
 export default async function Home() {
     const session = await requireSession();
-    const stores = await listStoresForUser(session.user.id);
+    const stores = await listStores();
 
     return (
         <main className="mx-auto max-w-4xl p-8">

@@ -6,9 +6,7 @@
         "dev": "next dev --port=3003",
         "build": "next build",
         "start": "next start",
-        "lint": "next lint",
-        "test": "vitest run",
-        "postinstall": "prisma generate --schema=../../packages/database/prisma/schema.prisma"
+        "lint": "next lint"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.1056.0",
@@ -59,11 +57,9 @@
         "react-hook-form": "catalog:",
         "react-icons": "catalog:",
         "sonner": "^2.0.7",
-        "tailwind-merge": "^3.6.0",
-        "zod": "catalog:"
+        "tailwind-merge": "^3.6.0"
     },
     "devDependencies": {
-        "@saroh/database": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
         "@tailwindcss/forms": "^0.5.11",
         "@tailwindcss/typography": "^0.5.19",
@@ -77,10 +73,8 @@
         "eslint-config-next": "catalog:",
         "postcss": "catalog:",
         "prettier-plugin-tailwindcss": "^0.8.0",
-        "prisma": "catalog:prisma",
         "tailwindcss": "catalog:",
         "tailwindcss-animate": "^1.0.7",
-        "typescript": "catalog:",
-        "vitest": "^3.2.4"
+        "typescript": "catalog:"
     }
 }

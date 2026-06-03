@@ -1,5 +1,5 @@
 import { StoreNav } from "@/components/stores/store-nav";
-import { getStoreForOwner } from "@/lib/stores/service";
+import { getStore } from "@/lib/stores/service";
 import { requireSession } from "@/lib/session";
 import { notFound } from "next/navigation";
 
@@ -18,7 +18,7 @@ export default async function StoreLayout({
 }) {
     const { storeId } = await params;
     const session = await requireSession();
-    const store = await getStoreForOwner(storeId, session.user.id);
+    const store = await getStore(storeId);
     if (!store) notFound();
 
     return (

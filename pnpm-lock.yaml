@@ -483,13 +483,7 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
-      zod:
-        specifier: 'catalog:'
-        version: 3.25.76
     devDependencies:
-      '@saroh/database':
-        specifier: workspace:*
-        version: link:../../packages/database
       '@saroh/tailwind-config':
         specifier: workspace:*
         version: link:../../tooling/tailwind-config
@@ -529,9 +523,6 @@ importers:
       prettier-plugin-tailwindcss:
         specifier: ^0.8.0
         version: 0.8.0(prettier-plugin-organize-imports@4.3.0(prettier@3.8.3)(typescript@5.9.3))(prettier@3.8.3)
-      prisma:
-        specifier: catalog:prisma
-        version: 7.4.0(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
       tailwindcss:
         specifier: 'catalog:'
         version: 3.4.19(tsx@4.22.3)(yaml@2.9.0)
@@ -541,9 +532,6 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.6(@types/debug@4.1.13)(@types/node@20.19.33)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0)
 
   apps/docs.saroh.in:
     dependencies:

@@ -1,139 +1,90 @@
-import { prisma } from "@saroh/database";
+import { headers } from "next/headers";
 
-import {
-    createStoreSchema,
-    type StoreResult,
-    updateStoreSchema,
+import type {
+    CreateStoreInput,
+    StoreResult,
+    UpdateStoreInput,
 } from "./schema";
-import { slugify } from "./slug";
-
-/** Store slugs are globally unique (Store.slug @unique). Server-only. */
-async function isSlugAvailable(slug: string): Promise<boolean> {
-    const existing = await prisma.store.findUnique({ where: { slug } });
-    return !existing;
-}
 
 /**
- * Store data layer. These take an explicit `userId` (resolved from the
- * accounts session by the Server Actions in actions.ts) so they're testable
- * without the request context. Ownership is the v1 authorization model:
- * a user may read/edit a store only if they're a StoreOwner of it.
+ * Store data access for app.saroh.in. The app no longer touches the database
+ * — every call forwards the request's session cookie to api.saroh.in (the
+ * single backend) which enforces ownership and validation. Server-only:
+ * imports next/headers, so it must never reach a client component.
  */
 
-/** Stores the user owns (newest first), excluding soft-deleted. */
-export function listStoresForUser(userId: string) {
-    return prisma.store.findMany({
-        where: { owners: { some: { userId } }, deletedAt: null },
-        orderBy: { createdAt: "desc" },
+const API_URL =
+    process.env.API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    process.env.NEXT_PUBLIC_BETTER_AUTH_URL ??
+    "https://api.saroh.in";
+
+export interface Store {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    logo: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+    const cookie = (await headers()).get("cookie") ?? "";
+    return fetch(`${API_URL}${path}`, {
+        ...init,
+        headers: {
+            "content-type": "application/json",
+            cookie,
+            ...(init?.headers ?? {}),
+        },
+        cache: "no-store",
     });
 }
 
-/** The store if the user owns it, else null (no leak for non-owners). */
-export function getStoreForOwner(storeId: string, userId: string) {
-    return prisma.store.findFirst({
-        where: { id: storeId, owners: { some: { userId } }, deletedAt: null },
-    });
+/** Stores the signed-in user owns (newest first). Empty on any failure. */
+export async function listStores(): Promise<Store[]> {
+    const res = await apiFetch("/stores");
+    if (!res.ok) return [];
+    return (await res.json()) as Store[];
 }
 
-export async function isStoreOwner(
-    storeId: string,
-    userId: string,
-): Promise<boolean> {
-    const owner = await prisma.storeOwner.findUnique({
-        where: { storeId_userId: { storeId, userId } },
-    });
-    return Boolean(owner);
+/** The store if the user owns it; null otherwise (api 404 → no leak). */
+export async function getStore(storeId: string): Promise<Store | null> {
+    const res = await apiFetch(`/stores/${storeId}`);
+    if (!res.ok) return null;
+    return (await res.json()) as Store;
 }
 
-/** Create a store and record the creator as OWNER, atomically. */
-export async function createStoreForUser(
-    userId: string,
-    input: unknown,
+async function mutate(
+    path: string,
+    method: "POST" | "PUT",
+    input: CreateStoreInput | UpdateStoreInput,
 ): Promise<StoreResult<{ id: string }>> {
-    const parsed = createStoreSchema.safeParse(input);
-    if (!parsed.success) {
-        const issue = parsed.error.issues[0];
-        return {
-            ok: false,
-            error: issue.message,
-            field: issue.path[0] as "name" | "slug" | undefined,
-        };
-    }
+    const res = await apiFetch(path, { method, body: JSON.stringify(input) });
+    const data = (await res.json().catch(() => null)) as
+        | { id?: string; message?: string; field?: "name" | "slug" | "logo" }
+        | null;
 
-    const { name, description } = parsed.data;
-    const slug = slugify(parsed.data.slug ?? name);
-    if (!slug) {
-        return {
-            ok: false,
-            error: "Could not derive a slug from the name",
-            field: "slug",
-        };
+    if (res.ok && data?.id) {
+        return { ok: true, data: { id: data.id } };
     }
-    if (!(await isSlugAvailable(slug))) {
-        return { ok: false, error: "That slug is already taken", field: "slug" };
-    }
-
-    try {
-        const store = await prisma.store.create({
-            data: {
-                name,
-                slug,
-                description: description || null,
-                // Nested create runs in one transaction → no orphan store.
-                owners: { create: { userId, role: "OWNER" } },
-            },
-        });
-        return { ok: true, data: { id: store.id } };
-    } catch {
-        // Unique-constraint backstop for a slug race between the check above
-        // and the insert.
-        return { ok: false, error: "That slug is already taken", field: "slug" };
-    }
+    return {
+        ok: false,
+        error: data?.message ?? "Something went wrong",
+        field: data?.field,
+    };
 }
 
-/** Update a store's core fields — owner only. */
-export async function updateStoreForUser(
-    userId: string,
-    storeId: string,
-    input: unknown,
+export function createStore(
+    input: CreateStoreInput,
 ): Promise<StoreResult<{ id: string }>> {
-    if (!(await isStoreOwner(storeId, userId))) {
-        return { ok: false, error: "Store not found" };
-    }
+    return mutate("/stores", "POST", input);
+}
 
-    const parsed = updateStoreSchema.safeParse(input);
-    if (!parsed.success) {
-        const issue = parsed.error.issues[0];
-        return {
-            ok: false,
-            error: issue.message,
-            field: issue.path[0] as "name" | "slug" | "logo" | undefined,
-        };
-    }
-
-    const { name, description, logo } = parsed.data;
-    const slug = slugify(parsed.data.slug);
-
-    const current = await prisma.store.findUnique({
-        where: { id: storeId },
-        select: { slug: true },
-    });
-    if (current && current.slug !== slug && !(await isSlugAvailable(slug))) {
-        return { ok: false, error: "That slug is already taken", field: "slug" };
-    }
-
-    try {
-        await prisma.store.update({
-            where: { id: storeId },
-            data: {
-                name,
-                slug,
-                description: description ?? null,
-                logo: logo || null,
-            },
-        });
-        return { ok: true, data: { id: storeId } };
-    } catch {
-        return { ok: false, error: "That slug is already taken", field: "slug" };
-    }
+export function updateStore(
+    storeId: string,
+    input: UpdateStoreInput,
+): Promise<StoreResult<{ id: string }>> {
+    return mutate(`/stores/${storeId}`, "PUT", input);
 }
