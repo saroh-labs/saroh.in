@@ -1,9 +1,13 @@
 import { type Auth, createAuth } from "@saroh/auth";
 
+import { sendPasswordResetEmail, sendVerificationEmail } from "../email";
+
 /**
- * api.saroh.in builds the SAME Better Auth instance as accounts.saroh.in
- * (identical secret, Prisma adapter, plugins) so it can validate sessions by
- * a direct lookup against the shared Postgres. It never issues auth, so no
- * email senders are supplied.
+ * The Better Auth instance — api.saroh.in is now the auth SERVER (it hosts
+ * /api/auth/*) and the sole DB owner. It issues auth and sends verification /
+ * reset email (relocated here from accounts, which is now just the UI).
  */
-export const auth: Auth = createAuth();
+export const auth: Auth = createAuth({
+    sendVerificationEmail: ({ to, url }) => sendVerificationEmail(to, url),
+    sendResetPassword: ({ to, url }) => sendPasswordResetEmail(to, url),
+});
