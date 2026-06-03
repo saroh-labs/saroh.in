@@ -6,12 +6,10 @@
         "dev": "next dev --port=3008",
         "build": " next build",
         "start": "next start",
-        "lint": "next lint",
-        "postinstall": "prisma generate --schema=../../packages/database/prisma/schema.prisma"
+        "lint": "next lint"
     },
     "dependencies": {
         "@hookform/resolvers": "catalog:",
-        "@prisma/client": "catalog:prisma",
         "@radix-ui/react-avatar": "^1.1.11",
         "@radix-ui/react-label": "^2.1.8",
         "@radix-ui/react-slot": "^1.2.4",
@@ -38,7 +36,6 @@
     },
     "devDependencies": {
         "@next/eslint-plugin-next": "^16.2.6",
-        "@saroh/database": "workspace:*",
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
         "@saroh/tsconfig": "workspace:*",
@@ -47,7 +44,6 @@
         "@types/react-dom": "catalog:react19",
         "autoprefixer": "catalog:",
         "postcss": "catalog:",
-        "prisma": "catalog:prisma",
         "tailwindcss": "catalog:",
         "typescript": "catalog:"
     }

@@ -1,136 +1,71 @@
-import { unstable_cache } from "next/cache";
-import prisma from "@/lib/prisma";
-import { serialize } from "next-mdx-remote/serialize";
-import { replaceTweets } from "@/lib/remark-plugins";
+import type { MDXRemoteProps } from "next-mdx-remote";
 
-export async function getSiteData(domain: string) {
-	const subdomain = domain.endsWith(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`)
-		? domain.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`, "")
-		: null;
+/**
+ * Storefront/blog data for the public site renderer.
+ *
+ * Per the single-backend refactor, only api.saroh.in may touch the database.
+ * sites.saroh.in is a public renderer scaffold that is not yet rebuilt against
+ * api, so these fetchers are DB-free stubs: they return no data (sites render
+ * notFound / empty) until api exposes storefront endpoints. Wire them to
+ * `fetch(`${API_URL}/sites/...`)` when those land — the signatures and the
+ * types below are the contract the pages already build against.
+ */
 
-	return await unstable_cache(
-		async () => {
-			return prisma.site.findUnique({
-				where: subdomain ? { subdomain } : { customDomain: domain },
-				include: { user: true },
-			});
-		},
-		[`${domain}-metadata`],
-		{
-			revalidate: 900,
-			tags: [`${domain}-metadata`],
-		},
-	)();
+export interface SiteUser {
+    name: string | null;
+    username: string | null;
+    gh_username: string | null;
+    image: string | null;
 }
 
-export async function getPostsForSite(domain: string) {
-	const subdomain = domain.endsWith(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`)
-		? domain.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`, "")
-		: null;
-
-	return await unstable_cache(
-		async () => {
-			return prisma.post.findMany({
-				where: {
-					site: subdomain ? { subdomain } : { customDomain: domain },
-					published: true,
-				},
-				select: {
-					title: true,
-					description: true,
-					slug: true,
-					image: true,
-					imageBlurhash: true,
-					createdAt: true,
-				},
-				orderBy: [
-					{
-						createdAt: "desc",
-					},
-				],
-			});
-		},
-		[`${domain}-posts`],
-		{
-			revalidate: 900,
-			tags: [`${domain}-posts`],
-		},
-	)();
+export interface SiteData {
+    name: string | null;
+    description: string | null;
+    image: string | null;
+    logo: string | null;
+    font: string;
+    subdomain: string | null;
+    customDomain: string | null;
+    message404: string | null;
+    user: SiteUser | null;
 }
 
-export async function getPostData(domain: string, slug: string) {
-	const subdomain = domain.endsWith(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`)
-		? domain.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`, "")
-		: null;
-
-	return await unstable_cache(
-		async () => {
-			const data = await prisma.post.findFirst({
-				where: {
-					site: subdomain ? { subdomain } : { customDomain: domain },
-					slug,
-					published: true,
-				},
-				include: {
-					site: {
-						include: {
-							user: true,
-						},
-					},
-				},
-			});
-
-			if (!data) return null;
-
-			const [mdxSource, adjacentPosts] = await Promise.all([
-				getMdxSource(data.content!),
-				prisma.post.findMany({
-					where: {
-						site: subdomain
-							? { subdomain }
-							: { customDomain: domain },
-						published: true,
-						NOT: {
-							id: data.id,
-						},
-					},
-					select: {
-						slug: true,
-						title: true,
-						createdAt: true,
-						description: true,
-						image: true,
-						imageBlurhash: true,
-					},
-				}),
-			]);
-
-			return {
-				...data,
-				mdxSource,
-				adjacentPosts,
-			};
-		},
-		[`${domain}-${slug}`],
-		{
-			revalidate: 900, // 15 minutes
-			tags: [`${domain}-${slug}`],
-		},
-	)();
+export interface PostMeta {
+    slug: string;
+    title: string | null;
+    description: string | null;
+    image: string | null;
+    imageBlurhash: string | null;
+    createdAt: Date;
 }
 
-async function getMdxSource(postContents: string) {
-	// transforms links like <link> to [link](link) as MDX doesn't support <link> syntax
-	// https://mdxjs.com/docs/what-is-mdx/#markdown
-	const content =
-		postContents?.replaceAll(/<(https?:\/\/\S+)>/g, "[$1]($1)") ?? "";
-	// Serialize the content string into MDX
-	const mdxSource = await serialize(content, {
-		mdxOptions: {
-			remarkPlugins: [],
-			// [replaceTweets, () => replaceExamples(prisma)],
-		},
-	});
+export interface PostData {
+    title: string | null;
+    description: string | null;
+    createdAt: Date;
+    mdxSource: MDXRemoteProps;
+    adjacentPosts: PostMeta[];
+    site: { user: SiteUser | null } | null;
+}
 
-	return mdxSource;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function getSiteData(domain: string): Promise<SiteData | null> {
+    // TODO: GET ${API_URL}/sites/by-domain/:domain
+    return null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function getPostsForSite(domain: string): Promise<PostMeta[]> {
+    // TODO: GET ${API_URL}/sites/by-domain/:domain/posts
+    return [];
+}
+
+export async function getPostData(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    domain: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    slug: string,
+): Promise<PostData | null> {
+    // TODO: GET ${API_URL}/sites/by-domain/:domain/posts/:slug
+    return null;
 }

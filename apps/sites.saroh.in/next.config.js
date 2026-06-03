@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-	// Prisma 7 driver adapter — externalize, no webpack PrismaPlugin needed.
-	serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "prisma"],
+	// No database here — sites renders via api.saroh.in (single backend).
 	reactStrictMode: false,
 	images: {
 		domains: [

@@ -1,5 +1,4 @@
 // import Image from "next/image";
-import prisma from "@/lib/prisma";
 import Link from "next/link";
 // import CTA from "@/components/cta";
 import { getSiteData } from "@/lib/fetchers";
@@ -50,34 +49,9 @@ export async function generateMetadata({
 }
 
 export async function generateStaticParams() {
-    const [subdomains, customDomains] = await Promise.all([
-        prisma.site.findMany({
-            select: {
-                subdomain: true,
-            },
-        }),
-        prisma.site.findMany({
-            where: {
-                NOT: {
-                    customDomain: null,
-                },
-            },
-            select: {
-                customDomain: true,
-            },
-        }),
-    ]);
-
-    const allPaths = [
-        ...subdomains.map(({ subdomain }) => subdomain),
-        ...customDomains.map(({ customDomain }) => customDomain),
-    ].filter((path) => path) as Array<string>;
-
-    return allPaths.map((domain) => ({
-        params: {
-            domain,
-        },
-    }));
+    // No DB here — domains are rendered on demand. Pre-rendering returns once
+    // api exposes a list-domains endpoint for the renderer to enumerate.
+    return [] as Array<{ params: { domain: string } }>;
 }
 
 export default async function SiteLayout({

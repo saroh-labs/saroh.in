@@ -1,18 +1,10 @@
 import Link from "next/link";
 
 import { toDateString } from "@/lib/utils";
-import type { Post } from "@saroh/database";
+import type { PostMeta } from "@/lib/fetchers";
 
 interface BlogCardProps {
-    data: Pick<
-        Post,
-        | "slug"
-        | "image"
-        | "imageBlurhash"
-        | "title"
-        | "description"
-        | "createdAt"
-    >;
+    data: PostMeta;
 }
 
 export default function BlogCard({ data }: BlogCardProps) {
