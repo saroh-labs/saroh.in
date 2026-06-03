@@ -1,10 +1,3 @@
-export interface StoreContext {
-    storeId: string;
-    userId: string;
-    role: "owner" | "admin" | "staff" | "customer";
-    permissions: string[];
-}
-
 /**
  * Shape attached to `request.user` by BetterAuthGuard — the Better Auth
  * session user. `role`/`permissions` arrive with the M2 admin/organization

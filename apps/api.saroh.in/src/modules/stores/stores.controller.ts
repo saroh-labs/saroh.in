@@ -1,7 +1,6 @@
 import {
     Body,
     Controller,
-    Delete,
     Get,
     HttpCode,
     Param,
@@ -9,103 +8,45 @@ import {
     Put,
     UseGuards,
 } from "@nestjs/common";
-import { IsOptional, IsString } from "class-validator";
 
-import { Store } from "../../common/decorators/store.decorator";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
-import { StoreAccessGuard } from "../../common/guards/store-auth.guard";
-import type { StoreContext } from "../../common/types/store-context";
+import type { AuthUser } from "../../common/types/store-context";
+import { CreateStoreDto, UpdateStoreDto } from "./dto";
 import { StoresService } from "./stores.service";
 
-class CreateStoreDto {
-    @IsString()
-    name!: string;
-
-    @IsOptional()
-    @IsString()
-    description?: string;
-}
-
-class UpdateStoreDto {
-    @IsOptional()
-    @IsString()
-    name?: string;
-
-    @IsOptional()
-    @IsString()
-    description?: string;
-}
-
+/**
+ * Owner-scoped store endpoints. The owning user is always the authenticated
+ * session user (resolved by BetterAuthGuard, read via @CurrentUser) — never
+ * client-supplied — and the service enforces ownership on read/update.
+ */
 @Controller("stores")
+@UseGuards(BetterAuthGuard)
 export class StoresController {
     constructor(private readonly storesService: StoresService) {}
 
-    @Get(":id")
-    @UseGuards(BetterAuthGuard, StoreAccessGuard)
-    async getStore(
-        @Param("id") id: string,
-        @Store() storeContext: StoreContext,
-    ) {
-        // Verify user has access to this store
-        if (storeContext.storeId !== id) {
-            return {
-                statusCode: 403,
-                message: "Access denied to this store",
-            };
-        }
-
-        return this.storesService.getStoreById(id);
-    }
-
     @Get()
-    @UseGuards(BetterAuthGuard)
-    async getStores() {
-        // TODO: Extract userId from request or JWT payload
-        return this.storesService.getStoresByUser("user-id");
+    list(@CurrentUser() user: AuthUser) {
+        return this.storesService.listForUser(user.id);
     }
 
     @Post()
-    @UseGuards(BetterAuthGuard)
     @HttpCode(201)
-    async createStore(@Body() createStoreDto: CreateStoreDto) {
-        // TODO: Extract userId from JWT payload
-        return this.storesService.createStore("user-id", createStoreDto);
+    create(@CurrentUser() user: AuthUser, @Body() dto: CreateStoreDto) {
+        return this.storesService.createForUser(user.id, dto);
+    }
+
+    @Get(":id")
+    get(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+        return this.storesService.getForOwner(id, user.id);
     }
 
     @Put(":id")
-    @UseGuards(BetterAuthGuard, StoreAccessGuard)
-    async updateStore(
+    update(
+        @CurrentUser() user: AuthUser,
         @Param("id") id: string,
-        @Body() updateStoreDto: UpdateStoreDto,
-        @Store() storeContext: StoreContext,
+        @Body() dto: UpdateStoreDto,
     ) {
-        // Verify user has access to this store
-        if (storeContext.storeId !== id) {
-            return {
-                statusCode: 403,
-                message: "Access denied to this store",
-            };
-        }
-
-        return this.storesService.updateStore(id, updateStoreDto);
-    }
-
-    @Delete(":id")
-    @UseGuards(BetterAuthGuard, StoreAccessGuard)
-    @HttpCode(204)
-    async deleteStore(
-        @Param("id") id: string,
-        @Store() storeContext: StoreContext,
-    ) {
-        // Verify user has access to this store
-        if (storeContext.storeId !== id) {
-            return {
-                statusCode: 403,
-                message: "Access denied to this store",
-            };
-        }
-
-        await this.storesService.deleteStore(id);
-        return null;
+        return this.storesService.updateForUser(user.id, id, dto);
     }
 }
