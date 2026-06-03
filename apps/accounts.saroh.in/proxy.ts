@@ -1,3 +1,4 @@
+import { getServerSession } from "@saroh/auth/next";
 import { getSessionCookie } from "better-auth/cookies";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -9,26 +10,10 @@ const authRoutePrefixes = [
     "/reset-password",
 ];
 
-async function getSession(req: NextRequest) {
-    const cookie = req.headers.get("cookie") ?? "";
-    if (!cookie) return null;
-
-    const sessionUrl = new URL("/api/auth/get-session", req.url);
-    const response = await fetch(sessionUrl, {
-        method: "GET",
-        headers: { cookie },
-        cache: "no-store",
-    });
-
-    if (!response.ok) return null;
-    return (await response.json()) as { user?: unknown } | null;
-}
-
 export default async function proxy(req: NextRequest) {
     const { nextUrl } = req;
+    // Cheap presence check (no network); full validation hits api below.
     const sessionCookie = getSessionCookie(req);
-
-    const res = NextResponse.next();
 
     const isLoggedIn = !!sessionCookie;
     const isOnProtectedRoute = protectedRoutes.has(nextUrl.pathname);
@@ -36,8 +21,10 @@ export default async function proxy(req: NextRequest) {
         nextUrl.pathname.startsWith(p),
     );
 
+    // Already authenticated visitors shouldn't see the auth screens — bounce
+    // them to the app picker. Validate against api (auth lives there now).
     if (isOnAuthRoute && sessionCookie) {
-        const session = await getSession(req);
+        const session = await getServerSession(req.headers);
         if (session?.user) {
             return NextResponse.redirect(new URL("/apps", req.url));
         }
@@ -47,7 +34,7 @@ export default async function proxy(req: NextRequest) {
         return NextResponse.redirect(new URL("/login", req.url));
     }
 
-    return res;
+    return NextResponse.next();
 }
 
 export const config = {

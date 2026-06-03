@@ -3,39 +3,30 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "db:gen": "prisma generate --schema=../../packages/database/prisma/schema.prisma",
-        "dev": "pnpm db:gen && next dev",
+        "dev": "next dev",
         "build": "next build",
         "start": "next start",
-        "lint": "next lint",
-        "postinstall": "pnpm db:gen"
+        "lint": "next lint"
     },
     "dependencies": {
-        "@prisma/client": "catalog:prisma",
-        "@react-email/components": "^1.0.12",
         "@saroh/auth": "workspace:*",
-        "@saroh/emails": "workspace:*",
         "@saroh/ui": "workspace:*",
         "better-auth": "^1.6.11",
         "next": "catalog:next16",
-        "nodemailer": "^8.0.10",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
         "react-icons": "catalog:"
     },
     "devDependencies": {
-        "@saroh/database": "workspace:*",
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
         "@types/node": "catalog:",
-        "@types/nodemailer": "^8.0.0",
         "@types/react": "catalog:react19",
         "@types/react-dom": "catalog:react19",
         "autoprefixer": "catalog:",
         "eslint": "catalog:",
         "eslint-config-next": "catalog:",
         "postcss": "catalog:",
-        "prisma": "catalog:prisma",
         "tailwindcss": "catalog:",
         "typescript": "catalog:"
     }
