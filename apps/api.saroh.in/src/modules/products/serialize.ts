@@ -6,6 +6,8 @@
  * `Decimal` across the pnpm boundary and trip TS2883.
  */
 
+import { toMoneyString } from "../../common/money";
+
 interface DecimalLike {
     toString(): string;
 }
@@ -86,7 +88,7 @@ export function serializeVariant(variant: RawVariant): VariantDto {
         productId: variant.productId,
         sku: variant.sku,
         title: variant.title,
-        price: variant.price?.toString() ?? null,
+        price: variant.price ? toMoneyString(variant.price) : null,
         image: variant.image,
         createdAt: variant.createdAt,
     };
@@ -101,7 +103,7 @@ export function serializeProduct(product: RawProduct): ProductDto {
         description: product.description,
         image: product.image,
         categoryId: product.categoryId,
-        price: product.price.toString(),
+        price: toMoneyString(product.price),
         currency: product.currency,
         status: product.status,
         createdAt: product.createdAt,

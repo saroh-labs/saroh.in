@@ -17,6 +17,8 @@ export function StoreNav({ storeId }: { storeId: string }) {
     const links = [
         { label: "Overview", href: base, exact: true },
         { label: "Products", href: `${base}/products`, exact: false },
+        { label: "Orders", href: `${base}/orders`, exact: false },
+        { label: "Customers", href: `${base}/customers`, exact: false },
         { label: "Members", href: `${base}/members`, exact: false },
         { label: "Settings", href: `${base}/settings`, exact: false },
     ];

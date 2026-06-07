@@ -4,8 +4,10 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { auth } from "./common/auth/auth";
 import { CategoriesModule } from "./modules/categories/categories.module";
+import { CustomersModule } from "./modules/customers/customers.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MembersModule } from "./modules/members/members.module";
+import { OrdersModule } from "./modules/orders/orders.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { StoresModule } from "./modules/stores/stores.module";
 
@@ -29,6 +31,8 @@ import { StoresModule } from "./modules/stores/stores.module";
         MembersModule,
         ProductsModule,
         CategoriesModule,
+        CustomersModule,
+        OrdersModule,
     ],
 })
 export class AppModule {}
