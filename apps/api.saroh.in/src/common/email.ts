@@ -86,3 +86,27 @@ export async function sendVerificationEmail(
         ),
     });
 }
+
+export async function sendStoreInvitationEmail(
+    to: string,
+    acceptUrl: string,
+    storeName: string,
+): Promise<void> {
+    if (!transporter) {
+        console.log(
+            `[Store invite] (no SMTP) ${to} -> ${storeName}: ${acceptUrl}`,
+        );
+        return;
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: `You've been invited to ${storeName} on Saroh`,
+        html: actionEmail(
+            `Join ${storeName}`,
+            `You've been invited to collaborate on ${storeName}. Accept below to join the team.`,
+            acceptUrl,
+            "Accept invitation",
+        ),
+    });
+}

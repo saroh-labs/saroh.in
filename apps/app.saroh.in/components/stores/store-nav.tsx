@@ -16,10 +16,11 @@ export function StoreNav({ storeId }: { storeId: string }) {
 
     const links = [
         { label: "Overview", href: base, exact: true },
+        { label: "Members", href: `${base}/members`, exact: false },
         { label: "Settings", href: `${base}/settings`, exact: false },
     ];
 
-    const comingSoon = ["Content", "Products", "Members"];
+    const comingSoon = ["Content", "Products"];
 
     const isActive = (href: string, exact: boolean) =>
         exact ? pathname === href : pathname.startsWith(href);
@@ -55,7 +56,10 @@ export function StoreNav({ storeId }: { storeId: string }) {
                     className="flex cursor-not-allowed items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground/50"
                 >
                     {label}
-                    <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                    <Badge
+                        variant="secondary"
+                        className="px-1.5 py-0 text-[10px]"
+                    >
                         Soon
                     </Badge>
                 </span>

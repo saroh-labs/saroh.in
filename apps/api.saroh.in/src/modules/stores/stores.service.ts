@@ -9,29 +9,42 @@ import { prisma } from "@saroh/database";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
 import { slugify } from "./slug";
 
+/** Staff roles allowed to mutate a store (VIEWER is read-only). */
+const WRITE_ROLES = new Set(["ADMIN", "MANAGER", "EDITOR"]);
+
 /**
  * Store data layer — the single place the DB is touched for stores. Every
  * method takes an explicit `userId` (resolved from the Better Auth session by
- * the controller, never client input). Ownership is the v1 authorization
- * model: a user may read/edit a store only if they're a StoreOwner of it.
+ * the controller, never client input). Authorization: a StoreOwner has full
+ * access; a StoreMembers staffer can read, and can write only with a
+ * write-capable role (ADMIN/MANAGER/EDITOR — not VIEWER).
  */
 @Injectable()
 export class StoresService {
-    /** Stores the user owns (newest first), excluding soft-deleted. */
+    /** Stores the user owns or is a member of (newest first), non-deleted. */
     listForUser(userId: string) {
         return prisma.store.findMany({
-            where: { owners: { some: { userId } }, deletedAt: null },
+            where: {
+                deletedAt: null,
+                OR: [
+                    { owners: { some: { userId } } },
+                    { members: { some: { userId } } },
+                ],
+            },
             orderBy: { createdAt: "desc" },
         });
     }
 
-    /** The store if the user owns it; 404 otherwise (no leak for non-owners). */
-    async getForOwner(storeId: string, userId: string) {
+    /** The store if the user can access it; 404 otherwise (no existence leak). */
+    async getForUser(storeId: string, userId: string) {
         const store = await prisma.store.findFirst({
             where: {
                 id: storeId,
-                owners: { some: { userId } },
                 deletedAt: null,
+                OR: [
+                    { owners: { some: { userId } } },
+                    { members: { some: { userId } } },
+                ],
             },
         });
         if (!store) {
@@ -45,6 +58,16 @@ export class StoresService {
             where: { storeId_userId: { storeId, userId } },
         });
         return Boolean(owner);
+    }
+
+    /** Owner, or a member with a write-capable role. */
+    async canWrite(storeId: string, userId: string): Promise<boolean> {
+        if (await this.isOwner(storeId, userId)) return true;
+        const member = await prisma.storeMembers.findUnique({
+            where: { storeId_userId: { storeId, userId } },
+            select: { role: true },
+        });
+        return Boolean(member && WRITE_ROLES.has(member.role));
     }
 
     /** Create a store and record the creator as OWNER, atomically. */
@@ -84,9 +107,9 @@ export class StoresService {
         }
     }
 
-    /** Update a store's core fields — owner only. */
+    /** Update a store's core fields — owner or a write-capable member. */
     async updateForUser(userId: string, storeId: string, dto: UpdateStoreDto) {
-        if (!(await this.isOwner(storeId, userId))) {
+        if (!(await this.canWrite(storeId, userId))) {
             throw new NotFoundException("Store not found");
         }
 

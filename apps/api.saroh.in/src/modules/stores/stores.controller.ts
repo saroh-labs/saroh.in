@@ -38,7 +38,7 @@ export class StoresController {
 
     @Get(":id")
     get(@CurrentUser() user: AuthUser, @Param("id") id: string) {
-        return this.storesService.getForOwner(id, user.id);
+        return this.storesService.getForUser(id, user.id);
     }
 
     @Put(":id")

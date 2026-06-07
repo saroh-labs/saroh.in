@@ -78,10 +78,10 @@ describe("StoresService (dev DB)", () => {
 
     it("denies a non-owner read and write", async () => {
         const id = createdStoreIds[0];
-        await expect(service.getForOwner(id, userB)).rejects.toBeInstanceOf(
+        await expect(service.getForUser(id, userB)).rejects.toBeInstanceOf(
             NotFoundException,
         );
-        await expect(service.getForOwner(id, userA)).resolves.not.toBeNull();
+        await expect(service.getForUser(id, userA)).resolves.not.toBeNull();
         await expect(
             service.updateForUser(userB, id, {
                 name: "Hacked",
@@ -97,7 +97,7 @@ describe("StoresService (dev DB)", () => {
             slug: `${slugPrefix}-blog`,
             description: "Updated desc",
         });
-        const store = await service.getForOwner(id, userA);
+        const store = await service.getForUser(id, userA);
         expect(store.description).toBe("Updated desc");
     });
 });

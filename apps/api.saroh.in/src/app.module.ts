@@ -4,6 +4,7 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { auth } from "./common/auth/auth";
 import { HealthModule } from "./modules/health/health.module";
+import { MembersModule } from "./modules/members/members.module";
 import { StoresModule } from "./modules/stores/stores.module";
 
 @Module({
@@ -23,6 +24,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         }),
         HealthModule,
         StoresModule,
+        MembersModule,
     ],
 })
 export class AppModule {}

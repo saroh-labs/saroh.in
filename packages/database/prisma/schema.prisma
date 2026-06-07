@@ -85,8 +85,9 @@ model Store {
   workspace   Workspace? @relation(fields: [workspaceId], references: [id])
 
   // Relations
-  owners  StoreOwner[]
-  members StoreMembers[]
+  owners      StoreOwner[]
+  members     StoreMembers[]
+  invitations StoreInvitation[]
 
   // Products & E-commerce
   products   Product[]
@@ -160,6 +161,29 @@ model StoreMembers {
 
   @@unique([storeId, userId])
   @@index([storeId])
+}
+
+// Pending invitations to join a store's team. Accepting one creates a
+// StoreMembers row for the invited user (matched by email).
+
+model StoreInvitation {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  email String // who was invited (need not have an account yet)
+  role  String @default("VIEWER") // ADMIN, MANAGER, EDITOR, VIEWER
+
+  token  String @unique // random, carried in the accept link
+  status String @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+
+  invitedById String // User.id of the inviter
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@unique([storeId, email]) // one live invite per email per store
+  @@index([storeId])
+  @@index([token])
 }
 
 // ============================================================================

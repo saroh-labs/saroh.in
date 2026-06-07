@@ -1,3 +1,5 @@
+import { requireSession } from "@/lib/session";
+import { getStore } from "@/lib/stores/service";
 import { Badge } from "@saroh/ui/badge";
 import {
     Card,
@@ -6,8 +8,6 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
-import { getStore } from "@/lib/stores/service";
-import { requireSession } from "@/lib/session";
 import { notFound } from "next/navigation";
 
 const COMING_SOON = [
@@ -18,10 +18,6 @@ const COMING_SOON = [
     {
         title: "Products",
         description: "Your catalog, inventory, and pricing.",
-    },
-    {
-        title: "Members",
-        description: "Invite teammates and manage their access.",
     },
 ];
 
@@ -49,7 +45,7 @@ export default async function StoreOverviewPage({
                     <CardDescription>/{store.slug}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-sm text-muted-foreground">
                         {store.description ?? "No description yet."}
                     </p>
                 </CardContent>
