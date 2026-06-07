@@ -3,8 +3,10 @@ import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { auth } from "./common/auth/auth";
+import { CategoriesModule } from "./modules/categories/categories.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MembersModule } from "./modules/members/members.module";
+import { ProductsModule } from "./modules/products/products.module";
 import { StoresModule } from "./modules/stores/stores.module";
 
 @Module({
@@ -25,6 +27,8 @@ import { StoresModule } from "./modules/stores/stores.module";
         HealthModule,
         StoresModule,
         MembersModule,
+        ProductsModule,
+        CategoriesModule,
     ],
 })
 export class AppModule {}

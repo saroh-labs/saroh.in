@@ -16,11 +16,12 @@ export function StoreNav({ storeId }: { storeId: string }) {
 
     const links = [
         { label: "Overview", href: base, exact: true },
+        { label: "Products", href: `${base}/products`, exact: false },
         { label: "Members", href: `${base}/members`, exact: false },
         { label: "Settings", href: `${base}/settings`, exact: false },
     ];
 
-    const comingSoon = ["Content", "Products"];
+    const comingSoon = ["Content"];
 
     const isActive = (href: string, exact: boolean) =>
         exact ? pathname === href : pathname.startsWith(href);

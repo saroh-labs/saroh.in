@@ -15,10 +15,6 @@ const COMING_SOON = [
         title: "Content",
         description: "Pages, posts, and media for your storefront.",
     },
-    {
-        title: "Products",
-        description: "Your catalog, inventory, and pricing.",
-    },
 ];
 
 /**
