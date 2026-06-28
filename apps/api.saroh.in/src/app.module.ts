@@ -4,6 +4,7 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { auth } from "./common/auth/auth";
 import { CategoriesModule } from "./modules/categories/categories.module";
+import { ContentModule } from "./modules/content/content.module";
 import { CustomersModule } from "./modules/customers/customers.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MembersModule } from "./modules/members/members.module";
@@ -33,6 +34,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         CategoriesModule,
         CustomersModule,
         OrdersModule,
+        ContentModule,
     ],
 })
 export class AppModule {}

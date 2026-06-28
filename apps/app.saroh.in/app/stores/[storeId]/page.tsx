@@ -10,12 +10,7 @@ import {
 } from "@saroh/ui/card";
 import { notFound } from "next/navigation";
 
-const COMING_SOON = [
-    {
-        title: "Content",
-        description: "Pages, posts, and media for your storefront.",
-    },
-];
+const COMING_SOON: { title: string; description: string }[] = [];
 
 /**
  * Store Overview. Re-resolves the store with the same owner gate as the
@@ -47,7 +42,9 @@ export default async function StoreOverviewPage({
                 </CardContent>
             </Card>
 
-            <section>
+            <section
+                className={COMING_SOON.length === 0 ? "hidden" : undefined}
+            >
                 <h2 className="mb-3 text-sm font-medium text-muted-foreground">
                     Coming soon
                 </h2>

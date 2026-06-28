@@ -6,8 +6,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /**
- * Per-store navigation. Active sections (Overview, Settings) are real links;
- * future sections (Content, Products, Members) render disabled with a "Soon"
+ * Per-store navigation. Every section is a real link; the `comingSoon` list
+ * (currently empty) renders any not-yet-built sections disabled with a "Soon"
  * badge so they read as deliberate placeholders, not broken links.
  */
 export function StoreNav({ storeId }: { storeId: string }) {
@@ -19,11 +19,12 @@ export function StoreNav({ storeId }: { storeId: string }) {
         { label: "Products", href: `${base}/products`, exact: false },
         { label: "Orders", href: `${base}/orders`, exact: false },
         { label: "Customers", href: `${base}/customers`, exact: false },
+        { label: "Content", href: `${base}/content`, exact: false },
         { label: "Members", href: `${base}/members`, exact: false },
         { label: "Settings", href: `${base}/settings`, exact: false },
     ];
 
-    const comingSoon = ["Content"];
+    const comingSoon: string[] = [];
 
     const isActive = (href: string, exact: boolean) =>
         exact ? pathname === href : pathname.startsWith(href);

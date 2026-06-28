@@ -473,8 +473,11 @@ model Post {
   excerpt String?
   content String  @db.Text // Markdown or HTML
 
-  authorId String
-  author   StoreMembers @relation(fields: [authorId], references: [id])
+  // Optional: a post is authored by a staff member (StoreMembers), but a store
+  // owner is a StoreOwner — not a member — so owner-authored posts have no
+  // author row. See StoresService: owners are deliberately kept out of members.
+  authorId String?
+  author   StoreMembers? @relation(fields: [authorId], references: [id])
 
   categoryId String?
   category   PostCategory? @relation(fields: [categoryId], references: [id])
