@@ -6,11 +6,19 @@ import { getTrustedOrigins } from "@saroh/auth";
 import helmet from "helmet";
 
 import { AppModule } from "./app.module";
+import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
+import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
+import { LoggingInterceptor } from "./common/logging/logging.interceptor";
+import { structuredLogger } from "./common/logging/structured-logger";
 
 async function bootstrap() {
     // Better Auth reads the raw request body, so Nest's body parser must be
     // disabled here; AuthModule re-adds JSON/urlencoded for the other routes.
     const app = await NestFactory.create(AppModule, { bodyParser: false });
+
+    // Runs first so every request (incl. the mounted Better Auth handler) gets
+    // a correlation id and its logs/error envelope can be traced.
+    app.use(correlationIdMiddleware);
 
     app.use(helmet());
 
@@ -36,17 +44,20 @@ async function bootstrap() {
         }),
     );
 
+    // One structured request log line per request, and a single consistent
+    // error envelope for every thrown error.
+    app.useGlobalInterceptors(new LoggingInterceptor());
+    app.useGlobalFilters(new AllExceptionsFilter());
+
     const port = parseInt(process.env.PORT ?? "3333", 10);
     await app.listen(port);
 
     const environment = process.env.NODE_ENV ?? "development";
-    console.info(
-        `🚀 API + Auth server running on port ${port} (${environment})`,
-    );
+    structuredLogger.info("api_started", { port, environment });
 }
 
 bootstrap().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("Failed to bootstrap application:", message);
+    structuredLogger.error("bootstrap_failed", { message });
     process.exit(1);
 });
