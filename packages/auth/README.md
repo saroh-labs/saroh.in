@@ -1,9 +1,22 @@
 # @saroh/auth
 
-This package provides the authentication config file, we can use this in the application.
+Shared authentication package for the Saroh.io monorepo, built on
+[Better Auth](https://www.better-auth.com/).
 
-> In future we will update this to provide a single authentication wrapper based on top of next-auth to use in our apps.
+The **Better Auth server** itself is hosted by the API (`apps/api.saroh.in`); this
+package provides the single shared config plus the client- and server-side helpers
+that every app consumes so there is exactly one auth surface across the monorepo.
 
-it exports the `nextAuthInstance` that can be used in the apps to configure authentication.
+## Exports
 
-It will be similar to the code here: [https://github.com/t3-oss/create-t3-turbo/blob/main/packages/auth/src/index.ts](https://github.com/t3-oss/create-t3-turbo/blob/main/packages/auth/src/index.ts)
+- **`@saroh/auth/server`** — the shared Better Auth server instance/config
+  (`BETTER_AUTH_SECRET`, Prisma adapter). Owned by `api`; frontends don't import it.
+- **`@saroh/auth/client`** — the browser `authClient` (`signIn`, `signOut`,
+  `useSession`) that talks to the API cross-origin.
+- **`@saroh/auth/middleware`** — Edge-safe Next.js middleware (cookie-presence /
+  origin checks only, no DB access).
+- **`@saroh/auth/next`** — `getServerSession()` for RSC/route handlers, which
+  validates the session against the API over HTTP (no Prisma, no secret in the app).
+
+`accounts.saroh.in` renders the auth UI; every other app authenticates against the
+same session cookie, scoped to `.saroh.in` in production.

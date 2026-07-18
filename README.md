@@ -86,6 +86,9 @@ full audited status and [`RISKS_AND_TECH_DEBT.md`](docs/architecture/RISKS_AND_T
 
 ## Local setup
 
+**Toolchain:** Node **>=24** (developed on 24.14.0) and pnpm **>=9.9** (9.9.0).
+Corepack or a matching pnpm install is recommended; Turborepo drives the tasks.
+
 ```bash
 # 1. Install
 pnpm install
@@ -131,9 +134,12 @@ implementation backlog live in [`docs/architecture/`](docs/architecture/):
 ## Auth
 
 **Better Auth is the only authentication system**, hosted by `api.saroh.in`; the
-NextAuth migration is complete and no NextAuth code remains in source. Remaining
-cleanup (tracked as S0-008 / S1-007): drop any stale `next-auth` references from
-docs and the version catalog, and finish canonical-host documentation. Advanced
+NextAuth migration is complete and no NextAuth code remains in source.
+`accounts.saroh.in` provides the sign-in UI only — it is not a separate auth
+server (see [DEC-001/002/003](docs/architecture/DECISIONS.md)). Documentation
+was reconciled to this canonical host in S0-008; the only remaining
+`next-auth` mentions are in local, gitignored `.env` files and in historical
+migration plans under `docs/plans/` (kept as an accurate record). Advanced
 Better Auth plugins (org, 2FA, OTP, API keys, admin roles) are a later milestone.
 
 ## License & contact

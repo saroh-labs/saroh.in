@@ -4,11 +4,11 @@ Auth app for Saroh: login, sign up, forgot password, and reset password. Uses [b
 
 ## Features
 
--   **Login** – Email/password and GitHub OAuth
--   **Sign up** – Email, name, password
--   **Forgot password** – Request reset link by email
--   **Reset password** – Set new password via link (token from email)
--   Cross-subdomain cookies (`.saroh.in`), rate limiting, and better-auth plugins (admin, organization, 2FA, etc.)
+- **Login** – Email/password and GitHub OAuth
+- **Sign up** – Email, name, password
+- **Forgot password** – Request reset link by email
+- **Reset password** – Set new password via link (token from email)
+- Cross-subdomain cookies (`.saroh.in`), rate limiting, and better-auth plugins (admin, organization, 2FA, etc.)
 
 ## Run locally
 
@@ -23,7 +23,7 @@ Set `DATABASE_URL`, `BETTER_AUTH_URL`, `AUTH_GITHUB_ID`, and `AUTH_GITHUB_SECRET
 
 **Email (React Email + Nodemailer):** Password reset and verification emails use templates from `@saroh/emails` and are sent via Nodemailer when SMTP is configured. Set either:
 
--   **Generic SMTP:** `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and optionally `EMAIL_FROM`, `SMTP_SECURE`
--   **Gmail (same as email.saroh.in):** `USER_ACCOUNT`, `USER_PASSWORD`, and optionally `SENDER_EMAIL_ID` or `EMAIL_FROM`
+- **Generic SMTP:** `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and optionally `EMAIL_FROM`, `SMTP_SECURE`
+- **Gmail:** `USER_ACCOUNT`, `USER_PASSWORD`, and optionally `SENDER_EMAIL_ID` or `EMAIL_FROM`
 
 If no SMTP env is set, reset/verification links are logged to the console instead of sent.
