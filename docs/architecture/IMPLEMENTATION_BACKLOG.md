@@ -2,6 +2,23 @@
 
 Legend: **Foundation**, **Blocker**, **Parallel**, **Migration**, **Cleanup**, **Product**. Each item is intended for one focused Codex session.
 
+## Stage 0 progress
+
+Status of the repo-stabilization stage. Each done item links to the commit that closed it.
+
+| ID     | Status         | Commit / note                                                                |
+| ------ | -------------- | ---------------------------------------------------------------------------- |
+| S0-001 | ✅ Done        | `bf565c8` — real lint + typecheck wired, all violations fixed (19/19, 21/21) |
+| S0-002 | ✅ Done        | CI workflow authored; **branch protection must mark `ci` a required check**  |
+| S0-003 | ✅ Done        | `2a4eafe` — isolated Postgres harness + non-test-DB guard (unit 30/30)       |
+| S0-004 | ⛔ Blocked     | Needs live DB access + backup/restore rehearsal; plan pending owner go-ahead |
+| S0-005 | ✅ Done        | `35505ba` — self-hosted Inter font, pinned Node/pnpm                         |
+| S0-006 | 🚧 In progress | Typed per-app env validation + Turbo env inputs                              |
+| S0-007 | ✅ Done        | `13174cd` — API error envelope, correlation IDs, structured logging          |
+| S0-008 | ✅ Done        | `e6b4307` — inventory + NextAuth→Better Auth doc reconciliation              |
+| S0-009 | ✅ Done        | `e485e82` — removed stray pre-rewrite schema backup                          |
+| S0-010 | ⬜ Pending     | Dependency/cycle/secret scanning + package-boundary rules (after S0-002)     |
+
 | ID     | Class                | Title; problem; proposed solution                                                                                                                                                               | Files or modules likely affected                                       | Dependencies                            | Security considerations and test requirements                                       | Acceptance criteria                                                                                  | Estimated complexity |
 | ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------- |
 | S0-001 | Foundation, Blocker  | Replace broken quality scripts: Next apps use removed `next lint`, API lint is a no-op. Add ESLint/typecheck tasks and Turbo tasks.                                                             | root/app package JSON, ESLint/Turbo config                             | None                                    | Run every monorepo project task                                                     | Root lint/typecheck executes real checks                                                             | S                    |
