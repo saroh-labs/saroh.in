@@ -101,8 +101,22 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
+      # Package-boundary enforcement (frontends must not import Prisma directly)
+      # is part of `lint` via the shared nextjs ESLint config. This step adds
+      # circular-dependency detection across all workspaces.
+      - name: Circular dependency check
+        run: pnpm run check:cycles
+
       - name: Typecheck
         run: pnpm run typecheck
+
+      # Block only on CRITICAL advisories. The tree currently carries ~36 "high"
+      # advisories, almost all transitive dev tooling (e.g. ws DoS via
+      # react-email > socket.io in @saroh/emails) with no upstream fix yet;
+      # hard-failing on "high" would rot CI. Highs/moderates are triaged in the
+      # dependency-refresh pass, not blocked here.
+      - name: Dependency audit (critical only)
+        run: pnpm audit --audit-level critical
 
       - name: Unit tests (api, no database)
         run: pnpm --filter @saroh/api test:unit
@@ -117,3 +131,22 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_test
         run: pnpm --filter @saroh/api test:int
+
+  # Secret scanning runs as its own job over the full git history so a secret
+  # committed in an earlier commit is still caught. gitleaks-action is free for
+  # personal/public repos; a GitHub *organization* additionally needs a
+  # GITLEAKS_LICENSE secret (uncomment below) — see gitleaks docs.
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # required only for GitHub organizations
