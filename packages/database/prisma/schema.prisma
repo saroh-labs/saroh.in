@@ -51,10 +51,33 @@ model Organization {
   stores      Store[]
   memberships Membership[]
 
+  // Optional 1:1 business identity captured at onboarding (S1-004)
+  businessProfile BusinessProfile?
+
   // Per-organization feature-flag overrides (S1-012)
   featureFlagOverrides FeatureFlagOverride[]
 
   createdAt DateTime @default(now())
+}
+
+// BusinessProfile: optional 1:1 business identity for an Organization, captured
+// during onboarding (S1-004). Kept separate from Organization so the tenant root
+// stays lean while legal/tax/contact details evolve independently. All fields are
+// optional — an org can onboard with just a name and fill this in later.
+model BusinessProfile {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  legalName    String?
+  type         String? // individual, company, ...
+  country      String?
+  taxId        String?
+  contactEmail String?
+  website      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Membership: links a User to an Organization with a role (renamed from
