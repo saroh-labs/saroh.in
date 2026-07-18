@@ -28,6 +28,8 @@ jest.mock("@saroh/database", () => {
 
 import { prisma } from "@saroh/database";
 
+import type { AuditService } from "../audit/audit.service";
+import { AuditAction, AuditOutcome } from "../audit/audit.service";
 import type { OnboardOrganizationDto } from "./dto";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
 
@@ -38,7 +40,11 @@ const membershipCreate = prisma.membership.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
 
 describe("OrganizationOnboardingService.onboard", () => {
-    const service = new OrganizationOnboardingService();
+    // AuditService.record is fire-and-forget (never throws); a jest mock stands
+    // in so we can also assert onboarding emits the audit event.
+    const record = jest.fn().mockResolvedValue(undefined);
+    const audit = { record } as unknown as AuditService;
+    const service = new OrganizationOnboardingService(audit);
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -79,6 +85,21 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
         expect(membershipCreate).toHaveBeenCalledWith({
             data: { organizationId: "org_1", userId: "user_1", role: "OWNER" },
+        });
+    });
+
+    it("emits an organization.onboard SUCCESS audit event after commit", async () => {
+        await service.onboard("user_1", { name: "Acme" });
+
+        expect(record).toHaveBeenCalledTimes(1);
+        expect(record).toHaveBeenCalledWith({
+            action: AuditAction.OrganizationOnboard,
+            actorUserId: "user_1",
+            organizationId: "org_1",
+            targetType: "organization",
+            targetId: "org_1",
+            outcome: AuditOutcome.Success,
+            metadata: { slug: "acme" },
         });
     });
 

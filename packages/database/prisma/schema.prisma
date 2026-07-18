@@ -706,6 +706,39 @@ model SecretAccessLog {
   @@index([createdAt])
 }
 
+// Organization-level immutable audit-event stream (S1-009).
+//
+// Distinct from the store-scoped `AuditLog` above: this records sensitive
+// ACTIONS taken against an Organization tenant (membership changes, Team /
+// Project access, profile edits, security-sensitive operations). It is
+// append-only BY CONVENTION — application code only ever calls
+// `prisma.auditEvent.create`; there is no update/delete path (see AuditService).
+//
+// DELIBERATELY NO RELATIONS. The compliance value of an audit trail is that it
+// outlives the things it describes: an event must survive the deletion of its
+// Organization, actor User, or Project. Foreign keys with cascade (or even a
+// restrict) would either destroy history or block deletions, so actor /
+// organization / project are stored as bare id strings, not relations.
+model AuditEvent {
+  id String @id @default(cuid())
+
+  action         String // e.g. "membership.invite", "organization.onboard", "secret.access"
+  actorUserId    String // Who performed the action (the authenticated actor)
+  organizationId String // Tenant the action belongs to
+  projectId      String? // Optional Project scope (Projects arrive in a later ticket)
+
+  targetType String? // Kind of entity acted upon, e.g. "membership", "profile"
+  targetId   String? // Id of that entity, when applicable
+
+  outcome  String // "SUCCESS" | "FAILURE" | "DENIED"
+  metadata Json? // Redacted, non-sensitive context (never secrets/PII)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId])
+}
+
 model Session {
   id        String   @id
   expiresAt DateTime

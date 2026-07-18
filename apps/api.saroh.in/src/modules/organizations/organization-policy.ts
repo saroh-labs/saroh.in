@@ -21,6 +21,9 @@ import type {
  *
  *  - `org:*`     — the Organization itself (settings, deletion).
  *  - `member:*`  — the Organization's membership roster.
+ *  - `audit:*`   — the Organization's immutable audit stream (S1-009). Reading
+ *                  it is OWNER/ADMIN-only: it is NOT in READ_ONLY_ACTIONS, so a
+ *                  MEMBER cannot see it (audit trails leak who-did-what).
  *  - `store:*`   — Organization-owned commerce channels (Stores).
  *
  * Add new actions here and to CAPABILITIES; TypeScript then forces every role
@@ -34,6 +37,7 @@ export type OrgAction =
     | "member:invite"
     | "member:remove"
     | "member:role:update"
+    | "audit:read"
     | "store:create"
     | "store:read"
     | "store:write"
@@ -48,6 +52,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "member:invite",
     "member:remove",
     "member:role:update",
+    "audit:read",
     "store:create",
     "store:read",
     "store:write",

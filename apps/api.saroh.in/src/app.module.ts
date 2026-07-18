@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { auth } from "./common/auth/auth";
+import { AuditModule } from "./modules/audit/audit.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { ContentModule } from "./modules/content/content.module";
 import { CustomersModule } from "./modules/customers/customers.module";
@@ -32,6 +33,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         HealthModule,
         FeatureFlagModule,
         OrganizationsModule,
+        AuditModule,
         StoresModule,
         MembersModule,
         ProductsModule,

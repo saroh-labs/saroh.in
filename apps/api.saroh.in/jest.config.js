@@ -18,6 +18,9 @@ module.exports = {
     testMatch: [
         "<rootDir>/src/common/**/*.spec.ts",
         "<rootDir>/src/modules/organizations/**/*.spec.ts",
+        // S1-009 audit: append-only AuditService + read-authorization specs,
+        // pure unit tests with a jest-mocked Prisma (never touch a DB).
+        "<rootDir>/src/modules/audit/**/*.spec.ts",
         "<rootDir>/src/modules/feature-flags/**/*.spec.ts",
         // S1-006 store authorization: pure unit specs with mocked Prisma +
         // mocked FeatureFlagService (never touch a DB). Only *.authorization

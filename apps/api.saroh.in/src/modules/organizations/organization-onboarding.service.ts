@@ -6,6 +6,11 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import {
+    AuditAction,
+    AuditOutcome,
+    AuditService,
+} from "../audit/audit.service";
 import type { OnboardOrganizationDto } from "./dto";
 import { slugify } from "./slug";
 
@@ -31,6 +36,8 @@ export interface OnboardedOrganization {
 export class OrganizationOnboardingService {
     private readonly logger = new Logger(OrganizationOnboardingService.name);
 
+    constructor(private readonly audit: AuditService) {}
+
     async onboard(
         userId: string,
         dto: OnboardOrganizationDto,
@@ -42,7 +49,7 @@ export class OrganizationOnboardingService {
             );
         }
 
-        return prisma.$transaction(async (tx) => {
+        const onboarded = await prisma.$transaction(async (tx) => {
             // Fail fast on a taken slug with a clear 409 rather than surfacing a
             // raw unique-constraint error; the check + create share the txn.
             const existing = await tx.organization.findUnique({
@@ -82,6 +89,22 @@ export class OrganizationOnboardingService {
 
             return { id: organization.id, slug: organization.slug };
         });
+
+        // Emit the audit event AFTER the transaction commits, so we only record
+        // an org that actually exists. `record` never throws (it swallows and
+        // logs internally), so a failed audit write can't undo a committed
+        // onboarding — see AuditService's tradeoff note.
+        await this.audit.record({
+            action: AuditAction.OrganizationOnboard,
+            actorUserId: userId,
+            organizationId: onboarded.id,
+            targetType: "organization",
+            targetId: onboarded.id,
+            outcome: AuditOutcome.Success,
+            metadata: { slug: onboarded.slug },
+        });
+
+        return onboarded;
     }
 
     /**

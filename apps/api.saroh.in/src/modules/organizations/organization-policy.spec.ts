@@ -13,6 +13,8 @@ import { authorize, can, ORG_ACTIONS } from "./organization-policy";
 const EXPECTED: Record<OrgRole, OrgAction[]> = {
     OWNER: [...ORG_ACTIONS],
     ADMIN: ORG_ACTIONS.filter((action) => action !== "org:delete"),
+    // audit:read is deliberately OWNER/ADMIN-only, so MEMBER (read-only floor)
+    // does NOT include it.
     MEMBER: ["org:read", "member:read", "store:read"],
 };
 
@@ -41,6 +43,12 @@ describe("organization-policy: can()", () => {
         for (const action of ORG_ACTIONS.filter((a) => a !== "org:delete")) {
             expect(can("ADMIN", action)).toBe(true);
         }
+    });
+
+    it("audit:read is OWNER/ADMIN-only (S1-009)", () => {
+        expect(can("OWNER", "audit:read")).toBe(true);
+        expect(can("ADMIN", "audit:read")).toBe(true);
+        expect(can("MEMBER", "audit:read")).toBe(false);
     });
 
     it("MEMBER is read-only", () => {
