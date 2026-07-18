@@ -78,6 +78,10 @@ model Organization {
   sections     Section[]
   publications Publication[]
 
+  // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
+  // `hostname` is globally unique, so a hostname maps to at most one org.
+  domains Domain[]
+
   createdAt DateTime @default(now())
 }
 
@@ -1043,6 +1047,11 @@ model Site {
   pages        Page[]
   publications Publication[] @relation("SitePublications")
 
+  // Verified subdomain / custom-domain claims routed to this Site (S2-007).
+  // Nullable on the Domain side (Domain.siteId) — a claim exists before it is
+  // linked to a site — so onDelete is SetNull there, not a cascade.
+  claimedDomains Domain[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // Soft delete
@@ -1158,4 +1167,47 @@ model Publication {
 
   @@index([siteId, publishedAt])
   @@index([organizationId])
+}
+
+// ============================================================================
+// DOMAINS: SUBDOMAIN / CUSTOM-DOMAIN CLAIM + VERIFICATION (Stage 2 — S2-007)
+// ============================================================================
+//
+// A Domain is an Organization's CLAIM on a single hostname (a platform
+// subdomain like "acme.saroh.in" or a custom domain like "shop.acme.com").
+//
+// `hostname` is GLOBALLY UNIQUE, which is the crux of the ownership model: a
+// second organization physically cannot insert a row for a hostname another org
+// already claimed (the DB rejects it), so the DomainsService can surface a clear
+// 409 Conflict. A claim starts PENDING and only becomes VERIFIED once the org
+// proves control by publishing the `verificationToken` in a DNS TXT record —
+// verification is NEVER asserted by the client. Routing/link to a Site happens
+// only AFTER a claim is VERIFIED, so at most one org ever controls a hostname.
+model Domain {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The subdomain or custom domain being claimed, e.g. "shop.acme.com".
+  // Globally unique: a hostname maps to at most one org (see model note).
+  hostname String @unique
+
+  // The Site this hostname routes to once VERIFIED. Nullable until linked; the
+  // Site may be attached at claim time or at verify time. SetNull so deleting a
+  // Site un-links the claim rather than destroying it.
+  siteId String?
+  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  status String @default("PENDING") // PENDING → VERIFIED (FAILED on a checked failure)
+
+  // Random token (node:crypto) the org must publish in a DNS TXT record.
+  verificationToken  String
+  verificationMethod String @default("DNS_TXT")
+  verifiedAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([siteId])
 }

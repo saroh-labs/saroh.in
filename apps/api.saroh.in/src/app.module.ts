@@ -7,6 +7,7 @@ import { AuditModule } from "./modules/audit/audit.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { ContentModule } from "./modules/content/content.module";
 import { CustomersModule } from "./modules/customers/customers.module";
+import { DomainsModule } from "./modules/domains/domains.module";
 import { FeatureFlagModule } from "./modules/feature-flags/feature-flags.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MediaModule } from "./modules/media/media.module";
@@ -47,6 +48,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         ContentModule,
         MediaModule,
         SitesModule,
+        DomainsModule,
     ],
 })
 export class AppModule {}
