@@ -27,16 +27,16 @@ Status of the repo-stabilization stage. Each done item links to the commit that 
 | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | S1-001 | ✅ Done    | [ADR-001](adr/ADR-001-organization-tenant-root.md) — Organization tenant-root vocabulary + compat map                                 |
 | S1-002 | ✅ Done    | `a53bc79` — Workspace→Organization, Membership, Store.organizationId; idempotent backfill applied to dev DB (2 orgs, acceptance PASS) |
-| S1-003 | ⬜ Pending | `OrganizationContext` + centralized authz policy (needs S1-002)                                                                       |
+| S1-003 | ✅ Done    | `c772e03` — OrganizationContext, centralized authorize() policy, OrganizationGuard + @OrgContext, organizations module (37 tests)     |
 | S1-004 | ⬜ Pending | Organization/business-profile onboarding API                                                                                          |
 | S1-005 | ⬜ Pending | Onboarding + Organization switcher UI                                                                                                 |
 | S1-006 | ⬜ Pending | Dual-read legacy StoreOwner/Member through Organization authz, then block Org-less writes                                             |
-| S1-007 | ⬜ Pending | Finish Better Auth cleanup + canonical API-host docs/config                                                                           |
+| S1-007 | ✅ Done    | `edf6c88` — zero NextAuth in code/config/deps; api.saroh.in canonical auth host                                                       |
 | S1-008 | ⬜ Pending | Browser E2E: cross-subdomain cookie, redirect, logout, CSRF                                                                           |
 | S1-009 | ⬜ Pending | Immutable audit events for membership/Team/Project/profile/secret changes                                                             |
 | S1-010 | ⬜ Pending | Team, TeamMember, direct/Team ProjectAccess (MANAGER/EDITOR/VIEWER)                                                                   |
 | S1-011 | ⬜ Pending | Transaction-local Organization context + PostgreSQL RLS policies                                                                      |
-| S1-012 | ⬜ Pending | Typed server-side feature flags with global/Organization overrides                                                                    |
+| S1-012 | ✅ Done    | `acbad70` (+ `73c1ebb` migration) — typed FlagKey registry, override>default>false, audit history; tables applied to dev DB           |
 
 | ID     | Class                | Title; problem; proposed solution                                                                                                                                                               | Files or modules likely affected                                       | Dependencies                            | Security considerations and test requirements                                       | Acceptance criteria                                                                                  | Estimated complexity |
 | ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------- |
