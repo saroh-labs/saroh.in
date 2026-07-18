@@ -9,6 +9,7 @@ import { CustomersModule } from "./modules/customers/customers.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MembersModule } from "./modules/members/members.module";
 import { OrdersModule } from "./modules/orders/orders.module";
+import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { StoresModule } from "./modules/stores/stores.module";
 
@@ -28,6 +29,7 @@ import { StoresModule } from "./modules/stores/stores.module";
             bodyParser: { json: {}, urlencoded: { extended: true } },
         }),
         HealthModule,
+        OrganizationsModule,
         StoresModule,
         MembersModule,
         ProductsModule,

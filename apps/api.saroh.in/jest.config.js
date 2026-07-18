@@ -6,6 +6,9 @@
  * integration project (jest.integration.config.js); they are excluded here so
  * `pnpm test` never needs a Postgres.
  *
+ * The organizations module (S1-003) is authorization logic with a mocked
+ * Prisma, so its specs are pure unit tests and run here (never touching a DB).
+ *
  * @type {import('jest').Config}
  */
 module.exports = {
@@ -14,6 +17,8 @@ module.exports = {
     rootDir: ".",
     testMatch: [
         "<rootDir>/src/common/**/*.spec.ts",
+        "<rootDir>/src/modules/organizations/**/*.spec.ts",
+        "<rootDir>/src/modules/feature-flags/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
