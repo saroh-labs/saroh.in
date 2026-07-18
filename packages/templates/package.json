@@ -1,12 +1,59 @@
 {
   "name": "@saroh/templates",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Versioned site-template manifests + registry that instantiate valid CMS pages for Saroh.io",
+  "license": "MIT",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsup",
+    "lint": "eslint .",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**",
+    "src/**"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@saroh/database": "workspace:*"
+  },
+  "devDependencies": {
+    "@saroh/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "tsup": "^8.5.1",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
+  },
+  "author": "Mohit Kumar <himohitmehta>",
+  "homepage": "https://saroh.in",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/himohitmehta/saroh.io.git"
+  },
+  "bugs": {
+    "url": "https://github.com/himohitmehta/saroh.io/issues"
+  },
+  "keywords": [
+    "saroh",
+    "saroh.io",
+    "templates",
+    "cms",
+    "site-builder"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
