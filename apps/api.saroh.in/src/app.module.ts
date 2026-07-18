@@ -15,6 +15,7 @@ import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
+import { SitesModule } from "./modules/sites/sites.module";
 import { StoresModule } from "./modules/stores/stores.module";
 
 @Module({
@@ -45,6 +46,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         OrdersModule,
         ContentModule,
         MediaModule,
+        SitesModule,
     ],
 })
 export class AppModule {}

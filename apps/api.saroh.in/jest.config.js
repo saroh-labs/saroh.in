@@ -33,6 +33,10 @@ module.exports = {
         // S2-008 media: MediaService specs with a jest-mocked Prisma AND a fake
         // ObjectStorage port (never touch a DB, R2, or the network).
         "<rootDir>/src/modules/media/**/*.spec.ts",
+        // S2-003 sites: SitesService specs with a jest-mocked Prisma (incl.
+        // $transaction) that run the REAL @saroh/templates instantiate against
+        // the real starter template — never touch a DB.
+        "<rootDir>/src/modules/sites/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],

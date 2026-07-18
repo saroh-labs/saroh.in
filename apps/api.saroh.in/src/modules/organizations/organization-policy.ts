@@ -25,6 +25,15 @@ import type {
  *                  it is OWNER/ADMIN-only: it is NOT in READ_ONLY_ACTIONS, so a
  *                  MEMBER cannot see it (audit trails leak who-did-what).
  *  - `store:*`   — Organization-owned commerce channels (Stores).
+ *  - `site:*`    — Organization-owned publishing properties (Sites, S2-003).
+ *                  `site:read` is in the read-only floor (every role, including
+ *                  MEMBER, may list/read the org's sites). `site:create` /
+ *                  `site:update` / `site:delete` are OWNER/ADMIN-only: they are
+ *                  NOT in READ_ONLY_ACTIONS, so a MEMBER cannot create or mutate
+ *                  a site. (Widening authoring to MEMBER later — so contributors
+ *                  can edit their own sites — is a one-line change to
+ *                  READ_ONLY_ACTIONS / CAPABILITIES; the default here is the
+ *                  least-privilege choice.)
  *  - `project:*` — Projects, Teams, and project-level access grants (S1-010).
  *                  `project:access:manage` (create/delete Projects & Teams,
  *                  grant/revoke project roles, manage team membership) is
@@ -56,6 +65,10 @@ export type OrgAction =
     | "store:read"
     | "store:write"
     | "store:delete"
+    | "site:create"
+    | "site:read"
+    | "site:update"
+    | "site:delete"
     | "project:access:manage"
     | "media:read"
     | "media:write";
@@ -74,6 +87,10 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "store:read",
     "store:write",
     "store:delete",
+    "site:create",
+    "site:read",
+    "site:update",
+    "site:delete",
     "project:access:manage",
     "media:read",
     "media:write",
@@ -84,6 +101,7 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
     "org:read",
     "member:read",
     "store:read",
+    "site:read",
     "media:read",
 ];
 
