@@ -29,7 +29,7 @@ Status of the repo-stabilization stage. Each done item links to the commit that 
 | S1-002 | ✅ Done    | `a53bc79` — Workspace→Organization, Membership, Store.organizationId; idempotent backfill applied to dev DB (2 orgs, acceptance PASS) |
 | S1-003 | ✅ Done    | `c772e03` — OrganizationContext, centralized authorize() policy, OrganizationGuard + @OrgContext, organizations module (37 tests)     |
 | S1-004 | ✅ Done    | `673b255` (+ `7ccc3c0` migration) — BusinessProfile + POST /organizations, atomic actor-derived OWNER onboarding                      |
-| S1-005 | ⬜ Pending | Onboarding + Organization switcher UI                                                                                                 |
+| S1-005 | ✅ Done    | `fa341ea` — org switcher + onboarding UI; active_org cookie → x-organization-id; zero-org funnel; member-guarded switching            |
 | S1-006 | ✅ Done    | `fdb9837` — Store authz via Org membership behind ORG_AUTHORIZATION flag (default off), additive dual-read; 13 cross-tenant tests     |
 | S1-007 | ✅ Done    | `edf6c88` — zero NextAuth in code/config/deps; api.saroh.in canonical auth host                                                       |
 | S1-008 | ⬜ Pending | Browser E2E: cross-subdomain cookie, redirect, logout, CSRF                                                                           |
