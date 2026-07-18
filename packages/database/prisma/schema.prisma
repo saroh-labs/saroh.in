@@ -66,6 +66,14 @@ model Organization {
   // Per-organization feature-flag overrides (S1-012)
   featureFlagOverrides FeatureFlagOverride[]
 
+  // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
+  // carries `organizationId` for tenant scoping / RLS.
+  sites        Site[]
+  pages        Page[]
+  pageVersions PageVersion[]
+  sections     Section[]
+  publications Publication[]
+
   createdAt DateTime @default(now())
 }
 
@@ -942,4 +950,180 @@ model ProjectAccess {
   @@index([projectId])
   @@index([userId])
   @@index([teamId])
+}
+
+// ============================================================================
+// CMS: SITES, PAGES, VERSIONS, SECTIONS & PUBLICATIONS (Stage 2 — S2-001)
+// ============================================================================
+//
+// The publishing data model. Two clearly separated halves (see ADR-002):
+//
+//   1. DRAFT / working set — Site → Page → PageVersion → Section. Mutable while
+//      editing (S2-004). DRAFTS ARE PRIVATE and are never read by the public
+//      renderer.
+//   2. IMMUTABLE published set — Publication. An append-only, fully-resolved,
+//      sanitized snapshot produced at publish time (S2-005). The public
+//      renderer (S2-006) reads ONLY Publications — never the draft tables.
+//
+// Every model is Organization-owned (ADR-001): it carries `organizationId`
+// (indexed) so tenant scoping / RLS applies uniformly. `Section.content` is
+// validated against the versioned section contract in
+// `src/cms/section-contract.ts` for its (type, contractVersion).
+//
+// Note: this is NEW, distinct from the store-scoped blog `Post`/`PostCategory`
+// and store `CustomDomain`. Those are intentionally left untouched here; the
+// mapping from them into Sites/Pages is deferred (see ADR-002 §mapping).
+
+// A version's editing lifecycle. A DRAFT is the mutable working copy; PUBLISHED
+// marks the version a live Publication was snapshotted from; ARCHIVED is a
+// retired version kept for history.
+enum PageVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// Site — an Organization-owned publishing property (public web presence).
+// Distinct from Store (a commerce channel), per ADR-001.
+model Site {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name String
+  slug String // unique within the owning Organization
+
+  // Optional platform subdomain, e.g. "acme" → acme.saroh.in. Globally unique
+  // when set (NULLs are distinct, so many sites may have no subdomain).
+  subdomain String? @unique
+
+  // Reserved placeholder for the S2-007 custom-domain claim/verification flow.
+  // NOT wired to a relation here and NOT the legacy store `CustomDomain`.
+  customDomainId String?
+
+  // Pointer to the current live Publication served for the site root. Null
+  // until first publish; (re)set on publish (S2-005). SetNull keeps the Site
+  // if the pointed-at Publication ever disappears (publications are otherwise
+  // append-only and never deleted).
+  currentPublicationId String?      @unique
+  currentPublication   Publication? @relation("SiteCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
+
+  pages        Page[]
+  publications Publication[] @relation("SitePublications")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+// Page — a routable page within a Site, identified by its `path`.
+model Page {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  // Denormalized tenant scope for isolation / RLS (ADR-001).
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  path   String // "/", "/about", ...
+  title  String
+  isHome Boolean @default(false)
+
+  versions PageVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([siteId, path])
+  @@index([siteId])
+  @@index([organizationId])
+}
+
+// PageVersion — a DRAFT / working version of a Page. Editing happens here; a
+// version is the source a Publication is snapshotted from at publish time.
+model PageVersion {
+  id     String @id @default(cuid())
+  pageId String
+  page   Page   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  status PageVersionStatus @default(DRAFT)
+
+  createdByUserId String? // authoring user, when known
+
+  sections Section[] // ordered content blocks (see Section.order)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pageId])
+  @@index([organizationId])
+}
+
+// Section — a typed content block within a PageVersion. `content` is JSON
+// validated against the versioned section contract keyed by
+// (type, contractVersion) — the single source of truth for what a section may
+// hold (src/cms/section-contract.ts).
+model Section {
+  id            String      @id @default(cuid())
+  pageVersionId String
+  pageVersion   PageVersion @relation(fields: [pageVersionId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type            String // registry key, e.g. "hero", "richText", "cta", "gallery"
+  contractVersion Int    @default(1) // contract version validating `content`
+  order           Int // ordering within the PageVersion
+  content         Json // validated against the contract for (type, contractVersion)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pageVersionId, order])
+  @@index([organizationId])
+}
+
+// Publication — an IMMUTABLE, APPEND-ONLY published snapshot.
+//
+// Rows are never updated or deleted: republishing inserts a NEW row (hence no
+// `updatedAt` — only `publishedAt`). `snapshot` is the fully-resolved, already
+// SANITIZED page(s) + sections captured at publish time, so it is
+// self-contained: the public renderer (S2-006) reads ONLY this table and never
+// needs the draft tables (Page/PageVersion/Section). Rich content is sanitized
+// on the way IN (during publish, S2-005) — see src/cms/section-contract.ts.
+model Publication {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation("SitePublications", fields: [siteId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Optional page-level scoping: a publication may snapshot a whole site or a
+  // single page/path.
+  pageId String?
+  path   String?
+
+  // Fully-resolved, sanitized page(s) + sections at publish time. Self-contained.
+  snapshot Json
+
+  // The template (versioned — S2-002/S2-003) the snapshot was built with.
+  templateId      String
+  templateVersion Int
+
+  publishedByUserId String?
+  publishedAt       DateTime @default(now()) // immutable; republish == new row
+
+  // Back-relation for Site.currentPublication (the live pointer above).
+  currentForSite Site? @relation("SiteCurrentPublication")
+
+  @@index([siteId, publishedAt])
+  @@index([organizationId])
 }

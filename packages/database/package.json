@@ -23,13 +23,15 @@
     "predev": "npm run generate",
     "studio": "prisma studio",
     "postinstall": "prisma generate",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.4.0",
     "@prisma/client": "catalog:prisma",
     "@types/node": "catalog:",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",
@@ -40,6 +42,7 @@
     "tsconfig": "^7.0.0",
     "tsup": "^8.5.1",
     "tsx": "^4.22.3",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
   }
 }
