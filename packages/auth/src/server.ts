@@ -24,10 +24,13 @@ export interface CreateAuthOptions {
 }
 
 /**
- * The single source of truth for the Better Auth server config. Both
- * accounts.saroh.in (issuer) and api.saroh.in (validator) build their
- * instance from this factory so secret, adapter, and plugins are identical
- * — the precondition for shared-DB cross-subdomain session validation.
+ * The single source of truth for the Better Auth server config. api.saroh.in
+ * is the auth host — it owns this instance, the DB, and the secret, and both
+ * issues and validates sessions. accounts.saroh.in is the SSO login UI only
+ * and talks to api over HTTP; it does not build an instance from this factory.
+ * Keeping one factory means secret, adapter, and plugins stay identical
+ * wherever it is constructed — the precondition for shared-DB cross-subdomain
+ * session validation.
  *
  * Milestone 1: core only (email/password + verification + reset, GitHub +
  * Google OAuth). Advanced plugins are layered on per M2 slice.
@@ -36,7 +39,7 @@ export function createAuth(opts: CreateAuthOptions = {}) {
     const secret = process.env.BETTER_AUTH_SECRET;
     if (!secret) {
         throw new Error(
-            "BETTER_AUTH_SECRET is not set — both accounts and api must load the same secret or session validation fails.",
+            "BETTER_AUTH_SECRET is not set — api hosts Better Auth and every app that validates sessions must load the same secret or session validation fails.",
         );
     }
 
