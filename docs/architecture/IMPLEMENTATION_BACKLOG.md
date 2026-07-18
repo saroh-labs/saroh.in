@@ -45,14 +45,14 @@ Status of the repo-stabilization stage. Each done item links to the commit that 
 | ID      | Status     | Commit / note                                                                                                               |
 | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
 | S2-001  | ✅ Done    | `378f024` (+ `20260718133036` migration) — Site/Page/PageVersion/Section/Publication + versioned section contract (ADR-002) |
-| S2-002  | ⬜ Pending | Template manifest/version registry + one production template (needs S2-001)                                                 |
+| S2-002  | ✅ Done    | `0274312` — @saroh/templates: versioned manifest/registry + starter@1; instantiate validates via the section contract       |
 | S2-003  | ⬜ Pending | Site creation from business profile/template (needs S2-001/002)                                                             |
 | S2-004  | ⬜ Pending | Section editor + preview UI (needs S2-003)                                                                                  |
 | S2-005  | ⬜ Pending | Immutable publication command + public read API (needs S2-003)                                                              |
 | S2-006  | ⬜ Pending | Public renderer client (sites app) (needs S2-005)                                                                           |
 | S2-007  | ⬜ Pending | Subdomain/custom-domain claim + verification (needs S2-003)                                                                 |
 | S2-008a | ✅ Done    | `151840e` — @saroh/object-storage: R2 signed-upload port + adapter, tenant-scoped keys, 39 tests                            |
-| S2-008b | ⬜ Pending | Media model + media API module (signed uploads via object-storage) (needs S2-001, S2-008a)                                  |
+| S2-008b | ✅ Done    | `11805e0` (+ `da807d7` migration) — Media model + media API module; R2-or-memory storage; media:read/write; 34 tests        |
 
 | ID     | Class                | Title; problem; proposed solution                                                                                                                                                               | Files or modules likely affected                                       | Dependencies                            | Security considerations and test requirements                                       | Acceptance criteria                                                                                  | Estimated complexity |
 | ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------- |
