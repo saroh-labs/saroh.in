@@ -40,6 +40,20 @@ Status of the repo-stabilization stage. Each done item links to the commit that 
 | S1-011 | ✅ Done\* | `a9d7ad3` — withOrgContext + FORCE RLS (org-direct tables), dark rollout; proven to isolate under a restricted role. \*Enforcement needs a non-BYPASSRLS app DB role (deploy step); store-child RLS is a follow-up                                              |
 | S1-012 | ✅ Done   | `acbad70` (+ `73c1ebb` migration) — typed FlagKey registry, override>default>false, audit history; tables applied to dev DB                                                                                                                                     |
 
+## Stage 2 progress — Site management, CMS, page builder
+
+| ID      | Status     | Commit / note                                                                                                               |
+| ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| S2-001  | ✅ Done    | `378f024` (+ `20260718133036` migration) — Site/Page/PageVersion/Section/Publication + versioned section contract (ADR-002) |
+| S2-002  | ⬜ Pending | Template manifest/version registry + one production template (needs S2-001)                                                 |
+| S2-003  | ⬜ Pending | Site creation from business profile/template (needs S2-001/002)                                                             |
+| S2-004  | ⬜ Pending | Section editor + preview UI (needs S2-003)                                                                                  |
+| S2-005  | ⬜ Pending | Immutable publication command + public read API (needs S2-003)                                                              |
+| S2-006  | ⬜ Pending | Public renderer client (sites app) (needs S2-005)                                                                           |
+| S2-007  | ⬜ Pending | Subdomain/custom-domain claim + verification (needs S2-003)                                                                 |
+| S2-008a | ✅ Done    | `151840e` — @saroh/object-storage: R2 signed-upload port + adapter, tenant-scoped keys, 39 tests                            |
+| S2-008b | ⬜ Pending | Media model + media API module (signed uploads via object-storage) (needs S2-001, S2-008a)                                  |
+
 | ID     | Class                | Title; problem; proposed solution                                                                                                                                                               | Files or modules likely affected                                       | Dependencies                            | Security considerations and test requirements                                       | Acceptance criteria                                                                                  | Estimated complexity |
 | ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------- |
 | S0-001 | Foundation, Blocker  | Replace broken quality scripts: Next apps use removed `next lint`, API lint is a no-op. Add ESLint/typecheck tasks and Turbo tasks.                                                             | root/app package JSON, ESLint/Turbo config                             | None                                    | Run every monorepo project task                                                     | Root lint/typecheck executes real checks                                                             | S                    |
