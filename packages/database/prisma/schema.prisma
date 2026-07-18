@@ -51,6 +51,9 @@ model Organization {
   stores      Store[]
   memberships Membership[]
 
+  // Per-organization feature-flag overrides (S1-012)
+  featureFlagOverrides FeatureFlagOverride[]
+
   createdAt DateTime @default(now())
 }
 
@@ -723,4 +726,66 @@ model Verification {
   updatedAt  DateTime @updatedAt
 
   @@index([identifier])
+}
+
+// ============================================================================
+// FEATURE FLAGS (S1-012)
+// ============================================================================
+
+// Server-side feature flags. Evaluation is server-only (never trust the
+// client for flag state). A flag has a global default (FeatureFlag) which can
+// be overridden per Organization (FeatureFlagOverride). Every write is
+// recorded immutably in FeatureFlagAudit. `key` is drawn from the typed
+// registry in src/modules/feature-flags/flags.ts (e.g. ORG_AUTHORIZATION).
+
+model FeatureFlag {
+  id String @id @default(cuid())
+
+  key         String  @unique // matches FlagKey in code
+  description String?
+
+  enabledByDefault Boolean @default(false)
+
+  overrides FeatureFlagOverride[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Per-Organization override of a flag's global default.
+model FeatureFlagOverride {
+  id String @id @default(cuid())
+
+  flagKey String
+  flag    FeatureFlag @relation(fields: [flagKey], references: [key], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  enabled Boolean
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([flagKey, organizationId])
+  @@index([organizationId])
+}
+
+// Immutable, append-only audit history of every flag/override write. A null
+// organizationId denotes a change to the global default; otherwise it is the
+// affected Organization. No updates or deletes are performed in code.
+model FeatureFlagAudit {
+  id String @id @default(cuid())
+
+  flagKey        String
+  organizationId String? // null => global default change
+
+  previousValue Boolean? // null when the flag/override did not exist before
+  newValue      Boolean
+
+  actorUserId String
+
+  createdAt DateTime @default(now())
+
+  @@index([flagKey])
+  @@index([organizationId])
 }

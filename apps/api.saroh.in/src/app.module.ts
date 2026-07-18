@@ -6,6 +6,7 @@ import { auth } from "./common/auth/auth";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { ContentModule } from "./modules/content/content.module";
 import { CustomersModule } from "./modules/customers/customers.module";
+import { FeatureFlagModule } from "./modules/feature-flags/feature-flags.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MembersModule } from "./modules/members/members.module";
 import { OrdersModule } from "./modules/orders/orders.module";
@@ -29,6 +30,7 @@ import { StoresModule } from "./modules/stores/stores.module";
             bodyParser: { json: {}, urlencoded: { extended: true } },
         }),
         HealthModule,
+        FeatureFlagModule,
         OrganizationsModule,
         StoresModule,
         MembersModule,
