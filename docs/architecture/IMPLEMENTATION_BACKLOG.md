@@ -19,6 +19,25 @@ Status of the repo-stabilization stage. Each done item links to the commit that 
 | S0-009 | ✅ Done | `e485e82` — removed stray pre-rewrite schema backup                                                                             |
 | S0-010 | ✅ Done | `dac11fb` — frontend→DB import ban (ESLint), madge cycles, gitleaks, pnpm audit (critical)                                      |
 
+**Stage 0 complete (10/10).**
+
+## Stage 1 progress — Organizations (org-first tenancy)
+
+| ID     | Status     | Commit / note                                                                                              |
+| ------ | ---------- | ---------------------------------------------------------------------------------------------------------- |
+| S1-001 | ✅ Done    | [ADR-001](adr/ADR-001-organization-tenant-root.md) — Organization tenant-root vocabulary + compat map      |
+| S1-002 | ⬜ Pending | Backfill: one Organization + OWNER membership per tenant; Store `organizationId` dual-write (needs S1-001) |
+| S1-003 | ⬜ Pending | `OrganizationContext` + centralized authz policy (needs S1-002)                                            |
+| S1-004 | ⬜ Pending | Organization/business-profile onboarding API                                                               |
+| S1-005 | ⬜ Pending | Onboarding + Organization switcher UI                                                                      |
+| S1-006 | ⬜ Pending | Dual-read legacy StoreOwner/Member through Organization authz, then block Org-less writes                  |
+| S1-007 | ⬜ Pending | Finish Better Auth cleanup + canonical API-host docs/config                                                |
+| S1-008 | ⬜ Pending | Browser E2E: cross-subdomain cookie, redirect, logout, CSRF                                                |
+| S1-009 | ⬜ Pending | Immutable audit events for membership/Team/Project/profile/secret changes                                  |
+| S1-010 | ⬜ Pending | Team, TeamMember, direct/Team ProjectAccess (MANAGER/EDITOR/VIEWER)                                        |
+| S1-011 | ⬜ Pending | Transaction-local Organization context + PostgreSQL RLS policies                                           |
+| S1-012 | ⬜ Pending | Typed server-side feature flags with global/Organization overrides                                         |
+
 | ID     | Class                | Title; problem; proposed solution                                                                                                                                                               | Files or modules likely affected                                       | Dependencies                            | Security considerations and test requirements                                       | Acceptance criteria                                                                                  | Estimated complexity |
 | ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------- |
 | S0-001 | Foundation, Blocker  | Replace broken quality scripts: Next apps use removed `next lint`, API lint is a no-op. Add ESLint/typecheck tasks and Turbo tasks.                                                             | root/app package JSON, ESLint/Turbo config                             | None                                    | Run every monorepo project task                                                     | Root lint/typecheck executes real checks                                                             | S                    |
