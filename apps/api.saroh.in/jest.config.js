@@ -37,6 +37,7 @@ module.exports = {
         // $transaction) that run the REAL @saroh/templates instantiate against
         // the real starter template — never touch a DB.
         "<rootDir>/src/modules/sites/**/*.spec.ts",
+        "<rootDir>/src/modules/domains/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],

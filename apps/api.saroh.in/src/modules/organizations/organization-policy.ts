@@ -71,7 +71,10 @@ export type OrgAction =
     | "site:delete"
     | "project:access:manage"
     | "media:read"
-    | "media:write";
+    | "media:write"
+    | "section:write"
+    | "site:publish"
+    | "domain:manage";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -94,6 +97,9 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "project:access:manage",
     "media:read",
     "media:write",
+    "section:write",
+    "site:publish",
+    "domain:manage",
 ];
 
 /** Read-only actions — the floor every role (including MEMBER) may perform. */
