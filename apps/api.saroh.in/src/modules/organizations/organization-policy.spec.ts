@@ -14,8 +14,8 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
     OWNER: [...ORG_ACTIONS],
     ADMIN: ORG_ACTIONS.filter((action) => action !== "org:delete"),
     // audit:read is deliberately OWNER/ADMIN-only, so MEMBER (read-only floor)
-    // does NOT include it.
-    MEMBER: ["org:read", "member:read", "store:read"],
+    // does NOT include it. media:read IS in the floor; media:write is not.
+    MEMBER: ["org:read", "member:read", "store:read", "media:read"],
 };
 
 function ctx(role: OrgRole): OrganizationContext {
@@ -55,6 +55,15 @@ describe("organization-policy: can()", () => {
         expect(can("OWNER", "project:access:manage")).toBe(true);
         expect(can("ADMIN", "project:access:manage")).toBe(true);
         expect(can("MEMBER", "project:access:manage")).toBe(false);
+    });
+
+    it("media:read is on the floor; media:write is OWNER/ADMIN-only (S2-008)", () => {
+        for (const role of ORG_ROLES) {
+            expect(can(role, "media:read")).toBe(true);
+        }
+        expect(can("OWNER", "media:write")).toBe(true);
+        expect(can("ADMIN", "media:write")).toBe(true);
+        expect(can("MEMBER", "media:write")).toBe(false);
     });
 
     it("MEMBER is read-only", () => {

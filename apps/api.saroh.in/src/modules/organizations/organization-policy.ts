@@ -30,6 +30,15 @@ import type {
  *                  grant/revoke project roles, manage team membership) is
  *                  OWNER/ADMIN-only: it is NOT in READ_ONLY_ACTIONS, so a MEMBER
  *                  cannot alter who can reach which Project.
+ *  - `media:*`   — Org-owned uploaded media (S2-008). `media:read` is in the
+ *                  read-only floor (every role, including MEMBER, may list
+ *                  media). `media:write` (issue an upload URL, confirm/complete
+ *                  an upload, delete an object) is OWNER/ADMIN-only: it is NOT in
+ *                  READ_ONLY_ACTIONS, so a MEMBER cannot mint upload URLs or
+ *                  delete objects. (Widening `media:write` to MEMBER later — so
+ *                  contributors can attach their own images — is a one-line
+ *                  change to READ_ONLY_ACTIONS / CAPABILITIES if the product
+ *                  wants it; the default here is the least-privilege choice.)
  *
  * Add new actions here and to CAPABILITIES; TypeScript then forces every role
  * to make an explicit allow/deny decision (the map is keyed by the union).
@@ -47,7 +56,9 @@ export type OrgAction =
     | "store:read"
     | "store:write"
     | "store:delete"
-    | "project:access:manage";
+    | "project:access:manage"
+    | "media:read"
+    | "media:write";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -64,6 +75,8 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "store:write",
     "store:delete",
     "project:access:manage",
+    "media:read",
+    "media:write",
 ];
 
 /** Read-only actions — the floor every role (including MEMBER) may perform. */
@@ -71,6 +84,7 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
     "org:read",
     "member:read",
     "store:read",
+    "media:read",
 ];
 
 /**

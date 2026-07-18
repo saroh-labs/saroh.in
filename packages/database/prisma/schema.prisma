@@ -66,6 +66,10 @@ model Organization {
   // Per-organization feature-flag overrides (S1-012)
   featureFlagOverrides FeatureFlagOverride[]
 
+  // Uploaded media objects, org-owned (S2-008). Bytes live in object storage
+  // (R2); this is the tenant-scoped metadata index.
+  media Media[]
+
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
   sites        Site[]
@@ -111,6 +115,34 @@ model Membership {
   role String @default("MEMBER") // OWNER, ADMIN, MEMBER
 
   @@unique([organizationId, userId])
+  @@index([organizationId])
+}
+
+// Media: an org-owned uploaded object (S2-008). The bytes live in object
+// storage (Cloudflare R2 in prod, in-memory in dev/tests) behind the
+// `@saroh/object-storage` port; this row is the tenant-scoped metadata index.
+//
+// Lifecycle: a row is created `PENDING` when a presigned upload URL is issued,
+// then flipped to `READY` once the client confirms (via the complete endpoint)
+// that the bytes landed. `key` is the server-derived, tenant-scoped storage key
+// (`org/<organizationId>/...`) — never client-supplied — and is globally unique.
+model Media {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  key         String  @unique // object-storage key (server-derived, tenant-scoped)
+  contentType String
+  sizeBytes   Int
+  filename    String
+  purpose     String? // logical bucketing, e.g. product-image, avatar
+  status      String  @default("PENDING") // PENDING → READY
+
+  uploadedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([organizationId])
 }
 

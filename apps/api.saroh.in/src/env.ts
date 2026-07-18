@@ -43,6 +43,15 @@ const envSchema = z.object({
     CORS_ORIGIN: z.string().optional(),
     APP_URL: z.string().url().optional(),
 
+    // Object storage (S2-008 — media uploads via @saroh/object-storage).
+    // All optional: when the R2 credentials below are absent the media module
+    // falls back to the network-free in-memory adapter for local/dev/offline.
+    R2_ENDPOINT: z.string().optional(),
+    R2_BUCKET: z.string().optional(),
+    R2_ACCESS_KEY_ID: z.string().optional(),
+    R2_SECRET_ACCESS_KEY: z.string().optional(),
+    R2_PUBLIC_BASE_URL: z.string().optional(),
+
     // Email (Nodemailer). Legacy aliases kept until callers converge.
     EMAIL_FROM: z.string().optional(),
     SENDER_EMAIL_ID: z.string().optional(),

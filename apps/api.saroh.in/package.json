@@ -26,6 +26,7 @@
     "@prisma/client": "catalog:prisma",
     "@saroh/auth": "workspace:*",
     "@saroh/database": "workspace:*",
+    "@saroh/object-storage": "workspace:*",
     "@thallesp/nestjs-better-auth": "^2.6.1",
     "better-auth": "^1.6.11",
     "class-transformer": "^0.5.1",

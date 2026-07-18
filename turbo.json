@@ -47,6 +47,11 @@
         "SPACES_NAME",
         "SPACES_FOLDER",
         "SPACES_IMAGES_CDN_BASE_URL",
+        "R2_ENDPOINT",
+        "R2_BUCKET",
+        "R2_ACCESS_KEY_ID",
+        "R2_SECRET_ACCESS_KEY",
+        "R2_PUBLIC_BASE_URL",
         "npm_package_version"
     ],
     "tasks": {
