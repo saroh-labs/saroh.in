@@ -6,6 +6,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { CategoriesService } from "../categories/categories.service";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { StoresService } from "../stores/stores.service";
 import { InventoryService } from "./inventory.service";
 import { ProductsService } from "./products.service";
@@ -16,7 +17,7 @@ const ownerEmail = `prod-owner-${process.pid}@example.com`;
 const strangerEmail = `prod-stranger-${process.pid}@example.com`;
 
 describe("Products catalog (dev DB)", () => {
-    const stores = new StoresService();
+    const stores = new StoresService(new FeatureFlagService());
     const products = new ProductsService(stores);
     const categories = new CategoriesService(stores);
     const variants = new VariantsService(products);

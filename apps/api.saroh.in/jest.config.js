@@ -19,6 +19,11 @@ module.exports = {
         "<rootDir>/src/common/**/*.spec.ts",
         "<rootDir>/src/modules/organizations/**/*.spec.ts",
         "<rootDir>/src/modules/feature-flags/**/*.spec.ts",
+        // S1-006 store authorization: pure unit specs with mocked Prisma +
+        // mocked FeatureFlagService (never touch a DB). Only *.authorization
+        // specs run here; the legacy DB-backed stores.service.spec.ts stays in
+        // the integration project.
+        "<rootDir>/src/modules/stores/**/*.authorization.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],

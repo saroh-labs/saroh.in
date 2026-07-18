@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { StoresService } from "../stores/stores.service";
 import { PostCategoriesService } from "./post-categories.service";
 import { PostsService } from "./posts.service";
@@ -15,7 +16,7 @@ const memberEmail = `post-member-${process.pid}@example.com`;
 const strangerEmail = `post-stranger-${process.pid}@example.com`;
 
 describe("Content: posts & categories (dev DB)", () => {
-    const stores = new StoresService();
+    const stores = new StoresService(new FeatureFlagService());
     const posts = new PostsService(stores);
     const categories = new PostCategoriesService(stores);
 

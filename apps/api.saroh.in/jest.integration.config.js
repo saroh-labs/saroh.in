@@ -18,7 +18,13 @@ module.exports = {
     testMatch: ["<rootDir>/src/modules/**/*.spec.ts"],
     // The organizations module specs mock Prisma (pure unit tests) and run in
     // the default/unit project — keep them out of the DB-backed run.
-    testPathIgnorePatterns: ["<rootDir>/src/modules/organizations/"],
+    // The organizations specs mock Prisma (pure unit tests), and the S1-006
+    // store *.authorization specs mock Prisma + FeatureFlagService — both run in
+    // the default/unit project, so keep them out of the DB-backed run.
+    testPathIgnorePatterns: [
+        "<rootDir>/src/modules/organizations/",
+        "\\.authorization\\.spec\\.ts$",
+    ],
     moduleFileExtensions: ["ts", "js", "json"],
     globalSetup: "<rootDir>/test/global-setup.ts",
     globalTeardown: "<rootDir>/test/global-teardown.ts",

@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { StoresService } from "../stores/stores.service";
 import { MembersService } from "./members.service";
 
@@ -16,7 +17,7 @@ const strangerEmail = `mem-stranger-${process.pid}@example.com`;
 
 describe("MembersService (dev DB)", () => {
     const members = new MembersService();
-    const stores = new StoresService();
+    const stores = new StoresService(new FeatureFlagService());
     let ownerId = "";
     let inviteeId = "";
     let strangerId = "";

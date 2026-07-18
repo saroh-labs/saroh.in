@@ -1,6 +1,8 @@
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+
 import { slugify } from "./slug";
 import { StoresService } from "./stores.service";
 
@@ -22,7 +24,8 @@ const emailB = `api-test-b-${process.pid}@example.com`;
 const slugPrefix = `apitest-${process.pid}`;
 
 describe("StoresService (dev DB)", () => {
-    const service = new StoresService();
+    // Flag is unseeded in the test DB → isEnabled resolves false → legacy path.
+    const service = new StoresService(new FeatureFlagService());
     let userA = "";
     let userB = "";
     const createdStoreIds: string[] = [];
