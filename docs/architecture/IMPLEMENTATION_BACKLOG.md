@@ -42,17 +42,17 @@ Status of the repo-stabilization stage. Each done item links to the commit that 
 
 ## Stage 2 progress — Site management, CMS, page builder
 
-| ID      | Status     | Commit / note                                                                                                               |
-| ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
-| S2-001  | ✅ Done    | `378f024` (+ `20260718133036` migration) — Site/Page/PageVersion/Section/Publication + versioned section contract (ADR-002) |
-| S2-002  | ✅ Done    | `0274312` — @saroh/templates: versioned manifest/registry + starter@1; instantiate validates via the section contract       |
-| S2-003  | ⬜ Pending | Site creation from business profile/template (needs S2-001/002)                                                             |
-| S2-004  | ⬜ Pending | Section editor + preview UI (needs S2-003)                                                                                  |
-| S2-005  | ⬜ Pending | Immutable publication command + public read API (needs S2-003)                                                              |
-| S2-006  | ⬜ Pending | Public renderer client (sites app) (needs S2-005)                                                                           |
-| S2-007  | ⬜ Pending | Subdomain/custom-domain claim + verification (needs S2-003)                                                                 |
-| S2-008a | ✅ Done    | `151840e` — @saroh/object-storage: R2 signed-upload port + adapter, tenant-scoped keys, 39 tests                            |
-| S2-008b | ✅ Done    | `11805e0` (+ `da807d7` migration) — Media model + media API module; R2-or-memory storage; media:read/write; 34 tests        |
+| ID      | Status      | Commit / note                                                                                                                 |
+| ------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| S2-001  | ✅ Done     | `378f024` (+ `20260718133036` migration) — Site/Page/PageVersion/Section/Publication + versioned section contract (ADR-002)   |
+| S2-002  | ✅ Done     | `0274312` — @saroh/templates: versioned manifest/registry + starter@1; instantiate validates via the section contract         |
+| S2-003  | ✅ Done     | `fd545b5` — createFromTemplate: atomic Site+Pages+DRAFT PageVersions+Sections from starter@1 + business profile               |
+| S2-004  | 🚧 Building | Section editor + preview UI (app.saroh.in)                                                                                    |
+| S2-005  | ✅ Done     | `1fd74d5` — draft section editing (contract-validated), immutable publish w/ richText sanitize, public read-only-snapshot API |
+| S2-006  | 🚧 Building | Public renderer client (sites.saroh.in) — renders publication snapshot; draft never renders                                   |
+| S2-007  | ✅ Done     | `c2b51b5` (+ `61acaf1` migration) — Domain claim + DNS-TXT verification; hostname @unique; link only after VERIFIED           |
+| S2-008a | ✅ Done     | `151840e` — @saroh/object-storage: R2 signed-upload port + adapter, tenant-scoped keys, 39 tests                              |
+| S2-008b | ✅ Done     | `11805e0` (+ `da807d7` migration) — Media model + media API module; R2-or-memory storage; media:read/write; 34 tests          |
 
 | ID     | Class                | Title; problem; proposed solution                                                                                                                                                               | Files or modules likely affected                                       | Dependencies                            | Security considerations and test requirements                                       | Acceptance criteria                                                                                  | Estimated complexity |
 | ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------- |
