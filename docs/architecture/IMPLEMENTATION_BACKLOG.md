@@ -23,20 +23,20 @@ Status of the repo-stabilization stage. Each done item links to the commit that 
 
 ## Stage 1 progress — Organizations (org-first tenancy)
 
-| ID     | Status     | Commit / note                                                                                                                         |
-| ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| S1-001 | ✅ Done    | [ADR-001](adr/ADR-001-organization-tenant-root.md) — Organization tenant-root vocabulary + compat map                                 |
-| S1-002 | ✅ Done    | `a53bc79` — Workspace→Organization, Membership, Store.organizationId; idempotent backfill applied to dev DB (2 orgs, acceptance PASS) |
-| S1-003 | ✅ Done    | `c772e03` — OrganizationContext, centralized authorize() policy, OrganizationGuard + @OrgContext, organizations module (37 tests)     |
-| S1-004 | ✅ Done    | `673b255` (+ `7ccc3c0` migration) — BusinessProfile + POST /organizations, atomic actor-derived OWNER onboarding                      |
-| S1-005 | ✅ Done    | `fa341ea` — org switcher + onboarding UI; active_org cookie → x-organization-id; zero-org funnel; member-guarded switching            |
-| S1-006 | ✅ Done    | `fdb9837` — Store authz via Org membership behind ORG_AUTHORIZATION flag (default off), additive dual-read; 13 cross-tenant tests     |
-| S1-007 | ✅ Done    | `edf6c88` — zero NextAuth in code/config/deps; api.saroh.in canonical auth host                                                       |
-| S1-008 | ⬜ Pending | Browser E2E: cross-subdomain cookie, redirect, logout, CSRF                                                                           |
-| S1-009 | ✅ Done    | `3f173af` (+ `4597bbc` migration) — relation-free AuditEvent, append-only fail-safe record, audit:read (OWNER/ADMIN), read endpoint   |
-| S1-010 | ✅ Done    | `063adc9` (+ `81221ee` migration) — Project/Team/TeamMember/ProjectAccess, strongest-wins roles, OWNER/ADMIN-all vs MEMBER-granted    |
-| S1-011 | ⬜ Pending | Transaction-local Organization context + PostgreSQL RLS policies                                                                      |
-| S1-012 | ✅ Done    | `acbad70` (+ `73c1ebb` migration) — typed FlagKey registry, override>default>false, audit history; tables applied to dev DB           |
+| ID     | Status     | Commit / note                                                                                                                                                                                                      |
+| ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S1-001 | ✅ Done    | [ADR-001](adr/ADR-001-organization-tenant-root.md) — Organization tenant-root vocabulary + compat map                                                                                                              |
+| S1-002 | ✅ Done    | `a53bc79` — Workspace→Organization, Membership, Store.organizationId; idempotent backfill applied to dev DB (2 orgs, acceptance PASS)                                                                              |
+| S1-003 | ✅ Done    | `c772e03` — OrganizationContext, centralized authorize() policy, OrganizationGuard + @OrgContext, organizations module (37 tests)                                                                                  |
+| S1-004 | ✅ Done    | `673b255` (+ `7ccc3c0` migration) — BusinessProfile + POST /organizations, atomic actor-derived OWNER onboarding                                                                                                   |
+| S1-005 | ✅ Done    | `fa341ea` — org switcher + onboarding UI; active_org cookie → x-organization-id; zero-org funnel; member-guarded switching                                                                                         |
+| S1-006 | ✅ Done    | `fdb9837` — Store authz via Org membership behind ORG_AUTHORIZATION flag (default off), additive dual-read; 13 cross-tenant tests                                                                                  |
+| S1-007 | ✅ Done    | `edf6c88` — zero NextAuth in code/config/deps; api.saroh.in canonical auth host                                                                                                                                    |
+| S1-008 | ⬜ Pending | Browser E2E: cross-subdomain cookie, redirect, logout, CSRF                                                                                                                                                        |
+| S1-009 | ✅ Done    | `3f173af` (+ `4597bbc` migration) — relation-free AuditEvent, append-only fail-safe record, audit:read (OWNER/ADMIN), read endpoint                                                                                |
+| S1-010 | ✅ Done    | `063adc9` (+ `81221ee` migration) — Project/Team/TeamMember/ProjectAccess, strongest-wins roles, OWNER/ADMIN-all vs MEMBER-granted                                                                                 |
+| S1-011 | ✅ Done\*  | `a9d7ad3` — withOrgContext + FORCE RLS (org-direct tables), dark rollout; proven to isolate under a restricted role. \*Enforcement needs a non-BYPASSRLS app DB role (deploy step); store-child RLS is a follow-up |
+| S1-012 | ✅ Done    | `acbad70` (+ `73c1ebb` migration) — typed FlagKey registry, override>default>false, audit history; tables applied to dev DB                                                                                        |
 
 | ID     | Class                | Title; problem; proposed solution                                                                                                                                                               | Files or modules likely affected                                       | Dependencies                            | Security considerations and test requirements                                       | Acceptance criteria                                                                                  | Estimated complexity |
 | ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------- |
