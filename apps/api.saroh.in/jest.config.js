@@ -18,6 +18,9 @@ module.exports = {
     testMatch: [
         "<rootDir>/src/common/**/*.spec.ts",
         "<rootDir>/src/modules/organizations/**/*.spec.ts",
+        // S1-010 projects: project-role precedence + ProjectAccessService
+        // acceptance specs, pure unit tests with a jest-mocked Prisma.
+        "<rootDir>/src/modules/projects/**/*.spec.ts",
         // S1-009 audit: append-only AuditService + read-authorization specs,
         // pure unit tests with a jest-mocked Prisma (never touch a DB).
         "<rootDir>/src/modules/audit/**/*.spec.ts",

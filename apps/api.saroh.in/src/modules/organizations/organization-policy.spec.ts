@@ -51,6 +51,12 @@ describe("organization-policy: can()", () => {
         expect(can("MEMBER", "audit:read")).toBe(false);
     });
 
+    it("project:access:manage is OWNER/ADMIN-only (S1-010)", () => {
+        expect(can("OWNER", "project:access:manage")).toBe(true);
+        expect(can("ADMIN", "project:access:manage")).toBe(true);
+        expect(can("MEMBER", "project:access:manage")).toBe(false);
+    });
+
     it("MEMBER is read-only", () => {
         const writeActions = ORG_ACTIONS.filter(
             (a) => !EXPECTED.MEMBER.includes(a),

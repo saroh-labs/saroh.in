@@ -25,6 +25,11 @@ import type {
  *                  it is OWNER/ADMIN-only: it is NOT in READ_ONLY_ACTIONS, so a
  *                  MEMBER cannot see it (audit trails leak who-did-what).
  *  - `store:*`   — Organization-owned commerce channels (Stores).
+ *  - `project:*` — Projects, Teams, and project-level access grants (S1-010).
+ *                  `project:access:manage` (create/delete Projects & Teams,
+ *                  grant/revoke project roles, manage team membership) is
+ *                  OWNER/ADMIN-only: it is NOT in READ_ONLY_ACTIONS, so a MEMBER
+ *                  cannot alter who can reach which Project.
  *
  * Add new actions here and to CAPABILITIES; TypeScript then forces every role
  * to make an explicit allow/deny decision (the map is keyed by the union).
@@ -41,7 +46,8 @@ export type OrgAction =
     | "store:create"
     | "store:read"
     | "store:write"
-    | "store:delete";
+    | "store:delete"
+    | "project:access:manage";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -57,6 +63,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "store:read",
     "store:write",
     "store:delete",
+    "project:access:manage",
 ];
 
 /** Read-only actions — the floor every role (including MEMBER) may perform. */

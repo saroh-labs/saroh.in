@@ -30,6 +30,10 @@ model User {
   memberships  Membership[] // Organizations they belong to
   storeMembers StoreMembers[] // Staff positions
 
+  // Project-level access (S1-010): team memberships and direct project grants
+  teamMemberships TeamMember[] // Teams they belong to
+  projectAccess   ProjectAccess[] // Direct project-role grants
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -50,6 +54,11 @@ model Organization {
   // Relations
   stores      Store[]
   memberships Membership[]
+
+  // Optional groupings beneath the org (S1-010). Projects and Teams are NEVER
+  // a tenant/ownership/billing root — always org-scoped (ADR-001).
+  projects Project[]
+  teams    Team[]
 
   // Optional 1:1 business identity captured at onboarding (S1-004)
   businessProfile BusinessProfile?
@@ -844,4 +853,93 @@ model FeatureFlagAudit {
 
   @@index([flagKey])
   @@index([organizationId])
+}
+
+// ============================================================================
+// PROJECTS, TEAMS & PROJECT-LEVEL ACCESS (S1-010)
+// ============================================================================
+
+// Project: an OPTIONAL grouping beneath an Organization (ADR-001). NEVER a
+// tenant/ownership/billing root — always org-scoped. OWNER/ADMIN implicitly see
+// every Project in their org; a MEMBER sees only Projects granted to them
+// directly or via a Team.
+model Project {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name String
+  slug String
+
+  access ProjectAccess[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+// Team: a named group of org members, used to grant Project access in bulk.
+// Org-scoped; deleting the Organization cascades.
+model Team {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name String
+
+  members TeamMember[]
+  access  ProjectAccess[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+// TeamMember: a User's membership in a Team. Both sides cascade on delete.
+model TeamMember {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+// ProjectAccess: a grant of a project role (MANAGER/EDITOR/VIEWER) on one
+// Project, to EITHER a User directly OR a Team — exactly one of userId/teamId is
+// set (enforced in code). Because Postgres treats NULLs as distinct, the two
+// @@unique constraints act as partial uniques: at most one grant per
+// (project, user) and per (project, team), while the unused column stays null.
+model ProjectAccess {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  role String // MANAGER, EDITOR, VIEWER
+
+  // Direct grant to a user (userId set, teamId null) ...
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // ... OR a grant to a team (teamId set, userId null). Exactly one is set.
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, userId])
+  @@unique([projectId, teamId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([teamId])
 }

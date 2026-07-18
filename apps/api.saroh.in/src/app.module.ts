@@ -13,6 +13,7 @@ import { MembersModule } from "./modules/members/members.module";
 import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import { ProductsModule } from "./modules/products/products.module";
+import { ProjectsModule } from "./modules/projects/projects.module";
 import { StoresModule } from "./modules/stores/stores.module";
 
 @Module({
@@ -33,6 +34,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         HealthModule,
         FeatureFlagModule,
         OrganizationsModule,
+        ProjectsModule,
         AuditModule,
         StoresModule,
         MembersModule,
