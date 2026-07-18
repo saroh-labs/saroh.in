@@ -12,6 +12,8 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "test:unit": "jest",
+    "test:int": "jest -c jest.integration.config.js",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage"
   },
