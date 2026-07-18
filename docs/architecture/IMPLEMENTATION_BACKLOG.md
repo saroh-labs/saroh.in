@@ -6,18 +6,18 @@ Legend: **Foundation**, **Blocker**, **Parallel**, **Migration**, **Cleanup**, *
 
 Status of the repo-stabilization stage. Each done item links to the commit that closed it.
 
-| ID     | Status           | Commit / note                                                                                          |
-| ------ | ---------------- | ------------------------------------------------------------------------------------------------------ |
-| S0-001 | ✅ Done          | `bf565c8` — real lint + typecheck wired, all violations fixed (19/19, 21/21)                           |
-| S0-002 | ✅ Done          | `7754303` — gated CI workflow; **branch protection must mark `ci` a required check**                   |
-| S0-003 | ✅ Done          | `2a4eafe` — isolated Postgres harness + non-test-DB guard (unit 30/30)                                 |
-| S0-004 | 📋 Runbook ready | [S0-004_MIGRATION_RUNBOOK.md](S0-004_MIGRATION_RUNBOOK.md) — execute needs DB URL(s) + backup + window |
-| S0-005 | ✅ Done          | `35505ba` — self-hosted Inter font, pinned Node/pnpm                                                   |
-| S0-006 | ✅ Done          | `1dcec0e` — typed per-app env modules, canonical Better Auth vars, Turbo env inputs                    |
-| S0-007 | ✅ Done          | `13174cd` — API error envelope, correlation IDs, structured logging                                    |
-| S0-008 | ✅ Done          | `e6b4307` — inventory + NextAuth→Better Auth doc reconciliation                                        |
-| S0-009 | ✅ Done          | `e485e82` — removed stray pre-rewrite schema backup                                                    |
-| S0-010 | ✅ Done          | `dac11fb` — frontend→DB import ban (ESLint), madge cycles, gitleaks, pnpm audit (critical)             |
+| ID     | Status  | Commit / note                                                                                                                   |
+| ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| S0-001 | ✅ Done | `bf565c8` — real lint + typecheck wired, all violations fixed (19/19, 21/21)                                                    |
+| S0-002 | ✅ Done | `7754303` — gated CI workflow; **branch protection must mark `ci` a required check**                                            |
+| S0-003 | ✅ Done | `2a4eafe` — isolated Postgres harness + non-test-DB guard (unit 30/30)                                                          |
+| S0-004 | ✅ Done | `14d5e16` — corrective migration + baselined dev DB (Neon); `migrate status` up to date. [Runbook](S0-004_MIGRATION_RUNBOOK.md) |
+| S0-005 | ✅ Done | `35505ba` — self-hosted Inter font, pinned Node/pnpm                                                                            |
+| S0-006 | ✅ Done | `1dcec0e` — typed per-app env modules, canonical Better Auth vars, Turbo env inputs                                             |
+| S0-007 | ✅ Done | `13174cd` — API error envelope, correlation IDs, structured logging                                                             |
+| S0-008 | ✅ Done | `e6b4307` — inventory + NextAuth→Better Auth doc reconciliation                                                                 |
+| S0-009 | ✅ Done | `e485e82` — removed stray pre-rewrite schema backup                                                                             |
+| S0-010 | ✅ Done | `dac11fb` — frontend→DB import ban (ESLint), madge cycles, gitleaks, pnpm audit (critical)                                      |
 
 | ID     | Class                | Title; problem; proposed solution                                                                                                                                                               | Files or modules likely affected                                       | Dependencies                            | Security considerations and test requirements                                       | Acceptance criteria                                                                                  | Estimated complexity |
 | ------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------- |
