@@ -5,6 +5,7 @@ import {
     HttpCode,
     Param,
     Post,
+    Put,
     UseGuards,
 } from "@nestjs/common";
 import { listTemplates } from "@saroh/templates";
@@ -13,7 +14,7 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { CreateSiteFromTemplateDto } from "./dto";
+import { CreateSiteFromTemplateDto, UpdateDraftSectionsDto } from "./dto";
 import { SitesService } from "./sites.service";
 
 /**
@@ -69,5 +70,48 @@ export class SitesController {
         @Param("siteId") siteId: string,
     ) {
         return this.sites.getSite(ctx, siteId);
+    }
+
+    /**
+     * Get a page's editable DRAFT version + ordered sections (the editor's load
+     * path). Creates an empty DRAFT if the page has none. Requires
+     * `section:write`.
+     */
+    @Get(":siteId/pages/:pageId/draft")
+    getDraft(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+    ) {
+        return this.sites.getPageDraft(ctx, siteId, pageId);
+    }
+
+    /**
+     * Replace a page's DRAFT sections with an ordered list. Each section is
+     * contract-validated before any write; the whole request is rejected if any
+     * is invalid. Requires `section:write`.
+     */
+    @Put(":siteId/pages/:pageId/draft/sections")
+    replaceDraftSections(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+        @Body() dto: UpdateDraftSectionsDto,
+    ) {
+        return this.sites.replaceDraftSections(ctx, siteId, pageId, dto);
+    }
+
+    /**
+     * Publish the site: snapshot its pages' current drafts into a new immutable
+     * Publication (sanitizing rich fields) and repoint the live pointer.
+     * Requires `site:publish`.
+     */
+    @Post(":siteId/publish")
+    @HttpCode(200)
+    publish(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.publishSite(ctx, siteId);
     }
 }

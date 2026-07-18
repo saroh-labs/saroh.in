@@ -5,23 +5,55 @@ import {
     InternalServerErrorException,
     NotFoundException,
 } from "@nestjs/common";
-import { Prisma, prisma } from "@saroh/database";
+import { parseSectionContent, Prisma, prisma } from "@saroh/database";
 import type { TemplateContext } from "@saroh/templates";
 import {
     getTemplate,
     instantiateTemplate,
     STARTER_TEMPLATE_ID,
+    starterTemplate,
     TemplateInstantiationError,
 } from "@saroh/templates";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
-import type { CreateSiteFromTemplateDto } from "./dto";
+import type { CreateSiteFromTemplateDto, UpdateDraftSectionsDto } from "./dto";
+import { sanitizeSectionContent } from "./sanitize";
 
 /** What creating a site returns to the caller: the new site's identity. */
 export interface CreatedSite {
     siteId: string;
     slug: string;
+}
+
+/** A section as returned by the draft-editing endpoints. */
+export interface DraftSectionView {
+    id: string;
+    type: string;
+    contractVersion: number;
+    order: number;
+    content: unknown;
+}
+
+/** A page's editable DRAFT version + its ordered sections. */
+export interface PageDraftView {
+    pageId: string;
+    pageVersionId: string;
+    status: "DRAFT";
+    sections: DraftSectionView[];
+}
+
+/** What a publish returns: the new immutable Publication + the live pointer. */
+export interface PublishResult {
+    publicationId: string;
+    publishedAt: Date;
+    currentPublicationId: string;
+}
+
+/** The public read contract: only the current, immutable Publication snapshot. */
+export interface PublicSiteView {
+    snapshot: unknown;
+    publishedAt: Date;
 }
 
 /**
@@ -229,6 +261,400 @@ export class SitesService {
             throw new NotFoundException(`Site "${siteId}" not found`);
         }
         return site;
+    }
+
+    // -----------------------------------------------------------------------
+    // Draft section editing (S2-005) — authorize `section:write`
+    // -----------------------------------------------------------------------
+
+    /**
+     * Return a page's editable DRAFT PageVersion + its ordered sections,
+     * creating an empty DRAFT if the page has none yet. Requires `section:write`
+     * (this is the editor's load path). The site and page are proven to belong
+     * to `ctx.organizationId` first, so a cross-tenant id is a 404.
+     */
+    async getPageDraft(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+    ): Promise<PageDraftView> {
+        authorize(ctx, "section:write");
+        await this.assertSiteInOrg(ctx, siteId);
+        await this.assertPageInSite(ctx, siteId, pageId);
+
+        const version = await this.getOrCreateDraftVersion(prisma, ctx, pageId);
+        const sections = await prisma.section.findMany({
+            where: { pageVersionId: version.id },
+            orderBy: { order: "asc" },
+            select: {
+                id: true,
+                type: true,
+                contractVersion: true,
+                order: true,
+                content: true,
+            },
+        });
+        return { pageId, pageVersionId: version.id, status: "DRAFT", sections };
+    }
+
+    /**
+     * Replace a page's DRAFT sections with an ordered list. Requires
+     * `section:write`. EVERY incoming section is validated through the section
+     * contract (`parseSectionContent`) BEFORE any write; the first failure
+     * rejects the whole request with a `400` naming the offending index and
+     * reason (nothing is written). On success, in ONE transaction the draft's
+     * existing Section rows are deleted and replaced with new rows whose
+     * `order = array index` (a whole-list replace keeps ordering gap-free and
+     * the write atomic). The persisted `content` is the contract-NORMALIZED
+     * value (defaults applied). Sanitization is deferred to publish, per the
+     * contract's sanitization boundary.
+     */
+    async replaceDraftSections(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+        dto: UpdateDraftSectionsDto,
+    ): Promise<PageDraftView> {
+        authorize(ctx, "section:write");
+        await this.assertSiteInOrg(ctx, siteId);
+        await this.assertPageInSite(ctx, siteId, pageId);
+
+        // Validate the entire list up front — reject before touching the DB.
+        const validated = dto.sections.map((section, index) => {
+            const result = parseSectionContent(
+                section.type,
+                section.contractVersion,
+                section.content,
+            );
+            if (!result.success) {
+                throw new BadRequestException({
+                    message: `Section at index ${index} is invalid: ${result.error.message}`,
+                    index,
+                    section: {
+                        type: section.type,
+                        contractVersion: section.contractVersion,
+                    },
+                    error: result.error,
+                });
+            }
+            return {
+                type: section.type,
+                contractVersion: section.contractVersion,
+                order: index,
+                content: result.data,
+            };
+        });
+
+        return prisma.$transaction(async (tx) => {
+            const version = await this.getOrCreateDraftVersion(tx, ctx, pageId);
+            await tx.section.deleteMany({
+                where: { pageVersionId: version.id },
+            });
+            if (validated.length > 0) {
+                await tx.section.createMany({
+                    data: validated.map((s) => ({
+                        pageVersionId: version.id,
+                        organizationId: ctx.organizationId,
+                        type: s.type,
+                        contractVersion: s.contractVersion,
+                        order: s.order,
+                        content: s.content as Prisma.InputJsonValue,
+                    })),
+                });
+            }
+            const sections = await tx.section.findMany({
+                where: { pageVersionId: version.id },
+                orderBy: { order: "asc" },
+                select: {
+                    id: true,
+                    type: true,
+                    contractVersion: true,
+                    order: true,
+                    content: true,
+                },
+            });
+            return {
+                pageId,
+                pageVersionId: version.id,
+                status: "DRAFT",
+                sections,
+            };
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Immutable publish (S2-005) — authorize `site:publish`
+    // -----------------------------------------------------------------------
+
+    /**
+     * Publish the site: build a self-contained, SANITIZED snapshot of every
+     * page from its current DRAFT version, then — in ONE transaction — append a
+     * new immutable {@link Publication} and repoint `Site.currentPublicationId`
+     * at it. Requires `site:publish`. The site must belong to
+     * `ctx.organizationId` (else 404).
+     *
+     * Immutability: a Publication is NEVER updated. Republishing inserts a NEW
+     * row and repoints the live pointer; rollback is simply repointing to an
+     * older row. Rich fields the contract flags (`richText.value`) are sanitized
+     * on the way IN, so the snapshot the public renderer reads is already safe.
+     *
+     * The DRAFT PageVersions are intentionally left DRAFT (not flipped to
+     * PUBLISHED): the draft stays the durable working copy for the next edit,
+     * and the immutable Publication is the published artifact. Republish just
+     * re-snapshots the current drafts.
+     */
+    async publishSite(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<PublishResult> {
+        authorize(ctx, "site:publish");
+
+        const site = await prisma.site.findFirst({
+            where: {
+                id: siteId,
+                organizationId: ctx.organizationId,
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                pages: {
+                    orderBy: { path: "asc" },
+                    select: {
+                        path: true,
+                        title: true,
+                        isHome: true,
+                        versions: {
+                            where: { status: "DRAFT" },
+                            orderBy: { createdAt: "desc" },
+                            take: 1,
+                            select: {
+                                sections: {
+                                    orderBy: { order: "asc" },
+                                    select: {
+                                        type: true,
+                                        contractVersion: true,
+                                        content: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        if (!site) {
+            throw new NotFoundException(`Site "${siteId}" not found`);
+        }
+
+        const publishedAt = new Date();
+        const pages = site.pages.map((page) => {
+            // `versions` holds the page's latest DRAFT (query `take: 1`) or is
+            // empty when the page has none; flatMap yields that draft's ordered
+            // sections, or [] — no draft, no sections.
+            const sections = page.versions.flatMap((version) =>
+                version.sections.map((section) => {
+                    // Defensive: a draft section should already be
+                    // contract-valid, but publish is the last gate before an
+                    // immutable write.
+                    const parsed = parseSectionContent(
+                        section.type,
+                        section.contractVersion,
+                        section.content,
+                    );
+                    if (!parsed.success) {
+                        throw new BadRequestException(
+                            `Cannot publish: page "${page.path}" has an invalid "${section.type}" section (${parsed.error.message})`,
+                        );
+                    }
+                    // SANITIZE the contract-flagged rich fields (e.g.
+                    // richText.value) BEFORE they enter the snapshot. A no-op
+                    // when the contract flags nothing.
+                    const content = sanitizeSectionContent(
+                        parsed.data,
+                        parsed.contract.sanitizedFields,
+                    );
+                    return {
+                        type: section.type,
+                        contractVersion: section.contractVersion,
+                        content,
+                    };
+                }),
+            );
+            return {
+                path: page.path,
+                title: page.title,
+                isHome: page.isHome,
+                sections,
+            };
+        });
+
+        const snapshot = {
+            site: { name: site.name, slug: site.slug },
+            pages,
+            publishedAt: publishedAt.toISOString(),
+        };
+
+        // The Site does not track which template produced it; default the
+        // Publication's required (non-null) template stamp to the starter
+        // template's identity/version.
+        return prisma.$transaction(async (tx) => {
+            const publication = await tx.publication.create({
+                data: {
+                    siteId: site.id,
+                    organizationId: ctx.organizationId,
+                    snapshot: snapshot as Prisma.InputJsonValue,
+                    templateId: starterTemplate.id,
+                    templateVersion: starterTemplate.version,
+                    publishedByUserId: ctx.userId,
+                    publishedAt,
+                },
+                select: { id: true, publishedAt: true },
+            });
+            await tx.site.update({
+                where: { id: site.id },
+                data: { currentPublicationId: publication.id },
+            });
+            return {
+                publicationId: publication.id,
+                publishedAt: publication.publishedAt,
+                currentPublicationId: publication.id,
+            };
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Public read (S2-005) — NO auth; only the current immutable Publication
+    // -----------------------------------------------------------------------
+
+    /**
+     * Public: resolve a site by its platform subdomain to its CURRENT
+     * publication snapshot. Returns 404 if the subdomain is unknown, the site is
+     * soft-deleted, or the site has never published. DRAFTS ARE NEVER RETURNED —
+     * only `currentPublication.snapshot` is read.
+     */
+    async getPublicationBySubdomain(
+        subdomain: string,
+    ): Promise<PublicSiteView> {
+        return this.resolveCurrentPublication(
+            { subdomain, deletedAt: null },
+            `subdomain "${subdomain}"`,
+        );
+    }
+
+    /**
+     * Public: resolve a site by id to its CURRENT publication snapshot. Same
+     * guarantees as {@link getPublicationBySubdomain}: only the immutable
+     * current Publication is ever exposed; drafts are never reachable here.
+     */
+    async getPublicationBySiteId(siteId: string): Promise<PublicSiteView> {
+        return this.resolveCurrentPublication(
+            { id: siteId, deletedAt: null },
+            `site "${siteId}"`,
+        );
+    }
+
+    /**
+     * Shared public resolver: load ONLY `currentPublication.snapshot` for the
+     * matched site. Because the query selects nothing but the current
+     * Publication, there is no path by which a draft or another org's content
+     * could be returned. 404 when the site is missing or unpublished.
+     */
+    private async resolveCurrentPublication(
+        where: Prisma.SiteWhereInput,
+        label: string,
+    ): Promise<PublicSiteView> {
+        const site = await prisma.site.findFirst({
+            where,
+            select: {
+                currentPublication: {
+                    select: { snapshot: true, publishedAt: true },
+                },
+            },
+        });
+        if (!site?.currentPublication) {
+            throw new NotFoundException(`No published site found for ${label}`);
+        }
+        return {
+            snapshot: site.currentPublication.snapshot,
+            publishedAt: site.currentPublication.publishedAt,
+        };
+    }
+
+    // -----------------------------------------------------------------------
+    // Shared tenant-scoping + draft helpers
+    // -----------------------------------------------------------------------
+
+    /** Prove `siteId` is a live site in the ctx org, or 404. */
+    private async assertSiteInOrg(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<void> {
+        const site = await prisma.site.findFirst({
+            where: {
+                id: siteId,
+                organizationId: ctx.organizationId,
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+        if (!site) {
+            throw new NotFoundException(`Site "${siteId}" not found`);
+        }
+    }
+
+    /** Prove `pageId` belongs to `siteId` in the ctx org, or 404. */
+    private async assertPageInSite(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+    ): Promise<void> {
+        const page = await prisma.page.findFirst({
+            where: {
+                id: pageId,
+                siteId,
+                organizationId: ctx.organizationId,
+            },
+            select: { id: true },
+        });
+        if (!page) {
+            throw new NotFoundException(`Page "${pageId}" not found`);
+        }
+    }
+
+    /**
+     * Get the page's latest DRAFT PageVersion, creating an empty one if none
+     * exists. Takes a Prisma client/transaction so callers can run it inside a
+     * write transaction. The caller must already have proven the page belongs
+     * to the ctx org.
+     */
+    private async getOrCreateDraftVersion(
+        client: Prisma.TransactionClient,
+        ctx: OrganizationContext,
+        pageId: string,
+    ): Promise<{ id: string }> {
+        const existing = await client.pageVersion.findFirst({
+            where: {
+                pageId,
+                organizationId: ctx.organizationId,
+                status: "DRAFT",
+            },
+            orderBy: { createdAt: "desc" },
+            select: { id: true },
+        });
+        if (existing) {
+            return existing;
+        }
+        return client.pageVersion.create({
+            data: {
+                pageId,
+                organizationId: ctx.organizationId,
+                status: "DRAFT",
+                createdByUserId: ctx.userId,
+            },
+            select: { id: true },
+        });
     }
 
     /**

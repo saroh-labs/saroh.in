@@ -1,5 +1,8 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
+    ArrayMaxSize,
+    IsArray,
+    IsDefined,
     IsInt,
     IsOptional,
     IsString,
@@ -7,6 +10,7 @@ import {
     MaxLength,
     Min,
     MinLength,
+    ValidateNested,
 } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -57,4 +61,43 @@ export class CreateSiteFromTemplateDto {
     @IsInt({ message: "templateVersion must be an integer" })
     @Min(1, { message: "templateVersion must be at least 1" })
     templateVersion?: number;
+}
+
+/**
+ * One section in a draft-sections replace request. `content` is deliberately
+ * typed loosely here (validation of its *shape* is the section contract's job,
+ * not class-validator's): the service runs every section through
+ * `parseSectionContent(type, contractVersion, content)` and rejects the whole
+ * request — naming the offending index and reason — if any fails. We only
+ * enforce that `type`/`contractVersion` are present and well-typed so the
+ * contract lookup can't be fed junk.
+ */
+export class DraftSectionInputDto {
+    @IsString()
+    @MinLength(1, { message: "type is required" })
+    @MaxLength(120)
+    type!: string;
+
+    @IsInt({ message: "contractVersion must be an integer" })
+    @Min(1, { message: "contractVersion must be at least 1" })
+    contractVersion!: number;
+
+    // Any JSON value the contract will validate; must be present (an empty
+    // object is fine — the contract decides whether that's valid content).
+    @IsDefined({ message: "content is required" })
+    content!: unknown;
+}
+
+/**
+ * Replace a draft PageVersion's sections with an ordered list (S2-005). The
+ * array order IS the section order: the service persists `order = index`. A
+ * whole-list replace keeps the write atomic and the resulting order gap-free.
+ * An empty array is allowed and clears the draft's sections.
+ */
+export class UpdateDraftSectionsDto {
+    @IsArray()
+    @ArrayMaxSize(200)
+    @ValidateNested({ each: true })
+    @Type(() => DraftSectionInputDto)
+    sections!: DraftSectionInputDto[];
 }
