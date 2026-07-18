@@ -3,6 +3,7 @@
     "globalDependencies": ["**/.env.*local"],
     "globalEnv": [
         "NODE_ENV",
+        "SKIP_ENV_VALIDATION",
         "DATABASE_URL",
         "BETTER_AUTH_SECRET",
         "BETTER_AUTH_URL",
@@ -14,7 +15,15 @@
         "AUTH_GOOGLE_ID",
         "AUTH_GOOGLE_SECRET",
         "NGROK_URL",
-        "REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS"
+        "REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS",
+        "NEXT_PUBLIC_ACCOUNTS_URL",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_BETTER_AUTH_URL",
+        "NEXT_PUBLIC_AUTH_APP_URL",
+        "NEXT_PUBLIC_ROOT_DOMAIN",
+        "NEXT_PUBLIC_APP_DOMAIN",
+        "NEXT_PUBLIC_VERCEL_ENV",
+        "NEXT_PUBLIC_VERCEL_URL"
     ],
     "globalPassThroughEnv": [
         "PORT",
@@ -30,6 +39,14 @@
         "SMTP_PASS",
         "USER_ACCOUNT",
         "USER_PASSWORD",
+        "TEST_DATABASE_URL",
+        "SPACES_ENDPOINT",
+        "SPACES_REGION",
+        "SPACES_KEY",
+        "SPACES_SECRET",
+        "SPACES_NAME",
+        "SPACES_FOLDER",
+        "SPACES_IMAGES_CDN_BASE_URL",
         "npm_package_version"
     ],
     "tasks": {

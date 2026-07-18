@@ -1,22 +1,22 @@
 import type { Transporter } from "nodemailer";
 import nodemailer from "nodemailer";
 
+import { env } from "../env";
+
 const FROM =
-    process.env.EMAIL_FROM ??
-    process.env.SENDER_EMAIL_ID ??
-    "Saroh <noreply@saroh.in>";
+    env.EMAIL_FROM ?? env.SENDER_EMAIL_ID ?? "Saroh <noreply@saroh.in>";
 
 function getTransporter(): Transporter | null {
-    const host = process.env.SMTP_HOST ?? process.env.SMTP_HOSTNAME;
-    const port = process.env.SMTP_PORT;
-    const user = process.env.SMTP_USER ?? process.env.USER_ACCOUNT;
-    const pass = process.env.SMTP_PASS ?? process.env.USER_PASSWORD;
+    const host = env.SMTP_HOST ?? env.SMTP_HOSTNAME;
+    const port = env.SMTP_PORT;
+    const user = env.SMTP_USER ?? env.USER_ACCOUNT;
+    const pass = env.SMTP_PASS ?? env.USER_PASSWORD;
 
     if (host && user && pass) {
         return nodemailer.createTransport({
             host,
             port: port ? Number(port) : 465,
-            secure: process.env.SMTP_SECURE !== "false",
+            secure: env.SMTP_SECURE !== "false",
             auth: { user, pass },
         });
     }

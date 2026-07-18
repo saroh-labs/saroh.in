@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+import { env } from "@/env";
+
 export const config = {
     matcher: [
         /*
@@ -20,7 +22,7 @@ export default function middleware(req: NextRequest) {
     // Get hostname of request (e.g. demo.vercel.pub, demo.localhost:3000)
     const hostname = (req.headers.get("host") ?? "").replace(
         ".localhost:3003",
-        `.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`,
+        `.${env.NEXT_PUBLIC_ROOT_DOMAIN}`,
     );
 
     // Get the pathname of the request (e.g. /, /about, /blog/first-post)
@@ -33,7 +35,7 @@ export default function middleware(req: NextRequest) {
     }
     if (
         hostname === "localhost:3003" ||
-        hostname === process.env.NEXT_PUBLIC_ROOT_DOMAIN ||
+        hostname === env.NEXT_PUBLIC_ROOT_DOMAIN ||
         hostname === "saroh.in" ||
         hostname === "www.saroh.site" ||
         hostname === "www.saroh.in"

@@ -10,6 +10,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
+import { env } from "./env";
 
 async function bootstrap() {
     // Better Auth reads the raw request body, so Nest's body parser must be
@@ -28,7 +29,7 @@ async function bootstrap() {
         (_, i) => `http://localhost:${3000 + i}`,
     );
     app.enableCors({
-        origin: process.env.CORS_ORIGIN?.split(",").map((o) => o.trim()) ?? [
+        origin: env.CORS_ORIGIN?.split(",").map((o) => o.trim()) ?? [
             ...getTrustedOrigins(),
             ...devOrigins,
         ],
@@ -49,10 +50,10 @@ async function bootstrap() {
     app.useGlobalInterceptors(new LoggingInterceptor());
     app.useGlobalFilters(new AllExceptionsFilter());
 
-    const port = parseInt(process.env.PORT ?? "3333", 10);
+    const port = env.PORT;
     await app.listen(port);
 
-    const environment = process.env.NODE_ENV ?? "development";
+    const environment = env.NODE_ENV;
     structuredLogger.info("api_started", { port, environment });
 }
 

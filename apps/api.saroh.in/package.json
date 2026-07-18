@@ -30,10 +30,12 @@
     "better-auth": "^1.6.11",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "dotenv": "^17.4.1",
     "helmet": "^8.2.0",
     "nodemailer": "^8.0.10",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.21",

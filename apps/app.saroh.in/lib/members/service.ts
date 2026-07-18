@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 
+import { env } from "@/env";
+
 /**
  * Members + invitations data access for app.saroh.in. Like the stores client,
  * the app never touches the DB — every call forwards the session cookie to
@@ -8,9 +10,9 @@ import { headers } from "next/headers";
  */
 
 const API_URL =
-    process.env.API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    process.env.NEXT_PUBLIC_BETTER_AUTH_URL ??
+    env.API_URL ??
+    env.NEXT_PUBLIC_API_URL ??
+    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
     "https://api.saroh.in";
 
 export type MemberRole = "ADMIN" | "MANAGER" | "EDITOR" | "VIEWER";

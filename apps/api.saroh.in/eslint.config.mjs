@@ -1,4 +1,4 @@
-import baseConfig from "@saroh/eslint-config/base";
+import baseConfig, { restrictEnvAccess } from "@saroh/eslint-config/base";
 
 /** @type {import('typescript-eslint').Config} */
 export default [
@@ -14,4 +14,5 @@ export default [
             "no-console": ["warn", { allow: ["warn", "error", "info"] }],
         },
     },
+    ...restrictEnvAccess,
 ];

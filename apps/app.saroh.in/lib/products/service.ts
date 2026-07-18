@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 
+import { env } from "@/env";
+
 /**
  * Catalog data access for app.saroh.in — products, categories, variants, and
  * inventory. Forwards the session cookie to api.saroh.in, which enforces store
@@ -8,9 +10,9 @@ import { headers } from "next/headers";
  */
 
 const API_URL =
-    process.env.API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    process.env.NEXT_PUBLIC_BETTER_AUTH_URL ??
+    env.API_URL ??
+    env.NEXT_PUBLIC_API_URL ??
+    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
     "https://api.saroh.in";
 
 export type ProductStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";

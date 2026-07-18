@@ -12,11 +12,13 @@
   "dependencies": {
     "@saroh/auth": "workspace:*",
     "@saroh/ui": "workspace:*",
+    "@t3-oss/env-nextjs": "^0.13.11",
     "better-auth": "^1.6.11",
     "next": "catalog:next16",
     "react": "catalog:react19",
     "react-dom": "catalog:react19",
-    "react-icons": "catalog:"
+    "react-icons": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@saroh/eslint-config": "workspace:*",

@@ -10,6 +10,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { sendStoreInvitationEmail } from "../../common/email";
+import { env } from "../../env";
 import type { MemberRole } from "./dto";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -177,7 +178,7 @@ export class MembersService {
             where: { id: storeId },
             select: { name: true },
         });
-        const appUrl = process.env.APP_URL ?? "http://localhost:3003";
+        const appUrl = env.APP_URL ?? "http://localhost:3003";
         await sendStoreInvitationEmail(
             email,
             `${appUrl}/invitations/${token}`,

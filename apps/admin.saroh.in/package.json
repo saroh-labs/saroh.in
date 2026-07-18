@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@saroh/auth": "workspace:*",
+    "@t3-oss/env-nextjs": "^0.13.11",
+    "next": "catalog:next16",
     "react": "catalog:react19",
     "react-dom": "catalog:react19",
-    "next": "catalog:next16"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",

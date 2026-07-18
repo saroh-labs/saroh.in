@@ -1,6 +1,7 @@
 // import Image from "next/image";
 import Link from "next/link";
 // import CTA from "@/components/cta";
+import { env } from "@/env";
 import { getSiteData } from "@/lib/fetchers";
 import { fontMapper } from "@/styles/fonts";
 import type { Metadata } from "next";
@@ -70,9 +71,9 @@ export default async function SiteLayout({
 
     // Optional: Redirect to custom domain if it exists
     if (
-        domain.endsWith(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`) &&
+        domain.endsWith(`.${env.NEXT_PUBLIC_ROOT_DOMAIN}`) &&
         data.customDomain &&
-        process.env.REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS === "true"
+        env.REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS === "true"
     ) {
         return redirect(`https://${data.customDomain}`);
     }
@@ -99,7 +100,7 @@ export default async function SiteLayout({
 
             <div className="mt-20">{children}</div>
 
-            {/* {params.domain == `demo.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}` ||
+            {/* {params.domain == `demo.${env.NEXT_PUBLIC_ROOT_DOMAIN}` ||
 			params.domain == `saroh.site` ? (
 				<CTA />
 			) : (

@@ -1,4 +1,5 @@
 "use client";
+import { env } from "@/env";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
@@ -42,7 +43,7 @@ const apps = [
 ];
 
 export default function AppsListPage() {
-    const isProduction = process.env.NODE_ENV === "production";
+    const isProduction = env.NODE_ENV === "production";
     const { data: session, isPending, error } = authClient.useSession();
     console.log(session);
     if (isPending) {

@@ -1,5 +1,7 @@
+import { env } from "@/env";
+
 export const accountsUrl =
-    process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? "https://accounts.saroh.in";
+    env.NEXT_PUBLIC_ACCOUNTS_URL ?? "https://accounts.saroh.in";
 
 export const accountsLoginUrl = `${accountsUrl}/login`;
 
@@ -16,7 +18,7 @@ export function isAdmin(
 ): boolean {
     const email = session?.user?.email?.toLowerCase();
     if (!email) return false;
-    const allow = (process.env.ADMIN_ALLOWLIST ?? "")
+    const allow = (env.ADMIN_ALLOWLIST ?? "")
         .split(",")
         .map((e) => e.trim().toLowerCase())
         .filter(Boolean);

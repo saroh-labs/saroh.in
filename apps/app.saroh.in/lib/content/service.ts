@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 
+import { env } from "@/env";
+
 /**
  * Content (blog) data access for app.saroh.in — posts and post categories.
  * Forwards the session cookie to api.saroh.in, which enforces store membership
@@ -7,9 +9,9 @@ import { headers } from "next/headers";
  */
 
 const API_URL =
-    process.env.API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    process.env.NEXT_PUBLIC_BETTER_AUTH_URL ??
+    env.API_URL ??
+    env.NEXT_PUBLIC_API_URL ??
+    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
     "https://api.saroh.in";
 
 export type PostStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";

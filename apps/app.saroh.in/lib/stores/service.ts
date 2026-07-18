@@ -1,10 +1,8 @@
 import { headers } from "next/headers";
 
-import type {
-    CreateStoreInput,
-    StoreResult,
-    UpdateStoreInput,
-} from "./schema";
+import { env } from "@/env";
+
+import type { CreateStoreInput, StoreResult, UpdateStoreInput } from "./schema";
 
 /**
  * Store data access for app.saroh.in. The app no longer touches the database
@@ -14,9 +12,9 @@ import type {
  */
 
 const API_URL =
-    process.env.API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    process.env.NEXT_PUBLIC_BETTER_AUTH_URL ??
+    env.API_URL ??
+    env.NEXT_PUBLIC_API_URL ??
+    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
     "https://api.saroh.in";
 
 export interface Store {
@@ -62,9 +60,11 @@ async function mutate(
     input: CreateStoreInput | UpdateStoreInput,
 ): Promise<StoreResult<{ id: string }>> {
     const res = await apiFetch(path, { method, body: JSON.stringify(input) });
-    const data = (await res.json().catch(() => null)) as
-        | { id?: string; message?: string; field?: "name" | "slug" | "logo" }
-        | null;
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        message?: string;
+        field?: "name" | "slug" | "logo";
+    } | null;
 
     if (res.ok && data?.id) {
         return { ok: true, data: { id: data.id } };
