@@ -139,7 +139,9 @@ export function MembersManager({
                         >
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-medium">
-                                    {m.name || m.email}
+                                    {m.name && m.name.length > 0
+                                        ? m.name
+                                        : m.email}
                                 </p>
                                 <p className="truncate text-xs text-muted-foreground">
                                     {m.email}

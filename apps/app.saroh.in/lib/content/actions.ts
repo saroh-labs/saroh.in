@@ -1,13 +1,11 @@
 "use server";
 
+import type { PostCategoryInput, PostInput, Result } from "./service";
 import {
     createPost as createPostApi,
     createPostCategory as createPostCategoryApi,
     deletePost as deletePostApi,
     deletePostCategory as deletePostCategoryApi,
-    type PostCategoryInput,
-    type PostInput,
-    type Result,
     updatePost as updatePostApi,
     updatePostCategory as updatePostCategoryApi,
 } from "./service";

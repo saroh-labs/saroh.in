@@ -75,7 +75,7 @@ export class CreateOrderDto {
     discount?: string;
 
     @IsOptional()
-    @Transform(({ value }) =>
+    @Transform(({ value }: { value: unknown }) =>
         typeof value === "string" ? value.trim().toUpperCase() : value,
     )
     @IsString()

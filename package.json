@@ -10,6 +10,7 @@
         "dev:api-auth": "turbo run dev --filter=@saroh/api --filter=auth",
         "dev:apps": "turbo run dev --filter=auth --filter=admin --filter=sites",
         "lint": "turbo run lint",
+        "typecheck": "turbo run typecheck",
         "format": "prettier --write \"**/*.{js,jsx,ts,tsx,md}\""
     },
     "prisma": {

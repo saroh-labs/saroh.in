@@ -7,11 +7,8 @@ import { prisma } from "@saroh/database";
 
 import { StoresService } from "../stores/stores.service";
 import type { CreateOrderDto, UpdateOrderDto } from "./dto";
-import {
-    applyInventoryTransition,
-    type OrderLine,
-    phaseOf,
-} from "./order-inventory";
+import type { OrderLine } from "./order-inventory";
+import { applyInventoryTransition, phaseOf } from "./order-inventory";
 import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
 
 /** Money helpers — integer-cents math so totals never drift on floats. */
@@ -108,7 +105,7 @@ export class OrdersService {
         const data = {
             storeId,
             customerId: dto.customerId,
-            currency: dto.currency || "USD",
+            currency: dto.currency ?? "USD",
             subtotal: fromCents(subtotalCents),
             tax: fromCents(taxCents),
             shipping: fromCents(shippingCents),

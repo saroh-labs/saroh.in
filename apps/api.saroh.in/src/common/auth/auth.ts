@@ -1,4 +1,5 @@
-import { type Auth, createAuth } from "@saroh/auth";
+import type { Auth } from "@saroh/auth";
+import { createAuth } from "@saroh/auth";
 
 import { sendPasswordResetEmail, sendVerificationEmail } from "../email";
 

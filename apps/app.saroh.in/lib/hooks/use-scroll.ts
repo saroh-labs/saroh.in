@@ -1,21 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 export default function useScroll(threshold: number) {
-  const [scrolled, setScrolled] = useState(false);
+    const subscribe = useCallback((onStoreChange: () => void) => {
+        window.addEventListener("scroll", onStoreChange);
+        return () => window.removeEventListener("scroll", onStoreChange);
+    }, []);
 
-  const onScroll = useCallback(() => {
-    setScrolled(window.scrollY > threshold);
-  }, [threshold]);
+    const getSnapshot = useCallback(
+        () => window.scrollY > threshold,
+        [threshold],
+    );
 
-  useEffect(() => {
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [onScroll]);
+    // Server render (and pre-hydration) reports "not scrolled".
+    const getServerSnapshot = useCallback(() => false, []);
 
-  // also check on first load
-  useEffect(() => {
-    onScroll();
-  }, [onScroll]);
-
-  return scrolled;
+    return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

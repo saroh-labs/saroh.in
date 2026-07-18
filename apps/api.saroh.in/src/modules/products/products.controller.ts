@@ -14,7 +14,8 @@ import {
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
-import { CreateProductDto, type ProductStatus, UpdateProductDto } from "./dto";
+import type { ProductStatus } from "./dto";
+import { CreateProductDto, UpdateProductDto } from "./dto";
 import { ProductsService } from "./products.service";
 
 /**

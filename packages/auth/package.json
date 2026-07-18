@@ -1,75 +1,76 @@
 {
-    "name": "@saroh/auth",
-    "description": "Shared Better Auth configuration for Saroh (server instance + browser client)",
-    "version": "1.0.0",
-    "main": "./dist/server.js",
-    "module": "./dist/server.mjs",
-    "types": "./dist/server.d.ts",
-    "files": [
-        "dist/**",
-        "src/**"
-    ],
-    "license": "MIT",
-    "scripts": {
-        "build": "tsup",
-        "lint": "eslint src/",
-        "dev": "tsup --watch",
-        "test": "vitest run",
-        "check-types": "tsc --noEmit"
+  "name": "@saroh/auth",
+  "description": "Shared Better Auth configuration for Saroh (server instance + browser client)",
+  "version": "1.0.0",
+  "main": "./dist/server.js",
+  "module": "./dist/server.mjs",
+  "types": "./dist/server.d.ts",
+  "files": [
+    "dist/**",
+    "src/**"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint src/",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@saroh/database": "workspace:*",
+    "better-auth": "^1.6.11",
+    "react": "catalog:react19"
+  },
+  "peerDependencies": {
+    "next": "catalog:next16"
+  },
+  "devDependencies": {
+    "@saroh/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:react19",
+    "next": "catalog:next16",
+    "eslint": "catalog:",
+    "prisma": "catalog:prisma",
+    "rimraf": "^6.1.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.22.3",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
+  },
+  "author": "Mohit Mehta <himohitmehta>",
+  "homepage": "https://saroh.in",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/himohitmehta/saroh.io.git"
+  },
+  "bugs": {
+    "url": "https://github.com/himohitmehta/saroh.io/issues"
+  },
+  "keywords": [
+    "saroh",
+    "saroh.io",
+    "better-auth",
+    "saroh auth"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.mjs",
+      "require": "./dist/server.js"
     },
-    "dependencies": {
-        "@saroh/database": "workspace:*",
-        "better-auth": "^1.6.11",
-        "react": "catalog:react19"
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.mjs",
+      "require": "./dist/server.js"
     },
-    "peerDependencies": {
-        "next": "catalog:next16"
-    },
-    "devDependencies": {
-        "@saroh/tsconfig": "workspace:*",
-        "@types/node": "catalog:",
-        "@types/react": "catalog:react19",
-        "next": "catalog:next16",
-        "eslint": "catalog:",
-        "prisma": "catalog:prisma",
-        "rimraf": "^6.1.3",
-        "tsup": "^8.5.1",
-        "tsx": "^4.22.3",
-        "typescript": "catalog:",
-        "vitest": "^3.2.4"
-    },
-    "author": "Mohit Mehta <himohitmehta>",
-    "homepage": "https://saroh.in",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/himohitmehta/saroh.io.git"
-    },
-    "bugs": {
-        "url": "https://github.com/himohitmehta/saroh.io/issues"
-    },
-    "keywords": [
-        "saroh",
-        "saroh.io",
-        "better-auth",
-        "saroh auth"
-    ],
-    "publishConfig": {
-        "access": "public"
-    },
-    "exports": {
-        ".": {
-            "types": "./dist/server.d.ts",
-            "import": "./dist/server.mjs",
-            "require": "./dist/server.js"
-        },
-        "./server": {
-            "types": "./dist/server.d.ts",
-            "import": "./dist/server.mjs",
-            "require": "./dist/server.js"
-        },
-        "./client": "./src/client.ts",
-        "./auth-status": "./src/auth-status.tsx",
-        "./middleware": "./src/middleware.ts",
-        "./next": "./src/next.ts"
-    }
+    "./client": "./src/client.ts",
+    "./auth-status": "./src/auth-status.tsx",
+    "./middleware": "./src/middleware.ts",
+    "./next": "./src/next.ts"
+  }
 }

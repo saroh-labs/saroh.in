@@ -34,9 +34,9 @@ describe("origins", () => {
 });
 
 vi.mock("better-auth/cookies", () => ({ getSessionCookie: vi.fn() }));
-// eslint-disable-next-line import/first
+
 import { getSessionCookie } from "better-auth/cookies";
-// eslint-disable-next-line import/first
+
 import { createAuthMiddleware } from "./middleware";
 
 function fakeRequest({

@@ -24,7 +24,7 @@ export default async function StoreOverviewPage({
     params: Promise<{ storeId: string }>;
 }) {
     const { storeId } = await params;
-    const session = await requireSession();
+    await requireSession();
     const store = await getStore(storeId);
     if (!store) notFound();
 

@@ -4,116 +4,118 @@ import React, { useEffect, useRef } from "react";
 import { createNoise3D } from "simplex-noise";
 
 export const WavyBackground = ({
-  children,
-  className,
-  containerClassName,
-  colors,
-  waveWidth,
-  backgroundFill,
-  blur = 10,
-  speed = "fast",
-  waveOpacity = 0.5,
-  ...props
+    children,
+    className,
+    containerClassName,
+    colors,
+    waveWidth,
+    backgroundFill,
+    blur = 10,
+    speed = "fast",
+    waveOpacity = 0.5,
+    ...props
 }: {
-  children?: any;
-  className?: string;
-  containerClassName?: string;
-  colors?: string[];
-  waveWidth?: number;
-  backgroundFill?: string;
-  blur?: number;
-  speed?: "slow" | "fast";
-  waveOpacity?: number;
-  [key: string]: any;
-}) => {
-  const noise = createNoise3D();
-  let w: number,
-    h: number,
-    nt: number,
-    i: number,
-    x: number,
-    ctx: any,
-    canvas: any;
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const getSpeed = () => {
-    switch (speed) {
-      case "slow":
-        return 0.001;
-      case "fast":
-        return 0.002;
-      default:
-        return 0.001;
-    }
-  };
-
-  const init = () => {
-    canvas = canvasRef.current;
-    ctx = canvas.getContext("2d");
-    w = ctx.canvas.width = window.innerWidth;
-    h = ctx.canvas.height = window.innerHeight;
-    ctx.filter = `blur(${blur}px)`;
-    nt = 0;
-    window.onresize = function () {
-      w = ctx.canvas.width = window.innerWidth;
-      h = ctx.canvas.height = window.innerHeight;
-      ctx.filter = `blur(${blur}px)`;
+    children?: React.ReactNode;
+    className?: string;
+    containerClassName?: string;
+    colors?: string[];
+    waveWidth?: number;
+    backgroundFill?: string;
+    blur?: number;
+    speed?: "slow" | "fast";
+    waveOpacity?: number;
+} & React.HTMLAttributes<HTMLDivElement>) => {
+    const noise = createNoise3D();
+    let w: number, h: number, nt: number, i: number, x: number;
+    let ctx: CanvasRenderingContext2D;
+    let canvas: HTMLCanvasElement;
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const getSpeed = () => {
+        switch (speed) {
+            case "slow":
+                return 0.001;
+            case "fast":
+                return 0.002;
+            default:
+                return 0.001;
+        }
     };
-    render();
-  };
 
-  const waveColors = colors ?? [
-    "#38bdf8",
-    "#818cf8",
-    "#c084fc",
-    "#e879f9",
-    "#22d3ee",
-  ];
-  const drawWave = (n: number) => {
-    nt += getSpeed();
-    for (i = 0; i < n; i++) {
-      ctx.beginPath();
-      ctx.lineWidth = waveWidth || 50;
-      ctx.strokeStyle = waveColors[i % waveColors.length];
-      for (x = 0; x < w; x += 5) {
-        var y = noise(x / 800, 0.3 * i, nt) * 100;
-        ctx.lineTo(x, y + h * 0.5); // adjust for height, currently at 50% of the container
-      }
-      ctx.stroke();
-      ctx.closePath();
-    }
-  };
-
-  let animationId: number;
-  const render = () => {
-    ctx.fillStyle = backgroundFill || "black";
-    ctx.globalAlpha = waveOpacity || 0.5;
-    ctx.fillRect(0, 0, w, h);
-    drawWave(5);
-    animationId = requestAnimationFrame(render);
-  };
-
-  useEffect(() => {
-    init();
-    return () => {
-      cancelAnimationFrame(animationId);
+    const init = () => {
+        const currentCanvas = canvasRef.current;
+        if (!currentCanvas) return;
+        canvas = currentCanvas;
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        ctx = context;
+        w = ctx.canvas.width = window.innerWidth;
+        h = ctx.canvas.height = window.innerHeight;
+        ctx.filter = `blur(${blur}px)`;
+        nt = 0;
+        window.onresize = function () {
+            w = ctx.canvas.width = window.innerWidth;
+            h = ctx.canvas.height = window.innerHeight;
+            ctx.filter = `blur(${blur}px)`;
+        };
+        render();
     };
-  }, []);
 
-  return (
-    <div
-      className={cn(
-        "h-screen flex flex-col items-center justify-center",
-        containerClassName
-      )}
-    >
-      <canvas
-        className="absolute inset-0 z-0"
-        ref={canvasRef}
-        id="canvas"
-      ></canvas>
-      <div className={cn("relative z-10", className)} {...props}>
-        {children}
-      </div>
-    </div>
-  );
+    const waveColors = colors ?? [
+        "#38bdf8",
+        "#818cf8",
+        "#c084fc",
+        "#e879f9",
+        "#22d3ee",
+    ];
+    const drawWave = (n: number) => {
+        nt += getSpeed();
+        for (i = 0; i < n; i++) {
+            ctx.beginPath();
+            ctx.lineWidth = waveWidth ?? 50;
+            ctx.strokeStyle = waveColors[i % waveColors.length];
+            for (x = 0; x < w; x += 5) {
+                const y = noise(x / 800, 0.3 * i, nt) * 100;
+                ctx.lineTo(x, y + h * 0.5); // adjust for height, currently at 50% of the container
+            }
+            ctx.stroke();
+            ctx.closePath();
+        }
+    };
+
+    let animationId: number;
+    const render = () => {
+        ctx.fillStyle = backgroundFill ?? "black";
+        ctx.globalAlpha = waveOpacity;
+        ctx.fillRect(0, 0, w, h);
+        drawWave(5);
+        animationId = requestAnimationFrame(render);
+    };
+
+    useEffect(() => {
+        init();
+        return () => {
+            cancelAnimationFrame(animationId);
+        };
+        // Mount-only imperative canvas setup that intentionally captures the
+        // initial props; re-running on every render/prop change is not desired.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return (
+        <div
+            className={cn(
+                "flex h-screen flex-col items-center justify-center",
+                containerClassName,
+            )}
+        >
+            <canvas
+                className="absolute inset-0 z-0"
+                ref={canvasRef}
+                id="canvas"
+            ></canvas>
+            <div className={cn("relative z-10", className)} {...props}>
+                {children}
+            </div>
+        </div>
+    );
 };

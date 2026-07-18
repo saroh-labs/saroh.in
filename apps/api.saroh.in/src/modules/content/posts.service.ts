@@ -96,11 +96,11 @@ export class PostsService {
                     storeId,
                     title: dto.title,
                     slug,
-                    excerpt: dto.excerpt || null,
+                    excerpt: dto.excerpt ?? null,
                     content: dto.content ?? "",
-                    categoryId: dto.categoryId || null,
+                    categoryId: dto.categoryId ?? null,
                     featured: dto.featured ?? false,
-                    image: dto.image || null,
+                    image: dto.image ?? null,
                     status,
                     publishedAt: status === "PUBLISHED" ? new Date() : null,
                     authorId,
@@ -144,11 +144,11 @@ export class PostsService {
                 data: {
                     title: dto.title,
                     slug,
-                    excerpt: dto.excerpt || null,
+                    excerpt: dto.excerpt ?? null,
                     content: dto.content ?? "",
                     categoryId: dto.categoryId ?? null,
                     featured: dto.featured ?? false,
-                    image: dto.image || null,
+                    image: dto.image ?? null,
                     status,
                     // Stamp publishedAt on the first PUBLISHED; keep it after.
                     publishedAt:

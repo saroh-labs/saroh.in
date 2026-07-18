@@ -91,7 +91,7 @@ export class StoresService {
                 data: {
                     name: dto.name,
                     slug,
-                    description: dto.description || null,
+                    description: dto.description ?? null,
                     // Nested create runs in one transaction → no orphan store.
                     owners: { create: { userId, role: "OWNER" } },
                 },
@@ -136,7 +136,7 @@ export class StoresService {
                     name: dto.name,
                     slug,
                     description: dto.description ?? null,
-                    logo: dto.logo || null,
+                    logo: dto.logo ?? null,
                 },
             });
             return { id: storeId };

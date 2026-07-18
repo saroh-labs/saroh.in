@@ -18,6 +18,11 @@ const formSchema = z.object({
     }),
 });
 
+interface WaitlistResponse {
+    status?: "success" | "failure";
+    reason?: { code?: string };
+}
+
 export default function JoinWaitlist() {
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -34,7 +39,7 @@ export default function JoinWaitlist() {
                 "Content-Type": "application/json",
             },
         })
-            .then((res) => res.json())
+            .then((res) => res.json() as Promise<WaitlistResponse>)
             .then((json) => {
                 if (json.status === "success") {
                     toast({
@@ -45,7 +50,7 @@ export default function JoinWaitlist() {
                     form.reset();
                 }
                 if (json.status === "failure") {
-                    if (json.reason.code === "P2002") {
+                    if (json.reason?.code === "P2002") {
                         return toast({
                             title: "Email already exists in the waitlist.",
                             variant: "destructive",
@@ -59,11 +64,12 @@ export default function JoinWaitlist() {
                     console.error(json.reason);
                 }
             })
-            .catch((error) => {
+            .catch((error: unknown) => {
                 toast({
                     title: "An error occurred. Please try again later.",
                     variant: "destructive",
-                    description: error.message,
+                    description:
+                        error instanceof Error ? error.message : undefined,
                 });
             });
     }
@@ -71,7 +77,7 @@ export default function JoinWaitlist() {
     return (
         <div className="relative flex h-[40rem] w-full flex-col items-center justify-center rounded-md bg-neutral-950 antialiased">
             <div className="mx-auto max-w-2xl p-4">
-                <h1 className="relative z-10 bg-gradient-to-b from-neutral-200  to-neutral-600 bg-clip-text text-center font-sans text-lg  font-bold text-transparent md:text-7xl">
+                <h1 className="relative z-10 bg-gradient-to-b from-neutral-200 to-neutral-600 bg-clip-text text-center font-sans text-lg font-bold text-transparent md:text-7xl">
                     Join the waitlist
                 </h1>
                 <p></p>
@@ -87,7 +93,7 @@ export default function JoinWaitlist() {
                 <Form {...form}>
                     <form
                         onSubmit={form.handleSubmit(onSubmit)}
-                        className=" space-y-6"
+                        className="space-y-6"
                     >
                         <FormField
                             control={form.control}
@@ -97,7 +103,7 @@ export default function JoinWaitlist() {
                                     <FormControl>
                                         <Input
                                             placeholder="Enter your email address"
-                                            className="relative z-10 mt-4 w-full rounded-lg  border border-neutral-800 bg-neutral-950 placeholder:text-neutral-700  focus:ring-2 focus:ring-teal-500"
+                                            className="relative z-10 mt-4 w-full rounded-lg border border-neutral-800 bg-neutral-950 placeholder:text-neutral-700 focus:ring-2 focus:ring-teal-500"
                                             {...field}
                                         />
                                     </FormControl>

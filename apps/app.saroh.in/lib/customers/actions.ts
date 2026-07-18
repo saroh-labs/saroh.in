@@ -1,9 +1,8 @@
 "use server";
 
+import type { CustomerInput, CustomerResult } from "./service";
 import {
     createCustomer as createCustomerApi,
-    type CustomerInput,
-    type CustomerResult,
     updateCustomer as updateCustomerApi,
 } from "./service";
 

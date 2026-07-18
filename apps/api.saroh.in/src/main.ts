@@ -36,16 +36,17 @@ async function bootstrap() {
         }),
     );
 
-    const port = parseInt(process.env.PORT || "3333", 10);
+    const port = parseInt(process.env.PORT ?? "3333", 10);
     await app.listen(port);
 
-    const environment = process.env.NODE_ENV || "development";
-    console.log(
+    const environment = process.env.NODE_ENV ?? "development";
+    console.info(
         `🚀 API + Auth server running on port ${port} (${environment})`,
     );
 }
 
-bootstrap().catch((error) => {
-    console.error("Failed to bootstrap application:", error.message);
+bootstrap().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Failed to bootstrap application:", message);
     process.exit(1);
 });

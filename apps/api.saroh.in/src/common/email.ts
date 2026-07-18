@@ -1,4 +1,5 @@
-import nodemailer, { type Transporter } from "nodemailer";
+import type { Transporter } from "nodemailer";
+import nodemailer from "nodemailer";
 
 const FROM =
     process.env.EMAIL_FROM ??
@@ -45,13 +46,13 @@ function actionEmail(heading: string, body: string, url: string, cta: string) {
 </div>`;
 }
 
-export async function sendPasswordResetEmail(
+export function sendPasswordResetEmail(
     to: string,
     resetUrl: string,
 ): Promise<void> {
     if (!transporter) {
-        console.log(`[Password reset] (no SMTP) ${to}: ${resetUrl}`);
-        return;
+        console.info(`[Password reset] (no SMTP) ${to}: ${resetUrl}`);
+        return Promise.resolve();
     }
     void transporter.sendMail({
         from: FROM,
@@ -64,15 +65,16 @@ export async function sendPasswordResetEmail(
             "Reset password",
         ),
     });
+    return Promise.resolve();
 }
 
-export async function sendVerificationEmail(
+export function sendVerificationEmail(
     to: string,
     verifyUrl: string,
 ): Promise<void> {
     if (!transporter) {
-        console.log(`[Verify email] (no SMTP) ${to}: ${verifyUrl}`);
-        return;
+        console.info(`[Verify email] (no SMTP) ${to}: ${verifyUrl}`);
+        return Promise.resolve();
     }
     void transporter.sendMail({
         from: FROM,
@@ -85,18 +87,19 @@ export async function sendVerificationEmail(
             "Verify email",
         ),
     });
+    return Promise.resolve();
 }
 
-export async function sendStoreInvitationEmail(
+export function sendStoreInvitationEmail(
     to: string,
     acceptUrl: string,
     storeName: string,
 ): Promise<void> {
     if (!transporter) {
-        console.log(
+        console.info(
             `[Store invite] (no SMTP) ${to} -> ${storeName}: ${acceptUrl}`,
         );
-        return;
+        return Promise.resolve();
     }
     void transporter.sendMail({
         from: FROM,
@@ -109,4 +112,5 @@ export async function sendStoreInvitationEmail(
             "Accept invitation",
         ),
     });
+    return Promise.resolve();
 }

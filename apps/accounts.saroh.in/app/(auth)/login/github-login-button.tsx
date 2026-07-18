@@ -11,12 +11,12 @@ export default function GithubLoginButton() {
 
     // Get error message added by next/auth in URL.
     const searchParams = useSearchParams();
-    const error = searchParams?.get("error");
+    const error = searchParams.get("error");
 
     useEffect(() => {
-        const errorMessage = Array.isArray(error) ? error.pop() : error;
-        errorMessage;
-        // && toast.error(errorMessage);
+        if (error) {
+            // TODO: surface the provider error, e.g. toast.error(error)
+        }
     }, [error]);
 
     return (
@@ -24,7 +24,7 @@ export default function GithubLoginButton() {
             disabled={loading}
             onClick={() => {
                 setLoading(true);
-                authClient.signIn.social({
+                void authClient.signIn.social({
                     provider: "github",
                     callbackURL: "/apps",
                 });

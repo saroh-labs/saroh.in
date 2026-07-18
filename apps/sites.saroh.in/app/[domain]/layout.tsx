@@ -3,7 +3,7 @@ import Link from "next/link";
 // import CTA from "@/components/cta";
 import { getSiteData } from "@/lib/fetchers";
 import { fontMapper } from "@/styles/fonts";
-import { Metadata } from "next";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 export async function generateMetadata({
@@ -48,10 +48,10 @@ export async function generateMetadata({
     };
 }
 
-export async function generateStaticParams() {
+export function generateStaticParams() {
     // No DB here — domains are rendered on demand. Pre-rendering returns once
     // api exposes a list-domains endpoint for the renderer to enumerate.
-    return [] as Array<{ params: { domain: string } }>;
+    return [] as { params: { domain: string } }[];
 }
 
 export default async function SiteLayout({

@@ -10,7 +10,7 @@ export default async function StoreSettingsPage({
     params: Promise<{ storeId: string }>;
 }) {
     const { storeId } = await params;
-    const session = await requireSession();
+    await requireSession();
     const store = await getStore(storeId);
     if (!store) notFound();
 
@@ -18,7 +18,7 @@ export default async function StoreSettingsPage({
         <div className="space-y-6">
             <div>
                 <h2 className="text-lg font-medium">Settings</h2>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-sm text-muted-foreground">
                     Edit this store&apos;s basic details.
                 </p>
             </div>

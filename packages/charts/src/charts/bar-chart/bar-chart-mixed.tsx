@@ -11,8 +11,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import type { ChartConfig } from "@saroh/ui/chart";
 import {
-    ChartConfig,
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
@@ -79,7 +79,7 @@ export function BarChartMixedExample() {
                             axisLine={false}
                             tickFormatter={(value) =>
                                 chartConfig[value as keyof typeof chartConfig]
-                                    ?.label
+                                    .label
                             }
                         />
                         <XAxis dataKey="visitors" type="number" hide />
@@ -92,7 +92,7 @@ export function BarChartMixedExample() {
                 </ChartContainer>
             </CardContent>
             <CardFooter className="flex-col items-start gap-2 text-sm">
-                <div className="flex gap-2 font-medium leading-none">
+                <div className="flex gap-2 leading-none font-medium">
                     Trending up by 5.2% this month{" "}
                     <TrendingUp className="h-4 w-4" />
                 </div>

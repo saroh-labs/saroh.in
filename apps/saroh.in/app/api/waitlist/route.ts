@@ -8,13 +8,13 @@
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-	try {
-		const data = await req.json();
-		// TODO: forward to api.saroh.in's waitlist endpoint.
-		console.log("[waitlist] signup:", data?.email);
-		return NextResponse.json({ message: "success", status: "success" });
-	} catch (reason) {
-		console.log(reason);
-		return NextResponse.json({ status: "failure", reason });
-	}
+    try {
+        const data = (await req.json()) as { email?: string };
+        // TODO: forward to api.saroh.in's waitlist endpoint.
+        console.log("[waitlist] signup:", data.email);
+        return NextResponse.json({ message: "success", status: "success" });
+    } catch (reason) {
+        console.log(reason);
+        return NextResponse.json({ status: "failure", reason });
+    }
 }

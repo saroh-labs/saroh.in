@@ -32,9 +32,8 @@ export function ForgotPasswordForm() {
         const { error: err } = await requestPasswordReset(
             { email, redirectTo },
             {
-                onError: (ctx) =>
-                    setError(ctx.error?.message ?? "Request failed"),
-            }
+                onError: (ctx) => setError(ctx.error.message),
+            },
         );
         setIsLoading(false);
         if (err) return;
@@ -47,8 +46,8 @@ export function ForgotPasswordForm() {
                 <CardHeader>
                     <CardTitle className="text-2xl">Check your email</CardTitle>
                     <CardDescription>
-                        If an account exists for {email}, we&apos;ve sent a
-                        link to reset your password.
+                        If an account exists for {email}, we&apos;ve sent a link
+                        to reset your password.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -89,7 +88,7 @@ export function ForgotPasswordForm() {
             <CardContent>
                 <form onSubmit={handleSubmit} className="grid gap-4">
                     {error && (
-                        <p className="text-sm text-destructive">{error}</p>
+                        <p className="text-destructive text-sm">{error}</p>
                     )}
                     <div className="grid gap-2">
                         <Label htmlFor="email">Email</Label>
@@ -103,7 +102,11 @@ export function ForgotPasswordForm() {
                             disabled={isLoading}
                         />
                     </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={isLoading}
+                    >
                         {isLoading ? "Sending…" : "Send reset link"}
                     </Button>
                 </form>

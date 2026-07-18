@@ -6,7 +6,8 @@
         "dev": "next dev --port=3008",
         "build": " next build",
         "start": "next start",
-        "lint": "next lint"
+        "lint": "eslint .",
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@hookform/resolvers": "catalog:",

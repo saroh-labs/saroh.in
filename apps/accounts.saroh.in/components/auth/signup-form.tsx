@@ -31,9 +31,8 @@ export function SignupForm() {
         const { error: err } = await signUp.email(
             { name, email, password, callbackURL: "/apps" },
             {
-                onError: (ctx) =>
-                    setError(ctx.error?.message ?? "Sign up failed"),
-            }
+                onError: (ctx) => setError(ctx.error.message),
+            },
         );
         setIsLoading(false);
         if (err) return;
@@ -51,7 +50,7 @@ export function SignupForm() {
             <CardContent>
                 <form onSubmit={handleSubmit} className="grid gap-4">
                     {error && (
-                        <p className="text-sm text-destructive">{error}</p>
+                        <p className="text-destructive text-sm">{error}</p>
                     )}
                     <div className="grid gap-2">
                         <Label htmlFor="name">Name</Label>
@@ -90,7 +89,11 @@ export function SignupForm() {
                             disabled={isLoading}
                         />
                     </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={isLoading}
+                    >
                         {isLoading ? "Creating account…" : "Sign up"}
                     </Button>
                 </form>

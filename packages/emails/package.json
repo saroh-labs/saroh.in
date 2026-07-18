@@ -1,26 +1,29 @@
 {
-    "name": "@saroh/emails",
-    "version": "1.0.0",
-    "description": "Email templates for saroh",
-    "main": "index.js",
-    "scripts": {
-        "dev": "email dev -p 3010",
-        "export": "email export"
-    },
-    "workspaces": [
-        ".react-email"
-    ],
-    "keywords": [],
-    "author": "",
-    "license": "ISC",
-    "dependencies": {
-        "@react-email/components": "^1.0.12",
-        "@types/nodemailer": "^8.0.0",
-        "nodemailer": "^8.0.10",
-        "react": "catalog:react19",
-        "react-email": "^6.5.0"
-    },
-    "devDependencies": {
-        "@types/react": "catalog:react19"
-    }
+  "name": "@saroh/emails",
+  "version": "1.0.0",
+  "description": "Email templates for saroh",
+  "main": "index.js",
+  "scripts": {
+    "dev": "email dev -p 3010",
+    "export": "email export",
+    "typecheck": "tsc --noEmit"
+  },
+  "workspaces": [
+    ".react-email"
+  ],
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@react-email/components": "^1.0.12",
+    "@types/nodemailer": "^8.0.0",
+    "nodemailer": "^8.0.10",
+    "react": "catalog:react19",
+    "react-email": "^6.5.0"
+  },
+  "devDependencies": {
+    "@saroh/tsconfig": "workspace:*",
+    "@types/react": "catalog:react19",
+    "typescript": "catalog:"
+  }
 }

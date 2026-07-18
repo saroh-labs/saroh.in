@@ -1,7 +1,37 @@
 {
     "$schema": "https://turbo.build/schema.json",
     "globalDependencies": ["**/.env.*local"],
-    "globalEnv": ["NODE_ENV", "DATABASE_URL", "BETTER_AUTH_SECRET"],
+    "globalEnv": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "BETTER_AUTH_TRUSTED_ORIGINS",
+        "API_URL",
+        "ADMIN_ALLOWLIST",
+        "AUTH_GITHUB_ID",
+        "AUTH_GITHUB_SECRET",
+        "AUTH_GOOGLE_ID",
+        "AUTH_GOOGLE_SECRET",
+        "NGROK_URL",
+        "REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS"
+    ],
+    "globalPassThroughEnv": [
+        "PORT",
+        "APP_URL",
+        "CORS_ORIGIN",
+        "EMAIL_FROM",
+        "SENDER_EMAIL_ID",
+        "SMTP_HOST",
+        "SMTP_HOSTNAME",
+        "SMTP_PORT",
+        "SMTP_SECURE",
+        "SMTP_USER",
+        "SMTP_PASS",
+        "USER_ACCOUNT",
+        "USER_PASSWORD",
+        "npm_package_version"
+    ],
     "tasks": {
         "build": {
             "dependsOn": ["^build"],
@@ -17,6 +47,11 @@
         "generate": {
             "dependsOn": ["^generate"]
         },
-        "lint": {}
+        "lint": {
+            "dependsOn": ["^build"]
+        },
+        "typecheck": {
+            "dependsOn": ["^build"]
+        }
     }
 }

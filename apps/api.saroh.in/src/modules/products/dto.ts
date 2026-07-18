@@ -62,7 +62,7 @@ export class CreateProductDto {
     price!: string;
 
     @IsOptional()
-    @Transform(({ value }) =>
+    @Transform(({ value }: { value: unknown }) =>
         typeof value === "string" ? value.trim().toUpperCase() : value,
     )
     @IsString()
@@ -111,7 +111,7 @@ export class UpdateProductDto {
     price!: string;
 
     @IsOptional()
-    @Transform(({ value }) =>
+    @Transform(({ value }: { value: unknown }) =>
         typeof value === "string" ? value.trim().toUpperCase() : value,
     )
     @IsString()

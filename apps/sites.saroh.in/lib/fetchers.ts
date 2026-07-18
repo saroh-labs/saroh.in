@@ -48,24 +48,20 @@ export interface PostData {
     site: { user: SiteUser | null } | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function getSiteData(domain: string): Promise<SiteData | null> {
+export function getSiteData(_domain: string): Promise<SiteData | null> {
     // TODO: GET ${API_URL}/sites/by-domain/:domain
-    return null;
+    return Promise.resolve(null);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function getPostsForSite(domain: string): Promise<PostMeta[]> {
+export function getPostsForSite(_domain: string): Promise<PostMeta[]> {
     // TODO: GET ${API_URL}/sites/by-domain/:domain/posts
-    return [];
+    return Promise.resolve([]);
 }
 
-export async function getPostData(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    domain: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    slug: string,
+export function getPostData(
+    _domain: string,
+    _slug: string,
 ): Promise<PostData | null> {
     // TODO: GET ${API_URL}/sites/by-domain/:domain/posts/:slug
-    return null;
+    return Promise.resolve(null);
 }

@@ -82,13 +82,13 @@ export class CustomersService {
     private fields(dto: CreateCustomerDto) {
         return {
             email: dto.email,
-            firstName: dto.firstName || null,
-            lastName: dto.lastName || null,
-            phone: dto.phone || null,
-            country: dto.country || null,
-            state: dto.state || null,
-            city: dto.city || null,
-            zipCode: dto.zipCode || null,
+            firstName: dto.firstName ?? null,
+            lastName: dto.lastName ?? null,
+            phone: dto.phone ?? null,
+            country: dto.country ?? null,
+            state: dto.state ?? null,
+            city: dto.city ?? null,
+            zipCode: dto.zipCode ?? null,
         };
     }
 

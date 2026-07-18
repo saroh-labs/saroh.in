@@ -1,21 +1,23 @@
 "use server";
 
+import type {
+    CategoryInput,
+    InventoryInput,
+    ProductInput,
+    Result,
+    VariantInput,
+} from "./service";
 import {
-    type CategoryInput,
     createCategory as createCategoryApi,
     createProduct as createProductApi,
     createVariant as createVariantApi,
     deleteCategory as deleteCategoryApi,
     deleteProduct as deleteProductApi,
     deleteVariant as deleteVariantApi,
-    type InventoryInput,
-    type ProductInput,
-    type Result,
     setInventory as setInventoryApi,
     updateCategory as updateCategoryApi,
     updateProduct as updateProductApi,
     updateVariant as updateVariantApi,
-    type VariantInput,
 } from "./service";
 
 /**

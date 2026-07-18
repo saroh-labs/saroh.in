@@ -1056,9 +1056,15 @@ importers:
         specifier: ^6.5.0
         version: 6.5.0(react-dom@19.2.6(react@19.2.4))(react@19.2.4)
     devDependencies:
+      '@saroh/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/tsconfig
       '@types/react':
         specifier: catalog:react19
         version: 19.2.14
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
 
   packages/templates: {}
 
@@ -1261,6 +1267,9 @@ importers:
       '@eslint/compat':
         specifier: ^2.1.0
         version: 2.1.0(eslint@10.0.0(jiti@2.7.0))
+      '@eslint/js':
+        specifier: ^10.0.1
+        version: 10.0.1(eslint@10.0.0(jiti@2.7.0))
       '@next/eslint-plugin-next':
         specifier: ^16.2.6
         version: 16.2.6
@@ -2308,6 +2317,15 @@ packages:
   '@eslint/eslintrc@2.1.4':
     resolution: {integrity: sha512-269Z39MS6wVJtsoUl10L60WdkhJVdPG24Q4eZTH3nnF6lpvSShEK3wQjDX9JRWAUPvPh7COouPpU9IrqaZFvtQ==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+
+  '@eslint/js@10.0.1':
+    resolution: {integrity: sha512-zeR9k5pd4gxjZ0abRoIaxdc7I3nDktoXZk2qOv9gCNWx3mVwEn32VRhyLaRsDiJjTs0xq/T8mfPtyuXu7GWBcA==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+    peerDependencies:
+      eslint: ^10.0.0
+    peerDependenciesMeta:
+      eslint:
+        optional: true
 
   '@eslint/object-schema@3.0.5':
     resolution: {integrity: sha512-vqTaUEgxzm+YDSdElad6PiRoX4t8VGDjCtt05zn4nU810UIx/uNEV7/lZJ6KwFThKZOzOxzXy48da+No7HZaMw==}
@@ -11567,6 +11585,10 @@ snapshots:
       strip-json-comments: 3.1.1
     transitivePeerDependencies:
       - supports-color
+
+  '@eslint/js@10.0.1(eslint@10.0.0(jiti@2.7.0))':
+    optionalDependencies:
+      eslint: 10.0.0(jiti@2.7.0)
 
   '@eslint/object-schema@3.0.5': {}
 

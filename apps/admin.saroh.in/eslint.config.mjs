@@ -1,4 +1,4 @@
-import baseConfig, { restrictEnvAccess } from "@saroh/eslint-config/base";
+import baseConfig from "@saroh/eslint-config/base";
 import nextjsConfig from "@saroh/eslint-config/nextjs";
 import reactConfig from "@saroh/eslint-config/react";
 
@@ -10,5 +10,4 @@ export default [
     ...baseConfig,
     ...reactConfig,
     ...nextjsConfig,
-    ...restrictEnvAccess,
 ];

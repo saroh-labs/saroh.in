@@ -1,9 +1,8 @@
 "use server";
 
+import type { MemberResult, MemberRole } from "./service";
 import {
     inviteMember as inviteMemberApi,
-    type MemberResult,
-    type MemberRole,
     removeMember as removeMemberApi,
     revokeInvitation as revokeInvitationApi,
     updateMemberRole as updateMemberRoleApi,

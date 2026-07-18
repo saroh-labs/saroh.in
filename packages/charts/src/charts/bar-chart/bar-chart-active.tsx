@@ -11,8 +11,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import type { ChartConfig } from "@saroh/ui/chart";
 import {
-    ChartConfig,
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
@@ -72,7 +72,7 @@ export function BarChartActiveExample() {
                             axisLine={false}
                             tickFormatter={(value) =>
                                 chartConfig[value as keyof typeof chartConfig]
-                                    ?.label
+                                    .label
                             }
                         />
                         <ChartTooltip
@@ -85,11 +85,14 @@ export function BarChartActiveExample() {
                             radius={8}
                             activeIndex={2}
                             activeBar={({ ...props }) => {
+                                const { payload } = props as {
+                                    payload: { fill: string };
+                                };
                                 return (
                                     <Rectangle
                                         {...props}
                                         fillOpacity={0.8}
-                                        stroke={props.payload.fill}
+                                        stroke={payload.fill}
                                         strokeDasharray={4}
                                         strokeDashoffset={4}
                                     />
@@ -100,7 +103,7 @@ export function BarChartActiveExample() {
                 </ChartContainer>
             </CardContent>
             <CardFooter className="flex-col items-start gap-2 text-sm">
-                <div className="flex gap-2 font-medium leading-none">
+                <div className="flex gap-2 leading-none font-medium">
                     Trending up by 5.2% this month{" "}
                     <TrendingUp className="h-4 w-4" />
                 </div>

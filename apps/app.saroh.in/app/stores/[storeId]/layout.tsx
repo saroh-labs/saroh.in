@@ -1,6 +1,6 @@
 import { StoreNav } from "@/components/stores/store-nav";
-import { getStore } from "@/lib/stores/service";
 import { requireSession } from "@/lib/session";
+import { getStore } from "@/lib/stores/service";
 import { notFound } from "next/navigation";
 
 /**
@@ -17,7 +17,7 @@ export default async function StoreLayout({
     params: Promise<{ storeId: string }>;
 }) {
     const { storeId } = await params;
-    const session = await requireSession();
+    await requireSession();
     const store = await getStore(storeId);
     if (!store) notFound();
 
@@ -27,7 +27,7 @@ export default async function StoreLayout({
                 <h1 className="text-2xl font-semibold tracking-tight">
                     {store.name}
                 </h1>
-                <p className="text-muted-foreground text-sm">/{store.slug}</p>
+                <p className="text-sm text-muted-foreground">/{store.slug}</p>
             </header>
             <StoreNav storeId={storeId} />
             <div className="mt-6">{children}</div>

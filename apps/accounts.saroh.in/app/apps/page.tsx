@@ -43,12 +43,7 @@ const apps = [
 
 export default function AppsListPage() {
     const isProduction = process.env.NODE_ENV === "production";
-    const {
-        data: session,
-        isPending,
-        error,
-        refetch,
-    } = authClient.useSession();
+    const { data: session, isPending, error } = authClient.useSession();
     console.log(session);
     if (isPending) {
         return <div>Loading...</div>;
@@ -57,13 +52,13 @@ export default function AppsListPage() {
         return <div>Error: {error.message}</div>;
     }
     return (
-        <div className="flex flex-col items-center justify-center gap-2 p-8 ">
+        <div className="flex flex-col items-center justify-center gap-2 p-8">
             <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-gray-200 bg-white p-8">
                 <Button onClick={() => authClient.signOut()}>Sign Out</Button>
                 <div className="flex flex-col gap-2 text-2xl font-bold">
                     Select the app to open
                 </div>
-                <div className="flex flex-col gap-2 p-8 ">
+                <div className="flex flex-col gap-2 p-8">
                     {apps.map((app) => (
                         <Link
                             key={app.name}

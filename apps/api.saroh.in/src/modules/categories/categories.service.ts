@@ -52,7 +52,7 @@ export class CategoriesService {
                     storeId,
                     name: dto.name,
                     slug,
-                    parentId: dto.parentId || null,
+                    parentId: dto.parentId ?? null,
                 },
             });
             return { id: category.id };

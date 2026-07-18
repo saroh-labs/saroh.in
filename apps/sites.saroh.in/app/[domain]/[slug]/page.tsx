@@ -49,13 +49,13 @@ export default async function SitePostPage({
         <>
             <div className="flex flex-col items-center justify-center">
                 <div className="m-auto w-full text-center md:w-7/12">
-                    <p className="m-auto my-5 w-10/12 text-sm font-light text-stone-500 md:text-base dark:text-stone-400">
+                    <p className="m-auto my-5 w-10/12 text-sm font-light text-stone-500 dark:text-stone-400 md:text-base">
                         {toDateString(data.createdAt)}
                     </p>
-                    <h1 className="font-title mb-10 text-3xl font-bold text-stone-800 md:text-6xl dark:text-white">
+                    <h1 className="font-title mb-10 text-3xl font-bold text-stone-800 dark:text-white md:text-6xl">
                         {data.title}
                     </h1>
-                    <p className="text-md m-auto w-10/12 text-stone-600 md:text-lg dark:text-stone-400">
+                    <p className="text-md m-auto w-10/12 text-stone-600 dark:text-stone-400 md:text-lg">
                         {data.description}
                     </p>
                 </div>
@@ -73,7 +73,7 @@ export default async function SitePostPage({
                         <div className="relative inline-block h-8 w-8 overflow-hidden rounded-full align-middle md:h-12 md:w-12">
                             {data.site?.user?.image ? (
                                 <Image
-                                    alt={data.site?.user?.name ?? "User Avatar"}
+                                    alt={data.site.user.name ?? "User Avatar"}
                                     height={80}
                                     src={data.site.user.image}
                                     width={80}
@@ -84,7 +84,7 @@ export default async function SitePostPage({
                                 </div>
                             )}
                         </div>
-                        <div className="text-md ml-3 inline-block align-middle md:text-lg dark:text-white">
+                        <div className="text-md ml-3 inline-block align-middle dark:text-white md:text-lg">
                             by{" "}
                             <span className="font-semibold">
                                 {data.site?.user?.name}
@@ -122,13 +122,11 @@ export default async function SitePostPage({
                     </div>
                 </div>
             )}
-            {data.adjacentPosts && (
-                <div className="mx-5 mb-20 grid max-w-screen-xl grid-cols-1 gap-x-4 gap-y-8 md:grid-cols-2 xl:mx-auto xl:grid-cols-3">
-                    {data.adjacentPosts.map((item, index) => (
-                        <BlogCard key={index} data={item} />
-                    ))}
-                </div>
-            )}
+            <div className="mx-5 mb-20 grid max-w-screen-xl grid-cols-1 gap-x-4 gap-y-8 md:grid-cols-2 xl:mx-auto xl:grid-cols-3">
+                {data.adjacentPosts.map((item, index) => (
+                    <BlogCard key={index} data={item} />
+                ))}
+            </div>
         </>
     );
 }

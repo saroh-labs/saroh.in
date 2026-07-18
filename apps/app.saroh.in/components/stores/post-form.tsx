@@ -78,7 +78,7 @@ export function PostForm({
         if (editing) {
             router.refresh();
         } else {
-            const id = (res.data as { id: string }).id;
+            const id = res.data.id;
             router.push(`/stores/${storeId}/content/${id}`);
         }
     }

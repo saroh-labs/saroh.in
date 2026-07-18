@@ -1,50 +1,51 @@
 {
-    "name": "@saroh/utils",
-    "version": "1.0.0",
-    "description": "Utility functions and constants for Saroh.io",
-    "scripts": {
-        "build": "tsup",
-        "lint": "eslint src/",
-        "dev": "tsup --watch",
-        "check-types": "tsc --noEmit"
-    },
-    "sideEffects": false,
-    "main": "./dist/index.mjs",
-    "module": "./dist/index.mjs",
-    "types": "./dist/index.d.ts",
-    "files": [
-        "dist/**"
-    ],
-    "dependencies": {
-        "clsx": "^2.1.1",
-        "tailwind-merge": "^3.6.0"
-    },
-    "peerDependencies": {
-        "react": "catalog:react19"
-    },
-    "devDependencies": {
-        "@types/node": "catalog:",
-        "@types/react": "catalog:react19",
-        "react": "catalog:react19",
-        "tsup": "^8.5.1",
-        "typescript": "catalog:"
-    },
-    "author": "Mohit Kumar <himohitmehta>",
-    "homepage": "https://saroh.in",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/himohitmehta/saroh.io.git"
-    },
-    "bugs": {
-        "url": "https://github.com/himohitmehta/saroh.io/issues"
-    },
-    "keywords": [
-        "saroh",
-        "saroh.io",
-        "utils",
-        "utility"
-    ],
-    "publishConfig": {
-        "access": "public"
-    }
+  "name": "@saroh/utils",
+  "version": "1.0.0",
+  "description": "Utility functions and constants for Saroh.io",
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint src/",
+    "dev": "tsup --watch",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**"
+  ],
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.6.0"
+  },
+  "peerDependencies": {
+    "react": "catalog:react19"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:react19",
+    "react": "catalog:react19",
+    "tsup": "^8.5.1",
+    "typescript": "catalog:"
+  },
+  "author": "Mohit Kumar <himohitmehta>",
+  "homepage": "https://saroh.in",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/himohitmehta/saroh.io.git"
+  },
+  "bugs": {
+    "url": "https://github.com/himohitmehta/saroh.io/issues"
+  },
+  "keywords": [
+    "saroh",
+    "saroh.io",
+    "utils",
+    "utility"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

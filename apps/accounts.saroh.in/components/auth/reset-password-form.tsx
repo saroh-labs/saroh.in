@@ -84,8 +84,7 @@ function ResetPasswordFormInner() {
         const { error: err } = await resetPassword(
             { newPassword, token },
             {
-                onError: (ctx) =>
-                    setError(ctx.error?.message ?? "Reset failed"),
+                onError: (ctx) => setError(ctx.error.message),
             },
         );
         setIsLoading(false);

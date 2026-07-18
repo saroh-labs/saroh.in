@@ -40,8 +40,8 @@ export class VariantsService {
                     productId,
                     sku: dto.sku,
                     title: dto.title,
-                    price: dto.price || null,
-                    image: dto.image || null,
+                    price: dto.price ?? null,
+                    image: dto.image ?? null,
                 },
             });
             return { id: variant.id };
@@ -74,8 +74,8 @@ export class VariantsService {
                 data: {
                     sku: dto.sku,
                     title: dto.title,
-                    price: dto.price || null,
-                    image: dto.image || null,
+                    price: dto.price ?? null,
+                    image: dto.image ?? null,
                 },
             });
             return { id: variantId };

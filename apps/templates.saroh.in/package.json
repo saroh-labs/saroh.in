@@ -1,28 +1,29 @@
 {
-    "name": "ecom-templates",
-    "version": "0.1.0",
-    "private": true,
-    "scripts": {
-        "dev": "next dev --port=3010",
-        "build": "next build",
-        "start": "next start",
-        "lint": "next lint"
-    },
-    "dependencies": {
-        "@saroh/auth": "workspace:*",
-        "react": "catalog:react19",
-        "react-dom": "catalog:react19",
-        "next": "catalog:next16"
-    },
-    "devDependencies": {
-        "typescript": "catalog:",
-        "@types/node": "catalog:",
-        "@types/react": "catalog:react19",
-        "@types/react-dom": "catalog:react19",
-        "postcss": "catalog:",
-        "@saroh/eslint-config": "workspace:*",
-        "tailwindcss": "catalog:",
-        "eslint": "catalog:",
-        "eslint-config-next": "catalog:"
-    }
+  "name": "ecom-templates",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port=3010",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@saroh/auth": "workspace:*",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19",
+    "next": "catalog:next16"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "postcss": "catalog:",
+    "@saroh/eslint-config": "workspace:*",
+    "tailwindcss": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-next": "catalog:"
+  }
 }
