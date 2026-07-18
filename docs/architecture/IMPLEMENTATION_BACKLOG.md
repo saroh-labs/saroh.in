@@ -34,7 +34,7 @@ Status of the repo-stabilization stage. Each done item links to the commit that 
 | S1-007 | ✅ Done    | `edf6c88` — zero NextAuth in code/config/deps; api.saroh.in canonical auth host                                                       |
 | S1-008 | ⬜ Pending | Browser E2E: cross-subdomain cookie, redirect, logout, CSRF                                                                           |
 | S1-009 | ✅ Done    | `3f173af` (+ `4597bbc` migration) — relation-free AuditEvent, append-only fail-safe record, audit:read (OWNER/ADMIN), read endpoint   |
-| S1-010 | ⬜ Pending | Team, TeamMember, direct/Team ProjectAccess (MANAGER/EDITOR/VIEWER)                                                                   |
+| S1-010 | ✅ Done    | `063adc9` (+ `81221ee` migration) — Project/Team/TeamMember/ProjectAccess, strongest-wins roles, OWNER/ADMIN-all vs MEMBER-granted    |
 | S1-011 | ⬜ Pending | Transaction-local Organization context + PostgreSQL RLS policies                                                                      |
 | S1-012 | ✅ Done    | `acbad70` (+ `73c1ebb` migration) — typed FlagKey registry, override>default>false, audit history; tables applied to dev DB           |
 
