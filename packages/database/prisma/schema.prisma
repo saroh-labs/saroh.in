@@ -102,6 +102,12 @@ model Organization {
   // driven by the job worker on top of these rows.
   notifications Notification[]
 
+  // Scheduling / bookings (Stage 4 — S4-001). Org-owned bookable Services with
+  // weekly AvailabilityRules and immutable Bookings.
+  services          Service[]
+  availabilityRules AvailabilityRule[]
+  bookings          Booking[]
+
   createdAt DateTime @default(now())
 }
 
@@ -1076,6 +1082,10 @@ model Site {
   // deleting a Site does not destroy its enquiry history (SetNull there).
   forms Form[]
 
+  // Bookable services surfaced on this site (S4-001). Nullable on the Service
+  // side (SetNull) — booking history outlives a site.
+  services Service[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // Soft delete
@@ -1268,6 +1278,7 @@ model Contact {
 
   leads       Lead[]
   submissions Submission[]
+  bookings    Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1530,4 +1541,119 @@ model Notification {
   @@unique([leadId, type])
   @@index([organizationId, userId, readAt])
   @@index([organizationId])
+}
+
+// ============================================================================
+// SCHEDULING / BOOKINGS (Stage 4 — S4-001)
+// ============================================================================
+//
+// Org-owned bookable Services with weekly AvailabilityRules and immutable
+// Bookings. Timezone-aware: availability windows are authored in the Service's
+// IANA `timezone`; a Booking stores absolute UTC `startAt`/`endAt` (resolved at
+// booking time, DST-correct) plus the display `timezone` the booker saw. Each
+// Booking carries an immutable `snapshot` of the Service terms at booking time,
+// so a later Service edit never rewrites booked history (same principle as
+// Publication). Capacity-one slot safety + transactional reservation land in
+// S4-002 (which may add a partial unique index on confirmed slots).
+
+// Service — an org-owned bookable offering (one provider/resource for now,
+// modeled as `capacity`).
+model Service {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Optional owning Site (for a public booking page). SetNull keeps the Service
+  // + its bookings if the Site is deleted.
+  siteId String?
+  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  name        String
+  description String?
+
+  durationMinutes     Int // length of one booking slot
+  bufferBeforeMinutes Int @default(0)
+  bufferAfterMinutes  Int @default(0)
+  capacity            Int @default(1) // max concurrent bookings per slot
+
+  priceCents Int? // optional price, minor units
+  currency   String? // ISO 4217 when priced
+
+  // IANA timezone the AvailabilityRules are expressed in, e.g. "Asia/Kolkata".
+  timezone String
+
+  status String @default("ACTIVE") // ACTIVE → ARCHIVED
+
+  availabilityRules AvailabilityRule[]
+  bookings          Booking[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([organizationId])
+  @@index([siteId])
+}
+
+// AvailabilityRule — a recurring WEEKLY availability window for a Service,
+// authored in the Service's timezone (minutes from local midnight).
+model AvailabilityRule {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  dayOfWeek   Int // 0 = Sunday … 6 = Saturday
+  startMinute Int // minutes from local midnight (0–1439), in the Service tz
+  endMinute   Int // exclusive; > startMinute
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([serviceId, dayOfWeek])
+}
+
+// Booking — an IMMUTABLE reserved slot. `startAt`/`endAt` are absolute UTC;
+// `snapshot` freezes the Service terms (+ booker) at booking time. A public
+// booking upserts a CRM Contact (booker), like an enquiry.
+model Booking {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  // Optional CRM linkage (the booker). SetNull so purging a Contact keeps the
+  // booking record + its snapshot.
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  startAt  DateTime // absolute UTC slot start
+  endAt    DateTime // absolute UTC slot end
+  timezone String // IANA tz the booker saw the slot in
+
+  status String @default("CONFIRMED") // PENDING → CONFIRMED → CANCELLED
+
+  // Immutable snapshot of the Service terms (+ booker) at booking time.
+  snapshot Json
+
+  bookerName  String?
+  bookerEmail String?
+  bookerPhone String?
+
+  idempotencyKey String? // dedupe double-submits (like Submission)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  cancelledAt DateTime?
+
+  // A given idempotency key yields at most one booking per service.
+  @@unique([serviceId, idempotencyKey])
+  @@index([organizationId])
+  @@index([serviceId, startAt])
+  @@index([contactId])
 }
