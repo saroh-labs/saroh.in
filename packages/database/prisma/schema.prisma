@@ -137,6 +137,10 @@ model Organization {
   automationRules        AutomationRule[]
   automationRuns         AutomationRun[]
 
+  // Stage 7 — analytics (S7-001)
+  analyticsEvents          AnalyticsEvent[]
+  analyticsDailyAggregates AnalyticsDailyAggregate[]
+
   createdAt DateTime @default(now())
 }
 
@@ -2006,4 +2010,84 @@ model AutomationRun {
   // Idempotency: one run per (rule, lead) — a rule fires once per matching lead.
   @@unique([ruleId, leadId])
   @@index([organizationId])
+}
+
+// AnalyticsEvent — the versioned, org-owned event taxonomy (S7-001).
+//
+// Every observable business event (a public site view, an enquiry submission, a
+// paid order) is recorded against ONE contract: the pair (type, schemaVersion)
+// selects a validator in code that the `properties` JSON must satisfy at intake
+// (S7-002). Bumping `schemaVersion` lets a type evolve without rewriting
+// history. Rows are tenant-owned (denormalized organizationId) and carry
+// consent + retention metadata so a privacy/retention job can prune withdrawn
+// or expired data.
+//
+// Site/project scoping is stored as plain ids (no FK cascade) so pruning a Site
+// never rewrites the analytics ledger; the aggregate jobs group by these.
+model AnalyticsEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  siteId    String?
+  projectId String?
+
+  // The contract selector.
+  type          String // "site.view" | "enquiry.submitted" | "order.paid" | ...
+  schemaVersion Int    @default(1)
+
+  properties Json // validated against (type, schemaVersion) at intake
+
+  // Consent basis at capture time ("anonymous" | "granted" | "revoked"). A
+  // revoked/withdrawn basis lets the retention job drop identifying rows.
+  consent String @default("anonymous")
+
+  // Coarse, NON-identifying visitor grouping for unique counts — a salted hash
+  // written by intake (S7-002), NEVER a raw IP. Null when not consented.
+  visitorHash String?
+
+  occurredAt DateTime // when the event happened (source clock, bounded at intake)
+  receivedAt DateTime @default(now()) // when Saroh accepted it (server clock)
+
+  // Retention: intake stamps an expiry from the org's retention policy; a prune
+  // job deletes rows past it. Null = no expiry configured.
+  expiresAt DateTime?
+
+  // Idempotency: an optional producer-supplied key dedupes at-least-once intake
+  // (P2002 → no-op). Nulls are distinct in Postgres, so only real keys dedupe.
+  dedupeKey String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, type, occurredAt])
+  @@index([organizationId, siteId, occurredAt])
+  @@index([expiresAt])
+}
+
+// AnalyticsDailyAggregate — pre-computed per-day rollups (S7-002 populates
+// these) so dashboards never scan the raw event ledger. One row per
+// (org, siteId, UTC day, type, dimension, dimensionValue). `siteId`/`dimension`
+// default to "" (a non-null sentinel) so the unique key backs a clean upsert —
+// "" means org-wide / the grand total for that type.
+model AnalyticsDailyAggregate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  siteId String @default("") // "" = all sites / org-wide
+
+  date           DateTime @db.Date // the UTC day bucket
+  type           String // event type this row aggregates
+  dimension      String   @default("") // "" = total; else e.g. "path" | "referrer"
+  dimensionValue String   @default("")
+
+  count       Int @default(0)
+  uniqueCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, siteId, date, type, dimension, dimensionValue])
+  @@index([organizationId, type, date])
 }
