@@ -60,6 +60,18 @@ export default async function Home() {
                             Pipeline
                         </Link>
                         <Link
+                            href="/services"
+                            className="text-muted-foreground hover:text-foreground hover:underline"
+                        >
+                            Services
+                        </Link>
+                        <Link
+                            href="/bookings"
+                            className="text-muted-foreground hover:text-foreground hover:underline"
+                        >
+                            Bookings
+                        </Link>
+                        <Link
                             href="/notifications"
                             className="relative text-muted-foreground hover:text-foreground hover:underline"
                         >

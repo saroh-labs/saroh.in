@@ -11,13 +11,16 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 import { Textarea } from "@saroh/ui/textarea";
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { DraftPreview } from "@/components/sites/section-preview";
 import { ensureFormForSection } from "@/lib/forms/actions";
+import { listServicesForPicker } from "@/lib/services/actions";
 import { publishSite, saveDraftSections } from "@/lib/sites/actions";
 import type {
+    BookingContent,
     CtaStyle,
     CtaValue,
     EnquiryContent,
@@ -30,6 +33,13 @@ import type {
     Section,
     SectionType,
 } from "@/lib/sites/service";
+
+/** A service as offered in the booking-section picker. */
+interface ServiceOption {
+    id: string;
+    name: string;
+    status: "ACTIVE" | "ARCHIVED";
+}
 
 /**
  * SiteEditor (S2-004) — the ticket's core deliverable. A client-side editable
@@ -45,6 +55,7 @@ const SECTION_LABELS: Record<SectionType, string> = {
     cta: "Call to action",
     gallery: "Gallery",
     enquiry: "Enquiry form",
+    booking: "Booking",
 };
 
 const SECTION_ORDER: SectionType[] = [
@@ -53,6 +64,7 @@ const SECTION_ORDER: SectionType[] = [
     "cta",
     "gallery",
     "enquiry",
+    "booking",
 ];
 
 /** The field types an enquiry field may take, with author-facing labels. */
@@ -110,6 +122,17 @@ function emptySection(type: SectionType): Section {
                     ],
                 },
             };
+        case "booking":
+            return {
+                type,
+                contractVersion: 1,
+                content: {
+                    title: "Book a time",
+                    submitLabel: "Confirm booking",
+                    successMessage:
+                        "You're booked — we've sent a confirmation to your email.",
+                },
+            };
     }
 }
 
@@ -148,6 +171,23 @@ export function SiteEditor({
     const [publishing, setPublishing] = useState(false);
     const [errorIndex, setErrorIndex] = useState<number | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    // The org's services for the booking-section picker. Loaded once on mount;
+    // Services are authored in the service editor, never inline here.
+    const [services, setServices] = useState<ServiceOption[]>([]);
+
+    useEffect(() => {
+        let active = true;
+        listServicesForPicker()
+            .then((list) => {
+                if (active) setServices(list);
+            })
+            .catch(() => {
+                /* leave the picker empty on failure */
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
 
     const dirty = JSON.stringify(sections) !== lastSavedJson;
 
@@ -342,6 +382,7 @@ export function SiteEditor({
 
                             <SectionFields
                                 section={section}
+                                services={services}
                                 onChange={(next) => replaceAt(index, next)}
                             />
 
@@ -383,9 +424,11 @@ export function SiteEditor({
 /** Per-type field editor. Narrowing on `section.type` gives the exact shape. */
 function SectionFields({
     section,
+    services,
     onChange,
 }: {
     section: Section;
+    services: ServiceOption[];
     onChange: (next: Section) => void;
 }) {
     switch (section.type) {
@@ -798,6 +841,97 @@ function SectionFields({
                             + Field
                         </Button>
                     </div>
+                </div>
+            );
+        }
+        case "booking": {
+            const c = section.content;
+            const patch = (next: Partial<BookingContent>) =>
+                onChange({ ...section, content: { ...c, ...next } });
+            // Prefer active services, but keep a currently-selected archived one
+            // visible so the author sees what's set.
+            const options = services.filter(
+                (s) => s.status === "ACTIVE" || s.id === c.serviceId,
+            );
+            const selectedMissing =
+                c.serviceId !== undefined &&
+                !services.some((s) => s.id === c.serviceId);
+            return (
+                <div className="grid gap-3">
+                    <Field label="Service">
+                        {services.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                No services yet.{" "}
+                                <Link
+                                    href="/services/new"
+                                    className="underline hover:text-foreground"
+                                >
+                                    Create a service
+                                </Link>{" "}
+                                first, then pick it here.
+                            </p>
+                        ) : (
+                            <Select
+                                value={c.serviceId ?? ""}
+                                onValueChange={(v) => patch({ serviceId: v })}
+                            >
+                                <SelectTrigger aria-label="Service">
+                                    <SelectValue placeholder="Choose a service" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {options.map((s) => (
+                                        <SelectItem key={s.id} value={s.id}>
+                                            {s.name}
+                                            {s.status === "ARCHIVED"
+                                                ? " (archived)"
+                                                : ""}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        {selectedMissing && (
+                            <p className="text-xs text-muted-foreground">
+                                The selected service is no longer available —
+                                choose another.
+                            </p>
+                        )}
+                    </Field>
+                    <Field label="Title">
+                        <Input
+                            value={c.title ?? ""}
+                            onChange={(e) => patch({ title: e.target.value })}
+                            placeholder="Book a time"
+                        />
+                    </Field>
+                    <Field label="Description">
+                        <Textarea
+                            value={c.description ?? ""}
+                            onChange={(e) =>
+                                patch({ description: e.target.value })
+                            }
+                            rows={2}
+                            placeholder="Pick a slot that suits you and we'll confirm by email."
+                        />
+                    </Field>
+                    <Field label="Submit button label">
+                        <Input
+                            value={c.submitLabel ?? ""}
+                            onChange={(e) =>
+                                patch({ submitLabel: e.target.value })
+                            }
+                            placeholder="Confirm booking"
+                        />
+                    </Field>
+                    <Field label="Success message">
+                        <Input
+                            value={c.successMessage ?? ""}
+                            onChange={(e) =>
+                                patch({ successMessage: e.target.value })
+                            }
+                            placeholder="You're booked — check your email."
+                        />
+                    </Field>
                 </div>
             );
         }

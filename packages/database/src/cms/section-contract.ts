@@ -136,6 +136,23 @@ const enquiryV1 = z
         }
     });
 
+/**
+ * booking v1 — a public booking widget the visitor reserves a slot through.
+ * `serviceId` points at the bookable Service the PUBLIC availability + book
+ * endpoints resolve the owning organization from (so the visitor's POST can
+ * only ever create a Booking in that Service's org, never a client-supplied
+ * one). It is optional because a just-added section has no Service picked until
+ * the editor chooses one — Services are authored in the service editor, NOT
+ * inline. All values are plain text, so NOTHING here requires sanitization.
+ */
+const bookingV1 = z.object({
+    serviceId: z.string().min(1).optional(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    submitLabel: z.string().optional(),
+    successMessage: z.string().optional(),
+});
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -147,6 +164,7 @@ export const SECTION_TYPES = [
     "cta",
     "gallery",
     "enquiry",
+    "booking",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -202,6 +220,13 @@ const REGISTRY: Record<string, SectionContract> = {
         type: "enquiry",
         version: 1,
         schema: enquiryV1,
+        // All values are plain text — nothing here is authored HTML.
+        sanitizedFields: [],
+    },
+    [key("booking", 1)]: {
+        type: "booking",
+        version: 1,
+        schema: bookingV1,
         // All values are plain text — nothing here is authored HTML.
         sanitizedFields: [],
     },

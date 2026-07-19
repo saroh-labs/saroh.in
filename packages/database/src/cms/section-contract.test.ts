@@ -103,6 +103,7 @@ describe("richText v1", () => {
         expect(requiresSanitization("cta", 1)).toBe(false);
         expect(requiresSanitization("gallery", 1)).toBe(false);
         expect(requiresSanitization("enquiry", 1)).toBe(false);
+        expect(requiresSanitization("booking", 1)).toBe(false);
     });
 });
 
@@ -213,6 +214,37 @@ describe("enquiry v1", () => {
             fields: [{ name: "email", label: "Email", type: "date" }],
         });
         expect(result.success).toBe(false);
+    });
+});
+
+describe("booking v1", () => {
+    it("accepts a booking with a serviceId + copy", () => {
+        const result = parseSectionContent("booking", 1, {
+            serviceId: "svc_123",
+            title: "Book a call",
+            description: "Pick a time that suits you.",
+            submitLabel: "Confirm booking",
+            successMessage: "You're booked!",
+        });
+        expect(result.success).toBe(true);
+        if (result.success) {
+            expect((result.data as { serviceId: string }).serviceId).toBe(
+                "svc_123",
+            );
+        }
+    });
+
+    it("accepts a booking without a serviceId (picked on save)", () => {
+        const result = parseSectionContent("booking", 1, {});
+        expect(result.success).toBe(true);
+    });
+
+    it("rejects an empty serviceId when present", () => {
+        const result = parseSectionContent("booking", 1, { serviceId: "" });
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            expect(result.error.code).toBe("INVALID_CONTENT");
+        }
     });
 });
 

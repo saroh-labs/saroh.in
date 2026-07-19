@@ -90,6 +90,21 @@ export interface EnquiryContent {
 }
 
 /**
+ * `booking` v1 — a public booking widget. `serviceId` names the bookable
+ * Service the PUBLIC availability + book endpoints resolve the owning org from
+ * (so the visitor's POST can only ever create a Booking in that Service's org).
+ * A section with no `serviceId` (never picked in the editor) renders nothing.
+ * All values are plain text — nothing here was authored HTML.
+ */
+export interface BookingContent {
+    serviceId?: string;
+    title?: string;
+    description?: string;
+    submitLabel?: string;
+    successMessage?: string;
+}
+
+/**
  * A single section as it appears in a publication snapshot. `content` is
  * deliberately `unknown`: it arrives as JSON, so the {@link SectionRenderer}
  * narrows it per `type` at the point of use. Unknown `type`s render nothing.

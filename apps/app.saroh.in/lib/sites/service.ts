@@ -29,7 +29,13 @@ const ACTIVE_ORG_COOKIE = "active_org";
 // ---------------------------------------------------------------------------
 
 /** The section types the editor supports. */
-export type SectionType = "hero" | "richText" | "cta" | "gallery" | "enquiry";
+export type SectionType =
+    | "hero"
+    | "richText"
+    | "cta"
+    | "gallery"
+    | "enquiry"
+    | "booking";
 
 /** Button style shared by hero CTA and the standalone cta section. */
 export type CtaStyle = "primary" | "secondary" | "link";
@@ -94,6 +100,21 @@ export interface EnquiryContent {
     fields: EnquiryField[];
 }
 
+/**
+ * `booking` v1 — a public booking widget. `serviceId` points at the bookable
+ * Service the PUBLIC availability + book endpoints resolve the owning org from;
+ * it is chosen from the org's services in the editor (Services are authored in
+ * the service editor, not inline) and is absent until then. All values are
+ * plain text.
+ */
+export interface BookingContent {
+    serviceId?: string;
+    title?: string;
+    description?: string;
+    submitLabel?: string;
+    successMessage?: string;
+}
+
 /** Content shape keyed by section type. */
 export interface SectionContentByType {
     hero: HeroContent;
@@ -101,6 +122,7 @@ export interface SectionContentByType {
     cta: CtaContent;
     gallery: GalleryContent;
     enquiry: EnquiryContent;
+    booking: BookingContent;
 }
 
 /**

@@ -1,4 +1,5 @@
 import type {
+    BookingContent,
     CtaContent,
     EnquiryContent,
     GalleryContent,
@@ -7,6 +8,7 @@ import type {
     Section,
 } from "@/lib/publication";
 
+import BookingSection from "./booking";
 import CtaSection from "./cta";
 import EnquirySection from "./enquiry";
 import GallerySection from "./gallery";
@@ -46,6 +48,10 @@ export default function SectionRenderer({ section }: { section: Section }) {
         case "enquiry":
             return (
                 <EnquirySection content={section.content as EnquiryContent} />
+            );
+        case "booking":
+            return (
+                <BookingSection content={section.content as BookingContent} />
             );
         default:
             // Unknown section type (e.g. from a newer contract version) —

@@ -142,6 +142,49 @@ function SectionPreview({ section }: { section: Section }) {
                 </section>
             );
         }
+        case "booking": {
+            const { title, description, serviceId, submitLabel } =
+                section.content;
+            return (
+                <section className="rounded-lg border p-6">
+                    {title && (
+                        <h3 className="text-lg font-semibold">{title}</h3>
+                    )}
+                    {description && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {description}
+                        </p>
+                    )}
+                    {serviceId ? (
+                        <div className="mt-4 grid gap-3">
+                            {/* A non-interactive mockup of the slot picker. */}
+                            <div className="flex flex-wrap gap-2">
+                                {["9:00", "9:30", "10:00", "10:30"].map(
+                                    (slot) => (
+                                        <span
+                                            key={slot}
+                                            className="rounded-md border bg-muted/30 px-3 py-1.5 text-sm text-muted-foreground"
+                                        >
+                                            {slot}
+                                        </span>
+                                    ),
+                                )}
+                            </div>
+                            <div className="h-9 rounded-md border bg-muted/30" />
+                            <div className="h-9 rounded-md border bg-muted/30" />
+                            <span className="mt-1 inline-block w-fit rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground">
+                                {[submitLabel].find((s) => s) ?? "Book"}
+                            </span>
+                        </div>
+                    ) : (
+                        <p className="mt-4 text-sm text-muted-foreground">
+                            Pick a service for this booking section to preview
+                            its available times.
+                        </p>
+                    )}
+                </section>
+            );
+        }
         default:
             return null;
     }
