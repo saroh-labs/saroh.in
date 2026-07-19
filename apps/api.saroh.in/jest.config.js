@@ -56,6 +56,11 @@ module.exports = {
         "<rootDir>/src/modules/contacts/**/*.spec.ts",
         "<rootDir>/src/modules/pipelines/**/*.spec.ts",
         "<rootDir>/src/modules/leads/**/*.spec.ts",
+        // S3-006 notifications: the enquiry.notify job handler (durable "notify
+        // once" idempotency + email) and the NotificationsService read/mark-read
+        // authorization + tenant-isolation specs, with a jest-mocked Prisma and a
+        // mocked email fn — no DB, no SMTP, no network.
+        "<rootDir>/src/modules/notifications/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],

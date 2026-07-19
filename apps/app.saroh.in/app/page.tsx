@@ -6,6 +6,7 @@ import { OrganizationSwitcher } from "@/components/organizations/organization-sw
 import { SignOutButton } from "@/components/sign-out-button";
 import { StoreCard } from "@/components/stores/store-card";
 import { StoresEmptyState } from "@/components/stores/stores-empty-state";
+import { unreadNotificationCount } from "@/lib/notifications/service";
 import {
     listOrganizations,
     resolveActiveOrganization,
@@ -22,6 +23,7 @@ export default async function Home() {
     const activeOrg = await resolveActiveOrganization();
 
     const stores = await listStores();
+    const unreadNotifications = await unreadNotificationCount();
 
     return (
         <main className="mx-auto max-w-4xl p-8">
@@ -56,6 +58,17 @@ export default async function Home() {
                             className="text-muted-foreground hover:text-foreground hover:underline"
                         >
                             Pipeline
+                        </Link>
+                        <Link
+                            href="/notifications"
+                            className="relative text-muted-foreground hover:text-foreground hover:underline"
+                        >
+                            Notifications
+                            {unreadNotifications > 0 && (
+                                <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
+                                    {unreadNotifications}
+                                </span>
+                            )}
                         </Link>
                     </nav>
                     <SignOutButton />

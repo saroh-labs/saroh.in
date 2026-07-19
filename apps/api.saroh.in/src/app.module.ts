@@ -17,6 +17,7 @@ import { JobsModule } from "./modules/jobs/jobs.module";
 import { LeadsModule } from "./modules/leads/leads.module";
 import { MediaModule } from "./modules/media/media.module";
 import { MembersModule } from "./modules/members/members.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import { PipelinesModule } from "./modules/pipelines/pipelines.module";
@@ -61,6 +62,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         ContactsModule,
         PipelinesModule,
         LeadsModule,
+        NotificationsModule,
     ],
 })
 export class AppModule {}
