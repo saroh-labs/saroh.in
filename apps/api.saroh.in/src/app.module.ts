@@ -6,6 +6,7 @@ import { auth } from "./common/auth/auth";
 import { AuditModule } from "./modules/audit/audit.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
+import { CommunicationsModule } from "./modules/communications/communications.module";
 import { ContactsModule } from "./modules/contacts/contacts.module";
 import { ContentModule } from "./modules/content/content.module";
 import { CustomersModule } from "./modules/customers/customers.module";
@@ -78,6 +79,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         BookingsModule,
         PaymentsModule,
         WebhooksModule,
+        CommunicationsModule,
     ],
 })
 export class AppModule {}

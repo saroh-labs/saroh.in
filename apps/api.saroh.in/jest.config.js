@@ -87,6 +87,13 @@ module.exports = {
         // settlement. Jest-mocked Prisma (incl. $transaction) + a fake webhook
         // provider; never touch a DB or the network.
         "<rootDir>/src/modules/webhooks/**/*.spec.ts",
+        // S6-001 communications: AES-256-GCM-sealed provider connect (only
+        // ciphertext stored, redacted reads), the consent gate (REVOKED →
+        // SUPPRESSED, no job/delivery), atomic Message+Delivery+Job send, and
+        // the message.send handler (fake provider, QUEUED→SENT, failure→FAILED,
+        // idempotent re-run). Jest-mocked Prisma (incl. $transaction) + a fake
+        // CommsProvider; never touch a DB or the network.
+        "<rootDir>/src/modules/communications/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
