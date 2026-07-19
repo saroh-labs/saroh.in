@@ -92,6 +92,11 @@ model Organization {
   leads       Lead[]
   activities  Activity[]
 
+  // Durable background jobs / transactional outbox (Stage 3 — S3-003). Optional
+  // tenant scope: some jobs are org-bound (an enquiry notification), some are
+  // system-wide, so the back-relation is nullable on the Job side.
+  jobs Job[]
+
   createdAt DateTime @default(now())
 }
 
@@ -1441,4 +1446,45 @@ model Activity {
 
   @@index([organizationId])
   @@index([leadId, createdAt])
+}
+
+// ============================================================================
+// DURABLE JOBS / TRANSACTIONAL OUTBOX (Stage 3 — S3-003)
+// ============================================================================
+//
+// A persistent, at-least-once job queue behind the `JobQueue` port. Producers
+// enqueue a Job in the SAME transaction as the domain change it follows (e.g.
+// the enquiry command inserts the Lead and the "enquiry.notify" Job atomically)
+// — the transactional-outbox pattern: if the tx commits the job is durably
+// recorded, if it rolls back so does the job, so a committed lead ALWAYS has a
+// pending notification and a rolled-back one never leaves a dangling job.
+//
+// A worker claims due PENDING jobs (status+runAt), sets a visibility lock
+// (lockedAt/lockedBy) so concurrent workers don't double-run one, executes the
+// registered handler for `type`, and on failure schedules a backed-off retry
+// (attempts++/runAt) until `maxAttempts`, after which the job is FAILED
+// (dead-letter). Handlers must be idempotent (at-least-once, not exactly-once).
+model Job {
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type    String // handler key, e.g. "enquiry.notify"
+  payload Json // handler input
+
+  status      String @default("PENDING") // PENDING → PROCESSING → DONE | FAILED
+  attempts    Int    @default(0)
+  maxAttempts Int    @default(5)
+
+  runAt     DateTime  @default(now()) // earliest execution (retry backoff)
+  lockedAt  DateTime? // visibility lock — claimed but not yet finished
+  lockedBy  String? // worker id holding the lock
+  lastError String? // last failure message (dead-letter diagnostics)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  processedAt DateTime? // set when DONE or FAILED (terminal)
+
+  @@index([status, runAt])
+  @@index([organizationId])
 }
