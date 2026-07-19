@@ -25,6 +25,7 @@ describe("Content: posts & categories (dev DB)", () => {
     let strangerId = "";
     let storeId = "";
     let categoryId = "";
+    let orgId = "";
 
     beforeAll(async () => {
         ownerId = (await prisma.user.create({ data: { email: ownerEmail } }))
@@ -37,8 +38,16 @@ describe("Content: posts & categories (dev DB)", () => {
         strangerId = (
             await prisma.user.create({ data: { email: strangerEmail } })
         ).id;
+        orgId = (
+            await prisma.organization.create({
+                data: {
+                    name: "Content Test Org",
+                    slug: `content-org-${process.pid}`,
+                },
+            })
+        ).id;
         storeId = (
-            await stores.createForUser(ownerId, {
+            await stores.createForUser(ownerId, orgId, {
                 name: "Content Test",
                 slug: `content-${process.pid}`,
             })
@@ -58,6 +67,7 @@ describe("Content: posts & categories (dev DB)", () => {
         await prisma.storeMembers.deleteMany({ where: { storeId } });
         await prisma.storeOwner.deleteMany({ where: { storeId } });
         await prisma.store.deleteMany({ where: { id: storeId } });
+        await prisma.organization.deleteMany({ where: { id: orgId } });
         await prisma.user.deleteMany({
             where: { email: { in: [ownerEmail, memberEmail, strangerEmail] } },
         });

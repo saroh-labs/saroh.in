@@ -28,11 +28,20 @@ describe("StoresService (dev DB)", () => {
     const service = new StoresService(new FeatureFlagService());
     let userA = "";
     let userB = "";
+    let orgId = "";
     const createdStoreIds: string[] = [];
 
     beforeAll(async () => {
         userA = (await prisma.user.create({ data: { email: emailA } })).id;
         userB = (await prisma.user.create({ data: { email: emailB } })).id;
+        orgId = (
+            await prisma.organization.create({
+                data: {
+                    name: "Stores Test Org",
+                    slug: `${slugPrefix}-org`,
+                },
+            })
+        ).id;
     });
 
     afterAll(async () => {
@@ -42,6 +51,7 @@ describe("StoresService (dev DB)", () => {
         await prisma.store.deleteMany({
             where: { id: { in: createdStoreIds } },
         });
+        await prisma.organization.deleteMany({ where: { id: orgId } });
         await prisma.user.deleteMany({
             where: { email: { in: [emailA, emailB] } },
         });
@@ -49,7 +59,7 @@ describe("StoresService (dev DB)", () => {
     });
 
     it("creates a store + OWNER atomically", async () => {
-        const res = await service.createForUser(userA, {
+        const res = await service.createForUser(userA, orgId, {
             name: "My Blog",
             slug: `${slugPrefix}-blog`,
         });
@@ -60,13 +70,13 @@ describe("StoresService (dev DB)", () => {
 
     it("rejects a taken slug and creates nothing", async () => {
         const slug = `${slugPrefix}-dup`;
-        const first = await service.createForUser(userA, {
+        const first = await service.createForUser(userA, orgId, {
             name: "Dup",
             slug,
         });
         createdStoreIds.push(first.id);
         await expect(
-            service.createForUser(userB, { name: "Dup Two", slug }),
+            service.createForUser(userB, orgId, { name: "Dup Two", slug }),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(await prisma.store.count({ where: { slug } })).toBe(1);
     });

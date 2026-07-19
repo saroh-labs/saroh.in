@@ -27,6 +27,7 @@ describe("Orders & inventory (dev DB)", () => {
     let strangerId = "";
     let storeId = "";
     let productId = "";
+    let orgId = "";
     let customerId = "";
 
     async function stock() {
@@ -43,8 +44,16 @@ describe("Orders & inventory (dev DB)", () => {
         strangerId = (
             await prisma.user.create({ data: { email: strangerEmail } })
         ).id;
+        orgId = (
+            await prisma.organization.create({
+                data: {
+                    name: "Orders Test Org",
+                    slug: `orders-org-${process.pid}`,
+                },
+            })
+        ).id;
         storeId = (
-            await stores.createForUser(ownerId, {
+            await stores.createForUser(ownerId, orgId, {
                 name: "Orders Test",
                 slug: `orders-${process.pid}`,
             })
@@ -72,6 +81,7 @@ describe("Orders & inventory (dev DB)", () => {
         await prisma.customer.deleteMany({ where: { storeId } });
         await prisma.storeOwner.deleteMany({ where: { storeId } });
         await prisma.store.deleteMany({ where: { id: storeId } });
+        await prisma.organization.deleteMany({ where: { id: orgId } });
         await prisma.user.deleteMany({
             where: { email: { in: [ownerEmail, strangerEmail] } },
         });

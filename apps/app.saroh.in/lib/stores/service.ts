@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { env } from "@/env";
 
@@ -17,6 +17,9 @@ const API_URL =
     env.NEXT_PUBLIC_BETTER_AUTH_URL ??
     "https://api.saroh.in";
 
+/** Cookie holding the active organization id (readable server-side). */
+const ACTIVE_ORG_COOKIE = "active_org";
+
 export interface Store {
     id: string;
     name: string;
@@ -29,11 +32,16 @@ export interface Store {
 
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
     const cookie = (await headers()).get("cookie") ?? "";
+    // Forward the active org so the org-scoped create endpoint (B5:
+    // `POST /stores` now requires it) can resolve + authorize the tenant. The
+    // owner-scoped list/get/update ignore it, so sending it always is safe.
+    const activeOrgId = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
     return fetch(`${API_URL}${path}`, {
         ...init,
         headers: {
             "content-type": "application/json",
             cookie,
+            ...(activeOrgId ? { "x-organization-id": activeOrgId } : {}),
             ...(init?.headers ?? {}),
         },
         cache: "no-store",

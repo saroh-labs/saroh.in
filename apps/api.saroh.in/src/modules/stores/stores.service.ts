@@ -208,8 +208,17 @@ export class StoresService {
         return Boolean(member && WRITE_ROLES.has(member.role));
     }
 
-    /** Create a store and record the creator as OWNER, atomically. */
-    async createForUser(userId: string, dto: CreateStoreDto) {
+    /**
+     * Create a store under an Organization and record the creator as OWNER,
+     * atomically. `organizationId` is REQUIRED (Store.organizationId is NOT NULL
+     * as of B5) and is proven by the caller (the org-scoped controller resolves
+     * it from the request context, never the client body).
+     */
+    async createForUser(
+        userId: string,
+        organizationId: string,
+        dto: CreateStoreDto,
+    ) {
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({
@@ -230,6 +239,7 @@ export class StoresService {
                     name: dto.name,
                     slug,
                     description: dto.description ?? null,
+                    organization: { connect: { id: organizationId } },
                     // Nested create runs in one transaction → no orphan store.
                     owners: { create: { userId, role: "OWNER" } },
                 },

@@ -226,11 +226,11 @@ model Store {
   logo        String?
 
   // Ownership
-  // ADR-001: Store becomes an Organization-owned commerce channel. Nullable
-  // during the Stage 1 transition (dual-write + backfill), constrained NOT NULL
-  // once every Store maps to a verified Organization.
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  // ADR-001: Store is an Organization-owned commerce channel. The nullable
+  // Stage 1 transition (dual-write + backfill) is complete; the column is now
+  // NOT NULL (B5), so every Store maps to a verified Organization.
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
   // Relations
   owners      StoreOwner[]
