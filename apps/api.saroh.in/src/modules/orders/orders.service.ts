@@ -6,9 +6,15 @@ import {
 import { prisma } from "@saroh/database";
 
 import { StoresService } from "../stores/stores.service";
-import type { CreateOrderDto, UpdateOrderDto } from "./dto";
+import type {
+    CreateOrderDto,
+    OrderStatus,
+    PaymentStatus,
+    UpdateOrderDto,
+} from "./dto";
 import type { OrderLine } from "./order-inventory";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
+import { assertPaymentTransition, assertStatusTransition } from "./order-state";
 import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
 
 /** Money helpers — integer-cents math so totals never drift on floats. */
@@ -160,6 +166,7 @@ export class OrdersService {
             select: {
                 id: true,
                 status: true,
+                paymentStatus: true,
                 items: { select: { productId: true, quantity: true } },
             },
         });
@@ -167,8 +174,25 @@ export class OrdersService {
             throw new NotFoundException("Order not found");
         }
 
+        const nextStatus = dto.status;
+        const nextPayment = dto.paymentStatus;
         const statusChanging =
-            dto.status != null && dto.status !== order.status;
+            nextStatus != null && nextStatus !== order.status;
+
+        // Guard the lifecycle BEFORE any write: an illegal status/payment move
+        // throws 400 (naming the from→to) and nothing is persisted. Same→same
+        // is a no-op (not "changing"), so it is never asserted — re-PATCHing an
+        // unchanged status stays idempotent. The inline null-checks narrow the
+        // dto fields so no non-null assertion is needed.
+        if (nextStatus != null && nextStatus !== order.status) {
+            assertStatusTransition(order.status as OrderStatus, nextStatus);
+        }
+        if (nextPayment != null && nextPayment !== order.paymentStatus) {
+            assertPaymentTransition(
+                order.paymentStatus as PaymentStatus,
+                nextPayment,
+            );
+        }
 
         await prisma.$transaction(async (tx) => {
             if (statusChanging) {

@@ -67,6 +67,12 @@ module.exports = {
         // booking command's capacity-one race, idempotency, org-from-Service,
         // rate-limit, cancel, and management authz. Never touch a DB, no network.
         "<rootDir>/src/modules/bookings/**/*.spec.ts",
+        // S5-001 orders lifecycle: the PURE order-state state machine and the
+        // OrdersService.updateStatus guard spec with a jest-mocked Prisma (never
+        // touch a DB). The legacy DB-backed orders.service.spec.ts stays in the
+        // integration project; these two named specs run here.
+        "<rootDir>/src/modules/orders/order-state.spec.ts",
+        "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],

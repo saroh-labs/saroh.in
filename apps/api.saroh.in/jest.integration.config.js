@@ -24,6 +24,12 @@ module.exports = {
     testPathIgnorePatterns: [
         "<rootDir>/src/modules/organizations/",
         "\\.authorization\\.spec\\.ts$",
+        // S5-001: the pure order-state machine and the mocked-Prisma
+        // updateStatus guard spec run in the default/unit project (they mock
+        // @saroh/database), so keep them out of the DB-backed run. The legacy
+        // DB-backed orders.service.spec.ts still runs here.
+        "<rootDir>/src/modules/orders/order-state.spec.ts",
+        "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
     globalSetup: "<rootDir>/test/global-setup.ts",
