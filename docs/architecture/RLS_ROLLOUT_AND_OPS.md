@@ -42,38 +42,52 @@ global catalog (`Plan`, `FeatureFlag` — no org column), or an intentional
 public/webhook path (public site render by hostname; webhook subscription lookup
 by `(provider, providerSubscriptionId)`). App-layer isolation is sound.
 
-### To make RLS actually enforce (the real prerequisite, not yet built)
+### The enforcement layer (now BUILT — `RLS_ENFORCEMENT` flag)
 
-Every org-scoped request/job must run its DB work inside `withOrgContext`. Do NOT
-do this by wrapping each handler in an outer `prisma.$transaction` naively:
-~30 services already call `prisma.$transaction(...)` for their atomic writes, and
-Prisma does **not** support nested interactive transactions — an outer
-request-tx would break them.
+The "enforcement half" of S1-011 is now implemented (packages/database
+`rls-proxy.ts` + api `OrgRlsInterceptor`), **flag-gated and off by default**:
 
-The correct shape (the ALS infra already exists for correlation IDs, see
-`common/logging/request-context.ts`):
+1. `OrgRlsInterceptor` (global, outermost) reads the org resolved by
+   `OrganizationGuard` and runs the rest of the request inside an org-context
+   `AsyncLocalStorage` — subscribing to the handler stream INSIDE the ALS scope
+   so async continuations inherit it.
+2. The exported `prisma` is an **RLS-aware proxy** over the base client. When an
+   org context is active AND `RLS_ENFORCEMENT` is on, every model op / raw query
+   runs in a **short per-operation transaction** whose first statement is
+   `set_config('app.current_organization_id', <org>, true)`. A service's own
+   `prisma.$transaction(...)` becomes that one transaction (GUC set first, its
+   callback participates; ambient calls inside it reuse the same tx — never a
+   nested one). Per-op micro-transactions (not one request-tx) mean a handler
+   that makes an external call mid-request never holds a tx open across I/O.
+3. Background jobs / public routes have no org context → the proxy falls through
+   to the base client → GUC unset → permissive branch (cross-org), as required.
 
-1. An org-context `AsyncLocalStorage` set by an interceptor after
-   `OrganizationGuard` resolves the org.
-2. A **Prisma client extension** on the ambient `prisma` that, when an org
-   context is present in the ALS, runs inside a single per-request transaction
-   whose first statement is the `set_config` GUC, and makes both ambient
-   `prisma.model.op()` calls AND the services' existing `prisma.$transaction`
-   blocks _participate in that one transaction_ (rather than open a nested one).
-3. Background jobs deliberately run with no context (the permissive branch) — the
-   B1 empty-string fix is what keeps that working under pooling.
+**Off by default:** with `RLS_ENFORCEMENT` unset the proxy is a transparent
+pass-through and the interceptor a no-op — merging the code changed nothing
+(full api suite stayed green).
 
-This is a self-contained but non-trivial piece (it is the "enforcement" half of
-S1-011 that was never built). **Until it lands, treat RLS as defense-in-depth
-that is installed but inert, and keep relying on the app-layer filters.**
+**Verified:** proxy unit tests (5, DB-free) + a live dev-DB proof: through the
+proxy over a `NOBYPASSRLS` connection, `runInOrgContext(realOrg)` returned only
+that org's rows, a bogus org returned 0, and no-context returned all — RLS
+enforced end-to-end.
+
+### Enablement order
+
+1. Ship the code (done — off by default).
+2. In dev/staging: set `RLS_ENFORCEMENT=on` **and** point runtime `DATABASE_URL`
+   at the `saroh_app` (NOBYPASSRLS) role (§1). Both are required together — the
+   flag alone (still on the BYPASSRLS owner) or the role alone (flag off, GUC
+   never set) each enforce nothing.
+3. Smoke-test the app, then roll the same pair to production. To roll back
+   instantly, unset `RLS_ENFORCEMENT` (no redeploy of code needed).
 
 ---
 
 ## 1. Deploy a non-`BYPASSRLS` application role (one of two prerequisites)
 
-This is **necessary but not sufficient** — see §0: it must be paired with the
-`withOrgContext` wiring, or RLS stays permissive. Do this step second, after the
-wiring lands and is validated.
+This is **necessary but not sufficient** — see §0: it must be paired with
+`RLS_ENFORCEMENT=on` (the enforcement layer is built and shipped, off by
+default), or RLS stays permissive.
 
 The app must connect as a role **without** `BYPASSRLS` (and not a superuser) for
 `FORCE ROW LEVEL SECURITY` to bite. Create a dedicated login role, grant it only

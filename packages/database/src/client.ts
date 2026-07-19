@@ -1,6 +1,8 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
+import { createRlsProxy } from "./rls-proxy";
+
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined;
 };
@@ -13,8 +15,15 @@ const adapter = new PrismaPg({
     connectionString: process.env.DATABASE_URL,
 });
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
+// The cached singleton is the RAW client (unproxied) so hot-reload reuses one
+// connection pool.
+const baseClient = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = baseClient;
+
+// Everything imports this: the RLS-aware proxy. It is a transparent pass-through
+// to `baseClient` unless RLS_ENFORCEMENT is on AND a request org context is
+// active (see rls-proxy.ts), so behavior is unchanged by default.
+export const prisma = createRlsProxy(baseClient);
 
 export * from "@prisma/client";

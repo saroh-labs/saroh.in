@@ -8,6 +8,7 @@ import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { OriginGuard } from "./common/guards/origin.guard";
+import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
@@ -52,9 +53,14 @@ async function bootstrap() {
     // Better Auth's own routes are exempt inside the guard.
     app.useGlobalGuards(new OriginGuard());
 
-    // One structured request log line per request, and a single consistent
-    // error envelope for every thrown error.
-    app.useGlobalInterceptors(new LoggingInterceptor());
+    // OrgRlsInterceptor first (outermost): it opens the per-request RLS org
+    // context so the handler's DB work runs inside it. A no-op unless
+    // RLS_ENFORCEMENT is enabled. Then one structured request log line per
+    // request, and a single consistent error envelope for every thrown error.
+    app.useGlobalInterceptors(
+        new OrgRlsInterceptor(),
+        new LoggingInterceptor(),
+    );
     app.useGlobalFilters(new AllExceptionsFilter());
 
     const port = env.PORT;
