@@ -7,6 +7,7 @@ import helmet from "helmet";
 
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
+import { OriginGuard } from "./common/guards/origin.guard";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
@@ -44,6 +45,12 @@ async function bootstrap() {
             transformOptions: { enableImplicitConversion: true },
         }),
     );
+
+    // App-layer CSRF origin check (B3): reject a present-but-untrusted Origin/
+    // Referer on unsafe methods for authenticated routes (defense-in-depth on
+    // top of the SameSite session cookie + CORS). Public/webhook routes and
+    // Better Auth's own routes are exempt inside the guard.
+    app.useGlobalGuards(new OriginGuard());
 
     // One structured request log line per request, and a single consistent
     // error envelope for every thrown error.
