@@ -102,6 +102,7 @@ describe("richText v1", () => {
         expect(requiresSanitization("hero", 1)).toBe(false);
         expect(requiresSanitization("cta", 1)).toBe(false);
         expect(requiresSanitization("gallery", 1)).toBe(false);
+        expect(requiresSanitization("enquiry", 1)).toBe(false);
     });
 });
 
@@ -143,6 +144,74 @@ describe("gallery v1", () => {
 
     it("rejects an empty gallery", () => {
         const result = parseSectionContent("gallery", 1, { images: [] });
+        expect(result.success).toBe(false);
+    });
+});
+
+describe("enquiry v1", () => {
+    const validFields = [
+        { name: "name", label: "Name", type: "text", required: true },
+        { name: "email", label: "Email", type: "email", required: true },
+        { name: "message", label: "Message", type: "textarea" },
+    ];
+
+    it("accepts an enquiry with a well-formed field list", () => {
+        const result = parseSectionContent("enquiry", 1, {
+            title: "Get in touch",
+            submitLabel: "Send",
+            successMessage: "Thanks!",
+            fields: validFields,
+        });
+        expect(result.success).toBe(true);
+    });
+
+    it("accepts an enquiry without a formId (synced on save)", () => {
+        const result = parseSectionContent("enquiry", 1, {
+            fields: [{ name: "email", label: "Email", type: "email" }],
+        });
+        expect(result.success).toBe(true);
+    });
+
+    it("keeps the formId when present", () => {
+        const result = parseSectionContent("enquiry", 1, {
+            formId: "form_123",
+            fields: [{ name: "email", label: "Email", type: "email" }],
+        });
+        expect(result.success).toBe(true);
+        if (result.success) {
+            expect((result.data as { formId: string }).formId).toBe("form_123");
+        }
+    });
+
+    it("rejects an enquiry with no fields", () => {
+        const result = parseSectionContent("enquiry", 1, { fields: [] });
+        expect(result.success).toBe(false);
+    });
+
+    it("rejects an enquiry with no email field", () => {
+        const result = parseSectionContent("enquiry", 1, {
+            fields: [{ name: "name", label: "Name", type: "text" }],
+        });
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            expect(result.error.code).toBe("INVALID_CONTENT");
+        }
+    });
+
+    it("rejects an enquiry with duplicate field names", () => {
+        const result = parseSectionContent("enquiry", 1, {
+            fields: [
+                { name: "email", label: "Email", type: "email" },
+                { name: "email", label: "Email again", type: "text" },
+            ],
+        });
+        expect(result.success).toBe(false);
+    });
+
+    it("rejects an enquiry with an invalid field type", () => {
+        const result = parseSectionContent("enquiry", 1, {
+            fields: [{ name: "email", label: "Email", type: "date" }],
+        });
         expect(result.success).toBe(false);
     });
 });

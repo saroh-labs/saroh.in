@@ -77,12 +77,77 @@ const galleryV1 = z.object({
     layout: z.enum(["grid", "carousel", "masonry"]).default("grid"),
 });
 
+/** The field descriptor types an enquiry form supports (mirrors the forms API). */
+const enquiryFieldTypes = ["text", "email", "tel", "textarea"] as const;
+
+/**
+ * One field descriptor in an enquiry section — a snapshot of the backing Form's
+ * `fields` (see the forms module on api.saroh.in). Persisted verbatim so the
+ * renderer can draw the form, and kept in sync with the Form (which the public
+ * submit endpoint validates against) by the editor on save.
+ */
+const enquiryFieldSchema = z.object({
+    name: z.string().min(1).max(64),
+    label: z.string().min(1).max(128),
+    type: z.enum(enquiryFieldTypes),
+    required: z.boolean().optional(),
+});
+
+/**
+ * enquiry v1 — a public enquiry form the visitor submits. `formId` points at
+ * the backing Form the public submit endpoint validates + routes by (the org is
+ * derived from that Form, never the client); it is optional because a
+ * just-added section has no Form until the editor syncs one on save. `fields`
+ * is a snapshot of that Form's fields used to render the inputs. Values are
+ * plain text, so NOTHING here requires sanitization.
+ *
+ * Semantic rules match the forms API: `fields` non-empty, field `name`s unique,
+ * and at least one `type:"email"` field (the Contact dedupe key at submit).
+ */
+const enquiryV1 = z
+    .object({
+        formId: z.string().min(1).optional(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+        submitLabel: z.string().optional(),
+        successMessage: z.string().optional(),
+        fields: z.array(enquiryFieldSchema).min(1),
+    })
+    .superRefine((value, ctx) => {
+        const seen = new Set<string>();
+        value.fields.forEach((field, index) => {
+            if (seen.has(field.name)) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["fields", index, "name"],
+                    message: `Duplicate field name "${field.name}" — field names must be unique`,
+                });
+            }
+            seen.add(field.name);
+        });
+
+        if (!value.fields.some((field) => field.type === "email")) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["fields"],
+                message:
+                    'An enquiry form must have at least one field of type "email"',
+            });
+        }
+    });
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
 /** The known section types. `Section.type` must be one of these. */
-export const SECTION_TYPES = ["hero", "richText", "cta", "gallery"] as const;
+export const SECTION_TYPES = [
+    "hero",
+    "richText",
+    "cta",
+    "gallery",
+    "enquiry",
+] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
 /** A contract version number (starts at 1). */
@@ -131,6 +196,13 @@ const REGISTRY: Record<string, SectionContract> = {
         type: "gallery",
         version: 1,
         schema: galleryV1,
+        sanitizedFields: [],
+    },
+    [key("enquiry", 1)]: {
+        type: "enquiry",
+        version: 1,
+        schema: enquiryV1,
+        // All values are plain text — nothing here is authored HTML.
         sanitizedFields: [],
     },
 };

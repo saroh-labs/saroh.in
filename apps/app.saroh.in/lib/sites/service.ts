@@ -29,7 +29,7 @@ const ACTIVE_ORG_COOKIE = "active_org";
 // ---------------------------------------------------------------------------
 
 /** The section types the editor supports. */
-export type SectionType = "hero" | "richText" | "cta" | "gallery";
+export type SectionType = "hero" | "richText" | "cta" | "gallery" | "enquiry";
 
 /** Button style shared by hero CTA and the standalone cta section. */
 export type CtaStyle = "primary" | "secondary" | "link";
@@ -68,12 +68,39 @@ export interface GalleryContent {
     layout?: GalleryLayout;
 }
 
+/** The field types an enquiry form supports (mirror of the section contract). */
+export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
+
+/** One authored field in an enquiry section (snapshot of the backing Form). */
+export interface EnquiryField {
+    name: string;
+    label: string;
+    type: EnquiryFieldType;
+    required?: boolean;
+}
+
+/**
+ * `enquiry` v1 — a public enquiry form. `formId` points at the backing Form the
+ * public submit endpoint validates against; the editor syncs it on save (it is
+ * absent until then). `fields` is the authored field list mirrored onto that
+ * Form.
+ */
+export interface EnquiryContent {
+    formId?: string;
+    title?: string;
+    description?: string;
+    submitLabel?: string;
+    successMessage?: string;
+    fields: EnquiryField[];
+}
+
 /** Content shape keyed by section type. */
 export interface SectionContentByType {
     hero: HeroContent;
     richText: RichTextContent;
     cta: CtaContent;
     gallery: GalleryContent;
+    enquiry: EnquiryContent;
 }
 
 /**

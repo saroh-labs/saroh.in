@@ -65,6 +65,30 @@ export interface GalleryContent {
     layout?: "grid" | "carousel" | "masonry";
 }
 
+/** One field descriptor snapshotted into an `enquiry` section. */
+export interface EnquiryField {
+    name: string;
+    label: string;
+    type: "text" | "email" | "tel" | "textarea";
+    required?: boolean;
+}
+
+/**
+ * `enquiry` v1 — a public enquiry form. `formId` names the backing Form the
+ * PUBLIC submit endpoint validates against and derives the owning org from (so
+ * the visitor's POST can only ever create a lead in that Form's org). `fields`
+ * is the snapshot the renderer draws the inputs from. All values are plain
+ * text — nothing here was authored HTML, so no sanitization is involved.
+ */
+export interface EnquiryContent {
+    formId?: string;
+    title?: string;
+    description?: string;
+    submitLabel?: string;
+    successMessage?: string;
+    fields: EnquiryField[];
+}
+
 /**
  * A single section as it appears in a publication snapshot. `content` is
  * deliberately `unknown`: it arrives as JSON, so the {@link SectionRenderer}
