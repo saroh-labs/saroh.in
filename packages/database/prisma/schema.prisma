@@ -119,6 +119,14 @@ model Organization {
   carts      Cart[]
   orders     Order[]
 
+  // Payments (Stage 5 — S5-002/003). Org-owned provider connections (encrypted
+  // credentials), intents/attempts/refunds, and the signed webhook inbox.
+  merchantPaymentProviders MerchantPaymentProvider[]
+  paymentIntents           PaymentIntent[]
+  paymentAttempts          PaymentAttempt[]
+  paymentRefunds           PaymentRefund[]
+  webhookEvents            WebhookEvent[]
+
   createdAt DateTime @default(now())
 }
 
@@ -497,6 +505,9 @@ model Order {
   // Relations
   items        OrderItem[]
   transactions Transaction[]
+
+  // Org-owned payment intents against this order (Stage 5 — S5-002).
+  paymentIntents PaymentIntent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1685,4 +1696,146 @@ model Booking {
   @@index([organizationId])
   @@index([serviceId, startAt])
   @@index([contactId])
+}
+
+// ============================================================================
+// PAYMENTS (Stage 5 — S5-002 / S5-003)
+// ============================================================================
+//
+// Organization-owned payment flow, isolated from Saroh's own billing (Stage 7).
+// An org connects a merchant provider (Razorpay/Cashfree) whose API credentials
+// are stored ENCRYPTED at the app layer (AES-256-GCM: only the ciphertext + iv
+// + authTag live here, never plaintext). A PaymentIntent is created from a
+// SERVER-CALCULATED order amount (never a client-supplied total); each provider
+// interaction is a PaymentAttempt. Money-state changes are driven by the signed
+// WebhookEvent inbox (S5-003) whose `(provider, providerEventId)` unique makes
+// reconciliation idempotent — a duplicate webhook changes state exactly once.
+
+// MerchantPaymentProvider — an org's connection to a payment provider.
+model MerchantPaymentProvider {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  provider String // "RAZORPAY" | "CASHFREE"
+  status   String @default("CONNECTED") // CONNECTED | DISABLED
+
+  // Non-secret public identifier (e.g. Razorpay key_id) — safe to read back.
+  publicKey String?
+
+  // AES-256-GCM encrypted secret credentials (JSON blob). Plaintext NEVER
+  // stored; the key lives in app env. iv + authTag are needed to decrypt.
+  encryptedCredentials String
+  credentialsIv        String
+  credentialsAuthTag   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // At most one connection per provider per org.
+  @@unique([organizationId, provider])
+  @@index([organizationId])
+}
+
+// PaymentIntent — an intent to collect a SERVER-CALCULATED amount for an Order.
+model PaymentIntent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider         String // which MerchantPaymentProvider
+  providerIntentId String? // the provider's order/intent id, set after create
+
+  amountCents Int // server-calculated from the Order; minor units
+  currency    String
+
+  // CREATED → REQUIRES_PAYMENT → PROCESSING → SUCCEEDED | FAILED | CANCELLED
+  status String @default("CREATED")
+
+  idempotencyKey String? // dedupe client "create intent" calls
+
+  attempts PaymentAttempt[]
+  refunds  PaymentRefund[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, idempotencyKey])
+  @@index([organizationId])
+  @@index([orderId])
+  @@index([provider, providerIntentId])
+}
+
+// PaymentAttempt — one interaction with the provider for an intent.
+model PaymentAttempt {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  paymentIntentId String
+  paymentIntent   PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+
+  provider    String
+  providerRef String? // provider payment id
+  status      String // CREATED | AUTHORIZED | CAPTURED | FAILED
+  rawResponse Json? // provider response (sanitized), for audit
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([paymentIntentId])
+}
+
+// PaymentRefund — an org-owned refund against a PaymentIntent. Distinct from the
+// legacy store-scoped `Refund` model.
+model PaymentRefund {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  paymentIntentId String
+  paymentIntent   PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+
+  amountCents      Int
+  currency         String
+  status           String  @default("PENDING") // PENDING | SUCCEEDED | FAILED
+  providerRefundId String?
+  reason           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([paymentIntentId])
+}
+
+// WebhookEvent — the SIGNED webhook inbox (S5-003). Every provider callback is
+// recorded here first; `(provider, providerEventId)` is UNIQUE so a duplicate
+// delivery is dropped and reconciliation applies exactly once.
+model WebhookEvent {
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  provider        String
+  providerEventId String // the provider's event id (idempotency key)
+  eventType       String
+
+  // The raw signed payload + signature, kept for verification + audit.
+  payload   Json
+  signature String?
+
+  status      String    @default("RECEIVED") // RECEIVED | PROCESSED | FAILED | IGNORED
+  processedAt DateTime?
+  error       String?
+
+  createdAt DateTime @default(now())
+
+  // Idempotency backstop: one row per provider event.
+  @@unique([provider, providerEventId])
+  @@index([organizationId])
+  @@index([status])
 }
