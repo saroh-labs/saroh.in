@@ -65,6 +65,15 @@ const envSchema = z.object({
     USER_PASSWORD: z.string().optional(),
 
     // Set automatically by npm/pnpm run scripts; used for the health probe.
+    // Background job worker (S3-003 — durable JobQueue outbox + worker).
+    // All optional with sane defaults; the poll loop is disabled under
+    // NODE_ENV=test regardless of these values.
+    JOB_WORKER_POLL_MS: z.coerce.number().int().positive().default(2000),
+    JOB_WORKER_BATCH: z.coerce.number().int().positive().default(10),
+    // Visibility timeout: a job stuck PROCESSING longer than this (its worker
+    // crashed mid-flight) is reclaimed by the next claim. Default 5 min.
+    JOB_VISIBILITY_MS: z.coerce.number().int().positive().default(300_000),
+
     npm_package_version: z.string().optional(),
 });
 

@@ -38,6 +38,10 @@ module.exports = {
         // the real starter template — never touch a DB.
         "<rootDir>/src/modules/sites/**/*.spec.ts",
         "<rootDir>/src/modules/domains/**/*.spec.ts",
+        // S3-003 jobs: nextBackoff (pure), PrismaJobQueue.fail branch selection
+        // (mocked prisma.job), the worker dispatch loop (in-memory FakeJobQueue
+        // + real registry), and the registry — all DB-free / timer-free.
+        "<rootDir>/src/modules/jobs/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
