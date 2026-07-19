@@ -43,6 +43,8 @@ export interface LeadActivity {
     type: string;
     body: string | null;
     actorUserId: string | null;
+    dueAt: string | null;
+    completedAt: string | null;
     createdAt: string;
 }
 
@@ -142,5 +144,44 @@ export function moveLead(
         "POST",
         { stageId },
         "Could not move the lead",
+    );
+}
+
+/** Log a NOTE (or generic activity) on a lead's timeline. */
+export function logActivity(
+    leadId: string,
+    body: string,
+): Promise<CrmResult<LeadActivity>> {
+    return mutate<LeadActivity>(
+        `/leads/${leadId}/activities`,
+        "POST",
+        { type: "NOTE", body },
+        "Could not log the note",
+    );
+}
+
+/** Create a follow-up TASK on a lead (body + ISO due date). */
+export function createTask(
+    leadId: string,
+    input: { body: string; dueAt: string },
+): Promise<CrmResult<LeadActivity>> {
+    return mutate<LeadActivity>(
+        `/leads/${leadId}/tasks`,
+        "POST",
+        input,
+        "Could not create the task",
+    );
+}
+
+/** Mark a follow-up TASK done. */
+export function completeTask(
+    leadId: string,
+    activityId: string,
+): Promise<CrmResult<LeadActivity>> {
+    return mutate<LeadActivity>(
+        `/leads/${leadId}/tasks/${activityId}/complete`,
+        "POST",
+        {},
+        "Could not complete the task",
     );
 }

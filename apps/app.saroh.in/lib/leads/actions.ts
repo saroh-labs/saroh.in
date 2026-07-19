@@ -2,7 +2,10 @@
 
 import type { CreateLeadInput, UpdateLeadInput } from "./service";
 import {
+    completeTask as completeTaskApi,
     createLead as createLeadApi,
+    createTask as createTaskApi,
+    logActivity as logActivityApi,
     moveLead as moveLeadApi,
     updateLead as updateLeadApi,
 } from "./service";
@@ -26,4 +29,19 @@ export async function updateLead(leadId: string, input: UpdateLeadInput) {
 
 export async function moveLead(leadId: string, stageId: string) {
     return moveLeadApi(leadId, stageId);
+}
+
+export async function logActivity(leadId: string, body: string) {
+    return logActivityApi(leadId, body);
+}
+
+export async function createTask(
+    leadId: string,
+    input: { body: string; dueAt: string },
+) {
+    return createTaskApi(leadId, input);
+}
+
+export async function completeTask(leadId: string, activityId: string) {
+    return completeTaskApi(leadId, activityId);
 }

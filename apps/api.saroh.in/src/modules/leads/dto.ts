@@ -3,6 +3,7 @@ import {
     IsEmail,
     IsIn,
     IsInt,
+    IsISO8601,
     IsOptional,
     IsString,
     MaxLength,
@@ -125,4 +126,37 @@ export class MoveLeadDto {
     @MinLength(1)
     @MaxLength(64)
     stageId!: string;
+}
+
+/**
+ * Log an activity on a lead's timeline (S3-007) — a NOTE by default. `type` is
+ * optional and, when given, may only be `"NOTE"` (STAGE_CHANGED/CREATED are
+ * system-authored; TASK has its own endpoint). `body` is the required text.
+ */
+export class CreateActivityDto {
+    @IsOptional()
+    @IsIn(["NOTE"])
+    type?: "NOTE";
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(2000)
+    body!: string;
+}
+
+/**
+ * Create a follow-up TASK on a lead (S3-007): a required `body` (what to do) and
+ * a `dueAt` ISO-8601 timestamp. Recorded as an `Activity{ type:"TASK" }` and
+ * completed via the dedicated complete endpoint.
+ */
+export class CreateTaskDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(2000)
+    body!: string;
+
+    @IsISO8601()
+    dueAt!: string;
 }
