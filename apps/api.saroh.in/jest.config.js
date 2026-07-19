@@ -49,6 +49,13 @@ module.exports = {
         // $transaction) — the public submit command's acceptance + security
         // cases (isolation, idempotency, validation, rate-limit); no DB, no net.
         "<rootDir>/src/modules/enquiry/**/*.spec.ts",
+        // S3-005 CRM: ContactsService, PipelinesService, and LeadsService specs
+        // with a jest-mocked Prisma (incl. $transaction) — org-scoped reads,
+        // authz (MEMBER denied), tenant isolation (cross-tenant id → 404), and
+        // the move-stage atomic STAGE_CHANGED activity. Never touch a DB.
+        "<rootDir>/src/modules/contacts/**/*.spec.ts",
+        "<rootDir>/src/modules/pipelines/**/*.spec.ts",
+        "<rootDir>/src/modules/leads/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],

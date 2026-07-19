@@ -37,7 +37,29 @@ export default async function Home() {
                         {session.user.email}
                     </span>
                 </div>
-                <SignOutButton />
+                <div className="flex items-center gap-4">
+                    <nav className="flex items-center gap-4 text-sm">
+                        <Link
+                            href="/contacts"
+                            className="text-muted-foreground hover:text-foreground hover:underline"
+                        >
+                            Contacts
+                        </Link>
+                        <Link
+                            href="/leads"
+                            className="text-muted-foreground hover:text-foreground hover:underline"
+                        >
+                            Leads
+                        </Link>
+                        <Link
+                            href="/pipeline"
+                            className="text-muted-foreground hover:text-foreground hover:underline"
+                        >
+                            Pipeline
+                        </Link>
+                    </nav>
+                    <SignOutButton />
+                </div>
             </div>
 
             <div className="mb-6 flex items-center justify-between">

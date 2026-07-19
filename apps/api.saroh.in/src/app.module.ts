@@ -5,6 +5,7 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 import { auth } from "./common/auth/auth";
 import { AuditModule } from "./modules/audit/audit.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
+import { ContactsModule } from "./modules/contacts/contacts.module";
 import { ContentModule } from "./modules/content/content.module";
 import { CustomersModule } from "./modules/customers/customers.module";
 import { DomainsModule } from "./modules/domains/domains.module";
@@ -13,10 +14,12 @@ import { FeatureFlagModule } from "./modules/feature-flags/feature-flags.module"
 import { FormsModule } from "./modules/forms/forms.module";
 import { HealthModule } from "./modules/health/health.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
+import { LeadsModule } from "./modules/leads/leads.module";
 import { MediaModule } from "./modules/media/media.module";
 import { MembersModule } from "./modules/members/members.module";
 import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
+import { PipelinesModule } from "./modules/pipelines/pipelines.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { SitesModule } from "./modules/sites/sites.module";
@@ -55,6 +58,9 @@ import { StoresModule } from "./modules/stores/stores.module";
         JobsModule,
         FormsModule,
         EnquiryModule,
+        ContactsModule,
+        PipelinesModule,
+        LeadsModule,
     ],
 })
 export class AppModule {}
