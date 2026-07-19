@@ -95,7 +95,9 @@ export type OrgAction =
     | "pipeline:read"
     | "pipeline:manage"
     | "activity:read"
-    | "activity:write";
+    | "activity:write"
+    | "notification:read"
+    | "notification:write";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -131,6 +133,8 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "pipeline:manage",
     "activity:read",
     "activity:write",
+    "notification:read",
+    "notification:write",
 ];
 
 /** Read-only actions — the floor every role (including MEMBER) may perform. */
