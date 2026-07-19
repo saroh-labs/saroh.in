@@ -66,6 +66,14 @@ export class PaymentsController {
         });
     }
 
+    @Get("orders/:orderId/payments")
+    listOrderPayments(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("orderId") orderId: string,
+    ) {
+        return this.payments.listOrderPayments(ctx, orderId);
+    }
+
     @Post("orders/:orderId/refund")
     @HttpCode(201)
     refund(

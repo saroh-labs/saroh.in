@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { OrderPayments } from "@/components/stores/order-payments";
 import { OrderStatusControls } from "@/components/stores/order-status-controls";
 import { getOrder } from "@/lib/orders/service";
+import { getOrderPayments } from "@/lib/payments/service";
 import { requireSession } from "@/lib/session";
 import { getStore } from "@/lib/stores/service";
 
@@ -27,6 +29,8 @@ export default async function OrderDetailPage({
 
     const order = await getOrder(storeId, orderId);
     if (!order) notFound();
+
+    const payments = await getOrderPayments(order.id);
 
     const cur = order.currency;
 
@@ -90,6 +94,8 @@ export default async function OrderDetailPage({
                     </div>
                 </div>
             </div>
+
+            <OrderPayments orderId={order.id} summary={payments} />
         </div>
     );
 }

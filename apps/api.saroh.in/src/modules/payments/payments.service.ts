@@ -62,6 +62,66 @@ export interface CreateIntentResult {
     clientParams: Record<string, unknown>;
 }
 
+/**
+ * A BUYER-safe receipt view (S5-004). Everything here is safe to show an
+ * anonymous buyer: the store-facing order number, the line totals, the currency,
+ * the reconciled `paymentStatus`, and the latest intent's status. It carries NO
+ * secrets and NO internal ids (no intent id, no provider intent id, no org id).
+ */
+export interface PublicReceiptResult {
+    orderNumber: string;
+    currency: string;
+    subtotal: string;
+    tax: string;
+    shipping: string;
+    discount: string;
+    total: string;
+    paymentStatus: string;
+    fulfilmentStatus: string;
+    latestPayment: {
+        provider: string;
+        status: string;
+        amountCents: number;
+        currency: string;
+    } | null;
+}
+
+/** One PaymentIntent (+ its attempts and refunds) in the owner summary. */
+export interface OrderPaymentIntentView {
+    id: string;
+    provider: string;
+    providerIntentId: string | null;
+    status: string;
+    amountCents: number;
+    currency: string;
+    createdAt: Date;
+    attempts: {
+        id: string;
+        provider: string;
+        providerRef: string | null;
+        status: string;
+        createdAt: Date;
+    }[];
+    refunds: {
+        id: string;
+        status: string;
+        amountCents: number;
+        currency: string;
+        providerRefundId: string | null;
+        reason: string | null;
+        createdAt: Date;
+    }[];
+}
+
+/** Owner-facing payments summary for one Order (`payment:read`). */
+export interface OrderPaymentsSummary {
+    orderId: string;
+    paymentStatus: string;
+    total: string;
+    currency: string;
+    intents: OrderPaymentIntentView[];
+}
+
 /** Convert a Decimal-ish order total (string | number | Decimal) to minor units. */
 function totalToCents(total: Prisma.Decimal | string | number): number {
     return Math.round(Number(total) * 100);
@@ -175,7 +235,10 @@ export class PaymentsService {
         provider: string,
     ): Promise<RedactedProvider> {
         authorize(ctx, "payment:read");
-        const row = await this.requireOwnedProvider(ctx, provider);
+        const row = await this.requireOwnedProvider(
+            ctx.organizationId,
+            provider,
+        );
         return redact(row);
     }
 
@@ -189,7 +252,10 @@ export class PaymentsService {
         provider: string,
     ): Promise<RedactedProvider> {
         authorize(ctx, "payment:manage");
-        const row = await this.requireOwnedProvider(ctx, provider);
+        const row = await this.requireOwnedProvider(
+            ctx.organizationId,
+            provider,
+        );
         const updated = await prisma.merchantPaymentProvider.update({
             where: { id: row.id },
             data: { status: "DISABLED" },
@@ -266,7 +332,7 @@ export class PaymentsService {
         }
 
         const providerRow = await this.requireOwnedProvider(
-            ctx,
+            ctx.organizationId,
             intent.provider,
         );
 
@@ -332,8 +398,46 @@ export class PaymentsService {
         options: { idempotencyKey?: string; provider?: string } = {},
     ): Promise<CreateIntentResult> {
         authorize(ctx, "payment:manage");
-
         const order = await this.requireOwnedOrder(ctx, orderId);
+        return this.createIntentInternal(ctx.organizationId, order, options);
+    }
+
+    /**
+     * PUBLIC checkout create-intent (S5-004) — the write behind
+     * `POST /public/orders/:orderId/payment-intent`. There is NO session and NO
+     * client-supplied org: the owning organization is resolved ENTIRELY from the
+     * Order row, and `amountCents` is derived from `order.total` server-side.
+     *
+     * SECURITY: no amount ever enters this path — a buyer targets an Order by id
+     * and the charged amount is fixed by that Order, so a tampered client cannot
+     * influence how much is charged (price-tampering protection). Idempotent via
+     * the shared `(orderId, idempotencyKey)` unique constraint.
+     */
+    async createIntentForOrderPublic(
+        orderId: string,
+        options: { idempotencyKey?: string; provider?: string } = {},
+    ): Promise<CreateIntentResult> {
+        const order = await this.requirePayableOrder(orderId);
+        return this.createIntentInternal(order.organizationId, order, options);
+    }
+
+    /**
+     * The shared server-authoritative create-intent core. `organizationId` is
+     * ALWAYS resolved by the caller from a trusted source (the proven
+     * OrganizationContext for the owner path, or the Order row for the public
+     * path) — never from client input. `amountCents`/`currency` are derived from
+     * the Order here so no caller can inject an amount.
+     */
+    private async createIntentInternal(
+        organizationId: string,
+        order: {
+            id: string;
+            total: Prisma.Decimal | string | number;
+            currency: string;
+        },
+        options: { idempotencyKey?: string; provider?: string },
+    ): Promise<CreateIntentResult> {
+        const orderId = order.id;
 
         // Server-authoritative money: derived ONLY from the Order.
         const amountCents = totalToCents(order.total);
@@ -348,13 +452,13 @@ export class PaymentsService {
                 where: { orderId_idempotencyKey: { orderId, idempotencyKey } },
             });
             if (existing) {
-                return this.replay(ctx, existing);
+                return this.replay(organizationId, existing);
             }
         }
 
         // Resolve the provider row: the pinned one, or the single CONNECTED one.
         const providerRow = await this.resolveConnectedProvider(
-            ctx,
+            organizationId,
             options.provider,
         );
 
@@ -374,7 +478,7 @@ export class PaymentsService {
             const created = await prisma.$transaction(async (tx) => {
                 const paymentIntent = await tx.paymentIntent.create({
                     data: {
-                        organizationId: ctx.organizationId,
+                        organizationId,
                         orderId,
                         provider: providerRow.provider,
                         providerIntentId: intent.providerIntentId,
@@ -386,7 +490,7 @@ export class PaymentsService {
                 });
                 await tx.paymentAttempt.create({
                     data: {
-                        organizationId: ctx.organizationId,
+                        organizationId,
                         paymentIntentId: paymentIntent.id,
                         provider: providerRow.provider,
                         providerRef: intent.providerIntentId,
@@ -418,10 +522,125 @@ export class PaymentsService {
                         orderId_idempotencyKey: { orderId, idempotencyKey },
                     },
                 });
-                if (winner) return this.replay(ctx, winner);
+                if (winner) return this.replay(organizationId, winner);
             }
             throw err;
         }
+    }
+
+    /**
+     * PUBLIC buyer receipt (S5-004) — the read behind
+     * `GET /public/orders/:orderId/receipt`. Returns a BUYER-safe view: the
+     * order number, line totals, currency, the reconciled `paymentStatus`, and
+     * the latest intent's status. NO secrets, NO internal ids. Anonymous (no
+     * session): a buyer polls this after paying to see PAID/UNPAID/FAILED/
+     * REFUNDED once the webhook reconciler (S5-003) moves the order.
+     */
+    async getReceipt(orderId: string): Promise<PublicReceiptResult> {
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            select: {
+                orderId: true,
+                subtotal: true,
+                tax: true,
+                shipping: true,
+                discount: true,
+                total: true,
+                currency: true,
+                paymentStatus: true,
+                status: true,
+            },
+        });
+        if (!order) {
+            throw new NotFoundException("Order not found");
+        }
+
+        const intent = await prisma.paymentIntent.findFirst({
+            where: { orderId },
+            orderBy: { createdAt: "desc" },
+            select: {
+                provider: true,
+                status: true,
+                amountCents: true,
+                currency: true,
+            },
+        });
+
+        return {
+            orderNumber: order.orderId,
+            currency: order.currency,
+            subtotal: String(order.subtotal),
+            tax: String(order.tax),
+            shipping: String(order.shipping),
+            discount: String(order.discount),
+            total: String(order.total),
+            paymentStatus: order.paymentStatus,
+            fulfilmentStatus: order.status,
+            latestPayment: intent
+                ? {
+                      provider: intent.provider,
+                      status: intent.status,
+                      amountCents: intent.amountCents,
+                      currency: intent.currency,
+                  }
+                : null,
+        };
+    }
+
+    /**
+     * Owner-facing payments summary for an Order (S5-004). `payment:read`. The
+     * Order must belong to `ctx.organizationId` (else 404). Returns every
+     * PaymentIntent with its attempts + refunds so the dashboard can show the
+     * full money trail. This is an authenticated owner view, so internal ids are
+     * fine — but still NO secret material (credentials never live on these rows).
+     */
+    async listOrderPayments(
+        ctx: OrganizationContext,
+        orderId: string,
+    ): Promise<OrderPaymentsSummary> {
+        authorize(ctx, "payment:read");
+        const order = await this.requireOwnedOrder(ctx, orderId);
+
+        const intents = await prisma.paymentIntent.findMany({
+            where: { orderId: order.id, organizationId: ctx.organizationId },
+            orderBy: { createdAt: "desc" },
+            include: {
+                attempts: { orderBy: { createdAt: "asc" } },
+                refunds: { orderBy: { createdAt: "asc" } },
+            },
+        });
+
+        return {
+            orderId: order.id,
+            paymentStatus: order.paymentStatus,
+            total: String(order.total),
+            currency: order.currency,
+            intents: intents.map((intent) => ({
+                id: intent.id,
+                provider: intent.provider,
+                providerIntentId: intent.providerIntentId,
+                status: intent.status,
+                amountCents: intent.amountCents,
+                currency: intent.currency,
+                createdAt: intent.createdAt,
+                attempts: intent.attempts.map((a) => ({
+                    id: a.id,
+                    provider: a.provider,
+                    providerRef: a.providerRef,
+                    status: a.status,
+                    createdAt: a.createdAt,
+                })),
+                refunds: intent.refunds.map((r) => ({
+                    id: r.id,
+                    status: r.status,
+                    amountCents: r.amountCents,
+                    currency: r.currency,
+                    providerRefundId: r.providerRefundId,
+                    reason: r.reason,
+                    createdAt: r.createdAt,
+                })),
+            })),
+        };
     }
 
     /**
@@ -430,7 +649,7 @@ export class PaymentsService {
      * sanitized rawResponse; publicKey from the provider row (if still present).
      */
     private async replay(
-        ctx: OrganizationContext,
+        organizationId: string,
         intent: {
             id: string;
             provider: string;
@@ -449,7 +668,7 @@ export class PaymentsService {
         const providerRow = await prisma.merchantPaymentProvider.findUnique({
             where: {
                 organizationId_provider: {
-                    organizationId: ctx.organizationId,
+                    organizationId,
                     provider: intent.provider,
                 },
             },
@@ -489,7 +708,7 @@ export class PaymentsService {
      * if the choice is ambiguous).
      */
     private async resolveConnectedProvider(
-        ctx: OrganizationContext,
+        organizationId: string,
         pinned?: string,
     ): Promise<MerchantPaymentProvider> {
         if (pinned) {
@@ -497,7 +716,7 @@ export class PaymentsService {
             const row = await prisma.merchantPaymentProvider.findUnique({
                 where: {
                     organizationId_provider: {
-                        organizationId: ctx.organizationId,
+                        organizationId,
                         provider: name,
                     },
                 },
@@ -516,7 +735,7 @@ export class PaymentsService {
         }
 
         const connected = await prisma.merchantPaymentProvider.findMany({
-            where: { organizationId: ctx.organizationId, status: "CONNECTED" },
+            where: { organizationId, status: "CONNECTED" },
             orderBy: { createdAt: "asc" },
         });
         if (connected.length === 0) {
@@ -537,14 +756,14 @@ export class PaymentsService {
      * unique [organizationId, provider] so tenant scoping is inherent.
      */
     private async requireOwnedProvider(
-        ctx: OrganizationContext,
+        organizationId: string,
         provider: string,
     ): Promise<MerchantPaymentProvider> {
         const name = provider.toUpperCase();
         const row = await prisma.merchantPaymentProvider.findUnique({
             where: {
                 organizationId_provider: {
-                    organizationId: ctx.organizationId,
+                    organizationId,
                     provider: name,
                 },
             },
@@ -567,5 +786,33 @@ export class PaymentsService {
             throw new NotFoundException("Order not found");
         }
         return order;
+    }
+
+    /**
+     * Load an Order for the PUBLIC checkout path and resolve its owning org from
+     * the row itself (never from a client). 404 for a missing order OR one with
+     * no `organizationId` (an org-less order cannot be charged) — the buyer is
+     * never told which case it was. Returns the order narrowed to a non-null
+     * `organizationId`.
+     */
+    private async requirePayableOrder(orderId: string): Promise<{
+        id: string;
+        organizationId: string;
+        total: Prisma.Decimal;
+        currency: string;
+    }> {
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            select: {
+                id: true,
+                organizationId: true,
+                total: true,
+                currency: true,
+            },
+        });
+        if (!order?.organizationId) {
+            throw new NotFoundException("Order not found");
+        }
+        return { ...order, organizationId: order.organizationId };
     }
 }

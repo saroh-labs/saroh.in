@@ -5,6 +5,7 @@ import { OrganizationsModule } from "../organizations/organizations.module";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
 import { providerFactoryProvider } from "./providers/provider.factory";
+import { PublicPaymentsController } from "./public-payments.controller";
 
 /**
  * Org merchant-payments module (S5-002). Imports {@link OrganizationsModule}
@@ -15,7 +16,7 @@ import { providerFactoryProvider } from "./providers/provider.factory";
  */
 @Module({
     imports: [forwardRef(() => OrganizationsModule)],
-    controllers: [PaymentsController],
+    controllers: [PaymentsController, PublicPaymentsController],
     providers: [PaymentsService, providerFactoryProvider, OrganizationGuard],
     exports: [PaymentsService],
 })
