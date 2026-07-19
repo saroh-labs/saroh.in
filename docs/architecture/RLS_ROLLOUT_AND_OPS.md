@@ -15,7 +15,65 @@ other infra-side follow-ups that only a repo/DB admin can complete.
 
 ---
 
-## 1. Deploy a non-`BYPASSRLS` application role (the enforcement switch)
+## 0. AUDIT (2026-07-19): the role flip is NECESSARY BUT NOT SUFFICIENT
+
+Before flipping, a `withOrgContext` coverage audit was run. **Result: the GUC is
+never set anywhere in the running app.**
+
+- `withOrgContext()` (packages/database/src/org-context.ts) is defined and
+  exported but has **0 callers** in application code. `withoutOrgContext()` also
+  has 0 callers.
+- All **278** org-scoped `prisma.<model>.<op>()` call sites across the 56
+  org-touching service files use the **ambient `prisma` singleton** — none run
+  through the `tx` that `withOrgContext` yields. `OrganizationGuard` resolves the
+  org and attaches `request.organizationContext`, but sets no GUC and opens no
+  transaction.
+
+**Consequence:** even after deploying the `saroh_app` (NOBYPASSRLS) role, every
+query runs with the GUC unset → the permissive branch → **all rows returned →
+RLS still enforces nothing.** The role flip is safe (nothing breaks) but adds no
+isolation on its own. RLS (B1/B2) is defense-in-depth that is currently dormant.
+
+**What IS protecting tenants today:** the app-layer `where organizationId = …`
+filters. The audit spot-checked the 12 queries that don't obviously scope by org
+and found **no leaks** — each is scoped by an owning FK whose parent was
+org-verified (`paymentIntentId`, `serviceId`, `projectId`), a deliberately
+global catalog (`Plan`, `FeatureFlag` — no org column), or an intentional
+public/webhook path (public site render by hostname; webhook subscription lookup
+by `(provider, providerSubscriptionId)`). App-layer isolation is sound.
+
+### To make RLS actually enforce (the real prerequisite, not yet built)
+
+Every org-scoped request/job must run its DB work inside `withOrgContext`. Do NOT
+do this by wrapping each handler in an outer `prisma.$transaction` naively:
+~30 services already call `prisma.$transaction(...)` for their atomic writes, and
+Prisma does **not** support nested interactive transactions — an outer
+request-tx would break them.
+
+The correct shape (the ALS infra already exists for correlation IDs, see
+`common/logging/request-context.ts`):
+
+1. An org-context `AsyncLocalStorage` set by an interceptor after
+   `OrganizationGuard` resolves the org.
+2. A **Prisma client extension** on the ambient `prisma` that, when an org
+   context is present in the ALS, runs inside a single per-request transaction
+   whose first statement is the `set_config` GUC, and makes both ambient
+   `prisma.model.op()` calls AND the services' existing `prisma.$transaction`
+   blocks _participate in that one transaction_ (rather than open a nested one).
+3. Background jobs deliberately run with no context (the permissive branch) — the
+   B1 empty-string fix is what keeps that working under pooling.
+
+This is a self-contained but non-trivial piece (it is the "enforcement" half of
+S1-011 that was never built). **Until it lands, treat RLS as defense-in-depth
+that is installed but inert, and keep relying on the app-layer filters.**
+
+---
+
+## 1. Deploy a non-`BYPASSRLS` application role (one of two prerequisites)
+
+This is **necessary but not sufficient** — see §0: it must be paired with the
+`withOrgContext` wiring, or RLS stays permissive. Do this step second, after the
+wiring lands and is validated.
 
 The app must connect as a role **without** `BYPASSRLS` (and not a superuser) for
 `FORCE ROW LEVEL SECURITY` to bite. Create a dedicated login role, grant it only
