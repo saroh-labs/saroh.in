@@ -10,6 +10,7 @@ import { CustomersModule } from "./modules/customers/customers.module";
 import { DomainsModule } from "./modules/domains/domains.module";
 import { FeatureFlagModule } from "./modules/feature-flags/feature-flags.module";
 import { HealthModule } from "./modules/health/health.module";
+import { JobsModule } from "./modules/jobs/jobs.module";
 import { MediaModule } from "./modules/media/media.module";
 import { MembersModule } from "./modules/members/members.module";
 import { OrdersModule } from "./modules/orders/orders.module";
@@ -49,6 +50,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         MediaModule,
         SitesModule,
         DomainsModule,
+        JobsModule,
     ],
 })
 export class AppModule {}
