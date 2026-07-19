@@ -82,6 +82,16 @@ model Organization {
   // `hostname` is globally unique, so a hostname maps to at most one org.
   domains Domain[]
 
+  // Enquiry / CRM (Stage 3 — S3-001). The public enquiry funnel and its CRM.
+  // Every entity is org-owned and carries `organizationId` for tenant scoping.
+  contacts    Contact[]
+  forms       Form[]
+  submissions Submission[]
+  pipelines   Pipeline[]
+  stages      Stage[]
+  leads       Lead[]
+  activities  Activity[]
+
   createdAt DateTime @default(now())
 }
 
@@ -1052,6 +1062,10 @@ model Site {
   // linked to a site — so onDelete is SetNull there, not a cascade.
   claimedDomains Domain[]
 
+  // Enquiry forms bound to this site (S3-001). Nullable on the Form side, so
+  // deleting a Site does not destroy its enquiry history (SetNull there).
+  forms Form[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // Soft delete
@@ -1202,7 +1216,7 @@ model Domain {
 
   // Random token (node:crypto) the org must publish in a DNS TXT record.
   verificationToken  String
-  verificationMethod String @default("DNS_TXT")
+  verificationMethod String    @default("DNS_TXT")
   verifiedAt         DateTime?
 
   createdAt DateTime @default(now())
@@ -1210,4 +1224,221 @@ model Domain {
 
   @@index([organizationId])
   @@index([siteId])
+}
+
+// ============================================================================
+// ENQUIRY / CRM: FORMS → SUBMISSIONS → CONTACTS → LEADS → PIPELINES (Stage 3)
+// ============================================================================
+//
+// The public enquiry funnel and its CRM. Every entity is org-owned (ADR-001)
+// and carries `organizationId` for tenant scoping / RLS. A public visitor
+// submits a Form on a published Site (no auth); that atomically upserts a
+// Contact (a person, deliberately DISTINCT from the commerce `Customer`) and
+// creates one Lead placed at the first Stage of the org's default Pipeline. The
+// raw Submission is kept immutably. Owners then work Leads across Pipeline
+// Stages and log Activities on each Lead's timeline.
+
+// Contact — an org-scoped person in the CRM. DISTINCT from the commerce
+// `Customer` (store-scoped, tied to orders/carts): a Contact is a
+// marketing/sales person captured from enquiries, deduped per org by email.
+model Contact {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  email     String // deduped per org (see @@unique); the primary identity
+  firstName String?
+  lastName  String?
+  phone     String?
+  company   String?
+
+  // Free-form provenance, e.g. "enquiry:form:<id>" — where this contact first
+  // entered the CRM. Never a tenant boundary; informational only.
+  source String?
+
+  leads       Lead[]
+  submissions Submission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
+  // enquiry from the same address updates the existing Contact rather than
+  // forking a duplicate. NOT globally unique — two orgs may each hold the same
+  // person independently.
+  @@unique([organizationId, email])
+  @@index([organizationId])
+}
+
+// Form — an org-owned enquiry form definition. Optionally bound to a Site so a
+// rendered enquiry section (S3-004) can target it. `fields` is the ordered set
+// of field descriptors, validated at submit time (S3-002).
+model Form {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Optional owning Site. SetNull keeps the Form (and its submissions/leads) if
+  // the Site is deleted — enquiry history is valuable and outlives a site.
+  siteId String?
+  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  name   String
+  fields Json // ordered field descriptors: [{ name, label, type, required }]
+
+  // The Pipeline new leads from this form land in. Null → the org's default.
+  pipelineId String?
+  pipeline   Pipeline? @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+
+  status String @default("ACTIVE") // ACTIVE → ARCHIVED (stops accepting)
+
+  submissions Submission[]
+  leads       Lead[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([organizationId])
+  @@index([siteId])
+}
+
+// Submission — an IMMUTABLE record of one public form submission. Append-only
+// (no updatedAt): the raw `data` as the visitor sent it, captured before any
+// CRM derivation, so there is always an audit of exactly what was submitted
+// even if the derived Contact/Lead are later edited.
+model Submission {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  formId String
+  form   Form   @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  // The derived Contact + Lead (set in the same transaction as creation). Kept
+  // as SetNull so purging a Contact/Lead never destroys the raw submission.
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  data Json // the raw submitted values, keyed by form field name
+
+  // Anti-abuse / dedupe metadata (S3-002).
+  ipHash         String? // hashed source IP, never the raw IP
+  idempotencyKey String? // client-supplied key to dedupe double-submits
+
+  createdAt DateTime @default(now()) // immutable; no updatedAt
+
+  // A given idempotency key produces at most one submission per form.
+  @@unique([formId, idempotencyKey])
+  @@index([organizationId])
+  @@index([formId])
+}
+
+// Pipeline — an org-owned sales pipeline: an ordered set of Stages a Lead moves
+// through. Exactly one Pipeline per org is the default (isDefault) that new
+// enquiry leads land in when a Form doesn't name one.
+model Pipeline {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name      String
+  isDefault Boolean @default(false)
+
+  stages Stage[]
+  leads  Lead[]
+  forms  Form[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+// Stage — one column of a Pipeline. `order` sorts the board left → right.
+model Stage {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  name  String
+  order Int // ordering within the Pipeline
+
+  leads Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([pipelineId, order])
+}
+
+// Lead — a CRM opportunity for a Contact, positioned at one Stage of a
+// Pipeline. Created from an enquiry Submission (or by hand) and worked by
+// owners; its Stage changes as it progresses. Activities log its timeline.
+model Lead {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stageId    String
+  stage      Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  // Provenance: the Form that created this lead, when it came from an enquiry
+  // (null for hand-created leads). SetNull so history survives form cleanup.
+  formId String?
+  form   Form?   @relation(fields: [formId], references: [id], onDelete: SetNull)
+
+  title  String
+  status String @default("OPEN") // OPEN → WON / LOST
+  value  Int? // optional monetary value, in minor units
+
+  submissions Submission[]
+  activities  Activity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([pipelineId, stageId])
+  @@index([contactId])
+}
+
+// Activity — an entry on a Lead's timeline: a system event (created, stage
+// change) or a user-logged note / follow-up task (S3-007). Append-mostly; a
+// follow-up task carries an optional dueAt + completedAt.
+model Activity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  type String // "CREATED" | "STAGE_CHANGED" | "NOTE" | "TASK" | ...
+  body String? // note text / description
+
+  // Actor: the user who performed it, when done by a person (null for system
+  // events). Informational — no FK cascade concerns.
+  actorUserId String?
+
+  // Follow-up task fields (used when type == "TASK"), S3-007.
+  dueAt       DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([leadId, createdAt])
 }

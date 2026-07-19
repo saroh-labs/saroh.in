@@ -49,6 +49,17 @@ import type {
  *                  change to READ_ONLY_ACTIONS / CAPABILITIES if the product
  *                  wants it; the default here is the least-privilege choice.)
  *
+ *  - `form:*` / `contact:*` / `lead:*` / `pipeline:*` / `activity:*`
+ *                — the enquiry funnel + CRM (Stage 3 — S3-001). ALL are
+ *                OWNER/ADMIN-only: none are in READ_ONLY_ACTIONS, so a MEMBER
+ *                cannot read contacts, leads, or the pipeline. This is the
+ *                least-privilege default — CRM rows are customer PII and sales
+ *                data (the same reasoning as `audit:read`). Note: the PUBLIC
+ *                enquiry submission (S3-002) is UNAUTHENTICATED and org-agnostic
+ *                — it is NOT one of these actions and never passes through this
+ *                policy. Widening any CRM read to MEMBER later is a one-line
+ *                change to READ_ONLY_ACTIONS.
+ *
  * Add new actions here and to CAPABILITIES; TypeScript then forces every role
  * to make an explicit allow/deny decision (the map is keyed by the union).
  */
@@ -74,7 +85,17 @@ export type OrgAction =
     | "media:write"
     | "section:write"
     | "site:publish"
-    | "domain:manage";
+    | "domain:manage"
+    | "form:read"
+    | "form:write"
+    | "contact:read"
+    | "contact:write"
+    | "lead:read"
+    | "lead:write"
+    | "pipeline:read"
+    | "pipeline:manage"
+    | "activity:read"
+    | "activity:write";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -100,6 +121,16 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "section:write",
     "site:publish",
     "domain:manage",
+    "form:read",
+    "form:write",
+    "contact:read",
+    "contact:write",
+    "lead:read",
+    "lead:write",
+    "pipeline:read",
+    "pipeline:manage",
+    "activity:read",
+    "activity:write",
 ];
 
 /** Read-only actions — the floor every role (including MEMBER) may perform. */
