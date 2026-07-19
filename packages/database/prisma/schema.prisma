@@ -135,6 +135,7 @@ model Organization {
   deliveries             Delivery[]
   consents               Consent[]
   automationRules        AutomationRule[]
+  automationRuns         AutomationRun[]
 
   createdAt DateTime @default(now())
 }
@@ -1978,8 +1979,31 @@ model AutomationRule {
 
   createdByUserId String?
 
+  runs AutomationRun[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([organizationId, trigger, enabled])
+}
+
+// AutomationRun — the ledger that makes a rule fire AT MOST ONCE per lead
+// (@@unique([ruleId, leadId])) and provides the audit trail (S6-003).
+model AutomationRun {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  ruleId String
+  rule   AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  leadId String
+  status String  @default("DONE") // DONE | FAILED | SKIPPED
+  error  String?
+
+  createdAt DateTime @default(now())
+
+  // Idempotency: one run per (rule, lead) — a rule fires once per matching lead.
+  @@unique([ruleId, leadId])
+  @@index([organizationId])
 }
