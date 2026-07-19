@@ -14,7 +14,13 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { CreateLeadDto, MoveLeadDto, UpdateLeadDto } from "./dto";
+import {
+    CreateActivityDto,
+    CreateLeadDto,
+    CreateTaskDto,
+    MoveLeadDto,
+    UpdateLeadDto,
+} from "./dto";
 import { LeadsService } from "./leads.service";
 
 /**
@@ -69,5 +75,60 @@ export class LeadsController {
         @Body() dto: MoveLeadDto,
     ) {
         return this.leads.move(ctx, leadId, dto);
+    }
+
+    @Get(":leadId/activities")
+    listActivities(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("leadId") leadId: string,
+    ) {
+        return this.leads.listActivities(ctx, leadId);
+    }
+
+    @Post(":leadId/activities")
+    @HttpCode(201)
+    logActivity(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("leadId") leadId: string,
+        @Body() dto: CreateActivityDto,
+    ) {
+        return this.leads.logActivity(ctx, leadId, dto);
+    }
+
+    @Post(":leadId/tasks")
+    @HttpCode(201)
+    createTask(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("leadId") leadId: string,
+        @Body() dto: CreateTaskDto,
+    ) {
+        return this.leads.createTask(ctx, leadId, dto);
+    }
+
+    @Post(":leadId/tasks/:activityId/complete")
+    completeTask(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("leadId") leadId: string,
+        @Param("activityId") activityId: string,
+    ) {
+        return this.leads.completeTask(ctx, leadId, activityId);
+    }
+}
+
+/**
+ * Org-wide follow-up worklist (S3-007), scoped to
+ * `/organizations/:organizationId/tasks`. A convenience read across leads:
+ * `GET ?open=true` lists incomplete TASKs soonest-due first. Same double-guard
+ * as {@link LeadsController}; reads require `activity:read`.
+ */
+@Controller("organizations/:organizationId/tasks")
+@UseGuards(BetterAuthGuard, OrganizationGuard)
+export class TasksController {
+    constructor(private readonly leads: LeadsService) {}
+
+    @Get()
+    list(@OrgContext() ctx: OrganizationContext, @Query("open") open?: string) {
+        // Only the open worklist is supported today; `open=true` is required.
+        return open === "true" ? this.leads.listOpenTasks(ctx) : [];
     }
 }

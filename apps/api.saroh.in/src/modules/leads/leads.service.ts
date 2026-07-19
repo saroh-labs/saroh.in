@@ -3,13 +3,19 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
-import type { Lead, Stage } from "@saroh/database";
+import type { Activity, Lead, Stage } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
 import { PipelinesService } from "../pipelines/pipelines.service";
-import type { CreateLeadDto, MoveLeadDto, UpdateLeadDto } from "./dto";
+import type {
+    CreateActivityDto,
+    CreateLeadDto,
+    CreateTaskDto,
+    MoveLeadDto,
+    UpdateLeadDto,
+} from "./dto";
 
 /** Optional filters for the lead list. */
 export interface LeadListFilter {
@@ -225,6 +231,130 @@ export class LeadsService {
             });
 
             return moved;
+        });
+    }
+
+    /**
+     * The lead's activity timeline, newest first — a dedicated fetch for the
+     * timeline component (the lead detail already embeds activities oldest
+     * first). Authorizes `activity:read`; a missing / cross-tenant lead 404s.
+     */
+    async listActivities(
+        ctx: OrganizationContext,
+        leadId: string,
+    ): Promise<Activity[]> {
+        authorize(ctx, "activity:read");
+
+        await this.requireOwned(ctx, leadId);
+
+        return prisma.activity.findMany({
+            where: { leadId, organizationId: ctx.organizationId },
+            orderBy: { createdAt: "desc" },
+        });
+    }
+
+    /**
+     * Log an activity (a NOTE by default) on a lead's timeline. Authorizes
+     * `activity:write`; a missing / cross-tenant lead 404s. The Activity records
+     * `actorUserId` so the timeline names who wrote it — matching `move`.
+     */
+    async logActivity(
+        ctx: OrganizationContext,
+        leadId: string,
+        dto: CreateActivityDto,
+    ): Promise<Activity> {
+        authorize(ctx, "activity:write");
+
+        await this.requireOwned(ctx, leadId);
+
+        return prisma.activity.create({
+            data: {
+                organizationId: ctx.organizationId,
+                leadId,
+                type: dto.type ?? "NOTE",
+                body: dto.body,
+                actorUserId: ctx.userId,
+            },
+        });
+    }
+
+    /**
+     * Create a follow-up TASK on a lead: `type:"TASK"` with `body` + `dueAt`,
+     * `actorUserId` set to the creator, `completedAt` null until done.
+     * Authorizes `activity:write`; a missing / cross-tenant lead 404s.
+     */
+    async createTask(
+        ctx: OrganizationContext,
+        leadId: string,
+        dto: CreateTaskDto,
+    ): Promise<Activity> {
+        authorize(ctx, "activity:write");
+
+        await this.requireOwned(ctx, leadId);
+
+        return prisma.activity.create({
+            data: {
+                organizationId: ctx.organizationId,
+                leadId,
+                type: "TASK",
+                body: dto.body,
+                dueAt: new Date(dto.dueAt),
+                actorUserId: ctx.userId,
+            },
+        });
+    }
+
+    /**
+     * Mark a follow-up TASK done by stamping `completedAt = now`. Authorizes
+     * `activity:write`. Idempotent — re-completing keeps the original
+     * `completedAt`. The activity must be a `TASK` of THIS lead in THIS org,
+     * else 404 (a note, a foreign task, or a cross-tenant lead never completes).
+     */
+    async completeTask(
+        ctx: OrganizationContext,
+        leadId: string,
+        activityId: string,
+    ): Promise<Activity> {
+        authorize(ctx, "activity:write");
+
+        await this.requireOwned(ctx, leadId);
+
+        const activity = await prisma.activity.findUnique({
+            where: { id: activityId },
+        });
+        if (
+            activity?.organizationId !== ctx.organizationId ||
+            activity.leadId !== leadId ||
+            activity.type !== "TASK"
+        ) {
+            throw new NotFoundException("Task not found");
+        }
+
+        // Idempotent: once completed, keep the original completion time.
+        if (activity.completedAt) {
+            return activity;
+        }
+
+        return prisma.activity.update({
+            where: { id: activity.id },
+            data: { completedAt: new Date() },
+        });
+    }
+
+    /**
+     * Open (incomplete) follow-up TASKs across the org — a follow-up worklist,
+     * soonest due first (nulls last), then newest. Authorizes `activity:read`.
+     */
+    async listOpenTasks(ctx: OrganizationContext): Promise<Activity[]> {
+        authorize(ctx, "activity:read");
+
+        return prisma.activity.findMany({
+            where: {
+                organizationId: ctx.organizationId,
+                type: "TASK",
+                completedAt: null,
+            },
+            orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
         });
     }
 

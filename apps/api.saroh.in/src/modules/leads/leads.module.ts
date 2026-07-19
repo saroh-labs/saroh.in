@@ -3,7 +3,7 @@ import { forwardRef, Module } from "@nestjs/common";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PipelinesModule } from "../pipelines/pipelines.module";
-import { LeadsController } from "./leads.controller";
+import { LeadsController, TasksController } from "./leads.controller";
 import { LeadsService } from "./leads.service";
 
 /**
@@ -14,7 +14,7 @@ import { LeadsService } from "./leads.service";
  */
 @Module({
     imports: [forwardRef(() => OrganizationsModule), PipelinesModule],
-    controllers: [LeadsController],
+    controllers: [LeadsController, TasksController],
     providers: [LeadsService, OrganizationGuard],
     exports: [LeadsService],
 })
