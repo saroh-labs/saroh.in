@@ -38,6 +38,13 @@ module.exports = {
         // the real starter template — never touch a DB.
         "<rootDir>/src/modules/sites/**/*.spec.ts",
         "<rootDir>/src/modules/domains/**/*.spec.ts",
+        // S3-002 forms: FormsService specs with a jest-mocked Prisma — org-scoped
+        // form CRUD + field validation authz (never touch a DB).
+        "<rootDir>/src/modules/forms/**/*.spec.ts",
+        // S3-002 enquiry: EnquiryService specs with a jest-mocked Prisma (incl.
+        // $transaction) — the public submit command's acceptance + security
+        // cases (isolation, idempotency, validation, rate-limit); no DB, no net.
+        "<rootDir>/src/modules/enquiry/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],

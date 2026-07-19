@@ -8,7 +8,9 @@ import { CategoriesModule } from "./modules/categories/categories.module";
 import { ContentModule } from "./modules/content/content.module";
 import { CustomersModule } from "./modules/customers/customers.module";
 import { DomainsModule } from "./modules/domains/domains.module";
+import { EnquiryModule } from "./modules/enquiry/enquiry.module";
 import { FeatureFlagModule } from "./modules/feature-flags/feature-flags.module";
+import { FormsModule } from "./modules/forms/forms.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MediaModule } from "./modules/media/media.module";
 import { MembersModule } from "./modules/members/members.module";
@@ -49,6 +51,8 @@ import { StoresModule } from "./modules/stores/stores.module";
         MediaModule,
         SitesModule,
         DomainsModule,
+        FormsModule,
+        EnquiryModule,
     ],
 })
 export class AppModule {}
