@@ -81,6 +81,27 @@ enforced end-to-end.
 3. Smoke-test the app, then roll the same pair to production. To roll back
    instantly, unset `RLS_ENFORCEMENT` (no redeploy of code needed).
 
+### ⚠️ Final validation gate — operator sign-off (NOT yet done)
+
+The enforcement layer was proven in development against a **throwaway**
+`NOBYPASSRLS` login role that was created and dropped in place (real org → own
+rows, bogus org → 0, no-context → all). That confirms the code path; it is **not**
+a production sign-off. Before enabling in production, the operator must:
+
+- [ ] Create the persistent `saroh_app` role (§1) in dev → staging → prod.
+- [ ] Point the **runtime** `DATABASE_URL` at `saroh_app` (keep migrations on the
+      owner role) and set `RLS_ENFORCEMENT=on`, per environment.
+- [ ] Run the §1 verify probe against each environment's real data.
+- [ ] Smoke-test the app end-to-end under the flag+role in **staging** — exercise
+      the cross-org, job-worker (context-free), and public/webhook paths — and
+      confirm no handler regressed (watch for tx-timeout / pool errors).
+- [ ] Only then roll the same flag+role pair to production; keep the flag as the
+      instant rollback.
+
+Until this gate is signed off, treat RLS as installed-but-inert defense-in-depth
+and keep relying on the app-layer `where organizationId` filters (verified sound
+in §0).
+
 ---
 
 ## 1. Deploy a non-`BYPASSRLS` application role (one of two prerequisites)
