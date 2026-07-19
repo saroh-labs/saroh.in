@@ -99,6 +99,13 @@ module.exports = {
         // unverified refused, per-user rate limit -> 429, and the `[Saroh test]`
         // label. Jest-mocked email helper; never touch SMTP or the network.
         "<rootDir>/src/modules/self-test/**/*.spec.ts",
+        // S6-003 automations: the AutomationsService CRUD + config-validation
+        // authz specs (MEMBER denied, cross-tenant 404, action/config pairing)
+        // and the automation.run handler (the AutomationRun once-per-(rule,lead)
+        // ledger, disabled rules skipped, send.message via the system send,
+        // create.task activity, and FAILED-run capture). Jest-mocked Prisma
+        // (incl. $transaction) + a mocked CommunicationsService; never touch a DB.
+        "<rootDir>/src/modules/automations/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],

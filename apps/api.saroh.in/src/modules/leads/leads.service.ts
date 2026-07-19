@@ -146,6 +146,18 @@ export class LeadsService {
                 },
             });
 
+            // Transactional outbox: a hand-created lead is a `lead.created`
+            // trigger too, so it gets one automation-run job in the same tx (the
+            // handler no-ops when the org has no enabled rules). Firing is
+            // idempotent per (rule, lead) via the AutomationRun ledger (S6-003).
+            await tx.job.create({
+                data: {
+                    organizationId: ctx.organizationId,
+                    type: "automation.run",
+                    payload: { leadId: lead.id },
+                },
+            });
+
             return lead;
         });
     }

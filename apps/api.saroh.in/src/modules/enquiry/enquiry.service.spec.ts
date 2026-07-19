@@ -107,7 +107,8 @@ describe("EnquiryService.submit — one submission produces one correct lead", (
         expect(contactUpsert).toHaveBeenCalledTimes(1);
         expect(leadCreate).toHaveBeenCalledTimes(1);
         expect(submissionCreate).toHaveBeenCalledTimes(1);
-        expect(jobCreate).toHaveBeenCalledTimes(1);
+        // Two outbox jobs: enquiry.notify + automation.run.
+        expect(jobCreate).toHaveBeenCalledTimes(2);
         expect(activityCreate).toHaveBeenCalledTimes(1);
 
         expect(res).toEqual({
@@ -125,7 +126,7 @@ describe("EnquiryService.submit — one submission produces one correct lead", (
             contactId: "contact_1",
         });
 
-        // The outbox Job is the enquiry.notify type with the derived ids.
+        // The first outbox Job is the enquiry.notify type with the derived ids.
         expect(jobCreate.mock.calls[0][0].data).toMatchObject({
             type: "enquiry.notify",
             payload: {
@@ -134,6 +135,11 @@ describe("EnquiryService.submit — one submission produces one correct lead", (
                 formId: "form_1",
                 submissionId: "sub_1",
             },
+        });
+        // The second is the automation.run trigger carrying the new lead id.
+        expect(jobCreate.mock.calls[1][0].data).toMatchObject({
+            type: "automation.run",
+            payload: { leadId: "lead_1" },
         });
     });
 

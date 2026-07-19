@@ -22,6 +22,7 @@ jest.mock("@saroh/database", () => {
         findFirst: jest.fn(),
         create: jest.fn(),
     };
+    const job = { create: jest.fn() };
     return {
         prisma: {
             lead,
@@ -29,9 +30,10 @@ jest.mock("@saroh/database", () => {
             stage,
             activity,
             pipeline,
+            job,
             // Run the callback synchronously with a tx that reuses the mocks.
             $transaction: jest.fn((cb) =>
-                cb({ lead, activity, contact, stage, pipeline }),
+                cb({ lead, activity, contact, stage, pipeline, job }),
             ),
         },
     };
@@ -60,6 +62,7 @@ const activityFindMany = prisma.activity.findMany as jest.Mock;
 const activityFindUnique = prisma.activity.findUnique as jest.Mock;
 const activityUpdate = prisma.activity.update as jest.Mock;
 const pipelineFindUnique = prisma.pipeline.findUnique as jest.Mock;
+const jobCreate = prisma.job.create as jest.Mock;
 const txMock = prisma.$transaction as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
@@ -289,6 +292,14 @@ describe("LeadsService.create", () => {
         });
         expect(activityCreate).toHaveBeenCalledWith({
             data: expect.objectContaining({ type: "CREATED" }),
+        });
+        // A hand-created lead enqueues one automation.run job (lead.created
+        // trigger) in the same transaction.
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "automation.run",
+                payload: { leadId: "l_new" },
+            }),
         });
         expect(res.id).toBe("l_new");
     });

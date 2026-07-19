@@ -171,6 +171,19 @@ export class EnquiryService {
                     },
                 });
 
+                // Transactional outbox: a committed NEW lead ALWAYS gets one
+                // automation-run job, so the org's enabled `lead.created` rules
+                // fire (the handler no-ops when there are none). Firing is
+                // idempotent per (rule, lead) via the AutomationRun ledger
+                // (S6-003).
+                await tx.job.create({
+                    data: {
+                        organizationId,
+                        type: "automation.run",
+                        payload: { leadId: lead.id },
+                    },
+                });
+
                 await tx.activity.create({
                     data: {
                         organizationId,

@@ -4,6 +4,7 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { auth } from "./common/auth/auth";
 import { AuditModule } from "./modules/audit/audit.module";
+import { AutomationsModule } from "./modules/automations/automations.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { CommunicationsModule } from "./modules/communications/communications.module";
@@ -81,6 +82,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         PaymentsModule,
         WebhooksModule,
         CommunicationsModule,
+        AutomationsModule,
         SelfTestModule,
     ],
 })

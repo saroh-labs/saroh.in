@@ -228,7 +228,7 @@ export class CommunicationsService {
             );
         }
 
-        await this.requireOwnedContact(ctx, input.contactId);
+        await this.requireOwnedContact(ctx.organizationId, input.contactId);
 
         return prisma.consent.upsert({
             where: {
@@ -261,7 +261,7 @@ export class CommunicationsService {
     ): Promise<Consent[]> {
         authorize(ctx, "consent:read");
         if (contactId) {
-            await this.requireOwnedContact(ctx, contactId);
+            await this.requireOwnedContact(ctx.organizationId, contactId);
         }
         return prisma.consent.findMany({
             where: {
@@ -288,7 +288,7 @@ export class CommunicationsService {
         if (!isCommsChannel(name)) {
             throw new BadRequestException(`Unsupported channel "${channel}"`);
         }
-        await this.requireOwnedContact(ctx, contactId);
+        await this.requireOwnedContact(ctx.organizationId, contactId);
 
         return prisma.consent.findUnique({
             where: { contactId_channel: { contactId, channel: name } },
@@ -317,7 +317,37 @@ export class CommunicationsService {
         input: SendMessageInput,
     ): Promise<QueueMessageResult> {
         authorize(ctx, "message:write");
+        return this.queueMessage(ctx.organizationId, ctx.userId, input);
+    }
 
+    /**
+     * SYSTEM send — queue a message on behalf of the platform (automations,
+     * S6-003), NOT a request actor. There is no `authorize` here on purpose: the
+     * caller is a background job whose `organizationId` was already resolved from
+     * the triggering domain row (e.g. the new Lead), never from client input. The
+     * `createdByUserId` is null (a system-authored message). Everything else —
+     * recipient resolution, the consent gate, the CONNECTED-provider requirement,
+     * and the atomic Message+Delivery+Job outbox — is IDENTICAL to a user send,
+     * because it runs through the same {@link queueMessage} core.
+     */
+    async sendMessageAsSystem(
+        organizationId: string,
+        input: SendMessageInput,
+    ): Promise<QueueMessageResult> {
+        return this.queueMessage(organizationId, null, input);
+    }
+
+    /**
+     * The shared send core behind {@link sendMessage} (user) and
+     * {@link sendMessageAsSystem} (automation). Assumes the caller has already
+     * authorized: it resolves the recipient, enforces the consent gate, requires
+     * a CONNECTED provider, and atomically creates Message + Delivery + Job.
+     */
+    private async queueMessage(
+        organizationId: string,
+        createdByUserId: string | null,
+        input: SendMessageInput,
+    ): Promise<QueueMessageResult> {
         const channel = input.channel.toUpperCase();
         if (!isCommsChannel(channel)) {
             throw new BadRequestException(
@@ -331,7 +361,7 @@ export class CommunicationsService {
         let toAddress: string;
         if (input.contactId) {
             const contact = await this.requireOwnedContact(
-                ctx,
+                organizationId,
                 input.contactId,
             );
             contactId = contact.id;
@@ -353,7 +383,7 @@ export class CommunicationsService {
 
         // Validate an optional Lead link belongs to the org.
         if (input.leadId) {
-            await this.requireOwnedLead(ctx, input.leadId);
+            await this.requireOwnedLead(organizationId, input.leadId);
         }
 
         // CONSENT GATE: a REVOKED consent for this contact+channel suppresses
@@ -368,7 +398,7 @@ export class CommunicationsService {
             if (consent?.status === "REVOKED") {
                 const suppressed = await prisma.message.create({
                     data: {
-                        organizationId: ctx.organizationId,
+                        organizationId,
                         channel,
                         contactId,
                         leadId: input.leadId ?? null,
@@ -376,7 +406,7 @@ export class CommunicationsService {
                         subject: input.subject ?? null,
                         body: input.body,
                         status: "SUPPRESSED",
-                        createdByUserId: ctx.userId,
+                        createdByUserId,
                     },
                 });
                 return {
@@ -391,7 +421,7 @@ export class CommunicationsService {
         const providerRow = await prisma.communicationProvider.findUnique({
             where: {
                 organizationId_channel: {
-                    organizationId: ctx.organizationId,
+                    organizationId,
                     channel,
                 },
             },
@@ -413,7 +443,7 @@ export class CommunicationsService {
         const message = await prisma.$transaction(async (tx) => {
             const created = await tx.message.create({
                 data: {
-                    organizationId: ctx.organizationId,
+                    organizationId,
                     channel,
                     contactId,
                     leadId: input.leadId ?? null,
@@ -421,13 +451,13 @@ export class CommunicationsService {
                     subject: input.subject ?? null,
                     body: input.body,
                     status: "QUEUED",
-                    createdByUserId: ctx.userId,
+                    createdByUserId,
                 },
             });
 
             const delivery = await tx.delivery.create({
                 data: {
-                    organizationId: ctx.organizationId,
+                    organizationId,
                     messageId: created.id,
                     provider: providerRow.provider,
                     status: "QUEUED",
@@ -436,7 +466,7 @@ export class CommunicationsService {
 
             await tx.job.create({
                 data: {
-                    organizationId: ctx.organizationId,
+                    organizationId,
                     type: MESSAGE_SEND_TYPE,
                     payload: {
                         messageId: created.id,
@@ -529,22 +559,22 @@ export class CommunicationsService {
      * contacts exist in another org.
      */
     private async requireOwnedContact(
-        ctx: OrganizationContext,
+        organizationId: string,
         contactId: string,
     ) {
         const contact = await prisma.contact.findUnique({
             where: { id: contactId },
         });
-        if (contact?.organizationId !== ctx.organizationId) {
+        if (contact?.organizationId !== organizationId) {
             throw new NotFoundException("Contact not found");
         }
         return contact;
     }
 
     /** Load a Lead and assert it belongs to the org. 404 otherwise. */
-    private async requireOwnedLead(ctx: OrganizationContext, leadId: string) {
+    private async requireOwnedLead(organizationId: string, leadId: string) {
         const lead = await prisma.lead.findUnique({ where: { id: leadId } });
-        if (lead?.organizationId !== ctx.organizationId) {
+        if (lead?.organizationId !== organizationId) {
             throw new NotFoundException("Lead not found");
         }
         return lead;
