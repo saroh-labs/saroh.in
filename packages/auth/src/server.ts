@@ -9,6 +9,45 @@ export { getTrustedOrigins, isTrustedOrigin } from "./origins";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
+/**
+ * A FIXED, well-known development-only Better Auth secret. Used ONLY when
+ * `BETTER_AUTH_SECRET` is unset AND we are not in production, so a fresh clone
+ * boots with just `DATABASE_URL`. It is deliberately constant (not random) so
+ * the api and every session-validating app derive the SAME key and
+ * cross-subdomain session validation still works locally. NEVER used in
+ * production — `resolveAuthSecret` throws there instead.
+ */
+const DEV_FALLBACK_AUTH_SECRET =
+    "saroh-dev-insecure-better-auth-secret-do-not-use-in-production";
+
+let warnedAuthSecretFallback = false;
+
+/**
+ * Resolve the Better Auth secret. Returns `BETTER_AUTH_SECRET` when set. When it
+ * is absent: in production this THROWS (a real secret is mandatory); outside
+ * production it falls back to {@link DEV_FALLBACK_AUTH_SECRET} with a one-time
+ * warning, so local dev needs no secret configured.
+ */
+export function resolveAuthSecret(): string {
+    const secret = process.env.BETTER_AUTH_SECRET;
+    if (secret) return secret;
+
+    if (IS_PRODUCTION) {
+        throw new Error(
+            "BETTER_AUTH_SECRET is not set — api hosts Better Auth and every app that validates sessions must load the same secret or session validation fails.",
+        );
+    }
+
+    if (!warnedAuthSecretFallback) {
+        warnedAuthSecretFallback = true;
+        console.warn(
+            "⚠️  BETTER_AUTH_SECRET is not set — using a fixed, INSECURE dev fallback. " +
+                "Set BETTER_AUTH_SECRET for any shared/staging/prod environment.",
+        );
+    }
+    return DEV_FALLBACK_AUTH_SECRET;
+}
+
 /** Email delivery is injected by the consuming app (accounts sends real
  *  mail; api never triggers sends). Keeping the signature here means the
  *  session-relevant config below stays identical across both apps. */
@@ -36,12 +75,7 @@ export interface CreateAuthOptions {
  * Google OAuth). Advanced plugins are layered on per M2 slice.
  */
 export function createAuth(opts: CreateAuthOptions = {}) {
-    const secret = process.env.BETTER_AUTH_SECRET;
-    if (!secret) {
-        throw new Error(
-            "BETTER_AUTH_SECRET is not set — api hosts Better Auth and every app that validates sessions must load the same secret or session validation fails.",
-        );
-    }
+    const secret = resolveAuthSecret();
 
     return betterAuth({
         secret,

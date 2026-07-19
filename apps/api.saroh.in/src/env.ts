@@ -27,9 +27,15 @@ const envSchema = z.object({
         .default("development"),
     PORT: z.coerce.number().default(3333),
 
-    // Data + auth (required — the api cannot serve requests without them).
+    // Data (REQUIRED — the one true prerequisite; the api cannot serve any
+    // request without a database).
     DATABASE_URL: z.string().url(),
-    BETTER_AUTH_SECRET: z.string().min(1),
+    // Auth secret: REQUIRED in production, OPTIONAL elsewhere. When unset in
+    // dev/test the @saroh/auth layer (resolveAuthSecret) supplies a fixed,
+    // insecure dev fallback with a warning, so a fresh clone boots with just
+    // DATABASE_URL. Must be byte-identical across the api + session-validating
+    // apps in any shared environment.
+    BETTER_AUTH_SECRET: z.string().min(1).optional(),
     BETTER_AUTH_URL: z.string().url().optional(),
     BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
 
