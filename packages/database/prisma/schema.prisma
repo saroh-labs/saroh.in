@@ -127,6 +127,15 @@ model Organization {
   paymentRefunds           PaymentRefund[]
   webhookEvents            WebhookEvent[]
 
+  // Communications (Stage 6 — S6-001). Org-connected email/WhatsApp providers,
+  // outbound messages, delivery records, per-contact channel consent, and the
+  // new-lead automation rules (S6-003).
+  communicationProviders CommunicationProvider[]
+  messages               Message[]
+  deliveries             Delivery[]
+  consents               Consent[]
+  automationRules        AutomationRule[]
+
   createdAt DateTime @default(now())
 }
 
@@ -1319,6 +1328,8 @@ model Contact {
   leads       Lead[]
   submissions Submission[]
   bookings    Booking[]
+  messages    Message[]
+  consents    Consent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1466,6 +1477,7 @@ model Lead {
 
   submissions Submission[]
   activities  Activity[]
+  messages    Message[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1838,4 +1850,136 @@ model WebhookEvent {
   @@unique([provider, providerEventId])
   @@index([organizationId])
   @@index([status])
+}
+
+// ============================================================================
+// COMMUNICATIONS (Stage 6 — S6-001/002/003)
+// ============================================================================
+//
+// Durable business messaging over the Organization's OWN connected provider
+// (email or WhatsApp), kept separate from Saroh's transactional email. A
+// Message is the intent to communicate; each provider send is a Delivery with
+// an auditable lifecycle; Consent gates who may be messaged on a channel
+// (unsubscribe/opt-out enforced before send). Provider API credentials are
+// AES-256-GCM sealed, exactly like MerchantPaymentProvider.
+
+// CommunicationProvider — an org's connection for one channel.
+model CommunicationProvider {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  channel  String // "EMAIL" | "WHATSAPP"
+  provider String // e.g. "RESEND" | "SENDGRID" | "SMTP" | "TWILIO" | "META"
+  status   String @default("CONNECTED") // CONNECTED | DISABLED
+
+  fromAddress String? // verified sender (email address / WhatsApp number)
+
+  // Sealed credentials (see crypto.ts). Plaintext never stored.
+  encryptedCredentials String
+  credentialsIv        String
+  credentialsAuthTag   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, channel])
+  @@index([organizationId])
+}
+
+// Message — an outbound business message (its intended content + context).
+model Message {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  channel String // "EMAIL" | "WHATSAPP"
+
+  // Optional CRM context.
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  toAddress String // resolved recipient (email / number)
+  subject   String?
+  body      String
+
+  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED
+
+  createdByUserId String?
+
+  deliveries Delivery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([leadId])
+  @@index([contactId])
+}
+
+// Delivery — one provider send attempt for a Message, with its final state.
+model Delivery {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  provider          String
+  providerMessageId String?
+  status            String  @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED
+  error             String?
+  attempts          Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([messageId])
+}
+
+// Consent — a contact's opt-in/out for a channel. Enforced before any send.
+model Consent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  channel String // "EMAIL" | "WHATSAPP"
+  status  String  @default("GRANTED") // GRANTED | REVOKED
+  source  String? // where consent was captured/changed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contactId, channel])
+  @@index([organizationId])
+}
+
+// AutomationRule — a constrained trigger→action rule for new leads (S6-003).
+// Enabled rules fire ONCE per matching lead (idempotency enforced by the
+// worker/outbox), and can be disabled + audited.
+model AutomationRule {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name    String
+  trigger String // e.g. "lead.created"
+  action  String // e.g. "send.message" | "create.task"
+  config  Json // action parameters (template id, channel, ...)
+
+  enabled Boolean @default(true)
+
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, trigger, enabled])
 }

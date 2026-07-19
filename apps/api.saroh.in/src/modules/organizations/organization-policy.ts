@@ -105,7 +105,13 @@ export type OrgAction =
     | "order:read"
     | "order:write"
     | "payment:read"
-    | "payment:manage";
+    | "payment:manage"
+    | "message:read"
+    | "message:write"
+    | "comms:manage"
+    | "consent:read"
+    | "consent:write"
+    | "automation:manage";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -151,6 +157,12 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "order:write",
     "payment:read",
     "payment:manage",
+    "message:read",
+    "message:write",
+    "comms:manage",
+    "consent:read",
+    "consent:write",
+    "automation:manage",
 ];
 
 /** Read-only actions — the floor every role (including MEMBER) may perform. */
