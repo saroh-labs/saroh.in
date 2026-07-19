@@ -3,8 +3,10 @@ import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { auth } from "./common/auth/auth";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { AuditModule } from "./modules/audit/audit.module";
 import { AutomationsModule } from "./modules/automations/automations.module";
+import { BillingModule } from "./modules/billing/billing.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { CommunicationsModule } from "./modules/communications/communications.module";
@@ -83,6 +85,8 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         WebhooksModule,
         CommunicationsModule,
         AutomationsModule,
+        AnalyticsModule,
+        BillingModule,
         SelfTestModule,
     ],
 })
