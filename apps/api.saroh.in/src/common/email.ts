@@ -90,6 +90,38 @@ export function sendVerificationEmail(
     return Promise.resolve();
 }
 
+/**
+ * Notify an org OWNER/ADMIN that a new enquiry (Lead) landed. Fired by the
+ * `enquiry.notify` job handler (S3-006), once per recipient. Mirrors the other
+ * `send*` helpers: console-fallback when no SMTP is configured, and never
+ * throws on the console path so the durable in-app Notification is the source
+ * of truth even without mail.
+ */
+export function sendEnquiryNotificationEmail(
+    to: string,
+    details: { contactName: string; formName: string; leadUrl: string },
+): Promise<void> {
+    const { contactName, formName, leadUrl } = details;
+    if (!transporter) {
+        console.info(
+            `[New enquiry] (no SMTP) ${to}: ${contactName} via ${formName} -> ${leadUrl}`,
+        );
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: `New enquiry from ${contactName}`,
+        html: actionEmail(
+            `New enquiry from ${contactName}`,
+            `${contactName} submitted the "${formName}" form. Open the lead to follow up.`,
+            leadUrl,
+            "View lead",
+        ),
+    });
+    return Promise.resolve();
+}
+
 export function sendStoreInvitationEmail(
     to: string,
     acceptUrl: string,

@@ -15,6 +15,7 @@ import { HealthModule } from "./modules/health/health.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { MediaModule } from "./modules/media/media.module";
 import { MembersModule } from "./modules/members/members.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import { ProductsModule } from "./modules/products/products.module";
@@ -55,6 +56,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         JobsModule,
         FormsModule,
         EnquiryModule,
+        NotificationsModule,
     ],
 })
 export class AppModule {}

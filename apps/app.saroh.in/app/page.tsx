@@ -6,6 +6,7 @@ import { OrganizationSwitcher } from "@/components/organizations/organization-sw
 import { SignOutButton } from "@/components/sign-out-button";
 import { StoreCard } from "@/components/stores/store-card";
 import { StoresEmptyState } from "@/components/stores/stores-empty-state";
+import { unreadNotificationCount } from "@/lib/notifications/service";
 import {
     listOrganizations,
     resolveActiveOrganization,
@@ -22,6 +23,7 @@ export default async function Home() {
     const activeOrg = await resolveActiveOrganization();
 
     const stores = await listStores();
+    const unreadNotifications = await unreadNotificationCount();
 
     return (
         <main className="mx-auto max-w-4xl p-8">
@@ -37,7 +39,20 @@ export default async function Home() {
                         {session.user.email}
                     </span>
                 </div>
-                <SignOutButton />
+                <div className="flex items-center gap-3">
+                    <Link
+                        href="/notifications"
+                        className="relative text-sm text-muted-foreground hover:text-foreground"
+                    >
+                        Notifications
+                        {unreadNotifications > 0 && (
+                            <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
+                                {unreadNotifications}
+                            </span>
+                        )}
+                    </Link>
+                    <SignOutButton />
+                </div>
             </div>
 
             <div className="mb-6 flex items-center justify-between">
