@@ -72,6 +72,12 @@ export default async function Home() {
                             Bookings
                         </Link>
                         <Link
+                            href="/analytics"
+                            className="text-muted-foreground hover:text-foreground hover:underline"
+                        >
+                            Analytics
+                        </Link>
+                        <Link
                             href="/notifications"
                             className="relative text-muted-foreground hover:text-foreground hover:underline"
                         >
