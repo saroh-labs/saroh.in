@@ -101,7 +101,11 @@ export type OrgAction =
     | "service:read"
     | "service:write"
     | "booking:read"
-    | "booking:write";
+    | "booking:write"
+    | "order:read"
+    | "order:write"
+    | "payment:read"
+    | "payment:manage";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -143,6 +147,10 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "service:write",
     "booking:read",
     "booking:write",
+    "order:read",
+    "order:write",
+    "payment:read",
+    "payment:manage",
 ];
 
 /** Read-only actions — the floor every role (including MEMBER) may perform. */

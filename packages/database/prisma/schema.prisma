@@ -108,6 +108,17 @@ model Organization {
   availabilityRules AvailabilityRule[]
   bookings          Booking[]
 
+  // Commerce attached to the Organization (Stage 5 — S5-001). Store becomes an
+  // optional channel; catalog/orders/inventory/customers are org-owned via a
+  // denormalized organizationId (backfilled from Store), nullable during the
+  // transition.
+  products   Product[]
+  categories Category[]
+  inventory  Inventory[]
+  customers  Customer[]
+  carts      Cart[]
+  orders     Order[]
+
   createdAt DateTime @default(now())
 }
 
@@ -303,9 +314,11 @@ model StoreInvitation {
 // ============================================================================
 
 model Product {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   name        String
   slug        String
@@ -331,6 +344,7 @@ model Product {
   @@unique([storeId, slug])
   @@index([storeId])
   @@index([categoryId])
+  @@index([organizationId])
 }
 
 model ProductVariant {
@@ -350,9 +364,11 @@ model ProductVariant {
 }
 
 model Category {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   name     String
   slug     String
@@ -366,14 +382,17 @@ model Category {
 
   @@unique([storeId, slug])
   @@index([storeId])
+  @@index([organizationId])
 }
 
 // Inventory tracking
 
 model Inventory {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   productId String  @unique
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -385,6 +404,7 @@ model Inventory {
   updatedAt DateTime @updatedAt
 
   @@index([storeId])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -395,9 +415,11 @@ model Inventory {
 // Email is unique PER STORE, not globally
 
 model Customer {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   email     String // NOT globally unique, unique per store
   firstName String?
@@ -418,12 +440,15 @@ model Customer {
 
   @@unique([storeId, email])
   @@index([storeId])
+  @@index([organizationId])
 }
 
 model Cart {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -438,6 +463,7 @@ model Cart {
 
   @@unique([storeId, customerId])
   @@index([storeId])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -445,9 +471,11 @@ model Cart {
 // ============================================================================
 
 model Order {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   orderId    String // Store-specific order number (ORD-001, etc)
   customerId String
@@ -476,6 +504,7 @@ model Order {
   @@unique([storeId, orderId])
   @@index([storeId])
   @@index([customerId])
+  @@index([organizationId])
 }
 
 model OrderItem {
