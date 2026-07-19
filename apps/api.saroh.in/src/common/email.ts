@@ -122,6 +122,53 @@ export function sendEnquiryNotificationEmail(
     return Promise.resolve();
 }
 
+/**
+ * Marker prefix that stamps every self-test/preview email (S6-004). It is
+ * applied to BOTH the subject and the top of the body so the message can never
+ * be mistaken for production Organization delivery — a template preview goes
+ * out via Saroh's OWN transactional transporter, addressed only to the
+ * requesting user's own verified account email.
+ */
+export const SAROH_TEST_LABEL = "[Saroh test]";
+
+/**
+ * Send a Saroh self-test / template-preview email (S6-004).
+ *
+ * SECURITY: this helper deliberately has NO template/recipient business logic —
+ * the caller (SelfTestService) hard-binds `to` to the authenticated user's own
+ * verified account email and renders one of a fixed set of built-in preview
+ * templates. Every message is loudly labeled `[Saroh test]` in the subject and
+ * again at the head of the body so it is unmistakably a Saroh preview and never
+ * a production Organization message. Console-fallback when no SMTP is
+ * configured, mirroring the other `send*` helpers.
+ */
+export function sendSelfTestEmail(
+    to: string,
+    details: { templateLabel: string; html: string },
+): Promise<void> {
+    const { templateLabel, html } = details;
+    const subject = `${SAROH_TEST_LABEL} ${templateLabel}`;
+    const bodyHtml = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <p style="background:#fffbe6;border:1px solid #f0d000;border-radius:6px;padding:8px 12px;color:#665500;font-size:13px;margin:0 0 16px">
+    ${SAROH_TEST_LABEL} This is a Saroh preview email sent only to your own
+    verified account address. It is not a production message from any Organization.
+  </p>
+  ${html}
+</div>`;
+
+    if (!transporter) {
+        console.info(`[Saroh self-test] (no SMTP) ${to}: ${subject}`);
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject,
+        html: bodyHtml,
+    });
+    return Promise.resolve();
+}
+
 export function sendStoreInvitationEmail(
     to: string,
     acceptUrl: string,

@@ -94,6 +94,11 @@ module.exports = {
         // idempotent re-run). Jest-mocked Prisma (incl. $transaction) + a fake
         // CommsProvider; never touch a DB or the network.
         "<rootDir>/src/modules/communications/**/*.spec.ts",
+        // S6-004 self-test: the account-level template-preview send — recipient
+        // hard-bound to the session user's own verified email (never the body),
+        // unverified refused, per-user rate limit -> 429, and the `[Saroh test]`
+        // label. Jest-mocked email helper; never touch SMTP or the network.
+        "<rootDir>/src/modules/self-test/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
