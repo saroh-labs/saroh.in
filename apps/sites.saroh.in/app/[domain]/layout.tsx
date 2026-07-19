@@ -1,11 +1,19 @@
-// import Image from "next/image";
-import Link from "next/link";
-// import CTA from "@/components/cta";
-import { env } from "@/env";
-import { getSiteData } from "@/lib/fetchers";
-import { fontMapper } from "@/styles/fonts";
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { getPublicationForHost } from "@/lib/publication";
+
+/**
+ * Tenant site layout (S2-006).
+ *
+ * Middleware rewrites an incoming tenant hostname to `/[domain]/<path>`, so the
+ * `domain` route param IS the full request hostname (e.g. `demo.saroh.in`). We
+ * resolve it to a publication via the public read API; a `null` snapshot means
+ * nothing is published for this host (drafts are never reachable), so we render
+ * a clean 404. There is no legacy DB / font mapping here — everything the
+ * renderer draws from lives in the immutable publication snapshot.
+ */
 
 export async function generateMetadata({
     params,
@@ -13,38 +21,16 @@ export async function generateMetadata({
     params: Promise<{ domain: string }>;
 }): Promise<Metadata | null> {
     const { domain } = await params;
-    const data = await getSiteData(domain);
-    if (!data) {
+    const snapshot = await getPublicationForHost(domain);
+    if (!snapshot) {
         return null;
     }
-    const {
-        name: title,
-        description,
-        image,
-        logo,
-    } = data as {
-        name: string;
-        description: string;
-        image: string;
-        logo: string;
-    };
 
+    const title = snapshot.site.name;
     return {
         title,
-        description,
-        openGraph: {
-            title,
-            description,
-            images: [image],
-        },
-        twitter: {
-            card: "summary_large_image",
-            title,
-            description,
-            images: [image],
-            creator: "@vercel",
-        },
-        icons: [logo],
+        openGraph: { title },
+        twitter: { card: "summary_large_image", title },
         metadataBase: new URL(`https://${domain}`),
     };
 }
@@ -63,49 +49,25 @@ export default async function SiteLayout({
     children: React.ReactNode;
 }) {
     const { domain } = await params;
-    const data = await getSiteData(domain);
+    const snapshot = await getPublicationForHost(domain);
 
-    if (!data) {
+    if (!snapshot) {
         notFound();
     }
 
-    // Optional: Redirect to custom domain if it exists
-    if (
-        domain.endsWith(`.${env.NEXT_PUBLIC_ROOT_DOMAIN}`) &&
-        data.customDomain &&
-        env.REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS === "true"
-    ) {
-        return redirect(`https://${data.customDomain}`);
-    }
-
     return (
-        <div className={fontMapper[data.font]}>
-            <div className="ease left-0 right-0 top-0 z-30 flex h-16 bg-white transition-all duration-150 dark:bg-black dark:text-white">
+        <div>
+            <header className="ease left-0 right-0 top-0 z-30 flex h-16 bg-white transition-all duration-150 dark:bg-black dark:text-white">
                 <div className="mx-auto flex h-full max-w-screen-xl items-center justify-center space-x-5 px-10 sm:px-20">
                     <Link href="/" className="flex items-center justify-center">
-                        <div className="inline-block h-8 w-8 overflow-hidden rounded-full align-middle">
-                            {/* <Image
-								alt={"logo"}
-								height={40}
-								src={"/vercel.svg"}
-								width={40}
-							/> */}
-                        </div>
-                        <span className="font-title ml-3 inline-block truncate font-medium">
-                            {data.name}
+                        <span className="font-title inline-block truncate font-medium">
+                            {snapshot.site.name}
                         </span>
                     </Link>
                 </div>
-            </div>
+            </header>
 
             <div className="mt-20">{children}</div>
-
-            {/* {params.domain == `demo.${env.NEXT_PUBLIC_ROOT_DOMAIN}` ||
-			params.domain == `saroh.site` ? (
-				<CTA />
-			) : (
-				<ReportAbuse />
-			)} */}
         </div>
     );
 }
