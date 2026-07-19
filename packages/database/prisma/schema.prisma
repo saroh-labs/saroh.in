@@ -141,6 +141,9 @@ model Organization {
   analyticsEvents          AnalyticsEvent[]
   analyticsDailyAggregates AnalyticsDailyAggregate[]
 
+  // Stage 7 — SaaS billing (S7-005). One current subscription per org.
+  subscription Subscription?
+
   createdAt DateTime @default(now())
 }
 
@@ -2090,4 +2093,84 @@ model AnalyticsDailyAggregate {
 
   @@unique([organizationId, siteId, date, type, dimension, dimensionValue])
   @@index([organizationId, type, date])
+}
+
+// Plan — the VERSIONED catalog of Saroh subscription plans sold to
+// Organizations (S7-005). NOT org-owned: a global catalog. A published plan
+// version is immutable — changing price or entitlements means a NEW version, so
+// existing subscribers keep the terms they signed up under. `entitlements` is
+// the typed limit map the server-side EntitlementService enforces (e.g.
+// { "sites": 3, "teamMembers": 5, "customDomain": true }).
+model Plan {
+  id      String @id @default(cuid())
+  key     String // "free" | "pro" | "business"
+  version Int    @default(1)
+  name    String
+
+  priceCents Int    @default(0)
+  currency   String @default("INR")
+  interval   String @default("month") // "month" | "year"
+
+  entitlements Json // typed limit map enforced by EntitlementService
+
+  active Boolean @default(true) // offerable to NEW subscribers
+
+  subscriptions Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([key, version])
+}
+
+// Subscription — an Organization's subscription to a Plan version (S7-005).
+// Org-owned; at most one row per org (`organizationId @unique`) — the tenant's
+// current plan. Billing runs through Saroh's OWN platform Razorpay/Cashfree
+// account (env-configured, NOT stored here), NEVER an org's merchant
+// MerchantPaymentProvider — credential separation is a hard boundary: Saroh
+// billing never reads or writes org merchant-payment records.
+model Subscription {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  status String @default("ACTIVE") // TRIALING | ACTIVE | PAST_DUE | CANCELLED
+
+  provider               String? // "RAZORPAY" | "CASHFREE" (null on a free plan)
+  providerSubscriptionId String? // the provider's subscription id
+  providerCustomerId     String?
+
+  currentPeriodEnd  DateTime?
+  cancelAtPeriodEnd Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerSubscriptionId])
+  @@index([planId])
+}
+
+// BillingWebhookEvent — the idempotent inbox for Saroh's billing-provider
+// webhooks (S7-005), the SaaS analogue of the merchant WebhookEvent. Signature
+// is verified before any write; @@unique([provider, providerEventId]) makes a
+// replay a 200 no-op. Kept ENTIRELY separate from merchant payments. The
+// resolved org is a plain denormalized id (no FK) so the append-only inbox is
+// never rewritten by a tenant delete.
+model BillingWebhookEvent {
+  id              String @id @default(cuid())
+  provider        String
+  providerEventId String
+  type            String
+
+  organizationId String?
+
+  payload     Json
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  @@unique([provider, providerEventId])
+  @@index([organizationId])
 }

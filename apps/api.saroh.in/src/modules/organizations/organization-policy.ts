@@ -111,7 +111,10 @@ export type OrgAction =
     | "comms:manage"
     | "consent:read"
     | "consent:write"
-    | "automation:manage";
+    | "automation:manage"
+    | "analytics:read"
+    | "billing:read"
+    | "billing:manage";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -163,6 +166,14 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "consent:read",
     "consent:write",
     "automation:manage",
+    // Stage 7 (S7-002/003 analytics reads, S7-005 billing). All OWNER/ADMIN-only
+    // — none are in READ_ONLY_ACTIONS: analytics is aggregate business
+    // intelligence and billing changes the org's paid plan (money), so a MEMBER
+    // sees neither. Public analytics INTAKE (site.view) is unauthenticated and
+    // never passes through this policy.
+    "analytics:read",
+    "billing:read",
+    "billing:manage",
 ];
 
 /** Read-only actions — the floor every role (including MEMBER) may perform. */

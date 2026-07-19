@@ -106,6 +106,17 @@ module.exports = {
         // create.task activity, and FAILED-run capture). Jest-mocked Prisma
         // (incl. $transaction) + a mocked CommunicationsService; never touch a DB.
         "<rootDir>/src/modules/automations/**/*.spec.ts",
+        // S7-002 analytics: the versioned event contract validators, the intake
+        // command (public site.view + org events, consent + retention stamping,
+        // at-least-once dedupe), and the org-safe daily aggregate job. Jest-mocked
+        // Prisma; never touch a DB or the network.
+        "<rootDir>/src/modules/analytics/**/*.spec.ts",
+        // S7-005 billing: the EntitlementService (plan-limit enforcement), the
+        // plans/subscriptions service (authz, one-sub-per-org), the billing
+        // provider adapters (credential separation from merchant payments), and
+        // the billing webhook inbox (signature-before-write, idempotent replay).
+        // Jest-mocked Prisma + fake provider; never touch a DB or the network.
+        "<rootDir>/src/modules/billing/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
