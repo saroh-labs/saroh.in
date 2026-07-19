@@ -4,6 +4,8 @@ import type {
     CreateOrderIntentInput,
     CreateOrderIntentResult,
     MerchantProvider,
+    RefundInput,
+    RefundResult,
 } from "./provider.port";
 
 /**
@@ -84,6 +86,60 @@ export class CashfreeProvider implements MerchantProvider {
                 amount: Number((amountCents / 100).toFixed(2)),
                 currency,
             },
+        };
+    }
+
+    /**
+     * Refund via `POST /orders/{order_id}/refunds` (Cashfree's `refund_amount`
+     * is in MAJOR units, so `amountCents` is divided by 100). `providerIntentId`
+     * is the order id the intent was created against. Errors are SANITIZED to
+     * the HTTP status — never the credentials or raw body.
+     */
+    async refund(input: RefundInput): Promise<RefundResult> {
+        const { providerIntentId, amountCents, credentials } = input;
+        // A deterministic, provider-unique refund id (Cashfree requires the
+        // merchant to supply `refund_id`); echoed back by the refund webhook.
+        const refundId = `rf_${providerIntentId}_${amountCents}`;
+
+        let res: Response;
+        try {
+            res = await fetch(
+                `${this.baseUrl}/orders/${providerIntentId}/refunds`,
+                {
+                    method: "POST",
+                    headers: {
+                        "x-client-id": credentials.keyId,
+                        "x-client-secret": credentials.keySecret,
+                        "x-api-version": this.apiVersion,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        refund_amount: Number((amountCents / 100).toFixed(2)),
+                        refund_id: refundId,
+                    }),
+                },
+            );
+        } catch {
+            throw new Error("Cashfree refund failed: network error");
+        }
+
+        if (!res.ok) {
+            this.logger.warn(`Cashfree refund failed with HTTP ${res.status}`);
+            throw new Error(`Cashfree refund failed (HTTP ${res.status})`);
+        }
+
+        const body = (await res.json()) as {
+            cf_refund_id?: string | number;
+            refund_id?: string;
+            refund_status?: string;
+        };
+        const providerRefundId =
+            body.cf_refund_id != null
+                ? String(body.cf_refund_id)
+                : (body.refund_id ?? refundId);
+        return {
+            providerRefundId,
+            status: body.refund_status ?? "PENDING",
         };
     }
 }

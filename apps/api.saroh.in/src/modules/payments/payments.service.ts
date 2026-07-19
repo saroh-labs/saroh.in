@@ -26,6 +26,19 @@ export interface ConnectProviderInput {
     publicKey?: string;
     keyId: string;
     keySecret: string;
+    /** Optional webhook signing secret (S5-003) — sealed, never echoed. */
+    webhookSecret?: string;
+}
+
+/** The client-safe result of initiating a refund — NO secret, ever. */
+export interface InitiateRefundResult {
+    refundId: string;
+    paymentIntentId: string;
+    provider: string;
+    providerRefundId: string | null;
+    amountCents: number;
+    currency: string;
+    status: string;
 }
 
 /** A REDACTED provider view — safe to return; never carries secret material. */
@@ -106,11 +119,15 @@ export class PaymentsService {
             );
         }
 
-        // Seal { keyId, keySecret } as one blob. Plaintext never persisted.
+        // Seal { keyId, keySecret, webhookSecret? } as one blob. Plaintext
+        // (incl. the webhook secret) is NEVER persisted or logged.
         const sealed = encryptSecret(
             JSON.stringify({
                 keyId: input.keyId,
                 keySecret: input.keySecret,
+                ...(input.webhookSecret
+                    ? { webhookSecret: input.webhookSecret }
+                    : {}),
             }),
         );
 
@@ -178,6 +195,123 @@ export class PaymentsService {
             data: { status: "DISABLED" },
         });
         return redact(updated);
+    }
+
+    /**
+     * Fetch + decrypt the org's webhook signing secret for a provider (S5-003).
+     *
+     * SECURITY: this is deliberately AUTHZ-FREE — it takes a raw
+     * `(organizationId, provider)` (both come from the trusted webhook URL, not
+     * from a session) and is only ever called by the webhook verifier to check
+     * an inbound HMAC. The plaintext secret is returned to the SERVER only and
+     * never to any client, echoed, or logged. Returns `null` when the provider
+     * is not connected or has no webhook secret configured (the verifier then
+     * rejects the delivery with 401). The provider status is ignored so a
+     * webhook can still be verified after a `DISABLED` disconnect.
+     */
+    async getWebhookSecret(
+        organizationId: string,
+        provider: string,
+    ): Promise<string | null> {
+        const name = provider.toUpperCase();
+        const row = await prisma.merchantPaymentProvider.findUnique({
+            where: {
+                organizationId_provider: { organizationId, provider: name },
+            },
+        });
+        if (!row) return null;
+        const json = decryptSecret({
+            ciphertext: row.encryptedCredentials,
+            iv: row.credentialsIv,
+            authTag: row.credentialsAuthTag,
+        });
+        const parsed = JSON.parse(json) as { webhookSecret?: string };
+        return parsed.webhookSecret ?? null;
+    }
+
+    /**
+     * Initiate a refund against an Order's SUCCEEDED payment (S5-003).
+     * `payment:manage`.
+     *
+     * - The Order must belong to `ctx.organizationId` (else 404).
+     * - The Order must have a SUCCEEDED PaymentIntent (else 400) — you can only
+     *   refund money that was actually collected.
+     * - `amountCents` is taken from the intent (server-authoritative) — never
+     *   from client input.
+     * - Calls the provider refund API and records a PENDING {@link PaymentRefund}.
+     *   The Order.paymentStatus is NOT moved here; it flips to REFUNDED only when
+     *   the provider's refund webhook is reconciled (via the state machine).
+     */
+    async initiateRefund(
+        ctx: OrganizationContext,
+        orderId: string,
+        reason?: string,
+    ): Promise<InitiateRefundResult> {
+        authorize(ctx, "payment:manage");
+
+        const order = await this.requireOwnedOrder(ctx, orderId);
+
+        const intent = await prisma.paymentIntent.findFirst({
+            where: {
+                orderId: order.id,
+                organizationId: ctx.organizationId,
+                status: "SUCCEEDED",
+            },
+            orderBy: { createdAt: "desc" },
+        });
+        if (!intent?.providerIntentId) {
+            throw new BadRequestException(
+                "Order has no successful payment to refund",
+            );
+        }
+
+        const providerRow = await this.requireOwnedProvider(
+            ctx,
+            intent.provider,
+        );
+
+        // The provider payment id captured from the success webhook (needed by
+        // e.g. Razorpay to book the refund). Null-safe: some providers refund
+        // against the order id alone.
+        const attempt = await prisma.paymentAttempt.findFirst({
+            where: {
+                paymentIntentId: intent.id,
+                providerRef: { not: null },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+
+        const credentials = this.openCredentials(providerRow);
+        const provider = this.factory.get(providerRow.provider);
+        const result = await provider.refund({
+            providerIntentId: intent.providerIntentId,
+            providerPaymentRef: attempt?.providerRef ?? null,
+            amountCents: intent.amountCents,
+            currency: intent.currency,
+            credentials,
+        });
+
+        const refund = await prisma.paymentRefund.create({
+            data: {
+                organizationId: ctx.organizationId,
+                paymentIntentId: intent.id,
+                amountCents: intent.amountCents,
+                currency: intent.currency,
+                status: "PENDING",
+                providerRefundId: result.providerRefundId,
+                reason: reason ?? null,
+            },
+        });
+
+        return {
+            refundId: refund.id,
+            paymentIntentId: intent.id,
+            provider: providerRow.provider,
+            providerRefundId: refund.providerRefundId,
+            amountCents: refund.amountCents,
+            currency: refund.currency,
+            status: refund.status,
+        };
     }
 
     /**

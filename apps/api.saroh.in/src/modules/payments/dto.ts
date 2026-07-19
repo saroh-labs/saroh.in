@@ -47,6 +47,18 @@ export class ConnectProviderDto {
     @MinLength(1)
     @MaxLength(1024)
     keySecret!: string;
+
+    /**
+     * OPTIONAL provider webhook signing secret (S5-003). Like `keySecret` it is
+     * INBOUND-ONLY: sealed into the same encrypted credentials blob and NEVER
+     * echoed back. Used server-side to HMAC-verify inbound webhooks for this org.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(1024)
+    webhookSecret?: string;
 }
 
 /**
@@ -70,4 +82,19 @@ export class CreateIntentDto {
     @IsString()
     @MaxLength(255)
     idempotencyKey?: string;
+}
+
+/**
+ * Initiate a refund against an Order's successful payment (S5-003).
+ *
+ * SECURITY: there is NO amount field — the refund amount is derived server-side
+ * from the Order's SUCCEEDED PaymentIntent (`amountCents`), so a client can
+ * never influence how much is refunded. `reason` is an optional free-text note.
+ */
+export class RefundOrderDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(500)
+    reason?: string;
 }

@@ -80,6 +80,13 @@ module.exports = {
         // Order, idempotent replay, cross-tenant 404, and payment authz. Never
         // touch a DB or the network.
         "<rootDir>/src/modules/payments/**/*.spec.ts",
+        // S5-003 webhooks: the signed webhook inbox + exactly-once reconciliation
+        // — signature verify (valid HMAC passes, forged 401s with no row written),
+        // idempotent inbox (duplicate P2002 → 200 no-op, state moved once), the
+        // reconcile state machine (illegal transition rejected), and refund
+        // settlement. Jest-mocked Prisma (incl. $transaction) + a fake webhook
+        // provider; never touch a DB or the network.
+        "<rootDir>/src/modules/webhooks/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],

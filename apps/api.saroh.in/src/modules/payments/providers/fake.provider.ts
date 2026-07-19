@@ -3,6 +3,8 @@ import type {
     CreateOrderIntentResult,
     MerchantProvider,
     ProviderFactory,
+    RefundInput,
+    RefundResult,
 } from "./provider.port";
 
 /**
@@ -14,6 +16,7 @@ import type {
  */
 export class FakeMerchantProvider implements MerchantProvider {
     readonly calls: CreateOrderIntentInput[] = [];
+    readonly refundCalls: RefundInput[] = [];
 
     constructor(readonly name = "RAZORPAY") {}
 
@@ -28,6 +31,14 @@ export class FakeMerchantProvider implements MerchantProvider {
                 amount: input.amountCents,
                 currency: input.currency,
             },
+        });
+    }
+
+    refund(input: RefundInput): Promise<RefundResult> {
+        this.refundCalls.push(input);
+        return Promise.resolve({
+            providerRefundId: `fake_refund_${input.providerIntentId}`,
+            status: "PENDING",
         });
     }
 }

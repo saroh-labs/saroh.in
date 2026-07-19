@@ -27,6 +27,7 @@ import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { SitesModule } from "./modules/sites/sites.module";
 import { StoresModule } from "./modules/stores/stores.module";
+import { WebhooksModule } from "./modules/webhooks/webhooks.module";
 
 @Module({
     imports: [
@@ -41,7 +42,16 @@ import { StoresModule } from "./modules/stores/stores.module";
         AuthModule.forRoot({
             auth,
             disableGlobalAuthGuard: true,
-            bodyParser: { json: {}, urlencoded: { extended: true } },
+            // rawBody: true attaches the raw request Buffer to `req.rawBody` (via
+            // the JSON parser's `verify` hook) for every non-auth route. The
+            // public webhook endpoint (S5-003) needs those exact bytes to
+            // HMAC-verify a provider signature — the re-serialized parsed JSON
+            // would not byte-match and would break verification.
+            bodyParser: {
+                json: {},
+                urlencoded: { extended: true },
+                rawBody: true,
+            },
         }),
         HealthModule,
         FeatureFlagModule,
@@ -67,6 +77,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         NotificationsModule,
         BookingsModule,
         PaymentsModule,
+        WebhooksModule,
     ],
 })
 export class AppModule {}

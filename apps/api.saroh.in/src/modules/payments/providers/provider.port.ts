@@ -45,11 +45,35 @@ export interface CreateOrderIntentResult {
     clientParams: Record<string, unknown>;
 }
 
+export interface RefundInput {
+    /** The provider's order/intent id the refund is booked against. */
+    providerIntentId: string;
+    /** The provider's payment id (from the capture webhook), when known. */
+    providerPaymentRef?: string | null;
+    /** Server-derived minor units to refund. Never client-supplied. */
+    amountCents: number;
+    currency: string;
+    credentials: ProviderCredentials;
+}
+
+export interface RefundResult {
+    /** The provider's refund id — later echoed by the refund webhook. */
+    providerRefundId: string;
+    /** The provider's refund status (e.g. "PENDING" | "PROCESSED"). */
+    status: string;
+}
+
 export interface MerchantProvider {
     readonly name: string;
     createOrderIntent(
         input: CreateOrderIntentInput,
     ): Promise<CreateOrderIntentResult>;
+    /**
+     * Book a refund with the provider (S5-003). Returns the provider refund id;
+     * the actual money-state settlement happens asynchronously when the
+     * provider's refund webhook is reconciled.
+     */
+    refund(input: RefundInput): Promise<RefundResult>;
 }
 
 /** Factory over the concrete providers — injectable so tests swap in a fake. */

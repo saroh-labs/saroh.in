@@ -4,6 +4,8 @@ import type {
     CreateOrderIntentInput,
     CreateOrderIntentResult,
     MerchantProvider,
+    RefundInput,
+    RefundResult,
 } from "./provider.port";
 
 /**
@@ -74,5 +76,54 @@ export class RazorpayProvider implements MerchantProvider {
                 currency,
             },
         };
+    }
+
+    /**
+     * Refund a captured payment via `POST /payments/{payment_id}/refund`
+     * (Razorpay amounts are in paise = `amountCents`). Requires the provider
+     * payment id (captured from the payment webhook). Errors are SANITIZED to
+     * the HTTP status only — never the auth header, key secret, or raw body.
+     */
+    async refund(input: RefundInput): Promise<RefundResult> {
+        const { providerPaymentRef, amountCents, credentials } = input;
+        if (!providerPaymentRef) {
+            throw new Error(
+                "Razorpay refund failed: missing payment id (payment not captured yet)",
+            );
+        }
+
+        const basic = Buffer.from(
+            `${credentials.keyId}:${credentials.keySecret}`,
+        ).toString("base64");
+
+        let res: Response;
+        try {
+            res = await fetch(
+                `${this.baseUrl}/payments/${providerPaymentRef}/refund`,
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Basic ${basic}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ amount: amountCents }),
+                },
+            );
+        } catch {
+            throw new Error("Razorpay refund failed: network error");
+        }
+
+        if (!res.ok) {
+            this.logger.warn(`Razorpay refund failed with HTTP ${res.status}`);
+            throw new Error(`Razorpay refund failed (HTTP ${res.status})`);
+        }
+
+        const body = (await res.json()) as { id?: string; status?: string };
+        if (!body.id) {
+            throw new Error(
+                "Razorpay refund failed: missing refund id in response",
+            );
+        }
+        return { providerRefundId: body.id, status: body.status ?? "PENDING" };
     }
 }

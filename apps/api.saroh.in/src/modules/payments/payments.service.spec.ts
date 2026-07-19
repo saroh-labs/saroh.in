@@ -21,12 +21,14 @@ jest.mock("@saroh/database", () => {
         },
         paymentIntent: {
             findUnique: jest.fn(),
+            findFirst: jest.fn(),
             create: jest.fn(),
         },
         paymentAttempt: {
             create: jest.fn(),
             findFirst: jest.fn(),
         },
+        paymentRefund: { create: jest.fn() },
         order: { findUnique: jest.fn() },
     };
     return {
@@ -62,9 +64,11 @@ const providerFindUnique = prisma.merchantPaymentProvider
     .findUnique as jest.Mock;
 const providerUpdate = prisma.merchantPaymentProvider.update as jest.Mock;
 const intentFindUnique = prisma.paymentIntent.findUnique as jest.Mock;
+const intentFindFirst = prisma.paymentIntent.findFirst as jest.Mock;
 const intentCreate = prisma.paymentIntent.create as jest.Mock;
 const attemptCreate = prisma.paymentAttempt.create as jest.Mock;
 const attemptFindFirst = prisma.paymentAttempt.findFirst as jest.Mock;
+const refundCreate = prisma.paymentRefund.create as jest.Mock;
 const orderFindUnique = prisma.order.findUnique as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
@@ -159,6 +163,41 @@ describe("PaymentsService.connectProvider", () => {
         expect(JSON.stringify(result)).not.toContain("super-secret-value");
         expect(result).not.toHaveProperty("encryptedCredentials");
         expect(result).not.toHaveProperty("keySecret");
+    });
+
+    it("seals an OPTIONAL webhookSecret into the encrypted blob and never echoes it", async () => {
+        const { service } = makeService();
+        providerUpsert.mockImplementation(
+            ({ create }: { create: Record<string, unknown> }) =>
+                Promise.resolve({
+                    id: "mpp_1",
+                    createdAt: new Date("2026-01-01"),
+                    updatedAt: new Date("2026-01-01"),
+                    ...create,
+                }),
+        );
+
+        const result = await service.connectProvider(ctx(), {
+            provider: "razorpay",
+            keyId: "rzp_key_123",
+            keySecret: "super-secret-value",
+            webhookSecret: "whsec_top_secret",
+        });
+
+        const call = providerUpsert.mock.calls[0][0];
+        // The webhook secret is NOT stored in plaintext anywhere on the row...
+        expect(JSON.stringify(call)).not.toContain("whsec_top_secret");
+        // ...but it round-trips out of the sealed blob via getWebhookSecret.
+        providerFindUnique.mockResolvedValue({
+            encryptedCredentials: call.create.encryptedCredentials,
+            credentialsIv: call.create.credentialsIv,
+            credentialsAuthTag: call.create.credentialsAuthTag,
+        });
+        await expect(
+            service.getWebhookSecret("org_1", "RAZORPAY"),
+        ).resolves.toBe("whsec_top_secret");
+        // The redacted response never carries the secret.
+        expect(JSON.stringify(result)).not.toContain("whsec_top_secret");
     });
 
     it("denies a MEMBER (payment:manage is OWNER/ADMIN-only) before any I/O", async () => {
@@ -374,5 +413,115 @@ describe("PaymentsService.disconnectProvider", () => {
             service.disconnectProvider(ctx(), "RAZORPAY"),
         ).rejects.toBeInstanceOf(NotFoundException);
         expect(providerUpdate).not.toHaveBeenCalled();
+    });
+});
+
+describe("PaymentsService.getWebhookSecret", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("decrypts the stored webhook secret (authz-free — keyed only by URL org)", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(
+            connectedRow({ keyId: "k", keySecret: "s" }),
+        );
+        // connectedRow seals only { keyId, keySecret } → no webhook secret.
+        await expect(
+            service.getWebhookSecret("org_1", "RAZORPAY"),
+        ).resolves.toBeNull();
+    });
+
+    it("returns null when the provider is not connected for the org", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(null);
+        await expect(
+            service.getWebhookSecret("org_1", "RAZORPAY"),
+        ).resolves.toBeNull();
+    });
+});
+
+describe("PaymentsService.initiateRefund", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const ORDER = { id: "order_1", organizationId: "org_1" };
+
+    it("validates a SUCCEEDED intent, calls the provider, and records a PENDING refund", async () => {
+        const { service, fake } = makeService();
+        orderFindUnique.mockResolvedValue(ORDER);
+        intentFindFirst.mockResolvedValue({
+            id: "pi_1",
+            provider: "RAZORPAY",
+            providerIntentId: "prov_intent_1",
+            status: "SUCCEEDED",
+            amountCents: 4250,
+            currency: "INR",
+        });
+        providerFindUnique.mockResolvedValue(connectedRow());
+        attemptFindFirst.mockResolvedValue({ providerRef: "pay_1" });
+        refundCreate.mockResolvedValue({
+            id: "rf_1",
+            providerRefundId: "fake_refund_prov_intent_1",
+            amountCents: 4250,
+            currency: "INR",
+            status: "PENDING",
+        });
+
+        const result = await service.initiateRefund(ctx(), "order_1", "oops");
+
+        // Provider refund was called with the server-derived amount + payment ref.
+        expect(fake.refundCalls).toHaveLength(1);
+        expect(fake.refundCalls[0]).toEqual(
+            expect.objectContaining({
+                providerIntentId: "prov_intent_1",
+                providerPaymentRef: "pay_1",
+                amountCents: 4250,
+                currency: "INR",
+            }),
+        );
+        // A PENDING refund is recorded; settlement happens later via the webhook.
+        expect(refundCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                organizationId: "org_1",
+                paymentIntentId: "pi_1",
+                amountCents: 4250,
+                status: "PENDING",
+                providerRefundId: "fake_refund_prov_intent_1",
+                reason: "oops",
+            }),
+        });
+        expect(result.status).toBe("PENDING");
+    });
+
+    it("rejects with 400 when the order has no SUCCEEDED intent", async () => {
+        const { service, fake } = makeService();
+        orderFindUnique.mockResolvedValue(ORDER);
+        intentFindFirst.mockResolvedValue(null);
+
+        await expect(
+            service.initiateRefund(ctx(), "order_1"),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(fake.refundCalls).toHaveLength(0);
+        expect(refundCreate).not.toHaveBeenCalled();
+    });
+
+    it("denies a MEMBER (payment:manage) before any I/O", async () => {
+        const { service } = makeService();
+        await expect(
+            service.initiateRefund(ctx({ role: "MEMBER" }), "order_1"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(orderFindUnique).not.toHaveBeenCalled();
+    });
+
+    it("rejects a cross-tenant order with 404", async () => {
+        const { service, fake } = makeService();
+        orderFindUnique.mockResolvedValue({
+            ...ORDER,
+            organizationId: "org_OTHER",
+        });
+
+        await expect(
+            service.initiateRefund(ctx(), "order_1"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(fake.refundCalls).toHaveLength(0);
+        expect(refundCreate).not.toHaveBeenCalled();
     });
 });

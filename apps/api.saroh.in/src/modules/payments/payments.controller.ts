@@ -13,7 +13,7 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { ConnectProviderDto, CreateIntentDto } from "./dto";
+import { ConnectProviderDto, CreateIntentDto, RefundOrderDto } from "./dto";
 import { PaymentsService } from "./payments.service";
 
 /**
@@ -64,5 +64,15 @@ export class PaymentsController {
             idempotencyKey: dto.idempotencyKey,
             provider: dto.provider,
         });
+    }
+
+    @Post("orders/:orderId/refund")
+    @HttpCode(201)
+    refund(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("orderId") orderId: string,
+        @Body() dto: RefundOrderDto,
+    ) {
+        return this.payments.initiateRefund(ctx, orderId, dto.reason);
     }
 }
