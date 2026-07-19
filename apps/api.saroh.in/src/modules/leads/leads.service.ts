@@ -115,12 +115,12 @@ export class LeadsService {
                 );
             }
         } else {
+            if (pipeline.stages.length === 0) {
+                throw new BadRequestException(
+                    "The target pipeline has no stages configured",
+                );
+            }
             stage = pipeline.stages[0];
-        }
-        if (!stage) {
-            throw new BadRequestException(
-                "The target pipeline has no stages configured",
-            );
         }
 
         return prisma.$transaction(async (tx) => {

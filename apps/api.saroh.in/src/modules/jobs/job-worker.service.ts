@@ -1,10 +1,5 @@
-import {
-    Inject,
-    Injectable,
-    Logger,
-    type OnModuleDestroy,
-    type OnModuleInit,
-} from "@nestjs/common";
+import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { randomBytes } from "node:crypto";
 import { hostname } from "node:os";
@@ -55,7 +50,7 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
             void this.runOnce();
         }, env.JOB_WORKER_POLL_MS);
         // Don't keep the event loop alive just for the poller.
-        this.timer.unref?.();
+        this.timer.unref();
     }
 
     onModuleDestroy(): void {

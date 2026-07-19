@@ -113,6 +113,8 @@ export class EnquiryNotifyHandler {
             .filter(Boolean)
             .join(" ")
             .trim();
+        // `||` (not `??`) is intentional: fall through on EMPTY strings too.
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         return full || contact.company || contact.email || "someone";
     }
 
@@ -123,7 +125,7 @@ export class EnquiryNotifyHandler {
             include: { user: true },
         });
         const emails = memberships
-            .map((m) => m.user?.email)
+            .map((m) => m.user.email)
             .filter((e): e is string => Boolean(e));
         return Array.from(new Set(emails));
     }

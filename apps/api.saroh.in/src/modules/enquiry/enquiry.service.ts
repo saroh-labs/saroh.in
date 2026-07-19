@@ -79,7 +79,7 @@ export class EnquiryService {
     ): Promise<EnquiryResult> {
         // 1. Load the Form. The org is taken from HERE, never from the client.
         const form = await prisma.form.findUnique({ where: { id: formId } });
-        if (!form || form.deletedAt !== null) {
+        if (form?.deletedAt !== null) {
             throw new NotFoundException("Form not found");
         }
         if (form.status !== "ACTIVE") {
@@ -221,9 +221,14 @@ export class EnquiryService {
     ): DerivedContact {
         const str = (name: string): string | undefined => {
             const v = data[name];
-            if (v === undefined || v === null) return undefined;
-            const s = typeof v === "string" ? v.trim() : String(v);
-            return s === "" ? undefined : s;
+            if (typeof v === "string") {
+                const t = v.trim();
+                return t === "" ? undefined : t;
+            }
+            if (typeof v === "number" || typeof v === "boolean") {
+                return String(v);
+            }
+            return undefined;
         };
 
         for (const field of fields) {
@@ -286,9 +291,14 @@ export class EnquiryService {
     }
 
     private value(v: unknown): string | undefined {
-        if (v === undefined || v === null) return undefined;
-        const s = typeof v === "string" ? v.trim() : String(v);
-        return s === "" ? undefined : s;
+        if (typeof v === "string") {
+            const t = v.trim();
+            return t === "" ? undefined : t;
+        }
+        if (typeof v === "number" || typeof v === "boolean") {
+            return String(v);
+        }
+        return undefined;
     }
 
     /**
@@ -352,53 +362,52 @@ export class EnquiryService {
                 ...withStages,
             });
             // Guard against a form pointing at another org's pipeline.
-            if (named && named.organizationId === organizationId) {
+            if (named?.organizationId === organizationId) {
                 pipeline = named;
             }
         }
 
-        if (!pipeline) {
-            pipeline = await tx.pipeline.findFirst({
-                where: { organizationId, isDefault: true },
-                ...withStages,
-            });
-        }
+        pipeline ??= await tx.pipeline.findFirst({
+            where: { organizationId, isDefault: true },
+            ...withStages,
+        });
 
-        if (!pipeline) {
-            pipeline = await tx.pipeline.create({
-                data: {
-                    organizationId,
-                    name: "Sales",
-                    isDefault: true,
-                    stages: {
-                        create: DEFAULT_STAGES.map((name, order) => ({
-                            organizationId,
-                            name,
-                            order,
-                        })),
-                    },
+        pipeline ??= await tx.pipeline.create({
+            data: {
+                organizationId,
+                name: "Sales",
+                isDefault: true,
+                stages: {
+                    create: DEFAULT_STAGES.map((name, order) => ({
+                        organizationId,
+                        name,
+                        order,
+                    })),
                 },
-                ...withStages,
-            });
-        }
+            },
+            ...withStages,
+        });
 
-        const stage = pipeline.stages[0];
-        if (!stage) {
+        if (pipeline.stages.length === 0) {
             // A pipeline with no stages can't host a lead — treat as a config error.
             throw new BadRequestException(
                 "The target pipeline has no stages configured",
             );
         }
+        const stage = pipeline.stages[0];
 
         return { pipeline, stage };
     }
 
     /** A readable lead title: the person's name (or email) plus the form name. */
     private leadTitle(c: DerivedContact, formName: string): string {
+        // First non-empty of: joined first/last, split fullName, then email.
         const name =
-            [c.firstName, c.lastName].filter(Boolean).join(" ").trim() ||
-            this.splitName(c.fullName).joined ||
-            c.email;
+            [
+                [c.firstName, c.lastName].filter(Boolean).join(" ").trim(),
+                this.splitName(c.fullName).joined,
+                c.email,
+            ].find((s) => (s ?? "").length > 0) ?? c.email;
         return `${name} — ${formName}`;
     }
 
