@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { BillingModule } from "../billing/billing.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { domainVerifierProvider } from "./domain-verifier";
 import { DomainsController } from "./domains.controller";
@@ -14,7 +15,7 @@ import { DomainsService } from "./domains.service";
  * {@link DomainsService} depends on via the `DOMAIN_VERIFIER` token.
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule)],
+    imports: [BillingModule, forwardRef(() => OrganizationsModule)],
     controllers: [DomainsController],
     providers: [DomainsService, domainVerifierProvider, OrganizationGuard],
     exports: [DomainsService],

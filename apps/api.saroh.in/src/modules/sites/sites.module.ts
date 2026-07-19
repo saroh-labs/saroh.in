@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { BillingModule } from "../billing/billing.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PublicSitesController } from "./public-sites.controller";
 import { SitesController } from "./sites.controller";
@@ -14,7 +15,7 @@ import { SitesService } from "./sites.service";
  * Sections) atomically.
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule)],
+    imports: [BillingModule, forwardRef(() => OrganizationsModule)],
     controllers: [SitesController, PublicSitesController],
     providers: [SitesService, OrganizationGuard],
     exports: [SitesService],

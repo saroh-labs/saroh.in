@@ -19,6 +19,7 @@ jest.mock("@saroh/database", () => {
             findFirst: jest.fn(),
             findUnique: jest.fn(),
             findMany: jest.fn(),
+            count: jest.fn(),
             create: jest.fn(),
         },
         page: {
@@ -41,15 +42,25 @@ import { prisma } from "@saroh/database";
 import { STARTER_TEMPLATE_ID } from "@saroh/templates";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { EntitlementService } from "../billing/entitlement.service";
 import type { CreateSiteFromTemplateDto } from "./dto";
 import { SitesService } from "./sites.service";
 
 const orgFindUnique = prisma.organization.findUnique as jest.Mock;
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
 const siteFindUnique = prisma.site.findUnique as jest.Mock;
+const siteCount = prisma.site.count as jest.Mock;
 const siteCreate = prisma.site.create as jest.Mock;
 const pageCreate = prisma.page.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
+
+/** A permissive EntitlementService fake — `check` allows unless overridden. */
+const entCheck = jest.fn().mockResolvedValue(true);
+const entitlements = {
+    check: entCheck,
+    can: jest.fn().mockResolvedValue(true),
+    getEntitlements: jest.fn(),
+} as unknown as EntitlementService;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -61,7 +72,7 @@ function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
 }
 
 describe("SitesService.createFromTemplate", () => {
-    const service = new SitesService();
+    const service = new SitesService(entitlements);
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -72,8 +83,31 @@ describe("SitesService.createFromTemplate", () => {
         });
         siteFindFirst.mockResolvedValue(null);
         siteFindUnique.mockResolvedValue(null);
+        siteCount.mockResolvedValue(0);
+        entCheck.mockResolvedValue(true);
         siteCreate.mockResolvedValue({ id: "site_1", slug: "acme" });
         pageCreate.mockResolvedValue({ id: "page_x" });
+    });
+
+    it("enforces the plan's `sites` entitlement before creating (403 when at the limit, no write)", async () => {
+        // Simulate the EntitlementService rejecting at the plan cap.
+        const { ForbiddenException } =
+            jest.requireActual<typeof import("@nestjs/common")>(
+                "@nestjs/common",
+            );
+        siteCount.mockResolvedValue(1);
+        entCheck.mockRejectedValueOnce(
+            new ForbiddenException("Plan limit reached"),
+        );
+
+        await expect(
+            service.createFromTemplate(ctx(), { name: "Acme" }),
+        ).rejects.toThrow(/Plan limit reached/);
+
+        // The cap is checked with the current site count and blocks the write.
+        expect(entCheck).toHaveBeenCalledWith("org_1", "sites", 1);
+        expect(transaction).not.toHaveBeenCalled();
+        expect(siteCreate).not.toHaveBeenCalled();
     });
 
     it("creates a Site + Pages + DRAFT PageVersions + Sections in one org-scoped transaction from the real starter template", async () => {
@@ -227,7 +261,7 @@ describe("SitesService.createFromTemplate", () => {
 });
 
 describe("SitesService.getSite", () => {
-    const service = new SitesService();
+    const service = new SitesService(entitlements);
 
     beforeEach(() => jest.clearAllMocks());
 

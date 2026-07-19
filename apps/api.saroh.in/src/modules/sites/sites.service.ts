@@ -16,6 +16,7 @@ import {
 } from "@saroh/templates";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { EntitlementService } from "../billing/entitlement.service";
 import { authorize } from "../organizations/organization-policy";
 import type { CreateSiteFromTemplateDto, UpdateDraftSectionsDto } from "./dto";
 import { sanitizeSectionContent } from "./sanitize";
@@ -84,19 +85,30 @@ function slugify(input: string): string {
  */
 @Injectable()
 export class SitesService {
+    constructor(private readonly entitlements: EntitlementService) {}
+
     /**
      * Create a draft Site (pages + DRAFT versions + sections) from a template.
      *
-     * Flow: authorize `site:create` → resolve the template (latest starter by
-     * default) → load the org's name + business profile into a
-     * {@link TemplateContext} → instantiate (contract-validated pages) → derive
-     * + collision-check the slug → persist the whole tree in one transaction.
+     * Flow: authorize `site:create` → enforce the plan's `sites` limit →
+     * resolve the template (latest starter by default) → load the org's name +
+     * business profile into a {@link TemplateContext} → instantiate
+     * (contract-validated pages) → derive + collision-check the slug → persist
+     * the whole tree in one transaction.
      */
     async createFromTemplate(
         ctx: OrganizationContext,
         dto: CreateSiteFromTemplateDto,
     ): Promise<CreatedSite> {
         authorize(ctx, "site:create");
+
+        // Enforce the subscription's `sites` cap (S7-005). Count the org's live
+        // sites (soft-deleted excluded) and let the EntitlementService throw a
+        // 403 when the org is already at its plan limit. FREE default is 1.
+        const siteCount = await prisma.site.count({
+            where: { organizationId: ctx.organizationId, deletedAt: null },
+        });
+        await this.entitlements.check(ctx.organizationId, "sites", siteCount);
 
         const templateId = dto.templateId ?? STARTER_TEMPLATE_ID;
         const template = getTemplate(templateId, dto.templateVersion);

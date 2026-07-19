@@ -28,8 +28,23 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { EntitlementService } from "../billing/entitlement.service";
 import { FakeDomainVerifier, verificationRecordName } from "./domain-verifier";
 import { DomainsService } from "./domains.service";
+
+/**
+ * EntitlementService stub. `can` resolves true by default so the existing claim
+ * tests (which predate the paid-plan gate) still succeed; the dedicated gate
+ * test overrides it to false.
+ */
+const entCan = jest.fn().mockResolvedValue(true);
+function ent(): EntitlementService {
+    return {
+        can: entCan,
+        check: jest.fn().mockResolvedValue(true),
+        getEntitlements: jest.fn(),
+    } as unknown as EntitlementService;
+}
 
 const domainCreate = prisma.domain.create as jest.Mock;
 const domainFindUnique = prisma.domain.findUnique as jest.Mock;
@@ -53,7 +68,7 @@ describe("DomainsService.claim", () => {
     beforeEach(() => jest.clearAllMocks());
 
     it("creates a PENDING domain with a token scoped to the ctx org and returns TXT instructions", async () => {
-        const service = new DomainsService(new FakeDomainVerifier());
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
         domainFindUnique.mockResolvedValue(null); // hostname free
         domainCreate.mockImplementation(
             ({ data }: { data: Record<string, unknown> }) =>
@@ -86,7 +101,7 @@ describe("DomainsService.claim", () => {
     });
 
     it("rejects an already-claimed hostname with 409 Conflict and never creates", async () => {
-        const service = new DomainsService(new FakeDomainVerifier());
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
         // Claimed by ANOTHER org — still blocks (hostname is globally unique).
         domainFindUnique.mockResolvedValue({
             id: "dom_x",
@@ -101,7 +116,7 @@ describe("DomainsService.claim", () => {
     });
 
     it("validates the bound Site belongs to the org (cross-tenant siteId → 404)", async () => {
-        const service = new DomainsService(new FakeDomainVerifier());
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
         domainFindUnique.mockResolvedValue(null);
         siteFindUnique.mockResolvedValue({
             id: "site_1",
@@ -118,7 +133,7 @@ describe("DomainsService.claim", () => {
     });
 
     it("denies a MEMBER (domain:manage is OWNER/ADMIN-only) before any I/O", async () => {
-        const service = new DomainsService(new FakeDomainVerifier());
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
 
         await expect(
             service.claim(ctx({ role: "MEMBER" }), {
@@ -128,6 +143,18 @@ describe("DomainsService.claim", () => {
         expect(domainFindUnique).not.toHaveBeenCalled();
         expect(domainCreate).not.toHaveBeenCalled();
     });
+
+    it("refuses the claim when the plan lacks the customDomain entitlement (FREE default), no write", async () => {
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
+        entCan.mockResolvedValueOnce(false); // FREE plan: customDomain is false
+        domainFindUnique.mockResolvedValue(null); // hostname is otherwise free
+
+        await expect(
+            service.claim(ctx(), { hostname: "shop.acme.com" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(entCan).toHaveBeenCalledWith("org_1", "customDomain");
+        expect(domainCreate).not.toHaveBeenCalled();
+    });
 });
 
 describe("DomainsService.verify", () => {
@@ -135,7 +162,7 @@ describe("DomainsService.verify", () => {
 
     it("flips PENDING → VERIFIED via the verifier and links the bound Site", async () => {
         const verifier = new FakeDomainVerifier(true); // DNS check passes
-        const service = new DomainsService(verifier);
+        const service = new DomainsService(verifier, ent());
         domainFindUnique.mockResolvedValue({
             id: "dom_1",
             organizationId: "org_1",
@@ -177,7 +204,7 @@ describe("DomainsService.verify", () => {
 
     it("leaves the domain PENDING and unlinked when the verifier fails", async () => {
         const verifier = new FakeDomainVerifier(false); // DNS check fails
-        const service = new DomainsService(verifier);
+        const service = new DomainsService(verifier, ent());
         domainFindUnique.mockResolvedValue({
             id: "dom_1",
             organizationId: "org_1",
@@ -199,7 +226,7 @@ describe("DomainsService.verify", () => {
 
     it("is idempotent: an already-VERIFIED domain is returned without re-checking DNS", async () => {
         const verifier = new FakeDomainVerifier(true);
-        const service = new DomainsService(verifier);
+        const service = new DomainsService(verifier, ent());
         domainFindUnique.mockResolvedValue({
             id: "dom_1",
             organizationId: "org_1",
@@ -218,7 +245,7 @@ describe("DomainsService.verify", () => {
 
     it("rejects a cross-tenant verify with 404 and never checks DNS", async () => {
         const verifier = new FakeDomainVerifier(true);
-        const service = new DomainsService(verifier);
+        const service = new DomainsService(verifier, ent());
         domainFindUnique.mockResolvedValue({
             id: "dom_1",
             organizationId: "org_OTHER",
@@ -235,7 +262,7 @@ describe("DomainsService.verify", () => {
     });
 
     it("denies a MEMBER before loading anything", async () => {
-        const service = new DomainsService(new FakeDomainVerifier(true));
+        const service = new DomainsService(new FakeDomainVerifier(true), ent());
         await expect(
             service.verify(ctx({ role: "MEMBER" }), "dom_1"),
         ).rejects.toBeInstanceOf(ForbiddenException);
@@ -247,7 +274,7 @@ describe("DomainsService.list", () => {
     beforeEach(() => jest.clearAllMocks());
 
     it("scopes the query to the ctx org, newest first", async () => {
-        const service = new DomainsService(new FakeDomainVerifier());
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
         domainFindMany.mockResolvedValue([]);
 
         await service.list(ctx());
@@ -263,7 +290,7 @@ describe("DomainsService.remove", () => {
     beforeEach(() => jest.clearAllMocks());
 
     it("unlinks the routed Site then deletes an owned domain", async () => {
-        const service = new DomainsService(new FakeDomainVerifier());
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
         domainFindUnique.mockResolvedValue({
             id: "dom_1",
             organizationId: "org_1",
@@ -284,7 +311,7 @@ describe("DomainsService.remove", () => {
     });
 
     it("rejects a cross-tenant remove with 404 and deletes nothing", async () => {
-        const service = new DomainsService(new FakeDomainVerifier());
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
         domainFindUnique.mockResolvedValue({
             id: "dom_1",
             organizationId: "org_OTHER",

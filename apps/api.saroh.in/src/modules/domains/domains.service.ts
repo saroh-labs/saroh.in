@@ -1,5 +1,6 @@
 import {
     ConflictException,
+    ForbiddenException,
     Inject,
     Injectable,
     NotFoundException,
@@ -8,6 +9,7 @@ import { prisma } from "@saroh/database";
 import { randomBytes } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { EntitlementService } from "../billing/entitlement.service";
 import { authorize } from "../organizations/organization-policy";
 import type { DomainVerifier } from "./domain-verifier";
 import { DOMAIN_VERIFIER, verificationRecordName } from "./domain-verifier";
@@ -41,6 +43,7 @@ export interface DnsTxtInstructions {
 export class DomainsService {
     constructor(
         @Inject(DOMAIN_VERIFIER) private readonly verifier: DomainVerifier,
+        private readonly entitlements: EntitlementService,
     ) {}
 
     /**
@@ -52,6 +55,16 @@ export class DomainsService {
      */
     async claim(ctx: OrganizationContext, input: ClaimDomainInput) {
         authorize(ctx, "domain:manage");
+
+        // Custom domains are a paid-plan entitlement (S7-005). The FREE default
+        // has `customDomain: false`, so an un-subscribed org is refused here.
+        if (
+            !(await this.entitlements.can(ctx.organizationId, "customDomain"))
+        ) {
+            throw new ForbiddenException(
+                "Custom domains require a paid plan; upgrade to add one.",
+            );
+        }
 
         const hostname = input.hostname.trim().toLowerCase();
 

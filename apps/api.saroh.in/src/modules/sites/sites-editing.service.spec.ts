@@ -67,7 +67,13 @@ function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     };
 }
 
-const service = new SitesService();
+// EntitlementService is only used by createFromTemplate (not the editing paths
+// under test); a stub satisfies the constructor.
+const service = new SitesService({
+    check: jest.fn().mockResolvedValue(true),
+    can: jest.fn().mockResolvedValue(true),
+    getEntitlements: jest.fn(),
+} as unknown as import("../billing/entitlement.service").EntitlementService);
 
 beforeEach(() => jest.clearAllMocks());
 
