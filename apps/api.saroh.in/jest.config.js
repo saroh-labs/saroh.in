@@ -61,6 +61,12 @@ module.exports = {
         // authorization + tenant-isolation specs, with a jest-mocked Prisma and a
         // mocked email fn — no DB, no SMTP, no network.
         "<rootDir>/src/modules/notifications/**/*.spec.ts",
+        // S4-002 bookings: the PURE availability geometry (tz-aware slots, DST
+        // boundaries, buffers, capacity) and BookingsService specs with a
+        // jest-mocked Prisma (incl. serializable $transaction) — the public
+        // booking command's capacity-one race, idempotency, org-from-Service,
+        // rate-limit, cancel, and management authz. Never touch a DB, no network.
+        "<rootDir>/src/modules/bookings/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],

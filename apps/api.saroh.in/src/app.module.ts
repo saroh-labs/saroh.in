@@ -4,6 +4,7 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { auth } from "./common/auth/auth";
 import { AuditModule } from "./modules/audit/audit.module";
+import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { ContactsModule } from "./modules/contacts/contacts.module";
 import { ContentModule } from "./modules/content/content.module";
@@ -63,6 +64,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         PipelinesModule,
         LeadsModule,
         NotificationsModule,
+        BookingsModule,
     ],
 })
 export class AppModule {}
