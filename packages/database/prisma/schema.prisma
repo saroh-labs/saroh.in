@@ -97,6 +97,11 @@ model Organization {
   // system-wide, so the back-relation is nullable on the Job side.
   jobs Job[]
 
+  // In-app notification inbox (Stage 3 — S3-006). Durable per-org (optionally
+  // per-user) records surfaced in the dashboard; email is a delivery channel
+  // driven by the job worker on top of these rows.
+  notifications Notification[]
+
   createdAt DateTime @default(now())
 }
 
@@ -1486,5 +1491,43 @@ model Job {
   processedAt DateTime? // set when DONE or FAILED (terminal)
 
   @@index([status, runAt])
+  @@index([organizationId])
+}
+
+// ============================================================================
+// NOTIFICATIONS (Stage 3 — S3-006)
+// ============================================================================
+//
+// A durable in-app inbox record. The enquiry.notify job handler (S3-006)
+// creates one Notification per new enquiry and, as a delivery channel, sends an
+// email — both driven by the at-least-once Job worker, so handlers must be
+// idempotent. The `(leadId, type)` unique guarantees "owner is notified once"
+// per lead+type even if the job runs twice (NULL leadId rows stay distinct).
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Recipient. Null = an org-wide notice any member/owner may see; set = a
+  // specific user's inbox item. Informational (no FK cascade wiring needed).
+  userId String?
+
+  type  String // "enquiry.new" | ...
+  title String
+  body  String?
+
+  // The subject this notice points at (a Lead, for enquiries).
+  leadId String?
+
+  readAt DateTime? // null = unread
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Idempotency backstop for the at-least-once worker: one notice per
+  // (leadId, type). NULL leadId rows are distinct, so non-lead notices are
+  // unconstrained.
+  @@unique([leadId, type])
+  @@index([organizationId, userId, readAt])
   @@index([organizationId])
 }
