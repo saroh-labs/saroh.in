@@ -64,6 +64,14 @@ const envSchema = z.object({
     USER_ACCOUNT: z.string().optional(),
     USER_PASSWORD: z.string().optional(),
 
+    // Payments (S5-002 — org merchant credential encryption at rest).
+    // A 32-byte AES-256-GCM key, supplied as base64 or 64-hex. OPTIONAL in the
+    // schema so dev/test can boot without payments configured; the payments
+    // crypto module validates its presence + length AT USE time (the moment a
+    // credential is en/decrypted) and throws a clear error if it is
+    // missing/malformed. Never logged.
+    PAYMENTS_ENC_KEY: z.string().optional(),
+
     // Set automatically by npm/pnpm run scripts; used for the health probe.
     // Background job worker (S3-003 — durable JobQueue outbox + worker).
     // All optional with sane defaults; the poll loop is disabled under

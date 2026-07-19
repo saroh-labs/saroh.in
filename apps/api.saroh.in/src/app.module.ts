@@ -21,6 +21,7 @@ import { MembersModule } from "./modules/members/members.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
+import { PaymentsModule } from "./modules/payments/payments.module";
 import { PipelinesModule } from "./modules/pipelines/pipelines.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
@@ -65,6 +66,7 @@ import { StoresModule } from "./modules/stores/stores.module";
         LeadsModule,
         NotificationsModule,
         BookingsModule,
+        PaymentsModule,
     ],
 })
 export class AppModule {}

@@ -73,6 +73,13 @@ module.exports = {
         // integration project; these two named specs run here.
         "<rootDir>/src/modules/orders/order-state.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
+        // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
+        // missing-key) and PaymentsService specs with a jest-mocked Prisma
+        // (incl. $transaction) + a fake MerchantProvider — connect stores only
+        // ciphertext, createIntent derives amountCents server-side from the
+        // Order, idempotent replay, cross-tenant 404, and payment authz. Never
+        // touch a DB or the network.
+        "<rootDir>/src/modules/payments/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
