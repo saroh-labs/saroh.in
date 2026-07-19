@@ -15,10 +15,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { DraftPreview } from "@/components/sites/section-preview";
+import { ensureFormForSection } from "@/lib/forms/actions";
 import { publishSite, saveDraftSections } from "@/lib/sites/actions";
 import type {
     CtaStyle,
     CtaValue,
+    EnquiryContent,
+    EnquiryField,
+    EnquiryFieldType,
     GalleryLayout,
     HeroContent,
     ImageValue,
@@ -40,9 +44,24 @@ const SECTION_LABELS: Record<SectionType, string> = {
     richText: "Rich text",
     cta: "Call to action",
     gallery: "Gallery",
+    enquiry: "Enquiry form",
 };
 
-const SECTION_ORDER: SectionType[] = ["hero", "richText", "cta", "gallery"];
+const SECTION_ORDER: SectionType[] = [
+    "hero",
+    "richText",
+    "cta",
+    "gallery",
+    "enquiry",
+];
+
+/** The field types an enquiry field may take, with author-facing labels. */
+const ENQUIRY_FIELD_TYPES: { value: EnquiryFieldType; label: string }[] = [
+    { value: "text", label: "Text" },
+    { value: "email", label: "Email" },
+    { value: "tel", label: "Phone" },
+    { value: "textarea", label: "Long text" },
+];
 
 /** A sensible empty section for the chosen type (contract v1). */
 function emptySection(type: SectionType): Section {
@@ -70,6 +89,26 @@ function emptySection(type: SectionType): Section {
                 type,
                 contractVersion: 1,
                 content: { images: [], layout: "grid" },
+            };
+        case "enquiry":
+            return {
+                type,
+                contractVersion: 1,
+                content: {
+                    title: "Get in touch",
+                    submitLabel: "Send",
+                    successMessage: "Thanks — we'll be in touch soon.",
+                    // Seed with an email field: the contract + the backing Form
+                    // both require one, so the section is valid out of the box.
+                    fields: [
+                        {
+                            name: "email",
+                            label: "Email",
+                            type: "email",
+                            required: true,
+                        },
+                    ],
+                },
             };
     }
 }
@@ -137,14 +176,65 @@ export function SiteEditor({
         });
     }
 
+    /**
+     * Sync each enquiry section's backing Form to its authored fields before
+     * saving, writing the returned `formId` back into the section content. The
+     * PUBLIC submit endpoint validates against that Form, so the two MUST stay
+     * in sync. On any failure (including a missing active org) the offending
+     * section index + message are surfaced and the save is aborted.
+     */
+    async function syncEnquiryForms(
+        current: Section[],
+    ): Promise<
+        | { ok: true; sections: Section[] }
+        | { ok: false; index: number; error: string }
+    > {
+        const next = [...current];
+        for (let i = 0; i < next.length; i++) {
+            const section = next[i];
+            if (section.type !== "enquiry") continue;
+            const content = section.content;
+            const res = await ensureFormForSection({
+                formId: content.formId,
+                name:
+                    [content.title?.trim()].find((s) => s) ??
+                    `${siteName} enquiry`,
+                fields: content.fields,
+            });
+            if (!res.ok) {
+                return { ok: false, index: i, error: res.error };
+            }
+            next[i] = {
+                ...section,
+                content: { ...content, formId: res.data.formId },
+            };
+        }
+        return { ok: true, sections: next };
+    }
+
     async function onSave() {
         setSaving(true);
         setErrorIndex(null);
         setErrorMessage(null);
-        const res = await saveDraftSections(siteId, pageId, sections);
+
+        // Keep every enquiry section's Form in sync first — this stamps the
+        // returned formId into the content we then persist + publish.
+        const synced = await syncEnquiryForms(sections);
+        if (!synced.ok) {
+            setSaving(false);
+            setErrorIndex(synced.index);
+            setErrorMessage(synced.error);
+            toast.error(synced.error);
+            return;
+        }
+        if (JSON.stringify(synced.sections) !== JSON.stringify(sections)) {
+            setSections(synced.sections);
+        }
+
+        const res = await saveDraftSections(siteId, pageId, synced.sections);
         setSaving(false);
         if (res.ok) {
-            setLastSavedJson(JSON.stringify(sections));
+            setLastSavedJson(JSON.stringify(synced.sections));
             toast.success("Draft saved.");
             return;
         }
@@ -545,6 +635,167 @@ function SectionFields({
                             }
                         >
                             + Image
+                        </Button>
+                    </div>
+                </div>
+            );
+        }
+        case "enquiry": {
+            const c = section.content;
+            const patch = (next: Partial<EnquiryContent>) =>
+                onChange({ ...section, content: { ...c, ...next } });
+            const setFields = (fields: EnquiryField[]) =>
+                onChange({ ...section, content: { ...c, fields } });
+            const patchField = (i: number, next: Partial<EnquiryField>) =>
+                setFields(
+                    c.fields.map((f, idx) =>
+                        idx === i ? { ...f, ...next } : f,
+                    ),
+                );
+            return (
+                <div className="grid gap-3">
+                    <Field label="Title">
+                        <Input
+                            value={c.title ?? ""}
+                            onChange={(e) => patch({ title: e.target.value })}
+                            placeholder="Get in touch"
+                        />
+                    </Field>
+                    <Field label="Description">
+                        <Textarea
+                            value={c.description ?? ""}
+                            onChange={(e) =>
+                                patch({ description: e.target.value })
+                            }
+                            rows={2}
+                            placeholder="Tell us what you need and we'll reply."
+                        />
+                    </Field>
+                    <Field label="Submit button label">
+                        <Input
+                            value={c.submitLabel ?? ""}
+                            onChange={(e) =>
+                                patch({ submitLabel: e.target.value })
+                            }
+                            placeholder="Send"
+                        />
+                    </Field>
+                    <Field label="Success message">
+                        <Input
+                            value={c.successMessage ?? ""}
+                            onChange={(e) =>
+                                patch({ successMessage: e.target.value })
+                            }
+                            placeholder="Thanks — we'll be in touch soon."
+                        />
+                    </Field>
+                    <div className="grid gap-2">
+                        <Label>Fields</Label>
+                        <p className="text-xs text-muted-foreground">
+                            Include at least one email field — it identifies the
+                            person who enquired.
+                        </p>
+                        {c.fields.map((field, i) => (
+                            <div
+                                key={i}
+                                className="grid gap-2 rounded-md border p-2"
+                            >
+                                <div className="flex items-start gap-2">
+                                    <Input
+                                        value={field.name}
+                                        onChange={(e) =>
+                                            patchField(i, {
+                                                name: e.target.value,
+                                            })
+                                        }
+                                        placeholder="Field name (email)"
+                                        aria-label="Field name"
+                                    />
+                                    <Input
+                                        value={field.label}
+                                        onChange={(e) =>
+                                            patchField(i, {
+                                                label: e.target.value,
+                                            })
+                                        }
+                                        placeholder="Label (Email)"
+                                        aria-label="Field label"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-label="Remove field"
+                                        onClick={() =>
+                                            setFields(
+                                                c.fields.filter(
+                                                    (_, idx) => idx !== i,
+                                                ),
+                                            )
+                                        }
+                                    >
+                                        ✕
+                                    </Button>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-40">
+                                        <Select
+                                            value={field.type}
+                                            onValueChange={(v) =>
+                                                patchField(i, {
+                                                    type: v as EnquiryFieldType,
+                                                })
+                                            }
+                                        >
+                                            <SelectTrigger aria-label="Field type">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {ENQUIRY_FIELD_TYPES.map(
+                                                    (t) => (
+                                                        <SelectItem
+                                                            key={t.value}
+                                                            value={t.value}
+                                                        >
+                                                            {t.label}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <input
+                                            type="checkbox"
+                                            checked={field.required ?? false}
+                                            onChange={(e) =>
+                                                patchField(i, {
+                                                    required: e.target.checked,
+                                                })
+                                            }
+                                        />
+                                        Required
+                                    </label>
+                                </div>
+                            </div>
+                        ))}
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="justify-self-start"
+                            onClick={() =>
+                                setFields([
+                                    ...c.fields,
+                                    {
+                                        name: "",
+                                        label: "",
+                                        type: "text",
+                                    },
+                                ])
+                            }
+                        >
+                            + Field
                         </Button>
                     </div>
                 </div>

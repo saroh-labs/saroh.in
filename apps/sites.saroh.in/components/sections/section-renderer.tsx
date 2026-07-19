@@ -1,5 +1,6 @@
 import type {
     CtaContent,
+    EnquiryContent,
     GalleryContent,
     HeroContent,
     RichTextContent,
@@ -7,6 +8,7 @@ import type {
 } from "@/lib/publication";
 
 import CtaSection from "./cta";
+import EnquirySection from "./enquiry";
 import GallerySection from "./gallery";
 import HeroSection from "./hero";
 import RichTextSection from "./rich-text";
@@ -40,6 +42,10 @@ export default function SectionRenderer({ section }: { section: Section }) {
         case "gallery":
             return (
                 <GallerySection content={section.content as GalleryContent} />
+            );
+        case "enquiry":
+            return (
+                <EnquirySection content={section.content as EnquiryContent} />
             );
         default:
             // Unknown section type (e.g. from a newer contract version) —

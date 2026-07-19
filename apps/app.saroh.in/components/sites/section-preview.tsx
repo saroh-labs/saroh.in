@@ -103,6 +103,45 @@ function SectionPreview({ section }: { section: Section }) {
                 </section>
             );
         }
+        case "enquiry": {
+            const { title, description, submitLabel, fields } = section.content;
+            return (
+                <section className="rounded-lg border p-6">
+                    {title && (
+                        <h3 className="text-lg font-semibold">{title}</h3>
+                    )}
+                    {description && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {description}
+                        </p>
+                    )}
+                    {/* A non-submitting mockup: shows the author their fields. */}
+                    <div className="mt-4 grid gap-3">
+                        {fields.map((field, i) => (
+                            <div key={i} className="grid gap-1.5">
+                                <span className="text-sm font-medium">
+                                    {[field.label, field.name].find((s) => s) ??
+                                        "Field"}
+                                    {field.required && (
+                                        <span className="text-destructive">
+                                            {" *"}
+                                        </span>
+                                    )}
+                                </span>
+                                {field.type === "textarea" ? (
+                                    <div className="h-16 rounded-md border bg-muted/30" />
+                                ) : (
+                                    <div className="h-9 rounded-md border bg-muted/30" />
+                                )}
+                            </div>
+                        ))}
+                        <span className="mt-1 inline-block w-fit rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground">
+                            {[submitLabel].find((s) => s) ?? "Send"}
+                        </span>
+                    </div>
+                </section>
+            );
+        }
         default:
             return null;
     }
