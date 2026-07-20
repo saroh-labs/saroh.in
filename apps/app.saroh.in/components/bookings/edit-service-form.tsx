@@ -1,12 +1,22 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { archiveService, updateService } from "@/lib/services/actions";
 import type { Service } from "@/lib/services/service";
@@ -17,52 +27,58 @@ import type { Service } from "@/lib/services/service";
  * offers an Archive control (`archiveService`) that stops the service accepting
  * new bookings while its historical bookings survive. Availability windows are
  * edited separately by the AvailabilityRulesEditor.
+ *
+ * Validation is schema-driven (zod + react-hook-form via the shared `@saroh/ui`
+ * `Form`), so field errors and the disabled/submitting states are handled by
+ * the form primitives rather than hand-rolled `useState`.
  */
+
+const formSchema = z.object({
+    name: z.string().trim().min(1, { message: "Name is required" }),
+    description: z.string().optional(),
+    durationMinutes: z.string().refine(
+        (v) => {
+            const n = Number(v);
+            return Number.isInteger(n) && n >= 1;
+        },
+        { message: "Duration must be at least 1 minute" },
+    ),
+    capacity: z.string().optional(),
+    bufferBefore: z.string().optional(),
+    bufferAfter: z.string().optional(),
+    timezone: z.string().trim().min(1, { message: "Timezone is required" }),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
 export function EditServiceForm({ service }: { service: Service }) {
     const router = useRouter();
-    const [name, setName] = useState(service.name);
-    const [description, setDescription] = useState(service.description ?? "");
-    const [durationMinutes, setDurationMinutes] = useState(
-        String(service.durationMinutes),
-    );
-    const [capacity, setCapacity] = useState(String(service.capacity));
-    const [bufferBefore, setBufferBefore] = useState(
-        String(service.bufferBeforeMinutes),
-    );
-    const [bufferAfter, setBufferAfter] = useState(
-        String(service.bufferAfterMinutes),
-    );
-    const [timezone, setTimezone] = useState(service.timezone);
-    const [saving, setSaving] = useState(false);
+    const form = useForm<FormValues>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            name: service.name,
+            description: service.description ?? "",
+            durationMinutes: String(service.durationMinutes),
+            capacity: String(service.capacity),
+            bufferBefore: String(service.bufferBeforeMinutes),
+            bufferAfter: String(service.bufferAfterMinutes),
+            timezone: service.timezone,
+        },
+    });
+    const { isSubmitting } = form.formState;
+    const name = form.watch("name");
     const [archiving, setArchiving] = useState(false);
 
-    async function onSave(e: React.FormEvent) {
-        e.preventDefault();
-        if (!name.trim()) {
-            toast.error("Name is required");
-            return;
-        }
-        const duration = Number(durationMinutes);
-        if (!Number.isInteger(duration) || duration < 1) {
-            toast.error("Duration must be at least 1 minute");
-            return;
-        }
-        if (!timezone.trim()) {
-            toast.error("Timezone is required");
-            return;
-        }
-
-        setSaving(true);
+    async function onSave(values: FormValues) {
         const res = await updateService(service.id, {
-            name: name.trim(),
-            description: description.trim(),
-            durationMinutes: duration,
-            bufferBeforeMinutes: Number(bufferBefore) || 0,
-            bufferAfterMinutes: Number(bufferAfter) || 0,
-            capacity: Number(capacity) || 1,
-            timezone: timezone.trim(),
+            name: values.name.trim(),
+            description: values.description?.trim() ?? "",
+            durationMinutes: Number(values.durationMinutes),
+            bufferBeforeMinutes: Number(values.bufferBefore) || 0,
+            bufferAfterMinutes: Number(values.bufferAfter) || 0,
+            capacity: Number(values.capacity) || 1,
+            timezone: values.timezone.trim(),
         });
-        setSaving(false);
         if (!res.ok) {
             toast.error(res.error);
             return;
@@ -86,105 +102,154 @@ export function EditServiceForm({ service }: { service: Service }) {
     const archived = service.status === "ARCHIVED";
 
     return (
-        <form onSubmit={onSave} className="grid max-w-xl gap-4">
-            <div className="grid gap-2">
-                <Label htmlFor="name">Service name</Label>
-                <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    disabled={saving}
+        <Form {...form}>
+            <form
+                onSubmit={form.handleSubmit(onSave)}
+                className="grid max-w-xl gap-4"
+            >
+                <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Service name</FormLabel>
+                            <FormControl>
+                                <Input disabled={isSubmitting} {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
-            </div>
 
-            <div className="grid gap-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={2}
-                    disabled={saving}
+                <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                                <Textarea
+                                    rows={2}
+                                    disabled={isSubmitting}
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
-            </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-2">
-                    <Label htmlFor="duration">Duration (minutes)</Label>
-                    <Input
-                        id="duration"
-                        type="number"
-                        min={1}
-                        max={1440}
-                        value={durationMinutes}
-                        onChange={(e) => setDurationMinutes(e.target.value)}
-                        disabled={saving}
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                        control={form.control}
+                        name="durationMinutes"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Duration (minutes)</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        max={1440}
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="capacity"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Capacity (per slot)</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="bufferBefore"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Buffer before (minutes)</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={1440}
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="bufferAfter"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Buffer after (minutes)</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={1440}
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
                     />
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="capacity">Capacity (per slot)</Label>
-                    <Input
-                        id="capacity"
-                        type="number"
-                        min={1}
-                        value={capacity}
-                        onChange={(e) => setCapacity(e.target.value)}
-                        disabled={saving}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="bufferBefore">
-                        Buffer before (minutes)
-                    </Label>
-                    <Input
-                        id="bufferBefore"
-                        type="number"
-                        min={0}
-                        max={1440}
-                        value={bufferBefore}
-                        onChange={(e) => setBufferBefore(e.target.value)}
-                        disabled={saving}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="bufferAfter">Buffer after (minutes)</Label>
-                    <Input
-                        id="bufferAfter"
-                        type="number"
-                        min={0}
-                        max={1440}
-                        value={bufferAfter}
-                        onChange={(e) => setBufferAfter(e.target.value)}
-                        disabled={saving}
-                    />
-                </div>
-            </div>
 
-            <div className="grid gap-2">
-                <Label htmlFor="timezone">Timezone (IANA)</Label>
-                <Input
-                    id="timezone"
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    disabled={saving}
+                <FormField
+                    control={form.control}
+                    name="timezone"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Timezone (IANA)</FormLabel>
+                            <FormControl>
+                                <Input disabled={isSubmitting} {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
-            </div>
 
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Button type="submit" disabled={saving || !name.trim()}>
-                    {saving ? "Saving…" : "Save changes"}
-                </Button>
-                {!archived && (
+                <div className="flex flex-wrap items-center gap-3 pt-2">
                     <Button
-                        type="button"
-                        variant="outline"
-                        onClick={onArchive}
-                        disabled={archiving}
+                        type="submit"
+                        disabled={isSubmitting || !name.trim()}
                     >
-                        {archiving ? "Archiving…" : "Archive service"}
+                        {isSubmitting ? "Saving…" : "Save changes"}
                     </Button>
-                )}
-            </div>
-        </form>
+                    {!archived && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onArchive}
+                            disabled={archiving}
+                        >
+                            {archiving ? "Archiving…" : "Archive service"}
+                        </Button>
+                    )}
+                </div>
+            </form>
+        </Form>
     );
 }

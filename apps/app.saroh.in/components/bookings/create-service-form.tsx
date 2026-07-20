@@ -1,12 +1,22 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
+import {
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { createService } from "@/lib/services/actions";
 
@@ -16,6 +26,10 @@ import { createService } from "@/lib/services/actions";
  * price — and calls the `createService` server action. The timezone defaults to
  * the author's browser zone (an IANA name the api validates). On success it
  * routes to the service editor where availability windows are added.
+ *
+ * Validation is schema-driven (zod + react-hook-form via the shared `@saroh/ui`
+ * `Form`), so field errors and the disabled/submitting states are handled by
+ * the form primitives rather than hand-rolled `useState`.
  */
 
 /** The author's best-guess IANA timezone, for a sensible default. */
@@ -27,62 +41,72 @@ function guessTimezone(): string {
     }
 }
 
+const formSchema = z.object({
+    name: z.string().trim().min(1, { message: "Name is required" }),
+    description: z.string().optional(),
+    durationMinutes: z.string().refine(
+        (v) => {
+            const n = Number(v);
+            return Number.isInteger(n) && n >= 1;
+        },
+        { message: "Duration must be at least 1 minute" },
+    ),
+    capacity: z.string().optional(),
+    bufferBefore: z.string().optional(),
+    bufferAfter: z.string().optional(),
+    timezone: z.string().trim().min(1, { message: "Timezone is required" }),
+    price: z.string().refine(
+        (v) => {
+            if (!v.trim()) return true;
+            const n = Number(v);
+            return !Number.isNaN(n) && n >= 0;
+        },
+        { message: "Price must be a positive amount" },
+    ),
+    currency: z.string().optional(),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
 export function CreateServiceForm() {
     const router = useRouter();
-    const [name, setName] = useState("");
-    const [description, setDescription] = useState("");
-    const [durationMinutes, setDurationMinutes] = useState("30");
-    const [capacity, setCapacity] = useState("1");
-    const [bufferBefore, setBufferBefore] = useState("0");
-    const [bufferAfter, setBufferAfter] = useState("0");
-    const [timezone, setTimezone] = useState(guessTimezone);
-    const [price, setPrice] = useState("");
-    const [currency, setCurrency] = useState("");
-    const [submitting, setSubmitting] = useState(false);
+    const form = useForm<FormValues>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            name: "",
+            description: "",
+            durationMinutes: "30",
+            capacity: "1",
+            bufferBefore: "0",
+            bufferAfter: "0",
+            timezone: guessTimezone(),
+            price: "",
+            currency: "",
+        },
+    });
+    const { isSubmitting } = form.formState;
+    const name = form.watch("name");
 
-    async function onSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!name.trim()) {
-            toast.error("Name is required");
-            return;
-        }
-        const duration = Number(durationMinutes);
-        if (!Number.isInteger(duration) || duration < 1) {
-            toast.error("Duration must be at least 1 minute");
-            return;
-        }
-        if (!timezone.trim()) {
-            toast.error("Timezone is required");
-            return;
-        }
-
-        const priceValue = price.trim() ? Number(price) : undefined;
-        if (
-            priceValue !== undefined &&
-            (Number.isNaN(priceValue) || priceValue < 0)
-        ) {
-            toast.error("Price must be a positive amount");
-            return;
-        }
-
-        setSubmitting(true);
+    async function onSubmit(values: FormValues) {
+        const priceValue = values.price.trim()
+            ? Number(values.price)
+            : undefined;
         const res = await createService({
-            name: name.trim(),
-            description: description.trim() || undefined,
-            durationMinutes: duration,
-            bufferBeforeMinutes: Number(bufferBefore) || 0,
-            bufferAfterMinutes: Number(bufferAfter) || 0,
-            capacity: Number(capacity) || 1,
-            timezone: timezone.trim(),
+            name: values.name.trim(),
+            description: values.description?.trim() || undefined,
+            durationMinutes: Number(values.durationMinutes),
+            bufferBeforeMinutes: Number(values.bufferBefore) || 0,
+            bufferAfterMinutes: Number(values.bufferAfter) || 0,
+            capacity: Number(values.capacity) || 1,
+            timezone: values.timezone.trim(),
             priceCents:
                 priceValue !== undefined
                     ? Math.round(priceValue * 100)
                     : undefined,
-            currency: currency.trim()
-                ? currency.trim().toUpperCase()
+            currency: values.currency?.trim()
+                ? values.currency.trim().toUpperCase()
                 : undefined,
         });
-        setSubmitting(false);
 
         if (!res.ok) {
             toast.error(res.error);
@@ -93,131 +117,197 @@ export function CreateServiceForm() {
     }
 
     return (
-        <form onSubmit={onSubmit} className="grid max-w-xl gap-4">
-            <div className="grid gap-2">
-                <Label htmlFor="name">Service name</Label>
-                <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Intro call"
-                    required
-                    disabled={submitting}
-                />
-            </div>
-
-            <div className="grid gap-2">
-                <Label htmlFor="description">Description (optional)</Label>
-                <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={2}
-                    placeholder="A 30-minute introductory call."
-                    disabled={submitting}
-                />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-2">
-                    <Label htmlFor="duration">Duration (minutes)</Label>
-                    <Input
-                        id="duration"
-                        type="number"
-                        min={1}
-                        max={1440}
-                        value={durationMinutes}
-                        onChange={(e) => setDurationMinutes(e.target.value)}
-                        disabled={submitting}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="capacity">Capacity (per slot)</Label>
-                    <Input
-                        id="capacity"
-                        type="number"
-                        min={1}
-                        value={capacity}
-                        onChange={(e) => setCapacity(e.target.value)}
-                        disabled={submitting}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="bufferBefore">
-                        Buffer before (minutes)
-                    </Label>
-                    <Input
-                        id="bufferBefore"
-                        type="number"
-                        min={0}
-                        max={1440}
-                        value={bufferBefore}
-                        onChange={(e) => setBufferBefore(e.target.value)}
-                        disabled={submitting}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="bufferAfter">Buffer after (minutes)</Label>
-                    <Input
-                        id="bufferAfter"
-                        type="number"
-                        min={0}
-                        max={1440}
-                        value={bufferAfter}
-                        onChange={(e) => setBufferAfter(e.target.value)}
-                        disabled={submitting}
-                    />
-                </div>
-            </div>
-
-            <div className="grid gap-2">
-                <Label htmlFor="timezone">Timezone (IANA)</Label>
-                <Input
-                    id="timezone"
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    placeholder="Asia/Kolkata"
-                    disabled={submitting}
-                />
-                <p className="text-xs text-muted-foreground">
-                    Availability windows are authored in this timezone.
-                </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-2">
-                    <Label htmlFor="price">Price (optional)</Label>
-                    <Input
-                        id="price"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        placeholder="0.00"
-                        disabled={submitting}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="currency">Currency (optional)</Label>
-                    <Input
-                        id="currency"
-                        value={currency}
-                        onChange={(e) => setCurrency(e.target.value)}
-                        placeholder="INR"
-                        maxLength={3}
-                        disabled={submitting}
-                    />
-                </div>
-            </div>
-
-            <Button
-                type="submit"
-                disabled={submitting || !name.trim()}
-                className="justify-self-start"
+        <Form {...form}>
+            <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="grid max-w-xl gap-4"
             >
-                {submitting ? "Creating…" : "Create service"}
-            </Button>
-        </form>
+                <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Service name</FormLabel>
+                            <FormControl>
+                                <Input
+                                    placeholder="Intro call"
+                                    disabled={isSubmitting}
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Description (optional)</FormLabel>
+                            <FormControl>
+                                <Textarea
+                                    rows={2}
+                                    placeholder="A 30-minute introductory call."
+                                    disabled={isSubmitting}
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                        control={form.control}
+                        name="durationMinutes"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Duration (minutes)</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        max={1440}
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="capacity"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Capacity (per slot)</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="bufferBefore"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Buffer before (minutes)</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={1440}
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="bufferAfter"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Buffer after (minutes)</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={1440}
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                <FormField
+                    control={form.control}
+                    name="timezone"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Timezone (IANA)</FormLabel>
+                            <FormControl>
+                                <Input
+                                    placeholder="Asia/Kolkata"
+                                    disabled={isSubmitting}
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                Availability windows are authored in this
+                                timezone.
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                        control={form.control}
+                        name="price"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Price (optional)</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="currency"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Currency (optional)</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        placeholder="INR"
+                                        maxLength={3}
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                <Button
+                    type="submit"
+                    disabled={isSubmitting || !name.trim()}
+                    className="justify-self-start"
+                >
+                    {isSubmitting ? "Creating…" : "Create service"}
+                </Button>
+            </form>
+        </Form>
     );
 }

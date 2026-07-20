@@ -1,14 +1,36 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { createCustomer, updateCustomer } from "@/lib/customers/actions";
 import type { Customer } from "@/lib/customers/service";
+
+const formSchema = z.object({
+    email: z.string().trim().min(1, { message: "Email is required" }),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    phone: z.string().optional(),
+    country: z.string().optional(),
+    state: z.string().optional(),
+    city: z.string().optional(),
+    zipCode: z.string().optional(),
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 export function CustomerForm({
     storeId,
@@ -20,44 +42,39 @@ export function CustomerForm({
     const router = useRouter();
     const editing = Boolean(customer);
 
-    const [form, setForm] = useState({
-        email: customer?.email ?? "",
-        firstName: customer?.firstName ?? "",
-        lastName: customer?.lastName ?? "",
-        phone: customer?.phone ?? "",
-        country: customer?.country ?? "",
-        state: customer?.state ?? "",
-        city: customer?.city ?? "",
-        zipCode: customer?.zipCode ?? "",
+    const form = useForm<FormValues>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            email: customer?.email ?? "",
+            firstName: customer?.firstName ?? "",
+            lastName: customer?.lastName ?? "",
+            phone: customer?.phone ?? "",
+            country: customer?.country ?? "",
+            state: customer?.state ?? "",
+            city: customer?.city ?? "",
+            zipCode: customer?.zipCode ?? "",
+        },
     });
-    const [emailError, setEmailError] = useState<string | undefined>();
-    const [saving, setSaving] = useState(false);
+    const { isSubmitting } = form.formState;
 
-    const set =
-        (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-            setForm((f) => ({ ...f, [k]: e.target.value }));
-
-    async function onSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        setEmailError(undefined);
-        setSaving(true);
+    async function onSubmit(values: FormValues) {
         const input = {
-            email: form.email.trim(),
-            firstName: form.firstName.trim() || null,
-            lastName: form.lastName.trim() || null,
-            phone: form.phone.trim() || null,
-            country: form.country.trim() || null,
-            state: form.state.trim() || null,
-            city: form.city.trim() || null,
-            zipCode: form.zipCode.trim() || null,
+            email: values.email.trim(),
+            firstName: values.firstName?.trim() || null,
+            lastName: values.lastName?.trim() || null,
+            phone: values.phone?.trim() || null,
+            country: values.country?.trim() || null,
+            state: values.state?.trim() || null,
+            city: values.city?.trim() || null,
+            zipCode: values.zipCode?.trim() || null,
         };
         const res =
             editing && customer
                 ? await updateCustomer(storeId, customer.id, input)
                 : await createCustomer(storeId, input);
-        setSaving(false);
         if (!res.ok) {
-            if (res.field === "email") setEmailError(res.error);
+            if (res.field === "email")
+                form.setError("email", { message: res.error });
             else toast.error(res.error);
             return;
         }
@@ -66,97 +83,133 @@ export function CustomerForm({
     }
 
     return (
-        <form onSubmit={onSubmit} className="grid max-w-lg gap-4">
-            <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                    id="email"
-                    type="email"
-                    value={form.email}
-                    onChange={set("email")}
-                    required
-                    disabled={saving}
+        <Form {...form}>
+            <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="grid max-w-lg gap-4"
+            >
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                                <Input
+                                    type="email"
+                                    disabled={isSubmitting}
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
-                {emailError && (
-                    <p className="text-sm text-destructive">{emailError}</p>
-                )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                    <Label htmlFor="firstName">First name</Label>
-                    <Input
-                        id="firstName"
-                        value={form.firstName}
-                        onChange={set("firstName")}
-                        disabled={saving}
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>First name</FormLabel>
+                                <FormControl>
+                                    <Input disabled={isSubmitting} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Last name</FormLabel>
+                                <FormControl>
+                                    <Input disabled={isSubmitting} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
                     />
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="lastName">Last name</Label>
-                    <Input
-                        id="lastName"
-                        value={form.lastName}
-                        onChange={set("lastName")}
-                        disabled={saving}
-                    />
-                </div>
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                    id="phone"
-                    value={form.phone}
-                    onChange={set("phone")}
-                    disabled={saving}
+                <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Phone</FormLabel>
+                            <FormControl>
+                                <Input disabled={isSubmitting} {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                        id="city"
-                        value={form.city}
-                        onChange={set("city")}
-                        disabled={saving}
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>City</FormLabel>
+                                <FormControl>
+                                    <Input disabled={isSubmitting} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="state"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>State</FormLabel>
+                                <FormControl>
+                                    <Input disabled={isSubmitting} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="country"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Country</FormLabel>
+                                <FormControl>
+                                    <Input disabled={isSubmitting} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="zipCode"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Zip</FormLabel>
+                                <FormControl>
+                                    <Input disabled={isSubmitting} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
                     />
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="state">State</Label>
-                    <Input
-                        id="state"
-                        value={form.state}
-                        onChange={set("state")}
-                        disabled={saving}
-                    />
+                <div>
+                    <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting
+                            ? "Saving…"
+                            : editing
+                              ? "Save changes"
+                              : "Create customer"}
+                    </Button>
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input
-                        id="country"
-                        value={form.country}
-                        onChange={set("country")}
-                        disabled={saving}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="zipCode">Zip</Label>
-                    <Input
-                        id="zipCode"
-                        value={form.zipCode}
-                        onChange={set("zipCode")}
-                        disabled={saving}
-                    />
-                </div>
-            </div>
-            <div>
-                <Button type="submit" disabled={saving}>
-                    {saving
-                        ? "Saving…"
-                        : editing
-                          ? "Save changes"
-                          : "Create customer"}
-                </Button>
-            </div>
-        </form>
+            </form>
+        </Form>
     );
 }
