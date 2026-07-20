@@ -4,13 +4,10 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CustomersTable } from "@/components/stores/customers-table";
 import { listCustomers } from "@/lib/customers/service";
 import { requireSession } from "@/lib/session";
 import { getStore } from "@/lib/stores/service";
-
-function name(c: { firstName: string | null; lastName: string | null }) {
-    return [c.firstName, c.lastName].filter(Boolean).join(" ");
-}
 
 export default async function CustomersPage({
     params,
@@ -48,30 +45,7 @@ export default async function CustomersPage({
                     }
                 />
             ) : (
-                <ul className="divide-y rounded-lg border">
-                    {customers.map((c) => (
-                        <li key={c.id}>
-                            <Link
-                                href={`${base}/${c.id}`}
-                                className="flex items-center justify-between gap-3 p-3 transition-colors hover:bg-accent"
-                            >
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-medium">
-                                        {name(c) || c.email}
-                                    </p>
-                                    <p className="truncate text-xs text-muted-foreground">
-                                        {c.email}
-                                    </p>
-                                </div>
-                                {c.city && (
-                                    <span className="text-xs text-muted-foreground">
-                                        {c.city}
-                                    </span>
-                                )}
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
+                <CustomersTable customers={customers} base={base} />
             )}
         </div>
     );

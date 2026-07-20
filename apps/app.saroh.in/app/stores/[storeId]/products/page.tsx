@@ -1,25 +1,13 @@
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ProductsTable } from "@/components/stores/products-table";
 import { listProducts } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
 import { getStore } from "@/lib/stores/service";
-
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
-    PUBLISHED: "default",
-    DRAFT: "secondary",
-    ARCHIVED: "outline",
-};
-
-/** Display a decimal-string price with 2 places (display only; value is exact). */
-function formatPrice(price: string): string {
-    const n = Number(price);
-    return Number.isFinite(n) ? n.toFixed(2) : price;
-}
 
 /**
  * Products catalog list. Store-access gated (members can read). Each row links
@@ -67,38 +55,7 @@ export default async function ProductsPage({
                     }
                 />
             ) : (
-                <ul className="divide-y rounded-lg border">
-                    {products.map((p) => (
-                        <li key={p.id}>
-                            <Link
-                                href={`${base}/${p.id}`}
-                                className="flex items-center justify-between gap-3 p-3 transition-colors hover:bg-accent"
-                            >
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-medium">
-                                        {p.name}
-                                    </p>
-                                    <p className="truncate text-xs text-muted-foreground">
-                                        {p.category?.name ?? "Uncategorized"}
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm tabular-nums">
-                                        {p.currency} {formatPrice(p.price)}
-                                    </span>
-                                    <Badge
-                                        variant={
-                                            STATUS_VARIANT[p.status] ??
-                                            "secondary"
-                                        }
-                                    >
-                                        {p.status}
-                                    </Badge>
-                                </div>
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
+                <ProductsTable products={products} base={base} />
             )}
         </div>
     );
