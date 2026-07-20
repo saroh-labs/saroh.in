@@ -80,12 +80,6 @@ export default async function AnalyticsPage({
                             </Button>
                         ))}
                     </div>
-                    <Link
-                        href="/"
-                        className="text-sm text-muted-foreground hover:underline"
-                    >
-                        ← Dashboard
-                    </Link>
                 </div>
             </div>
 

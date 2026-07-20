@@ -103,12 +103,6 @@ export default async function BookingsPage() {
                     <Button asChild variant="outline">
                         <Link href="/services">Services</Link>
                     </Button>
-                    <Link
-                        href="/"
-                        className="text-sm text-muted-foreground hover:underline"
-                    >
-                        ← Dashboard
-                    </Link>
                 </div>
             </div>
 

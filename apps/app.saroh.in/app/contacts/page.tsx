@@ -20,12 +20,6 @@ export default async function ContactsPage() {
         <main className="mx-auto max-w-4xl p-8">
             <div className="mb-6 flex items-center justify-between">
                 <h1 className="text-2xl font-semibold">Contacts</h1>
-                <Link
-                    href="/"
-                    className="text-sm text-muted-foreground hover:underline"
-                >
-                    ← Dashboard
-                </Link>
             </div>
 
             {contacts.length === 0 ? (

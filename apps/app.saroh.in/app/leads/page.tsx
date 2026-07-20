@@ -27,12 +27,6 @@ export default async function LeadsPage() {
                     <Button asChild variant="outline">
                         <Link href="/pipeline">Pipeline board</Link>
                     </Button>
-                    <Link
-                        href="/"
-                        className="text-sm text-muted-foreground hover:underline"
-                    >
-                        ← Dashboard
-                    </Link>
                 </div>
             </div>
 

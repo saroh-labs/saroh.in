@@ -1,36 +1,41 @@
+import { AppHeader } from "@/components/shared/app-header";
 import { ThemeProvider } from "@/components/theme-provider";
-import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import "./globals.css";
 import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-	title: "Saroh.io - Coming Soon",
-	description: "Build your online storefronts with Saroh.io",
+    title: {
+        default: "Saroh",
+        template: "%s · Saroh",
+    },
+    description:
+        "Manage your storefronts, sites, leads, bookings and more with Saroh.",
 };
 
 export default function RootLayout({
-	children,
+    children,
 }: {
-	children: React.ReactNode;
+    children: React.ReactNode;
 }) {
-	return (
-		<html lang="en">
-			<body className={inter.className}>
-				<Providers>
-					<ThemeProvider
-						attribute="class"
-						defaultTheme="light"
-						enableSystem
-						disableTransitionOnChange
-					>
-						{/* <Navigation /> */}
-						{children}
-					</ThemeProvider>
-				</Providers>
-			</body>
-		</html>
-	);
+    return (
+        <html lang="en">
+            <body className={inter.className}>
+                <Providers>
+                    <ThemeProvider
+                        attribute="class"
+                        defaultTheme="light"
+                        enableSystem
+                        disableTransitionOnChange
+                    >
+                        <AppHeader />
+                        {children}
+                    </ThemeProvider>
+                </Providers>
+            </body>
+        </html>
+    );
 }

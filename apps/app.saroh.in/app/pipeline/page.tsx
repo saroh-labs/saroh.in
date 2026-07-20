@@ -147,12 +147,6 @@ function Header({ pipelineName }: { pipelineName?: string }) {
                 >
                     List view
                 </Link>
-                <Link
-                    href="/"
-                    className="text-sm text-muted-foreground hover:underline"
-                >
-                    ← Dashboard
-                </Link>
             </div>
         </div>
     );

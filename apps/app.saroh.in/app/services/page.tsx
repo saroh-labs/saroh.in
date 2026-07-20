@@ -31,12 +31,6 @@ export default async function ServicesPage() {
                             <Link href="/services/new">New service</Link>
                         </Button>
                     )}
-                    <Link
-                        href="/"
-                        className="text-sm text-muted-foreground hover:underline"
-                    >
-                        ← Dashboard
-                    </Link>
                 </div>
             </div>
 
