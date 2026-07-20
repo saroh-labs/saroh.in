@@ -4,6 +4,7 @@ import {
     HttpException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
@@ -54,6 +55,9 @@ export class EnquiryService {
      * for the distributed-limiter caveat.
      */
     constructor(
+        // Not a DI provider — a per-instance default; @Optional() stops Nest
+        // trying to inject it so the default (and test overrides) apply.
+        @Optional()
         private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(),
     ) {}
 

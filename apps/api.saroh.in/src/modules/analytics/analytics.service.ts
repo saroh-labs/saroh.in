@@ -1,4 +1,9 @@
-import { HttpException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+    HttpException,
+    Injectable,
+    NotFoundException,
+    Optional,
+} from "@nestjs/common";
 import type { AnalyticsDailyAggregate } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 import { createHash } from "node:crypto";
@@ -88,6 +93,9 @@ export class AnalyticsService {
      * 120 hits / minute per `${siteId}:${ipHash}`). Injectable for tests.
      */
     constructor(
+        // Not a DI provider — a per-instance default; @Optional() stops Nest
+        // trying to inject it so the default (and test overrides) apply.
+        @Optional()
         private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
             120,
             60_000,

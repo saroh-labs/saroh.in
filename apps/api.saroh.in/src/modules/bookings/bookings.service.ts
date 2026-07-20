@@ -5,6 +5,7 @@ import {
     HttpException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
@@ -60,6 +61,9 @@ export class BookingsService {
      * `${serviceId}:${ipHash}`). Injectable for tests.
      */
     constructor(
+        // Not a DI provider — a per-instance default; @Optional() stops Nest
+        // trying to inject it so the default (and test overrides) apply.
+        @Optional()
         private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(),
     ) {}
 

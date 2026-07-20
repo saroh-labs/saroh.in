@@ -1,4 +1,9 @@
-import { ForbiddenException, HttpException, Injectable } from "@nestjs/common";
+import {
+    ForbiddenException,
+    HttpException,
+    Injectable,
+    Optional,
+} from "@nestjs/common";
 
 import { sendSelfTestEmail } from "../../common/email";
 import type { AuthUser } from "../../common/types/store-context";
@@ -45,10 +50,15 @@ export class SelfTestService {
      * speed-bump). Injectable so tests can drive the boundary deterministically.
      */
     constructor(
+        // Neither param is a DI provider — both are per-instance defaults;
+        // @Optional() stops Nest trying to inject them so the defaults (and
+        // test overrides) apply.
+        @Optional()
         private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
             5,
             60 * 60_000,
         ),
+        @Optional()
         private readonly sendEmail: typeof sendSelfTestEmail = sendSelfTestEmail,
     ) {}
 
