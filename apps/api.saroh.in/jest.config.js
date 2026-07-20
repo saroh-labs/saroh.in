@@ -118,6 +118,11 @@ module.exports = {
         // Jest-mocked Prisma + fake provider; never touch a DB or the network.
         "<rootDir>/src/modules/billing/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
+        // #90 (S0-011) API bootstrap smoke test: compiles the full AppModule DI
+        // graph so "the app doesn't even start" (the 0fc8f72 boot crash class)
+        // is caught. compile() resolves every provider without a DB — see the
+        // spec header for why it lives in the no-database unit project.
+        "<rootDir>/src/app.bootstrap.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
 };
