@@ -2,6 +2,7 @@
 import { env } from "@/env";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
+import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
 const apps = [
@@ -55,6 +56,7 @@ export default function AppsListPage() {
     return (
         <div className="flex flex-col items-center justify-center gap-2 p-8">
             <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-gray-200 bg-white p-8">
+                <Wordmark style={{ fontSize: "1.5rem" }} />
                 <Button onClick={() => authClient.signOut()}>Sign Out</Button>
                 <div className="flex flex-col gap-2 text-2xl font-bold">
                     Select the app to open

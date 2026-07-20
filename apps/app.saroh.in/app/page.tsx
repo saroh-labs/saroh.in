@@ -1,4 +1,5 @@
 import { Button } from "@saroh/ui/button";
+import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -29,6 +30,9 @@ export default async function Home() {
         <main className="mx-auto max-w-4xl p-8">
             <div className="mb-8 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
+                    <Link href="/" aria-label="Saroh" className="mr-1">
+                        <Wordmark />
+                    </Link>
                     {activeOrg && (
                         <OrganizationSwitcher
                             organizations={organizations}
