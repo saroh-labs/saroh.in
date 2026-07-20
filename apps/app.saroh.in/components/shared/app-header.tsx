@@ -1,6 +1,7 @@
 import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
 import { CommandTrigger } from "@/components/shared/command-trigger";
 import { MobileNav } from "@/components/shared/mobile-nav";
@@ -52,13 +53,14 @@ export function AppHeader(props: AppHeaderProps) {
                 </Link>
                 <CommandTrigger />
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
                 {activeOrg && (
                     <OrganizationSwitcher
                         organizations={organizations}
                         activeOrgId={activeOrg.id}
                     />
                 )}
+                <ThemeToggle />
                 <SignOutButton />
             </div>
         </header>
