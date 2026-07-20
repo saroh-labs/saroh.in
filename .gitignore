@@ -45,6 +45,15 @@ packages/database/generated/prisma
 docs/*
 !docs/architecture/
 !docs/architecture/*.md
+!docs/plans/
+docs/plans/*
+!docs/plans/2026-07-20-product-design-system-audit-design.md
+!docs/plans/2026-07-20-product-design-system-audit-plan.md
+!docs/design-system/
+!docs/design-system/**/*.md
+!docs/design-system/**/*.json
+!docs/design-system/**/*.csv
+!docs/design-system/**/*.png
 internal-decision-docs
 
 dist
