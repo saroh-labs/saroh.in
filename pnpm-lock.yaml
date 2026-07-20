@@ -868,6 +868,9 @@ importers:
       '@saroh/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@saroh/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       next:
         specifier: catalog:next16
         version: 16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

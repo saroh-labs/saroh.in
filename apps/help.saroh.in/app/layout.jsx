@@ -1,3 +1,4 @@
+import { Wordmark } from "@saroh/ui/wordmark";
 import { Footer, Layout, Navbar } from "nextra-theme-docs";
 import "nextra-theme-docs/style.css";
 import { Head } from "nextra/components";
@@ -10,35 +11,12 @@ export const metadata = {
     },
 };
 
-// Inline copy of the canonical @saroh/ui <Wordmark> (Nextra's JS layout can't
-// transpile the shared TSX component). Keep in sync with packages/ui wordmark.
-const wordmark = (
-    <span
-        style={{
-            display: "inline-flex",
-            alignItems: "baseline",
-            gap: "0.4ch",
-            fontWeight: 700,
-            fontSize: "1.125rem",
-            letterSpacing: "-0.02em",
-        }}
-    >
-        <span
-            style={{
-                backgroundImage:
-                    "linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-            }}
-        >
-            Saroh
-        </span>
-        <span style={{ fontWeight: 500, color: "#71717a" }}>Help</span>
-    </span>
+const navbar = (
+    <Navbar
+        logo={<Wordmark suffix="Help" />}
+        projectLink="https://app.saroh.in"
+    />
 );
-
-const navbar = <Navbar logo={wordmark} projectLink="https://app.saroh.in" />;
 
 const footer = <Footer>MIT {new Date().getFullYear()} © Saroh.in</Footer>;
 
