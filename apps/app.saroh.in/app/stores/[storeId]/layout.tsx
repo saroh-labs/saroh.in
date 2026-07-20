@@ -1,9 +1,4 @@
-import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
 import { StoreNav } from "@/components/stores/store-nav";
-import {
-    listOrganizations,
-    resolveActiveOrganization,
-} from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { getStore } from "@/lib/stores/service";
 import Link from "next/link";
@@ -11,9 +6,10 @@ import { notFound } from "next/navigation";
 
 /**
  * Per-store shell. Owner-gated: resolves the accounts session, then loads the
- * store ONLY if the signed-in user owns it (getStoreForOwner returns null
- * otherwise). A non-owner or unauthenticated visitor gets a 404 via
- * notFound() — no store data is rendered or leaked.
+ * store ONLY if the signed-in user owns it (getStore returns null otherwise).
+ * A non-owner or unauthenticated visitor gets a 404 via notFound() — no store
+ * data is rendered or leaked. Global chrome (brand, org switcher, nav) lives in
+ * AppHeader; this layout only renders the store breadcrumb + context.
  */
 export default async function StoreLayout({
     children,
@@ -27,26 +23,21 @@ export default async function StoreLayout({
     const store = await getStore(storeId);
     if (!store) notFound();
 
-    const organizations = await listOrganizations();
-    // Reuse the already-fetched list instead of re-fetching it (#102).
-    const activeOrg = await resolveActiveOrganization(organizations);
-
     return (
         <main className="mx-auto max-w-5xl p-8">
-            <div className="mb-6 flex items-center gap-3">
+            <nav
+                className="mb-4 text-sm text-muted-foreground"
+                aria-label="Breadcrumb"
+            >
                 <Link
                     href="/"
-                    className="text-sm text-muted-foreground hover:underline"
+                    className="hover:text-foreground hover:underline"
                 >
-                    ← Dashboard
+                    Stores
                 </Link>
-                {activeOrg && (
-                    <OrganizationSwitcher
-                        organizations={organizations}
-                        activeOrgId={activeOrg.id}
-                    />
-                )}
-            </div>
+                <span className="mx-1.5">/</span>
+                <span className="text-foreground">{store.name}</span>
+            </nav>
             <header className="mb-6">
                 <h1 className="text-2xl font-semibold tracking-tight">
                     {store.name}

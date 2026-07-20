@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 
 import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
+import { MobileNav } from "@/components/shared/mobile-nav";
 import { SignOutButton } from "@/components/sign-out-button";
 import { unreadNotificationCount } from "@/lib/notifications/service";
 import {
@@ -59,7 +60,8 @@ export async function AppHeader() {
     return (
         <header className="border-b">
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <MobileNav items={NAV} />
                     <Link href="/" aria-label="Saroh" className="shrink-0">
                         <Wordmark />
                     </Link>
