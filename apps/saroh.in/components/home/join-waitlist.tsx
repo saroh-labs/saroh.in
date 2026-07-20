@@ -88,7 +88,7 @@ export default function JoinWaitlist() {
                 {/* <Input
 					type="text"
 					placeholder="Enter your email address"
-					className="rounded-lg border border-neutral-800 focus:ring-2 focus:ring-teal-500  w-full relative z-10 mt-4  bg-neutral-950 placeholder:text-neutral-700"
+					className="rounded-lg border border-neutral-800 focus:ring-2 focus:ring-blue-500  w-full relative z-10 mt-4  bg-neutral-950 placeholder:text-neutral-700"
 				/> */}
                 <Form {...form}>
                     <form
@@ -103,7 +103,7 @@ export default function JoinWaitlist() {
                                     <FormControl>
                                         <Input
                                             placeholder="Enter your email address"
-                                            className="relative z-10 mt-4 w-full rounded-lg border border-neutral-800 bg-neutral-950 placeholder:text-neutral-700 focus:ring-2 focus:ring-teal-500"
+                                            className="relative z-10 mt-4 w-full rounded-lg border border-neutral-800 bg-neutral-950 placeholder:text-neutral-700 focus:ring-2 focus:ring-blue-500"
                                             {...field}
                                         />
                                     </FormControl>

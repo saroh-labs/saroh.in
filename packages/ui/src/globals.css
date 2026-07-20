@@ -32,6 +32,11 @@
         --input: 214.3 31.8% 91.4%;
         --ring: 222.2 84% 4.9%;
 
+        /* Canonical Saroh brand accent (blue-600). Shared across all apps;
+           the <Wordmark> and docs/help nav derive from this hue. */
+        --brand: 221.2 83.2% 53.3%;
+        --brand-foreground: 210 40% 98%;
+
         --radius: 0.5rem;
     }
 
@@ -63,6 +68,10 @@
         --border: 217.2 32.6% 17.5%;
         --input: 217.2 32.6% 17.5%;
         --ring: 212.7 26.8% 83.9%;
+
+        /* Slightly lighter brand blue for legibility on dark surfaces. */
+        --brand: 217.2 91.2% 59.8%;
+        --brand-foreground: 222.2 47.4% 11.2%;
     }
 }
 

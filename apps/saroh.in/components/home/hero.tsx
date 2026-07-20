@@ -19,7 +19,7 @@ function Hero() {
             >
                 Storefronts With
                 <br />
-                <span className="bg-gradient-to-r from-amber-500 via-orange-600 to-yellow-500 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-blue-400 via-blue-600 to-blue-700 bg-clip-text text-transparent">
                     Superpowers
                 </span>
             </h1>
