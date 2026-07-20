@@ -1,4 +1,4 @@
-import { AppHeader } from "@/components/shared/app-header";
+import { AppShell } from "@/components/shared/app-shell";
 import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
@@ -34,8 +34,7 @@ export default function RootLayout({
                         enableSystem
                         disableTransitionOnChange
                     >
-                        <AppHeader />
-                        {children}
+                        <AppShell>{children}</AppShell>
                     </ThemeProvider>
                 </Providers>
             </body>
