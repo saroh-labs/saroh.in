@@ -56,6 +56,13 @@ const config = {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
                 },
+                // Canonical Saroh brand accent (blue-600 light / blue-500 dark;
+                // see @saroh/ui globals.css --brand). Enables bg-brand /
+                // text-brand / border-brand across every app on this preset.
+                brand: {
+                    DEFAULT: "hsl(var(--brand))",
+                    foreground: "hsl(var(--brand-foreground))",
+                },
             },
             borderRadius: {
                 lg: "var(--radius)",

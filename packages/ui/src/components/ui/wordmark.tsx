@@ -29,6 +29,14 @@ export function Wordmark({ suffix, style, ...props }: WordmarkProps) {
             }}
             {...props}
         >
+            {/*
+             * The wordmark gradient brackets the canonical brand accent
+             * `--brand` (blue-600, #2563eb): blue-500 (#3b82f6) → blue-700
+             * (#1d4ed8), so it reads as the same blue as `text-brand`/`bg-brand`.
+             * Hex is intentional here (not `hsl(var(--brand))`): this component
+             * is inlined into apps that don't load the token (Nextra docs/help,
+             * marketing) — keep these values in sync with --brand if it changes.
+             */}
             <span
                 style={{
                     backgroundImage:
