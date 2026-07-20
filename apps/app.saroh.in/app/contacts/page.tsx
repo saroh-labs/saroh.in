@@ -1,4 +1,6 @@
 import { Card, CardDescription, CardHeader, CardTitle } from "@saroh/ui/card";
+import { EmptyState } from "@saroh/ui/empty-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import type { Contact } from "@/lib/contacts/service";
@@ -17,21 +19,17 @@ export default async function ContactsPage() {
     const contacts: Contact[] = await listContacts();
 
     return (
-        <main className="mx-auto max-w-4xl p-8">
-            <div className="mb-6 flex items-center justify-between">
-                <h1 className="text-2xl font-semibold">Contacts</h1>
-            </div>
+        <main className="mx-auto max-w-5xl p-8">
+            <PageHeader
+                title="Contacts"
+                description="People and companies in your CRM."
+            />
 
             {contacts.length === 0 ? (
-                <Card className="border-dashed">
-                    <CardHeader className="items-center text-center">
-                        <CardTitle>No contacts yet</CardTitle>
-                        <CardDescription>
-                            Contacts appear here as enquiries come in or when
-                            you create a lead by hand.
-                        </CardDescription>
-                    </CardHeader>
-                </Card>
+                <EmptyState
+                    title="No contacts yet"
+                    description="Contacts appear here as enquiries come in, or when you create a lead by hand from a contact."
+                />
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
                     {contacts.map((contact) => (

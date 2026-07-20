@@ -1,4 +1,5 @@
 import { Button } from "@saroh/ui/button";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -20,15 +21,18 @@ export default async function Home() {
     // Global chrome (brand, org switcher, nav, sign-out) lives in AppHeader via
     // the root layout — this page renders only its own content.
     return (
-        <main className="mx-auto max-w-4xl p-8">
-            <div className="mb-6 flex items-center justify-between">
-                <h1 className="text-2xl font-semibold">Your stores</h1>
-                {stores.length > 0 && (
-                    <Button asChild>
-                        <Link href="/stores/new">New store</Link>
-                    </Button>
-                )}
-            </div>
+        <main className="mx-auto max-w-5xl p-8">
+            <PageHeader
+                title="Your stores"
+                description="Storefronts you own in this organization."
+                actions={
+                    stores.length > 0 ? (
+                        <Button asChild variant="brand">
+                            <Link href="/stores/new">New store</Link>
+                        </Button>
+                    ) : undefined
+                }
+            />
 
             {stores.length === 0 ? (
                 <StoresEmptyState />

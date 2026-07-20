@@ -1,6 +1,8 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@saroh/ui/card";
+import { EmptyState } from "@saroh/ui/empty-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { contactName, formatValue } from "@/lib/crm/format";
@@ -20,26 +22,22 @@ export default async function LeadsPage() {
     const leads: LeadListItem[] = await listLeads();
 
     return (
-        <main className="mx-auto max-w-4xl p-8">
-            <div className="mb-6 flex items-center justify-between">
-                <h1 className="text-2xl font-semibold">Leads</h1>
-                <div className="flex items-center gap-3">
+        <main className="mx-auto max-w-5xl p-8">
+            <PageHeader
+                title="Leads"
+                description="Opportunities in your pipeline, newest first."
+                actions={
                     <Button asChild variant="outline">
                         <Link href="/pipeline">Pipeline board</Link>
                     </Button>
-                </div>
-            </div>
+                }
+            />
 
             {leads.length === 0 ? (
-                <Card className="border-dashed">
-                    <CardHeader className="items-center text-center">
-                        <CardTitle>No leads yet</CardTitle>
-                        <CardDescription>
-                            Leads appear here as enquiries come in. You can also
-                            create one by hand from a contact.
-                        </CardDescription>
-                    </CardHeader>
-                </Card>
+                <EmptyState
+                    title="No leads yet"
+                    description="Leads appear here as enquiries come in. You can also create one by hand from a contact."
+                />
             ) : (
                 <div className="grid gap-3">
                     {leads.map((lead) => {
