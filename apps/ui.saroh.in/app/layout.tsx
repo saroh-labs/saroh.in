@@ -1,9 +1,12 @@
 import BaseLayout from "@/components/layouts/base-layout";
 import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = localFont({
+    src: "../../../packages/ui/fonts/InterVariable-latin.woff2",
+    display: "swap",
+});
 
 export const metadata: Metadata = {
     title: "saroh/ui — Components",

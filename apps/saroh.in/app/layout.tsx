@@ -9,7 +9,7 @@ import "./globals.css";
 // fetches fonts from an external network. Mirrors the previous
 // `Inter({ subsets: ["latin"] })` from next/font/google.
 const inter = localFont({
-    src: "./fonts/InterVariable-latin.woff2",
+    src: "../../../packages/ui/fonts/InterVariable-latin.woff2",
     weight: "100 900",
     style: "normal",
     display: "swap",

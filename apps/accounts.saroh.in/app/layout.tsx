@@ -1,10 +1,15 @@
 import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 
 import Providers from "./providers";
 
-const inter = Inter({ subsets: ["latin"] });
+// Self-hosted Inter from the shared @saroh/ui font asset — no build-time
+// Google Fonts fetch, one file for every app (#96).
+const inter = localFont({
+    src: "../../../packages/ui/fonts/InterVariable-latin.woff2",
+    display: "swap",
+});
 
 export const metadata: Metadata = {
     title: "Saroh Auth",

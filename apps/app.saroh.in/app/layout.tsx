@@ -1,11 +1,14 @@
 import { AppHeader } from "@/components/shared/app-header";
 import { ThemeProvider } from "@/components/theme-provider";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = localFont({
+    src: "../../../packages/ui/fonts/InterVariable-latin.woff2",
+    display: "swap",
+});
 
 export const metadata: Metadata = {
     title: {
