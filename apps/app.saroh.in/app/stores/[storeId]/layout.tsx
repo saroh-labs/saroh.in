@@ -28,7 +28,8 @@ export default async function StoreLayout({
     if (!store) notFound();
 
     const organizations = await listOrganizations();
-    const activeOrg = await resolveActiveOrganization();
+    // Reuse the already-fetched list instead of re-fetching it (#102).
+    const activeOrg = await resolveActiveOrganization(organizations);
 
     return (
         <main className="mx-auto max-w-5xl p-8">

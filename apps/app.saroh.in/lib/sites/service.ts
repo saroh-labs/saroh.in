@@ -1,6 +1,4 @@
-import { cookies, headers } from "next/headers";
-
-import { env } from "@/env";
+import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
 
 /**
  * CMS Sites data access for app.saroh.in (S2-004). Every call is org-scoped:
@@ -8,21 +6,13 @@ import { env } from "@/env";
  * path (`/organizations/:organizationId/...`) and forwarded as the
  * `x-organization-id` header — mirroring `lib/organizations/service.ts`. The
  * request's session cookie is forwarded so api.saroh.in derives the user and
- * enforces org membership. Server-only: imports next/headers.
+ * enforces org membership. Server-only: imports next/headers (via the shared
+ * HTTP plumbing).
  *
  * The app never imports @saroh/database — the section content types below are a
  * hand-maintained mirror of the versioned section contract
  * (packages/database/src/cms/section-contract.ts), reached only through the API.
  */
-
-const API_URL =
-    env.API_URL ??
-    env.NEXT_PUBLIC_API_URL ??
-    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "https://api.saroh.in";
-
-/** Cookie holding the active organization id (readable server-side). */
-const ACTIVE_ORG_COOKIE = "active_org";
 
 // ---------------------------------------------------------------------------
 // Section content types — mirror of the section contract (v1)
@@ -193,27 +183,8 @@ export type SitesResult<T> =
     | { ok: false; error: string; field?: string; index?: number };
 
 // ---------------------------------------------------------------------------
-// Fetch plumbing
+// Fetch plumbing (shared apiFetch/getActiveOrgId from @/lib/api/http)
 // ---------------------------------------------------------------------------
-
-async function getActiveOrgId(): Promise<string | null> {
-    return (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
-}
-
-async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
-    const activeOrgId = await getActiveOrgId();
-    return fetch(`${API_URL}${path}`, {
-        ...init,
-        headers: {
-            "content-type": "application/json",
-            cookie,
-            ...(activeOrgId ? { "x-organization-id": activeOrgId } : {}),
-            ...(init?.headers ?? {}),
-        },
-        cache: "no-store",
-    });
-}
 
 /** Base path for the active org's sites, or null when no org is active. */
 async function sitesBase(): Promise<string | null> {
@@ -236,43 +207,39 @@ function readError(
 // Reads (called from server components)
 // ---------------------------------------------------------------------------
 
-/** Templates available to seed a new site. Empty on any failure. */
+/** Templates available to seed a new site. Empty with no active org; empty when
+ * none exist, but throws on a real API/network failure (#101). */
 export async function listTemplates(): Promise<Template[]> {
     const base = await sitesBase();
     if (!base) return [];
-    const res = await apiFetch(`${base}/templates`);
-    if (!res.ok) return [];
-    return (await res.json()) as Template[];
+    return getList<Template>(`${base}/templates`);
 }
 
-/** The active org's sites (newest first). Empty on any failure. */
+/** The active org's sites (newest first). Empty with no active org / when none
+ * exist, but throws on a real API/network failure (#101). */
 export async function listSites(): Promise<SiteSummary[]> {
     const base = await sitesBase();
     if (!base) return [];
-    const res = await apiFetch(base);
-    if (!res.ok) return [];
-    return (await res.json()) as SiteSummary[];
+    return getList<SiteSummary>(base);
 }
 
-/** A site + its pages, or null when missing / not permitted. */
+/** A site + its pages, or null when missing / no active org (throws on a real
+ * failure). */
 export async function getSite(siteId: string): Promise<SiteDetail | null> {
     const base = await sitesBase();
     if (!base) return null;
-    const res = await apiFetch(`${base}/${siteId}`);
-    if (!res.ok) return null;
-    return (await res.json()) as SiteDetail;
+    return getJson<SiteDetail>(`${base}/${siteId}`);
 }
 
-/** The current editable draft for a page (the API creates one if none). */
+/** The current editable draft for a page (the API creates one if none). Null on
+ * a 404 / no active org; throws on a real failure. */
 export async function getPageDraft(
     siteId: string,
     pageId: string,
 ): Promise<PageDraft | null> {
     const base = await sitesBase();
     if (!base) return null;
-    const res = await apiFetch(`${base}/${siteId}/pages/${pageId}/draft`);
-    if (!res.ok) return null;
-    return (await res.json()) as PageDraft;
+    return getJson<PageDraft>(`${base}/${siteId}/pages/${pageId}/draft`);
 }
 
 // ---------------------------------------------------------------------------

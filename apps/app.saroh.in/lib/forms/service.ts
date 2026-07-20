@@ -1,6 +1,4 @@
-import { cookies, headers } from "next/headers";
-
-import { env } from "@/env";
+import { apiFetch, getActiveOrgId, readError } from "@/lib/api/http";
 
 /**
  * Enquiry-Form data access for app.saroh.in (S3-004). An enquiry section in the
@@ -14,20 +12,11 @@ import { env } from "@/env";
  * (`/organizations/:organizationId/forms`) and forwarded as the
  * `x-organization-id` header, and the session cookie is forwarded so
  * api.saroh.in derives the user and enforces membership + `form:write`.
- * Server-only: imports next/headers.
+ * Server-only: imports next/headers (via the shared HTTP plumbing).
  *
  * The app never imports @saroh/database — the field descriptor type below is a
  * hand-maintained mirror of the forms API DTO, reached only through the API.
  */
-
-const API_URL =
-    env.API_URL ??
-    env.NEXT_PUBLIC_API_URL ??
-    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "https://api.saroh.in";
-
-/** Cookie holding the active organization id (readable server-side). */
-const ACTIVE_ORG_COOKIE = "active_org";
 
 // ---------------------------------------------------------------------------
 // Types — mirror of the forms API field descriptor
@@ -71,40 +60,13 @@ export interface EnsureFormInput {
 }
 
 // ---------------------------------------------------------------------------
-// Fetch plumbing (mirrors lib/sites/service.ts)
+// Fetch plumbing (org-scoped base; shared apiFetch/readError from @/lib/api/http)
 // ---------------------------------------------------------------------------
-
-async function getActiveOrgId(): Promise<string | null> {
-    return (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
-}
-
-async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
-    const activeOrgId = await getActiveOrgId();
-    return fetch(`${API_URL}${path}`, {
-        ...init,
-        headers: {
-            "content-type": "application/json",
-            cookie,
-            ...(activeOrgId ? { "x-organization-id": activeOrgId } : {}),
-            ...(init?.headers ?? {}),
-        },
-        cache: "no-store",
-    });
-}
 
 /** Base path for the active org's forms, or null when no org is active. */
 async function formsBase(): Promise<string | null> {
     const orgId = await getActiveOrgId();
     return orgId ? `/organizations/${orgId}/forms` : null;
-}
-
-/** Extract a human message from a JSON error body. */
-function readError(
-    data: { message?: string; error?: string } | null,
-    fallback: string,
-): string {
-    return data?.message ?? data?.error ?? fallback;
 }
 
 // ---------------------------------------------------------------------------

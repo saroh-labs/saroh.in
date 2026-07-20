@@ -2,9 +2,10 @@
 
 import { cookies } from "next/headers";
 
+import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
+
 import type { CreateOrganizationInput, OrganizationResult } from "./service";
 import {
-    ACTIVE_ORG_COOKIE,
     createOrganization as createOrganizationApi,
     listOrganizations,
 } from "./service";

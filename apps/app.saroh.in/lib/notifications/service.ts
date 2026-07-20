@@ -1,6 +1,4 @@
-import { cookies, headers } from "next/headers";
-
-import { env } from "@/env";
+import { apiFetch, getActiveOrgId, getList, readError } from "@/lib/api/http";
 
 /**
  * In-app notification data access for app.saroh.in (S3-006). The owner/admin
@@ -13,17 +11,9 @@ import { env } from "@/env";
  * (`/organizations/:organizationId/notifications`) and forwarded as the
  * `x-organization-id` header, and the session cookie is forwarded so
  * api.saroh.in derives the user and enforces membership + `notification:read` /
- * `notification:write`. Server-only: imports next/headers.
+ * `notification:write`. Server-only: imports next/headers (via the shared
+ * HTTP plumbing).
  */
-
-const API_URL =
-    env.API_URL ??
-    env.NEXT_PUBLIC_API_URL ??
-    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "https://api.saroh.in";
-
-/** Cookie holding the active organization id (readable server-side). */
-const ACTIVE_ORG_COOKIE = "active_org";
 
 /** A notification as returned by the notifications API. */
 export interface Notification {
@@ -41,52 +31,30 @@ export type NotificationsResult<T> =
     | { ok: true; data: T }
     | { ok: false; error: string };
 
-async function getActiveOrgId(): Promise<string | null> {
-    return (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
-}
-
-async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
-    const activeOrgId = await getActiveOrgId();
-    return fetch(`${API_URL}${path}`, {
-        ...init,
-        headers: {
-            "content-type": "application/json",
-            cookie,
-            ...(activeOrgId ? { "x-organization-id": activeOrgId } : {}),
-            ...(init?.headers ?? {}),
-        },
-        cache: "no-store",
-    });
-}
-
 /** Base path for the active org's notifications, or null when no org is active. */
 async function notificationsBase(): Promise<string | null> {
     const orgId = await getActiveOrgId();
     return orgId ? `/organizations/${orgId}/notifications` : null;
 }
 
-function readError(
-    data: { message?: string; error?: string } | null,
-    fallback: string,
-): string {
-    return data?.message ?? data?.error ?? fallback;
-}
-
-/** The active org's notifications, newest-first. Empty on any failure. */
+/** The active org's notifications, newest-first. Empty with no active org /
+ * when none exist, but throws on a real API/network failure (#101). */
 export async function listNotifications(
     options: { unreadOnly?: boolean } = {},
 ): Promise<Notification[]> {
     const base = await notificationsBase();
     if (!base) return [];
-    const res = await apiFetch(
+    return getList<Notification>(
         options.unreadOnly ? `${base}?unread=true` : base,
     );
-    if (!res.ok) return [];
-    return (await res.json()) as Notification[];
 }
 
-/** The active org's unread notification count (for the nav badge). 0 on failure. */
+/**
+ * The active org's unread notification count (for the nav badge). 0 on ANY
+ * failure — intentionally non-throwing (unlike the #101 reads): it renders in
+ * `AppHeader` in the root layout on every page, which must degrade to a hidden
+ * badge rather than tripping the global error boundary.
+ */
 export async function unreadNotificationCount(): Promise<number> {
     const base = await notificationsBase();
     if (!base) return 0;

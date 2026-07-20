@@ -1,18 +1,10 @@
-import { headers } from "next/headers";
-
-import { env } from "@/env";
+import { apiFetch, getJson, getList } from "@/lib/api/http";
 
 /**
  * Orders data access for app.saroh.in. Forwards the session cookie to
  * api.saroh.in (store membership enforced). Money fields are decimal strings.
  * Server-only.
  */
-
-const API_URL =
-    env.API_URL ??
-    env.NEXT_PUBLIC_API_URL ??
-    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "https://api.saroh.in";
 
 export type OrderStatus =
     | "PENDING"
@@ -72,32 +64,15 @@ export type OrderResult =
     | { ok: true; data: { id: string } }
     | { ok: false; error: string };
 
-async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
-    return fetch(`${API_URL}${path}`, {
-        ...init,
-        headers: {
-            "content-type": "application/json",
-            cookie,
-            ...(init?.headers ?? {}),
-        },
-        cache: "no-store",
-    });
+export function listOrders(storeId: string): Promise<OrderSummary[]> {
+    return getList<OrderSummary>(`/stores/${storeId}/orders`);
 }
 
-export async function listOrders(storeId: string): Promise<OrderSummary[]> {
-    const res = await apiFetch(`/stores/${storeId}/orders`);
-    if (!res.ok) return [];
-    return (await res.json()) as OrderSummary[];
-}
-
-export async function getOrder(
+export function getOrder(
     storeId: string,
     orderId: string,
 ): Promise<OrderDetail | null> {
-    const res = await apiFetch(`/stores/${storeId}/orders/${orderId}`);
-    if (!res.ok) return null;
-    return (await res.json()) as OrderDetail;
+    return getJson<OrderDetail>(`/stores/${storeId}/orders/${orderId}`);
 }
 
 async function mutate(

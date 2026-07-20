@@ -52,7 +52,8 @@ export async function AppHeader() {
         );
     }
 
-    const activeOrg = await resolveActiveOrganization();
+    // Reuse the already-fetched list instead of re-fetching it (#102).
+    const activeOrg = await resolveActiveOrganization(organizations);
     const unread = await unreadNotificationCount();
 
     return (

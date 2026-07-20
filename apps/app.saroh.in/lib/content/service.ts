@@ -1,18 +1,10 @@
-import { headers } from "next/headers";
-
-import { env } from "@/env";
+import { apiFetch, getJson, getList } from "@/lib/api/http";
 
 /**
  * Content (blog) data access for app.saroh.in — posts and post categories.
  * Forwards the session cookie to api.saroh.in, which enforces store membership
  * (read = access, write = owner/EDITOR+). Server-only.
  */
-
-const API_URL =
-    env.API_URL ??
-    env.NEXT_PUBLIC_API_URL ??
-    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "https://api.saroh.in";
 
 export type PostStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
@@ -74,25 +66,6 @@ export type Result<T = { id: string }> =
     | { ok: true; data: T }
     | { ok: false; error: string; field?: ResultField };
 
-async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
-    return fetch(`${API_URL}${path}`, {
-        ...init,
-        headers: {
-            "content-type": "application/json",
-            cookie,
-            ...(init?.headers ?? {}),
-        },
-        cache: "no-store",
-    });
-}
-
-async function getJson<T>(path: string, fallback: T): Promise<T> {
-    const res = await apiFetch(path);
-    if (!res.ok) return fallback;
-    return (await res.json()) as T;
-}
-
 async function mutate<T = { id: string }>(
     path: string,
     method: "POST" | "PUT" | "DELETE",
@@ -119,16 +92,14 @@ async function mutate<T = { id: string }>(
 // ---- Posts ----
 
 export function listPosts(storeId: string): Promise<Post[]> {
-    return getJson<Post[]>(`/stores/${storeId}/posts`, []);
+    return getList<Post>(`/stores/${storeId}/posts`);
 }
 
-export async function getPost(
+export function getPost(
     storeId: string,
     postId: string,
 ): Promise<PostDetail | null> {
-    const res = await apiFetch(`/stores/${storeId}/posts/${postId}`);
-    if (!res.ok) return null;
-    return (await res.json()) as PostDetail;
+    return getJson<PostDetail>(`/stores/${storeId}/posts/${postId}`);
 }
 
 export function createPost(storeId: string, input: PostInput) {
@@ -146,7 +117,7 @@ export function deletePost(storeId: string, postId: string) {
 // ---- Post categories ----
 
 export function listPostCategories(storeId: string): Promise<PostCategory[]> {
-    return getJson<PostCategory[]>(`/stores/${storeId}/post-categories`, []);
+    return getList<PostCategory>(`/stores/${storeId}/post-categories`);
 }
 
 export function createPostCategory(storeId: string, input: PostCategoryInput) {

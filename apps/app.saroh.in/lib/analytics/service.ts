@@ -1,6 +1,4 @@
-import { cookies, headers } from "next/headers";
-
-import { env } from "@/env";
+import { getActiveOrgId, getList } from "@/lib/api/http";
 
 /**
  * Analytics dashboard data access for app.saroh.in (S7-003). Backed by the
@@ -12,17 +10,9 @@ import { env } from "@/env";
  * (from the `active_org` cookie) goes both in the path
  * (`/organizations/:organizationId/analytics`) and the `x-organization-id`
  * header, and the session cookie is forwarded so api.saroh.in derives the user
- * and enforces membership + `analytics:read`. Server-only (imports next/headers).
+ * and enforces membership + `analytics:read`. Server-only (imports next/headers
+ * via the shared HTTP plumbing).
  */
-
-const API_URL =
-    env.API_URL ??
-    env.NEXT_PUBLIC_API_URL ??
-    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "https://api.saroh.in";
-
-/** Cookie holding the active organization id (readable server-side). */
-const ACTIVE_ORG_COOKIE = "active_org";
 
 /** A pre-computed daily aggregate row as returned by the analytics API. */
 export interface AnalyticsAggregateRow {
@@ -43,27 +33,11 @@ export interface AnalyticsFilter {
     to?: string;
 }
 
-async function getActiveOrgId(): Promise<string | null> {
-    return (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
-}
-
-async function apiFetch(path: string): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
-    const activeOrgId = await getActiveOrgId();
-    return fetch(`${API_URL}${path}`, {
-        headers: {
-            "content-type": "application/json",
-            cookie,
-            ...(activeOrgId ? { "x-organization-id": activeOrgId } : {}),
-        },
-        cache: "no-store",
-    });
-}
-
 /**
- * The active org's daily aggregate rows for the given filter. Empty on any
- * failure (no active org, not a member, API down) — the dashboard renders an
- * empty state rather than throwing.
+ * The active org's daily aggregate rows for the given filter. Empty when there
+ * is no active org or the org genuinely has no aggregates yet; throws on a real
+ * API/network failure (#101) so an outage renders the route error boundary
+ * rather than an empty dashboard indistinguishable from "no data yet".
  */
 export async function getAnalyticsDashboard(
     filter: AnalyticsFilter = {},
@@ -78,11 +52,9 @@ export async function getAnalyticsDashboard(
     if (filter.to) qs.set("to", filter.to);
     const query = qs.toString();
 
-    const res = await apiFetch(
+    return getList<AnalyticsAggregateRow>(
         `/organizations/${orgId}/analytics${query ? `?${query}` : ""}`,
     );
-    if (!res.ok) return [];
-    return (await res.json().catch(() => [])) as AnalyticsAggregateRow[];
 }
 
 /** A single headline metric shown as a stat card. */

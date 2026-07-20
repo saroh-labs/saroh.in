@@ -1,6 +1,4 @@
-import { headers } from "next/headers";
-
-import { env } from "@/env";
+import { apiFetch, getJson, getList } from "@/lib/api/http";
 
 /**
  * Catalog data access for app.saroh.in — products, categories, variants, and
@@ -8,12 +6,6 @@ import { env } from "@/env";
  * membership (read = access, write = owner/EDITOR+). Prices are decimal strings
  * end-to-end so money never round-trips through a float. Server-only.
  */
-
-const API_URL =
-    env.API_URL ??
-    env.NEXT_PUBLIC_API_URL ??
-    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "https://api.saroh.in";
 
 export type ProductStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
@@ -70,25 +62,6 @@ export type Result<T = { ok: true }> =
     | { ok: true; data: T }
     | { ok: false; error: string; field?: ResultField };
 
-async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
-    return fetch(`${API_URL}${path}`, {
-        ...init,
-        headers: {
-            "content-type": "application/json",
-            cookie,
-            ...(init?.headers ?? {}),
-        },
-        cache: "no-store",
-    });
-}
-
-async function getJson<T>(path: string, fallback: T): Promise<T> {
-    const res = await apiFetch(path);
-    if (!res.ok) return fallback;
-    return (await res.json()) as T;
-}
-
 async function mutate<T = { id: string }>(
     path: string,
     method: "POST" | "PUT" | "DELETE",
@@ -119,16 +92,14 @@ export function listProducts(
     status?: ProductStatus,
 ): Promise<Product[]> {
     const q = status ? `?status=${status}` : "";
-    return getJson<Product[]>(`/stores/${storeId}/products${q}`, []);
+    return getList<Product>(`/stores/${storeId}/products${q}`);
 }
 
-export async function getProduct(
+export function getProduct(
     storeId: string,
     productId: string,
 ): Promise<ProductDetail | null> {
-    const res = await apiFetch(`/stores/${storeId}/products/${productId}`);
-    if (!res.ok) return null;
-    return (await res.json()) as ProductDetail;
+    return getJson<ProductDetail>(`/stores/${storeId}/products/${productId}`);
 }
 
 export interface ProductInput {
@@ -161,7 +132,7 @@ export function deleteProduct(storeId: string, productId: string) {
 // ---- Categories ----
 
 export function listCategories(storeId: string): Promise<Category[]> {
-    return getJson<Category[]>(`/stores/${storeId}/categories`, []);
+    return getList<Category>(`/stores/${storeId}/categories`);
 }
 
 export interface CategoryInput {

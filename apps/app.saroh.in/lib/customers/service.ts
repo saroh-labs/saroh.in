@@ -1,18 +1,10 @@
-import { headers } from "next/headers";
-
-import { env } from "@/env";
+import { apiFetch, getJson, getList } from "@/lib/api/http";
 
 /**
  * Customers data access for app.saroh.in. Forwards the session cookie to
  * api.saroh.in (store membership enforced: read = access, write = owner/EDITOR+).
  * Server-only.
  */
-
-const API_URL =
-    env.API_URL ??
-    env.NEXT_PUBLIC_API_URL ??
-    env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "https://api.saroh.in";
 
 export interface Customer {
     id: string;
@@ -41,32 +33,15 @@ export type CustomerResult =
     | { ok: true; data: { id: string } }
     | { ok: false; error: string; field?: "email" };
 
-async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
-    return fetch(`${API_URL}${path}`, {
-        ...init,
-        headers: {
-            "content-type": "application/json",
-            cookie,
-            ...(init?.headers ?? {}),
-        },
-        cache: "no-store",
-    });
+export function listCustomers(storeId: string): Promise<Customer[]> {
+    return getList<Customer>(`/stores/${storeId}/customers`);
 }
 
-export async function listCustomers(storeId: string): Promise<Customer[]> {
-    const res = await apiFetch(`/stores/${storeId}/customers`);
-    if (!res.ok) return [];
-    return (await res.json()) as Customer[];
-}
-
-export async function getCustomer(
+export function getCustomer(
     storeId: string,
     customerId: string,
 ): Promise<Customer | null> {
-    const res = await apiFetch(`/stores/${storeId}/customers/${customerId}`);
-    if (!res.ok) return null;
-    return (await res.json()) as Customer;
+    return getJson<Customer>(`/stores/${storeId}/customers/${customerId}`);
 }
 
 async function mutate(
