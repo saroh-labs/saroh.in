@@ -2,6 +2,17 @@
 
 Audit date: 2026-07-17. “Blocks” means unsafe or impossible to build the named future capability without first resolving the finding.
 
+> **⚠️ SUPERSEDED (2026-07-20) — pre-build snapshot.** This register predates Stages 0–7
+> and was not refreshed. Most rows below are resolved: **R-01** (tenant root → Organization,
+> Stage 1 / B5), **R-02** (CI exists; fonts partly self-hosted), **R-03** (isolated test
+> harness, S0-003), **R-04** (migrations reconciled, S0-004), **R-06** (publishing shipped,
+> Stage 2). Still open: **R-05** — RLS is built but **inert** (no non-BYPASSRLS role yet;
+> see [`RLS_ROLLOUT_AND_OPS.md`](./RLS_ROLLOUT_AND_OPS.md)); **R-10** (CSRF missing-origin,
+> mitigated in B3); **R-13** (credential rotation). New risks from the 2026-07-20 audit —
+> no Nest bootstrap/DI test, no CD pipeline, no observability, placeholder frontends
+> shipping — are filed as GitHub issues **#90, #98–#108**. **Source of truth for status:
+> [`IMPLEMENTATION_BACKLOG.md`](./IMPLEMENTATION_BACKLOG.md).**
+
 | ID   | Severity | Finding and evidence                                                                                                                                                                                                                                                       | Impact                                                                                                                                                         | Recommended resolution                                                                                                                                                                              | Dependencies                    | Blocks                               |
 | ---- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------ |
 | R-01 | Critical | Tenant root is ambiguous: `Workspace` is called an enterprise/Y2 feature and `Store.workspaceId` is nullable (`packages/database/prisma/schema.prisma`). Authorization operates on `StoreOwner`/`StoreMembers` (`apps/api.saroh.in/src/modules/stores/stores.service.ts`). | CRM, bookings, subscriptions and multiple sites can attach to different roots; access rules become inconsistent and data migration becomes increasingly risky. | Implement the accepted Organization tenant: Organization owns all business data; Projects are optional groupings; Sites and Stores are Organization-owned modules. Migrate incrementally.           | DEC-005 accepted                | Stage 1 and all new business modules |

@@ -2,6 +2,17 @@
 
 Audit date: 2026-07-17. Scope: the full pnpm/Turborepo monorepo at `saroh-labs/saroh.in` (local remote currently names `himohitmehta/saroh.io`).
 
+> **⚠️ SUPERSEDED (2026-07-20) — pre-build snapshot.** This document describes the repo
+> _before_ Stages 0–7 were built and was **not** refreshed as they landed. Several claims
+> below are now false: "`Store` is the effective tenant root" (Organization is the tenant
+> root since Stage 1 / B5 made `Store.organizationId` NOT NULL); "sites fetchers return
+> null" / "publishing not implemented end to end" (Stage 2 shipped Site/Page/Publication +
+> a working public renderer); "no job queue, entitlement enforcement or analytics"
+> (S3-003 JobQueue, B4 entitlements, Stage 7 analytics); "CI/CD: No committed workflow"
+> (`.github/workflows/ci.yml` exists). **For current status, use the live per-stage tables
+> in [`IMPLEMENTATION_BACKLOG.md`](./IMPLEMENTATION_BACKLOG.md).** Read this file as
+> historical context only.
+
 ## Architecture summary
 
 Saroh is a 21-workspace-project monorepo: 10 deployable applications, 7 product packages, and 3 tooling packages. Next.js frontends call a NestJS API. The API and `@saroh/auth` are the only runtime consumers of `@saroh/database`. PostgreSQL is accessed through Prisma 7 and `@prisma/adapter-pg`.
