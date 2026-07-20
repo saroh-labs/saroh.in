@@ -5,6 +5,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import { StatCard as UIStatCard } from "@saroh/ui/stat-card";
 
 import type {
     AnalyticsView,
@@ -12,18 +13,9 @@ import type {
     TopPage,
 } from "@/lib/analytics/service";
 
-/** A single headline metric card. */
+/** A single headline metric card (delegates to the shared @saroh/ui StatCard). */
 function StatCard({ label, value }: { label: string; value: number }) {
-    return (
-        <Card>
-            <CardHeader className="pb-2">
-                <CardDescription>{label}</CardDescription>
-                <CardTitle className="text-3xl tabular-nums">
-                    {value.toLocaleString()}
-                </CardTitle>
-            </CardHeader>
-        </Card>
-    );
+    return <UIStatCard label={label} value={value.toLocaleString()} />;
 }
 
 /**
