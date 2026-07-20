@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
+import { CommandMenu } from "@/components/shared/command-menu";
 import { unreadNotificationCount } from "@/lib/notifications/service";
 import {
     listOrganizations,
@@ -44,6 +45,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="flex min-h-screen">
+            <CommandMenu />
             <AppSidebar unread={unread} />
             <div className="flex min-w-0 flex-1 flex-col">
                 <AppHeader

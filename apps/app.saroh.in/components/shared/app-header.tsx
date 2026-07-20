@@ -2,6 +2,7 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
 import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
+import { CommandTrigger } from "@/components/shared/command-trigger";
 import { MobileNav } from "@/components/shared/mobile-nav";
 import { SignOutButton } from "@/components/sign-out-button";
 import type { Organization } from "@/lib/organizations/service";
@@ -49,6 +50,7 @@ export function AppHeader(props: AppHeaderProps) {
                 >
                     <Wordmark />
                 </Link>
+                <CommandTrigger />
             </div>
             <div className="flex items-center gap-4">
                 {activeOrg && (
