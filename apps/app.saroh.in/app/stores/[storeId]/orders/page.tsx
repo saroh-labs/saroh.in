@@ -1,5 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/empty-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -30,25 +32,26 @@ export default async function OrdersPage({
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-lg font-medium">Orders</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Orders and fulfilment for this store.
-                    </p>
-                </div>
-                <Button asChild>
-                    <Link href={`${base}/new`}>New order</Link>
-                </Button>
-            </div>
+            <PageHeader
+                title="Orders"
+                description="Orders and fulfilment for this store."
+                actions={
+                    <Button variant="brand" asChild>
+                        <Link href={`${base}/new`}>New order</Link>
+                    </Button>
+                }
+            />
 
             {orders.length === 0 ? (
-                <div className="rounded-lg border p-8 text-center">
-                    <h3 className="font-medium">No orders yet</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Create an order for a customer to get started.
-                    </p>
-                </div>
+                <EmptyState
+                    title="No orders yet"
+                    description="Create an order for a customer to get started."
+                    action={
+                        <Button variant="brand" asChild>
+                            <Link href={`${base}/new`}>New order</Link>
+                        </Button>
+                    }
+                />
             ) : (
                 <ul className="divide-y rounded-lg border">
                     {orders.map((o) => (

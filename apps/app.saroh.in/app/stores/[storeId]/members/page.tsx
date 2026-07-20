@@ -1,3 +1,4 @@
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { MembersManager } from "@/components/stores/members-manager";
@@ -32,12 +33,10 @@ export default async function StoreMembersPage({
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-lg font-medium">Members</h2>
-                <p className="text-sm text-muted-foreground">
-                    Invite teammates and manage their access to this store.
-                </p>
-            </div>
+            <PageHeader
+                title="Members"
+                description="Invite teammates and manage their access to this store."
+            />
             <MembersManager
                 storeId={storeId}
                 members={members}

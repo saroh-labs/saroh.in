@@ -1,11 +1,5 @@
 import { Button } from "@saroh/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@saroh/ui/card";
+import { EmptyState } from "@saroh/ui/empty-state";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -33,21 +27,16 @@ export default async function AcceptInvitationPage({
 
     return (
         <main className="mx-auto flex min-h-[60vh] max-w-md items-center p-8">
-            <Card className="w-full">
-                <CardHeader>
-                    <CardTitle>Invitation problem</CardTitle>
-                    <CardDescription>{result.error}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="mb-4 text-sm text-muted-foreground">
-                        If this invitation was sent to a different email, sign
-                        in with that account and open the link again.
-                    </p>
-                    <Button asChild>
+            <EmptyState
+                className="w-full"
+                title="Invitation problem"
+                description={`${result.error} If this invitation was sent to a different email, sign in with that account and open the link again.`}
+                action={
+                    <Button asChild variant="brand">
                         <Link href="/">Go to your stores</Link>
                     </Button>
-                </CardContent>
-            </Card>
+                }
+            />
         </main>
     );
 }

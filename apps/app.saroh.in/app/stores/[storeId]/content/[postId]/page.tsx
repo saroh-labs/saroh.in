@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { PostForm } from "@/components/stores/post-form";
@@ -24,13 +24,7 @@ export default async function EditPostPage({
 
     return (
         <div className="space-y-6">
-            <Link
-                href={`/stores/${storeId}/content`}
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to content
-            </Link>
-            <h2 className="text-lg font-medium">{post.title}</h2>
+            <PageHeader title={post.title} description="Edit this post." />
             <PostForm storeId={storeId} categories={categories} post={post} />
         </div>
     );

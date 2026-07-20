@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { PostCategoriesManager } from "@/components/stores/post-categories-manager";
@@ -20,18 +20,10 @@ export default async function PostCategoriesPage({
 
     return (
         <div className="space-y-6">
-            <Link
-                href={`/stores/${storeId}/content`}
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to content
-            </Link>
-            <div>
-                <h2 className="text-lg font-medium">Post categories</h2>
-                <p className="text-sm text-muted-foreground">
-                    Organize posts into categories for your storefront blog.
-                </p>
-            </div>
+            <PageHeader
+                title="Post categories"
+                description="Organize posts into categories for your storefront blog."
+            />
             <PostCategoriesManager storeId={storeId} categories={categories} />
         </div>
     );

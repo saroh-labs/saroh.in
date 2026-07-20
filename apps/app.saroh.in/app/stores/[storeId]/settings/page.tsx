@@ -1,3 +1,4 @@
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { StoreSettingsForm } from "@/components/stores/store-settings-form";
@@ -16,12 +17,10 @@ export default async function StoreSettingsPage({
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-lg font-medium">Settings</h2>
-                <p className="text-sm text-muted-foreground">
-                    Edit this store&apos;s basic details.
-                </p>
-            </div>
+            <PageHeader
+                title="Settings"
+                description="Edit this store's basic details."
+            />
             <StoreSettingsForm store={store} />
         </div>
     );

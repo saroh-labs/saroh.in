@@ -1,4 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/empty-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { MoveStageControl } from "@/components/crm/move-stage-control";
@@ -28,10 +31,10 @@ export default async function PipelinePage() {
         return (
             <main className="mx-auto max-w-6xl p-8">
                 <Header />
-                <p className="mt-8 text-sm text-muted-foreground">
-                    No pipeline yet. One is created automatically with your
-                    first enquiry or hand-created lead.
-                </p>
+                <EmptyState
+                    title="No pipeline yet"
+                    description="One is created automatically with your first enquiry or hand-created lead."
+                />
             </main>
         );
     }
@@ -128,26 +131,17 @@ export default async function PipelinePage() {
     );
 }
 
-/** The board header with a title + dashboard / list links. */
+/** The board header with a title + list-view link. */
 function Header({ pipelineName }: { pipelineName?: string }) {
     return (
-        <div className="flex items-center justify-between">
-            <div>
-                <h1 className="text-2xl font-semibold">Pipeline</h1>
-                {pipelineName && (
-                    <p className="text-sm text-muted-foreground">
-                        {pipelineName}
-                    </p>
-                )}
-            </div>
-            <div className="flex items-center gap-4">
-                <Link
-                    href="/leads"
-                    className="text-sm text-muted-foreground hover:underline"
-                >
-                    List view
-                </Link>
-            </div>
-        </div>
+        <PageHeader
+            title="Pipeline"
+            description={pipelineName}
+            actions={
+                <Button asChild variant="outline">
+                    <Link href="/leads">List view</Link>
+                </Button>
+            }
+        />
     );
 }

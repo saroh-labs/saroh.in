@@ -1,4 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/empty-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -25,26 +27,26 @@ export default async function CustomersPage({
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-lg font-medium">Customers</h2>
-                    <p className="text-sm text-muted-foreground">
-                        People who order from this store.
-                    </p>
-                </div>
-                <Button asChild>
-                    <Link href={`${base}/new`}>New customer</Link>
-                </Button>
-            </div>
+            <PageHeader
+                title="Customers"
+                description="People who order from this store."
+                actions={
+                    <Button variant="brand" asChild>
+                        <Link href={`${base}/new`}>New customer</Link>
+                    </Button>
+                }
+            />
 
             {customers.length === 0 ? (
-                <div className="rounded-lg border p-8 text-center">
-                    <h3 className="font-medium">No customers yet</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Add a customer, or one is created with their first
-                        order.
-                    </p>
-                </div>
+                <EmptyState
+                    title="No customers yet"
+                    description="Add a customer, or one is created with their first order."
+                    action={
+                        <Button variant="brand" asChild>
+                            <Link href={`${base}/new`}>New customer</Link>
+                        </Button>
+                    }
+                />
             ) : (
                 <ul className="divide-y rounded-lg border">
                     {customers.map((c) => (

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { PostForm } from "@/components/stores/post-form";
@@ -20,13 +20,10 @@ export default async function NewPostPage({
 
     return (
         <div className="space-y-6">
-            <Link
-                href={`/stores/${storeId}/content`}
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to content
-            </Link>
-            <h2 className="text-lg font-medium">New post</h2>
+            <PageHeader
+                title="New post"
+                description="Write a new blog post for your storefront."
+            />
             <PostForm storeId={storeId} categories={categories} />
         </div>
     );

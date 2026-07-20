@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { ProductForm } from "@/components/stores/product-form";
@@ -20,13 +20,10 @@ export default async function NewProductPage({
 
     return (
         <div className="space-y-6">
-            <Link
-                href={`/stores/${storeId}/products`}
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to products
-            </Link>
-            <h2 className="text-lg font-medium">New product</h2>
+            <PageHeader
+                title="New product"
+                description="Add a product to your catalog."
+            />
             <ProductForm storeId={storeId} categories={categories} />
         </div>
     );

@@ -1,4 +1,5 @@
 import { Badge } from "@saroh/ui/badge";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -63,18 +64,11 @@ export default async function LeadDetailPage({
 
     return (
         <main className="mx-auto max-w-3xl p-8">
-            <Link
-                href="/leads"
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to leads
-            </Link>
-
-            <div className="mb-6 mt-4 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-semibold">{lead.title}</h1>
-                    {lead.contact && (
-                        <p className="text-sm text-muted-foreground">
+            <PageHeader
+                title={lead.title}
+                description={
+                    lead.contact ? (
+                        <>
                             <Link
                                 href={`/contacts/${lead.contact.id}`}
                                 className="hover:underline"
@@ -83,27 +77,31 @@ export default async function LeadDetailPage({
                             </Link>
                             {" · "}
                             {lead.contact.email}
-                        </p>
-                    )}
-                    {amount && <p className="mt-1 text-sm">Value: {amount}</p>}
-                </div>
-                <div className="flex items-center gap-2">
-                    {lead.stage && (
-                        <Badge variant="secondary">{lead.stage.name}</Badge>
-                    )}
-                    <Badge
-                        variant={
-                            lead.status === "WON"
-                                ? "default"
-                                : lead.status === "LOST"
-                                  ? "destructive"
-                                  : "outline"
-                        }
-                    >
-                        {lead.status}
-                    </Badge>
-                </div>
-            </div>
+                            {amount ? ` · Value: ${amount}` : ""}
+                        </>
+                    ) : amount ? (
+                        `Value: ${amount}`
+                    ) : undefined
+                }
+                actions={
+                    <>
+                        {lead.stage && (
+                            <Badge variant="secondary">{lead.stage.name}</Badge>
+                        )}
+                        <Badge
+                            variant={
+                                lead.status === "WON"
+                                    ? "default"
+                                    : lead.status === "LOST"
+                                      ? "destructive"
+                                      : "outline"
+                            }
+                        >
+                            {lead.status}
+                        </Badge>
+                    </>
+                }
+            />
 
             <div className="mb-8 flex flex-wrap gap-4 rounded-lg border p-4">
                 {stages.length > 0 && (

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { OrderForm } from "@/components/stores/order-form";
@@ -24,13 +24,10 @@ export default async function NewOrderPage({
 
     return (
         <div className="space-y-6">
-            <Link
-                href={`/stores/${storeId}/orders`}
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to orders
-            </Link>
-            <h2 className="text-lg font-medium">New order</h2>
+            <PageHeader
+                title="New order"
+                description="Create an order for a customer."
+            />
             <OrderForm
                 storeId={storeId}
                 customers={customers}

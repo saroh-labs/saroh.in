@@ -1,3 +1,5 @@
+import { Button } from "@saroh/ui/button";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { CreateOrganizationForm } from "@/components/organizations/create-organization-form";
@@ -17,23 +19,21 @@ export default async function OnboardingPage() {
 
     return (
         <main className="mx-auto max-w-lg p-8">
-            {hasOrgs && (
-                <Link
-                    href="/"
-                    className="text-sm text-muted-foreground hover:underline"
-                >
-                    ← Back to dashboard
-                </Link>
-            )}
-            <h1 className="mt-4 text-2xl font-semibold tracking-tight">
-                {hasOrgs
-                    ? "Create an organization"
-                    : "Welcome — create your organization"}
-            </h1>
-            <p className="mb-8 mt-1 text-sm text-muted-foreground">
-                An organization is your workspace and billing boundary. You can
-                belong to several and switch between them anytime.
-            </p>
+            <PageHeader
+                title={
+                    hasOrgs
+                        ? "Create an organization"
+                        : "Welcome — create your organization"
+                }
+                description="An organization is your workspace and billing boundary. You can belong to several and switch between them anytime."
+                actions={
+                    hasOrgs ? (
+                        <Button asChild variant="ghost" size="sm">
+                            <Link href="/">Back to dashboard</Link>
+                        </Button>
+                    ) : undefined
+                }
+            />
             <CreateOrganizationForm />
         </main>
     );

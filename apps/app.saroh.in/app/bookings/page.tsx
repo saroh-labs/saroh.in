@@ -1,6 +1,8 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@saroh/ui/card";
+import { EmptyState } from "@saroh/ui/empty-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { CancelBookingControl } from "@/components/bookings/cancel-booking-control";
@@ -96,26 +98,22 @@ export default async function BookingsPage() {
     const groups = groupByDay(upcoming);
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
-            <div className="mb-6 flex items-center justify-between">
-                <h1 className="text-2xl font-semibold">Bookings</h1>
-                <div className="flex items-center gap-3">
+        <main className="mx-auto max-w-5xl p-8">
+            <PageHeader
+                title="Bookings"
+                description="Upcoming reservations across your services, grouped by day."
+                actions={
                     <Button asChild variant="outline">
                         <Link href="/services">Services</Link>
                     </Button>
-                </div>
-            </div>
+                }
+            />
 
             {groups.length === 0 ? (
-                <Card className="border-dashed">
-                    <CardHeader className="items-center text-center">
-                        <CardTitle>No upcoming bookings</CardTitle>
-                        <CardDescription>
-                            Bookings appear here as visitors reserve slots on
-                            your services.
-                        </CardDescription>
-                    </CardHeader>
-                </Card>
+                <EmptyState
+                    title="No upcoming bookings"
+                    description="Bookings appear here as visitors reserve slots on your services."
+                />
             ) : (
                 <div className="grid gap-8">
                     {groups.map((group) => (

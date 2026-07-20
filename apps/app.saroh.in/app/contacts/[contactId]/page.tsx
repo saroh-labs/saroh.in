@@ -1,5 +1,6 @@
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@saroh/ui/card";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -25,20 +26,14 @@ export default async function ContactDetailPage({
     if (!contact) notFound();
 
     return (
-        <main className="mx-auto max-w-4xl p-8">
-            <Link
-                href="/contacts"
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to contacts
-            </Link>
+        <main className="mx-auto max-w-3xl p-8">
+            <PageHeader
+                title={contactName(contact)}
+                description={contact.email}
+            />
 
-            <div className="mb-8 mt-4">
-                <h1 className="text-2xl font-semibold">
-                    {contactName(contact)}
-                </h1>
-                <p className="text-sm text-muted-foreground">{contact.email}</p>
-                <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+            <div className="mb-8">
+                <dl className="grid gap-2 text-sm sm:grid-cols-2">
                     {contact.company && (
                         <div>
                             <dt className="text-muted-foreground">Company</dt>

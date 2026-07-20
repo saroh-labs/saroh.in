@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 
 import { CreateSiteForm } from "@/components/sites/create-site-form";
 import { requireSession } from "@/lib/session";
@@ -15,14 +15,11 @@ export default async function NewSitePage() {
     const templates = await listTemplates();
 
     return (
-        <main className="mx-auto max-w-4xl p-8">
-            <Link
-                href="/sites"
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to sites
-            </Link>
-            <h1 className="mb-6 mt-4 text-2xl font-semibold">Create a site</h1>
+        <main className="mx-auto max-w-2xl p-8">
+            <PageHeader
+                title="Create a site"
+                description="Pick a template and name your new site."
+            />
             <CreateSiteForm templates={templates} />
         </main>
     );

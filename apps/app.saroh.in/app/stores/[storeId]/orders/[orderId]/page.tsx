@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { OrderPayments } from "@/components/stores/order-payments";
@@ -36,27 +36,18 @@ export default async function OrderDetailPage({
 
     return (
         <div className="space-y-6">
-            <Link
-                href={`/stores/${storeId}/orders`}
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to orders
-            </Link>
-
-            <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-lg font-medium">{order.orderId}</h2>
-                    <p className="text-sm text-muted-foreground">
-                        {order.customer?.email ?? "—"}
-                    </p>
-                </div>
-                <OrderStatusControls
-                    storeId={storeId}
-                    orderId={order.id}
-                    status={order.status}
-                    paymentStatus={order.paymentStatus}
-                />
-            </div>
+            <PageHeader
+                title={order.orderId}
+                description={order.customer?.email ?? "—"}
+                actions={
+                    <OrderStatusControls
+                        storeId={storeId}
+                        orderId={order.id}
+                        status={order.status}
+                        paymentStatus={order.paymentStatus}
+                    />
+                }
+            />
 
             <div className="rounded-lg border">
                 <ul className="divide-y">

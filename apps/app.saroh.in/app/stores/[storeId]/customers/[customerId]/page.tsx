@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { CustomerForm } from "@/components/stores/customer-form";
@@ -21,17 +21,14 @@ export default async function EditCustomerPage({
 
     return (
         <div className="space-y-6">
-            <Link
-                href={`/stores/${storeId}/customers`}
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to customers
-            </Link>
-            <h2 className="text-lg font-medium">
-                {[customer.firstName, customer.lastName]
-                    .filter(Boolean)
-                    .join(" ") || customer.email}
-            </h2>
+            <PageHeader
+                title={
+                    [customer.firstName, customer.lastName]
+                        .filter(Boolean)
+                        .join(" ") || customer.email
+                }
+                description="Edit this customer's details."
+            />
             <CustomerForm storeId={storeId} customer={customer} />
         </div>
     );

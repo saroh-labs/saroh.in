@@ -1,6 +1,5 @@
 import { requireSession } from "@/lib/session";
 import { getStore } from "@/lib/stores/service";
-import { Badge } from "@saroh/ui/badge";
 import {
     Card,
     CardContent,
@@ -8,9 +7,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import { EmptyState } from "@saroh/ui/empty-state";
 import { notFound } from "next/navigation";
-
-const COMING_SOON: { title: string; description: string }[] = [];
 
 /**
  * Store Overview. Re-resolves the store with the same owner gate as the
@@ -42,28 +40,10 @@ export default async function StoreOverviewPage({
                 </CardContent>
             </Card>
 
-            <section
-                className={COMING_SOON.length === 0 ? "hidden" : undefined}
-            >
-                <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                    Coming soon
-                </h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {COMING_SOON.map((section) => (
-                        <Card key={section.title} className="opacity-70">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    {section.title}
-                                    <Badge variant="secondary">Soon</Badge>
-                                </CardTitle>
-                                <CardDescription>
-                                    {section.description}
-                                </CardDescription>
-                            </CardHeader>
-                        </Card>
-                    ))}
-                </div>
-            </section>
+            <EmptyState
+                title="No insights yet"
+                description="Once you add products and take orders, a summary of your store will appear here."
+            />
         </div>
     );
 }

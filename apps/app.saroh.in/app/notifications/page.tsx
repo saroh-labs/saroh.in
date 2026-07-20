@@ -1,4 +1,5 @@
 import { Button } from "@saroh/ui/button";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { NotificationsInbox } from "@/components/notifications/notifications-inbox";
@@ -17,13 +18,16 @@ export default async function NotificationsPage() {
     const notifications = await listNotifications();
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
-            <div className="mb-8 flex items-center justify-between gap-4">
-                <h1 className="text-2xl font-semibold">Notifications</h1>
-                <Button asChild variant="ghost" size="sm">
-                    <Link href="/">Back to dashboard</Link>
-                </Button>
-            </div>
+        <main className="mx-auto max-w-5xl p-8">
+            <PageHeader
+                title="Notifications"
+                description="New enquiries and activity across your organization."
+                actions={
+                    <Button asChild variant="ghost" size="sm">
+                        <Link href="/">Back to dashboard</Link>
+                    </Button>
+                }
+            />
 
             <NotificationsInbox notifications={notifications} />
         </main>

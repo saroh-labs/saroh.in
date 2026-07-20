@@ -1,5 +1,5 @@
 import { Badge } from "@saroh/ui/badge";
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { AvailabilityRulesEditor } from "@/components/bookings/availability-rules-editor";
@@ -27,24 +27,20 @@ export default async function ServiceEditorPage({
     const rules = await listRules(serviceId);
 
     return (
-        <main className="mx-auto max-w-4xl p-8">
-            <Link
-                href="/services"
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to services
-            </Link>
-
-            <div className="mb-6 mt-4 flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl font-semibold">{service.name}</h1>
-                <Badge
-                    variant={
-                        service.status === "ACTIVE" ? "default" : "outline"
-                    }
-                >
-                    {service.status}
-                </Badge>
-            </div>
+        <main className="mx-auto max-w-3xl p-8">
+            <PageHeader
+                title={service.name}
+                description="Set this service's terms and weekly availability."
+                actions={
+                    <Badge
+                        variant={
+                            service.status === "ACTIVE" ? "default" : "outline"
+                        }
+                    >
+                        {service.status}
+                    </Badge>
+                }
+            />
 
             <section className="mb-10">
                 <h2 className="mb-3 text-lg font-medium">Details</h2>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 
 import { CreateServiceForm } from "@/components/bookings/create-service-form";
 import { requireSession } from "@/lib/session";
@@ -12,16 +12,11 @@ export default async function NewServicePage() {
     await requireSession();
 
     return (
-        <main className="mx-auto max-w-4xl p-8">
-            <Link
-                href="/services"
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to services
-            </Link>
-            <h1 className="mb-6 mt-4 text-2xl font-semibold">
-                Create a service
-            </h1>
+        <main className="mx-auto max-w-2xl p-8">
+            <PageHeader
+                title="Create a service"
+                description="Name your bookable service and set its duration; add availability next."
+            />
             <CreateServiceForm />
         </main>
     );

@@ -1,4 +1,5 @@
 import { Button } from "@saroh/ui/button";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
@@ -50,14 +51,10 @@ export default async function AnalyticsPage({
 
     return (
         <main className="mx-auto max-w-5xl p-8">
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-semibold">Analytics</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Last {range.label} · site views, enquiries and sales
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
+            <PageHeader
+                title="Analytics"
+                description={`Last ${range.label} · site views, enquiries and sales.`}
+                actions={
                     <div className="flex items-center gap-1">
                         {RANGES.map((r) => (
                             <Button
@@ -80,8 +77,8 @@ export default async function AnalyticsPage({
                             </Button>
                         ))}
                     </div>
-                </div>
-            </div>
+                }
+            />
 
             <AnalyticsDashboard view={view} />
         </main>

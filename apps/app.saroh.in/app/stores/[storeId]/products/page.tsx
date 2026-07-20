@@ -1,5 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/empty-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -39,30 +41,31 @@ export default async function ProductsPage({
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-lg font-medium">Products</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Your catalog — products, pricing, and stock.
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" asChild>
-                        <Link href={`${base}/categories`}>Categories</Link>
-                    </Button>
-                    <Button asChild>
-                        <Link href={`${base}/new`}>New product</Link>
-                    </Button>
-                </div>
-            </div>
+            <PageHeader
+                title="Products"
+                description="Your catalog — products, pricing, and stock."
+                actions={
+                    <>
+                        <Button variant="outline" asChild>
+                            <Link href={`${base}/categories`}>Categories</Link>
+                        </Button>
+                        <Button variant="brand" asChild>
+                            <Link href={`${base}/new`}>New product</Link>
+                        </Button>
+                    </>
+                }
+            />
 
             {products.length === 0 ? (
-                <div className="rounded-lg border p-8 text-center">
-                    <h3 className="font-medium">No products yet</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Add your first product to start building the catalog.
-                    </p>
-                </div>
+                <EmptyState
+                    title="No products yet"
+                    description="Add your first product to start building the catalog."
+                    action={
+                        <Button variant="brand" asChild>
+                            <Link href={`${base}/new`}>New product</Link>
+                        </Button>
+                    }
+                />
             ) : (
                 <ul className="divide-y rounded-lg border">
                     {products.map((p) => (

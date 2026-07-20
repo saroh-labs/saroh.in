@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { CategoriesManager } from "@/components/stores/categories-manager";
@@ -20,18 +20,10 @@ export default async function CategoriesPage({
 
     return (
         <div className="space-y-6">
-            <Link
-                href={`/stores/${storeId}/products`}
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to products
-            </Link>
-            <div>
-                <h2 className="text-lg font-medium">Categories</h2>
-                <p className="text-sm text-muted-foreground">
-                    Organize your catalog. Categories can be nested.
-                </p>
-            </div>
+            <PageHeader
+                title="Categories"
+                description="Organize your catalog. Categories can be nested."
+            />
             <CategoriesManager storeId={storeId} categories={categories} />
         </div>
     );

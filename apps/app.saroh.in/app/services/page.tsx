@@ -1,6 +1,8 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@saroh/ui/card";
+import { EmptyState } from "@saroh/ui/empty-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import type { Service } from "@/lib/services/service";
@@ -19,39 +21,34 @@ export default async function ServicesPage() {
     const services: Service[] = await listServices();
 
     return (
-        <main className="mx-auto max-w-4xl p-8">
-            <div className="mb-6 flex items-center justify-between">
-                <h1 className="text-2xl font-semibold">Services</h1>
-                <div className="flex items-center gap-3">
-                    <Button asChild variant="outline">
-                        <Link href="/bookings">Bookings</Link>
-                    </Button>
-                    {services.length > 0 && (
-                        <Button asChild>
-                            <Link href="/services/new">New service</Link>
+        <main className="mx-auto max-w-5xl p-8">
+            <PageHeader
+                title="Services"
+                description="Bookable services visitors can reserve from your sites."
+                actions={
+                    <>
+                        <Button asChild variant="outline">
+                            <Link href="/bookings">Bookings</Link>
                         </Button>
-                    )}
-                </div>
-            </div>
+                        {services.length > 0 && (
+                            <Button asChild variant="brand">
+                                <Link href="/services/new">New service</Link>
+                            </Button>
+                        )}
+                    </>
+                }
+            />
 
             {services.length === 0 ? (
-                <Card className="border-dashed">
-                    <CardHeader className="items-center text-center">
-                        <CardTitle>No services yet</CardTitle>
-                        <CardDescription>
-                            Create a bookable service, add availability windows,
-                            then drop a Booking section onto a site so visitors
-                            can book.
-                        </CardDescription>
-                        <div className="pt-4">
-                            <Button asChild>
-                                <Link href="/services/new">
-                                    Create a service
-                                </Link>
-                            </Button>
-                        </div>
-                    </CardHeader>
-                </Card>
+                <EmptyState
+                    title="No services yet"
+                    description="Create a bookable service, add availability windows, then drop a Booking section onto a site so visitors can book."
+                    action={
+                        <Button asChild variant="brand">
+                            <Link href="/services/new">Create a service</Link>
+                        </Button>
+                    }
+                />
             ) : (
                 <div className="grid gap-3">
                     {services.map((service) => (
