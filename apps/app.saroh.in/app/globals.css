@@ -20,8 +20,14 @@
 		--muted-foreground: 215.4 16.3% 46.9%;
 		--accent: 210 40% 96.1%;
 		--accent-foreground: 222.2 47.4% 11.2%;
-		--destructive: 0 84.2% 60.2%;
+		--destructive: 0 72% 44%;
 		--destructive-foreground: 210 40% 98%;
+		--success: 142 72% 29%;
+		--success-foreground: 0 0% 100%;
+		--warning: 38 92% 50%;
+		--warning-foreground: 20 14% 10%;
+		--info: 221.2 83.2% 45%;
+		--info-foreground: 0 0% 100%;
 		--border: 214.3 31.8% 91.4%;
 		--input: 214.3 31.8% 91.4%;
 		--ring: 221.2 83.2% 53.3%;
@@ -47,9 +53,15 @@
 		--accent-foreground: 210 40% 98%;
 		--destructive: 0 62.8% 30.6%;
 		--destructive-foreground: 210 40% 98%;
+		--success: 142 69% 42%;
+		--success-foreground: 0 0% 100%;
+		--warning: 38 92% 52%;
+		--warning-foreground: 20 14% 10%;
+		--info: 217.2 91.2% 59.8%;
+		--info-foreground: 222.2 47.4% 11.2%;
 		--border: 217.2 32.6% 17.5%;
 		--input: 217.2 32.6% 17.5%;
-		--ring: 224.3 76.3% 48%;
+		--ring: 217.2 91.2% 59.8%;
 	}
 }
 
@@ -59,5 +71,17 @@
 	}
 	body {
 		@apply bg-background text-foreground;
+	}
+}
+
+/* Honour the OS "reduce motion" setting (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	::before,
+	::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
 	}
 }
