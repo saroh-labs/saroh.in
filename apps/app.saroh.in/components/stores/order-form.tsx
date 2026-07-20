@@ -1,12 +1,14 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { createOrder } from "@/lib/orders/actions";
 
@@ -25,6 +27,32 @@ interface CustomerLite {
 const money = (cents: number) => (cents / 100).toFixed(2);
 const toCents = (s: string) => Math.round((Number(s) || 0) * 100);
 
+const formSchema = z.object({
+    customerId: z.string().min(1, { message: "Pick a customer" }),
+    lines: z
+        .array(
+            z.object({
+                productId: z.string(),
+                quantity: z.number(),
+            }),
+        )
+        .refine((lines) => lines.some((l) => l.productId && l.quantity > 0), {
+            message: "Add at least one product",
+        }),
+    tax: z.string(),
+    shipping: z.string(),
+    discount: z.string(),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+/**
+ * Create-order form. Unlike the flat entity forms, this one is a line-item
+ * editor: a dynamic array of product/quantity rows (react-hook-form
+ * `useFieldArray`) plus a live-computed subtotal/total. Validation is still
+ * zod-driven; the two top-level guards ("pick a customer", "add a product")
+ * surface as toasts (preserving the original UX) via the invalid handler.
+ */
 export function OrderForm({
     storeId,
     customers,
@@ -35,18 +63,31 @@ export function OrderForm({
     products: ProductLite[];
 }) {
     const router = useRouter();
-    const [customerId, setCustomerId] = useState("");
-    const [lines, setLines] = useState<
-        { productId: string; quantity: number }[]
-    >([{ productId: products[0]?.id ?? "", quantity: 1 }]);
-    const [tax, setTax] = useState("0");
-    const [shipping, setShipping] = useState("0");
-    const [discount, setDiscount] = useState("0");
-    const [saving, setSaving] = useState(false);
+    const form = useForm<FormValues>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            customerId: "",
+            lines: [{ productId: products[0]?.id ?? "", quantity: 1 }],
+            tax: "0",
+            shipping: "0",
+            discount: "0",
+        },
+    });
+    const { fields, append, remove } = useFieldArray({
+        control: form.control,
+        name: "lines",
+    });
+    const { isSubmitting } = form.formState;
+
+    // Watch the value-bearing fields so the totals recompute as the user types.
+    const watchedLines = form.watch("lines");
+    const tax = form.watch("tax");
+    const shipping = form.watch("shipping");
+    const discount = form.watch("discount");
 
     const priceOf = (id: string) =>
         toCents(products.find((p) => p.id === id)?.price ?? "0");
-    const subtotalCents = lines.reduce(
+    const subtotalCents = (watchedLines ?? []).reduce(
         (sum, l) => sum + priceOf(l.productId) * (l.quantity || 0),
         0,
     );
@@ -55,47 +96,33 @@ export function OrderForm({
         subtotalCents + toCents(tax) + toCents(shipping) - toCents(discount),
     );
 
-    function setLine(i: number, patch: Partial<(typeof lines)[number]>) {
-        setLines((ls) =>
-            ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)),
-        );
-    }
-    const addLine = () =>
-        setLines((ls) => [
-            ...ls,
-            { productId: products[0]?.id ?? "", quantity: 1 },
-        ]);
-    const removeLine = (i: number) =>
-        setLines((ls) => ls.filter((_, idx) => idx !== i));
-
-    async function onSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!customerId) {
-            toast.error("Pick a customer");
-            return;
-        }
-        const items = lines
+    async function onSubmit(values: FormValues) {
+        const items = values.lines
             .filter((l) => l.productId && l.quantity > 0)
             .map((l) => ({ productId: l.productId, quantity: l.quantity }));
-        if (items.length === 0) {
-            toast.error("Add at least one product");
-            return;
-        }
-        setSaving(true);
         const res = await createOrder(storeId, {
-            customerId,
+            customerId: values.customerId,
             items,
-            tax,
-            shipping,
-            discount,
+            tax: values.tax,
+            shipping: values.shipping,
+            discount: values.discount,
         });
-        setSaving(false);
         if (!res.ok) {
             toast.error(res.error);
             return;
         }
         toast.success("Order created");
         router.push(`/stores/${storeId}/orders/${res.data.id}`);
+    }
+
+    /** Preserve the original toast UX for the two top-level guards. */
+    function onInvalid(errors: FieldErrors<FormValues>) {
+        const message =
+            errors.customerId?.message ??
+            errors.lines?.message ??
+            errors.lines?.root?.message ??
+            "Please fix the highlighted fields";
+        toast.error(String(message));
     }
 
     if (products.length === 0 || customers.length === 0) {
@@ -123,15 +150,17 @@ export function OrderForm({
     }
 
     return (
-        <form onSubmit={onSubmit} className="grid max-w-2xl gap-6">
+        <form
+            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+            className="grid max-w-2xl gap-6"
+        >
             <div className="grid gap-2">
                 <Label htmlFor="customer">Customer</Label>
                 <select
                     id="customer"
-                    value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
-                    disabled={saving}
+                    disabled={isSubmitting}
                     className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    {...form.register("customerId")}
                 >
                     <option value="">Select a customer…</option>
                     {customers.map((c) => (
@@ -147,16 +176,13 @@ export function OrderForm({
 
             <div className="space-y-3">
                 <Label>Items</Label>
-                {lines.map((line, i) => (
-                    <div key={i} className="flex items-center gap-2">
+                {fields.map((line, i) => (
+                    <div key={line.id} className="flex items-center gap-2">
                         <select
                             aria-label="Product"
-                            value={line.productId}
-                            onChange={(e) =>
-                                setLine(i, { productId: e.target.value })
-                            }
-                            disabled={saving}
+                            disabled={isSubmitting}
                             className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                            {...form.register(`lines.${i}.productId`)}
                         >
                             {products.map((p) => (
                                 <option key={p.id} value={p.id}>
@@ -168,26 +194,24 @@ export function OrderForm({
                             aria-label="Quantity"
                             type="number"
                             min={1}
-                            value={line.quantity}
-                            onChange={(e) =>
-                                setLine(i, {
-                                    quantity: Number(e.target.value),
-                                })
-                            }
-                            disabled={saving}
+                            disabled={isSubmitting}
                             className="w-20"
+                            {...form.register(`lines.${i}.quantity`, {
+                                valueAsNumber: true,
+                            })}
                         />
                         <span className="w-20 text-right text-sm tabular-nums text-muted-foreground">
                             {money(
-                                priceOf(line.productId) * (line.quantity || 0),
+                                priceOf(watchedLines?.[i]?.productId ?? "") *
+                                    (watchedLines?.[i]?.quantity || 0),
                             )}
                         </span>
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            disabled={saving || lines.length === 1}
-                            onClick={() => removeLine(i)}
+                            disabled={isSubmitting || fields.length === 1}
+                            onClick={() => remove(i)}
                         >
                             ✕
                         </Button>
@@ -197,8 +221,13 @@ export function OrderForm({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={addLine}
-                    disabled={saving}
+                    onClick={() =>
+                        append({
+                            productId: products[0]?.id ?? "",
+                            quantity: 1,
+                        })
+                    }
+                    disabled={isSubmitting}
                 >
                     Add item
                 </Button>
@@ -210,9 +239,8 @@ export function OrderForm({
                     <Input
                         id="tax"
                         inputMode="decimal"
-                        value={tax}
-                        onChange={(e) => setTax(e.target.value)}
-                        disabled={saving}
+                        disabled={isSubmitting}
+                        {...form.register("tax")}
                     />
                 </div>
                 <div className="grid gap-2">
@@ -220,9 +248,8 @@ export function OrderForm({
                     <Input
                         id="shipping"
                         inputMode="decimal"
-                        value={shipping}
-                        onChange={(e) => setShipping(e.target.value)}
-                        disabled={saving}
+                        disabled={isSubmitting}
+                        {...form.register("shipping")}
                     />
                 </div>
                 <div className="grid gap-2">
@@ -230,9 +257,8 @@ export function OrderForm({
                     <Input
                         id="discount"
                         inputMode="decimal"
-                        value={discount}
-                        onChange={(e) => setDiscount(e.target.value)}
-                        disabled={saving}
+                        disabled={isSubmitting}
+                        {...form.register("discount")}
                     />
                 </div>
             </div>
@@ -246,8 +272,8 @@ export function OrderForm({
                         Total {money(totalCents)}
                     </p>
                 </div>
-                <Button type="submit" disabled={saving}>
-                    {saving ? "Creating…" : "Create order"}
+                <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Creating…" : "Create order"}
                 </Button>
             </div>
         </form>
