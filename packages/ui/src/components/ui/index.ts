@@ -37,6 +37,8 @@ export * from "./switch";
 export * from "./table";
 export * from "./tabs";
 export * from "./textarea";
+export * from "./theme-provider";
 export * from "./toggle";
 export * from "./toggle-group";
 export * from "./tooltip";
+export * from "./wordmark";
