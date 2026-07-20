@@ -14,6 +14,11 @@
     "check-types": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.51.5"
+  },
   "devDependencies": {
     "@saroh/eslint-config": "workspace:*",
     "@saroh/tailwind-config": "workspace:*",
@@ -23,6 +28,8 @@
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",
     "react": "catalog:react19",
+    "react-dom": "catalog:react19",
+    "react-hook-form": "catalog:",
     "typescript": "catalog:"
   },
   "dependencies": {
@@ -63,7 +70,6 @@
     "next-themes": "^0.4.6",
     "postcss": "^8.5.15",
     "react-day-picker": "catalog:",
-    "react-hook-form": "catalog:",
     "react-resizable-panels": "^4.11.2",
     "recharts": "catalog:",
     "sonner": "^2.0.7",
