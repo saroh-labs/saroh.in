@@ -1,5 +1,6 @@
 import BaseLayout from "@/components/layouts/base-layout";
 import "@saroh/ui/globals.css";
+import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 
@@ -18,11 +19,17 @@ export default function RootLayout({
 }: Readonly<{
     children: React.ReactNode;
 }>) {
-    // if (typeof window === "undefined")
     return (
         <html lang="en" suppressHydrationWarning>
             <body className={inter.className}>
-                <BaseLayout>{children}</BaseLayout>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="light"
+                    enableSystem
+                    disableTransitionOnChange
+                >
+                    <BaseLayout>{children}</BaseLayout>
+                </ThemeProvider>
             </body>
         </html>
     );

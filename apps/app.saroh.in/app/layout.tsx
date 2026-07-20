@@ -1,5 +1,5 @@
 import { AppHeader } from "@/components/shared/app-header";
-import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
