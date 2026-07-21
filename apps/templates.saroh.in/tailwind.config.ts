@@ -5,6 +5,10 @@ const config: Config = {
         "./pages/**/*.{js,ts,jsx,tsx,mdx}",
         "./components/**/*.{js,ts,jsx,tsx,mdx}",
         "./app/**/*.{js,ts,jsx,tsx,mdx}",
+        // This app consumes @saroh/ui (e.g. Wordmark); include the shared
+        // component source so any Tailwind classes used only inside those
+        // components aren't purged from the production build (#92).
+        "../../packages/ui/src/**/*.{js,ts,jsx,tsx}",
     ],
     theme: {
         extend: {
