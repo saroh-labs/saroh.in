@@ -76,6 +76,7 @@ export default function Home() {
                 <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap items-center gap-3">
                         <Button>Default</Button>
+                        <Button variant="brand">Brand</Button>
                         <Button variant="secondary">Secondary</Button>
                         <Button variant="destructive">Destructive</Button>
                         <Button variant="outline">Outline</Button>
