@@ -45,6 +45,10 @@ export class ModuleLifecycleService {
         authorize(ctx, "module:manage");
         const descriptor = this.descriptor(moduleKey);
 
+        // Idempotent: enabling an already-enabled module is a no-op (no second
+        // audit event).
+        if ((await this.currentStatus(ctx, moduleKey)) === "ENABLED") return;
+
         // Hard dependencies must already be ENABLED.
         if (descriptor.dependencies.length > 0) {
             const deps = await this.db.organizationModule.findMany({
@@ -101,6 +105,10 @@ export class ModuleLifecycleService {
         authorize(ctx, "module:manage");
         this.descriptor(moduleKey);
 
+        // Idempotent: only an ENABLED module transitions to DISABLED. Disabling
+        // an already-disabled/archived/absent module is a no-op.
+        if ((await this.currentStatus(ctx, moduleKey)) !== "ENABLED") return;
+
         // Reverse dependency: no ENABLED module may still depend on this one.
         const dependentKeys = MODULES.filter((m) =>
             m.dependencies.includes(moduleKey),
@@ -131,6 +139,7 @@ export class ModuleLifecycleService {
         });
         if (blockers.length > 0) {
             throw new ConflictException({
+                error: "MODULE_DEACTIVATION_BLOCKED",
                 message: `Cannot disable ${moduleKey} yet.`,
                 blockers,
             });
@@ -313,6 +322,23 @@ export class ModuleLifecycleService {
                 projectId,
             );
         });
+    }
+
+    /** The persisted lifecycle status, or null when no row exists yet. */
+    private async currentStatus(
+        ctx: OrganizationContext,
+        moduleKey: ModuleKey,
+    ): Promise<string | null> {
+        const row = await this.db.organizationModule.findUnique({
+            where: {
+                organizationId_moduleKey: {
+                    organizationId: ctx.organizationId,
+                    moduleKey,
+                },
+            },
+            select: { status: true },
+        });
+        return row?.status ?? null;
     }
 
     private descriptor(moduleKey: ModuleKey) {

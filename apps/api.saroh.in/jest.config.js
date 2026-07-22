@@ -37,6 +37,8 @@ module.exports = {
         "<rootDir>/src/modules/capabilities/module-availability.service.spec.ts",
         "<rootDir>/src/modules/capabilities/module-lifecycle.service.spec.ts",
         "<rootDir>/src/modules/capabilities/readiness/module-readiness.registry.spec.ts",
+        // #115 module API controller (mocked services).
+        "<rootDir>/src/modules/capabilities/capabilities.controller.spec.ts",
         // S1-006 store authorization: pure unit specs with mocked Prisma +
         // mocked FeatureFlagService (never touch a DB). Only *.authorization
         // specs run here; the legacy DB-backed stores.service.spec.ts stays in

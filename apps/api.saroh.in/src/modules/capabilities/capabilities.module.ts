@@ -1,7 +1,10 @@
 import { Module } from "@nestjs/common";
 
+import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { BillingModule } from "../billing/billing.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
+import { OrganizationsModule } from "../organizations/organizations.module";
+import { CapabilitiesController } from "./capabilities.controller";
 import { ModuleAvailabilityService } from "./module-availability.service";
 import { ModuleLifecycleService } from "./module-lifecycle.service";
 import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
@@ -14,11 +17,13 @@ import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
  * #115.
  */
 @Module({
-    imports: [FeatureFlagModule, BillingModule],
+    imports: [FeatureFlagModule, BillingModule, OrganizationsModule],
+    controllers: [CapabilitiesController],
     providers: [
         ModuleReadinessRegistry,
         ModuleAvailabilityService,
         ModuleLifecycleService,
+        OrganizationGuard,
     ],
     exports: [
         ModuleReadinessRegistry,

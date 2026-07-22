@@ -348,5 +348,10 @@ export const MODULE_BY_KEY: ReadonlyMap<ModuleKey, ModuleDescriptor> = new Map(
     MODULES.map((m) => [m.key, m]),
 );
 
+/** True when `key` is a registered module key. */
+export function isModuleKey(key: string): key is ModuleKey {
+    return MODULE_KEY_SET.has(key);
+}
+
 // Fail fast at import time if the shipped registry is ever made invalid.
 validateModuleRegistry(MODULES);

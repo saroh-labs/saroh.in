@@ -84,8 +84,22 @@ describe("ModuleLifecycleService", () => {
         );
     });
 
+    it("enabling an already-enabled module is a no-op (no second audit)", async () => {
+        const db = makeDb();
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
+        const svc = new ModuleLifecycleService(makeReadiness(), db as never);
+        await svc.enable(OWNER, "CRM");
+        expect(db.organizationModule.upsert).not.toHaveBeenCalled();
+        expect(db.auditEvent.create).not.toHaveBeenCalled();
+    });
+
     it("disable is blocked while an enabled module depends on it", async () => {
         const db = makeDb();
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
         db.organizationModule.findMany.mockResolvedValue([
             { moduleKey: "APPOINTMENTS" },
         ]);
@@ -98,6 +112,9 @@ describe("ModuleLifecycleService", () => {
 
     it("disable is blocked by a safe-deactivation blocker", async () => {
         const db = makeDb();
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
         const readiness = makeReadiness([
             { code: "COMMERCE_OPEN_ORDERS", message: "x" },
         ]);
@@ -110,6 +127,9 @@ describe("ModuleLifecycleService", () => {
 
     it("disable writes a DISABLED row when safe", async () => {
         const db = makeDb();
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
         const svc = new ModuleLifecycleService(makeReadiness(), db as never);
         await svc.disable(OWNER, "WEBSITE");
         expect(db.organizationModule.upsert).toHaveBeenCalledWith(

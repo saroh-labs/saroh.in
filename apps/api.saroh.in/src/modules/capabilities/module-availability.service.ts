@@ -21,7 +21,11 @@ import type { OrgRole } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { can } from "../organizations/organization-policy";
-import type { ModuleKey, ModuleReadiness } from "./module-registry";
+import type {
+    ModuleKey,
+    ModuleLifecycle,
+    ModuleReadiness,
+} from "./module-registry";
 import { MODULE_BY_KEY, MODULE_KEYS } from "./module-registry";
 import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
 
@@ -50,6 +54,20 @@ export interface AvailabilityInput {
     moduleKey: ModuleKey;
     organizationRole: OrgRole;
     projectId?: string;
+}
+
+/**
+ * The client-safe module view (API read model). Deliberately omits rollout-flag
+ * keys, entitlement internals, and provider secrets.
+ */
+export interface ModuleView {
+    key: ModuleKey;
+    label: string;
+    lifecycle: ModuleLifecycle;
+    readiness: ModuleReadiness;
+    selectedForProject: boolean;
+    canManage: boolean;
+    blockers: AvailabilityBlocker[];
 }
 
 const MODULES_SETTINGS_HREF = "/settings/modules";
@@ -166,5 +184,63 @@ export class ModuleAvailabilityService {
                 this.evaluate({ ...input, moduleKey }),
             ),
         );
+    }
+
+    /**
+     * The client-safe catalog + effective state for every module — what
+     * `GET /organizations/:id/modules` returns. Enriches availability with the
+     * registry label and the persisted lifecycle.
+     */
+    async listViews(
+        input: Omit<AvailabilityInput, "moduleKey">,
+    ): Promise<ModuleView[]> {
+        const [availabilities, installations] = await Promise.all([
+            this.evaluateAll(input),
+            this.db.organizationModule.findMany({
+                where: { organizationId: input.organizationId },
+                select: { moduleKey: true, status: true },
+            }),
+        ]);
+        const lifecycleByKey = new Map(
+            installations.map((i) => [i.moduleKey, i.status]),
+        );
+        const canManage = can(input.organizationRole, "module:manage");
+
+        return availabilities.map((a) => ({
+            key: a.key,
+            label: MODULE_BY_KEY.get(a.key)?.label ?? a.key,
+            lifecycle: (lifecycleByKey.get(a.key) ??
+                "DISABLED") as ModuleLifecycle,
+            readiness: a.readiness,
+            selectedForProject: a.selectedForProject,
+            canManage,
+            blockers: a.blockers,
+        }));
+    }
+
+    /** The client-safe view for a single module (returned after a mutation). */
+    async view(input: AvailabilityInput): Promise<ModuleView> {
+        const [availability, installation] = await Promise.all([
+            this.evaluate(input),
+            this.db.organizationModule.findUnique({
+                where: {
+                    organizationId_moduleKey: {
+                        organizationId: input.organizationId,
+                        moduleKey: input.moduleKey,
+                    },
+                },
+                select: { status: true },
+            }),
+        ]);
+        return {
+            key: availability.key,
+            label:
+                MODULE_BY_KEY.get(availability.key)?.label ?? availability.key,
+            lifecycle: (installation?.status ?? "DISABLED") as ModuleLifecycle,
+            readiness: availability.readiness,
+            selectedForProject: availability.selectedForProject,
+            canManage: can(input.organizationRole, "module:manage"),
+            blockers: availability.blockers,
+        };
     }
 }
