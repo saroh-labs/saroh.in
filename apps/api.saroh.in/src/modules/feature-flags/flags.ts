@@ -9,6 +9,24 @@
 export const FlagKey = {
     /** Stage 1 org-authorization switch (ADR-001). */
     ORG_AUTHORIZATION: "ORG_AUTHORIZATION",
+
+    /**
+     * Per-module Saroh-side rollout switches (ADR-003). These are the *rollout*
+     * gate only — the emergency/gradual kill switch Saroh controls — and are
+     * deliberately distinct from an Organization *enabling* a module (an
+     * installation record) and from *entitlement* (commercial rights). A module
+     * is available only when its rollout flag is on AND the Organization has
+     * enabled it AND entitlement AND authorization all pass. Default false, so
+     * modules dark-roll out (see the modular-capabilities plan, Task 9).
+     */
+    MODULE_WEBSITE: "MODULE_WEBSITE",
+    MODULE_CRM: "MODULE_CRM",
+    MODULE_APPOINTMENTS: "MODULE_APPOINTMENTS",
+    MODULE_COMMERCE: "MODULE_COMMERCE",
+    MODULE_PAYMENTS: "MODULE_PAYMENTS",
+    MODULE_COMMUNICATIONS: "MODULE_COMMUNICATIONS",
+    MODULE_AUTOMATIONS: "MODULE_AUTOMATIONS",
+    MODULE_INSIGHTS: "MODULE_INSIGHTS",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];

@@ -25,6 +25,11 @@ module.exports = {
         // pure unit tests with a jest-mocked Prisma (never touch a DB).
         "<rootDir>/src/modules/audit/**/*.spec.ts",
         "<rootDir>/src/modules/feature-flags/**/*.spec.ts",
+        // #112 (ADR-003) capabilities: the pure module-registry validator —
+        // uniqueness, dependency validity, cycle detection, absolute routes,
+        // known rollout/entitlement keys, and the AI exclusion (DEC-015). No
+        // Prisma, no DB, no network.
+        "<rootDir>/src/modules/capabilities/**/*.spec.ts",
         // S1-006 store authorization: pure unit specs with mocked Prisma +
         // mocked FeatureFlagService (never touch a DB). Only *.authorization
         // specs run here; the legacy DB-backed stores.service.spec.ts stays in

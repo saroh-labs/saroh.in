@@ -24,7 +24,7 @@ jest.mock("@saroh/database", () => {
 import { prisma } from "@saroh/database";
 
 import { FeatureFlagService } from "./feature-flags.service";
-import { FlagKey } from "./flags";
+import { FLAG_KEYS, FlagKey } from "./flags";
 
 const flagFindUnique = prisma.featureFlag.findUnique as jest.Mock;
 const flagFindMany = prisma.featureFlag.findMany as jest.Mock;
@@ -241,13 +241,14 @@ describe("FeatureFlagService.list", () => {
 
         const result = await service.list("org_1");
 
-        expect(result).toEqual([
-            {
-                key: FlagKey.ORG_AUTHORIZATION,
-                enabled: true,
-                source: "override",
-            },
-        ]);
+        // list() resolves every registered flag; ORG_AUTHORIZATION is overridden
+        // on, the rest (the module rollout flags) fall back to false.
+        expect(result).toHaveLength(FLAG_KEYS.length);
+        expect(result).toContainEqual({
+            key: FlagKey.ORG_AUTHORIZATION,
+            enabled: true,
+            source: "override",
+        });
     });
 
     it("uses the global default and never queries overrides without an org", async () => {
@@ -257,13 +258,12 @@ describe("FeatureFlagService.list", () => {
 
         const result = await service.list();
 
-        expect(result).toEqual([
-            {
-                key: FlagKey.ORG_AUTHORIZATION,
-                enabled: true,
-                source: "default",
-            },
-        ]);
+        expect(result).toHaveLength(FLAG_KEYS.length);
+        expect(result).toContainEqual({
+            key: FlagKey.ORG_AUTHORIZATION,
+            enabled: true,
+            source: "default",
+        });
         expect(overrideFindMany).not.toHaveBeenCalled();
     });
 
@@ -273,12 +273,15 @@ describe("FeatureFlagService.list", () => {
 
         const result = await service.list("org_1");
 
-        expect(result).toEqual([
-            {
-                key: FlagKey.ORG_AUTHORIZATION,
-                enabled: false,
-                source: "fallback",
-            },
-        ]);
+        // No default rows and no overrides: every registered flag falls back.
+        expect(result).toHaveLength(FLAG_KEYS.length);
+        expect(
+            result.every((f) => f.enabled === false && f.source === "fallback"),
+        ).toBe(true);
+        expect(result).toContainEqual({
+            key: FlagKey.ORG_AUTHORIZATION,
+            enabled: false,
+            source: "fallback",
+        });
     });
 });
