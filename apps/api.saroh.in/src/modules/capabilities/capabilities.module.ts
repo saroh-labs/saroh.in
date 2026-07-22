@@ -6,6 +6,7 @@ import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { CapabilitiesController } from "./capabilities.controller";
 import { ModuleAvailabilityService } from "./module-availability.service";
+import { ModuleEnforcementGuard } from "./module-enforcement.guard";
 import { ModuleLifecycleService } from "./module-lifecycle.service";
 import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
 
@@ -23,12 +24,17 @@ import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
         ModuleReadinessRegistry,
         ModuleAvailabilityService,
         ModuleLifecycleService,
+        ModuleEnforcementGuard,
         OrganizationGuard,
     ],
     exports: [
         ModuleReadinessRegistry,
         ModuleAvailabilityService,
         ModuleLifecycleService,
+        // Exported so any domain module can adopt @RequireModule enforcement by
+        // importing CapabilitiesModule and adding ModuleEnforcementGuard to its
+        // controller's @UseGuards (after OrganizationGuard). Dark by default.
+        ModuleEnforcementGuard,
     ],
 })
 export class CapabilitiesModule {}

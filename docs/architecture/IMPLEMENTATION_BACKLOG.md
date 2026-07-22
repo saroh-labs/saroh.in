@@ -213,3 +213,19 @@ Quality/blocker pass taken after the Stage 0–7 code was complete. See
 Repository and Organization tenant foundation: `S0-001`, `S0-002`, `S0-003`, `S0-004`, `S0-005`, `S0-006`, `S0-008`, `S0-010`, `S1-001`, `S1-002`, `S1-003`, `S1-004`, `S1-005`, `S1-007`, `S1-008`, `S1-010`, `S1-011`, `S1-012`.
 
 `S0-005`, `S0-006`, `S0-008` and `S0-010` can proceed in parallel after `S0-001`; Organization migration/context/RLS items remain sequential. Do not start implementation until the audit is reviewed.
+
+## Modular capabilities (epic #110, ADR-003 / DEC-016)
+
+Customer-owned capability modules by Organization + Project, separate from
+feature flags and entitlements. Built on `development`; ships **dark** (rollout
+`MODULE_*` flags default off, `MODULE_ENFORCEMENT` unset). See
+[runbooks/MODULE_ROLLOUT.md](runbooks/MODULE_ROLLOUT.md).
+
+| ID   | Status  | Commit / note                                                                                                                                                              |
+| ---- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #112 | ✅ Done | typed module registry + ADR-003 (8 modules, AI excluded); `MODULE_*` rollout flags                                                                                         |
+| #113 | ⏳ Code | `OrganizationModule`/`ProjectModule` schema + migration + idempotent evidence backfill. **Needs `test:int` + apply against a real Postgres** (authored, DB-verify pending) |
+| #114 | ✅ Done | lifecycle + availability (4-gate) + readiness/deactivation services; `module:read`/`module:manage` actions                                                                 |
+| #115 | ✅ Done | module API controller (org+project routes, 409 blockers) + Settings → Modules UI                                                                                           |
+| #116 | ✅ Done | capability-aware shell (fail-open nav projection) + per-Project module selection                                                                                           |
+| #117 | ⏳ Code | dark `@RequireModule` enforcement guard + rollout runbook. Per-domain endpoint annotation + e2e matrix = the gradual rollout (needs a live DB)                             |
