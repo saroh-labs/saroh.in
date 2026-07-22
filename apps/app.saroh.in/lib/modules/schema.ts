@@ -32,6 +32,7 @@ export const moduleViewSchema = z.object({
     readiness: z.enum(MODULE_READINESS),
     selectedForProject: z.boolean(),
     canManage: z.boolean(),
+    dependencies: z.array(z.string()).default([]),
     blockers: z.array(moduleBlockerSchema),
 });
 export type ModuleView = z.infer<typeof moduleViewSchema>;

@@ -25,6 +25,8 @@ module.exports = {
         // pure unit tests with a jest-mocked Prisma (never touch a DB).
         "<rootDir>/src/modules/audit/**/*.spec.ts",
         "<rootDir>/src/modules/feature-flags/**/*.spec.ts",
+        // #119 Home aggregator: pure ranking with mocked availability + counts.
+        "<rootDir>/src/modules/home/**/*.spec.ts",
         // #112 (ADR-003) capabilities: the pure module-registry validator —
         // uniqueness, dependency validity, cycle detection, absolute routes,
         // known rollout/entitlement keys, and the AI exclusion (DEC-015). No

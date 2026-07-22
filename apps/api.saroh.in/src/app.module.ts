@@ -19,6 +19,7 @@ import { EnquiryModule } from "./modules/enquiry/enquiry.module";
 import { FeatureFlagModule } from "./modules/feature-flags/feature-flags.module";
 import { FormsModule } from "./modules/forms/forms.module";
 import { HealthModule } from "./modules/health/health.module";
+import { HomeModule } from "./modules/home/home.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { LeadsModule } from "./modules/leads/leads.module";
 import { MediaModule } from "./modules/media/media.module";
@@ -62,6 +63,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         HealthModule,
         FeatureFlagModule,
         CapabilitiesModule,
+        HomeModule,
         OrganizationsModule,
         ProjectsModule,
         AuditModule,

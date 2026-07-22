@@ -67,6 +67,8 @@ export interface ModuleView {
     readiness: ModuleReadiness;
     selectedForProject: boolean;
     canManage: boolean;
+    /** Hard enable-dependencies (server-owned; the client must not derive these). */
+    dependencies: ModuleKey[];
     blockers: AvailabilityBlocker[];
 }
 
@@ -214,6 +216,7 @@ export class ModuleAvailabilityService {
             readiness: a.readiness,
             selectedForProject: a.selectedForProject,
             canManage,
+            dependencies: [...(MODULE_BY_KEY.get(a.key)?.dependencies ?? [])],
             blockers: a.blockers,
         }));
     }
@@ -240,6 +243,9 @@ export class ModuleAvailabilityService {
             readiness: availability.readiness,
             selectedForProject: availability.selectedForProject,
             canManage: can(input.organizationRole, "module:manage"),
+            dependencies: [
+                ...(MODULE_BY_KEY.get(availability.key)?.dependencies ?? []),
+            ],
             blockers: availability.blockers,
         };
     }
