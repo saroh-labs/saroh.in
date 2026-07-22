@@ -28,8 +28,9 @@ module.exports = {
         // #112 (ADR-003) capabilities: the pure module-registry validator —
         // uniqueness, dependency validity, cycle detection, absolute routes,
         // known rollout/entitlement keys, and the AI exclusion (DEC-015). No
-        // Prisma, no DB, no network.
-        "<rootDir>/src/modules/capabilities/**/*.spec.ts",
+        // Prisma, no DB, no network. (module-backfill.spec.ts is DB-backed and
+        // runs only in the integration project.)
+        "<rootDir>/src/modules/capabilities/module-registry.spec.ts",
         // S1-006 store authorization: pure unit specs with mocked Prisma +
         // mocked FeatureFlagService (never touch a DB). Only *.authorization
         // specs run here; the legacy DB-backed stores.service.spec.ts stays in
