@@ -72,6 +72,9 @@ module.exports = {
         // authz (MEMBER denied), tenant isolation (cross-tenant id → 404), and
         // the move-stage atomic STAGE_CHANGED activity. Never touch a DB.
         "<rootDir>/src/modules/contacts/**/*.spec.ts",
+        // #120 customer workspace: identity-link safety (never by name, org-
+        // scoped) + module-gated timeline, with a jest-mocked Prisma.
+        "<rootDir>/src/modules/customer-workspace/**/*.spec.ts",
         "<rootDir>/src/modules/pipelines/**/*.spec.ts",
         "<rootDir>/src/modules/leads/**/*.spec.ts",
         // S3-006 notifications: the enquiry.notify job handler (durable "notify

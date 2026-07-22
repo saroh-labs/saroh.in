@@ -65,6 +65,10 @@ model Organization {
   // derived, never stored here.
   organizationModules OrganizationModule[]
 
+  // Explicit customer identity links (#120): a user-confirmed connection between
+  // a CRM Contact and a commerce Customer. Never an automatic merge.
+  customerIdentityLinks CustomerIdentityLink[]
+
   // Optional 1:1 business identity captured at onboarding (S1-004)
   businessProfile BusinessProfile?
 
@@ -464,6 +468,9 @@ model Customer {
 
   orders Order[]
   carts  Cart[]
+
+  // Explicit links to CRM Contact records (#120).
+  identityLinks CustomerIdentityLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1079,6 +1086,30 @@ model ProjectModule {
   @@index([organizationId, projectId])
 }
 
+// CustomerIdentityLink: a user-confirmed link between a CRM Contact and a
+// commerce Customer (#120). Saroh NEVER merges people automatically on weak
+// evidence (e.g. similar names); an exact normalized email/phone only *suggests*
+// a link — a person confirms it. The record is Organization-scoped, carries the
+// actor for audit, and is reversible (deletable) without touching either
+// underlying record. It links, it does not merge: Contact and Customer keep
+// their own identity and domain ownership.
+model CustomerIdentityLink {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  linkedByUserId String
+  createdAt      DateTime @default(now())
+
+  @@unique([contactId, customerId])
+  @@index([organizationId])
+}
+
 // Team: a named group of org members, used to grant Project access in bulk.
 // Org-scoped; deleting the Organization cascades.
 model Team {
@@ -1410,6 +1441,9 @@ model Contact {
   bookings    Booking[]
   messages    Message[]
   consents    Consent[]
+
+  // Explicit links to commerce Customer records (#120).
+  identityLinks CustomerIdentityLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

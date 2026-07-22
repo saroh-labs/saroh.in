@@ -13,6 +13,7 @@ import { CategoriesModule } from "./modules/categories/categories.module";
 import { CommunicationsModule } from "./modules/communications/communications.module";
 import { ContactsModule } from "./modules/contacts/contacts.module";
 import { ContentModule } from "./modules/content/content.module";
+import { CustomerWorkspaceModule } from "./modules/customer-workspace/customer-workspace.module";
 import { CustomersModule } from "./modules/customers/customers.module";
 import { DomainsModule } from "./modules/domains/domains.module";
 import { EnquiryModule } from "./modules/enquiry/enquiry.module";
@@ -72,6 +73,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         ProductsModule,
         CategoriesModule,
         CustomersModule,
+        CustomerWorkspaceModule,
         OrdersModule,
         ContentModule,
         MediaModule,
