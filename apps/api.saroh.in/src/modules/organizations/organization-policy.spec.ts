@@ -22,6 +22,8 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
         "store:read",
         "site:read",
         "media:read",
+        // ADR-003: every role may read effective module availability.
+        "module:read",
     ],
 };
 

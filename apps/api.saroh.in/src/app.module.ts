@@ -8,6 +8,7 @@ import { AuditModule } from "./modules/audit/audit.module";
 import { AutomationsModule } from "./modules/automations/automations.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
+import { CapabilitiesModule } from "./modules/capabilities/capabilities.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { CommunicationsModule } from "./modules/communications/communications.module";
 import { ContactsModule } from "./modules/contacts/contacts.module";
@@ -60,6 +61,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         }),
         HealthModule,
         FeatureFlagModule,
+        CapabilitiesModule,
         OrganizationsModule,
         ProjectsModule,
         AuditModule,

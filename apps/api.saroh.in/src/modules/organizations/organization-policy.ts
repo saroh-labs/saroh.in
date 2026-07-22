@@ -114,7 +114,13 @@ export type OrgAction =
     | "automation:manage"
     | "analytics:read"
     | "billing:read"
-    | "billing:manage";
+    | "billing:manage"
+    // Modular capabilities (ADR-003). `module:read` is the read floor — every
+    // role may see effective module availability for the Projects it can access.
+    // `module:manage` (OWNER/ADMIN) enables/disables Organization modules and
+    // manages Project selection.
+    | "module:read"
+    | "module:manage";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -174,6 +180,9 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "analytics:read",
     "billing:read",
     "billing:manage",
+    // Modular capabilities (ADR-003).
+    "module:read",
+    "module:manage",
 ];
 
 /** Read-only actions — the floor every role (including MEMBER) may perform. */
@@ -183,6 +192,9 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
     "store:read",
     "site:read",
     "media:read",
+    // Every role may read effective module availability (ADR-003); managing
+    // modules requires the separate OWNER/ADMIN `module:manage` action.
+    "module:read",
 ];
 
 /**

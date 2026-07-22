@@ -31,6 +31,12 @@ module.exports = {
         // Prisma, no DB, no network. (module-backfill.spec.ts is DB-backed and
         // runs only in the integration project.)
         "<rootDir>/src/modules/capabilities/module-registry.spec.ts",
+        // #114 capabilities services: availability composition, lifecycle
+        // commands, and the readiness registry — all with mocked Prisma/flags/
+        // entitlements (no DB, no network).
+        "<rootDir>/src/modules/capabilities/module-availability.service.spec.ts",
+        "<rootDir>/src/modules/capabilities/module-lifecycle.service.spec.ts",
+        "<rootDir>/src/modules/capabilities/readiness/module-readiness.registry.spec.ts",
         // S1-006 store authorization: pure unit specs with mocked Prisma +
         // mocked FeatureFlagService (never touch a DB). Only *.authorization
         // specs run here; the legacy DB-backed stores.service.spec.ts stays in
