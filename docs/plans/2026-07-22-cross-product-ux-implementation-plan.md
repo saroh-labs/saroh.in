@@ -348,3 +348,389 @@ git diff --check
 Run rendered checks for every changed route using `agent-browser` and attach the evidence to the corresponding issue/PR.
 
 Commit: `test(ux): gate modular activation journeys`
+
+---
+
+## Detailed execution packets
+
+Each packet must produce one reviewable user outcome and rendered evidence. Backend work that is shared with epic #110 lands first; UI must not fake unavailable APIs.
+
+| Packet | GitHub issue | User-visible outcome                       | Depends on        | Evidence required                 |
+| ------ | ------------ | ------------------------------------------ | ----------------- | --------------------------------- |
+| U-00A  | #118         | Current audit reflects shipped remediation | None              | Source delta and screenshots      |
+| U-00B  | #118         | Baseline task metrics exist                | U-00A             | Reproducible task script          |
+| U-01A  | #119         | Need-based module selection                | #115              | Four onboarding variants          |
+| U-01B  | #119         | Setup checklist from readiness             | U-01A             | Setup/error/skip states           |
+| U-01C  | #119         | Action-oriented Home                       | #117              | Six role/module fixtures          |
+| U-02A  | #120         | Safe identity-link domain                  | #117              | Cross-tenant and reversal tests   |
+| U-02B  | #120         | Customer timeline read model               | U-02A             | Event-order contract tests        |
+| U-02C  | #120         | Customer list/detail UI                    | U-02B             | Mobile/desktop/keyboard evidence  |
+| U-03A  | #121         | Appointments route and shell               | #117              | Legacy redirect and nav tests     |
+| U-03B  | #121         | Calendar/agenda and booking detail         | U-03A             | DST/mobile/keyboard evidence      |
+| U-04A  | #122         | Organization commerce rollup API           | #117              | Reconciliation tests              |
+| U-04B  | #122         | Commerce operations workspace              | U-04A             | Large-data and mobile evidence    |
+| U-05A  | #123         | Provider health read model                 | #114              | Redaction tests                   |
+| U-05B  | #123         | Provider settings/recovery UX              | U-05A             | Degraded/recovery evidence        |
+| U-06A  | #124         | URL-backed filters                         | U-02C/U-03B/U-04B | Reload/share tests                |
+| U-06B  | #124         | Saved views and bulk commands              | U-06A             | Idempotency/partial failure tests |
+| U-06C  | #124         | Cross-module insights                      | U-06B             | Aggregate reconciliation          |
+| U-07A  | #125         | Automated activation journeys              | All above         | Four capability variants          |
+| U-07B  | #125         | Accessibility/responsive release gate      | U-07A             | Automated and manual evidence     |
+
+## Current route transition map
+
+Preserve bookmarks and provide server redirects during IA changes.
+
+| Current route                 | Target route                                | Transition behavior                                                             |
+| ----------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------- |
+| `/`                           | `/`                                         | Replace store list with Home; stores remain linked from Commerce                |
+| `/contacts`                   | `/customers?view=crm`                       | Temporary redirect after customer workspace is complete                         |
+| `/contacts/[contactId]`       | `/customers/[subjectId]`                    | Resolve a Contact-backed subject; preserve query/referrer                       |
+| `/leads`                      | `/customers/leads` or stable `/leads` alias | Keep pipeline workflow addressable; do not bury leads inside commerce customers |
+| `/services`                   | `/appointments/services`                    | Permanent redirect only after new route parity                                  |
+| `/services/[serviceId]`       | `/appointments/services/[serviceId]`        | Preserve edit deep links                                                        |
+| `/bookings`                   | `/appointments`                             | Default to agenda/list                                                          |
+| `/stores/[storeId]/orders`    | `/commerce/orders?store=<id>`               | Preserve Store filter in URL                                                    |
+| `/stores/[storeId]/products`  | `/commerce/catalog?store=<id>`              | Preserve Store filter in URL                                                    |
+| `/stores/[storeId]/customers` | `/customers?store=<id>&view=commerce`       | Preserve source context                                                         |
+| `/analytics`                  | `/insights`                                 | Redirect only when Insights is enabled; Settings remains discoverable otherwise |
+
+Do not move a route until target behavior, permissions, loading/error states, and analytics attribution match. Maintain redirects for at least one stable release cycle and instrument their use before removal.
+
+## Shared screen-state contract
+
+Every new or changed screen must intentionally implement these states:
+
+| State              | Required content                              | Primary action rule                  | Accessibility requirement                                          |
+| ------------------ | --------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| Loading            | Skeleton mirrors final structure              | None                                 | `aria-busy` only where meaningful; avoid announcing every skeleton |
+| Empty              | What the module does and why it matters       | One creation/setup action            | Heading and description are programmatically associated            |
+| Setup required     | Exact missing dependency                      | Deep link to first solvable blocker  | Do not communicate only through color                              |
+| Active             | Operational data and next action              | At most one dominant CTA             | Logical headings and landmark structure                            |
+| Attention required | Impact, evidence time, recovery               | One recovery action                  | `role=status` for new non-blocking health changes                  |
+| Error              | User-safe explanation and correlation ID      | Retry or safe navigation             | Focus moves to error summary after failed submit/navigation        |
+| Forbidden          | What is unavailable without leaking existence | Return to accessible context         | No upsell when authorization is the blocker                        |
+| Disabled           | Retained-history explanation                  | OWNER/ADMIN: enable; MEMBER: none    | Never masquerade as 404 when history is intentionally readable     |
+| Archived           | Read-only history and archive date            | Reactivate when safe                 | Controls expose disabled/read-only state semantically              |
+| Success            | What completed and what happens next          | Next useful action, not generic Done | Announce once; restore focus predictably                           |
+
+Use `@saroh/ui` `PageHeader`, `EmptyState`, `Alert`, `Skeleton`, `Button`, `Form`, `DataTable`, `Sheet`, and `Dialog`. Add a new shared primitive only when at least three screens need the same anatomy.
+
+## Module onboarding specification
+
+### Screen 1: Organization
+
+Ask only name and required business identity fields. On successful creation, route to `/onboarding/modules`; do not present eight modules in the Organization form.
+
+### Screen 2: Needs
+
+Present task-oriented choices rather than technical module names:
+
+- “Publish a website and collect enquiries” → Website + CRM suggestion.
+- “Manage leads and follow-ups” → CRM.
+- “Accept appointments” → CRM + Appointments.
+- “Sell products online” → Commerce; suggest Payments.
+- “Send business messages” → CRM + Communications.
+- “Understand performance” → Insights, with dependency explanation.
+
+Users may choose any combination, review the actual module list, or skip. Never ask number of employees, revenue, or business size to determine availability.
+
+### Screen 3: Setup
+
+Render server blocker codes in dependency order. Example for paid appointments:
+
+1. Create service.
+2. Add availability.
+3. Connect Razorpay or Cashfree.
+4. Publish booking section.
+5. Send a self-test confirmation.
+
+Completion updates from the availability API. The UI must not mark a step complete optimistically before the server confirms readiness.
+
+## Home ranking contract
+
+The Home endpoint returns candidates; the server ranks them consistently:
+
+```ts
+type HomeAction = {
+    id: string;
+    kind: "BLOCKER" | "OVERDUE" | "OPERATIONAL" | "SETUP" | "GROWTH";
+    severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+    moduleKey?: ModuleKey;
+    title: string;
+    description: string;
+    href: string;
+    occurredAt?: string;
+};
+```
+
+Sort by:
+
+1. Critical provider/security/financial blockers.
+2. High-impact overdue tasks, failed deliveries, payment/refund exceptions, and bookings requiring action.
+3. Active operational work due today.
+4. Setup blockers for enabled modules.
+5. Growth suggestions based on completed prerequisites.
+
+Tie-break with oldest unresolved operational item, then stable ID. Return no more than five actions and one dominant action. Do not infer “recommended” from business size.
+
+Home response shape:
+
+```json
+{
+    "primaryAction": {},
+    "secondaryActions": [],
+    "setup": { "completed": 3, "total": 5, "items": [] },
+    "recentActivity": [],
+    "moduleSummaries": [],
+    "generatedAt": "2026-07-22T00:00:00.000Z"
+}
+```
+
+Use bounded counts and recent rows. Do not make the frontend issue one request per module.
+
+## Unified customer workspace contract
+
+### Identity-link model
+
+The final schema may use a neutral name such as `CustomerIdentityLink`:
+
+```prisma
+model CustomerIdentityLink {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  status         String       @default("CONFIRMED")
+  reason         String
+  confirmedByUserId String
+  createdAt      DateTime     @default(now())
+  revokedAt      DateTime?
+  revokedByUserId String?
+  @@unique([organizationId, contactId, customerId])
+  @@index([organizationId, contactId])
+  @@index([organizationId, customerId])
+}
+```
+
+Add compound ownership validation so both linked records belong to the same Organization. Because commerce Customer is currently store-specific with nullable `organizationId`, complete/verify its Organization migration before enabling links.
+
+### Linking rules
+
+- Never link by name alone.
+- Exact normalized email is a high-confidence suggestion, not automatic confirmation, unless the commerce record was created from the same authenticated/transactional identity flow.
+- Exact normalized phone is a suggestion only.
+- Conflicting email or phone is displayed clearly before confirmation.
+- Revocation does not delete either record or its history.
+- Suggestions rejected by a user are remembered so they do not reappear immediately.
+- Every confirm/revoke action emits an Organization audit event.
+
+### Timeline event contract
+
+```ts
+type CustomerTimelineEvent = {
+    id: string;
+    source: "CRM" | "APPOINTMENTS" | "COMMERCE" | "PAYMENTS" | "COMMUNICATIONS";
+    type: string;
+    occurredAt: string;
+    title: string;
+    summary?: string;
+    status?: string;
+    amountMinor?: number;
+    currency?: string;
+    actor?: { id: string; displayName: string };
+    href?: string;
+};
+```
+
+Order descending by `occurredAt`, then source priority, then stable ID. Paginate with a cursor; do not load an unlimited customer history. Currency amounts use shared minor-unit formatters. Raw message content, provider payloads, and private submission data are not included in the list projection.
+
+## Appointment experience specification
+
+### Information architecture
+
+- `/appointments`: agenda/list with today/upcoming/attention segments.
+- `/appointments/calendar`: week/month visual planning for wide screens.
+- `/appointments/services`: reusable services.
+- `/appointments/services/[serviceId]`: service, availability, public booking settings.
+- `/appointments/settings`: timezone, defaults, providers, cancellation rules.
+
+### Core journey acceptance
+
+1. Enable CRM and Appointments.
+2. Create a service with duration, capacity, timezone, and optional price.
+3. Add availability and preview next slots.
+4. Publish a booking section.
+5. Visitor chooses slot and submits details.
+6. Booking is committed once under concurrency.
+7. Owner sees it in agenda; customer timeline links it.
+8. Confirmation delivery status is visible.
+9. Owner reschedules/cancels according to policy.
+10. Analytics reflects the outcome after aggregation.
+
+The mobile primary view is an agenda. Calendar cells must not be the only way to inspect or act on a booking.
+
+## Commerce experience specification
+
+### Information architecture
+
+- `/commerce`: operational queue and KPIs.
+- `/commerce/orders`: Organization rollup with Store/Project filters.
+- `/commerce/orders/[orderId]`: items, customer, payment, fulfilment, refund, and audit timeline.
+- `/commerce/catalog`: products, variants, inventory, categories.
+- `/commerce/settings`: channels/stores, checkout, payment provider, order defaults.
+
+### Operational priority
+
+Commerce Home ranks:
+
+1. payment/refund/reconciliation failures;
+2. paid orders awaiting fulfilment;
+3. cancelled/failed orders needing review;
+4. low stock or oversell risk;
+5. incomplete provider/catalog setup;
+6. informational revenue/conversion metrics.
+
+Organization rollups must be computed server-side with filters and pagination. Do not fetch every Store in the browser and merge totals client-side.
+
+### Responsive behavior
+
+- Desktop: DataTable with selectable rows, column headers, filters, sort, and pagination.
+- Mobile: summary cards showing status, customer, total, time, and one next action; full detail opens as a page or Sheet.
+- Bulk actions appear only after selection and remain within a sticky action region that does not cover content or safe areas.
+
+## Provider-health contract
+
+```ts
+type ProviderHealth = {
+    domain:
+        | "MERCHANT_PAYMENTS"
+        | "SAROH_BILLING"
+        | "BUSINESS_EMAIL"
+        | "WHATSAPP"
+        | "DOMAIN"
+        | "STORAGE";
+    provider: string;
+    status: "NOT_CONFIGURED" | "PENDING" | "ACTIVE" | "DEGRADED" | "FAILED";
+    checkedAt?: string;
+    lastSuccessAt?: string;
+    reasonCode?: string;
+    recoveryHref?: string;
+};
+```
+
+Never include access keys, secret fragments, webhook secrets, encrypted blobs, or raw provider responses. `reasonCode` maps to reviewed copy. A live provider check is a privileged, rate-limited command; normal page loads use stored health evidence.
+
+## Saved-view and bulk-operation contracts
+
+### URL query contract
+
+Use stable names shared by server and client:
+
+```text
+?q=<search>&status=<csv>&store=<id>&project=<id>&sort=<field>:<asc|desc>&page=<positive-int>&pageSize=<25|50|100>
+```
+
+Reject unknown sort/filter fields. Clamp page size. Clear dependent filters when Organization/Project context changes.
+
+### Saved view
+
+```ts
+type SavedViewDefinition = {
+    resource: "CUSTOMERS" | "LEADS" | "BOOKINGS" | "ORDERS" | "PRODUCTS";
+    name: string;
+    query: Record<string, string | string[]>;
+    visibility: "PRIVATE" | "ORGANIZATION";
+};
+```
+
+Private views belong to the actor; Organization views require an explicit manage action. Never persist raw SQL, arbitrary JSON operators, inaccessible Project IDs, or secrets.
+
+### Bulk result
+
+```ts
+type BulkOperationResult = {
+    operationId: string;
+    requested: number;
+    succeeded: Array<{ id: string }>;
+    failed: Array<{ id: string; code: string; message: string }>;
+};
+```
+
+Require an idempotency key and cap each synchronous batch. Large operations use the existing durable job runner and expose progress/retry without reapplying successful records.
+
+## Activation analytics contract
+
+Extend the canonical event registry with versioned, PII-minimized events:
+
+| Event                           | When emitted                      | Required properties                           |
+| ------------------------------- | --------------------------------- | --------------------------------------------- |
+| `module.enabled.v1`             | Server commits enablement         | organizationId, moduleKey, optional projectId |
+| `module.setup_completed.v1`     | Readiness first becomes Active    | organizationId, moduleKey, duration bucket    |
+| `organization.first_value.v1`   | First approved value event        | organizationId, valueType, elapsed bucket     |
+| `site.first_published.v1`       | First publication                 | organizationId, optional projectId            |
+| `crm.first_lead_progressed.v1`  | First non-default stage movement  | organizationId, optional projectId            |
+| `appointments.first_booking.v1` | First confirmed booking           | organizationId, optional projectId            |
+| `commerce.first_paid_order.v1`  | First reconciled paid order       | organizationId, optional projectId            |
+| `provider.first_connected.v1`   | First healthy provider per domain | organizationId, provider domain only          |
+
+Do not emit customer identity, email, phone, order contents, message content, credentials, or free-form setup data. Deduplicate first-value events at the server/database boundary.
+
+## Rendered verification matrix
+
+For each changed screen capture and inspect:
+
+| Dimension | Required cases                                                                   |
+| --------- | -------------------------------------------------------------------------------- |
+| Viewport  | 1440x1000, 1024x768 when structure changes, 390x844, 320x568 for dense screens   |
+| Theme     | Light and dark                                                                   |
+| Motion    | Normal and `prefers-reduced-motion`                                              |
+| Data      | Empty, typical, high count, long names/content                                   |
+| State     | Loading, setup, active, attention, error, forbidden, disabled, archived, success |
+| Role      | OWNER, ADMIN, restricted MEMBER                                                  |
+| Context   | Organization-only, selected Project, inaccessible Project attempt                |
+| Input     | Keyboard-only, pointer/touch, 200% zoom                                          |
+
+Use `agent-browser` consistently:
+
+```bash
+agent-browser open http://127.0.0.1:3003/<route>
+agent-browser snapshot -i
+agent-browser screenshot docs/design-system/_evidence/screenshots/<issue>/<route>-<viewport>-<state>.png
+```
+
+Record the commit, fixture, viewport, theme, role, Organization, Project, and state beside each screenshot. A screenshot is supporting evidence, not proof of keyboard behavior; record the actual focus sequence separately.
+
+## Per-PR UX review checklist
+
+- The changed route has one clear purpose and dominant action.
+- Organization/Project/module context is visible and correct.
+- Disabled versus unauthorized versus no-data is distinguishable.
+- All API errors use safe copy and preserve a correlation ID.
+- Forms have labels, descriptions where needed, inline errors, `aria-invalid`, submission locking, and focus on the first error.
+- Tables have accessible headers; mobile retains every essential action.
+- Dialog/Sheet focus is trapped, restored, and dismissible as appropriate.
+- Status never relies on color alone.
+- Touch targets meet 44px ergonomic guidance on mobile.
+- Reduced motion is honored; no essential information depends on animation.
+- Long names, Indian currency/date conventions, zero values, and high counts render correctly.
+- The server enforces authorization, entitlement, module availability, and Project scope.
+- Product analytics contains no customer PII.
+
+## Definition of done for epic #111
+
+- Issues #118–#125 are closed with linked commits and rendered verification.
+- The refreshed audit does not list already shipped work as pending.
+- Need-based onboarding supports no-module, service-only, commerce-only, and hybrid Organizations.
+- Home presents a server-ranked next action without module or permission leakage.
+- Customer identity links are explicit, auditable, reversible, and tenant-safe.
+- Appointment and commerce activation journeys complete on desktop and mobile.
+- Provider health is redacted and actionable.
+- Filters are URL-backed; saved views and bulk operations are bounded and authorized.
+- Insights reconcile to source records and show only enabled/authorized modules.
+- Core flows pass keyboard, focus, contrast, dark mode, reduced motion, 320px/390px, 200% zoom, and all shared state checks.
+- Time-to-first-value events are deduplicated and contain no customer PII.
+- No AI feature, route, dependency, or active milestone is added.

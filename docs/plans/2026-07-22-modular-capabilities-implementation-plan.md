@@ -366,3 +366,400 @@ git diff --check
 ```
 
 Commit: `docs(modules): add capability rollout runbook`
+
+---
+
+## Detailed execution packets
+
+The nine tasks above define product scope. Execute them through the following PR-sized packets so schema, API, UI, and rollout concerns stay reviewable. Do not combine packets unless the earlier packet is already merged and green.
+
+| Packet | GitHub issue | Deliverable                        | Depends on  | Merge gate                               |
+| ------ | ------------ | ---------------------------------- | ----------- | ---------------------------------------- |
+| M-01A  | #112         | ADR and module vocabulary          | None        | Architecture review                      |
+| M-01B  | #112         | Typed registry and validator       | M-01A       | Registry tests                           |
+| M-02A  | #113         | Additive schema and constraints    | M-01B       | Migration test                           |
+| M-02B  | #113         | Evidence-based backfill            | M-02A       | Idempotency and reconciliation           |
+| M-03A  | #114         | Lifecycle and policy               | M-02B       | Role/cross-tenant matrix                 |
+| M-03B  | #114         | Effective availability composition | M-03A       | Gate-precedence tests                    |
+| M-03C  | #114         | Readiness/deactivation adapters    | M-03B       | Domain safety matrix                     |
+| M-04A  | #115         | Read/query API                     | M-03B       | Controller contract tests                |
+| M-04B  | #115         | Mutation API                       | M-03C       | Audit/idempotency tests                  |
+| M-04C  | #115         | Settings → Modules                 | M-04A/B     | Browser state matrix                     |
+| M-05A  | #116         | Project selection API/UI           | M-04B       | Project role matrix                      |
+| M-05B  | #116         | Capability-aware shell             | M-04C/M-05A | Navigation projection tests              |
+| M-06A  | #117         | Authenticated domain enforcement   | M-03C       | Domain test suites                       |
+| M-06B  | #117         | Public/reconciliation enforcement  | M-06A       | Public/webhook regression tests          |
+| M-06C  | #117         | Dark rollout and telemetry         | M-06B       | Shadow comparison and rollback rehearsal |
+
+### Packet workflow
+
+For every packet:
+
+1. Create an isolated worktree and branch named after the issue, for example `feat/112-module-registry`.
+2. Re-read ADR-003, `DEC-005`, `DEC-006`, `DEC-007`, `DEC-013`, `DEC-014`, and `DEC-015` before changing code.
+3. Add the smallest failing unit or integration test for the packet.
+4. Run only that test and record the expected failure.
+5. Implement the minimum behavior.
+6. Run the focused test, then the affected package suite.
+7. Run types, lint, migration/status checks, and `git diff --check` as relevant.
+8. Update issue acceptance checkboxes and attach verification output.
+9. Commit one coherent value unit. Do not include unrelated formatting or refactoring.
+10. Request review before starting a dependent packet.
+
+## Exact module registry contract
+
+Create one server-owned registry. Frontends receive a serialized projection; they must not maintain their own dependency or permission maps.
+
+```ts
+export const MODULE_KEYS = [
+    "WEBSITE",
+    "CRM",
+    "APPOINTMENTS",
+    "COMMERCE",
+    "PAYMENTS",
+    "COMMUNICATIONS",
+    "AUTOMATIONS",
+    "INSIGHTS",
+] as const;
+
+export type ModuleKey = (typeof MODULE_KEYS)[number];
+export type ModuleLifecycle = "DISABLED" | "ENABLED" | "ARCHIVED";
+export type ModuleReadiness =
+    | "DISABLED"
+    | "SETUP_REQUIRED"
+    | "ACTIVE"
+    | "ATTENTION_REQUIRED";
+
+export interface ModuleDescriptor {
+    key: ModuleKey;
+    label: string;
+    description: string;
+    rootRoutes: readonly string[];
+    requiredAction: OrgAction;
+    dependencies: readonly ModuleKey[];
+    projectSelectable: boolean;
+    rolloutFlag: FlagKey;
+    entitlementKey?: keyof EntitlementMap;
+    readinessAdapter: ModuleKey;
+    deactivationPolicy: ModuleKey;
+}
+```
+
+Registry validation must reject:
+
+- duplicate keys or labels;
+- dependencies outside `MODULE_KEYS`;
+- direct or transitive dependency cycles;
+- routes not beginning with `/`;
+- a Project-selectable module whose dependencies cannot also be selected;
+- entitlement or rollout keys not present in their typed registries;
+- `AI` or unapproved placeholder modules.
+
+The first registry version should use these relationships:
+
+| Module         | Hard enable dependency | Readiness dependency                               | Project-selectable |
+| -------------- | ---------------------- | -------------------------------------------------- | ------------------ |
+| Website        | None                   | Site/template/domain setup                         | Yes                |
+| CRM            | None                   | Pipeline exists                                    | Yes                |
+| Appointments   | CRM                    | Service and availability exist                     | Yes                |
+| Commerce       | None                   | Store/channel and catalog exist                    | Yes                |
+| Payments       | None                   | Appointments or Commerce enabled; provider healthy | Yes                |
+| Communications | CRM                    | Organization provider healthy for real sends       | Yes                |
+| Automations    | CRM                    | At least one supported trigger/action pair         | Yes                |
+| Insights       | None                   | At least one event-producing module active         | Yes                |
+
+Payments uses an OR readiness dependency rather than two hard dependencies. Enabling Payments must not force both Commerce and Appointments.
+
+## Persistence and migration detail
+
+### Allowed lifecycle values
+
+Add database checks:
+
+```sql
+ALTER TABLE "OrganizationModule"
+ADD CONSTRAINT "OrganizationModule_status_check"
+CHECK ("status" IN ('DISABLED', 'ENABLED', 'ARCHIVED'));
+```
+
+Add a Project/Organization consistency constraint through an Organization-denormalized `organizationId` on `ProjectModule` plus compound foreign keys, rather than a trigger if Prisma supports the relation cleanly:
+
+```prisma
+model ProjectModule {
+  id                   String @id @default(cuid())
+  organizationId       String
+  projectId            String
+  organizationModuleId String
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade)
+  organizationModule OrganizationModule @relation(
+    fields: [organizationId, organizationModuleId],
+    references: [organizationId, id],
+    onDelete: Cascade
+  )
+
+  @@unique([projectId, organizationModuleId])
+  @@index([organizationId, projectId])
+}
+```
+
+If the current Prisma version cannot express both compound relations, use explicit SQL foreign keys in the migration and add an integration test that proves Prisma writes still honor them.
+
+### Backfill algorithm
+
+Backfill in one transaction per Organization, not one global transaction. For each Organization:
+
+1. Query existence/counts only.
+2. Derive evidence keys from the table below.
+3. Add hard dependencies.
+4. Upsert `ENABLED` rows without overwriting a pre-existing explicit status.
+5. Write one system audit event listing derived evidence.
+6. Requery and compare expected versus stored keys.
+
+| Evidence                                                                 | Module enabled       |
+| ------------------------------------------------------------------------ | -------------------- |
+| Site, Page, Form, Domain, or Publication                                 | Website              |
+| Contact, Lead, Pipeline, Stage, or CRM Activity                          | CRM                  |
+| Service, AvailabilityRule, or Booking                                    | Appointments + CRM   |
+| Store, Product, Inventory, Cart, Order, or commerce Customer             | Commerce             |
+| MerchantPaymentProvider, PaymentIntent, Attempt, Refund, or WebhookEvent | Payments             |
+| CommunicationProvider, Message, Delivery, or Consent                     | Communications + CRM |
+| AutomationRule or AutomationRun                                          | Automations + CRM    |
+| AnalyticsEvent or DailyAggregate                                         | Insights             |
+
+Organizations with no evidence receive all modules as `DISABLED`. Do not infer modules from subscription plans, feature-flag overrides, or business size.
+
+### Migration verification queries
+
+The migration packet must record results for:
+
+```sql
+SELECT "organizationId", "moduleKey", COUNT(*)
+FROM "OrganizationModule"
+GROUP BY 1, 2 HAVING COUNT(*) > 1;
+
+SELECT pm.id
+FROM "ProjectModule" pm
+JOIN "Project" p ON p.id = pm."projectId"
+JOIN "OrganizationModule" om ON om.id = pm."organizationModuleId"
+WHERE p."organizationId" <> om."organizationId";
+```
+
+Both return zero rows.
+
+## Availability evaluation algorithm
+
+Evaluate in a deterministic order so UI messages and API errors are stable:
+
+```ts
+async function evaluateModule(
+    input: AvailabilityInput,
+): Promise<ModuleAvailability> {
+    const descriptor = registry.get(input.moduleKey);
+    const rolloutAllowed = await flags.isEnabled(
+        descriptor.rolloutFlag,
+        input.organizationId,
+    );
+    const installation = await installations.get(
+        input.organizationId,
+        input.moduleKey,
+    );
+    const configured = installation?.status === "ENABLED";
+    const selectedForProject = input.projectId
+        ? await projectModules.isSelected(
+              input.organizationId,
+              input.projectId,
+              input.moduleKey,
+          )
+        : true;
+    const entitled = descriptor.entitlementKey
+        ? await entitlements.can(
+              input.organizationId,
+              descriptor.entitlementKey,
+          )
+        : true;
+    const authorized = can(input.organizationRole, descriptor.requiredAction);
+
+    const blockers = collectGateBlockers({
+        rolloutAllowed,
+        configured,
+        selectedForProject,
+        entitled,
+        authorized,
+    });
+
+    if (blockers.length > 0) return disabledAvailability(blockers);
+    return readiness.evaluate(input);
+}
+```
+
+Precedence for user-facing actionability:
+
+1. `UNAUTHORIZED` is returned as 404/403 according to the existing no-existence-leak policy; it is not shown as an upsell.
+2. `ROLLOUT_DISABLED` is a generic unavailable state and reveals no flag details.
+3. `ORG_MODULE_DISABLED` links OWNER/ADMIN to Settings → Modules; MEMBER sees unavailable.
+4. `PROJECT_MODULE_UNSELECTED` links OWNER/ADMIN to Project settings; MEMBER sees unavailable.
+5. `ENTITLEMENT_REQUIRED` may show plan/limit guidance only after authorization and module configuration pass.
+6. Readiness blockers describe setup or health.
+
+Cache effective availability only for the request or a short Organization/Project keyed interval. Invalidate it after module, Project selection, entitlement, flag, role, or provider-health changes.
+
+## API contract detail
+
+### Read response
+
+`GET /organizations/:organizationId/modules?projectId=<optional>` returns:
+
+```json
+{
+    "data": [
+        {
+            "key": "APPOINTMENTS",
+            "label": "Appointments",
+            "lifecycle": "ENABLED",
+            "readiness": "SETUP_REQUIRED",
+            "selectedForProject": true,
+            "canManage": true,
+            "blockers": [
+                {
+                    "code": "SERVICE_REQUIRED",
+                    "message": "Create a service before accepting bookings.",
+                    "actionHref": "/appointments/settings"
+                }
+            ]
+        }
+    ],
+    "meta": {
+        "organizationId": "org_123",
+        "projectId": "project_123"
+    }
+}
+```
+
+Do not return rollout-flag keys, entitlement implementation details, provider secrets, or inaccessible Project identifiers.
+
+### Mutation requests
+
+```json
+{
+    "status": "ENABLED",
+    "reason": "We now accept online appointments",
+    "acknowledgedBlockerCodes": []
+}
+```
+
+Disablement that is unsafe returns `409 MODULE_DEACTIVATION_BLOCKED` with stable blocker codes and remediation actions. A second request can acknowledge warnings, but blockers cannot be overridden.
+
+### Idempotency
+
+- Enabling an enabled module returns its current representation without a second audit event.
+- Disabling a disabled module behaves the same.
+- Concurrent enable/disable writes serialize using the unique row and a transaction.
+- Project selection upserts; deselection deletes only the exact Organization/Project/module row.
+
+## Readiness and deactivation matrix
+
+| Module         | Setup required                 | Attention required                         | Disable behavior                                                                           | Retained paths                                    |
+| -------------- | ------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Website        | No site/template/publication   | Domain verification or publication failure | Stop new publishing; explicitly unpublish or preserve current publication per confirmation | Existing publication and domain management        |
+| CRM            | No default pipeline            | Intake/job failure                         | Stop new manual CRM activity only after forms are reassigned/paused                        | Historical contacts/leads/activities              |
+| Appointments   | No service/availability        | Delivery/provider problem                  | Stop new public slots; preserve manage/cancel/reschedule                                   | Existing bookings and notifications               |
+| Commerce       | No store/catalog               | Inventory/checkout exception               | Stop new checkout; preserve fulfilment/refund                                              | Orders, payments, inventory reconciliation        |
+| Payments       | No verified provider           | Credential/webhook/reconciliation failure  | Stop new intents; continue webhooks/refunds/reconciliation                                 | Attempts, refunds, webhook inbox                  |
+| Communications | No Organization provider       | Delivery/provider failure                  | Stop new business sends; continue receipts/retries as policy requires                      | Messages, delivery history, consent               |
+| Automations    | No enabled rule                | Repeated/dead-letter failures              | Stop new runs; finish/cancel claimed jobs deterministically                                | Rules and run ledger                              |
+| Insights       | No event-producing module/data | Aggregation lag/failure                    | Stop UI access/new optional collection only; apply retention normally                      | Required audit/operational events remain separate |
+
+Every adapter must return stable codes, a safe plain-language message, optional action URL, and severity. Never return raw provider errors.
+
+## Domain-enforcement matrix
+
+Apply enforcement at service entry points, not controllers alone:
+
+| Domain         | New commands blocked when disabled                   | Reads retained when disabled           | Public/background exceptions                               |
+| -------------- | ---------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------- |
+| Sites/forms    | create, update, publish, new form intake when paused | drafts/publication history             | currently published renderer follows chosen disable policy |
+| CRM            | create/update lead, pipeline move, new task          | contacts/leads/activity history        | already accepted submissions finish atomically             |
+| Bookings       | create service/rule/booking, reschedule              | existing bookings                      | cancellation and committed notifications continue          |
+| Commerce       | product/order creation, checkout intent              | catalog/order history as policy allows | fulfilment/refund/webhook reconciliation continue          |
+| Payments       | new provider/intents                                 | attempts/refunds/provider status       | signed webhooks and refunds continue                       |
+| Communications | new messages/rules                                   | message/delivery/consent history       | delivery receipts and safe retries continue                |
+| Automations    | new/enable rule and new trigger runs                 | rules/run history                      | claimed run completes or safely cancels                    |
+| Analytics      | optional queries/collection per policy               | retention/admin operations             | required security/audit telemetry is unaffected            |
+
+## Test fixture matrix
+
+Use deterministic Organizations:
+
+| Fixture         | Modules                            | Projects        | Actor cases                | Critical assertion                           |
+| --------------- | ---------------------------------- | --------------- | -------------------------- | -------------------------------------------- |
+| `org_none`      | None                               | None            | OWNER                      | Settings discoverability; no operational nav |
+| `org_service`   | CRM, Appointments, Communications  | `front-desk`    | OWNER, restricted MEMBER   | booking flow works; Commerce absent          |
+| `org_commerce`  | Commerce, Payments, Communications | `retail`        | ADMIN, direct-grant MEMBER | order flow works; Appointments absent        |
+| `org_hybrid`    | All initial modules                | `salon`, `shop` | OWNER, team-grant MEMBER   | Project selections differ without cross-leak |
+| `org_attention` | Payments/Communications enabled    | None            | OWNER                      | provider failure yields attention state      |
+| `org_archived`  | Commerce archived                  | None            | ADMIN                      | history visible, new checkout denied         |
+
+For every fixture test:
+
+- direct service invocation;
+- authenticated controller request;
+- missing/forged Organization header;
+- inaccessible Project ID;
+- connection-pool/RLS context isolation;
+- concurrent conflicting lifecycle writes;
+- feature flag off;
+- entitlement denied;
+- module disabled/unselected;
+- provider readiness failure.
+
+## Telemetry contract
+
+Emit internal operational events without configuration payloads:
+
+```ts
+type ModuleOperationalEvent =
+    | "module.enable.requested"
+    | "module.enabled"
+    | "module.disable.blocked"
+    | "module.disabled"
+    | "module.archived"
+    | "module.project.selected"
+    | "module.project.deselected"
+    | "module.readiness.changed"
+    | "module.operation.denied";
+```
+
+Allowed properties: event, module key, Organization ID, optional Project ID, actor ID for audited mutations, blocker code, request correlation ID, and timestamp. Do not emit provider configuration, secrets, customer IDs, free-form reasons, or raw errors to product analytics.
+
+## Rollout and rollback procedure
+
+1. **Schema only:** deploy additive tables/constraints; no behavior reads them.
+2. **Backfill:** run and reconcile counts; keep enforcement off.
+3. **Shadow evaluation:** compute availability and log differences from current behavior.
+4. **Internal Organization:** enable Settings UI and API enforcement for a controlled test Organization.
+5. **Selected beta Organizations:** confirm service-only, commerce-only, and hybrid behavior.
+6. **Default on:** enable enforcement after seven days without unexplained shadow mismatches or reconciliation failures.
+7. **Cleanup:** remove temporary shadow branches only after the rollout issue records evidence.
+
+Rollback order:
+
+1. Disable the enforcement rollout flag.
+2. Leave tables, selections, and audit records intact.
+3. Confirm public checkout/booking/publication and webhook handling match pre-enforcement behavior.
+4. Investigate using correlation IDs and blocker codes.
+5. Forward-fix; never down-migrate or delete module configuration during an incident.
+
+## Definition of done for epic #110
+
+- Issues #112–#117 are closed with linked commits and verification.
+- Migration/backfill reconciliation reports zero duplicate or cross-Organization rows.
+- All initial modules have readiness and deactivation adapters.
+- API operations enforce rollout, module, Project, entitlement, and authorization gates.
+- Navigation and quick actions consume the same effective-availability projection.
+- Service-only, commerce-only, hybrid, no-module, attention, and archived fixtures pass.
+- OWNER/ADMIN-all and MEMBER-grant rules pass adversarial tests.
+- Disabling/re-enabling preserves configuration and history.
+- Webhook, refund, cancellation, delivery receipt, and public-state regressions pass.
+- Rollout and rollback are rehearsed and documented.
+- No AI dependency, schema, route, module key, or product promise is introduced.
