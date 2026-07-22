@@ -3,10 +3,12 @@ import {
     BarChart3,
     Bell,
     Briefcase,
+    CalendarClock,
     CalendarDays,
     Globe,
     Home,
     KanbanSquare,
+    Store,
     Target,
     Users,
 } from "lucide-react";
@@ -51,9 +53,19 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Appointments",
         moduleKey: "APPOINTMENTS",
         items: [
+            {
+                href: "/appointments",
+                label: "Appointments",
+                icon: CalendarDays,
+            },
             { href: "/services", label: "Services", icon: Briefcase },
-            { href: "/bookings", label: "Bookings", icon: CalendarDays },
+            { href: "/bookings", label: "Bookings", icon: CalendarClock },
         ],
+    },
+    {
+        label: "Commerce",
+        moduleKey: "COMMERCE",
+        items: [{ href: "/commerce", label: "Commerce", icon: Store }],
     },
     {
         label: "Website",
