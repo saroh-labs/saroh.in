@@ -11,7 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { NAV_GROUPS } from "./nav-items";
+import { NAV_GROUPS, filterNavGroups } from "./nav-items";
 
 const OPEN_EVENT = "saroh:open-command";
 
@@ -26,9 +26,10 @@ export function openCommandMenu() {
  * page gets keyboard-driven jump-to-anywhere, the fastest "one product"
  * navigation affordance.
  */
-export function CommandMenu() {
+export function CommandMenu({ moduleKeys = [] }: { moduleKeys?: string[] }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
+    const groups = filterNavGroups(NAV_GROUPS, moduleKeys);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -56,7 +57,7 @@ export function CommandMenu() {
             <CommandInput placeholder="Search or jump to…" />
             <CommandList>
                 <CommandEmpty>No results found.</CommandEmpty>
-                {NAV_GROUPS.map((group, i) => (
+                {groups.map((group, i) => (
                     <CommandGroup key={i} heading={group.label ?? "Go to"}>
                         {group.items.map((item) => {
                             const Icon = item.icon;

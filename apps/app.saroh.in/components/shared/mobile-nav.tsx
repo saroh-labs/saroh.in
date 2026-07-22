@@ -17,6 +17,7 @@ import { useState } from "react";
 import {
     NAV_GROUPS,
     NOTIFICATIONS_HREF,
+    filterNavGroups,
     isNavItemActive,
 } from "@/components/shared/nav-items";
 
@@ -26,9 +27,16 @@ import {
  * sidebar exactly — same goal groups, icons, and active state — so switching
  * breakpoints never changes the mental model. Closes on selection.
  */
-export function MobileNav({ unread = 0 }: { unread?: number }) {
+export function MobileNav({
+    unread = 0,
+    moduleKeys = [],
+}: {
+    unread?: number;
+    moduleKeys?: string[];
+}) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
+    const groups = filterNavGroups(NAV_GROUPS, moduleKeys);
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>
@@ -47,7 +55,7 @@ export function MobileNav({ unread = 0 }: { unread?: number }) {
                     <SheetTitle>Menu</SheetTitle>
                 </SheetHeader>
                 <nav aria-label="Primary" className="mt-6 flex flex-col gap-6">
-                    {NAV_GROUPS.map((group, index) => (
+                    {groups.map((group, index) => (
                         <div
                             key={group.label ?? `group-${index}`}
                             className="flex flex-col gap-1"

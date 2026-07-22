@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { CommandMenu } from "@/components/shared/command-menu";
+import { listModules } from "@/lib/modules/service";
 import { unreadNotificationCount } from "@/lib/notifications/service";
 import {
     listOrganizations,
@@ -43,15 +44,27 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     const activeOrg = await resolveActiveOrganization(organizations);
     const unread = await unreadNotificationCount();
 
+    // Capability-aware chrome (ADR-003): fetch effective module availability
+    // once here and pass the available keys (serializable strings — icons are
+    // client refs and can't cross the boundary) to the nav so it reflects the
+    // Organization's enabled modules. Fail-open during dark rollout is handled
+    // in filterNavGroups. Never let a modules-fetch failure blank the shell.
+    const moduleKeys = await listModules()
+        .then((modules) =>
+            modules.filter((m) => m.readiness !== "DISABLED").map((m) => m.key),
+        )
+        .catch(() => [] as string[]);
+
     return (
         <div className="flex min-h-screen">
-            <CommandMenu />
-            <AppSidebar unread={unread} />
+            <CommandMenu moduleKeys={moduleKeys} />
+            <AppSidebar unread={unread} moduleKeys={moduleKeys} />
             <div className="flex min-w-0 flex-1 flex-col">
                 <AppHeader
                     organizations={organizations}
                     activeOrg={activeOrg}
                     unread={unread}
+                    moduleKeys={moduleKeys}
                 />
                 {children}
             </div>

@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import {
     NAV_GROUPS,
     NOTIFICATIONS_HREF,
+    filterNavGroups,
     isNavItemActive,
 } from "@/components/shared/nav-items";
 
@@ -18,8 +19,15 @@ import {
  * Client-only for `usePathname` active state; the `unread` count is fetched
  * server-side by `AppShell` and passed in (this component never fetches).
  */
-export function AppSidebar({ unread = 0 }: { unread?: number }) {
+export function AppSidebar({
+    unread = 0,
+    moduleKeys = [],
+}: {
+    unread?: number;
+    moduleKeys?: string[];
+}) {
     const pathname = usePathname();
+    const groups = filterNavGroups(NAV_GROUPS, moduleKeys);
 
     return (
         <aside className="hidden w-60 shrink-0 flex-col border-r lg:flex">
@@ -32,7 +40,7 @@ export function AppSidebar({ unread = 0 }: { unread?: number }) {
                 aria-label="Primary"
                 className="flex flex-1 flex-col gap-6 overflow-y-auto p-4"
             >
-                {NAV_GROUPS.map((group, index) => (
+                {groups.map((group, index) => (
                     <div
                         key={group.label ?? `group-${index}`}
                         className="flex flex-col gap-1"

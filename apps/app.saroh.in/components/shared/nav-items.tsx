@@ -27,6 +27,12 @@ export interface NavItem {
 export interface NavGroup {
     /** Uppercase group label; omitted for the ungrouped Home anchor. */
     label?: string;
+    /**
+     * The capability module this group belongs to (ADR-003). When set, the
+     * group is shown only if that module is available for the actor; when
+     * omitted, the group is always shown (core navigation).
+     */
+    moduleKey?: string;
     items: NavItem[];
 }
 
@@ -34,6 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { items: [{ href: "/", label: "Home", icon: Home }] },
     {
         label: "Customers",
+        moduleKey: "CRM",
         items: [
             { href: "/contacts", label: "Contacts", icon: Users },
             { href: "/leads", label: "Leads", icon: Target },
@@ -42,6 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
     },
     {
         label: "Appointments",
+        moduleKey: "APPOINTMENTS",
         items: [
             { href: "/services", label: "Services", icon: Briefcase },
             { href: "/bookings", label: "Bookings", icon: CalendarDays },
@@ -49,16 +57,39 @@ export const NAV_GROUPS: NavGroup[] = [
     },
     {
         label: "Website",
+        moduleKey: "WEBSITE",
         items: [{ href: "/sites", label: "Sites", icon: Globe }],
     },
     {
         label: "Insights",
-        items: [
-            { href: "/analytics", label: "Analytics", icon: BarChart3 },
-            { href: "/notifications", label: "Notifications", icon: Bell },
-        ],
+        moduleKey: "INSIGHTS",
+        items: [{ href: "/analytics", label: "Analytics", icon: BarChart3 }],
     },
+    // Notifications is core chrome (not a module), so it is always available.
+    { items: [{ href: "/notifications", label: "Notifications", icon: Bell }] },
 ];
+
+/**
+ * Project the nav to what an actor may see, given the module keys currently
+ * available to them (a module is "available" when every capability gate passes,
+ * i.e. its effective readiness is not DISABLED).
+ *
+ * Fail-open during dark rollout: when the capability system reports NO available
+ * modules (rollout flags still off, or an Organization not yet backfilled), the
+ * full nav is shown so the app is never emptied. Strict "disabled modules are
+ * absent from operational nav" enforcement lands with the dark-rollout flip
+ * (#117). Groups without a `moduleKey` (Home, Notifications) are always kept.
+ */
+export function filterNavGroups(
+    groups: readonly NavGroup[],
+    availableModuleKeys: readonly string[],
+): NavGroup[] {
+    if (availableModuleKeys.length === 0) return [...groups];
+    const available = new Set(availableModuleKeys);
+    return groups.filter(
+        (group) => !group.moduleKey || available.has(group.moduleKey),
+    );
+}
 
 /**
  * Active-route match: exact for the Home root (so it isn't lit on every page),
