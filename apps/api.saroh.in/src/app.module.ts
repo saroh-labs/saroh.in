@@ -33,6 +33,7 @@ import { PipelinesModule } from "./modules/pipelines/pipelines.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { ProviderHealthModule } from "./modules/provider-health/provider-health.module";
+import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
 import { SitesModule } from "./modules/sites/sites.module";
 import { StoresModule } from "./modules/stores/stores.module";
@@ -67,6 +68,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         CapabilitiesModule,
         HomeModule,
         ProviderHealthModule,
+        SavedViewsModule,
         OrganizationsModule,
         ProjectsModule,
         AuditModule,

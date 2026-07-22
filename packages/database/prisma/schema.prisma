@@ -69,6 +69,9 @@ model Organization {
   // a CRM Contact and a commerce Customer. Never an automatic merge.
   customerIdentityLinks CustomerIdentityLink[]
 
+  // Saved list views (#124): per-actor, per-resource named filter sets.
+  savedViews SavedView[]
+
   // Optional 1:1 business identity captured at onboarding (S1-004)
   businessProfile BusinessProfile?
 
@@ -1108,6 +1111,26 @@ model CustomerIdentityLink {
 
   @@unique([contactId, customerId])
   @@index([organizationId])
+}
+
+// SavedView: a per-actor, per-resource named set of list filters (#124). The
+// `filters` payload is the SHAREABLE URL query contract (search/filter/sort/
+// page) — plain JSON, NEVER raw SQL — so a saved view can never smuggle an
+// unsafe query. Scoped to the Organization and the owner who created it.
+model SavedView {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  ownerUserId String
+  resource    String // e.g. "orders" | "leads" | "products"
+  name        String
+  filters     Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, ownerUserId, resource])
 }
 
 // Team: a named group of org members, used to grant Project access in bulk.

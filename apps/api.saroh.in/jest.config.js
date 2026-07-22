@@ -30,6 +30,8 @@ module.exports = {
         // #123 provider health: state derivation + credential redaction, mocked
         // Prisma.
         "<rootDir>/src/modules/provider-health/**/*.spec.ts",
+        // #124 saved views + safe bulk contract (mocked Prisma / pure helper).
+        "<rootDir>/src/modules/saved-views/**/*.spec.ts",
         // #112 (ADR-003) capabilities: the pure module-registry validator —
         // uniqueness, dependency validity, cycle detection, absolute routes,
         // known rollout/entitlement keys, and the AI exclusion (DEC-015). No
