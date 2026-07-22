@@ -229,3 +229,21 @@ feature flags and entitlements. Built on `development`; ships **dark** (rollout
 | #115 | ✅ Done | module API controller (org+project routes, 409 blockers) + Settings → Modules UI                                                                                           |
 | #116 | ✅ Done | capability-aware shell (fail-open nav projection) + per-Project module selection                                                                                           |
 | #117 | ⏳ Code | dark `@RequireModule` enforcement guard + rollout runbook. Per-domain endpoint annotation + e2e matrix = the gradual rollout (needs a live DB)                             |
+
+## Cross-product UX (epic #111)
+
+Connected operational journeys on the modular foundation. Plan:
+`docs/plans/2026-07-22-cross-product-ux-implementation-plan.md`. Browser
+verification (`agent-browser`, 320/390/1440px, keyboard, a11y) is the recurring
+remaining step where noted — it needs a running seeded stack.
+
+| ID   | Status  | Commit / note                                                                                                                                                            |
+| ---- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| #118 | ✅ Done | audit baseline refresh (17_CURRENT_STATE_DELTA) + task metrics; AI deferred (DEC-015); need-based framing                                                                |
+| #119 | ✅ Done | Home aggregator API (ranked next-actions) + action-oriented Home + need-based module onboarding. Deferred: recent-activity panel, browser verify                         |
+| #120 | ⏳ Code | CustomerIdentityLink schema + migration + workspace API (link by exact email/phone only, org-scoped, module-gated timeline) + detail UI. **Needs `test:int` + Postgres** |
+| #121 | ◑ Slice | unified /appointments hub. Deferred: calendar/agenda responsive + booking sheet (browser)                                                                                |
+| #122 | ◑ Slice | unified /commerce hub. Deferred: org-wide order/low-stock rollup API + dense tables (browser)                                                                            |
+| #123 | ✅ Done | provider & dependency health surface (redacted, OWNER/ADMIN); completes the ATTENTION story deferred from #114                                                           |
+| #124 | ⏳ Code | SavedView schema + migration + safe `executeBulk` contract + saved-views API. Deferred: table/URL-filter UI + endpoint wiring (browser). **Needs Postgres**              |
+| #125 | ◑ Docs  | activation release gate defined (18_ACTIVATION_RELEASE_GATE) + a11y/responsive guide gates. Deferred: `agent-browser` activation specs (running stack)                   |

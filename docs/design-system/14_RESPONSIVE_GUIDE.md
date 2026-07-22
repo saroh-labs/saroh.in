@@ -1,5 +1,9 @@
 # 14 · Responsive Guide
 
+> **Release gate:** every activation journey must reflow at 320px and 390px with
+> no hidden operations and no forced horizontal scroll for core work. See
+> [18_ACTIVATION_RELEASE_GATE](./18_ACTIVATION_RELEASE_GATE.md) (#125).
+
 > Part of the Saroh design system. Companions: `06_LAYOUT_SYSTEM.md`,
 > `13_ACCESSIBILITY_GUIDE.md`, `15_MOTION_GUIDELINES.md`.
 

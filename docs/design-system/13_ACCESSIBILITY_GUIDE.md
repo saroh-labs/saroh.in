@@ -1,5 +1,10 @@
 # 13 · Accessibility Guide
 
+> **Release gate:** accessibility is a merge criterion for every activation
+> journey — keyboard (no traps, restored focus), WCAG AA contrast in light/dark,
+> reduced motion, and no inaccessible-action leakage. See
+> [18_ACTIVATION_RELEASE_GATE](./18_ACTIVATION_RELEASE_GATE.md) (#125).
+
 > Part of the Saroh design system. Companions: `04_DESIGN_TOKENS.md`,
 > `05_COMPONENT_LIBRARY.md`, `06_LAYOUT_SYSTEM.md`, `14_RESPONSIVE_GUIDE.md`,
 > `15_MOTION_GUIDELINES.md`.
