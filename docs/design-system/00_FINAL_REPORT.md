@@ -1,5 +1,11 @@
 # 00 · Final Report — Saroh Canvas Design-System Audit (Capstone)
 
+> **Post-remediation delta (2026-07-22):** much of the "current state" below has
+> since shipped (shell, mobile nav, ⌘K, PageHeader/EmptyState, DataTable, validated
+> forms, dark mode, brand CTA) and the modular-capabilities epic (#110) has landed.
+> See [17_CURRENT_STATE_DELTA](./17_CURRENT_STATE_DELTA.md) for what's resolved vs
+> still present, with commit evidence. **AI stays deferred (`DEC-015`).**
+
 > **Status:** Capstone synthesis of the 16-document Saroh Canvas audit. Docs-only —
 > nothing here changes UI/app/config code. Every claim is grounded in a real
 > route/file and traces to one of the source docs

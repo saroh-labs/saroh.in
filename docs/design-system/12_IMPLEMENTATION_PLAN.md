@@ -144,9 +144,15 @@ Total ≈ **100–135 person-days**. Milestones are largely sequential (each dep
 
 ---
 
-## Milestone 5 — a11y, animations, dark-mode, performance, AI
+## Milestone 5 — a11y, animations, dark-mode, performance ~~, AI~~
 
-**Goals:** make it accessible, calm, fast, and finally add the AI that defines the product.
+> **AI is deferred ([`DEC-015`](../architecture/DECISIONS.md))** and removed from
+> this active milestone — D-38 / the `app/ai` surface must not be scheduled here
+> and must never gate the accessibility, responsive, or performance work below.
+> Module selection is **need-based, not size-based** (ADR-003 / DEC-016). See the
+> [current-state delta](./17_CURRENT_STATE_DELTA.md).
+
+**Goals:** make it accessible, calm, fast. (The AI item that formerly defined this milestone is deferred per DEC-015.)
 
 **Deliverables:**
 
