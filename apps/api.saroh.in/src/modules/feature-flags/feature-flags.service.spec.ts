@@ -12,9 +12,11 @@ jest.mock("@saroh/database", () => {
             findUnique: jest.fn(),
             findMany: jest.fn(),
             upsert: jest.fn(),
+            delete: jest.fn(),
         },
         featureFlagAudit: {
             create: jest.fn(),
+            findMany: jest.fn(),
         },
         $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
     };
@@ -33,6 +35,7 @@ const overrideFindUnique = prisma.featureFlagOverride.findUnique as jest.Mock;
 const overrideFindMany = prisma.featureFlagOverride.findMany as jest.Mock;
 const overrideUpsert = prisma.featureFlagOverride.upsert as jest.Mock;
 const auditCreate = prisma.featureFlagAudit.create as jest.Mock;
+const overrideDelete = prisma.featureFlagOverride.delete as jest.Mock;
 
 describe("FeatureFlagService.isEnabled — precedence", () => {
     const service = new FeatureFlagService();
@@ -283,5 +286,142 @@ describe("FeatureFlagService.list", () => {
             enabled: false,
             source: "fallback",
         });
+    });
+});
+
+describe("FeatureFlagService.clearOverride", () => {
+    const service = new FeatureFlagService();
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it("deletes the override and audits the value the org now inherits", async () => {
+        overrideFindUnique.mockResolvedValue({ enabled: true });
+        flagFindUnique.mockResolvedValue({ enabledByDefault: false });
+
+        await service.clearOverride(
+            FlagKey.MODULE_CRM,
+            "org_1",
+            "user_1",
+            "beta over",
+        );
+
+        expect(overrideDelete).toHaveBeenCalledWith({
+            where: {
+                flagKey_organizationId: {
+                    flagKey: FlagKey.MODULE_CRM,
+                    organizationId: "org_1",
+                },
+            },
+        });
+        expect(auditCreate).toHaveBeenCalledWith({
+            data: {
+                flagKey: FlagKey.MODULE_CRM,
+                organizationId: "org_1",
+                previousValue: true,
+                // Falls back to the global default, not to `false` blindly.
+                newValue: false,
+                actorUserId: "user_1",
+                reason: "beta over",
+            },
+        });
+    });
+
+    it("records the global default as the new effective value", async () => {
+        overrideFindUnique.mockResolvedValue({ enabled: false });
+        flagFindUnique.mockResolvedValue({ enabledByDefault: true });
+
+        await service.clearOverride(
+            FlagKey.MODULE_CRM,
+            "org_1",
+            "user_1",
+            "why",
+        );
+
+        expect(auditCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ newValue: true }),
+            }),
+        );
+    });
+
+    it("treats a missing global row as the fail-closed false", async () => {
+        overrideFindUnique.mockResolvedValue({ enabled: true });
+        flagFindUnique.mockResolvedValue(null);
+
+        await service.clearOverride(
+            FlagKey.MODULE_CRM,
+            "org_1",
+            "user_1",
+            "why",
+        );
+
+        expect(auditCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ newValue: false }),
+            }),
+        );
+    });
+
+    it("is a no-op with no audit row when there is no override to clear", async () => {
+        overrideFindUnique.mockResolvedValue(null);
+
+        await service.clearOverride(
+            FlagKey.MODULE_CRM,
+            "org_1",
+            "user_1",
+            "why",
+        );
+
+        expect(overrideDelete).not.toHaveBeenCalled();
+        expect(auditCreate).not.toHaveBeenCalled();
+    });
+});
+
+describe("FeatureFlagService — change reason", () => {
+    const service = new FeatureFlagService();
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        flagFindUnique.mockResolvedValue({ enabledByDefault: false });
+        overrideFindUnique.mockResolvedValue(null);
+    });
+
+    it("records the operator's reason on a global change", async () => {
+        await service.setGlobal(
+            FlagKey.MODULE_CRM,
+            true,
+            "user_1",
+            "CRM GA rollout",
+        );
+
+        expect(auditCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    actorUserId: "user_1",
+                    reason: "CRM GA rollout",
+                }),
+            }),
+        );
+    });
+
+    it("records the operator's reason on an org override", async () => {
+        await service.setOverride(
+            FlagKey.MODULE_CRM,
+            "org_1",
+            true,
+            "user_1",
+            "internal pilot",
+        );
+
+        expect(auditCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    organizationId: "org_1",
+                    reason: "internal pilot",
+                }),
+            }),
+        );
     });
 });

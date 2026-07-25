@@ -73,6 +73,7 @@ export class FeatureFlagService {
         key: FlagKey,
         enabledByDefault: boolean,
         actorUserId: string,
+        reason?: string,
     ): Promise<void> {
         await prisma.$transaction(async (tx) => {
             const existing = await tx.featureFlag.findUnique({
@@ -93,6 +94,7 @@ export class FeatureFlagService {
                     previousValue: existing?.enabledByDefault ?? null,
                     newValue: enabledByDefault,
                     actorUserId,
+                    reason,
                 },
             });
         });
@@ -107,6 +109,7 @@ export class FeatureFlagService {
         organizationId: string,
         enabled: boolean,
         actorUserId: string,
+        reason?: string,
     ): Promise<void> {
         await prisma.$transaction(async (tx) => {
             const existing = await tx.featureFlagOverride.findUnique({
@@ -131,8 +134,76 @@ export class FeatureFlagService {
                     previousValue: existing?.enabled ?? null,
                     newValue: enabled,
                     actorUserId,
+                    reason,
                 },
             });
+        });
+    }
+
+    /**
+     * Remove an Organization's override so the flag falls back to the global
+     * default, appending an audit row in the same transaction.
+     *
+     * A no-op when no override exists: clearing something already absent is not
+     * a change, and writing an audit row for it would pollute the history an
+     * operator reads during an incident.
+     */
+    async clearOverride(
+        key: FlagKey,
+        organizationId: string,
+        actorUserId: string,
+        reason?: string,
+    ): Promise<void> {
+        await prisma.$transaction(async (tx) => {
+            const existing = await tx.featureFlagOverride.findUnique({
+                where: {
+                    flagKey_organizationId: { flagKey: key, organizationId },
+                },
+                select: { enabled: true },
+            });
+            if (!existing) return;
+
+            await tx.featureFlagOverride.delete({
+                where: {
+                    flagKey_organizationId: { flagKey: key, organizationId },
+                },
+            });
+
+            const globalDefault = await tx.featureFlag.findUnique({
+                where: { key },
+                select: { enabledByDefault: true },
+            });
+
+            await tx.featureFlagAudit.create({
+                data: {
+                    flagKey: key,
+                    organizationId,
+                    previousValue: existing.enabled,
+                    // The org now resolves to the global default (false when the
+                    // flag has no global row yet — the fail-closed fallback).
+                    newValue: globalDefault?.enabledByDefault ?? false,
+                    actorUserId,
+                    reason,
+                },
+            });
+        });
+    }
+
+    /** Most recent changes for a flag (global and per-Organization), newest first. */
+    async history(key: FlagKey, limit = 50) {
+        return prisma.featureFlagAudit.findMany({
+            where: { flagKey: key },
+            orderBy: { createdAt: "desc" },
+            take: limit,
+            select: {
+                id: true,
+                organizationId: true,
+                previousValue: true,
+                newValue: true,
+                actorUserId: true,
+                reason: true,
+                createdAt: true,
+            },
         });
     }
 

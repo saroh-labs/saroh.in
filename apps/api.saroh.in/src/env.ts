@@ -78,6 +78,14 @@ const envSchema = z.object({
     // missing/malformed. Never logged.
     PAYMENTS_ENC_KEY: z.string().optional(),
 
+    // Saroh STAFF break-glass bootstrap (S1-012 admin). Comma-separated emails
+    // that are treated as platform admins even with no PlatformAdmin row. This
+    // is ONLY how the first admin is seeded (and how access is recovered if every
+    // grant is revoked by mistake) — day-to-day staff live in the table, so this
+    // should normally hold one break-glass address or be empty. Unset = nobody,
+    // and the guard still fails closed.
+    ADMIN_ALLOWLIST: z.string().optional(),
+
     // Set automatically by npm/pnpm run scripts; used for the health probe.
     // Background job worker (S3-003 — durable JobQueue outbox + worker).
     // All optional with sane defaults; the poll loop is disabled under

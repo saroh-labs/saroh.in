@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { auth } from "./common/auth/auth";
+import { AdminModule } from "./modules/admin/admin.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { AuditModule } from "./modules/audit/audit.module";
 import { AutomationsModule } from "./modules/automations/automations.module";
@@ -65,6 +66,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         }),
         HealthModule,
         FeatureFlagModule,
+        AdminModule,
         CapabilitiesModule,
         HomeModule,
         ProviderHealthModule,

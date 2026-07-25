@@ -34,6 +34,11 @@ model User {
   teamMemberships TeamMember[] // Teams they belong to
   projectAccess   ProjectAccess[] // Direct project-role grants
 
+  // Saroh-staff grants (S1-012 admin). Two sides: the grant held BY this user,
+  // and the grants they have issued to others.
+  platformAdmin        PlatformAdmin?  @relation("PlatformAdminUser")
+  platformAdminsGranted PlatformAdmin[] @relation("PlatformAdminGrantedBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -991,10 +996,47 @@ model FeatureFlagAudit {
 
   actorUserId String
 
+  // Why the operator made this change. Nullable only because rows written
+  // before the admin surface existed have none; the admin API requires it.
+  reason String?
+
   createdAt DateTime @default(now())
 
   @@index([flagKey])
   @@index([organizationId])
+}
+
+// PlatformAdmin: a Saroh STAFF grant — the control-plane identity behind
+// admin.saroh.in (S1-012).
+//
+// Deliberately NOT a Membership role and NOT an Organization concept: every
+// role in `organization-policy` is scoped to one tenant, whereas this is the
+// opposite — the right to act across all of them. Keeping it in its own table
+// means a tenant OWNER can never escalate into staff by editing their own org.
+//
+// Data rather than env config, because staff access must be grantable and
+// revocable at runtime with a record of WHO granted it. `ADMIN_ALLOWLIST`
+// survives only as the break-glass bootstrap that seeds the first admin (and
+// recovers access if every grant is revoked by mistake).
+//
+// Revocation is a `revokedAt` stamp, never a delete: who held control-plane
+// access, and when, is exactly the history an incident review needs.
+model PlatformAdmin {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation("PlatformAdminUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  grantedByUserId String?
+  grantedBy       User?   @relation("PlatformAdminGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+
+  grantedAt DateTime  @default(now())
+  revokedAt DateTime? // null => currently active
+
+  /// Why this person has staff access (e.g. "on-call platform engineer").
+  note String?
+
+  @@index([revokedAt])
 }
 
 // ============================================================================
