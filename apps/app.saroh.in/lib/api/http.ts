@@ -97,12 +97,27 @@ export async function apiFetch(
     });
 }
 
-/** Extract a human message from a JSON error body. */
+/**
+ * Extract a human message from a JSON error body.
+ *
+ * Handles all three shapes we actually receive: a bare `{ message }`, a legacy
+ * `{ error: "text" }`, and api.saroh.in's standard envelope
+ * `{ error: { code, message, ... } }` (see AllExceptionsFilter). The last one
+ * used to fall through and return the error OBJECT from a `string`-typed
+ * function, so callers rendered "[object Object]" instead of the reason.
+ */
 export function readError(
-    data: { message?: string; error?: string } | null,
+    data: {
+        message?: string;
+        error?: string | { message?: string };
+    } | null,
     fallback: string,
 ): string {
-    return data?.message ?? data?.error ?? fallback;
+    if (typeof data?.message === "string") return data.message;
+    const error = data?.error;
+    if (typeof error === "string") return error;
+    if (error && typeof error.message === "string") return error.message;
+    return fallback;
 }
 
 /**

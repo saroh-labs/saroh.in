@@ -4,6 +4,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { AuditModule } from "../audit/audit.module";
 import { OrganizationContextService } from "./organization-context.service";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
+import { OrganizationSettingsService } from "./organization-settings.service";
 import { OrganizationsController } from "./organizations.controller";
 
 /**
@@ -23,6 +24,7 @@ import { OrganizationsController } from "./organizations.controller";
     providers: [
         OrganizationContextService,
         OrganizationOnboardingService,
+        OrganizationSettingsService,
         OrganizationGuard,
     ],
     exports: [OrganizationContextService],

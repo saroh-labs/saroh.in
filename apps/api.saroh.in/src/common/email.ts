@@ -91,6 +91,62 @@ export function sendVerificationEmail(
 }
 
 /**
+ * Approve an email change. Deliberately addressed to the account's CURRENT
+ * address — the holder of the existing mailbox authorizes the move — and it
+ * names the destination so a victim of an unauthorized attempt can see where
+ * their account was about to go.
+ */
+export function sendChangeEmailConfirmationEmail(
+    to: string,
+    confirmUrl: string,
+    newEmail: string,
+): Promise<void> {
+    if (!transporter) {
+        console.info(
+            `[Change email] (no SMTP) ${to} -> ${newEmail}: ${confirmUrl}`,
+        );
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: "Confirm your new Saroh email address",
+        html: actionEmail(
+            "Confirm your email change",
+            `We received a request to change your Saroh sign-in email to ${newEmail}. ` +
+                "Confirm below if that was you. If it wasn't, ignore this email — nothing changes.",
+            confirmUrl,
+            "Confirm change",
+        ),
+    });
+    return Promise.resolve();
+}
+
+/** Confirm account deletion. Irreversible, so it always requires this link. */
+export function sendDeleteAccountEmail(
+    to: string,
+    confirmUrl: string,
+): Promise<void> {
+    if (!transporter) {
+        console.info(`[Delete account] (no SMTP) ${to}: ${confirmUrl}`);
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: "Confirm deleting your Saroh account",
+        html: actionEmail(
+            "Confirm account deletion",
+            "This permanently deletes your Saroh account and cannot be undone. " +
+                "If you didn't request this, ignore this email — nothing is deleted.",
+            confirmUrl,
+            "Delete my account",
+        ),
+    });
+    return Promise.resolve();
+}
+
+/**
  * Notify an org OWNER/ADMIN that a new enquiry (Lead) landed. Fired by the
  * `enquiry.notify` job handler (S3-006), once per recipient. Mirrors the other
  * `send*` helpers: console-fallback when no SMTP is configured, and never

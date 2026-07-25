@@ -1,6 +1,7 @@
 import { prisma } from "@saroh/database";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { APIError } from "better-auth/api";
 
 import { getTrustedOrigins } from "./origins";
 
@@ -60,6 +61,65 @@ type EmailSender = (args: {
 export interface CreateAuthOptions {
     sendVerificationEmail?: EmailSender;
     sendResetPassword?: EmailSender;
+    /**
+     * Approve an email change. Sent to the account's CURRENT address (not the
+     * new one) — that is what makes the flow takeover-resistant: whoever holds
+     * the existing mailbox authorizes the move. `newEmail` is included so the
+     * message can name the destination.
+     */
+    sendChangeEmailConfirmation?: (args: {
+        to: string;
+        newEmail: string;
+        url: string;
+        token: string;
+    }) => Promise<void> | void;
+    /** Confirm account deletion via a one-time link, never a bare API call. */
+    sendDeleteAccountVerification?: EmailSender;
+}
+
+/**
+ * Refuse to delete a user who is the ONLY OWNER of an Organization.
+ *
+ * `Membership` cascades on user delete but `Organization` does not — nothing in
+ * the schema ties an org's lifetime to a person. So deleting the last OWNER
+ * would strand the tenant: the org, its stores, sites, orders and audit history
+ * would all survive with no one able to reach them, and no UI to recover it.
+ * Ownership must be transferred (or the org deleted) first.
+ *
+ * Runs inside Better Auth's `beforeDelete` hook, so throwing here aborts the
+ * deletion before any row is touched.
+ */
+async function assertNotSoleOwner(userId: string): Promise<void> {
+    const ownerships = await prisma.membership.findMany({
+        where: { userId, role: "OWNER" },
+        select: {
+            organizationId: true,
+            organization: { select: { name: true } },
+        },
+    });
+    if (ownerships.length === 0) return;
+
+    const stranded: string[] = [];
+    for (const ownership of ownerships) {
+        const otherOwners = await prisma.membership.count({
+            where: {
+                organizationId: ownership.organizationId,
+                role: "OWNER",
+                userId: { not: userId },
+            },
+        });
+        if (otherOwners === 0) {
+            stranded.push(ownership.organization.name);
+        }
+    }
+
+    if (stranded.length > 0) {
+        throw new APIError("BAD_REQUEST", {
+            message:
+                `You are the only owner of ${stranded.join(", ")}. Make someone else an owner, ` +
+                `or delete the organization first, then delete your account.`,
+        });
+    }
 }
 
 /**
@@ -107,6 +167,46 @@ export function createAuth(opts: CreateAuthOptions = {}) {
                     url,
                     token,
                 });
+            },
+        },
+        user: {
+            changeEmail: {
+                enabled: true,
+                // Approval goes to the CURRENT address. `updateEmailWithoutVerification`
+                // is deliberately left off: an unverified account must not be
+                // able to move its own login identity without proving mailbox
+                // control, or an unverified signup on someone else's address
+                // becomes a way to squat a second one.
+                sendChangeEmailConfirmation: async ({
+                    user,
+                    newEmail,
+                    url,
+                    token,
+                }) => {
+                    await opts.sendChangeEmailConfirmation?.({
+                        to: user.email,
+                        newEmail,
+                        url,
+                        token,
+                    });
+                },
+            },
+            deleteUser: {
+                enabled: true,
+                // With a verification sender configured, Better Auth requires a
+                // one-time emailed link — deletion is never a single API call.
+                sendDeleteAccountVerification: async ({ user, url, token }) => {
+                    await opts.sendDeleteAccountVerification?.({
+                        to: user.email,
+                        url,
+                        token,
+                    });
+                },
+                // Last line of defence: refuse to strand a tenant (see
+                // assertNotSoleOwner). Runs before any row is deleted.
+                beforeDelete: async (user) => {
+                    await assertNotSoleOwner(user.id);
+                },
             },
         },
         socialProviders: {

@@ -1,7 +1,12 @@
 import type { Auth } from "@saroh/auth";
 import { createAuth } from "@saroh/auth";
 
-import { sendPasswordResetEmail, sendVerificationEmail } from "../email";
+import {
+    sendChangeEmailConfirmationEmail,
+    sendDeleteAccountEmail,
+    sendPasswordResetEmail,
+    sendVerificationEmail,
+} from "../email";
 
 /**
  * The Better Auth instance — api.saroh.in is now the auth SERVER (it hosts
@@ -11,4 +16,8 @@ import { sendPasswordResetEmail, sendVerificationEmail } from "../email";
 export const auth: Auth = createAuth({
     sendVerificationEmail: ({ to, url }) => sendVerificationEmail(to, url),
     sendResetPassword: ({ to, url }) => sendPasswordResetEmail(to, url),
+    sendChangeEmailConfirmation: ({ to, newEmail, url }) =>
+        sendChangeEmailConfirmationEmail(to, url, newEmail),
+    sendDeleteAccountVerification: ({ to, url }) =>
+        sendDeleteAccountEmail(to, url),
 });

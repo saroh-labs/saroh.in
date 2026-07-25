@@ -4,6 +4,7 @@ import {
     Bell,
     Blocks,
     Briefcase,
+    Building2,
     CalendarClock,
     CalendarDays,
     Globe,
@@ -89,6 +90,11 @@ export const NAV_GROUPS: NavGroup[] = [
     {
         label: "Settings",
         items: [
+            {
+                href: "/settings/organization",
+                label: "Organization",
+                icon: Building2,
+            },
             { href: "/settings/modules", label: "Modules", icon: Blocks },
             { href: "/settings/providers", label: "Providers", icon: Plug },
         ],

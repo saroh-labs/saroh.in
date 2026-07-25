@@ -79,3 +79,28 @@ export class OnboardOrganizationDto {
     @Type(() => BusinessProfileDto)
     profile?: BusinessProfileDto;
 }
+
+/**
+ * Payload for `PATCH /organizations/:organizationId`. Both fields are optional
+ * so a caller can rename the org, edit the business profile, or both.
+ *
+ * Deliberately absent: `slug`. It is the org's stable public identifier (unique
+ * index, and it is embedded in published site content), so renaming the org does
+ * NOT re-slug it. The global ValidationPipe runs with `forbidNonWhitelisted`, so
+ * a client that tries to send one gets an explicit 400 rather than a silent
+ * no-op. Also absent: anything about ownership or membership — those move only
+ * through the membership endpoints.
+ */
+export class UpdateOrganizationDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "An organization name is required" })
+    @MaxLength(120)
+    name?: string;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => BusinessProfileDto)
+    profile?: BusinessProfileDto;
+}

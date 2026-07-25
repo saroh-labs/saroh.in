@@ -34,7 +34,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     if (organizations.length === 0) {
         return (
             <div className="flex min-h-screen flex-col">
-                <AppHeader onboarding />
+                <AppHeader onboarding user={session.user} />
                 {children}
             </div>
         );
@@ -61,6 +61,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             <AppSidebar unread={unread} moduleKeys={moduleKeys} />
             <div className="flex min-w-0 flex-1 flex-col">
                 <AppHeader
+                    user={session.user}
                     organizations={organizations}
                     activeOrg={activeOrg}
                     unread={unread}

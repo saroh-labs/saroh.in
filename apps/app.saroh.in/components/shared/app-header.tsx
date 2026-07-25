@@ -5,7 +5,7 @@ import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
 import { CommandTrigger } from "@/components/shared/command-trigger";
 import { MobileNav } from "@/components/shared/mobile-nav";
-import { SignOutButton } from "@/components/sign-out-button";
+import { UserMenu } from "@/components/shared/user-menu";
 import type { Organization } from "@/lib/organizations/service";
 
 /**
@@ -16,10 +16,17 @@ import type { Organization } from "@/lib/organizations/service";
  * sign-out. It is presentational — `AppShell` fetches session/org/unread ONCE
  * and passes them in, so the session is never fetched twice per request.
  */
+/** The signed-in user, for the identity menu. */
+export interface HeaderUser {
+    name?: string | null;
+    email: string;
+}
+
 type AppHeaderProps =
-    | { onboarding: true }
+    | { onboarding: true; user: HeaderUser }
     | {
           onboarding?: false;
+          user: HeaderUser;
           organizations: Organization[];
           activeOrg: Organization | null;
           unread: number;
@@ -27,19 +34,26 @@ type AppHeaderProps =
       };
 
 export function AppHeader(props: AppHeaderProps) {
-    // Zero-org onboarding: no switcher/nav yet — just the brand + sign-out.
+    // Zero-org onboarding: no switcher/nav yet — brand + identity menu only.
+    // The menu still appears (you must be able to see which account you are
+    // completing onboarding as), minus the org-settings link, which has no
+    // meaning before an org exists.
     if (props.onboarding) {
         return (
             <header className="flex h-14 items-center justify-between border-b px-4 sm:px-6">
                 <Link href="/" aria-label="Saroh">
                     <Wordmark />
                 </Link>
-                <SignOutButton />
+                <UserMenu
+                    name={props.user.name}
+                    email={props.user.email}
+                    showOrganizationSettings={false}
+                />
             </header>
         );
     }
 
-    const { organizations, activeOrg, unread, moduleKeys } = props;
+    const { organizations, activeOrg, unread, moduleKeys, user } = props;
 
     return (
         <header className="flex h-14 items-center justify-between gap-4 border-b px-4 sm:px-6">
@@ -62,7 +76,7 @@ export function AppHeader(props: AppHeaderProps) {
                     />
                 )}
                 <ThemeToggle />
-                <SignOutButton />
+                <UserMenu name={user.name} email={user.email} />
             </div>
         </header>
     );

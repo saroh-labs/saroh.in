@@ -65,6 +65,11 @@ import type {
  */
 export type OrgAction =
     | "org:read"
+    // Reading the BusinessProfile is DELIBERATELY not part of the `org:read`
+    // floor: legal name, tax id and contact email are sensitive business
+    // identity, not roster-level facts, so a MEMBER must not see them even
+    // though they may see the org exists.
+    | "org:settings:read"
     | "org:update"
     | "org:delete"
     | "member:read"
@@ -125,6 +130,7 @@ export type OrgAction =
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
     "org:read",
+    "org:settings:read",
     "org:update",
     "org:delete",
     "member:read",
