@@ -2,12 +2,14 @@ import type { LucideIcon } from "lucide-react";
 import {
     BarChart3,
     Bell,
+    Blocks,
     Briefcase,
     CalendarClock,
     CalendarDays,
     Globe,
     Home,
     KanbanSquare,
+    Plug,
     Store,
     Target,
     Users,
@@ -79,6 +81,18 @@ export const NAV_GROUPS: NavGroup[] = [
     },
     // Notifications is core chrome (not a module), so it is always available.
     { items: [{ href: "/notifications", label: "Notifications", icon: Bell }] },
+    // Settings is core chrome too — and it must never be module-gated, because
+    // Settings → Modules is where a module gets turned on in the first place.
+    // Both destinations degrade by role on the server (Modules is read-only for
+    // non-managers; Providers renders an owners/admins-only empty state), so
+    // showing them to every actor leaks nothing.
+    {
+        label: "Settings",
+        items: [
+            { href: "/settings/modules", label: "Modules", icon: Blocks },
+            { href: "/settings/providers", label: "Providers", icon: Plug },
+        ],
+    },
 ];
 
 /**

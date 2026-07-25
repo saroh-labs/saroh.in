@@ -91,12 +91,12 @@ export class ModuleReadinessRegistry {
                     return setup(
                         "WEBSITE_NO_PUBLICATION",
                         "Publish your site to go live.",
-                        "/website",
+                        "/sites",
                     );
                 return setup(
                     "WEBSITE_NO_SITE",
                     "Create a site to get started.",
-                    "/website",
+                    "/sites/new",
                 );
             },
             deactivationBlockers: () => Promise.resolve([]),
@@ -116,7 +116,7 @@ export class ModuleReadinessRegistry {
                 return setup(
                     "CRM_NO_PIPELINE",
                     "Create a pipeline to start tracking leads.",
-                    "/crm",
+                    "/pipeline",
                 );
             },
             deactivationBlockers: () => Promise.resolve([]),
@@ -136,13 +136,13 @@ export class ModuleReadinessRegistry {
                     return setup(
                         "APPOINTMENTS_NO_SERVICE",
                         "Add a bookable service.",
-                        "/appointments",
+                        "/services/new",
                     );
                 if (rules === 0)
                     return setup(
                         "APPOINTMENTS_NO_AVAILABILITY",
                         "Set your availability so customers can book.",
-                        "/appointments",
+                        "/services",
                     );
                 return active();
             },
@@ -200,7 +200,7 @@ export class ModuleReadinessRegistry {
                 return setup(
                     "PAYMENTS_NO_PROVIDER",
                     "Connect a payment provider to accept payments.",
-                    "/payments",
+                    "/settings/providers",
                 );
             },
             deactivationBlockers: () => Promise.resolve([]),
@@ -220,7 +220,7 @@ export class ModuleReadinessRegistry {
                 return setup(
                     "COMMUNICATIONS_NO_PROVIDER",
                     "Connect a provider to send messages.",
-                    "/communications",
+                    "/settings/providers",
                 );
             },
             deactivationBlockers: () => Promise.resolve([]),
@@ -237,10 +237,14 @@ export class ModuleReadinessRegistry {
                     })) > 0
                 )
                     return active();
+                // No actionHref: Automations has no shell surface yet, so the
+                // consumer's fallback (Settings → Modules) is the only honest
+                // destination. NEVER point a blocker at an unbuilt route — a
+                // 404 is worse than no link (release gate §2, no inaccessible
+                // action leakage).
                 return setup(
                     "AUTOMATIONS_NO_RULE",
                     "Create a rule to automate follow-up.",
-                    "/automations",
                 );
             },
             deactivationBlockers: () => Promise.resolve([]),
@@ -260,7 +264,7 @@ export class ModuleReadinessRegistry {
                 return setup(
                     "INSIGHTS_NO_DATA",
                     "Insights become available once your modules produce activity.",
-                    "/insights",
+                    "/analytics",
                 );
             },
             deactivationBlockers: () => Promise.resolve([]),

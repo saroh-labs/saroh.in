@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import { cache } from "react";
 
 import { env } from "@/env";
 
@@ -31,10 +32,46 @@ export const ACTIVE_ORG_COOKIE = "active_org";
 /** Discriminated result so a client component can surface a message inline. */
 export type CrmResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
-/** The active organization id from the cookie, or null when unset. */
-export async function getActiveOrgId(): Promise<string | null> {
-    return (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
-}
+/**
+ * Member organization ids for the session, newest-first as the API returns
+ * them. Uses a bare `fetch` — NOT `apiFetch` — because `apiFetch` resolves the
+ * active org through this function, and going through it would recurse.
+ * Request-cached, so the reconciliation below costs one call per render pass.
+ */
+const memberOrgIds = cache(async (): Promise<string[] | null> => {
+    const cookie = (await headers()).get("cookie") ?? "";
+    const res = await fetch(`${API_URL}/organizations`, {
+        headers: { "content-type": "application/json", cookie },
+        cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const orgs = (await res.json().catch(() => null)) as
+        | { id: string }[]
+        | null;
+    return Array.isArray(orgs) ? orgs.map((o) => o.id) : null;
+});
+
+/**
+ * The active organization id: the `active_org` cookie when the caller is still
+ * a member of it, otherwise their first organization.
+ *
+ * The fallback is not cosmetic. The cookie is written ONLY when someone creates
+ * an org or explicitly switches, so a user who joined by invitation (or whose
+ * session outlived a membership) has none — and reading it raw made every
+ * org-scoped call either silently empty (no cookie → no request) or a 403
+ * (stale cookie → foreign org). Resolving against real membership here is what
+ * makes the data layer agree with the chrome, which has always fallen back to
+ * the first org (`resolveActiveOrganization`). A failed org-list lookup leaves
+ * the cookie value untouched, so an API outage degrades exactly as before
+ * rather than silently retargeting the tenant.
+ */
+export const getActiveOrgId = cache(async (): Promise<string | null> => {
+    const cookieId = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
+    const ids = await memberOrgIds();
+    if (ids === null) return cookieId;
+    if (cookieId && ids.includes(cookieId)) return cookieId;
+    return ids[0] ?? null;
+});
 
 /** Base path for the active org, or null when no org is active. */
 export async function orgBase(): Promise<string | null> {

@@ -3,6 +3,7 @@ import { Catch, HttpException, HttpStatus } from "@nestjs/common";
 import type { Request, Response } from "express";
 
 import type { CorrelatedRequest } from "../logging/correlation-id.middleware";
+import { logHttpRequestOnce } from "../logging/http-request-log";
 import { redactHeaders } from "../logging/redact";
 import { RESPONSE_ID_HEADER } from "../logging/request-context";
 import { structuredLogger } from "../logging/structured-logger";
@@ -117,6 +118,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
                 exception as HttpException,
             ));
         }
+
+        // Guards run before interceptors, so LoggingInterceptor never sees a
+        // guard rejection (401/403). Emit the request line here for anything it
+        // missed — a no-op when the interceptor already logged this request.
+        logHttpRequestOnce(req, statusCode);
 
         const envelope: ErrorEnvelope = {
             error: {

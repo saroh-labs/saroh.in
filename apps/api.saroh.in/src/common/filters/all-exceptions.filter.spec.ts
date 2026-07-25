@@ -1,12 +1,16 @@
 import {
     BadRequestException,
+    ForbiddenException,
     HttpException,
     HttpStatus,
     InternalServerErrorException,
     NotFoundException,
     type ArgumentsHost,
 } from "@nestjs/common";
+import type { Request } from "express";
 
+import { logHttpRequestOnce } from "../logging/http-request-log";
+import { structuredLogger } from "../logging/structured-logger";
 import { AllExceptionsFilter } from "./all-exceptions.filter";
 
 interface CapturedResponse {
@@ -148,5 +152,65 @@ describe("AllExceptionsFilter", () => {
         filter.catch(new NotFoundException(), makeHost(res));
         expect(res.status).not.toHaveBeenCalled();
         expect(res.json).not.toHaveBeenCalled();
+    });
+
+    // Guards run BEFORE interceptors, so LoggingInterceptor never sees a guard
+    // rejection: every 401/403 (incl. the module-enforcement guard once the
+    // rollout flips) was invisible in the request log, which is precisely the
+    // signal a rollout needs. The filter now emits that line.
+    describe("request logging", () => {
+        it("logs the http_request line for a guard-rejected 403", () => {
+            const info = jest
+                .spyOn(structuredLogger, "info")
+                .mockImplementation(() => undefined);
+            const res = makeResponse();
+
+            filter.catch(
+                new ForbiddenException("not a member"),
+                makeHost(res, {
+                    method: "GET",
+                    originalUrl: "/organizations/org_1/home",
+                    correlationId: "cid-403",
+                    startTime: Date.now(),
+                    headers: {},
+                }),
+            );
+
+            expect(info).toHaveBeenCalledWith(
+                "http_request",
+                expect.objectContaining({
+                    statusCode: 403,
+                    method: "GET",
+                    path: "/organizations/org_1/home",
+                    correlationId: "cid-403",
+                }),
+            );
+            info.mockRestore();
+        });
+
+        it("never double-logs a request the interceptor already logged", () => {
+            const info = jest
+                .spyOn(structuredLogger, "info")
+                .mockImplementation(() => undefined);
+            const req = {
+                method: "GET",
+                originalUrl: "/x",
+                correlationId: "cid-once",
+                startTime: Date.now(),
+                headers: {},
+            };
+
+            // Stand in for LoggingInterceptor having logged this request.
+            logHttpRequestOnce(req as unknown as Request, 200);
+            expect(info).toHaveBeenCalledTimes(1);
+
+            filter.catch(
+                new ForbiddenException(),
+                makeHost(makeResponse(), req),
+            );
+
+            expect(info).toHaveBeenCalledTimes(1);
+            info.mockRestore();
+        });
     });
 });

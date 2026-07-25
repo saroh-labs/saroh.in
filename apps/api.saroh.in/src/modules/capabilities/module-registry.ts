@@ -62,7 +62,17 @@ export interface ModuleDescriptor {
     key: ModuleKey;
     label: string;
     description: string;
-    /** Product-shell routes owned by the module. Every route must start with `/`. */
+    /**
+     * Product-shell routes owned by the module. Every route must start with `/`.
+     *
+     * These name the module's INTENDED unified hub, which for most modules is
+     * not built yet: only `/appointments` (#121) and `/commerce` (#122) exist in
+     * app.saroh.in today — `/website`, `/crm`, `/payments`, `/communications`,
+     * `/automations`, and `/insights` all 404. Nothing consumes this field for
+     * navigation, and nothing should until the hubs land: user-facing
+     * destinations belong in the readiness adapters' `actionHref`, which point
+     * at routes that actually exist.
+     */
     rootRoutes: readonly string[];
     /** The representative OrgAction gating the module's primary capability. */
     requiredAction: OrgAction;

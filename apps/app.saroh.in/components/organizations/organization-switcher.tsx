@@ -42,7 +42,10 @@ export function OrganizationSwitcher({
         organizations.find((o) => o.id === activeOrgId) ?? organizations[0];
 
     function onSelect(organizationId: string) {
-        if (organizationId === active.id) return;
+        // No early return when the id already matches: `active` may be the
+        // fallback for a missing/stale cookie, and re-selecting it is the user's
+        // only way to write the cookie back. The action is membership-guarded,
+        // so a redundant selection is harmless.
         startTransition(async () => {
             const res = await setActiveOrganization(organizationId);
             if (!res.ok) {
