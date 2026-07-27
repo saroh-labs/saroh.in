@@ -36,7 +36,7 @@ model User {
 
   // Saroh-staff grants (S1-012 admin). Two sides: the grant held BY this user,
   // and the grants they have issued to others.
-  platformAdmin        PlatformAdmin?  @relation("PlatformAdminUser")
+  platformAdmin         PlatformAdmin?  @relation("PlatformAdminUser")
   platformAdminsGranted PlatformAdmin[] @relation("PlatformAdminGrantedBy")
 
   createdAt DateTime @default(now())
@@ -1027,6 +1027,8 @@ model PlatformAdmin {
   userId String @unique
   user   User   @relation("PlatformAdminUser", fields: [userId], references: [id], onDelete: Cascade)
 
+  roleAssignments PlatformAdminRoleAssignment[]
+
   grantedByUserId String?
   grantedBy       User?   @relation("PlatformAdminGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
 
@@ -1037,6 +1039,59 @@ model PlatformAdmin {
   note String?
 
   @@index([revokedAt])
+}
+
+// One fixed control-plane role held by a PlatformAdmin. Assignments are
+// append-only lifecycle records: revocation stamps `revokedAt`; it never
+// deletes the record. `role` is validated through the typed API registry and a
+// database CHECK constraint.
+model PlatformAdminRoleAssignment {
+  id String @id @default(cuid())
+
+  platformAdminId String
+  platformAdmin   PlatformAdmin @relation(fields: [platformAdminId], references: [id], onDelete: Cascade)
+
+  role String
+
+  // Bare actor id by design. Historical staff assignments must survive if the
+  // assigning User is later removed.
+  assignedByUserId String?
+  reason           String
+
+  assignedAt DateTime  @default(now())
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+
+  @@index([platformAdminId, revokedAt, expiresAt])
+  @@index([role, revokedAt])
+}
+
+// Global, append-only history of staff activity in the Saroh control plane.
+// Deliberately relation-free: deleting a User, Organization, or target business
+// record must never cascade into the platform audit trail.
+model AdminAuditEvent {
+  id String @id @default(cuid())
+
+  actorUserId String
+  permission  String
+  action      String
+  targetType  String
+
+  targetId       String?
+  organizationId String?
+  reason         String?
+  outcome        String
+  correlationId  String?
+
+  // Redacted operational context only. The API rejects secret-bearing keys.
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([targetType, targetId, createdAt])
 }
 
 // ============================================================================
@@ -1122,7 +1177,7 @@ model ProjectModule {
   projectId            String
   organizationModuleId String
 
-  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade)
+  project            Project            @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade)
   organizationModule OrganizationModule @relation(fields: [organizationId, organizationModuleId], references: [organizationId, id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
