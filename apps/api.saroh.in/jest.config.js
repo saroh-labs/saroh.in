@@ -24,6 +24,9 @@ module.exports = {
         // S1-009 audit: append-only AuditService + read-authorization specs,
         // pure unit tests with a jest-mocked Prisma (never touch a DB).
         "<rootDir>/src/modules/audit/**/*.spec.ts",
+        // Internal control plane: fixed staff permissions, admin read models,
+        // and services with mocked Prisma. Never touch a DB.
+        "<rootDir>/src/modules/admin/**/*.spec.ts",
         "<rootDir>/src/modules/feature-flags/**/*.spec.ts",
         // #119 Home aggregator: pure ranking with mocked availability + counts.
         "<rootDir>/src/modules/home/**/*.spec.ts",
