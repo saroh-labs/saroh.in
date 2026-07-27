@@ -9,11 +9,17 @@ import {
 import { prisma } from "@saroh/database";
 
 import { env } from "../../env";
+import {
+    AdminRole,
+    isAdminRole,
+    permissionsFor,
+} from "../../modules/admin/admin-permissions";
+import type { PlatformAdminInfo } from "../decorators/platform-admin-context.decorator";
 import type { AuthUser } from "../types/store-context";
 
 interface PlatformAdminRequest {
     user?: AuthUser;
-    platformAdmin?: { userId: string; viaBootstrap: boolean };
+    platformAdmin?: PlatformAdminInfo;
 }
 
 /**
@@ -27,8 +33,9 @@ interface PlatformAdminRequest {
  * never escalate into the control plane by editing their own org.
  *
  * Two ways to pass, both fail-closed:
- *   1. An ACTIVE `PlatformAdmin` row (`revokedAt` null) — the normal path.
- *      Revocation takes effect on the very next request; nothing is cached.
+ *   1. An ACTIVE `PlatformAdmin` row with at least one active fixed role — the
+ *      normal path. Revocation and role changes take effect on the very next
+ *      request; nothing is cached.
  *   2. `ADMIN_ALLOWLIST` — break-glass only. It seeds the first admin (before
  *      any row can be granted) and recovers access if every grant is revoked by
  *      mistake. Use of this path is logged at WARN precisely because it bypasses
@@ -50,21 +57,52 @@ export class PlatformAdminGuard implements CanActivate {
             throw new UnauthorizedException("Authentication required");
         }
 
+        const now = new Date();
         const grant = await prisma.platformAdmin.findUnique({
             where: { userId: user.id },
-            select: { revokedAt: true },
+            select: {
+                id: true,
+                revokedAt: true,
+                roleAssignments: {
+                    where: {
+                        revokedAt: null,
+                        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+                    },
+                    select: {
+                        role: true,
+                        expiresAt: true,
+                        revokedAt: true,
+                    },
+                },
+            },
         });
 
         if (grant?.revokedAt === null) {
-            request.platformAdmin = { userId: user.id, viaBootstrap: false };
-            return true;
+            const roles = resolveActiveRoles(grant.roleAssignments, now);
+            if (roles.length > 0) {
+                request.platformAdmin = {
+                    userId: user.id,
+                    platformAdminId: grant.id,
+                    roles,
+                    permissions: permissionsFor(roles),
+                    viaBootstrap: false,
+                };
+                return true;
+            }
         }
 
         if (isBootstrapAdmin(user.email)) {
             this.logger.warn(
                 `Platform admin access granted to ${user.email} via ADMIN_ALLOWLIST bootstrap (no PlatformAdmin grant).`,
             );
-            request.platformAdmin = { userId: user.id, viaBootstrap: true };
+            const roles = [AdminRole.PlatformOwner];
+            request.platformAdmin = {
+                userId: user.id,
+                platformAdminId: null,
+                roles,
+                permissions: permissionsFor(roles),
+                viaBootstrap: true,
+            };
             return true;
         }
 
@@ -73,6 +111,28 @@ export class PlatformAdminGuard implements CanActivate {
         // staff.
         throw new ForbiddenException("Platform administrator access required");
     }
+}
+
+interface RoleAssignment {
+    role: string;
+    expiresAt: Date | null;
+    revokedAt: Date | null;
+}
+
+function resolveActiveRoles(
+    assignments: readonly RoleAssignment[],
+    now: Date,
+): AdminRole[] {
+    const active = new Set<AdminRole>();
+    for (const assignment of assignments) {
+        if (assignment.revokedAt !== null) continue;
+        if (assignment.expiresAt !== null && assignment.expiresAt <= now) {
+            continue;
+        }
+        if (isAdminRole(assignment.role)) active.add(assignment.role);
+    }
+
+    return Object.values(AdminRole).filter((role) => active.has(role));
 }
 
 /** True when `email` is listed in the break-glass `ADMIN_ALLOWLIST`. */

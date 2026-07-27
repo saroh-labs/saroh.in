@@ -9,6 +9,10 @@ jest.mock("../../env", () => ({ env: { ADMIN_ALLOWLIST: undefined } }));
 import { prisma } from "@saroh/database";
 
 import { env } from "../../env";
+import {
+    AdminPermission,
+    AdminRole,
+} from "../../modules/admin/admin-permissions";
 import { PlatformAdminGuard } from "./platform-admin.guard";
 
 const findUnique = prisma.platformAdmin.findUnique as jest.Mock;
@@ -16,7 +20,13 @@ const mutableEnv = env as { ADMIN_ALLOWLIST?: string };
 
 interface TestRequest {
     user?: { id: string; email: string };
-    platformAdmin?: { userId: string; viaBootstrap: boolean };
+    platformAdmin?: {
+        userId: string;
+        platformAdminId: string | null;
+        roles: AdminRole[];
+        permissions: AdminPermission[];
+        viaBootstrap: boolean;
+    };
 }
 
 function contextFor(request: TestRequest): ExecutionContext {
@@ -35,7 +45,17 @@ describe("PlatformAdminGuard", () => {
     });
 
     it("admits a user with an ACTIVE PlatformAdmin grant", async () => {
-        findUnique.mockResolvedValue({ revokedAt: null });
+        findUnique.mockResolvedValue({
+            id: "pa_1",
+            revokedAt: null,
+            roleAssignments: [
+                {
+                    role: AdminRole.Support,
+                    expiresAt: null,
+                    revokedAt: null,
+                },
+            ],
+        });
         const request: TestRequest = {
             user: { id: "user_1", email: "staff@saroh.in" },
         };
@@ -45,12 +65,21 @@ describe("PlatformAdminGuard", () => {
         );
         expect(request.platformAdmin).toEqual({
             userId: "user_1",
+            platformAdminId: "pa_1",
+            roles: [AdminRole.Support],
+            permissions: expect.arrayContaining([
+                AdminPermission.OrganizationRead,
+            ]),
             viaBootstrap: false,
         });
     });
 
     it("REFUSES a revoked grant — revocation takes effect immediately", async () => {
-        findUnique.mockResolvedValue({ revokedAt: new Date() });
+        findUnique.mockResolvedValue({
+            id: "pa_1",
+            revokedAt: new Date(),
+            roleAssignments: [],
+        });
 
         await expect(
             guard.canActivate(
@@ -91,8 +120,137 @@ describe("PlatformAdminGuard", () => {
         // Marked so the surface can tell config-based access from a real grant.
         expect(request.platformAdmin).toEqual({
             userId: "user_4",
+            platformAdminId: null,
+            roles: [AdminRole.PlatformOwner],
+            permissions: expect.arrayContaining([
+                AdminPermission.StaffGrant,
+                AdminPermission.FlagsPublish,
+            ]),
             viaBootstrap: true,
         });
+    });
+
+    it("ignores expired and revoked role assignments", async () => {
+        findUnique.mockResolvedValue({
+            id: "pa_1",
+            revokedAt: null,
+            roleAssignments: [
+                {
+                    role: AdminRole.Operations,
+                    expiresAt: new Date(Date.now() - 60_000),
+                    revokedAt: null,
+                },
+                {
+                    role: AdminRole.Billing,
+                    expiresAt: null,
+                    revokedAt: new Date(),
+                },
+                {
+                    role: AdminRole.Support,
+                    expiresAt: null,
+                    revokedAt: null,
+                },
+            ],
+        });
+        const request: TestRequest = {
+            user: { id: "user_roles", email: "roles@saroh.in" },
+        };
+
+        await guard.canActivate(contextFor(request));
+
+        expect(request.platformAdmin?.roles).toEqual([AdminRole.Support]);
+        expect(request.platformAdmin?.permissions).not.toContain(
+            AdminPermission.JobsRetry,
+        );
+        expect(request.platformAdmin?.permissions).not.toContain(
+            AdminPermission.SubscriptionOverride,
+        );
+    });
+
+    it("refuses an active grant with no active roles", async () => {
+        findUnique.mockResolvedValue({
+            id: "pa_1",
+            revokedAt: null,
+            roleAssignments: [],
+        });
+
+        await expect(
+            guard.canActivate(
+                contextFor({
+                    user: { id: "user_roleless", email: "roleless@saroh.in" },
+                }),
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("unions permissions from multiple active roles", async () => {
+        findUnique.mockResolvedValue({
+            id: "pa_multi",
+            revokedAt: null,
+            roleAssignments: [
+                {
+                    role: AdminRole.Operations,
+                    expiresAt: null,
+                    revokedAt: null,
+                },
+                {
+                    role: AdminRole.Billing,
+                    expiresAt: null,
+                    revokedAt: null,
+                },
+            ],
+        });
+        const request: TestRequest = {
+            user: { id: "user_multi", email: "multi@saroh.in" },
+        };
+
+        await guard.canActivate(contextFor(request));
+
+        expect(request.platformAdmin?.permissions).toEqual(
+            expect.arrayContaining([
+                AdminPermission.JobsRetry,
+                AdminPermission.SubscriptionOverride,
+            ]),
+        );
+    });
+
+    it("re-resolves role changes on the next request", async () => {
+        findUnique
+            .mockResolvedValueOnce({
+                id: "pa_1",
+                revokedAt: null,
+                roleAssignments: [
+                    {
+                        role: AdminRole.Support,
+                        expiresAt: null,
+                        revokedAt: null,
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({
+                id: "pa_1",
+                revokedAt: null,
+                roleAssignments: [
+                    {
+                        role: AdminRole.Auditor,
+                        expiresAt: null,
+                        revokedAt: null,
+                    },
+                ],
+            });
+        const first: TestRequest = {
+            user: { id: "user_1", email: "staff@saroh.in" },
+        };
+        const second: TestRequest = {
+            user: { id: "user_1", email: "staff@saroh.in" },
+        };
+
+        await guard.canActivate(contextFor(first));
+        await guard.canActivate(contextFor(second));
+
+        expect(first.platformAdmin?.roles).toEqual([AdminRole.Support]);
+        expect(second.platformAdmin?.roles).toEqual([AdminRole.Auditor]);
+        expect(findUnique).toHaveBeenCalledTimes(2);
     });
 
     it("does not admit an email merely similar to an allowlisted one", async () => {
@@ -115,7 +273,11 @@ describe("PlatformAdminGuard", () => {
     });
 
     it("never leaks whether a refused user used to be staff", async () => {
-        findUnique.mockResolvedValue({ revokedAt: new Date() });
+        findUnique.mockResolvedValue({
+            id: "pa_1",
+            revokedAt: new Date(),
+            roleAssignments: [],
+        });
         const revoked = await guard
             .canActivate(
                 contextFor({ user: { id: "user_6", email: "ex@saroh.in" } }),
