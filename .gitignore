@@ -64,3 +64,4 @@ dist
 .eslintcache
 # parallel subagent worktrees
 .claude/worktrees/
+.worktrees/
