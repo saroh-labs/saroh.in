@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { PlatformAdminGuard } from "../../common/guards/platform-admin.guard";
+import { PlatformPermissionGuard } from "../../common/guards/platform-permission.guard";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminMetricsService } from "./admin-metrics.service";
@@ -14,6 +15,11 @@ import { AdminController } from "./admin.controller";
 @Module({
     imports: [FeatureFlagModule],
     controllers: [AdminController],
-    providers: [AdminFlagsService, AdminMetricsService, PlatformAdminGuard],
+    providers: [
+        AdminFlagsService,
+        AdminMetricsService,
+        PlatformAdminGuard,
+        PlatformPermissionGuard,
+    ],
 })
 export class AdminModule {}

@@ -12,14 +12,17 @@ import {
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
+import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { PlatformAdminGuard } from "../../common/guards/platform-admin.guard";
+import { PlatformPermissionGuard } from "../../common/guards/platform-permission.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { FlagKey } from "../feature-flags/flags";
 import { isKnownFlagKey } from "../feature-flags/flags";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminMetricsService } from "./admin-metrics.service";
+import { AdminPermission } from "./admin-permissions";
 import { ClearFlagOverrideDto, SetFlagDto } from "./dto";
 
 /**
@@ -32,7 +35,7 @@ import { ClearFlagOverrideDto, SetFlagDto } from "./dto";
  * and aggregate metrics, no tenant records.
  */
 @Controller("admin")
-@UseGuards(BetterAuthGuard, PlatformAdminGuard)
+@UseGuards(BetterAuthGuard, PlatformAdminGuard, PlatformPermissionGuard)
 export class AdminController {
     constructor(
         private readonly flags: FeatureFlagService,
@@ -59,29 +62,34 @@ export class AdminController {
 
     /** Platform dashboard: aggregate counts only, never a tenant record. */
     @Get("metrics")
+    @RequireAdminPermission(AdminPermission.PlatformRead)
     getMetrics() {
         return this.metrics.summary();
     }
 
     /** Every registered flag with its global default and per-org overrides. */
     @Get("flags")
+    @RequireAdminPermission(AdminPermission.FlagsRead)
     listFlags() {
         return this.adminFlags.list();
     }
 
     /** Organizations available as override targets (id/name/slug only). */
     @Get("organizations")
+    @RequireAdminPermission(AdminPermission.OrganizationRead)
     listOrganizations() {
         return this.adminFlags.targetableOrganizations();
     }
 
     @Get("flags/:flagKey/history")
+    @RequireAdminPermission(AdminPermission.FlagsRead)
     async history(@Param("flagKey") flagKey: string) {
         return this.flags.history(assertKnownFlag(flagKey));
     }
 
     /** Set a flag's GLOBAL default — the value every Organization inherits. */
     @Put("flags/:flagKey")
+    @RequireAdminPermission(AdminPermission.FlagsPublish)
     async setGlobal(
         @CurrentUser() user: AuthUser,
         @Param("flagKey") flagKey: string,
@@ -98,6 +106,7 @@ export class AdminController {
 
     /** Set one Organization's override — the targeted-rollout lever. */
     @Put("flags/:flagKey/organizations/:organizationId")
+    @RequireAdminPermission(AdminPermission.FlagsPublish)
     async setOverride(
         @CurrentUser() user: AuthUser,
         @Param("flagKey") flagKey: string,
@@ -116,6 +125,7 @@ export class AdminController {
 
     /** Drop an override so the Organization follows the global default again. */
     @Delete("flags/:flagKey/organizations/:organizationId")
+    @RequireAdminPermission(AdminPermission.FlagsPublish)
     async clearOverride(
         @CurrentUser() user: AuthUser,
         @Param("flagKey") flagKey: string,
