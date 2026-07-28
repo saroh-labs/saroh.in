@@ -1,0 +1,2292 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        />
+        <title>Saroh Admin — Control Plane Flow Preview</title>
+        <style>
+            :root {
+                --paper: #f4f1e9;
+                --paper-strong: #fbfaf5;
+                --ink: #17202b;
+                --ink-soft: #5c6570;
+                --line: #d8d3c8;
+                --line-strong: #bbb4a5;
+                --blue: #174ea6;
+                --blue-pale: #e7eef9;
+                --amber: #c87500;
+                --amber-pale: #fff2d8;
+                --red: #af2e24;
+                --red-pale: #fbe7e4;
+                --green: #176842;
+                --green-pale: #e5f2e9;
+                --nav: #111923;
+                --nav-muted: #9da7b2;
+                --radius: 10px;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                color: var(--ink);
+                background:
+                    linear-gradient(
+                        rgba(23, 32, 43, 0.025) 1px,
+                        transparent 1px
+                    ),
+                    var(--paper);
+                background-size: 100% 28px;
+                font-family:
+                    "Avenir Next", "Segoe UI", Helvetica, sans-serif;
+                font-size: 14px;
+            }
+
+            button,
+            input {
+                font: inherit;
+            }
+
+            button {
+                color: inherit;
+            }
+
+            .prototype-notice {
+                position: fixed;
+                z-index: 20;
+                top: 0;
+                right: 0;
+                left: 0;
+                height: 28px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #684300;
+                border-bottom: 1px solid #e7c87b;
+                background: #fff3c8;
+                font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+            }
+
+            .app {
+                min-height: 100vh;
+                padding-top: 28px;
+                display: grid;
+                grid-template-columns: 236px minmax(0, 1fr);
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 28px;
+                bottom: 0;
+                left: 0;
+                width: 236px;
+                display: flex;
+                flex-direction: column;
+                color: white;
+                background:
+                    radial-gradient(
+                        circle at 20% -10%,
+                        rgba(48, 105, 187, 0.32),
+                        transparent 34%
+                    ),
+                    var(--nav);
+                border-right: 1px solid #2a3541;
+            }
+
+            .brand {
+                height: 76px;
+                padding: 0 22px;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                border-bottom: 1px solid #2a3541;
+            }
+
+            .brand-mark {
+                width: 30px;
+                height: 30px;
+                display: grid;
+                place-items: center;
+                color: var(--nav);
+                background: #edf4ff;
+                border-radius: 50%;
+                font: 800 14px/1 Georgia, serif;
+            }
+
+            .brand-name {
+                font: 700 18px/1 Georgia, serif;
+            }
+
+            .brand-name span {
+                margin-left: 3px;
+                color: var(--nav-muted);
+                font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+
+            .nav-section {
+                padding: 18px 12px 0;
+            }
+
+            .nav-label {
+                padding: 0 10px 8px;
+                color: #6f7b88;
+                font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                letter-spacing: 0.15em;
+                text-transform: uppercase;
+            }
+
+            .nav-item {
+                width: 100%;
+                height: 42px;
+                padding: 0 11px;
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                color: #b7c0c9;
+                border: 0;
+                border-radius: 7px;
+                background: transparent;
+                cursor: pointer;
+                text-align: left;
+            }
+
+            .nav-item:hover {
+                color: white;
+                background: rgba(255, 255, 255, 0.06);
+            }
+
+            .nav-item.active {
+                color: white;
+                background: #1d5cab;
+                box-shadow: inset 3px 0 #a9cfff;
+            }
+
+            .nav-icon {
+                width: 18px;
+                color: currentColor;
+                font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                text-align: center;
+            }
+
+            .nav-count {
+                margin-left: auto;
+                min-width: 21px;
+                padding: 2px 6px;
+                color: #0c1722;
+                background: #f2c96d;
+                border-radius: 999px;
+                font: 800 9px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+                text-align: center;
+            }
+
+            .sidebar-user {
+                margin-top: auto;
+                padding: 15px 18px;
+                display: grid;
+                grid-template-columns: 32px 1fr;
+                gap: 10px;
+                border-top: 1px solid #2a3541;
+            }
+
+            .avatar {
+                width: 32px;
+                height: 32px;
+                display: grid;
+                place-items: center;
+                color: #173c6e;
+                background: #dceaff;
+                border-radius: 50%;
+                font: 800 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+
+            .user-name {
+                overflow: hidden;
+                font-size: 12px;
+                font-weight: 700;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .user-role {
+                margin-top: 3px;
+                color: #7f8c99;
+                font: 600 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+                text-transform: uppercase;
+            }
+
+            .content {
+                grid-column: 2;
+                min-width: 0;
+            }
+
+            .topbar {
+                position: sticky;
+                z-index: 10;
+                top: 28px;
+                height: 64px;
+                padding: 0 28px;
+                display: flex;
+                align-items: center;
+                gap: 18px;
+                background: rgba(251, 250, 245, 0.94);
+                border-bottom: 1px solid var(--line);
+                backdrop-filter: blur(12px);
+            }
+
+            .breadcrumb {
+                min-width: 180px;
+                color: var(--ink-soft);
+                font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+
+            .breadcrumb strong {
+                color: var(--ink);
+            }
+
+            .search {
+                position: relative;
+                max-width: 500px;
+                flex: 1;
+            }
+
+            .search input {
+                width: 100%;
+                height: 38px;
+                padding: 0 92px 0 36px;
+                color: var(--ink);
+                border: 1px solid var(--line);
+                border-radius: 7px;
+                outline: none;
+                background: white;
+            }
+
+            .search input:focus {
+                border-color: var(--blue);
+                box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+            }
+
+            .search::before {
+                position: absolute;
+                top: 11px;
+                left: 13px;
+                color: var(--ink-soft);
+                content: "⌕";
+                font-size: 18px;
+            }
+
+            .shortcut {
+                position: absolute;
+                top: 9px;
+                right: 10px;
+                padding: 4px 7px;
+                color: var(--ink-soft);
+                border: 1px solid var(--line);
+                border-radius: 4px;
+                background: #f8f7f2;
+                font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+
+            .top-status {
+                margin-left: auto;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: var(--green);
+                font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                text-transform: uppercase;
+            }
+
+            .dot {
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: currentColor;
+                box-shadow: 0 0 0 4px currentColor;
+                opacity: 0.78;
+            }
+
+            main {
+                max-width: 1480px;
+                padding: 30px 32px 56px;
+            }
+
+            .page-head {
+                margin-bottom: 24px;
+                display: flex;
+                align-items: flex-end;
+                justify-content: space-between;
+                gap: 28px;
+            }
+
+            .eyebrow {
+                margin-bottom: 8px;
+                color: var(--blue);
+                font: 800 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                letter-spacing: 0.13em;
+                text-transform: uppercase;
+            }
+
+            h1,
+            h2,
+            h3,
+            p {
+                margin-top: 0;
+            }
+
+            h1 {
+                margin-bottom: 7px;
+                font: 600 clamp(28px, 3vw, 42px) / 1.05 Georgia, serif;
+                letter-spacing: -0.035em;
+            }
+
+            .page-subtitle {
+                max-width: 670px;
+                margin-bottom: 0;
+                color: var(--ink-soft);
+                line-height: 1.55;
+            }
+
+            .button-row {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 9px;
+            }
+
+            .button {
+                min-height: 36px;
+                padding: 0 14px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 7px;
+                border: 1px solid var(--line-strong);
+                border-radius: 6px;
+                background: var(--paper-strong);
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 700;
+            }
+
+            .button:hover {
+                border-color: var(--blue);
+            }
+
+            .button.primary {
+                color: white;
+                border-color: var(--blue);
+                background: var(--blue);
+            }
+
+            .button.danger {
+                color: var(--red);
+                border-color: #dcaaa5;
+                background: var(--red-pale);
+            }
+
+            .button.small {
+                min-height: 30px;
+                padding: 0 10px;
+                font-size: 11px;
+            }
+
+            .metrics {
+                margin-bottom: 20px;
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 12px;
+            }
+
+            .metric {
+                position: relative;
+                min-height: 128px;
+                padding: 18px;
+                overflow: hidden;
+                border: 1px solid var(--line);
+                border-radius: var(--radius);
+                background: rgba(251, 250, 245, 0.88);
+                box-shadow: 0 4px 14px rgba(42, 45, 48, 0.035);
+            }
+
+            .metric::after {
+                position: absolute;
+                right: -25px;
+                bottom: -35px;
+                width: 110px;
+                height: 110px;
+                border: 1px solid var(--line);
+                border-radius: 50%;
+                content: "";
+            }
+
+            .metric-label {
+                color: var(--ink-soft);
+                font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+
+            .metric-value {
+                margin: 11px 0 8px;
+                font: 600 34px/1 Georgia, serif;
+                letter-spacing: -0.04em;
+            }
+
+            .metric-foot {
+                color: var(--ink-soft);
+                font-size: 11px;
+            }
+
+            .trend-up {
+                color: var(--green);
+                font-weight: 800;
+            }
+
+            .trend-risk {
+                color: var(--red);
+                font-weight: 800;
+            }
+
+            .grid-2 {
+                display: grid;
+                grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.8fr);
+                gap: 16px;
+            }
+
+            .grid-even {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 16px;
+            }
+
+            .panel {
+                min-width: 0;
+                border: 1px solid var(--line);
+                border-radius: var(--radius);
+                background: rgba(251, 250, 245, 0.9);
+                box-shadow: 0 4px 16px rgba(42, 45, 48, 0.035);
+            }
+
+            .panel-head {
+                min-height: 60px;
+                padding: 13px 16px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .panel-title {
+                margin: 0;
+                font: 700 14px/1.2 Georgia, serif;
+            }
+
+            .panel-kicker {
+                margin-top: 4px;
+                color: var(--ink-soft);
+                font-size: 10px;
+            }
+
+            .panel-link {
+                color: var(--blue);
+                border: 0;
+                background: none;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: 700;
+            }
+
+            .panel-body {
+                padding: 16px;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th {
+                height: 38px;
+                padding: 0 12px;
+                color: var(--ink-soft);
+                border-bottom: 1px solid var(--line);
+                font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                letter-spacing: 0.08em;
+                text-align: left;
+                text-transform: uppercase;
+            }
+
+            td {
+                height: 50px;
+                padding: 8px 12px;
+                border-bottom: 1px solid #e7e3da;
+                font-size: 12px;
+                vertical-align: middle;
+            }
+
+            tr:last-child td {
+                border-bottom: 0;
+            }
+
+            tbody tr[data-open] {
+                cursor: pointer;
+            }
+
+            tbody tr[data-open]:hover {
+                background: #f2f5f9;
+            }
+
+            .mono {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 10px;
+            }
+
+            .muted {
+                color: var(--ink-soft);
+            }
+
+            .strong {
+                font-weight: 750;
+            }
+
+            .badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 4px 7px;
+                border: 1px solid var(--line);
+                border-radius: 999px;
+                background: #f5f3ed;
+                font: 750 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                white-space: nowrap;
+                text-transform: uppercase;
+            }
+
+            .badge::before {
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                background: currentColor;
+                content: "";
+            }
+
+            .badge.good {
+                color: var(--green);
+                border-color: #bbd9c8;
+                background: var(--green-pale);
+            }
+
+            .badge.warn {
+                color: #8c5900;
+                border-color: #e9cd90;
+                background: var(--amber-pale);
+            }
+
+            .badge.bad {
+                color: var(--red);
+                border-color: #e4bbb6;
+                background: var(--red-pale);
+            }
+
+            .badge.info {
+                color: var(--blue);
+                border-color: #bdcce5;
+                background: var(--blue-pale);
+            }
+
+            .attention-list {
+                display: grid;
+                gap: 8px;
+            }
+
+            .attention {
+                padding: 12px;
+                display: grid;
+                grid-template-columns: 31px 1fr auto;
+                gap: 11px;
+                align-items: center;
+                border: 1px solid var(--line);
+                border-radius: 7px;
+                background: white;
+            }
+
+            .attention-mark {
+                width: 31px;
+                height: 31px;
+                display: grid;
+                place-items: center;
+                color: #704600;
+                background: var(--amber-pale);
+                border-radius: 7px;
+                font-weight: 900;
+            }
+
+            .attention-title {
+                margin-bottom: 3px;
+                font-size: 11px;
+                font-weight: 750;
+            }
+
+            .attention-copy {
+                color: var(--ink-soft);
+                font-size: 10px;
+            }
+
+            .flow-strip {
+                margin-bottom: 20px;
+                display: grid;
+                grid-template-columns: repeat(5, 1fr);
+                border: 1px solid var(--line);
+                border-radius: var(--radius);
+                overflow: hidden;
+                background: var(--paper-strong);
+            }
+
+            .flow-step {
+                position: relative;
+                min-height: 76px;
+                padding: 14px 15px;
+                border-right: 1px solid var(--line);
+            }
+
+            .flow-step:last-child {
+                border-right: 0;
+            }
+
+            .flow-step:not(:last-child)::after {
+                position: absolute;
+                z-index: 2;
+                top: 29px;
+                right: -6px;
+                width: 11px;
+                height: 11px;
+                background: var(--paper-strong);
+                border-top: 1px solid var(--line);
+                border-right: 1px solid var(--line);
+                content: "";
+                transform: rotate(45deg);
+            }
+
+            .flow-number {
+                color: var(--blue);
+                font: 800 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+
+            .flow-name {
+                margin-top: 8px;
+                font-size: 11px;
+                font-weight: 750;
+            }
+
+            .flow-desc {
+                margin-top: 3px;
+                color: var(--ink-soft);
+                font-size: 9px;
+            }
+
+            .filters {
+                margin-bottom: 14px;
+                padding: 10px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                border: 1px solid var(--line);
+                border-radius: 8px;
+                background: rgba(251, 250, 245, 0.84);
+            }
+
+            .filter {
+                height: 32px;
+                padding: 0 10px;
+                border: 1px solid var(--line);
+                border-radius: 5px;
+                background: white;
+                font-size: 10px;
+                font-weight: 650;
+            }
+
+            .filter.search-filter {
+                min-width: 260px;
+                flex: 1;
+            }
+
+            .target-head {
+                margin: -30px -32px 24px;
+                padding: 22px 32px 0;
+                background: #edf1f6;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .target-top {
+                padding-bottom: 18px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 20px;
+            }
+
+            .target-identity {
+                display: flex;
+                align-items: center;
+                gap: 13px;
+            }
+
+            .org-logo {
+                width: 42px;
+                height: 42px;
+                display: grid;
+                place-items: center;
+                color: white;
+                background: #183a67;
+                border-radius: 9px;
+                font: 700 14px/1 Georgia, serif;
+            }
+
+            .target-name {
+                margin-bottom: 4px;
+                font: 700 20px/1 Georgia, serif;
+            }
+
+            .tabs {
+                display: flex;
+                gap: 24px;
+                overflow-x: auto;
+            }
+
+            .tab {
+                padding: 0 0 11px;
+                color: var(--ink-soft);
+                border: 0;
+                border-bottom: 2px solid transparent;
+                background: transparent;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: 700;
+                white-space: nowrap;
+            }
+
+            .tab.active {
+                color: var(--blue);
+                border-color: var(--blue);
+            }
+
+            .health-row {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 8px;
+            }
+
+            .health-cell {
+                padding: 12px;
+                border: 1px solid var(--line);
+                border-radius: 7px;
+                background: white;
+            }
+
+            .health-label {
+                color: var(--ink-soft);
+                font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                text-transform: uppercase;
+            }
+
+            .health-value {
+                margin-top: 8px;
+                font-size: 12px;
+                font-weight: 750;
+            }
+
+            .timeline {
+                display: grid;
+            }
+
+            .event {
+                position: relative;
+                padding: 0 0 18px 25px;
+            }
+
+            .event::before {
+                position: absolute;
+                top: 5px;
+                bottom: -5px;
+                left: 6px;
+                width: 1px;
+                background: var(--line);
+                content: "";
+            }
+
+            .event:last-child::before {
+                display: none;
+            }
+
+            .event::after {
+                position: absolute;
+                top: 3px;
+                left: 2px;
+                width: 9px;
+                height: 9px;
+                border: 2px solid var(--paper-strong);
+                border-radius: 50%;
+                background: var(--blue);
+                box-shadow: 0 0 0 1px var(--blue);
+                content: "";
+            }
+
+            .event-title {
+                margin-bottom: 4px;
+                font-size: 11px;
+                font-weight: 750;
+            }
+
+            .event-meta {
+                color: var(--ink-soft);
+                font: 500 9px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+
+            .role-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 12px;
+            }
+
+            .role-card {
+                padding: 16px;
+                border: 1px solid var(--line);
+                border-radius: 8px;
+                background: white;
+            }
+
+            .role-card.owner {
+                color: white;
+                border-color: #183a67;
+                background: #183a67;
+            }
+
+            .role-card h3 {
+                margin-bottom: 7px;
+                font: 700 15px/1.2 Georgia, serif;
+            }
+
+            .role-card p {
+                min-height: 34px;
+                margin-bottom: 13px;
+                color: var(--ink-soft);
+                font-size: 10px;
+                line-height: 1.5;
+            }
+
+            .role-card.owner p {
+                color: #b9cbe0;
+            }
+
+            .role-stat {
+                font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+                text-transform: uppercase;
+            }
+
+            .stage {
+                position: relative;
+                padding: 14px 14px 14px 44px;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .stage:last-child {
+                border-bottom: 0;
+            }
+
+            .stage-number {
+                position: absolute;
+                top: 13px;
+                left: 13px;
+                width: 22px;
+                height: 22px;
+                display: grid;
+                place-items: center;
+                color: var(--ink-soft);
+                border: 1px solid var(--line);
+                border-radius: 50%;
+                background: white;
+                font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+
+            .stage.complete .stage-number {
+                color: white;
+                border-color: var(--green);
+                background: var(--green);
+            }
+
+            .stage.current {
+                background: var(--blue-pale);
+            }
+
+            .stage.current .stage-number {
+                color: white;
+                border-color: var(--blue);
+                background: var(--blue);
+            }
+
+            .stage-name {
+                font-size: 11px;
+                font-weight: 750;
+            }
+
+            .stage-copy {
+                margin-top: 4px;
+                color: var(--ink-soft);
+                font-size: 10px;
+            }
+
+            .risk-bar {
+                height: 6px;
+                overflow: hidden;
+                border-radius: 99px;
+                background: #e3dfd5;
+            }
+
+            .risk-bar span {
+                display: block;
+                height: 100%;
+                border-radius: inherit;
+                background: var(--blue);
+            }
+
+            .permission-matrix th,
+            .permission-matrix td {
+                text-align: center;
+            }
+
+            .permission-matrix th:first-child,
+            .permission-matrix td:first-child {
+                text-align: left;
+            }
+
+            .yes {
+                color: var(--green);
+                font-weight: 900;
+            }
+
+            .no {
+                color: #b7afa3;
+            }
+
+            .toast {
+                position: fixed;
+                z-index: 40;
+                right: 22px;
+                bottom: 22px;
+                max-width: 340px;
+                padding: 13px 15px;
+                display: none;
+                color: white;
+                border-radius: 7px;
+                background: #182431;
+                box-shadow: 0 16px 45px rgba(18, 27, 37, 0.28);
+                font-size: 11px;
+                line-height: 1.5;
+            }
+
+            .toast.show {
+                display: block;
+                animation: toast-in 180ms ease-out;
+            }
+
+            @keyframes toast-in {
+                from {
+                    opacity: 0;
+                    transform: translateY(8px);
+                }
+            }
+
+            @media (max-width: 1040px) {
+                .metrics {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+
+                .grid-2,
+                .grid-even {
+                    grid-template-columns: 1fr;
+                }
+
+                .role-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+
+                .flow-strip {
+                    grid-template-columns: 1fr;
+                }
+
+                .flow-step {
+                    border-right: 0;
+                    border-bottom: 1px solid var(--line);
+                }
+
+                .flow-step::after {
+                    display: none;
+                }
+            }
+
+            @media (max-width: 760px) {
+                .prototype-notice {
+                    height: 42px;
+                    padding: 0 16px;
+                    line-height: 1.25;
+                    text-align: center;
+                }
+
+                .app {
+                    display: block;
+                    padding-top: 42px;
+                    padding-bottom: 64px;
+                }
+
+                .sidebar {
+                    z-index: 30;
+                    top: auto;
+                    right: 0;
+                    width: auto;
+                    height: 64px;
+                    flex-direction: row;
+                    border-top: 1px solid #2a3541;
+                    border-right: 0;
+                }
+
+                .brand,
+                .nav-label,
+                .sidebar-user {
+                    display: none;
+                }
+
+                .nav-section {
+                    width: 100%;
+                    padding: 7px;
+                    display: grid;
+                    grid-template-columns: repeat(6, 1fr);
+                    gap: 2px;
+                }
+
+                .nav-item {
+                    height: 49px;
+                    padding: 4px;
+                    flex-direction: column;
+                    justify-content: center;
+                    gap: 4px;
+                    font-size: 8px;
+                    text-align: center;
+                }
+
+                .nav-count {
+                    display: none;
+                }
+
+                .content {
+                    display: block;
+                }
+
+                .topbar {
+                    top: 42px;
+                    padding: 0 14px;
+                }
+
+                .breadcrumb,
+                .top-status {
+                    display: none;
+                }
+
+                main {
+                    padding: 22px 14px 40px;
+                }
+
+                .page-head {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
+
+                .metrics,
+                .role-grid,
+                .health-row {
+                    grid-template-columns: 1fr;
+                }
+
+                .panel {
+                    overflow: hidden;
+                }
+
+                table {
+                    max-width: 100%;
+                    display: block;
+                    overflow-x: auto;
+                    overscroll-behavior-inline: contain;
+                }
+
+                thead,
+                tbody {
+                    width: 680px;
+                    display: table;
+                    table-layout: fixed;
+                }
+
+                .target-head {
+                    margin: -22px -14px 20px;
+                    padding: 18px 14px 0;
+                }
+
+                .target-top {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                *,
+                *::before,
+                *::after {
+                    scroll-behavior: auto !important;
+                    animation-duration: 0.01ms !important;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="prototype-notice">
+            Approved-flow prototype · representative data · no live actions
+        </div>
+        <div class="app">
+            <aside class="sidebar">
+                <div class="brand">
+                    <div class="brand-mark">S</div>
+                    <div class="brand-name">Saroh <span>admin</span></div>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-label">Control plane</div>
+                    <button class="nav-item active" data-screen="dashboard">
+                        <span class="nav-icon">01</span>Dashboard
+                    </button>
+                    <button class="nav-item" data-screen="organizations">
+                        <span class="nav-icon">02</span>Organizations
+                        <span class="nav-count">3</span>
+                    </button>
+                    <button class="nav-item" data-screen="operations">
+                        <span class="nav-icon">03</span>Operations
+                        <span class="nav-count">7</span>
+                    </button>
+                    <button class="nav-item" data-screen="releases">
+                        <span class="nav-icon">04</span>Releases
+                    </button>
+                    <button class="nav-item" data-screen="team">
+                        <span class="nav-icon">05</span>Team
+                    </button>
+                    <button class="nav-item" data-screen="audit">
+                        <span class="nav-icon">06</span>Audit
+                    </button>
+                </div>
+                <div class="sidebar-user">
+                    <div class="avatar">MM</div>
+                    <div>
+                        <div class="user-name">mohit@saroh.in</div>
+                        <div class="user-role">Platform owner</div>
+                    </div>
+                </div>
+            </aside>
+            <div class="content">
+                <header class="topbar">
+                    <div class="breadcrumb">
+                        Control plane / <strong id="crumb">Dashboard</strong>
+                    </div>
+                    <label class="search">
+                        <input
+                            aria-label="Global control-plane search"
+                            placeholder="Find organization, user, incident, flag…"
+                        />
+                        <span class="shortcut">⌘ K</span>
+                    </label>
+                    <div class="top-status">
+                        <span class="dot"></span>All systems nominal
+                    </div>
+                </header>
+                <main id="main"></main>
+            </div>
+        </div>
+        <div class="toast" id="toast" role="status"></div>
+
+        <template id="dashboard">
+            <div class="page-head">
+                <div>
+                    <div class="eyebrow">Tuesday · 28 July · 16:40 IST</div>
+                    <h1>Platform situation room</h1>
+                    <p class="page-subtitle">
+                        A role-aware briefing of customer risk, operational
+                        health, and changes that need a human decision.
+                    </p>
+                </div>
+                <div class="button-row">
+                    <button class="button" data-go="audit">Review audit</button>
+                    <button class="button primary" data-go="organizations">
+                        Open support queue →
+                    </button>
+                </div>
+            </div>
+            <div class="flow-strip">
+                <div class="flow-step">
+                    <div class="flow-number">01 / DISCOVER</div>
+                    <div class="flow-name">Find the target</div>
+                    <div class="flow-desc">Global search or risk queue</div>
+                </div>
+                <div class="flow-step">
+                    <div class="flow-number">02 / JUSTIFY</div>
+                    <div class="flow-name">Open access session</div>
+                    <div class="flow-desc">Reason + short expiry</div>
+                </div>
+                <div class="flow-step">
+                    <div class="flow-number">03 / DIAGNOSE</div>
+                    <div class="flow-name">Inspect 360° context</div>
+                    <div class="flow-desc">Health, people, billing, audit</div>
+                </div>
+                <div class="flow-step">
+                    <div class="flow-number">04 / ACT</div>
+                    <div class="flow-name">Preview then execute</div>
+                    <div class="flow-desc">Capability + impact + reason</div>
+                </div>
+                <div class="flow-step">
+                    <div class="flow-number">05 / PROVE</div>
+                    <div class="flow-name">Durable result</div>
+                    <div class="flow-desc">Operation + immutable audit</div>
+                </div>
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Organizations</div>
+                    <div class="metric-value">248</div>
+                    <div class="metric-foot">
+                        <span class="trend-up">+18</span> in 30 days
+                    </div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Healthy tenants</div>
+                    <div class="metric-value">96.8%</div>
+                    <div class="metric-foot">
+                        <span class="trend-up">+1.2%</span> this week
+                    </div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Failed operations</div>
+                    <div class="metric-value">7</div>
+                    <div class="metric-foot">
+                        <span class="trend-risk">3</span> need review
+                    </div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Active rollout</div>
+                    <div class="metric-value">20%</div>
+                    <div class="metric-foot">CRM workspace · stable cohort</div>
+                </div>
+            </div>
+            <div class="grid-2">
+                <section class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2 class="panel-title">Organizations at risk</h2>
+                            <div class="panel-kicker">
+                                Ranked by customer impact, not raw error count
+                            </div>
+                        </div>
+                        <button class="panel-link" data-go="organizations">
+                            View directory →
+                        </button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Organization</th>
+                                <th>Risk</th>
+                                <th>Signal</th>
+                                <th>Owner</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-open="organization">
+                                <td>
+                                    <div class="strong">Northstar Fitness</div>
+                                    <div class="mono muted">org_north_44</div>
+                                </td>
+                                <td><span class="badge bad">High</span></td>
+                                <td>Payment webhooks failing</td>
+                                <td>Unassigned</td>
+                                <td class="mono">4m ago</td>
+                            </tr>
+                            <tr data-open="organization">
+                                <td>
+                                    <div class="strong">Juniper Academy</div>
+                                    <div class="mono muted">org_jun_92</div>
+                                </td>
+                                <td><span class="badge warn">Medium</span></td>
+                                <td>Email provider degraded</td>
+                                <td>A. Shah</td>
+                                <td class="mono">17m ago</td>
+                            </tr>
+                            <tr data-open="organization">
+                                <td>
+                                    <div class="strong">Basil & Bloom</div>
+                                    <div class="mono muted">org_bas_18</div>
+                                </td>
+                                <td><span class="badge warn">Medium</span></td>
+                                <td>Domain verification stalled</td>
+                                <td>R. Patel</td>
+                                <td class="mono">39m ago</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+                <section class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2 class="panel-title">Needs a decision</h2>
+                            <div class="panel-kicker">
+                                Actions the system will not take alone
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-body attention-list">
+                        <div class="attention">
+                            <div class="attention-mark">!</div>
+                            <div>
+                                <div class="attention-title">
+                                    3 dead-lettered payment events
+                                </div>
+                                <div class="attention-copy">
+                                    Dry-run ready · 1 organization
+                                </div>
+                            </div>
+                            <button class="button small" data-go="operations">
+                                Inspect
+                            </button>
+                        </div>
+                        <div class="attention">
+                            <div class="attention-mark">↗</div>
+                            <div>
+                                <div class="attention-title">
+                                    CRM rollout eligible for 50%
+                                </div>
+                                <div class="attention-copy">
+                                    0.3% error rate · 48h stable
+                                </div>
+                            </div>
+                            <button class="button small" data-go="releases">
+                                Review
+                            </button>
+                        </div>
+                        <div class="attention">
+                            <div class="attention-mark">⌛</div>
+                            <div>
+                                <div class="attention-title">
+                                    2 staff grants expire tomorrow
+                                </div>
+                                <div class="attention-copy">
+                                    Operations and Support
+                                </div>
+                            </div>
+                            <button class="button small" data-go="team">
+                                Review
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </template>
+
+        <template id="organizations">
+            <div class="page-head">
+                <div>
+                    <div class="eyebrow">Customer support</div>
+                    <h1>Organizations</h1>
+                    <p class="page-subtitle">
+                        Search safely, open a reason-bound access session, and
+                        diagnose the whole tenant before taking an explicit
+                        action.
+                    </p>
+                </div>
+                <button class="button">Export redacted view</button>
+            </div>
+            <div class="filters">
+                <input
+                    class="filter search-filter"
+                    value="north"
+                    aria-label="Search organizations"
+                />
+                <button class="filter">Status: Any ⌄</button>
+                <button class="filter">Health: Attention ⌄</button>
+                <button class="filter">Plan: Any ⌄</button>
+                <button class="filter">Module: Any ⌄</button>
+            </div>
+            <section class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2 class="panel-title">248 organizations</h2>
+                        <div class="panel-kicker">
+                            Member-email search requires PII permission
+                        </div>
+                    </div>
+                    <span class="badge info">Support capability</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Organization</th>
+                            <th>Lifecycle</th>
+                            <th>Plan</th>
+                            <th>Modules</th>
+                            <th>Health</th>
+                            <th>Last activity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-open="organization">
+                            <td>
+                                <div class="strong">Northstar Fitness</div>
+                                <div class="mono muted">
+                                    northstar · org_north_44
+                                </div>
+                            </td>
+                            <td><span class="badge good">Active</span></td>
+                            <td>Growth</td>
+                            <td>6 enabled</td>
+                            <td><span class="badge bad">Attention</span></td>
+                            <td class="mono">4m ago</td>
+                        </tr>
+                        <tr data-open="organization">
+                            <td>
+                                <div class="strong">North & Pine Studio</div>
+                                <div class="mono muted">
+                                    north-pine · org_np_08
+                                </div>
+                            </td>
+                            <td><span class="badge good">Active</span></td>
+                            <td>Starter</td>
+                            <td>3 enabled</td>
+                            <td><span class="badge good">Healthy</span></td>
+                            <td class="mono">2h ago</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="strong">Northfield Foundation</div>
+                                <div class="mono muted">
+                                    northfield · org_nf_73
+                                </div>
+                            </td>
+                            <td><span class="badge warn">Suspended</span></td>
+                            <td>Nonprofit</td>
+                            <td>4 enabled</td>
+                            <td><span class="badge warn">Paused</span></td>
+                            <td class="mono">3d ago</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </template>
+
+        <template id="organization">
+            <div class="target-head">
+                <div class="target-top">
+                    <div class="target-identity">
+                        <div class="org-logo">NF</div>
+                        <div>
+                            <div class="target-name">Northstar Fitness</div>
+                            <div class="mono muted">
+                                northstar · org_north_44 · Growth
+                            </div>
+                        </div>
+                        <span class="badge good">Active</span>
+                        <span class="badge bad">Attention</span>
+                    </div>
+                    <div class="button-row">
+                        <button class="button" data-toast="Read-only view session opened for 30 minutes.">
+                            View as organization
+                        </button>
+                        <button
+                            class="button danger"
+                            data-toast="Impact preview would open before suspension."
+                        >
+                            Suspend…
+                        </button>
+                    </div>
+                </div>
+                <div class="tabs">
+                    <button class="tab active">Overview</button>
+                    <button class="tab">People</button>
+                    <button class="tab">Modules</button>
+                    <button class="tab">Operations</button>
+                    <button class="tab">Billing</button>
+                    <button class="tab">Audit</button>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div>
+                    <section class="panel" style="margin-bottom: 16px">
+                        <div class="panel-head">
+                            <div>
+                                <h2 class="panel-title">Operational health</h2>
+                                <div class="panel-kicker">
+                                    Derived now · never persisted as stale status
+                                </div>
+                            </div>
+                            <button class="button small" data-go="operations">
+                                Open operations
+                            </button>
+                        </div>
+                        <div class="panel-body health-row">
+                            <div class="health-cell">
+                                <div class="health-label">Payments</div>
+                                <div class="health-value">
+                                    <span class="badge bad">Degraded</span>
+                                </div>
+                            </div>
+                            <div class="health-cell">
+                                <div class="health-label">Communications</div>
+                                <div class="health-value">
+                                    <span class="badge good">Healthy</span>
+                                </div>
+                            </div>
+                            <div class="health-cell">
+                                <div class="health-label">Website</div>
+                                <div class="health-value">
+                                    <span class="badge good">Published</span>
+                                </div>
+                            </div>
+                            <div class="health-cell">
+                                <div class="health-label">Queue</div>
+                                <div class="health-value">
+                                    <span class="badge warn">3 failed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="panel">
+                        <div class="panel-head">
+                            <div>
+                                <h2 class="panel-title">Installed capabilities</h2>
+                                <div class="panel-kicker">
+                                    Rollout × installation × entitlement × readiness
+                                </div>
+                            </div>
+                            <button
+                                class="button small"
+                                data-toast="Module action panel would show impact and required permission."
+                            >
+                                Manage modules
+                            </button>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Module</th>
+                                    <th>Rollout</th>
+                                    <th>Installed</th>
+                                    <th>Readiness</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="strong">Website</td>
+                                    <td>On</td>
+                                    <td>Enabled</td>
+                                    <td><span class="badge good">Active</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="strong">CRM</td>
+                                    <td>20% cohort</td>
+                                    <td>Enabled</td>
+                                    <td><span class="badge good">Active</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="strong">Payments</td>
+                                    <td>On</td>
+                                    <td>Enabled</td>
+                                    <td><span class="badge bad">Attention</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="strong">Insights</td>
+                                    <td>Off</td>
+                                    <td>Disabled</td>
+                                    <td><span class="badge">Disabled</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </section>
+                </div>
+                <div>
+                    <section class="panel" style="margin-bottom: 16px">
+                        <div class="panel-head">
+                            <div>
+                                <h2 class="panel-title">Support access</h2>
+                                <div class="panel-kicker">
+                                    Reason-bound and automatically expiring
+                                </div>
+                            </div>
+                            <span class="badge info">18m left</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="mono muted">CASE REASON</div>
+                            <p style="margin: 7px 0 13px; font-size: 11px">
+                                Investigate payment webhook failures reported by
+                                owner.
+                            </p>
+                            <div class="mono muted">
+                                OPENED BY · mohit@saroh.in · 16:26 IST
+                            </div>
+                        </div>
+                    </section>
+                    <section class="panel">
+                        <div class="panel-head">
+                            <div>
+                                <h2 class="panel-title">Recent history</h2>
+                                <div class="panel-kicker">
+                                    Customer and staff events stay distinct
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-body timeline">
+                            <div class="event">
+                                <div class="event-title">
+                                    Support session opened
+                                </div>
+                                <div class="event-meta">
+                                    STAFF · mohit · reason recorded · 14m ago
+                                </div>
+                            </div>
+                            <div class="event">
+                                <div class="event-title">
+                                    Payment webhook failed
+                                </div>
+                                <div class="event-meta">
+                                    SYSTEM · evt_rzp_908 · 18m ago
+                                </div>
+                            </div>
+                            <div class="event">
+                                <div class="event-title">
+                                    Subscription renewed
+                                </div>
+                                <div class="event-meta">
+                                    SYSTEM · invoice_144 · yesterday
+                                </div>
+                            </div>
+                            <div class="event">
+                                <div class="event-title">
+                                    Member role changed
+                                </div>
+                                <div class="event-meta">
+                                    CUSTOMER · owner@n… · 2d ago
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </template>
+
+        <template id="operations">
+            <div class="page-head">
+                <div>
+                    <div class="eyebrow">Reliability</div>
+                    <h1>Operations center</h1>
+                    <p class="page-subtitle">
+                        Understand impact first, then perform bounded,
+                        duplicate-safe retries through durable operations.
+                    </p>
+                </div>
+                <div class="button-row">
+                    <button
+                        class="button"
+                        data-toast="Incident draft created with affected capabilities prefilled."
+                    >
+                        Declare incident
+                    </button>
+                    <button
+                        class="button primary"
+                        data-toast="Dry run: 3 eligible, 1 skipped, 0 unsafe."
+                    >
+                        Preview bulk retry
+                    </button>
+                </div>
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Queue depth</div>
+                    <div class="metric-value">184</div>
+                    <div class="metric-foot">Within operating range</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Dead letters</div>
+                    <div class="metric-value">3</div>
+                    <div class="metric-foot">
+                        <span class="trend-risk">Payment reconciliation</span>
+                    </div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Webhook success</div>
+                    <div class="metric-value">99.2%</div>
+                    <div class="metric-foot">Last 24 hours</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Open incidents</div>
+                    <div class="metric-value">1</div>
+                    <div class="metric-foot">SEV-2 · Payments</div>
+                </div>
+            </div>
+            <div class="grid-2">
+                <section class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2 class="panel-title">Failure queue</h2>
+                            <div class="panel-kicker">
+                                Raw payloads and signatures are always redacted
+                            </div>
+                        </div>
+                        <span class="badge warn">7 records</span>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Organization</th>
+                                <th>Attempt</th>
+                                <th>Error</th>
+                                <th>Next step</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="mono">payment.reconcile</td>
+                                <td>Northstar Fitness</td>
+                                <td>5 / 5</td>
+                                <td>Transition conflict</td>
+                                <td>
+                                    <button
+                                        class="button small"
+                                        data-toast="Dry run ready: replay is idempotent and affects one payment."
+                                    >
+                                        Preview
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="mono">message.send</td>
+                                <td>Juniper Academy</td>
+                                <td>3 / 5</td>
+                                <td>Provider unavailable</td>
+                                <td><span class="badge warn">Backoff</span></td>
+                            </tr>
+                            <tr>
+                                <td class="mono">domain.verify</td>
+                                <td>Basil & Bloom</td>
+                                <td>2 / 5</td>
+                                <td>DNS record absent</td>
+                                <td><span class="badge info">Customer action</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+                <section class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2 class="panel-title">Incident #INC-024</h2>
+                            <div class="panel-kicker">
+                                Payment webhook degradation
+                            </div>
+                        </div>
+                        <span class="badge bad">SEV-2</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="risk-bar">
+                            <span style="width: 68%"></span>
+                        </div>
+                        <p
+                            style="
+                                margin: 12px 0 16px;
+                                color: var(--ink-soft);
+                                font-size: 11px;
+                                line-height: 1.55;
+                            "
+                        >
+                            4 Organizations affected. Incoming events verify
+                            successfully; reconciliation is failing after a
+                            provider status change.
+                        </p>
+                        <div class="timeline">
+                            <div class="event">
+                                <div class="event-title">
+                                    Bulk replay dry-run completed
+                                </div>
+                                <div class="event-meta">
+                                    3 eligible · 1 skipped · 4m ago
+                                </div>
+                            </div>
+                            <div class="event">
+                                <div class="event-title">
+                                    Release manager paused PAYMENTS_V2
+                                </div>
+                                <div class="event-meta">
+                                    linked flag change · 12m ago
+                                </div>
+                            </div>
+                            <div class="event">
+                                <div class="event-title">Incident declared</div>
+                                <div class="event-meta">
+                                    assigned to Operations · 21m ago
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </template>
+
+        <template id="releases">
+            <div class="page-head">
+                <div>
+                    <div class="eyebrow">Controlled delivery</div>
+                    <h1>Release control</h1>
+                    <p class="page-subtitle">
+                        Move features through inspectable cohorts, understand
+                        every effective value, and make rollback a new audited
+                        change.
+                    </p>
+                </div>
+                <button
+                    class="button primary"
+                    data-toast="Publication preview: 74 newly affected, 3 overrides, 0 readiness blockers."
+                >
+                    Preview next stage
+                </button>
+            </div>
+            <div class="grid-2">
+                <section class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2 class="panel-title">CRM workspace</h2>
+                            <div class="panel-kicker mono">
+                                MODULE_CRM · owned by Product Systems
+                            </div>
+                        </div>
+                        <span class="badge good">Stable</span>
+                    </div>
+                    <div>
+                        <div class="stage complete">
+                            <div class="stage-number">✓</div>
+                            <div class="stage-name">Shadow</div>
+                            <div class="stage-copy">
+                                Evaluation active, UI hidden
+                            </div>
+                        </div>
+                        <div class="stage complete">
+                            <div class="stage-number">✓</div>
+                            <div class="stage-name">Internal organizations</div>
+                            <div class="stage-copy">
+                                5 staff-owned tenants · completed
+                            </div>
+                        </div>
+                        <div class="stage current">
+                            <div class="stage-number">3</div>
+                            <div class="stage-name">Percentage cohort · 20%</div>
+                            <div class="stage-copy">
+                                48 organizations · deterministic membership
+                            </div>
+                        </div>
+                        <div class="stage">
+                            <div class="stage-number">4</div>
+                            <div class="stage-name">Percentage cohort · 50%</div>
+                            <div class="stage-copy">
+                                Eligible after publication preview
+                            </div>
+                        </div>
+                        <div class="stage">
+                            <div class="stage-number">5</div>
+                            <div class="stage-name">Global default</div>
+                            <div class="stage-copy">Not scheduled</div>
+                        </div>
+                    </div>
+                </section>
+                <div>
+                    <section class="panel" style="margin-bottom: 16px">
+                        <div class="panel-head">
+                            <div>
+                                <h2 class="panel-title">Stage evidence</h2>
+                                <div class="panel-kicker">
+                                    Last 48 hours in current cohort
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <div class="health-row">
+                                <div class="health-cell">
+                                    <div class="health-label">Error rate</div>
+                                    <div class="health-value">0.3%</div>
+                                </div>
+                                <div class="health-cell">
+                                    <div class="health-label">Overrides</div>
+                                    <div class="health-value">3</div>
+                                </div>
+                                <div class="health-cell">
+                                    <div class="health-label">Attention</div>
+                                    <div class="health-value">0</div>
+                                </div>
+                                <div class="health-cell">
+                                    <div class="health-label">Adoption</div>
+                                    <div class="health-value">71%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="panel">
+                        <div class="panel-head">
+                            <div>
+                                <h2 class="panel-title">
+                                    Effective-value inspector
+                                </h2>
+                                <div class="panel-kicker">
+                                    Explain exactly why an Organization gets a value
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <div class="filters">
+                                <input
+                                    class="filter search-filter"
+                                    value="Northstar Fitness"
+                                />
+                                <button class="filter">Inspect</button>
+                            </div>
+                            <div class="attention">
+                                <div
+                                    class="attention-mark"
+                                    style="
+                                        color: var(--green);
+                                        background: var(--green-pale);
+                                    "
+                                >
+                                    ON
+                                </div>
+                                <div>
+                                    <div class="attention-title">
+                                        Included by deterministic 20% cohort
+                                    </div>
+                                    <div class="attention-copy">
+                                        No Organization override · global default
+                                        remains off
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </template>
+
+        <template id="team">
+            <div class="page-head">
+                <div>
+                    <div class="eyebrow">Internal governance</div>
+                    <h1>Team authority</h1>
+                    <p class="page-subtitle">
+                        Fixed roles, multiple assignments, immediate revocation,
+                        and a visible explanation of what each teammate can do.
+                    </p>
+                </div>
+                <button
+                    class="button primary"
+                    data-toast="Grant flow requires a business reason, roles, and optional expiry."
+                >
+                    Grant staff access
+                </button>
+            </div>
+            <div class="role-grid" style="margin-bottom: 16px">
+                <div class="role-card owner">
+                    <h3>Platform Owner</h3>
+                    <p>
+                        Complete control, staff governance, lifecycle, and
+                        system configuration.
+                    </p>
+                    <div class="role-stat">2 active teammates</div>
+                </div>
+                <div class="role-card">
+                    <h3>Support</h3>
+                    <p>
+                        Organization access sessions, diagnostics, and safe
+                        people recovery.
+                    </p>
+                    <div class="role-stat">5 active teammates</div>
+                </div>
+                <div class="role-card">
+                    <h3>Operations</h3>
+                    <p>
+                        Jobs, webhooks, providers, incidents, retries, and
+                        operational actions.
+                    </p>
+                    <div class="role-stat">3 active teammates</div>
+                </div>
+                <div class="role-card">
+                    <h3>Billing</h3>
+                    <p>
+                        Subscriptions, invoices, credits, limits, and entitlement
+                        overrides.
+                    </p>
+                    <div class="role-stat">2 active teammates</div>
+                </div>
+                <div class="role-card">
+                    <h3>Release Manager</h3>
+                    <p>
+                        Flags, cohorts, schedules, staged releases, and rollback.
+                    </p>
+                    <div class="role-stat">2 active teammates</div>
+                </div>
+                <div class="role-card">
+                    <h3>Auditor</h3>
+                    <p>
+                        Read-only staff activity, platform history, and redacted
+                        exports.
+                    </p>
+                    <div class="role-stat">1 active teammate</div>
+                </div>
+            </div>
+            <section class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2 class="panel-title">Active staff</h2>
+                        <div class="panel-kicker">
+                            Permissions are resolved on every API request
+                        </div>
+                    </div>
+                    <span class="badge info">13 active</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Teammate</th>
+                            <th>Roles</th>
+                            <th>Grant status</th>
+                            <th>Last admin activity</th>
+                            <th>Access sessions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div class="strong">Mohit Mehta</div>
+                                <div class="mono muted">mohit@saroh.in</div>
+                            </td>
+                            <td><span class="badge info">Platform owner</span></td>
+                            <td><span class="badge good">Active</span></td>
+                            <td class="mono">Now</td>
+                            <td>1 open</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="strong">Aarav Shah</div>
+                                <div class="mono muted">aarav@saroh.in</div>
+                            </td>
+                            <td>
+                                <span class="badge">Support</span>
+                                <span class="badge">Operations</span>
+                            </td>
+                            <td><span class="badge good">Active</span></td>
+                            <td class="mono">12m ago</td>
+                            <td>0</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="strong">Riya Patel</div>
+                                <div class="mono muted">riya@saroh.in</div>
+                            </td>
+                            <td><span class="badge">Release manager</span></td>
+                            <td><span class="badge warn">Expires tomorrow</span></td>
+                            <td class="mono">1h ago</td>
+                            <td>0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </template>
+
+        <template id="audit">
+            <div class="page-head">
+                <div>
+                    <div class="eyebrow">Immutable evidence</div>
+                    <h1>Platform audit</h1>
+                    <p class="page-subtitle">
+                        Every sensitive staff read and mutation answers who,
+                        what, why, outcome, and request correlation—without
+                        storing secrets.
+                    </p>
+                </div>
+                <button class="button">Export redacted CSV</button>
+            </div>
+            <div class="filters">
+                <input
+                    class="filter search-filter"
+                    placeholder="Actor, action, target ID, correlation ID…"
+                />
+                <button class="filter">Outcome: Any ⌄</button>
+                <button class="filter">Action: Any ⌄</button>
+                <button class="filter">Last 24 hours ⌄</button>
+            </div>
+            <section class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2 class="panel-title">Control-plane events</h2>
+                        <div class="panel-kicker">
+                            Append-only · newest first · bounded pagination
+                        </div>
+                    </div>
+                    <span class="badge good">Audit healthy</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Actor</th>
+                            <th>Action</th>
+                            <th>Target</th>
+                            <th>Reason</th>
+                            <th>Outcome</th>
+                            <th>Request</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="mono">16:32:08</td>
+                            <td class="mono">usr_mohit</td>
+                            <td>organization.access.open</td>
+                            <td>
+                                <div>Northstar Fitness</div>
+                                <div class="mono muted">org_north_44</div>
+                            </td>
+                            <td>Investigate payment webhook failures</td>
+                            <td><span class="badge good">Success</span></td>
+                            <td class="mono">req_a82f</td>
+                        </tr>
+                        <tr>
+                            <td class="mono">16:27:41</td>
+                            <td class="mono">usr_aarav</td>
+                            <td>job.replay.preview</td>
+                            <td>
+                                <div>payment.reconcile</div>
+                                <div class="mono muted">3 jobs</div>
+                            </td>
+                            <td>INC-024 mitigation dry run</td>
+                            <td><span class="badge good">Success</span></td>
+                            <td class="mono">req_981c</td>
+                        </tr>
+                        <tr>
+                            <td class="mono">16:12:22</td>
+                            <td class="mono">usr_riya</td>
+                            <td>flag.rollout.pause</td>
+                            <td>
+                                <div>PAYMENTS_V2</div>
+                                <div class="mono muted">global rollout</div>
+                            </td>
+                            <td>Linked to payment incident INC-024</td>
+                            <td><span class="badge good">Success</span></td>
+                            <td class="mono">req_d110</td>
+                        </tr>
+                        <tr>
+                            <td class="mono">15:51:03</td>
+                            <td class="mono">usr_support</td>
+                            <td>organization.pii.search</td>
+                            <td>
+                                <div>Member email</div>
+                                <div class="mono muted">value redacted</div>
+                            </td>
+                            <td>Locate tenant for support case #882</td>
+                            <td><span class="badge bad">Denied</span></td>
+                            <td class="mono">req_b41e</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </template>
+
+        <script>
+            const titles = {
+                dashboard: "Dashboard",
+                organizations: "Organizations",
+                organization: "Organizations / Northstar Fitness",
+                operations: "Operations",
+                releases: "Releases",
+                team: "Team",
+                audit: "Audit",
+            };
+
+            const main = document.getElementById("main");
+            const crumb = document.getElementById("crumb");
+            const toast = document.getElementById("toast");
+            let toastTimer;
+
+            function showToast(message) {
+                toast.textContent = message;
+                toast.classList.add("show");
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(
+                    () => toast.classList.remove("show"),
+                    3200,
+                );
+            }
+
+            function render(screen) {
+                const template = document.getElementById(screen);
+                if (!template) return;
+                main.replaceChildren(template.content.cloneNode(true));
+                crumb.textContent = titles[screen];
+
+                document.querySelectorAll(".nav-item").forEach((item) => {
+                    const navScreen =
+                        screen === "organization" ? "organizations" : screen;
+                    item.classList.toggle(
+                        "active",
+                        item.dataset.screen === navScreen,
+                    );
+                });
+
+                main.querySelectorAll("[data-go]").forEach((button) => {
+                    button.addEventListener("click", () =>
+                        render(button.dataset.go),
+                    );
+                });
+
+                main.querySelectorAll("[data-open]").forEach((row) => {
+                    row.addEventListener("click", () =>
+                        render(row.dataset.open),
+                    );
+                });
+
+                main.querySelectorAll("[data-toast]").forEach((button) => {
+                    button.addEventListener("click", () =>
+                        showToast(button.dataset.toast),
+                    );
+                });
+
+                window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+
+            document.querySelectorAll(".nav-item").forEach((item) => {
+                item.addEventListener("click", () => render(item.dataset.screen));
+            });
+
+            document.addEventListener("keydown", (event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+                    event.preventDefault();
+                    document.querySelector(".search input").focus();
+                }
+            });
+
+            render("dashboard");
+        </script>
+    </body>
+</html>
