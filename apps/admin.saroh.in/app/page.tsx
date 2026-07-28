@@ -27,7 +27,7 @@ export default async function DashboardPage() {
     if (!metrics) return <NotAuthorized email={session.user.email} />;
 
     return (
-        <AdminShell email={staff.email} viaBootstrap={staff.viaBootstrap}>
+        <AdminShell staff={staff}>
             <main className="mx-auto max-w-5xl p-6 sm:p-8">
                 <h1 className="text-2xl font-semibold">Platform</h1>
                 <p className="mt-1 text-sm text-muted-foreground">

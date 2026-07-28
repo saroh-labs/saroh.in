@@ -21,7 +21,7 @@ import {
  * database. Precedence is override > global default > off, so an override is
  * the targeted-rollout lever and clearing it returns the org to the default.
  */
-export const metadata = { title: "Feature flags" };
+export const metadata = { title: "Releases" };
 
 export default async function FlagsPage() {
     const session = await getServerSession(await headers());
@@ -29,6 +29,9 @@ export default async function FlagsPage() {
 
     const staff = await getStaffIdentity();
     if (!staff) return <NotAuthorized email={session.user.email} />;
+    if (!staff.permissions.includes("flags:read")) {
+        return <NotAuthorized email={session.user.email} />;
+    }
 
     const [flags, organizations] = await Promise.all([
         listFlags(),
@@ -39,9 +42,14 @@ export default async function FlagsPage() {
     }
 
     return (
-        <AdminShell email={staff.email} viaBootstrap={staff.viaBootstrap}>
+        <AdminShell staff={staff}>
             <main className="mx-auto max-w-4xl p-6 sm:p-8">
-                <h1 className="text-2xl font-semibold">Feature flags</h1>
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                    Delivery
+                </p>
+                <h1 className="mt-1 text-2xl font-semibold">
+                    Release controls
+                </h1>
                 <p className="mt-1 text-sm text-muted-foreground">
                     Precedence: an organization override wins over the global
                     default, which wins over off. Every change records who made
@@ -54,6 +62,9 @@ export default async function FlagsPage() {
                             key={flag.key}
                             flag={flag}
                             organizations={organizations}
+                            canPublish={staff.permissions.includes(
+                                "flags:publish",
+                            )}
                         />
                     ))}
                 </div>

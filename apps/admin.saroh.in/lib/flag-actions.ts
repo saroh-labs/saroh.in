@@ -19,8 +19,14 @@ export async function setGlobalFlagAction(
     flagKey: string,
     enabled: boolean,
     reason: string,
+    idempotencyKey: string,
 ): Promise<ControlPlaneResult<null>> {
-    const result = await setGlobalFlag(flagKey, enabled, reason);
+    const result = await setGlobalFlag(
+        flagKey,
+        enabled,
+        reason,
+        idempotencyKey,
+    );
     if (result.ok) revalidatePath("/flags");
     return result;
 }
@@ -30,12 +36,14 @@ export async function setFlagOverrideAction(
     organizationId: string,
     enabled: boolean,
     reason: string,
+    idempotencyKey: string,
 ): Promise<ControlPlaneResult<null>> {
     const result = await setFlagOverride(
         flagKey,
         organizationId,
         enabled,
         reason,
+        idempotencyKey,
     );
     if (result.ok) revalidatePath("/flags");
     return result;
@@ -45,8 +53,14 @@ export async function clearFlagOverrideAction(
     flagKey: string,
     organizationId: string,
     reason: string,
+    idempotencyKey: string,
 ): Promise<ControlPlaneResult<null>> {
-    const result = await clearFlagOverride(flagKey, organizationId, reason);
+    const result = await clearFlagOverride(
+        flagKey,
+        organizationId,
+        reason,
+        idempotencyKey,
+    );
     if (result.ok) revalidatePath("/flags");
     return result;
 }

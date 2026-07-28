@@ -21,9 +21,11 @@ import {
 export function FlagCard({
     flag,
     organizations,
+    canPublish,
 }: {
     flag: AdminFlag;
     organizations: AdminOrganization[];
+    canPublish: boolean;
 }) {
     const [reason, setReason] = useState("");
     const [targetOrg, setTargetOrg] = useState("");
@@ -36,7 +38,7 @@ export function FlagCard({
     const availableOrgs = organizations.filter(
         (org) => !overriddenIds.has(org.id),
     );
-    const canSubmit = reason.trim().length >= 4 && !pending;
+    const canSubmit = canPublish && reason.trim().length >= 4 && !pending;
 
     function run(action: () => Promise<{ ok: boolean; error?: string }>) {
         setError(null);
@@ -80,7 +82,12 @@ export function FlagCard({
                         disabled={!canSubmit}
                         onClick={() =>
                             run(() =>
-                                setGlobalFlagAction(flag.key, true, reason),
+                                setGlobalFlagAction(
+                                    flag.key,
+                                    true,
+                                    reason,
+                                    crypto.randomUUID(),
+                                ),
                             )
                         }
                         className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
@@ -92,7 +99,12 @@ export function FlagCard({
                         disabled={!canSubmit}
                         onClick={() =>
                             run(() =>
-                                setGlobalFlagAction(flag.key, false, reason),
+                                setGlobalFlagAction(
+                                    flag.key,
+                                    false,
+                                    reason,
+                                    crypto.randomUUID(),
+                                ),
                             )
                         }
                         className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
@@ -114,6 +126,12 @@ export function FlagCard({
                     className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
                 />
             </label>
+
+            {!canPublish && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                    Read-only: your role does not include release publishing.
+                </p>
+            )}
 
             {error && (
                 <p className="mt-2 text-sm text-destructive" role="alert">
@@ -151,6 +169,7 @@ export function FlagCard({
                                                 flag.key,
                                                 override.organizationId,
                                                 reason,
+                                                crypto.randomUUID(),
                                             ),
                                         )
                                     }
@@ -189,6 +208,7 @@ export function FlagCard({
                                         targetOrg,
                                         true,
                                         reason,
+                                        crypto.randomUUID(),
                                     ),
                                 )
                             }
@@ -206,6 +226,7 @@ export function FlagCard({
                                         targetOrg,
                                         false,
                                         reason,
+                                        crypto.randomUUID(),
                                     ),
                                 )
                             }

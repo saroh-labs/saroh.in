@@ -62,3 +62,33 @@ describe("AdminController permission contract", () => {
         },
     );
 });
+
+describe("AdminController staff identity", () => {
+    it("returns the server-resolved roles and permissions to the admin shell", () => {
+        const controller = new AdminController(
+            {} as never,
+            {} as never,
+            {} as never,
+            {} as never,
+        );
+
+        expect(
+            controller.me(
+                { id: "user_1", email: "staff@example.test" } as never,
+                {
+                    userId: "user_1",
+                    platformAdminId: "platform_admin_1",
+                    roles: ["AUDITOR"],
+                    permissions: [AdminPermission.AuditRead],
+                    viaBootstrap: false,
+                },
+            ),
+        ).toEqual({
+            userId: "user_1",
+            email: "staff@example.test",
+            roles: ["AUDITOR"],
+            permissions: [AdminPermission.AuditRead],
+            viaBootstrap: false,
+        });
+    });
+});

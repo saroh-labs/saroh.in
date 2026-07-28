@@ -59,6 +59,8 @@ export class AdminController {
         return {
             userId: user.id,
             email: user.email,
+            roles: ctx.roles,
+            permissions: ctx.permissions,
             viaBootstrap: ctx.viaBootstrap,
         };
     }
@@ -137,7 +139,12 @@ export class AdminController {
                 targetId: flagKey,
                 reason: dto.reason,
                 outcome: AdminAuditOutcome.Success,
-                idempotencyKey: dto.idempotencyKey,
+                idempotencyKey: [
+                    user.id,
+                    "flags.global.set",
+                    flagKey,
+                    dto.idempotencyKey,
+                ].join(":"),
                 metadata: { enabled: dto.enabled },
             },
         );
@@ -168,7 +175,13 @@ export class AdminController {
                 organizationId,
                 reason: dto.reason,
                 outcome: AdminAuditOutcome.Success,
-                idempotencyKey: dto.idempotencyKey,
+                idempotencyKey: [
+                    user.id,
+                    "flags.organization.set",
+                    flagKey,
+                    organizationId,
+                    dto.idempotencyKey,
+                ].join(":"),
                 metadata: { enabled: dto.enabled },
             },
         );
@@ -198,7 +211,13 @@ export class AdminController {
                 organizationId,
                 reason: dto.reason,
                 outcome: AdminAuditOutcome.Success,
-                idempotencyKey: dto.idempotencyKey,
+                idempotencyKey: [
+                    user.id,
+                    "flags.organization.clear",
+                    flagKey,
+                    organizationId,
+                    dto.idempotencyKey,
+                ].join(":"),
             },
         );
         return { ok: true };

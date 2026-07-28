@@ -51,12 +51,73 @@ export interface FlagChange {
     createdAt: string;
 }
 
+export interface AdminAuditEvent {
+    id: string;
+    actorUserId: string;
+    permission: string;
+    action: string;
+    targetType: string;
+    targetId: string | null;
+    organizationId: string | null;
+    reason: string | null;
+    outcome: "SUCCESS" | "FAILURE" | "DENIED";
+    correlationId: string | null;
+    createdAt: string;
+}
+
+export interface AdminAuditPage {
+    items: AdminAuditEvent[];
+    nextCursor?: string;
+}
+
+export interface AdminAuditQuery {
+    cursor?: string;
+    limit?: number;
+    actorUserId?: string;
+    organizationId?: string;
+    action?: string;
+}
+
 export interface StaffIdentity {
     userId: string;
     email: string;
+    roles: AdminRole[];
+    permissions: AdminPermission[];
     /** Access came from ADMIN_ALLOWLIST config rather than a recorded grant. */
     viaBootstrap: boolean;
 }
+
+export type AdminRole =
+    | "PLATFORM_OWNER"
+    | "SUPPORT"
+    | "OPERATIONS"
+    | "BILLING"
+    | "RELEASE_MANAGER"
+    | "AUDITOR";
+
+export type AdminPermission =
+    | "platform:read"
+    | "organization:read"
+    | "organization:pii:read"
+    | "organization:people:write"
+    | "organization:modules:write"
+    | "organization:lifecycle:write"
+    | "organization:view-as"
+    | "jobs:read"
+    | "jobs:retry"
+    | "webhooks:read"
+    | "webhooks:replay"
+    | "providers:read"
+    | "providers:recheck"
+    | "incidents:read"
+    | "incidents:write"
+    | "subscription:read"
+    | "subscription:override"
+    | "flags:read"
+    | "flags:publish"
+    | "staff:read"
+    | "staff:grant"
+    | "audit:read";
 
 export type ControlPlaneResult<T> =
     | { ok: true; data: T }
@@ -115,6 +176,21 @@ export function flagHistory(flagKey: string): Promise<FlagChange[] | null> {
     );
 }
 
+export function listAudit(
+    query: AdminAuditQuery = {},
+): Promise<AdminAuditPage | null> {
+    const search = new URLSearchParams();
+    if (query.cursor) search.set("cursor", query.cursor);
+    if (query.limit) search.set("limit", String(query.limit));
+    if (query.actorUserId) search.set("actorUserId", query.actorUserId);
+    if (query.organizationId) {
+        search.set("organizationId", query.organizationId);
+    }
+    if (query.action) search.set("action", query.action);
+    const suffix = search.size > 0 ? `?${search.toString()}` : "";
+    return getJson<AdminAuditPage>(`/audit${suffix}`);
+}
+
 /** Extract the API's error-envelope message so operators see the real reason. */
 async function readError(res: Response, fallback: string): Promise<string> {
     const body = (await res.json().catch(() => null)) as {
@@ -132,10 +208,11 @@ export async function setGlobalFlag(
     flagKey: string,
     enabled: boolean,
     reason: string,
+    idempotencyKey: string,
 ): Promise<ControlPlaneResult<null>> {
     const res = await adminFetch(`/flags/${encodeURIComponent(flagKey)}`, {
         method: "PUT",
-        body: JSON.stringify({ enabled, reason }),
+        body: JSON.stringify({ enabled, reason, idempotencyKey }),
     });
     if (!res.ok) {
         return {
@@ -151,10 +228,14 @@ export async function setFlagOverride(
     organizationId: string,
     enabled: boolean,
     reason: string,
+    idempotencyKey: string,
 ): Promise<ControlPlaneResult<null>> {
     const res = await adminFetch(
         `/flags/${encodeURIComponent(flagKey)}/organizations/${encodeURIComponent(organizationId)}`,
-        { method: "PUT", body: JSON.stringify({ enabled, reason }) },
+        {
+            method: "PUT",
+            body: JSON.stringify({ enabled, reason, idempotencyKey }),
+        },
     );
     if (!res.ok) {
         return {
@@ -169,10 +250,14 @@ export async function clearFlagOverride(
     flagKey: string,
     organizationId: string,
     reason: string,
+    idempotencyKey: string,
 ): Promise<ControlPlaneResult<null>> {
     const res = await adminFetch(
         `/flags/${encodeURIComponent(flagKey)}/organizations/${encodeURIComponent(organizationId)}`,
-        { method: "DELETE", body: JSON.stringify({ reason }) },
+        {
+            method: "DELETE",
+            body: JSON.stringify({ reason, idempotencyKey }),
+        },
     );
     if (!res.ok) {
         return {
