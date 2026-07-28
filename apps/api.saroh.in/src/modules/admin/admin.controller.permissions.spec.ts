@@ -16,6 +16,7 @@ type AdminMethod = keyof Pick<
     | "listFlags"
     | "listOrganizations"
     | "history"
+    | "listAudit"
     | "setGlobal"
     | "setOverride"
     | "clearOverride"
@@ -49,6 +50,10 @@ describe("AdminController permission contract", () => {
             expect(required(method)).toEqual([AdminPermission.FlagsRead]);
         },
     );
+
+    it("protects the platform audit ledger with audit read", () => {
+        expect(required("listAudit")).toEqual([AdminPermission.AuditRead]);
+    });
 
     it.each(["setGlobal", "setOverride", "clearOverride"] as const)(
         "protects %s with flag publish",

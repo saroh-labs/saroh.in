@@ -18,6 +18,10 @@ jest.mock("@saroh/database", () => {
             create: jest.fn(),
             findMany: jest.fn(),
         },
+        adminAuditEvent: {
+            create: jest.fn(),
+            findUnique: jest.fn(),
+        },
         $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
     };
     return { prisma };
@@ -35,6 +39,8 @@ const overrideFindUnique = prisma.featureFlagOverride.findUnique as jest.Mock;
 const overrideFindMany = prisma.featureFlagOverride.findMany as jest.Mock;
 const overrideUpsert = prisma.featureFlagOverride.upsert as jest.Mock;
 const auditCreate = prisma.featureFlagAudit.create as jest.Mock;
+const adminAuditCreate = prisma.adminAuditEvent.create as jest.Mock;
+const adminAuditFindUnique = prisma.adminAuditEvent.findUnique as jest.Mock;
 const overrideDelete = prisma.featureFlagOverride.delete as jest.Mock;
 
 describe("FeatureFlagService.isEnabled — precedence", () => {
@@ -423,5 +429,86 @@ describe("FeatureFlagService — change reason", () => {
                 }),
             }),
         );
+    });
+});
+
+describe("FeatureFlagService — control-plane audit", () => {
+    const service = new FeatureFlagService();
+    const controlPlaneAudit = {
+        actorUserId: "user_1",
+        permission: "flags:publish" as const,
+        action: "flags.global.set",
+        targetType: "feature_flag",
+        targetId: FlagKey.MODULE_CRM,
+        reason: "CRM GA rollout",
+        outcome: "SUCCESS" as const,
+        idempotencyKey: "flag-change-123",
+        metadata: { enabled: true },
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        adminAuditFindUnique.mockResolvedValue(null);
+        flagFindUnique.mockResolvedValue({ enabledByDefault: false });
+    });
+
+    it("commits the domain and platform audit rows in the flag transaction", async () => {
+        await service.setGlobal(
+            FlagKey.MODULE_CRM,
+            true,
+            "user_1",
+            "CRM GA rollout",
+            controlPlaneAudit,
+        );
+
+        expect(auditCreate).toHaveBeenCalledTimes(1);
+        expect(adminAuditCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                actorUserId: "user_1",
+                permission: "flags:publish",
+                action: "flags.global.set",
+                targetType: "feature_flag",
+                targetId: FlagKey.MODULE_CRM,
+                reason: "CRM GA rollout",
+                outcome: "SUCCESS",
+                idempotencyKey: "flag-change-123",
+                metadata: { enabled: true },
+            }),
+        });
+    });
+
+    it("propagates a platform-audit failure from the mutation transaction", async () => {
+        const failure = new Error("platform audit unavailable");
+        adminAuditCreate.mockRejectedValue(failure);
+
+        await expect(
+            service.setGlobal(
+                FlagKey.MODULE_CRM,
+                true,
+                "user_1",
+                "CRM GA rollout",
+                controlPlaneAudit,
+            ),
+        ).rejects.toBe(failure);
+
+        expect(flagUpsert).toHaveBeenCalled();
+        expect(auditCreate).toHaveBeenCalled();
+        expect(adminAuditCreate).toHaveBeenCalled();
+    });
+
+    it("does not repeat a mutation whose idempotency key already exists", async () => {
+        adminAuditFindUnique.mockResolvedValue({ id: "audit_existing" });
+
+        await service.setGlobal(
+            FlagKey.MODULE_CRM,
+            true,
+            "user_1",
+            "CRM GA rollout",
+            controlPlaneAudit,
+        );
+
+        expect(flagUpsert).not.toHaveBeenCalled();
+        expect(auditCreate).not.toHaveBeenCalled();
+        expect(adminAuditCreate).not.toHaveBeenCalled();
     });
 });

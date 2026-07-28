@@ -6,6 +6,7 @@ import {
     Get,
     Param,
     Put,
+    Query,
     UseGuards,
 } from "@nestjs/common";
 
@@ -20,10 +21,11 @@ import type { AuthUser } from "../../common/types/store-context";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { FlagKey } from "../feature-flags/flags";
 import { isKnownFlagKey } from "../feature-flags/flags";
+import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminMetricsService } from "./admin-metrics.service";
 import { AdminPermission } from "./admin-permissions";
-import { ClearFlagOverrideDto, SetFlagDto } from "./dto";
+import { ClearFlagOverrideDto, ListAdminAuditDto, SetFlagDto } from "./dto";
 
 /**
  * The Saroh control plane (S1-012) — the API behind admin.saroh.in.
@@ -41,6 +43,7 @@ export class AdminController {
         private readonly flags: FeatureFlagService,
         private readonly adminFlags: AdminFlagsService,
         private readonly metrics: AdminMetricsService,
+        private readonly adminAudit: AdminAuditService,
     ) {}
 
     /**
@@ -87,6 +90,32 @@ export class AdminController {
         return this.flags.history(assertKnownFlag(flagKey));
     }
 
+    @Get("audit")
+    @RequireAdminPermission(AdminPermission.AuditRead)
+    async listAudit(
+        @CurrentUser() user: AuthUser,
+        @Query() query: ListAdminAuditDto,
+    ) {
+        const page = await this.adminAudit.list(query);
+        await this.adminAudit.recordRead({
+            actorUserId: user.id,
+            permission: AdminPermission.AuditRead,
+            action: "admin.audit.read",
+            targetType: "admin_audit",
+            outcome: AdminAuditOutcome.Success,
+            metadata: {
+                filtered: Boolean(
+                    query.actorUserId !== undefined ||
+                    query.organizationId !== undefined ||
+                    query.action !== undefined ||
+                    query.cursor !== undefined,
+                ),
+                resultCount: page.items.length,
+            },
+        });
+        return page;
+    }
+
     /** Set a flag's GLOBAL default — the value every Organization inherits. */
     @Put("flags/:flagKey")
     @RequireAdminPermission(AdminPermission.FlagsPublish)
@@ -100,6 +129,17 @@ export class AdminController {
             dto.enabled,
             user.id,
             dto.reason,
+            {
+                actorUserId: user.id,
+                permission: AdminPermission.FlagsPublish,
+                action: "flags.global.set",
+                targetType: "feature_flag",
+                targetId: flagKey,
+                reason: dto.reason,
+                outcome: AdminAuditOutcome.Success,
+                idempotencyKey: dto.idempotencyKey,
+                metadata: { enabled: dto.enabled },
+            },
         );
         return { ok: true };
     }
@@ -119,6 +159,18 @@ export class AdminController {
             dto.enabled,
             user.id,
             dto.reason,
+            {
+                actorUserId: user.id,
+                permission: AdminPermission.FlagsPublish,
+                action: "flags.organization.set",
+                targetType: "feature_flag",
+                targetId: flagKey,
+                organizationId,
+                reason: dto.reason,
+                outcome: AdminAuditOutcome.Success,
+                idempotencyKey: dto.idempotencyKey,
+                metadata: { enabled: dto.enabled },
+            },
         );
         return { ok: true };
     }
@@ -137,6 +189,17 @@ export class AdminController {
             organizationId,
             user.id,
             dto.reason,
+            {
+                actorUserId: user.id,
+                permission: AdminPermission.FlagsPublish,
+                action: "flags.organization.clear",
+                targetType: "feature_flag",
+                targetId: flagKey,
+                organizationId,
+                reason: dto.reason,
+                outcome: AdminAuditOutcome.Success,
+                idempotencyKey: dto.idempotencyKey,
+            },
         );
         return { ok: true };
     }

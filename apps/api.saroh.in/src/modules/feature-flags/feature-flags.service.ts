@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import type { AdminAuditInput } from "../admin/admin-audit.service";
+import { createAdminAuditData } from "../admin/admin-audit.service";
 import type { FlagKey } from "./flags";
 import { FLAG_KEYS, isKnownFlagKey } from "./flags";
 
@@ -74,8 +76,11 @@ export class FeatureFlagService {
         enabledByDefault: boolean,
         actorUserId: string,
         reason?: string,
+        controlPlaneAudit?: AdminAuditInput,
     ): Promise<void> {
         await prisma.$transaction(async (tx) => {
+            if (await wasAlreadyAudited(tx, controlPlaneAudit)) return;
+
             const existing = await tx.featureFlag.findUnique({
                 where: { key },
                 select: { enabledByDefault: true },
@@ -97,6 +102,12 @@ export class FeatureFlagService {
                     reason,
                 },
             });
+
+            if (controlPlaneAudit) {
+                await tx.adminAuditEvent.create({
+                    data: createAdminAuditData(controlPlaneAudit),
+                });
+            }
         });
     }
 
@@ -110,8 +121,11 @@ export class FeatureFlagService {
         enabled: boolean,
         actorUserId: string,
         reason?: string,
+        controlPlaneAudit?: AdminAuditInput,
     ): Promise<void> {
         await prisma.$transaction(async (tx) => {
+            if (await wasAlreadyAudited(tx, controlPlaneAudit)) return;
+
             const existing = await tx.featureFlagOverride.findUnique({
                 where: {
                     flagKey_organizationId: { flagKey: key, organizationId },
@@ -137,6 +151,12 @@ export class FeatureFlagService {
                     reason,
                 },
             });
+
+            if (controlPlaneAudit) {
+                await tx.adminAuditEvent.create({
+                    data: createAdminAuditData(controlPlaneAudit),
+                });
+            }
         });
     }
 
@@ -153,15 +173,31 @@ export class FeatureFlagService {
         organizationId: string,
         actorUserId: string,
         reason?: string,
+        controlPlaneAudit?: AdminAuditInput,
     ): Promise<void> {
         await prisma.$transaction(async (tx) => {
+            if (await wasAlreadyAudited(tx, controlPlaneAudit)) return;
+
             const existing = await tx.featureFlagOverride.findUnique({
                 where: {
                     flagKey_organizationId: { flagKey: key, organizationId },
                 },
                 select: { enabled: true },
             });
-            if (!existing) return;
+            if (!existing) {
+                if (controlPlaneAudit) {
+                    await tx.adminAuditEvent.create({
+                        data: createAdminAuditData({
+                            ...controlPlaneAudit,
+                            metadata: {
+                                ...controlPlaneAudit.metadata,
+                                changed: false,
+                            },
+                        }),
+                    });
+                }
+                return;
+            }
 
             await tx.featureFlagOverride.delete({
                 where: {
@@ -186,6 +222,12 @@ export class FeatureFlagService {
                     reason,
                 },
             });
+
+            if (controlPlaneAudit) {
+                await tx.adminAuditEvent.create({
+                    data: createAdminAuditData(controlPlaneAudit),
+                });
+            }
         });
     }
 
@@ -245,4 +287,17 @@ export class FeatureFlagService {
             return { key, enabled: false, source: "fallback" };
         });
     }
+}
+
+async function wasAlreadyAudited(
+    tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+    audit?: AdminAuditInput,
+): Promise<boolean> {
+    if (!audit?.idempotencyKey) return false;
+
+    const existing = await tx.adminAuditEvent.findUnique({
+        where: { idempotencyKey: audit.idempotencyKey },
+        select: { id: true },
+    });
+    return existing !== null;
 }

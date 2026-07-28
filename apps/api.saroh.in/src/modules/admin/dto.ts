@@ -1,5 +1,14 @@
 import { Transform } from "class-transformer";
-import { IsBoolean, IsString, MaxLength, MinLength } from "class-validator";
+import {
+    IsBoolean,
+    IsInt,
+    IsOptional,
+    IsString,
+    Max,
+    MaxLength,
+    Min,
+    MinLength,
+} from "class-validator";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -22,6 +31,12 @@ export class SetFlagDto {
     @MinLength(4, { message: "Give a reason for this change" })
     @MaxLength(500)
     reason!: string;
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(8)
+    @MaxLength(200)
+    idempotencyKey!: string;
 }
 
 /** Clearing an override still needs a reason — it is a rollout change too. */
@@ -31,4 +46,38 @@ export class ClearFlagOverrideDto {
     @MinLength(4, { message: "Give a reason for this change" })
     @MaxLength(500)
     reason!: string;
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(8)
+    @MaxLength(200)
+    idempotencyKey!: string;
+}
+
+export class ListAdminAuditDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(100)
+    limit?: number;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    actorUserId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    organizationId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    action?: string;
 }

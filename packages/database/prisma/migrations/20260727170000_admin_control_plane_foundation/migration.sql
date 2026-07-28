@@ -37,6 +37,7 @@ CREATE TABLE "AdminAuditEvent" (
     "reason" TEXT,
     "outcome" TEXT NOT NULL,
     "correlationId" TEXT,
+    "idempotencyKey" TEXT,
     "metadata" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -63,6 +64,9 @@ CREATE INDEX "AdminAuditEvent_organizationId_createdAt_idx"
 
 CREATE INDEX "AdminAuditEvent_targetType_targetId_createdAt_idx"
     ON "AdminAuditEvent"("targetType", "targetId", "createdAt");
+
+CREATE UNIQUE INDEX "AdminAuditEvent_idempotencyKey_key"
+    ON "AdminAuditEvent"("idempotencyKey");
 
 ALTER TABLE "PlatformAdminRoleAssignment"
     ADD CONSTRAINT "PlatformAdminRoleAssignment_platformAdminId_fkey"

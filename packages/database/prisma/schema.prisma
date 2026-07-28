@@ -1082,6 +1082,9 @@ model AdminAuditEvent {
   reason         String?
   outcome        String
   correlationId  String?
+  // Optional because read events are not commands. Mutation events always set
+  // this key so retries become transactionally idempotent.
+  idempotencyKey String? @unique
 
   // Redacted operational context only. The API rejects secret-bearing keys.
   metadata Json?
