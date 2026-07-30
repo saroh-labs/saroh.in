@@ -17,6 +17,8 @@ type AdminMethod = keyof Pick<
     | "listOrganizations"
     | "history"
     | "listAudit"
+    | "openOrganizationAccess"
+    | "revokeOrganizationAccess"
     | "setGlobal"
     | "setOverride"
     | "clearOverride"
@@ -55,6 +57,15 @@ describe("AdminController permission contract", () => {
         expect(required("listAudit")).toEqual([AdminPermission.AuditRead]);
     });
 
+    it.each(["openOrganizationAccess", "revokeOrganizationAccess"] as const)(
+        "protects %s with Organization view-as",
+        (method) => {
+            expect(required(method)).toEqual([
+                AdminPermission.OrganizationViewAs,
+            ]);
+        },
+    );
+
     it.each(["setGlobal", "setOverride", "clearOverride"] as const)(
         "protects %s with flag publish",
         (method) => {
@@ -66,6 +77,7 @@ describe("AdminController permission contract", () => {
 describe("AdminController staff identity", () => {
     it("returns the server-resolved roles and permissions to the admin shell", () => {
         const controller = new AdminController(
+            {} as never,
             {} as never,
             {} as never,
             {} as never,

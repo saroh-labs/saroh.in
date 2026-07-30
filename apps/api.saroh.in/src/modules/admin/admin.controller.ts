@@ -5,6 +5,7 @@ import {
     Delete,
     Get,
     Param,
+    Post,
     Put,
     Query,
     UseGuards,
@@ -21,11 +22,18 @@ import type { AuthUser } from "../../common/types/store-context";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { FlagKey } from "../feature-flags/flags";
 import { isKnownFlagKey } from "../feature-flags/flags";
+import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminMetricsService } from "./admin-metrics.service";
 import { AdminPermission } from "./admin-permissions";
-import { ClearFlagOverrideDto, ListAdminAuditDto, SetFlagDto } from "./dto";
+import {
+    ClearFlagOverrideDto,
+    ListAdminAuditDto,
+    OpenAdminAccessSessionDto,
+    RevokeAdminAccessSessionDto,
+    SetFlagDto,
+} from "./dto";
 
 /**
  * The Saroh control plane (S1-012) — the API behind admin.saroh.in.
@@ -44,6 +52,7 @@ export class AdminController {
         private readonly adminFlags: AdminFlagsService,
         private readonly metrics: AdminMetricsService,
         private readonly adminAudit: AdminAuditService,
+        private readonly adminAccess: AdminAccessService,
     ) {}
 
     /**
@@ -116,6 +125,45 @@ export class AdminController {
             },
         });
         return page;
+    }
+
+    @Post("organizations/:organizationId/access-sessions")
+    @RequireAdminPermission(AdminPermission.OrganizationViewAs)
+    async openOrganizationAccess(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: OpenAdminAccessSessionDto,
+    ) {
+        const session = await this.adminAccess.open({
+            organizationId,
+            staff,
+            reason: dto.reason,
+            idempotencyKey: dto.idempotencyKey,
+        });
+        return {
+            id: session.id,
+            organizationId: session.organizationId,
+            scope: session.scope,
+            expiresAt: session.expiresAt,
+        };
+    }
+
+    @Delete("organizations/:organizationId/access-sessions/:accessSessionId")
+    @RequireAdminPermission(AdminPermission.OrganizationViewAs)
+    async revokeOrganizationAccess(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Param("accessSessionId") accessSessionId: string,
+        @Body() dto: RevokeAdminAccessSessionDto,
+    ) {
+        await this.adminAccess.revoke({
+            sessionId: accessSessionId,
+            organizationId,
+            staff,
+            reason: dto.reason,
+            idempotencyKey: dto.idempotencyKey,
+        });
+        return { ok: true };
     }
 
     /** Set a flag's GLOBAL default — the value every Organization inherits. */

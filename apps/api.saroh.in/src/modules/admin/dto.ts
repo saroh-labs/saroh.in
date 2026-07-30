@@ -81,3 +81,31 @@ export class ListAdminAuditDto {
     @MaxLength(120)
     action?: string;
 }
+
+export class OpenAdminAccessSessionDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(4, { message: "Give a reason for support access" })
+    @MaxLength(500)
+    reason!: string;
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(8)
+    @MaxLength(200)
+    idempotencyKey!: string;
+}
+
+export class RevokeAdminAccessSessionDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(4, { message: "Give a reason for closing support access" })
+    @MaxLength(500)
+    reason!: string;
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(8)
+    @MaxLength(200)
+    idempotencyKey!: string;
+}

@@ -56,9 +56,23 @@ model Organization {
   name String
   slug String @unique
 
+  // Platform lifecycle is independent of a tenant user's membership role.
+  // Changes are made only through audited control-plane commands.
+  lifecycleStatus  String @default("ACTIVE")
+  lifecycleVersion Int    @default(1)
+
+  suspendedAt         DateTime?
+  suspendedByUserId   String?
+  suspensionReason    String?
+  deletionScheduledAt DateTime?
+  deletionScheduledBy String?
+  deletionReason      String?
+  deletedRetainedAt   DateTime?
+
   // Relations
-  stores      Store[]
-  memberships Membership[]
+  stores              Store[]
+  memberships         Membership[]
+  adminAccessSessions AdminAccessSession[]
 
   // Optional groupings beneath the org (S1-010). Projects and Teams are NEVER
   // a tenant/ownership/billing root — always org-scoped (ADR-001).
@@ -1028,6 +1042,7 @@ model PlatformAdmin {
   user   User   @relation("PlatformAdminUser", fields: [userId], references: [id], onDelete: Cascade)
 
   roleAssignments PlatformAdminRoleAssignment[]
+  accessSessions  AdminAccessSession[]
 
   grantedByUserId String?
   grantedBy       User?   @relation("PlatformAdminGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
@@ -1039,6 +1054,36 @@ model PlatformAdmin {
   note String?
 
   @@index([revokedAt])
+}
+
+// Short-lived, read-only staff access to one Organization support workspace.
+// The session is never a tenant Membership and cannot authorize mutations.
+model AdminAccessSession {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Null only for ADMIN_ALLOWLIST break-glass staff.
+  platformAdminId String?
+  platformAdmin   PlatformAdmin? @relation(fields: [platformAdminId], references: [id], onDelete: SetNull)
+
+  actorUserId String
+  reason      String
+  scope       String @default("READ_ONLY")
+
+  idempotencyKey String @unique
+
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  revokedByUserId  String?
+  revocationReason String?
+
+  @@index([organizationId, expiresAt, revokedAt])
+  @@index([actorUserId, expiresAt, revokedAt])
+  @@index([platformAdminId, revokedAt])
 }
 
 // One fixed control-plane role held by a PlatformAdmin. Assignments are
