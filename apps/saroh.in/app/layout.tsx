@@ -5,14 +5,23 @@ import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
 
-// Self-hosted Inter (latin subset, variable weight 100–900) so the build never
-// fetches fonts from an external network. Mirrors the previous
-// `Inter({ subsets: ["latin"] })` from next/font/google.
-const inter = localFont({
-    src: "../../../packages/ui/fonts/InterVariable-latin.woff2",
+// Self-hosted (latin subset, variable) so the build never fetches fonts from an
+// external network. Geist carries UI/body; Bricolage Grotesque is the display
+// face for headings and the wordmark.
+const fontSans = localFont({
+    src: "../../../packages/ui/fonts/Geist-latin.woff2",
     weight: "100 900",
     style: "normal",
     display: "swap",
+    variable: "--font-sans",
+});
+
+const fontDisplay = localFont({
+    src: "../../../packages/ui/fonts/BricolageGrotesque-latin.woff2",
+    weight: "200 800",
+    style: "normal",
+    display: "swap",
+    variable: "--font-display",
 });
 
 export const metadata: Metadata = {
@@ -28,7 +37,9 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en">
-            <body className={inter.className}>
+            <body
+                className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
+            >
                 <Script
                     async
                     src="https://www.googletagmanager.com/gtag/js?id=G-L19ZLH2N5K"

@@ -6,9 +6,16 @@ import Providers from "./providers";
 
 // Self-hosted Inter from the shared @saroh/ui font asset — no build-time
 // Google Fonts fetch, one file for every app (#96).
-const inter = localFont({
-    src: "../../../packages/ui/fonts/InterVariable-latin.woff2",
+const fontSans = localFont({
+    src: "../../../packages/ui/fonts/Geist-latin.woff2",
     display: "swap",
+    variable: "--font-sans",
+});
+
+const fontDisplay = localFont({
+    src: "../../../packages/ui/fonts/BricolageGrotesque-latin.woff2",
+    display: "swap",
+    variable: "--font-display",
 });
 
 export const metadata: Metadata = {
@@ -23,7 +30,9 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en">
-            <body className={inter.className}>
+            <body
+                className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
+            >
                 <Providers>
                     {/* `fixed` + `min-h-screen`, not `absolute` + `h-screen`:
                         every screen here used to fit the viewport, so the

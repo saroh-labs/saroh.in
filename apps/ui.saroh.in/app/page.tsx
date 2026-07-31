@@ -57,15 +57,127 @@ export default function Home() {
 
             <Section
                 title="Brand & color tokens"
-                description="Semantic tokens from @saroh/ui globals.css. brand is the canonical accent (blue-600)."
+                description="Semantic tokens from @saroh/ui globals.css — “Midnight & Lime”. brand is INTERACTIVE and lightens in dark mode; brand-surface is a FILL and stays deep in both."
             >
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
+                <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
                     <Swatch name="brand" className="bg-brand" />
+                    <Swatch name="brand-surface" className="bg-brand-surface" />
+                    <Swatch name="brand-subtle" className="bg-brand-subtle" />
                     <Swatch name="primary" className="bg-primary" />
                     <Swatch name="secondary" className="bg-secondary" />
-                    <Swatch name="accent" className="bg-accent" />
                     <Swatch name="muted" className="bg-muted" />
+                </div>
+                <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
+                    <Swatch name="highlight" className="bg-highlight" />
+                    <Swatch
+                        name="highlight-subtle"
+                        className="bg-highlight-subtle"
+                    />
+                    <Swatch name="success" className="bg-success" />
+                    <Swatch name="warning" className="bg-warning" />
+                    <Swatch name="info" className="bg-info" />
                     <Swatch name="destructive" className="bg-destructive" />
+                </div>
+                <p className="text-muted-foreground mb-3 text-sm">
+                    <strong className="text-foreground">accent</strong> is
+                    shadcn&rsquo;s neutral hover/selected surface (button ghost
+                    hover, menu focus, calendar selection) — not a brand colour.
+                    The brand accent is{" "}
+                    <strong className="text-foreground">highlight</strong>.
+                </p>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
+                    <Swatch name="accent (hover)" className="bg-accent" />
+                    <Swatch name="border" className="bg-border" />
+                    <Swatch name="input" className="bg-input" />
+                    <Swatch name="ring" className="bg-ring" />
+                    <Swatch name="background" className="bg-background" />
+                    <Swatch name="foreground" className="bg-foreground" />
+                </div>
+            </Section>
+
+            <Section
+                title="Brand ramp"
+                description="50 → 950. Use the ramp for charts and bespoke surfaces; use the semantic tokens for everything else."
+            >
+                <div className="flex overflow-hidden rounded-lg">
+                    {[
+                        "bg-brand-50",
+                        "bg-brand-100",
+                        "bg-brand-200",
+                        "bg-brand-300",
+                        "bg-brand-400",
+                        "bg-brand-500",
+                        "bg-brand-600",
+                        "bg-brand-700",
+                        "bg-brand-800",
+                        "bg-brand-900",
+                        "bg-brand-950",
+                    ].map((c) => (
+                        <div key={c} className={`h-12 flex-1 ${c}`} />
+                    ))}
+                </div>
+                <div className="mt-2 flex overflow-hidden rounded-lg">
+                    {[
+                        "bg-highlight-50",
+                        "bg-highlight-100",
+                        "bg-highlight-200",
+                        "bg-highlight-300",
+                        "bg-highlight-400",
+                        "bg-highlight-500",
+                        "bg-highlight-600",
+                        "bg-highlight-700",
+                        "bg-highlight-800",
+                        "bg-highlight-900",
+                        "bg-highlight-950",
+                    ].map((c) => (
+                        <div key={c} className={`h-12 flex-1 ${c}`} />
+                    ))}
+                </div>
+            </Section>
+
+            <Section
+                title="Typography"
+                description="Bricolage Grotesque (display) for page-level titles; Geist (sans) for UI and body. Both self-hosted, latin subset, variable."
+            >
+                <div className="space-y-3">
+                    <p className="font-display text-4xl font-bold tracking-tight">
+                        Run your whole business from one place.
+                    </p>
+                    <p className="font-display text-2xl font-semibold tracking-tight">
+                        Display · page titles
+                    </p>
+                    <p className="text-base">
+                        Sans · body and dense UI. The quick brown fox jumps over
+                        the lazy dog — 0123456789 ₹4.2L
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                        Muted · secondary and descriptive copy.
+                    </p>
+                </div>
+            </Section>
+
+            <Section
+                title="Elevation"
+                description="Shadows are tinted with the brand hue rather than pure black, so they sit in the palette instead of greying it."
+            >
+                {/* Written out, not interpolated: Tailwind scans source
+                    statically, so `shadow-${s}` would be purged. */}
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+                    <div className="bg-card shadow-xs rounded-lg p-4 text-center text-sm">
+                        shadow-xs
+                    </div>
+                    <div className="bg-card rounded-lg p-4 text-center text-sm shadow-sm">
+                        shadow-sm
+                    </div>
+                    <div className="bg-card rounded-lg p-4 text-center text-sm shadow-md">
+                        shadow-md
+                    </div>
+                    <div className="bg-card rounded-lg p-4 text-center text-sm shadow-lg">
+                        shadow-lg
+                    </div>
+                    <div className="bg-card rounded-lg p-4 text-center text-sm shadow-xl">
+                        shadow-xl
+                    </div>
                 </div>
             </Section>
 

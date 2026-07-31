@@ -5,9 +5,16 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const inter = localFont({
-    src: "../../../packages/ui/fonts/InterVariable-latin.woff2",
+const fontSans = localFont({
+    src: "../../../packages/ui/fonts/Geist-latin.woff2",
     display: "swap",
+    variable: "--font-sans",
+});
+
+const fontDisplay = localFont({
+    src: "../../../packages/ui/fonts/BricolageGrotesque-latin.woff2",
+    display: "swap",
+    variable: "--font-display",
 });
 
 export const metadata: Metadata = {
@@ -26,7 +33,9 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en">
-            <body className={inter.className}>
+            <body
+                className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
+            >
                 <Providers>
                     <ThemeProvider
                         attribute="class"

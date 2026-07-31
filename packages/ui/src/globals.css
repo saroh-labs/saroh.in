@@ -2,94 +2,214 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================================================
+   Saroh design tokens — "Midnight & Lime"
+   =============================================================================
+
+   Every value is an unwrapped HSL triple so it composes with Tailwind's opacity
+   modifier: hsl(var(--brand) / 0.4) works, #hex would not.
+
+   THREE RULES worth knowing before editing:
+
+   1. `--accent` is NOT the brand accent. In the shadcn component contract it is
+      the neutral hover/selected surface (button ghost+outline hover, menu focus,
+      calendar selection — 32 usages). It must stay neutral. The brand accent is
+      `--highlight`.
+
+   2. `--brand` is INTERACTIVE (links, focus, emphasis) so it lightens in dark
+      mode to stay legible on dark surfaces. `--brand-surface` is a FILL (heroes,
+      filled chrome) and stays deep in both modes. Using one token for both is
+      why a hero inverts to pale blue in dark mode.
+
+   3. Contrast is verified, not eyeballed. All pairs meet WCAG AA (4.5:1 text,
+      3:1 non-text per 1.4.11). `--input` is deliberately much darker than stock
+      shadcn's, which scored ~1.2:1 and never met 1.4.11 for form controls.
+      `--border` is decorative (card dividers, table rules) and is exempt.
+   ========================================================================== */
+
 @layer base {
     :root {
-        --background: 0 0% 100%;
-        --foreground: 222.2 84% 4.9%;
+        /* ---- ramps: brand (midnight navy) ---- */
+        --brand-50: 222 44% 96%;
+        --brand-100: 222 46% 91%;
+        --brand-200: 222 44% 83%;
+        --brand-300: 222 42% 71%;
+        --brand-400: 222 46% 56%;
+        --brand-500: 222 52% 44%;
+        --brand-600: 222 58% 34%;
+        --brand-700: 222 60% 27%;
+        --brand-800: 222 58% 22%;
+        --brand-900: 222 56% 17%;
+        --brand-950: 222 55% 11%;
 
+        /* ---- ramps: highlight (lime) ---- */
+        --highlight-50: 78 70% 95%;
+        --highlight-100: 78 72% 88%;
+        --highlight-200: 78 74% 78%;
+        --highlight-300: 78 76% 66%;
+        --highlight-400: 78 78% 56%;
+        --highlight-500: 78 78% 48%;
+        --highlight-600: 78 80% 40%;
+        --highlight-700: 78 82% 31%;
+        --highlight-800: 78 72% 25%;
+        --highlight-900: 78 68% 19%;
+        --highlight-950: 78 70% 11%;
+
+        /* ---- ramps: neutral (navy-tinted, never pure grey) ---- */
+        --neutral-50: 222 22% 99%;
+        --neutral-100: 222 18% 96%;
+        --neutral-200: 222 15% 91%;
+        --neutral-300: 222 14% 84%;
+        --neutral-400: 222 12% 66%;
+        --neutral-500: 222 10% 48%;
+        --neutral-600: 222 10% 40%;
+        --neutral-700: 222 12% 28%;
+        --neutral-800: 222 14% 18%;
+        --neutral-900: 222 16% 12%;
+        --neutral-950: 222 20% 7%;
+
+        /* ---- semantic: surfaces ---- */
+        --background: 222 22% 99%;
+        --foreground: 222 20% 10%;
         --card: 0 0% 100%;
-        --card-foreground: 222.2 84% 4.9%;
-
+        --card-foreground: 222 20% 10%;
         --popover: 0 0% 100%;
-        --popover-foreground: 222.2 84% 4.9%;
+        --popover-foreground: 222 20% 10%;
 
-        --primary: 222.2 47.4% 11.2%;
-        --primary-foreground: 210 40% 98%;
+        /* ---- semantic: actions ---- */
+        --primary: 222 58% 22%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 222 18% 96%;
+        --secondary-foreground: 222 30% 20%;
+        --muted: 222 18% 96%;
+        --muted-foreground: 222 10% 40%;
 
-        --secondary: 210 40% 96.1%;
-        --secondary-foreground: 222.2 47.4% 11.2%;
+        /* Neutral hover/selected surface — see rule 1. Not the brand accent. */
+        --accent: 222 18% 94%;
+        --accent-foreground: 222 30% 18%;
 
-        --muted: 210 40% 96.1%;
-        --muted-foreground: 215.4 16.3% 46.9%;
+        --destructive: 358 68% 46%;
+        --destructive-foreground: 0 0% 100%;
 
-        --accent: 210 40% 96.1%;
-        --accent-foreground: 222.2 47.4% 11.2%;
+        /* ---- semantic: lines ---- */
+        --border: 222 15% 89%; /* decorative */
+        --input: 222 14% 58%; /* form control boundary — must meet 3:1 */
+        --ring: 222 58% 40%;
 
-        /* Darkened from red-500 so white text meets WCAG AA (was 0 84% 60%,
-           ~3.8:1 which failed at 14px). */
-        --destructive: 0 72% 44%;
-        --destructive-foreground: 210 40% 98%;
+        /* ---- brand ---- */
+        --brand: 222 58% 32%; /* interactive: links, emphasis */
+        --brand-foreground: 0 0% 100%;
+        --brand-surface: 222 56% 17%; /* fill: heroes, filled chrome */
+        --brand-surface-foreground: 0 0% 100%;
+        --brand-subtle: 222 44% 95%; /* tinted background */
+        --brand-subtle-foreground: 222 58% 26%;
 
-        --border: 214.3 31.8% 91.4%;
-        --input: 214.3 31.8% 91.4%;
-        --ring: 221.2 83.2% 53.3%;
+        /* ---- highlight (the lime accent) ---- */
+        --highlight: 78 78% 48%;
+        --highlight-foreground: 78 82% 10%;
+        --highlight-border: 78 82% 34%; /* CTA boundary on light surfaces */
+        --highlight-subtle: 78 70% 90%;
+        --highlight-subtle-foreground: 78 80% 20%;
 
-        /* Canonical Saroh brand accent (blue-600). Shared across all apps;
-           the <Wordmark> and docs/help nav derive from this hue. */
-        --brand: 221.2 83.2% 53.3%;
-        --brand-foreground: 210 40% 98%;
-
-        /* Semantic status tokens (AA on their foreground). Use these instead
-           of raw palette classes for success/warning/info states. */
-        --success: 142 72% 29%;
+        /* ---- status. Hues held >=40 apart from --highlight so a lime CTA can
+               never be mistaken for a warning. ---- */
+        --success: 152 62% 30%;
         --success-foreground: 0 0% 100%;
-        --warning: 38 92% 50%;
-        --warning-foreground: 20 14% 10%;
-        --info: 221.2 83.2% 45%;
+        --warning: 38 94% 50%;
+        --warning-foreground: 38 90% 10%;
+        --info: 210 80% 38%;
         --info-foreground: 0 0% 100%;
 
-        --radius: 0.5rem;
+        /* ---- chart series: brand -> highlight, perceptually stepped ---- */
+        --chart-1: 222 58% 34%;
+        --chart-2: 196 66% 38%;
+        --chart-3: 168 58% 36%;
+        --chart-4: 118 46% 40%;
+        --chart-5: 78 78% 38%;
+
+        /* ---- shape ---- */
+        --radius: 0.625rem;
+
+        /* ---- elevation. Tinted with the brand hue rather than pure black, so
+               shadows sit in the palette instead of greying it. ---- */
+        --shadow-color: 222 40% 12%;
+        --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.05);
+        --shadow-sm:
+            0 1px 3px 0 hsl(var(--shadow-color) / 0.08),
+            0 1px 2px -1px hsl(var(--shadow-color) / 0.06);
+        --shadow-md:
+            0 6px 16px -3px hsl(var(--shadow-color) / 0.1),
+            0 2px 6px -2px hsl(var(--shadow-color) / 0.05);
+        --shadow-lg:
+            0 14px 32px -8px hsl(var(--shadow-color) / 0.13),
+            0 4px 10px -4px hsl(var(--shadow-color) / 0.06);
+        --shadow-xl:
+            0 28px 56px -12px hsl(var(--shadow-color) / 0.18),
+            0 8px 18px -8px hsl(var(--shadow-color) / 0.08);
+
+        /* ---- motion. One easing curve for the whole suite; duration carries
+               the meaning. ---- */
+        --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+        --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+        --duration-fast: 120ms;
+        --duration-base: 200ms;
+        --duration-slow: 320ms;
     }
 
     .dark {
-        --background: 222.2 84% 4.9%;
-        --foreground: 210 40% 98%;
+        --background: 222 20% 7%;
+        --foreground: 222 12% 96%;
+        --card: 222 18% 9%;
+        --card-foreground: 222 12% 96%;
+        --popover: 222 18% 11%;
+        --popover-foreground: 222 12% 96%;
 
-        --card: 222.2 84% 4.9%;
-        --card-foreground: 210 40% 98%;
+        --primary: 222 52% 50%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 222 14% 16%;
+        --secondary-foreground: 222 12% 94%;
+        --muted: 222 14% 15%;
+        --muted-foreground: 222 10% 64%;
 
-        --popover: 222.2 84% 4.9%;
-        --popover-foreground: 210 40% 98%;
+        --accent: 222 14% 17%;
+        --accent-foreground: 222 12% 94%;
 
-        --primary: 210 40% 98%;
-        --primary-foreground: 222.2 47.4% 11.2%;
+        --destructive: 358 62% 48%;
+        --destructive-foreground: 0 0% 100%;
 
-        --secondary: 217.2 32.6% 17.5%;
-        --secondary-foreground: 210 40% 98%;
+        --border: 222 12% 19%;
+        --input: 222 10% 42%;
+        --ring: 222 60% 60%;
 
-        --muted: 217.2 32.6% 17.5%;
-        --muted-foreground: 215 20.2% 65.1%;
+        /* Lightened for legibility ON dark; the surface token below does not
+           move, so heroes stay deep. See rule 2. */
+        --brand: 222 64% 72%;
+        --brand-foreground: 222 58% 12%;
+        --brand-surface: 222 52% 14%;
+        --brand-surface-foreground: 0 0% 100%;
+        --brand-subtle: 222 32% 18%;
+        --brand-subtle-foreground: 222 60% 80%;
 
-        --accent: 217.2 32.6% 17.5%;
-        --accent-foreground: 210 40% 98%;
+        --highlight: 78 76% 56%;
+        --highlight-foreground: 78 82% 10%;
+        --highlight-border: 78 76% 56%;
+        --highlight-subtle: 78 40% 18%;
+        --highlight-subtle-foreground: 78 72% 68%;
 
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 210 40% 98%;
+        --success: 152 48% 52%;
+        --success-foreground: 152 60% 8%;
+        --warning: 38 86% 60%;
+        --warning-foreground: 38 80% 8%;
+        --info: 210 70% 60%;
+        --info-foreground: 210 60% 8%;
 
-        --border: 217.2 32.6% 17.5%;
-        --input: 217.2 32.6% 17.5%;
-        --ring: 217.2 91.2% 59.8%;
+        --chart-1: 222 64% 66%;
+        --chart-2: 196 66% 58%;
+        --chart-3: 168 56% 52%;
+        --chart-4: 118 46% 56%;
+        --chart-5: 78 76% 56%;
 
-        /* Slightly lighter brand blue for legibility on dark surfaces. */
-        --brand: 217.2 91.2% 59.8%;
-        --brand-foreground: 222.2 47.4% 11.2%;
-
-        --success: 142 69% 42%;
-        --success-foreground: 0 0% 100%;
-        --warning: 38 92% 52%;
-        --warning-foreground: 20 14% 10%;
-        --info: 217.2 91.2% 59.8%;
-        --info-foreground: 222.2 47.4% 11.2%;
+        --shadow-color: 222 60% 2%;
     }
 }
 
@@ -99,6 +219,20 @@
     }
     body {
         @apply bg-background text-foreground;
+        font-feature-settings:
+            "cv11" 1,
+            "ss01" 1;
+    }
+    /* Numerals in data UI should align in columns and never reflow as values
+       change — tables, stat cards, currency. */
+    th,
+    td,
+    [data-numeric] {
+        font-variant-numeric: tabular-nums;
+    }
+    /* Display face is optical-size aware; let it tighten as it grows. */
+    .font-display {
+        font-variation-settings: "opsz" 32;
     }
 }
 

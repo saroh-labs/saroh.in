@@ -34,7 +34,10 @@ export function PageHeader({
             {...props}
         >
             <div className="space-y-1">
-                <h1 className="text-2xl font-semibold tracking-tight">
+                {/* The display face is reserved for page-level titles. Component
+                    titles (CardTitle, DialogTitle) stay on the UI face — a
+                    display cut at 14px reads as noise in dense screens. */}
+                <h1 className="font-display text-2xl font-semibold tracking-tight">
                     {title}
                 </h1>
                 {description ? (

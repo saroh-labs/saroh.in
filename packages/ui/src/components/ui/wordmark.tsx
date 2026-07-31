@@ -6,14 +6,17 @@ export interface WordmarkProps extends React.HTMLAttributes<HTMLSpanElement> {
 }
 
 /**
- * The canonical Saroh brand wordmark: "Saroh" in the blue brand gradient with
- * an optional muted per-app suffix. Styled with INLINE styles only (no Tailwind,
- * no CSS-var dependency) so it renders identically in every app — shadcn/Tailwind
- * apps, Nextra docs, or a plain marketing page — without any per-app setup.
+ * The canonical Saroh brand wordmark: "Saroh" in the midnight brand gradient
+ * with an optional muted per-app suffix. Styled with INLINE styles only (no
+ * Tailwind) so it renders identically in every app — shadcn/Tailwind apps,
+ * Nextra docs, or a plain marketing page — without any per-app setup.
  *
- * Keep this the single source of truth for the wordmark. Apps that can't import
- * from `@saroh/ui` (e.g. the Nextra docs/help layouts and the marketing site)
- * inline the same markup; if you change the brand here, update those too.
+ * Every colour is `var(--token, <literal fallback>)`. In an app that loads
+ * @saroh/ui tokens the wordmark tracks the live theme (including dark mode);
+ * in one that does not (Nextra docs/help), the fallback renders the identical
+ * colour. That is why this file no longer needs manual hex syncing — the
+ * previous hardcoded blue silently survived the rebrand and left every logo on
+ * the old palette.
  */
 export function Wordmark({ suffix, style, ...props }: WordmarkProps) {
     return (
@@ -22,25 +25,19 @@ export function Wordmark({ suffix, style, ...props }: WordmarkProps) {
                 display: "inline-flex",
                 alignItems: "baseline",
                 gap: "0.4ch",
+                fontFamily:
+                    "var(--font-display, ui-sans-serif, system-ui, sans-serif)",
                 fontWeight: 700,
                 fontSize: "1.125rem",
-                letterSpacing: "-0.02em",
+                letterSpacing: "-0.03em",
                 ...style,
             }}
             {...props}
         >
-            {/*
-             * The wordmark gradient brackets the canonical brand accent
-             * `--brand` (blue-600, #2563eb): blue-500 (#3b82f6) → blue-700
-             * (#1d4ed8), so it reads as the same blue as `text-brand`/`bg-brand`.
-             * Hex is intentional here (not `hsl(var(--brand))`): this component
-             * is inlined into apps that don't load the token (Nextra docs/help,
-             * marketing) — keep these values in sync with --brand if it changes.
-             */}
             <span
                 style={{
                     backgroundImage:
-                        "linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)",
+                        "linear-gradient(96deg, hsl(var(--brand-800, 222 58% 22%)) 0%, hsl(var(--brand-500, 222 52% 44%)) 100%)",
                     WebkitBackgroundClip: "text",
                     backgroundClip: "text",
                     color: "transparent",
@@ -49,7 +46,12 @@ export function Wordmark({ suffix, style, ...props }: WordmarkProps) {
                 Saroh
             </span>
             {suffix ? (
-                <span style={{ fontWeight: 500, color: "#71717a" }}>
+                <span
+                    style={{
+                        fontWeight: 500,
+                        color: "hsl(var(--muted-foreground, 222 10% 40%))",
+                    }}
+                >
                     {suffix}
                 </span>
             ) : null}

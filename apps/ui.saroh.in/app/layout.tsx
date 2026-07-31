@@ -4,9 +4,16 @@ import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 
-const inter = localFont({
-    src: "../../../packages/ui/fonts/InterVariable-latin.woff2",
+const fontSans = localFont({
+    src: "../../../packages/ui/fonts/Geist-latin.woff2",
     display: "swap",
+    variable: "--font-sans",
+});
+
+const fontDisplay = localFont({
+    src: "../../../packages/ui/fonts/BricolageGrotesque-latin.woff2",
+    display: "swap",
+    variable: "--font-display",
 });
 
 export const metadata: Metadata = {
@@ -21,7 +28,9 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={inter.className}>
+            <body
+                className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
+            >
                 <ThemeProvider
                     attribute="class"
                     defaultTheme="light"
