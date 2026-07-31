@@ -1,8 +1,8 @@
 import { AuthStatus } from "@saroh/auth/auth-status";
+import "@saroh/ui/globals.css";
 import { Wordmark } from "@saroh/ui/wordmark";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import "./globals.css";
 
 const fontSans = localFont({
     src: "../../../packages/ui/fonts/Geist-latin.woff2",

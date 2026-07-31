@@ -1,6 +1,6 @@
+import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import "./globals.css";
 
 const fontSans = localFont({
     src: "../../../packages/ui/fonts/Geist-latin.woff2",

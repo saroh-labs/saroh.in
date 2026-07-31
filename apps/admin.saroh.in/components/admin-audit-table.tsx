@@ -1,13 +1,27 @@
+import { buttonVariants } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/empty-state";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@saroh/ui/table";
 import Link from "next/link";
 
 import type { AdminAuditPage, AdminAuditQuery } from "@/lib/control-plane";
 
+/**
+ * Semantic status tokens, not raw palette classes. These previously hardcoded
+ * emerald/red/amber with hand-written dark variants, which meant the audit
+ * ledger did not move when the theme did. The DB pins `outcome` to exactly
+ * these three values via a CHECK constraint, so the lookup is total.
+ */
 const OUTCOME_STYLES = {
-    SUCCESS:
-        "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200",
-    FAILURE:
-        "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200",
-    DENIED: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100",
+    SUCCESS: "border-success/30 bg-success/10 text-success",
+    FAILURE: "border-destructive/30 bg-destructive/10 text-destructive",
+    DENIED: "border-warning/40 bg-warning/15 text-warning-foreground dark:text-warning",
 } as const;
 
 export function AdminAuditTable({
@@ -19,52 +33,48 @@ export function AdminAuditTable({
 }) {
     if (page.items.length === 0) {
         return (
-            <div className="rounded-lg border border-dashed px-6 py-14 text-center">
-                <p className="font-medium">No audit events found</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Try removing a filter or return to the newest events.
-                </p>
-            </div>
+            <EmptyState
+                title="No audit events found"
+                description="Try removing a filter or return to the newest events."
+            />
         );
     }
 
     return (
         <>
             <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-                    <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
-                        <tr>
-                            <th className="px-4 py-3 font-medium">Time</th>
-                            <th className="px-4 py-3 font-medium">Actor</th>
-                            <th className="px-4 py-3 font-medium">Action</th>
-                            <th className="px-4 py-3 font-medium">Target</th>
-                            <th className="px-4 py-3 font-medium">Outcome</th>
-                            <th className="px-4 py-3 font-medium">Reason</th>
-                            <th className="px-4 py-3 font-medium">
-                                Correlation
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
+                <Table className="min-w-[980px]">
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Time</TableHead>
+                            <TableHead>Actor</TableHead>
+                            <TableHead>Action</TableHead>
+                            <TableHead>Target</TableHead>
+                            <TableHead>Outcome</TableHead>
+                            <TableHead>Reason</TableHead>
+                            <TableHead>Correlation</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
                         {page.items.map((event) => (
-                            <tr key={event.id} className="align-top">
-                                <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                            <TableRow key={event.id} className="align-top">
+                                <TableCell className="whitespace-nowrap text-muted-foreground">
                                     {formatTime(event.createdAt)}
-                                </td>
-                                <td className="max-w-48 px-4 py-3 font-mono text-xs">
+                                </TableCell>
+                                <TableCell className="max-w-48 font-mono text-xs">
                                     <span className="block truncate">
                                         {event.actorUserId}
                                     </span>
-                                </td>
-                                <td className="px-4 py-3">
+                                </TableCell>
+                                <TableCell>
                                     <p className="font-medium">
                                         {event.action}
                                     </p>
                                     <p className="mt-0.5 text-xs text-muted-foreground">
                                         {event.permission}
                                     </p>
-                                </td>
-                                <td className="max-w-56 px-4 py-3">
+                                </TableCell>
+                                <TableCell className="max-w-56">
                                     <p>{event.targetType}</p>
                                     <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                                         {event.targetId ?? "platform"}
@@ -74,26 +84,26 @@ export function AdminAuditTable({
                                             Org: {event.organizationId}
                                         </p>
                                     )}
-                                </td>
-                                <td className="px-4 py-3">
+                                </TableCell>
+                                <TableCell>
                                     <span
                                         className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${OUTCOME_STYLES[event.outcome]}`}
                                     >
                                         {event.outcome.toLowerCase()}
                                     </span>
-                                </td>
-                                <td className="max-w-72 px-4 py-3 text-muted-foreground">
+                                </TableCell>
+                                <TableCell className="max-w-72 text-muted-foreground">
                                     {event.reason ?? "—"}
-                                </td>
-                                <td className="max-w-48 px-4 py-3 font-mono text-xs text-muted-foreground">
+                                </TableCell>
+                                <TableCell className="max-w-48 font-mono text-xs text-muted-foreground">
                                     <span className="block truncate">
                                         {event.correlationId ?? "—"}
                                     </span>
-                                </td>
-                            </tr>
+                                </TableCell>
+                            </TableRow>
                         ))}
-                    </tbody>
-                </table>
+                    </TableBody>
+                </Table>
             </div>
 
             <div className="mt-4 flex items-center justify-between gap-4">
@@ -103,7 +113,10 @@ export function AdminAuditTable({
                             pathname: "/audit",
                             query: withoutCursor(query),
                         }}
-                        className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                        className={buttonVariants({
+                            variant: "ghost",
+                            size: "sm",
+                        })}
                     >
                         Back to newest
                     </Link>
@@ -119,7 +132,10 @@ export function AdminAuditTable({
                                 cursor: page.nextCursor,
                             },
                         }}
-                        className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+                        className={buttonVariants({
+                            variant: "outline",
+                            size: "sm",
+                        })}
                     >
                         Older events
                     </Link>

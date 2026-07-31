@@ -47,7 +47,7 @@ export default async function FlagsPage() {
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
                     Delivery
                 </p>
-                <h1 className="mt-1 text-2xl font-semibold">
+                <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
                     Release controls
                 </h1>
                 <p className="mt-1 text-sm text-muted-foreground">

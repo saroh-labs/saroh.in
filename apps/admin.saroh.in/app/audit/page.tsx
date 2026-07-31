@@ -1,4 +1,7 @@
 import { getServerSession } from "@saroh/auth/next";
+import { Button, buttonVariants } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
+import { Label } from "@saroh/ui/label";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -49,7 +52,7 @@ export default async function AuditPage({
                         <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
                             Governance
                         </p>
-                        <h1 className="mt-1 text-2xl font-semibold">
+                        <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
                             Platform audit
                         </h1>
                         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -62,7 +65,10 @@ export default async function AuditPage({
                         query.action !== undefined) && (
                         <Link
                             href="/audit"
-                            className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                            className={buttonVariants({
+                                variant: "ghost",
+                                size: "sm",
+                            })}
                         >
                             Clear filters
                         </Link>
@@ -71,7 +77,7 @@ export default async function AuditPage({
 
                 <form
                     action="/audit"
-                    className="my-6 grid gap-3 rounded-lg border bg-muted/20 p-4 sm:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_auto]"
+                    className="my-6 grid gap-3 rounded-lg border bg-muted/30 p-4 sm:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_auto]"
                 >
                     <FilterField
                         label="Actor ID"
@@ -89,12 +95,9 @@ export default async function AuditPage({
                         defaultValue={query.action}
                         placeholder="flags.organization.set"
                     />
-                    <button
-                        type="submit"
-                        className="self-end rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
-                    >
+                    <Button type="submit" className="self-end">
                         Apply filters
-                    </button>
+                    </Button>
                 </form>
 
                 <AdminAuditTable page={page} query={query} />
@@ -121,17 +124,18 @@ function FilterField({
     placeholder?: string;
 }) {
     return (
-        <label className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
+        <div className="grid gap-1.5">
+            <Label htmlFor={name} className="text-xs text-muted-foreground">
                 {label}
-            </span>
-            <input
+            </Label>
+            <Input
+                id={name}
                 type="search"
                 name={name}
                 defaultValue={defaultValue}
                 placeholder={placeholder}
-                className="min-w-0 rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="min-w-0"
             />
-        </label>
+        </div>
     );
 }

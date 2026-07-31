@@ -1,8 +1,8 @@
 import { AppShell } from "@/components/shared/app-shell";
+import "@saroh/ui/globals.css";
 import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import "./globals.css";
 import { Providers } from "./providers";
 
 const fontSans = localFont({

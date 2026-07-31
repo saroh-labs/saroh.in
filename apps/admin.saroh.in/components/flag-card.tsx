@@ -1,5 +1,17 @@
 "use client";
 
+import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
+import { Card, CardContent, CardHeader } from "@saroh/ui/card";
+import { Input } from "@saroh/ui/input";
+import { Label } from "@saroh/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@saroh/ui/select";
 import { useState, useTransition } from "react";
 
 import type { AdminFlag, AdminOrganization } from "@/lib/control-plane";
@@ -52,33 +64,43 @@ export function FlagCard({
         });
     }
 
+    const reasonId = `reason-${flag.key}`;
+
     return (
-        <div className="rounded-lg border p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h2 className="font-mono text-sm font-medium">
-                        {flag.key}
-                    </h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
+        <Card>
+            <CardHeader className="flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="font-mono text-sm font-medium">
+                            {flag.key}
+                        </h2>
                         {flag.enabledByDefault === null ? (
-                            <>
-                                Never configured — no global row exists, so this
-                                flag resolves to <strong>off</strong> for
-                                everyone.
-                            </>
+                            <Badge variant="outline">Never configured</Badge>
+                        ) : flag.enabledByDefault ? (
+                            <Badge className="bg-success/12 hover:bg-success/12 border border-success/30 text-success">
+                                On
+                            </Badge>
                         ) : (
-                            <>
-                                Global default:{" "}
-                                <strong>
-                                    {flag.enabledByDefault ? "on" : "off"}
-                                </strong>
-                            </>
+                            <Badge variant="secondary">Off</Badge>
                         )}
+                        {flag.overrides.length > 0 && (
+                            <Badge className="bg-highlight-subtle text-highlight-subtle-foreground hover:bg-highlight-subtle">
+                                {flag.overrides.length} override
+                                {flag.overrides.length === 1 ? "" : "s"}
+                            </Badge>
+                        )}
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                        {flag.enabledByDefault === null
+                            ? "No global row exists, so this flag resolves to off for everyone."
+                            : "Organization overrides win over this global default."}
                     </p>
                 </div>
-                <div className="flex gap-2">
-                    <button
+                <div className="flex shrink-0 gap-2">
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         disabled={!canSubmit}
                         onClick={() =>
                             run(() =>
@@ -90,12 +112,13 @@ export function FlagCard({
                                 ),
                             )
                         }
-                        className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
                     >
                         Enable globally
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         disabled={!canSubmit}
                         onClick={() =>
                             run(() =>
@@ -107,136 +130,154 @@ export function FlagCard({
                                 ),
                             )
                         }
-                        className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
                     >
                         Disable globally
-                    </button>
+                    </Button>
                 </div>
-            </div>
+            </CardHeader>
 
-            <label className="mt-4 grid gap-1">
-                <span className="text-xs font-medium">
-                    Reason (recorded against every change)
-                </span>
-                <input
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    placeholder="e.g. CRM beta for internal org"
-                    disabled={pending}
-                    className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
-                />
-            </label>
+            <CardContent>
+                <div className="grid gap-1.5">
+                    <Label htmlFor={reasonId}>
+                        Reason (recorded against every change)
+                    </Label>
+                    <Input
+                        id={reasonId}
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="e.g. CRM beta for internal org"
+                        disabled={pending || !canPublish}
+                    />
+                </div>
 
-            {!canPublish && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                    Read-only: your role does not include release publishing.
-                </p>
-            )}
-
-            {error && (
-                <p className="mt-2 text-sm text-destructive" role="alert">
-                    {error}
-                </p>
-            )}
-
-            <div className="mt-4">
-                <h3 className="text-xs font-medium">
-                    Organization overrides ({flag.overrides.length})
-                </h3>
-                {flag.overrides.length === 0 ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        Every organization follows the global default.
+                {!canPublish && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        Read-only: your role does not include release
+                        publishing.
                     </p>
-                ) : (
-                    <ul className="mt-2 grid gap-2">
-                        {flag.overrides.map((override) => (
-                            <li
-                                key={override.organizationId}
-                                className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-                            >
-                                <span className="truncate">
-                                    {override.organizationName}
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                        {override.enabled ? "on" : "off"}
-                                    </span>
-                                </span>
-                                <button
-                                    type="button"
-                                    disabled={!canSubmit}
-                                    onClick={() =>
-                                        run(() =>
-                                            clearFlagOverrideAction(
-                                                flag.key,
-                                                override.organizationId,
-                                                reason,
-                                                crypto.randomUUID(),
-                                            ),
-                                        )
-                                    }
-                                    className="text-xs text-muted-foreground underline hover:text-foreground disabled:opacity-50"
-                                >
-                                    Clear override
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
                 )}
 
-                {availableOrgs.length > 0 && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <select
-                            value={targetOrg}
-                            onChange={(e) => setTargetOrg(e.target.value)}
-                            disabled={pending}
-                            aria-label={`Add an override for ${flag.key}`}
-                            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-                        >
-                            <option value="">Add override for…</option>
-                            {availableOrgs.map((org) => (
-                                <option key={org.id} value={org.id}>
-                                    {org.name}
-                                </option>
-                            ))}
-                        </select>
-                        <button
-                            type="button"
-                            disabled={!canSubmit || !targetOrg}
-                            onClick={() =>
-                                run(() =>
-                                    setFlagOverrideAction(
-                                        flag.key,
-                                        targetOrg,
-                                        true,
-                                        reason,
-                                        crypto.randomUUID(),
-                                    ),
-                                )
-                            }
-                            className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
-                        >
-                            Force on
-                        </button>
-                        <button
-                            type="button"
-                            disabled={!canSubmit || !targetOrg}
-                            onClick={() =>
-                                run(() =>
-                                    setFlagOverrideAction(
-                                        flag.key,
-                                        targetOrg,
-                                        false,
-                                        reason,
-                                        crypto.randomUUID(),
-                                    ),
-                                )
-                            }
-                            className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
-                        >
-                            Force off
-                        </button>
-                    </div>
+                {error && (
+                    <p className="mt-2 text-sm text-destructive" role="alert">
+                        {error}
+                    </p>
                 )}
-            </div>
-        </div>
+
+                <div className="mt-5 border-t pt-4">
+                    <h3 className="text-xs font-medium">
+                        Organization overrides ({flag.overrides.length})
+                    </h3>
+                    {flag.overrides.length === 0 ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Every organization follows the global default.
+                        </p>
+                    ) : (
+                        <ul className="mt-2 grid gap-2">
+                            {flag.overrides.map((override) => (
+                                <li
+                                    key={override.organizationId}
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                                >
+                                    <span className="flex min-w-0 items-center gap-2 truncate">
+                                        <span className="truncate">
+                                            {override.organizationName}
+                                        </span>
+                                        <Badge
+                                            variant={
+                                                override.enabled
+                                                    ? "default"
+                                                    : "secondary"
+                                            }
+                                        >
+                                            {override.enabled ? "on" : "off"}
+                                        </Badge>
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={!canSubmit}
+                                        onClick={() =>
+                                            run(() =>
+                                                clearFlagOverrideAction(
+                                                    flag.key,
+                                                    override.organizationId,
+                                                    reason,
+                                                    crypto.randomUUID(),
+                                                ),
+                                            )
+                                        }
+                                    >
+                                        Clear override
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
+                    {availableOrgs.length > 0 && (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <Select
+                                value={targetOrg}
+                                onValueChange={setTargetOrg}
+                                disabled={pending || !canPublish}
+                            >
+                                <SelectTrigger
+                                    className="w-[220px]"
+                                    aria-label={`Add an override for ${flag.key}`}
+                                >
+                                    <SelectValue placeholder="Add override for…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availableOrgs.map((org) => (
+                                        <SelectItem key={org.id} value={org.id}>
+                                            {org.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={!canSubmit || !targetOrg}
+                                onClick={() =>
+                                    run(() =>
+                                        setFlagOverrideAction(
+                                            flag.key,
+                                            targetOrg,
+                                            true,
+                                            reason,
+                                            crypto.randomUUID(),
+                                        ),
+                                    )
+                                }
+                            >
+                                Force on
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={!canSubmit || !targetOrg}
+                                onClick={() =>
+                                    run(() =>
+                                        setFlagOverrideAction(
+                                            flag.key,
+                                            targetOrg,
+                                            false,
+                                            reason,
+                                            crypto.randomUUID(),
+                                        ),
+                                    )
+                                }
+                            >
+                                Force off
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
     );
 }

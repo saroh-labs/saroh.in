@@ -1,3 +1,5 @@
+import { Badge } from "@saroh/ui/badge";
+import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
 import { SignOutButton } from "@/components/sign-out-button";
@@ -30,17 +32,14 @@ export function AdminShell({
 
     return (
         <div className="min-h-screen">
-            <header className="border-b px-4 sm:px-6">
+            {/* A thin brand rule across the top: the cheapest possible signal
+                that this is the control plane and not a tenant workspace. */}
+            <div className="h-1 w-full bg-brand-surface" aria-hidden />
+            <header className="border-b bg-card px-4 sm:px-6">
                 <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-7 gap-y-3">
-                        <Link
-                            href="/"
-                            className="shrink-0 font-semibold tracking-tight"
-                        >
-                            Saroh{" "}
-                            <span className="font-normal text-muted-foreground">
-                                control
-                            </span>
+                        <Link href="/" className="shrink-0">
+                            <Wordmark suffix="control" />
                         </Link>
                         <nav
                             aria-label="Control plane"
@@ -50,7 +49,7 @@ export function AdminShell({
                                 <Link
                                     key={item.href}
                                     href={item.href}
-                                    className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors duration-fast ease-out hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
                                     {item.label}
                                 </Link>
@@ -70,11 +69,18 @@ export function AdminShell({
             </header>
 
             {staff.viaBootstrap && (
-                <p className="border-b bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100 sm:px-6">
-                    You are here via the <code>ADMIN_ALLOWLIST</code>{" "}
-                    break-glass path, not a recorded grant. Add a PlatformAdmin
-                    grant so staff access is revocable and attributable.
-                </p>
+                <div className="border-b border-warning/30 bg-warning/10 px-4 py-2.5 sm:px-6">
+                    <div className="mx-auto flex max-w-7xl items-center gap-2.5 text-sm text-foreground">
+                        <Badge variant="outline" className="shrink-0">
+                            Break-glass
+                        </Badge>
+                        <p>
+                            You are here via the <code>ADMIN_ALLOWLIST</code>{" "}
+                            path, not a recorded grant. Add a PlatformAdmin
+                            grant so staff access is revocable and attributable.
+                        </p>
+                    </div>
+                </div>
             )}
 
             {children}

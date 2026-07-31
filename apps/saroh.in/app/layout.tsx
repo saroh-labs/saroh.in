@@ -1,9 +1,9 @@
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
+import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Script from "next/script";
-import "./globals.css";
 
 // Self-hosted (latin subset, variable) so the build never fetches fonts from an
 // external network. Geist carries UI/body; Bricolage Grotesque is the display

@@ -1,4 +1,13 @@
 import { getServerSession } from "@saroh/auth/next";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@saroh/ui/card";
+import { PageHeader } from "@saroh/ui/page-header";
+import { StatCard } from "@saroh/ui/stat-card";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -28,30 +37,29 @@ export default async function DashboardPage() {
 
     return (
         <AdminShell staff={staff}>
-            <main className="mx-auto max-w-5xl p-6 sm:p-8">
-                <h1 className="text-2xl font-semibold">Platform</h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Aggregate health across every tenant. No customer records
-                    are shown here.
-                </p>
+            <main className="mx-auto max-w-6xl p-6 sm:p-8">
+                <PageHeader
+                    title="Platform"
+                    description="Aggregate health across every tenant. No customer records are shown here."
+                />
 
-                <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Stat
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatCard
                         label="Organizations"
                         value={metrics.organizations.total}
                         hint={`${metrics.organizations.createdLast30Days} new in 30 days`}
                     />
-                    <Stat
+                    <StatCard
                         label="Users"
                         value={metrics.users.total}
                         hint={`${metrics.users.verified} verified · ${metrics.users.createdLast30Days} new in 30 days`}
                     />
-                    <Stat
+                    <StatCard
                         label="Orders"
                         value={metrics.commerce.orders}
                         hint={`${metrics.commerce.openOrders} open`}
                     />
-                    <Stat
+                    <StatCard
                         label="Sites"
                         value={metrics.content.sites}
                         hint={`${metrics.content.publishedSites} published`}
@@ -85,24 +93,6 @@ export default async function DashboardPage() {
     );
 }
 
-function Stat({
-    label,
-    value,
-    hint,
-}: {
-    label: string;
-    value: number;
-    hint: string;
-}) {
-    return (
-        <div className="rounded-lg border p-4">
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums">{value}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-        </div>
-    );
-}
-
 function Panel({
     title,
     description,
@@ -114,27 +104,47 @@ function Panel({
     empty: string;
     rows: { key: string; label: string; value: number }[];
 }) {
+    // A bar per row, scaled to the largest value: the shape of adoption is the
+    // thing an operator reads here, and a bare number column hides it.
+    const max = Math.max(1, ...rows.map((row) => row.value));
+
     return (
-        <div className="rounded-lg border p-4">
-            <h2 className="font-medium">{title}</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-                {description}
-            </p>
-            {rows.length === 0 ? (
-                <p className="mt-4 text-sm text-muted-foreground">{empty}</p>
-            ) : (
-                <ul className="mt-4 grid gap-2">
-                    {rows.map((row) => (
-                        <li
-                            key={row.key}
-                            className="flex items-center justify-between gap-4 text-sm"
-                        >
-                            <span className="truncate">{row.label}</span>
-                            <span className="tabular-nums">{row.value}</span>
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </div>
+        <Card>
+            <CardHeader>
+                <CardTitle>{title}</CardTitle>
+                <CardDescription>{description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {rows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{empty}</p>
+                ) : (
+                    <ul className="grid gap-2.5">
+                        {rows.map((row) => (
+                            <li key={row.key} className="grid gap-1">
+                                <div className="flex items-center justify-between gap-4 text-sm">
+                                    <span className="truncate">
+                                        {row.label}
+                                    </span>
+                                    <span className="tabular-nums">
+                                        {row.value}
+                                    </span>
+                                </div>
+                                <div
+                                    className="h-1 overflow-hidden rounded-full bg-muted"
+                                    aria-hidden
+                                >
+                                    <div
+                                        className="h-full rounded-full bg-brand"
+                                        style={{
+                                            width: `${(row.value / max) * 100}%`,
+                                        }}
+                                    />
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </CardContent>
+        </Card>
     );
 }
