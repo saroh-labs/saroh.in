@@ -19,11 +19,11 @@ export default function HeroSection({ content }: { content: HeroContent }) {
                 }
             >
                 <div className={hasImage ? "" : "flex flex-col items-center"}>
-                    <h1 className="text-4xl font-bold tracking-tight text-stone-900 dark:text-white sm:text-5xl md:text-6xl">
+                    <h1 className="text-4xl font-bold tracking-tight text-site-fg sm:text-5xl md:text-6xl">
                         {content.heading}
                     </h1>
                     {content.subheading ? (
-                        <p className="mt-6 max-w-2xl text-lg text-stone-600 dark:text-stone-300 sm:text-xl">
+                        <p className="mt-6 max-w-2xl text-lg text-site-body sm:text-xl">
                             {content.subheading}
                         </p>
                     ) : null}

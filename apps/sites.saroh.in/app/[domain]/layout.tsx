@@ -56,18 +56,61 @@ export default async function SiteLayout({
     }
 
     return (
-        <div>
-            <header className="ease left-0 right-0 top-0 z-30 flex h-16 bg-white transition-all duration-150 dark:bg-black dark:text-white">
+        <div className="min-h-screen bg-site-bg text-site-body">
+            <SiteTheme />
+            <header className="left-0 right-0 top-0 z-30 flex h-16 border-b border-site-border bg-site-surface">
                 <div className="mx-auto flex h-full max-w-screen-xl items-center justify-center space-x-5 px-10 sm:px-20">
                     <Link href="/" className="flex items-center justify-center">
-                        <span className="font-title inline-block truncate font-medium">
+                        <span className="inline-block truncate text-lg font-medium tracking-tight text-site-fg">
                             {snapshot.site.name}
                         </span>
                     </Link>
                 </div>
             </header>
 
-            <div className="mt-20">{children}</div>
+            <div>{children}</div>
         </div>
+    );
+}
+
+/**
+ * Per-publication theme.
+ *
+ * These sections used to hardcode ~136 `stone-*` classes, so every merchant's
+ * site rendered in the same greys with no way to express their own brand. The
+ * `--site-*` layer makes the palette data rather than markup: the defaults below
+ * reproduce the previous stone values exactly (this is a visual no-op today),
+ * and when the publication snapshot starts carrying brand fields this component
+ * interpolates them instead — no further component churn.
+ *
+ * Deliberately NOT Saroh's brand tokens: this subtree is the merchant's website,
+ * not a Saroh surface.
+ */
+function SiteTheme() {
+    return (
+        <style>{`
+            :root {
+                --site-bg: 0 0% 100%;
+                --site-surface: 0 0% 100%;
+                --site-fg: 24 10% 10%;
+                --site-body: 25 5% 45%;
+                --site-muted: 24 6% 56%;
+                --site-border: 20 6% 90%;
+                --site-accent: 24 10% 10%;
+                --site-accent-fg: 0 0% 100%;
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --site-bg: 0 0% 0%;
+                    --site-surface: 24 6% 10%;
+                    --site-fg: 0 0% 100%;
+                    --site-body: 24 6% 83%;
+                    --site-muted: 24 5% 64%;
+                    --site-border: 25 6% 26%;
+                    --site-accent: 0 0% 100%;
+                    --site-accent-fg: 24 10% 10%;
+                }
+            }
+        `}</style>
     );
 }

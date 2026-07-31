@@ -9,23 +9,23 @@ import { cn } from "@/lib/utils";
  */
 export function ctaClasses(style: CtaContent["style"]): string {
     const base =
-        "inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-stone-400";
+        "inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-site-accent focus-visible:ring-offset-site-bg";
     switch (style) {
         case "secondary":
             return cn(
                 base,
-                "px-5 py-2.5 border border-stone-300 text-stone-900 hover:bg-stone-100 dark:border-stone-700 dark:text-white dark:hover:bg-stone-800",
+                "border-site-border text-site-fg hover:bg-site-border/40 border px-5 py-2.5",
             );
         case "link":
             return cn(
                 base,
-                "underline underline-offset-4 text-stone-900 hover:text-stone-600 dark:text-white dark:hover:text-stone-300",
+                "text-site-fg hover:text-site-body underline underline-offset-4",
             );
         case "primary":
         default:
             return cn(
                 base,
-                "px-5 py-2.5 bg-stone-900 text-white hover:bg-stone-700 dark:bg-white dark:text-stone-900 dark:hover:bg-stone-200",
+                "bg-site-accent text-site-accent-fg px-5 py-2.5 hover:opacity-90",
             );
     }
 }

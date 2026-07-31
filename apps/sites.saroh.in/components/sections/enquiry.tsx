@@ -119,8 +119,8 @@ export default function EnquirySection({
     if (state.kind === "success") {
         return (
             <section className="mx-auto w-full max-w-2xl px-5 py-16 sm:px-8">
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-8 text-center dark:border-stone-700 dark:bg-stone-900">
-                    <p className="text-lg font-medium text-stone-900 dark:text-white">
+                <div className="rounded-xl border border-site-border bg-site-surface p-8 text-center">
+                    <p className="text-lg font-medium text-site-fg">
                         {content.successMessage ??
                             "Thanks — we'll be in touch soon."}
                     </p>
@@ -132,14 +132,12 @@ export default function EnquirySection({
     return (
         <section className="mx-auto w-full max-w-2xl px-5 py-16 sm:px-8">
             {content.title ? (
-                <h2 className="text-3xl font-bold tracking-tight text-stone-900 dark:text-white">
+                <h2 className="text-3xl font-bold tracking-tight text-site-fg">
                     {content.title}
                 </h2>
             ) : null}
             {content.description ? (
-                <p className="mt-3 text-stone-600 dark:text-stone-300">
-                    {content.description}
-                </p>
+                <p className="mt-3 text-site-body">{content.description}</p>
             ) : null}
 
             <form className="mt-8 grid gap-5" onSubmit={onSubmit} noValidate>
@@ -163,12 +161,12 @@ export default function EnquirySection({
                             })),
                     };
                     const controlClasses =
-                        "w-full max-w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-white";
+                        "w-full max-w-full rounded-lg border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border ";
                     return (
                         <div key={i} className="grid gap-1.5">
                             <label
                                 htmlFor={fieldId}
-                                className="text-sm font-medium text-stone-900 dark:text-white"
+                                className="text-sm font-medium text-site-fg"
                             >
                                 {label}
                                 {field.required ? (

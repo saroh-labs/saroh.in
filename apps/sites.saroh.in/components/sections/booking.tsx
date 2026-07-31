@@ -56,7 +56,7 @@ type SlotsState =
     | { kind: "ready"; slots: Slot[] }
     | { kind: "error"; message: string };
 
-/** The visitor's resolved IANA timezone, for the "times shown in …" note. */
+/** The visitor's resolved IANA timezone, for the "times shown in …"note. */
 function visitorTimezone(): string {
     try {
         return (
@@ -287,8 +287,8 @@ export default function BookingSection({
     if (submit.kind === "success") {
         return (
             <section className="mx-auto w-full max-w-2xl px-5 py-16 sm:px-8">
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-8 text-center dark:border-stone-700 dark:bg-stone-900">
-                    <p className="text-lg font-medium text-stone-900 dark:text-white">
+                <div className="rounded-xl border border-site-border bg-site-surface p-8 text-center">
+                    <p className="text-lg font-medium text-site-fg">
                         {content.successMessage ?? "You're booked!"}
                     </p>
                 </div>
@@ -302,29 +302,27 @@ export default function BookingSection({
     return (
         <section className="mx-auto w-full max-w-2xl px-5 py-16 sm:px-8">
             {content.title ? (
-                <h2 className="text-3xl font-bold tracking-tight text-stone-900 dark:text-white">
+                <h2 className="text-3xl font-bold tracking-tight text-site-fg">
                     {content.title}
                 </h2>
             ) : null}
             {content.description ? (
-                <p className="mt-3 text-stone-600 dark:text-stone-300">
-                    {content.description}
-                </p>
+                <p className="mt-3 text-site-body">{content.description}</p>
             ) : null}
 
             {/* Slot picker */}
             <div className="mt-8">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
+                    <h3 className="text-sm font-semibold text-site-fg">
                         Choose a time
                     </h3>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                    <p className="text-xs text-site-muted">
                         Times shown in {timezone}
                     </p>
                 </div>
 
                 {slotsState.kind === "loading" ? (
-                    <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
+                    <p className="mt-4 text-sm text-site-muted">
                         Loading available times…
                     </p>
                 ) : slotsState.kind === "error" ? (
@@ -341,7 +339,7 @@ export default function BookingSection({
                         </button>
                     </div>
                 ) : groups.length === 0 ? (
-                    <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
+                    <p className="mt-4 text-sm text-site-muted">
                         No open times in the next {WINDOW_DAYS} days — please
                         check back soon.
                     </p>
@@ -353,7 +351,7 @@ export default function BookingSection({
                     >
                         {groups.map((group) => (
                             <div key={group.key}>
-                                <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                                <p className="text-xs font-medium uppercase tracking-wide text-site-muted">
                                     {group.label}
                                 </p>
                                 <div className="mt-2 flex flex-wrap gap-2">
@@ -371,10 +369,10 @@ export default function BookingSection({
                                                     setSelected(slot.startAt)
                                                 }
                                                 className={cn(
-                                                    "rounded-lg border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 disabled:opacity-60",
+                                                    "rounded-lg border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent disabled:opacity-60",
                                                     active
-                                                        ? "border-stone-900 bg-stone-900 text-white dark:border-white dark:bg-white dark:text-stone-900"
-                                                        : "border-stone-300 text-stone-900 hover:bg-stone-100 dark:border-stone-700 dark:text-white dark:hover:bg-stone-800",
+                                                        ? "border-site-accent bg-site-accent text-site-accent-fg"
+                                                        : "border-site-border text-site-fg hover:bg-site-surface",
                                                 )}
                                             >
                                                 {formatSlotTime(slot.startAt)}
@@ -393,7 +391,7 @@ export default function BookingSection({
                 <div className="grid gap-1.5">
                     <label
                         htmlFor={`${baseId}-name`}
-                        className="text-sm font-medium text-stone-900 dark:text-white"
+                        className="text-sm font-medium text-site-fg"
                     >
                         Name
                     </label>
@@ -404,13 +402,13 @@ export default function BookingSection({
                         value={name}
                         disabled={submitting}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full max-w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-white"
+                        className="w-full max-w-full rounded-lg border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
                     />
                 </div>
                 <div className="grid gap-1.5">
                     <label
                         htmlFor={`${baseId}-email`}
-                        className="text-sm font-medium text-stone-900 dark:text-white"
+                        className="text-sm font-medium text-site-fg"
                     >
                         Email
                         <span aria-hidden="true" className="text-red-600">
@@ -425,13 +423,13 @@ export default function BookingSection({
                         value={email}
                         disabled={submitting}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full max-w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-white"
+                        className="w-full max-w-full rounded-lg border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
                     />
                 </div>
                 <div className="grid gap-1.5">
                     <label
                         htmlFor={`${baseId}-phone`}
-                        className="text-sm font-medium text-stone-900 dark:text-white"
+                        className="text-sm font-medium text-site-fg"
                     >
                         Phone
                     </label>
@@ -442,7 +440,7 @@ export default function BookingSection({
                         value={phone}
                         disabled={submitting}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="w-full max-w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-white"
+                        className="w-full max-w-full rounded-lg border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
                     />
                 </div>
 
