@@ -146,6 +146,10 @@ module.exports = {
         // the billing webhook inbox (signature-before-write, idempotent replay).
         // Jest-mocked Prisma + fake provider; never touch a DB or the network.
         "<rootDir>/src/modules/billing/**/*.spec.ts",
+        // Public waitlist capture: normalization, idempotency (including the
+        // concurrent-insert P2002 race), and that a full address never reaches
+        // the logs. Jest-mocked Prisma; no DB.
+        "<rootDir>/src/modules/waitlist/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
         // #90 (S0-011) API bootstrap smoke test: compiles the full AppModule DI
         // graph so "the app doesn't even start" (the 0fc8f72 boot crash class)

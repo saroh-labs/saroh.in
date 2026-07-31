@@ -2448,3 +2448,37 @@ model BillingWebhookEvent {
   @@unique([provider, providerEventId])
   @@index([organizationId])
 }
+
+// WaitlistSignup — pre-launch interest captured from the public marketing site.
+//
+// Deliberately NOT tied to Organization or User: nobody who signs up has either
+// yet, and that is the whole point of a waitlist. It is the only tenant-less
+// business table, which is why it carries no organizationId and is exempt from
+// RLS considerations.
+//
+// `email` is stored normalized (trimmed + lowercased by the service) and is
+// unique, so a repeat submission is an idempotent no-op rather than a duplicate
+// row or a 500. `ipHash` is a sha256 of the source IP — the raw IP is never
+// stored, matching the public enquiry surface — and exists only so abuse can be
+// investigated after the fact.
+model WaitlistSignup {
+  id String @id @default(cuid())
+
+  email String @unique
+
+  // Where the signup came from, e.g. "saroh.in". Free text, never trusted for
+  // authorization — it is analytics only.
+  source String?
+
+  ipHash String?
+
+  // Set when the batch containing this signup is opened, so "who is still
+  // waiting" is a query rather than a spreadsheet.
+  invitedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([invitedAt])
+}

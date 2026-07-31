@@ -31,6 +31,9 @@ module.exports = {
         // DB-backed orders.service.spec.ts still runs here.
         "<rootDir>/src/modules/orders/order-state.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
+        // The waitlist spec mocks Prisma (pure unit test) and runs in the
+        // default/unit project — keep it out of the DB-backed run.
+        "<rootDir>/src/modules/waitlist/",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
     globalSetup: "<rootDir>/test/global-setup.ts",

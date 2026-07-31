@@ -20,6 +20,8 @@ const formSchema = z.object({
 
 interface WaitlistResponse {
     status?: "success" | "failure";
+    /** False when the address was already on the list. */
+    created?: boolean;
     reason?: { code?: string };
 }
 
@@ -30,48 +32,51 @@ export default function JoinWaitlist() {
             email: "",
         },
     });
-    function onSubmit(data: z.infer<typeof formSchema>) {
-        console.log({ data });
-        fetch("/api/waitlist", {
-            method: "POST",
-            body: JSON.stringify(data),
-            headers: {
-                "Content-Type": "application/json",
-            },
-        })
-            .then((res) => res.json() as Promise<WaitlistResponse>)
-            .then((json) => {
-                if (json.status === "success") {
-                    toast({
-                        description:
-                            "Thanks for joining the waitlist! We'll be in touch soon.",
-                    });
 
-                    form.reset();
-                }
-                if (json.status === "failure") {
-                    if (json.reason?.code === "P2002") {
-                        return toast({
-                            title: "Email already exists in the waitlist.",
-                            variant: "destructive",
-                        });
-                    }
-                    toast({
-                        title: "An error occurred. Please try again later.",
-                        variant: "destructive",
-                        // description: json.reason.,
-                    });
-                    console.error(json.reason);
-                }
-            })
-            .catch((error: unknown) => {
-                toast({
-                    title: "An error occurred. Please try again later.",
-                    variant: "destructive",
-                    description:
-                        error instanceof Error ? error.message : undefined,
-                });
+    /**
+     * `async` so react-hook-form's `formState.isSubmitting` actually tracks the
+     * request — with the previous non-awaited promise chain it flipped back to
+     * false immediately and the button never showed a pending state.
+     */
+    async function onSubmit(data: z.infer<typeof formSchema>) {
+        try {
+            const res = await fetch("/api/waitlist", {
+                method: "POST",
+                body: JSON.stringify(data),
+                headers: { "Content-Type": "application/json" },
             });
+            const json = (await res.json()) as WaitlistResponse;
+
+            if (json.status === "success") {
+                // A repeat signup is not an error — the address is on the list
+                // either way, which is what the visitor wanted. Saying so is
+                // friendlier than the previous destructive "Email already
+                // exists" toast.
+                toast({
+                    description:
+                        json.created === false
+                            ? "You're already on the list — we'll be in touch."
+                            : "You're on the list. We'll email you when we open your batch.",
+                });
+                form.reset();
+                return;
+            }
+
+            toast({
+                title:
+                    json.reason?.code === "RATE_LIMITED"
+                        ? "Too many attempts. Try again in a minute."
+                        : "Something went wrong. Please try again.",
+                variant: "destructive",
+            });
+            console.error("[waitlist]", json.reason);
+        } catch (error: unknown) {
+            toast({
+                title: "Something went wrong. Please try again.",
+                variant: "destructive",
+                description: error instanceof Error ? error.message : undefined,
+            });
+        }
     }
 
     // `watch`, not `getValues`: getValues does not subscribe to changes, so the
@@ -126,7 +131,11 @@ export default function JoinWaitlist() {
                         <Button
                             type="submit"
                             disabled={!email || submitting}
-                            className="h-11 shrink-0 rounded-lg bg-highlight px-6 font-semibold text-highlight-foreground hover:bg-highlight hover:opacity-90 disabled:opacity-40"
+                            // Disabled is a neutral wash rather than a faded
+                            // lime: bg-highlight at low opacity over the navy
+                            // surface reads olive, which looks like a different
+                            // (broken) colour instead of an inactive control.
+                            className="h-11 shrink-0 rounded-lg bg-highlight px-6 font-semibold text-highlight-foreground hover:bg-highlight hover:opacity-90 disabled:bg-white/10 disabled:text-white/40 disabled:opacity-100"
                         >
                             {submitting ? "Joining…" : "Join the waitlist"}
                         </Button>

@@ -38,6 +38,7 @@ import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
 import { SitesModule } from "./modules/sites/sites.module";
 import { StoresModule } from "./modules/stores/stores.module";
+import { WaitlistModule } from "./modules/waitlist/waitlist.module";
 import { WebhooksModule } from "./modules/webhooks/webhooks.module";
 
 @Module({
@@ -99,6 +100,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         AutomationsModule,
         AnalyticsModule,
         BillingModule,
+        WaitlistModule,
         SelfTestModule,
     ],
 })
