@@ -57,6 +57,48 @@ const config = {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
                 },
+                // The Saroh identity, mirroring tooling/tailwind-config. This
+                // app cannot simply re-export the shared preset: it carries
+                // Aceternity plugins (mini-svg-data-uri grid/dot utilities,
+                // addVariablesForColors) the preset does not have.
+                //
+                // NOTE: addVariablesForColors below flattens theme("colors")
+                // into `--<name>` at :root, which would make these
+                // self-referential. It does not break because @saroh/ui's
+                // globals.css declares the real values in its own `@layer base`
+                // block, which wins on source order. Keep that import.
+                brand: {
+                    DEFAULT: "hsl(var(--brand))",
+                    foreground: "hsl(var(--brand-foreground))",
+                    surface: "hsl(var(--brand-surface))",
+                    "surface-foreground":
+                        "hsl(var(--brand-surface-foreground))",
+                    subtle: "hsl(var(--brand-subtle))",
+                    "subtle-foreground": "hsl(var(--brand-subtle-foreground))",
+                },
+                highlight: {
+                    DEFAULT: "hsl(var(--highlight))",
+                    foreground: "hsl(var(--highlight-foreground))",
+                    subtle: "hsl(var(--highlight-subtle))",
+                    "subtle-foreground":
+                        "hsl(var(--highlight-subtle-foreground))",
+                },
+                success: {
+                    DEFAULT: "hsl(var(--success))",
+                    foreground: "hsl(var(--success-foreground))",
+                },
+            },
+            fontFamily: {
+                sans: ["var(--font-sans)", "ui-sans-serif", "system-ui"],
+                display: ["var(--font-display)", "ui-sans-serif", "system-ui"],
+                mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+            },
+            boxShadow: {
+                xs: "var(--shadow-xs)",
+                sm: "var(--shadow-sm)",
+                md: "var(--shadow-md)",
+                lg: "var(--shadow-lg)",
+                xl: "var(--shadow-xl)",
             },
             borderRadius: {
                 lg: "var(--radius)",

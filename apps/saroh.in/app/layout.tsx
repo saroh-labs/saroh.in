@@ -24,10 +24,27 @@ const fontDisplay = localFont({
     variable: "--font-display",
 });
 
+// The previous copy ("Create blogs, portfolios or storefronts") described the
+// product two rewrites ago — it is a modular business platform now, and the
+// title is what a search result shows.
 export const metadata: Metadata = {
-    title: "Create blogs, portfolios or storefronts | saroh.in",
+    metadataBase: new URL("https://saroh.in"),
+    title: "Saroh — run your whole business from one place",
     description:
-        "Create your own blog, portfolio or storefront with ease. Easily manage your online presence with saroh.",
+        "Website, commerce, appointments and CRM in one system. Switch on only the modules your business needs and add the rest as you grow.",
+    openGraph: {
+        type: "website",
+        siteName: "Saroh",
+        title: "Saroh — run your whole business from one place",
+        description:
+            "Website, commerce, appointments and CRM in one system. Switch on only the modules your business needs.",
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "Saroh — run your whole business from one place",
+        description:
+            "Website, commerce, appointments and CRM in one system. Switch on only the modules your business needs.",
+    },
 };
 
 export default function RootLayout({
@@ -36,7 +53,10 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en">
+        // next-themes writes `class` and `color-scheme` onto <html> before
+        // React hydrates, which the server render cannot know about — without
+        // this the page logs a hydration mismatch on every load.
+        <html lang="en" suppressHydrationWarning>
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
             >
