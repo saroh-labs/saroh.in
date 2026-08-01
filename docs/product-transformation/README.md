@@ -1,77 +1,64 @@
 # Product transformation
 
-Repository-backed plan for turning Saroh into a commerce-first operating system.
+Repository-backed plan for turning Saroh into a commerce-led operating system.
 
-Started 2026-07-31 against `development` @ `3066a81`.
+Audit cycle completed 2026-07-31 against `development` @ `9aa1899`.
+**No application code, schema, migration, dependency, environment or deployment
+configuration was modified during this cycle.**
 
-## Read these first
+## Documents
 
-| Document                                                   | Status   | What it is                                                                                       |
-| ---------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| [`current-state-audit.md`](./current-state-audit.md)       | **Done** | What the code actually does, with file paths. Four findings that change the brief's assumptions. |
-| [`implementation-backlog.md`](./implementation-backlog.md) | **Done** | Prioritised, sequenced work with acceptance criteria.                                            |
+| Document                                                       | What it is                                                                                                  |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [`current-state-audit.md`](./current-state-audit.md)           | What the code actually does, with file paths and confidence levels. Includes corrections to the first pass. |
+| [`security-remediation.md`](./security-remediation.md)         | Nine findings with evidence, impact, alternatives and acceptance criteria.                                  |
+| [`domain-boundaries.md`](./domain-boundaries.md)               | Current vs proposed boundaries; Customer Core; the `Project`/`Store` question.                              |
+| [`product-north-star.md`](./product-north-star.md)             | Positioning, first launch persona, success measures.                                                        |
+| [`information-architecture.md`](./information-architecture.md) | Current IA, proposed IA, capability visibility, command centre.                                             |
+| [`implementation-backlog.md`](./implementation-backlog.md)     | Prioritised, sequenced work with hard prerequisites.                                                        |
 
-## Written when the work reaches them
+Written as the work reaches them, to avoid documents that restate the brief:
+`idempotency-design.md` (during SEC-001) · `customer-core-plan.md` and
+`module-dependencies.md` (during ARCH-001) · `rls-rollout.md` (during SEC-004) ·
+`global-commerce-readiness.md` and `launch-readiness.md` (Phase 4).
 
-The transformation brief lists twelve documents. The remaining ten are
-deliberately **not** written yet — each one either restates the brief or
-front-runs a decision the code has not been analysed for. Writing them now would
-produce exactly the "documentation that merely repeats this prompt" the brief
-warns against.
+## Findings that changed the plan
 
-| Document                       | Written during | Blocked on                             |
-| ------------------------------ | -------------- | -------------------------------------- |
-| `security-remediation.md`      | Phase 0        | Nothing — starts with SEC-001          |
-| `idempotency-design.md`        | Phase 0        | Design decided as part of SEC-001      |
-| `domain-boundaries.md`         | Phase 1        | ARCH-001 outcome                       |
-| `customer-core-plan.md`        | Phase 1        | Audit §1.1 changed the shape of this   |
-| `module-dependencies.md`       | Phase 1        | ARCH-001                               |
-| `product-north-star.md`        | Phase 1        | Positioning decision (see below)       |
-| `information-architecture.md`  | Phase 2        | ARCH-001, ARCH-003                     |
-| `rls-rollout.md`               | Phase 1–4      | ARCH-002 step 1 is a hard prerequisite |
-| `global-commerce-readiness.md` | Phase 4        | Audit §1.3 shrank this to ~2 items     |
-| `launch-readiness.md`          | Phase 4        | Everything above                       |
+Six, of which two are corrections to this project's own earlier pass.
 
-## The four findings that changed the plan
+1. **Customer Core mostly exists — it is called `Contact`.** Org-scoped, and
+   already owns bookings, messages and consent. Appointments and Communications
+   depend on the CRM _module_, not CRM _data_. Extraction is repackaging.
+2. **The real identity problem is `Customer` vs `Contact`.** Commerce customers
+   are Store-scoped with a **nullable** `organizationId`, reconciled manually.
+   Harder than assumed — and it blocks RLS.
+3. **RLS is far more built than "inert" implied** _(correction)_ — 113 policies,
+   65 tables, a correct transaction-local proxy. But the policies **fail open**
+   when the tenant GUC is unset, and the runtime role has `BYPASSRLS`.
+4. **The publication pipeline is real and already versioned** _(correction)_ —
+   `getSiteData` is dead legacy code with zero callers. The gap is brand fields,
+   not the pipeline.
+5. **Money is `Decimal(_,2)`, not minor units** — hard-codes a two-decimal
+   assumption that JPY and KWD do not fit.
+6. **The outcome vocabulary already exists** in `/onboarding/modules` and is
+   discarded the moment onboarding ends. Highest value-per-effort in the backlog.
 
-Detail in the audit; summarised because they alter cost and order.
+## Decisions required from the product owner
 
-1. **Customer Core mostly exists** — it is called `Contact`, and Appointments
-   and Communications already bind to it. Extracting it is repackaging, not
-   greenfield. _Cheaper and earlier than the brief assumed._
-2. **The real problem is `Customer` vs `Contact`** — commerce customers are
-   Store-scoped with a **nullable** `organizationId`, and reconciliation is
-   manual. _Harder than the brief assumed, and it blocks RLS._
-3. **Global readiness is nearly done** — currencies default to `USD`, bookings
-   already store UTC + IANA timezone. One `INR` default and one `₹` remain.
-   _Downgraded from a phase to two backlog items._
-4. **`Project` has no domain meaning** — and competes with `Store`, which is
-   where commerce data actually hangs. _Needs an ADR before any rename._
+| #   | Decision                                                                                             | Blocks                             |
+| --- | ---------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| 1   | Commerce-**led** or commerce-**only**? The code is genuinely module-neutral.                         | IA, marketing, onboarding defaults |
+| 2   | `Project` vs `Store` — which container do merchants see? Three options in `domain-boundaries.md` §4. | ARCH-003                           |
+| 3   | Fix the unified-customer claim, or stop making it? It is currently false.                            | LAUNCH-001, SEC-005 priority       |
+| 4   | Waitlist or open signup?                                                                             | Launch readiness, marketing CTAs   |
+| 5   | Pricing shape — base + capabilities + usage?                                                         | Entitlements, packaging            |
+| 6   | Money: migrate to minor units, or keep `Decimal` with a per-currency exponent?                       | GLOB-002                           |
 
-## Open decisions needed from the product owner
+## Ground rules
 
-These are not engineering calls and block specific items:
-
-1. **Positioning.** The brief says commerce-first. The code is genuinely
-   module-neutral, and Appointments/CRM/Website are as built as Commerce.
-   Committing to commerce-first is a _marketing and defaults_ decision, not a
-   code one — confirm before `product-north-star.md`.
-2. **`Project` vs `Store`.** Which is the container merchants see? Blocks
-   ARCH-003.
-3. **Waitlist vs open signup.** The marketing site says waitlist; the product
-   looks launch-ready. Blocks LAUNCH-001.
-4. **Pricing model.** Base + capabilities + usage, per the brief — needs
-   confirmation before entitlements are reshaped.
-
-## Ground rules held throughout
-
-From the brief, and worth keeping visible:
-
-- `api.saroh.in` stays the only database-facing service. No microservices, no
-  second backend, no frontend reaching Postgres.
+- `api.saroh.in` stays the only database-facing service.
 - Modularity is preserved internally; the _interface_ becomes outcome-driven.
 - Disabling a capability never deletes merchant data.
-- Merchant sites never inherit Saroh's brand — the `--site-*` layer stays
-  separate.
+- Merchant sites never inherit Saroh's brand.
 - No security defect gets papered over with UI work.
 - Every recommendation cites repository evidence.

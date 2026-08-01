@@ -1,300 +1,501 @@
 # Current-state audit
 
-> Audited 2026-07-31 against `development` @ `3066a81`.
-> Every claim below cites a file path. Where this audit contradicts the
-> transformation brief, the repository won.
+> Audit-only cycle. Audited 2026-07-31 against `development` @ `9aa1899`.
+> No application code, schema, migration, dependency, env or deploy config was
+> modified during this cycle.
+>
+> Where this audit contradicts the transformation brief, **the repository won**.
 
-Legend for confidence:
+**Confidence legend**
 
-- **CONFIRMED** — reproduced or read directly in the code.
-- **INFERRED** — read from code but not exercised; needs validation.
-- **RECOMMENDATION** — a product/architecture opinion, not a defect.
+- **CONFIRMED** — reproduced against a running system, or read directly in code.
+- **INFERRED** — read but not exercised; needs validation before acting.
+- **RECOMMENDATION** — opinion, not a defect.
 
 ---
 
-## 1. Four findings that change the plan
+## 0. Corrections to the previous cycle
 
-The brief makes reasonable assumptions that the code does not bear out. These
-change sequencing and cost, so they are stated first.
+Two claims in the first audit pass were wrong. Both are corrected below and in
+the backlog.
 
-### 1.1 Customer Core is ~80% built already — it is called `Contact`
+| Previous claim               | Reality                                                                                                                            | Where |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| "Site publishing is a stub"  | **False.** The pipeline is real _and versioned_. `getSiteData` is dead legacy code with zero callers                               | §7    |
+| "RLS is installed but inert" | **Understated.** The full enforcement layer exists — transaction-local context, ALS, an RLS-aware Prisma proxy — and is flag-gated | §8    |
 
-**CONFIRMED.** `packages/database/prisma/schema.prisma:1592`
+This is the value of the audit-only cycle: both would have produced wasted work.
 
-`Contact` is already the organization-level person record, and it already owns
-the relationships Customer Core is supposed to own:
+---
+
+## 1. Applications, packages and request flows
+
+**CONFIRMED.**
+
+### Applications (10)
+
+| App                                        | Role                                                           | Port (dev) |
+| ------------------------------------------ | -------------------------------------------------------------- | ---------- |
+| `apps/api.saroh.in`                        | NestJS. **Only** DB-facing service. 42 controllers, 180 routes | 3333       |
+| `apps/app.saroh.in`                        | Merchant workspace, 44 routes                                  | 3003       |
+| `apps/accounts.saroh.in`                   | Identity — sign-up/in, account settings                        | 3000       |
+| `apps/admin.saroh.in`                      | Staff control plane                                            | 3001       |
+| `apps/saroh.in`                            | Marketing                                                      | 3007       |
+| `apps/sites.saroh.in`                      | Merchant site renderer (hostname → tenant)                     | 3009       |
+| `apps/templates.saroh.in`                  | Template gallery                                               | 3006       |
+| `apps/ui.saroh.in`                         | Design-system gallery                                          | 3011       |
+| `apps/docs.saroh.in`, `apps/help.saroh.in` | Nextra docs                                                    | —          |
+
+### Packages (8)
+
+`database` · `ui` (49 components) · `auth` · `emails` · `object-storage` ·
+`templates` · `charts` · `utils`
+
+### Route counts
+
+`@Get` 76 · `@Post` 54 · `@Delete` 27 · `@Put` 14 · `@Patch` 9 = **180**.
+
+### Key request flows
+
+1. **Authenticated org-scoped request.**
+   `BetterAuthGuard` → `OrganizationGuard` (resolves tenant onto
+   `request.organizationContext`) → `OrgRlsInterceptor` (opens the ALS org
+   scope) → controller → service → RLS-aware `prisma` proxy.
+   `apps/api.saroh.in/src/common/guards/organization.guard.ts`,
+   `common/interceptors/org-rls.interceptor.ts`
+
+2. **Admin request.** `BetterAuthGuard` → `PlatformAdminGuard` (resolves staff
+   roles/permissions per request, uncached) → `PlatformPermissionGuard` →
+   controller. `common/guards/platform-admin.guard.ts`
+
+3. **Public/unauthenticated.** No guards by design. Owning org derived
+   server-side from the target resource, never from the client.
+   `modules/enquiry/enquiry.controller.ts`,
+   `modules/payments/public-payments.controller.ts`,
+   `modules/waitlist/waitlist.controller.ts`
+
+4. **Merchant site render.** Request to a tenant hostname → `middleware.ts`
+   rewrite to `/[domain]/*` → `getPublicationForHost` → API
+   `public-sites.controller.ts` → `Site.currentPublication.snapshot`.
+
+5. **Background work.** `JobWorkerService` polls `prisma-job-queue`, dispatches
+   through `JobHandlerRegistry`. **Runs with no org context** (see §8.3).
+
+---
+
+## 2. The three defects — verification
+
+All three **reproduced or read directly**. Full remediation detail in
+[`security-remediation.md`](./security-remediation.md).
+
+| ID      | Defect                                                       | Status                          |
+| ------- | ------------------------------------------------------------ | ------------------------------- |
+| SEC-001 | Idempotency replay silently discards a mutation              | **CONFIRMED — reproduced live** |
+| SEC-002 | Admin authorization fails **open** on missing route metadata | **CONFIRMED — read**            |
+| SEC-003 | `AdminAccessService.authorize()` has zero production callers | **CONFIRMED — grep**            |
+
+Reproduction of SEC-001 against a running API (2026-07-31):
+
+```
+PUT /admin/flags/MODULE_INSIGHTS {enabled:false, idempotencyKey:K} → flag=false
+PUT /admin/flags/MODULE_INSIGHTS {enabled:true,  idempotencyKey:K} → HTTP 200 {"ok":true}
+                                                                     flag STILL false
+                                                                     no FeatureFlagAudit row
+```
+
+Reproduction of the related access-session replay:
+
+```
+POST .../access-sessions {key:K}   → 201 id=S, expiresAt=T
+DELETE .../access-sessions/S       → 200, revokedAt set in DB
+POST .../access-sessions {key:K}   → 201 id=S, expiresAt=T   ← revoked session returned as fresh
+```
+
+---
+
+## 3. Module dependency graph
+
+**CONFIRMED.** `apps/api.saroh.in/src/modules/capabilities/module-registry.ts`
+
+```
+WEBSITE      ──▶ (none)
+COMMERCE     ──▶ (none)
+CRM          ──▶ (none)
+INSIGHTS     ──▶ (none)          readiness: needs an event-producing module
+PAYMENTS     ──▶ (none)          readiness: needs Commerce|Appointments + healthy provider
+APPOINTMENTS ──▶ CRM
+COMMUNICATIONS ▶ CRM
+AUTOMATIONS  ──▶ CRM
+```
+
+**Finding — the declared dependency overstates the real one.**
+`Booking.contactId → Contact` (`schema.prisma:1966`) and `Message → Contact`.
+Neither touches `Lead` or `Pipeline`. The dependency is on the **`Contact`
+table**, not on Sales-CRM concepts. See §4.
+
+**User impact.** A studio that only takes bookings is told it needs a CRM and is
+shown pipeline concepts it will never use.
+
+---
+
+## 4. Where customer, contact, CRM, order and booking live
+
+**CONFIRMED.** `packages/database/prisma/schema.prisma`
+
+| Concept              | Model                  | Line | Scope                                                     |
+| -------------------- | ---------------------- | ---- | --------------------------------------------------------- |
+| Commerce customer    | `Customer`             | 473  | **Store** (`storeId` required, `organizationId` NULLABLE) |
+| Person / CRM contact | `Contact`              | 1592 | Organization                                              |
+| Link between them    | `CustomerIdentityLink` | 1244 | Organization — **manual**, `linkedByUserId`               |
+| Sales pipeline       | `Lead`                 | 1738 | Organization                                              |
+| Consent              | `Consent`              | 2227 | attached to `Contact`                                     |
+| Order                | `Order`                | —    | Store                                                     |
+| Booking              | `Booking`              | 1966 | `contactId → Contact`                                     |
+
+### 4.1 `Contact` is already ~80% of "Customer Core"
 
 ```prisma
 model Contact {
-  organizationId String        // org-scoped, not module-scoped
-  email     String             // "the primary identity", deduped per org
+  organizationId String       // org-scoped
+  email     String            // "the primary identity", deduped per org
   leads       Lead[]
   submissions Submission[]
-  bookings    Booking[]        // Appointments already binds here
-  messages    Message[]        // Communications already binds here
-  consents    Consent[]        // consent already lives here
+  bookings    Booking[]       // Appointments already binds here
+  messages    Message[]       // Communications already binds here
+  consents    Consent[]       // consent already lives here
   identityLinks CustomerIdentityLink[]
 }
 ```
 
-`Booking.contactId` → `Contact` (`schema.prisma:1966`). So **Appointments and
-Communications already depend on the Contact table, not on Sales-CRM concepts**
-(`Lead`, `Pipeline`).
+**Implication.** Extracting Customer Core is a **repackaging and dependency
+retarget**, not a greenfield domain build. Substantially cheaper than the brief
+assumes, and it can land early.
 
-The dependency on CRM is declared at the _module_ level, not the data level:
-
-```ts
-// apps/api.saroh.in/src/modules/capabilities/module-registry.ts:129
-{ key: "APPOINTMENTS", dependencies: ["CRM"], ... }
-```
-
-**Implication:** extracting Customer Core is largely a _repackaging and naming_
-exercise plus an auto-link job — not building a new domain. This is
-substantially cheaper than the brief assumes, and it can land early.
-
-### 1.2 The real customer problem is `Customer` vs `Contact`, and it is worse than described
-
-**CONFIRMED.** `schema.prisma:473`
+### 4.2 The real problem: `Customer` ≠ `Contact`
 
 ```prisma
 model Customer {
-  storeId        String        // REQUIRED — scoped to a Store, not the org
-  organizationId String?       // OPTIONAL
-  email          String        // "NOT globally unique, unique per store"
+  storeId        String       // REQUIRED
+  organizationId String?      // OPTIONAL  ← RLS blocker
+  email          String       // "NOT globally unique, unique per store"
   @@unique([storeId, email])
 }
 ```
 
-Three consequences:
+Consequences:
 
-1. One human buying from two of the same merchant's stores is **two `Customer`
-   rows**.
-2. `Customer.organizationId` being **nullable** means commerce customers are not
-   reliably org-scoped — this is also an RLS blocker (§4.3).
-3. Reconciling a `Customer` to a `Contact` is **manual**:
-   `CustomerIdentityLink.linkedByUserId` (`schema.prisma:1253`) — a person has to
-   press a button.
+1. One person buying from two of a merchant's stores = **two `Customer` rows**.
+2. `organizationId` nullable ⇒ commerce customers are **not reliably
+   org-scoped**. A tenant policy keyed on that column cannot protect them.
+3. Reconciliation is **manual** (`linkedByUserId`).
 
-So "the same customer record sits behind an order and a booking" — which the
-marketing site now claims — **is not true today** unless a human linked them by
-hand.
+**User impact.** The merchant sees the same human as separate records.
+**Business impact.** The marketing site now claims "the same customer record is
+behind an order and a booking" — **that claim is currently false**.
+**Data-integrity impact.** Nullable tenant key on a customer-data table.
 
-### 1.3 The platform is far more globally ready than the brief assumes
+---
 
-**CONFIRMED.** Currency/timezone defaults in `schema.prisma`:
-
-| Line          | Field              | Default                              |
-| ------------- | ------------------ | ------------------------------------ |
-| 388, 550, 769 | `currency`         | `"USD"`                              |
-| 768           | `timezone`         | `"UTC"`                              |
-| 1914          | `Service.currency` | ISO 4217, nullable                   |
-| 1916, 1971    | `timezone`         | IANA, stored per Service/Booking     |
-| **2385**      | `currency`         | **`"INR"`** ← the only India default |
-
-Bookings already store absolute UTC plus the display timezone the booker saw,
-DST-correct (`schema.prisma:1886-1887`). Country fields exist at `:192`, `:486`.
-
-Hardcoded `INR`/`₹`/`en-IN` in non-test source is **one file**:
-`apps/app.saroh.in/components/bookings/create-service-form.tsx`.
-
-**Implication:** §9 of the brief ("remove India-only assumptions") is nearly
-done. The remaining work is one schema default, one form, and money-as-minor-
-units verification — not a platform-wide abstraction programme. Downgrade from
-a phase to a handful of backlog items.
-
-### 1.4 `Project` has no domain meaning at all
+## 5. Organization and Project — actual meaning
 
 **CONFIRMED.** `schema.prisma:1153`
 
-`Project` carries `name`, `slug`, `access[]`, `modules[]` — and nothing else. It
-is a permission-and-module scoping container with no business semantics. It is
-_not_ a Store: `Store` is its own model and `Customer.storeId` points there.
+`Project` carries `name`, `slug`, `access[]`, `modules[]` — **and nothing else**.
+It is a permission-and-module scoping container with no business semantics.
 
-So there are currently **two competing sub-org containers** — `Project` and
-`Store` — and commerce data hangs off `Store` while module selection hangs off
-`Project`. That, not the word "Project", is the actual problem.
+Critically, it is **not** the commerce container: `Store` is its own model and
+`Customer.storeId`/`Order` hang off `Store`, not `Project`.
+
+**Finding.** There are two competing sub-organization containers:
+
+```
+Organization ──▶ Project ──▶ ProjectModule      (capability selection, access)
+     └────────▶ Store   ──▶ Customer, Order     (commerce data)
+```
+
+The problem is not the _word_ "Project" — it is that module selection and
+commerce data hang off different containers.
+
+**RECOMMENDATION.** ADR before any rename. Migration consequences must be
+written down first.
 
 ---
 
-## 2. Confirmed security and correctness defects
+## 6. Merchant navigation, dashboard, onboarding, empty states
 
-All three were **reproduced live** during the 2026-07-31 session, not read.
+**CONFIRMED** — inspected in-browser 2026-07-31 as an org owner with all 8
+modules enabled.
 
-### 2.1 P0 — Idempotency replay silently discards a mutation
+### 6.1 Navigation mirrors the module registry
 
-**CONFIRMED (reproduced).**
-`apps/api.saroh.in/src/modules/admin/admin.controller.ts:190-195`,
-`apps/api.saroh.in/src/modules/feature-flags/feature-flags.service.ts:82`
+Sidebar groups: `CUSTOMERS` · `APPOINTMENTS` · `COMMERCE` · `WEBSITE` ·
+`INSIGHTS` · `SETTINGS` — i.e. the architecture rendered as navigation.
 
-The key omits the value being written:
+### 6.2 Onboarding is already outcome-framed — then abandoned
 
-```ts
-idempotencyKey: [user.id, "flags.global.set", flagKey, dto.idempotencyKey].join(
-    ":",
-);
-```
+`apps/app.saroh.in/app/onboarding/modules/page.tsx` asks _"What does your
+business need to do?"_ with cards: **Show up online · Manage customers & leads ·
+Take appointments · Sell products · Take payments · Message customers · Automate
+follow-ups · See performance**.
 
-Reproduced against a running API:
+This is precisely the vocabulary the brief asks for — and it is **discarded the
+moment onboarding ends**. The user is handed a sidebar of module names instead.
 
-```
-PUT enabled=false key=K  → flag = false
-PUT enabled=true  key=K  → HTTP 200 {"ok":true}, flag STILL false, no audit row
-```
+**This is the single highest-leverage UX finding in the audit:** the language
+already exists and tests well; it just needs to survive into the shell.
 
-**Impact:** an incident-time rollback run from a script with a stable key
-reports success and changes nothing. The flag history shows only the first
-write. The admin UI dodges it only because `flag-card.tsx` mints a random UUID
-per click — the API is the contract, and the API is wrong.
+### 6.3 Home is action-oriented already
 
-### 2.2 P0 — Access-session replay returns a revoked session as a fresh grant
+`/` renders "Do this next" plus a next-best-action list with `Setup` / `Overdue`
+badges. A reasonable foundation for the command centre — extend, don't replace.
 
-**CONFIRMED (reproduced).**
-`apps/api.saroh.in/src/modules/admin/admin-access.service.ts:107-110`
+### 6.4 Empty states are competent but terminal
 
-```ts
-const replay = await tx.adminAccessSession.findUnique({
-    where: { idempotencyKey },
-});
-if (replay) return replay; // returns BEFORE the lifecycle checks at :112-126
-```
+`Commerce` renders "No sales channels yet → Create a store". It explains and
+offers one action, but offers no import, no sample data, and no illustration of
+what the populated state looks like.
 
-Reproduced: open → revoke → replay same key → `201` with the same session id and
-the original `expiresAt`, still `revokedAt` in the DB, no audit event written,
-and the `DELETED_RETAINED` org check at `:119-126` never runs.
-
-### 2.3 P0 — Authorization fails **open** on missing route metadata
-
-**CONFIRMED (read).**
-`apps/api.saroh.in/src/common/guards/platform-permission.guard.ts:32`
-
-```ts
-if (!required || required.length === 0) return true;
-```
-
-Compounded by the contract test being a hand-maintained list — a newly added
-handler is simply absent from `AdminMethod` and the spec still passes
-(`admin.controller.permissions.spec.ts:12-25`).
-
-Nothing is ungated _today_ (every current route carries
-`@RequireAdminPermission` except the deliberately identity-only `/admin/me`),
-but the default for the next route added is ungated.
-
-### 2.4 P1 — `AdminAccessService.authorize()` has zero production callers
-
-**CONFIRMED.** A repo-wide search for `.authorize(` returns the definition plus
-five calls, all in `admin-access.service.spec.ts`.
-
-The ledger writes `organization.access.open` events asserting a gated
-support-access control that is not wired to anything. `expire()` is only
-reachable from `authorize()`, so sessions are never marked expired — rows sit at
-`revokedAt: null` past `expiresAt` indefinitely.
-
-### 2.5 P2 — lower-severity admin issues
-
-- **Nobody can revoke another staff member's session.** `revoke()` requires
-  `actorUserId === staff.userId` (`admin-access.service.ts:233-240`), so a
-  Platform Owner cannot close a compromised engineer's session.
-- **Denials audit through an error-swallowing path.** `deny()` uses
-  `recordRead()` (`admin-audit.service.ts:84-96`), which catches and logs. A
-  denial is the signal the ledger exists to capture; it should fail closed.
-- **Concurrent duplicate keys surface as 500,** not 409 — `wasAlreadyAudited` is
-  SELECT-then-INSERT under READ COMMITTED and the loser's `P2002` is unmapped.
+**Blocked finding.** Every screen reviewed was an empty state, because the dev
+DB has 0 contacts, 0 services, 0 bookings, 3 products, 2 orders. **UX work on
+populated states is blocked until seed data exists.**
 
 ---
 
-## 3. Multi-tenancy and isolation
+## 7. Website publication pipeline — CORRECTED
 
-### 3.1 RLS is installed but inert — CONFIRMED
+**CONFIRMED.** The pipeline is **real and already versioned**. The previous
+audit's "stub" claim was wrong.
 
-Policies exist in migrations, but the enforcement flag is off and the runtime
-role has `BYPASSRLS`. Tenant isolation today is **entirely application-layer**
-`organizationId` scoping.
+```
+Merchant edits Site/Page
+   → POST /sites/:siteId/publish            sites.controller.ts:109 (requires site:publish)
+   → Publication row created                schema.prisma:1504
+       snapshot Json                        "fully-resolved, sanitized page(s)+sections"
+       templateId + templateVersion
+       publishedAt                          "immutable; republish == new row"
+   → Site.currentPublication pointer updated
+   ─────────────────────────────────────────
+Visitor hits tenant hostname
+   → sites middleware.ts rewrites to /[domain]/*
+   → getPublicationForHost()                sites.saroh.in/lib/publication.ts:219
+   → GET api /public/sites/...              public-sites.controller.ts
+       "serves nothing but currentPublication.snapshot; drafts and unpublished are 404"
+   → section-renderer.tsx renders sections
+```
 
-### 3.2 Blockers that must be fixed _before_ RLS can be switched on
+**Already present:** immutable versioned snapshots · republish-as-new-row (so
+rollback is a pointer move) · template versioning · draft/unpublished never
+served · org-scoped.
 
-**CONFIRMED.** These are why "just enable RLS" is not a one-step task:
+**The actual gaps:**
 
-1. **`Customer.organizationId` is nullable** (`schema.prisma:477`). A tenant
-   policy keyed on `organizationId` cannot protect rows where it is null.
-2. **`Customer` is Store-scoped**, so the tenant predicate has to traverse
-   `Store → Organization` rather than read a local column — slower and easier to
-   get wrong.
-3. Pooled connections mean tenant context must be **transaction-local**, not
-   session-local, or context leaks between requests.
-
-**Recommendation:** backfill and require `Customer.organizationId` _before_ any
-RLS work. It is a prerequisite, not a parallel task.
-
----
-
-## 4. Product architecture
-
-### 4.1 Module dependencies overstate coupling — CONFIRMED
-
-`module-registry.ts` declares `APPOINTMENTS → CRM`, `COMMUNICATIONS → CRM`,
-`AUTOMATIONS → CRM`. As §1.1 shows, the true data dependency is on `Contact`,
-not on `Lead`/`Pipeline`.
-
-**Impact:** a merchant who only wants bookings is told they need a CRM, and the
-onboarding shows them pipeline concepts they will never use.
-
-### 4.2 Navigation exposes architecture, not outcomes — CONFIRMED
-
-`apps/app.saroh.in` sidebar groups are CUSTOMERS / APPOINTMENTS / COMMERCE /
-WEBSITE / INSIGHTS / SETTINGS — i.e. the module registry rendered as navigation.
-Verified in-browser 2026-07-31.
-
-The onboarding screen (`/onboarding/modules`) is **already outcome-framed**
-("Show up online", "Sell products", "Take appointments") — so the vocabulary the
-brief asks for exists; it is just abandoned after onboarding.
-
-### 4.3 Site publishing is a stub — CONFIRMED
-
-- `apps/sites.saroh.in/lib/fetchers.ts:51` — `getSiteData()` returns
-  `Promise.resolve(null)`, always.
-- The publication snapshot (`lib/publication.ts`) carries **no brand fields** —
-  grep for theme/colour/font returns nothing. Content types are `HeroContent`,
-  `CtaContent`, `GalleryContent` etc. only.
-- A `--site-*` token layer now exists (`app/[domain]/layout.tsx`, commit
-  `2b2add5`) with defaults matching the previous hardcoded greys, so the
-  _rendering_ side is ready. Nothing feeds it.
+1. **No brand fields in the snapshot.** `lib/publication.ts` content types are
+   `HeroContent`, `CtaContent`, `GalleryContent`, `EnquiryField` — grep for
+   colour/font/theme returns nothing. A `--site-*` token layer exists
+   (`app/[domain]/layout.tsx`, commit `2b2add5`) and is fed **defaults only**.
+2. **No rollback UI** — the data model supports it; nothing exposes it.
+3. **`getSiteData` (`lib/fetchers.ts:51`) is dead legacy** returning `null`
+   always, with zero callers. Delete, don't "fix".
 
 ---
 
-## 5. Delivery and environment
+## 8. Tenant isolation, Prisma access, RLS — CORRECTED
+
+**CONFIRMED.** Far more complete than the previous audit stated.
+
+### 8.1 What exists
+
+- **113 policies across 65 tables**, in four migrations
+  (`20260718123258_rls_org_isolation`, `..._stage2_7`, `..._empty_string_safe`,
+  `..._rls_child_tables`).
+- **`runInOrgContext(orgId, fn)`** — `AsyncLocalStorage` scope
+  (`packages/database/src/rls-proxy.ts`).
+- **RLS-aware Prisma proxy** that wraps the ambient client so every org-scoped
+  operation runs in a short transaction whose first statement is
+  `set_config('app.current_organization_id', …, is_local => true)`.
+- **`OrgRlsInterceptor`** opens that scope per org-scoped request, subscribing
+  _inside_ the ALS scope so async continuations inherit it.
+- **Per-operation micro-transactions**, deliberately not one long transaction —
+  so a handler making an external call mid-request never holds a transaction
+  open across network I/O.
+
+This is a correct design for pooled connections. Transaction-local, not
+session-local.
+
+### 8.2 Why it is not active
+
+1. `RLS_ENFORCEMENT` flag is **off** — the proxy is a transparent pass-through.
+2. The runtime DB role still has **`BYPASSRLS`**.
+
+### 8.3 The policy design is **fail-open** — key finding
+
+```sql
+CREATE POLICY "org_isolation" ON "Store"
+  USING (current_setting('app.current_organization_id', true) IS NULL
+         OR "organizationId" = current_setting('app.current_organization_id', true));
+```
+
+If the GUC is unset, **the policy permits everything**. Per the proxy docstring
+this is deliberate — "background jobs and public endpoints run with NO org id in
+the ALS … the policies' permissive branch → cross-org access, as the job worker
+requires."
+
+**Consequences.**
+
+- RLS protects the **org-scoped HTTP path only**. Jobs, webhooks and public
+  endpoints are unprotected by RLS _by design_.
+- Any future code path that forgets to establish context silently gets
+  full-table access rather than an error.
+- The brief's §7 asks for RLS tests covering jobs/webhooks/public endpoints —
+  under this design those tests would pass **trivially and misleadingly**.
+
+**RECOMMENDATION.** Keep the permissive branch for the job worker, but pair it
+with an explicit, auditable "system context" rather than absence-of-context, so
+"no context" can eventually become deny.
+
+### 8.4 Blocker before enforcement
+
+`Customer.organizationId` is nullable (§4.2). A tenant policy keyed on it cannot
+protect those rows. **Backfill and require it before enabling RLS.**
+
+### 8.5 No cross-tenant tests
+
+**CONFIRMED.** Isolation is the platform's core safety property and nothing
+asserts it. No negative test attempts a cross-tenant read or write.
+
+---
+
+## 9. Environment, migrations, seeding, deployment
 
 **CONFIRMED.**
 
-- Repo-root `.env` `DATABASE_URL` → Neon project `neondb` (7 tables). The API's
-  `apps/api.saroh.in/.env` → `saroh-dev` (81 tables). Root-level `pnpm db:seed`
-  or `db:migrate:deploy` therefore targets the **wrong database**.
-- `.github/workflows/` contains `ci.yml` only — **no CD**.
-- No tracing, metrics, or error aggregation anywhere.
-- The API cannot start from `pnpm start` alone: `createAuth()` runs at import
-  time and throws before `ConfigModule` loads `.env`. Env must be sourced first.
-- Two admin migrations sat unapplied on the dev DB until 2026-07-31 — there is
-  no migration-status visibility in any pipeline.
+| Finding                                                                                                                                                | Evidence                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| Root `.env` → Neon `neondb` (7 tables); API `.env` → `saroh-dev` (81 tables). Root-level `pnpm db:seed` / `db:migrate:deploy` targets the **wrong DB** | both `.env` files                    |
+| **No CD** — `.github/workflows/` contains `ci.yml` only                                                                                                | filesystem                           |
+| API cannot start via `pnpm start` alone — `createAuth()` runs at import time and throws before `ConfigModule` loads `.env`                             | `common/auth/auth.ts`                |
+| Two admin migrations sat unapplied on dev until 2026-07-31; no migration-status visibility in any pipeline                                             | `prisma migrate status`              |
+| Integration tests **do** have a DB guard refusing to run against non-test databases                                                                    | `apps/api.saroh.in/test/db-guard.ts` |
+| Seed exists but is thin — `packages/database/src/seed.ts` creates no credential, so the seeded user cannot log in                                      | `seed.ts`                            |
 
 ---
 
-## 6. Testing
+## 10. Observability, logging, jobs, webhooks
 
-**CONFIRMED.** 675 unit tests / 72 suites, all passing. Separate DB-backed
-integration project with a guard that refuses to run against dev or prod. A
-bootstrap/DI smoke test compiles the whole module graph.
+**CONFIRMED.** Better than the brief assumes on logging; absent on metrics.
 
-**Gap:** no cross-tenant negative tests. Isolation is the platform's core safety
-property and nothing asserts it.
+### Present
+
+- **Correlation IDs** — `common/logging/correlation-id.middleware.ts`
+- **Structured JSON logger** — `common/logging/structured-logger.ts`
+- **Redaction** — `common/logging/redact.ts` covers `authorization`, `cookie`,
+  `set-cookie`, `x-api-key`, `x-auth-token`, `password*`, `token`
+- **Guard-denial logging** — `http-request-log.ts` with a symbol marker so
+  interceptor and exception filter cannot double-log (added because guards run
+  before interceptors, so 401/403 were previously invisible)
+- **Durable job queue** — `prisma-job-queue.ts`, `job-worker.service.ts`,
+  typed `JobHandlerRegistry`, attempt tracking, unknown-type no-op with error log
+- **Webhook inbox** — signature verified before write; replay idempotent
+
+### Absent
+
+- No metrics of any kind (latency, error rate, queue depth, job failures)
+- No tracing
+- No error aggregation
+- `/health` returns a **static object** — `status:"ok"` unconditionally, with no
+  DB or queue check. It cannot fail, so it is not a readiness probe
+  (`modules/health/health.controller.ts`)
 
 ---
 
-## 7. What this audit does _not_ cover
+## 11. Test, lint and typecheck baseline
 
-Stated so the backlog is not mistaken for complete:
+**Commands run this cycle** — see §13.
 
-- `admin-metrics.service.ts` and several spec files were not read in depth.
-- Commerce, Orders, Payments and Automations internals were not audited beyond
-  their schema and module registration.
-- No performance, load or cost analysis.
-- No review of `packages/emails`, `packages/charts`, `packages/object-storage`.
-- Frontend accessibility was verified for the design tokens only, not per screen.
+| Gate                                                                      | Result                     |
+| ------------------------------------------------------------------------- | -------------------------- |
+| API unit tests                                                            | **675 passed / 72 suites** |
+| Typecheck — api, application, auth, web, sites, ecom-templates, ui, admin | **0 errors, all 8**        |
+| Lint — api, auth, sites, ecom-templates, ui, admin                        | **0 errors**               |
+| Lint — `application` (`app.saroh.in`)                                     | **28 errors, 6 warnings**  |
+| Lint — `web` (`saroh.in`)                                                 | 0 errors, **1 warning**    |
+
+Integration tests were **not** run — they require `TEST_DATABASE_URL` pointing at
+a dedicated test database, which is not provisioned locally.
+
+---
+
+## 12. Pre-existing vs newly discovered failures
+
+**No new failures were introduced this cycle** — no code was modified.
+
+### Pre-existing (present before any 2026-07-31 work)
+
+| Failure                                       | Detail                                                                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 28 lint errors + 6 warnings in `app.saroh.in` | mostly `@typescript-eslint/prefer-nullish-coalescing`; verified pre-existing by stashing all changes and re-running |
+| 1 lint warning in `saroh.in`                  | `react-hooks/incompatible-library` on RHF `watch`                                                                   |
+| SEC-001/002/003                               | all predate this session                                                                                            |
+
+### Newly discovered this cycle (not new _failures_ — newly _found_)
+
+| Finding                                                          | Section    |
+| ---------------------------------------------------------------- | ---------- |
+| RLS policies are fail-open when the GUC is unset                 | §8.3       |
+| `Customer.organizationId` nullable blocks RLS                    | §4.2, §8.4 |
+| `/health` cannot fail — not a readiness probe                    | §10        |
+| Money is `Decimal(_,2)`, **not** minor units                     | §14        |
+| No cross-tenant negative tests exist                             | §8.5       |
+| Publication pipeline is versioned already (corrects prior claim) | §7         |
+
+---
+
+## 13. Commands run
+
+```bash
+pnpm --filter @saroh/api test                      # 675 passed / 72 suites
+pnpm --filter <each of 8> typecheck                # 0 errors each
+pnpm --filter <each of 8> lint                     # baseline recorded §11
+grep/find across schema, module registry, guards, interceptors, migrations
+```
+
+No mutating command was run. No migration applied. No dependency installed.
+
+---
+
+## 14. Global-commerce readiness
+
+**CONFIRMED.** Much further along than the brief assumes — with one real gap.
+
+| Aspect                   | State                                                                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| Currency defaults        | `"USD"` at `schema.prisma:388, 550, 769`                                                                                          |
+| Timezone                 | `"UTC"` default; bookings store absolute UTC **plus** the IANA tz the booker saw, DST-correct (`:1886-1887, 1916, 1971`)          |
+| Country fields           | present at `:192, :486`                                                                                                           |
+| India-specific residue   | **one** `@default("INR")` at `:2385`; **one** hardcoded `₹` in `app.saroh.in/components/bookings/create-service-form.tsx`         |
+| **Money representation** | **`Decimal(_,2)`, not minor units** — `apps/api.saroh.in/src/common/money.ts` renders a fixed 2-dp string from a Prisma `Decimal` |
+
+**The money finding is the substantive one.** `Decimal(_,2)` is safe from float
+error (the helper is careful to use string ops only), but it hard-codes a
+**two-decimal assumption**. Zero-decimal currencies (JPY, KRW) and
+three-decimal ones (KWD, BHD) do not fit. This is a genuine
+global-commerce blocker that the brief's "store minor units" instruction
+correctly anticipates.
+
+Everything else in brief §9 is close to done.
+
+---
+
+## 15. What this audit did not cover
+
+Stated so the backlog is not mistaken for complete.
+
+- Commerce, Orders, Payments, Automations **internals** — only their schema,
+  module registration and public surfaces were read.
+- `admin-metrics.service.ts` and most spec files were not read in depth.
+- `packages/emails`, `packages/charts`, `packages/object-storage` unreviewed.
+- Integration test suite not executed (no test DB provisioned).
+- No performance, load, cost or bundle-size analysis.
+- Per-screen accessibility was not audited; only design tokens were verified
+  (50 pairs, WCAG AA, both themes).
+- `docs.saroh.in` / `help.saroh.in` content not reviewed.

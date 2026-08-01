@@ -1,333 +1,318 @@
 # Implementation backlog
 
-> Derived from [`current-state-audit.md`](./current-state-audit.md), 2026-07-31.
-> Ordered by priority, then by dependency.
+> Audit-only cycle. **Nothing here is implemented.**
+> Derived from [`current-state-audit.md`](./current-state-audit.md), revised
+> 2026-07-31 after the full audit.
 
-**Priority:** P0 security/data-integrity/launch-blocker · P1 activation or major
+**Priority** P0 security/data-integrity/launch-blocker · P1 activation or major
 architectural correction · P2 growth/efficiency · P3 optimisation.
 
-**Effort:** S ≤1 day · M ≤1 week · L ≤3 weeks · XL >3 weeks.
+**Effort** S ≤1 day · M ≤1 week · L ≤3 weeks · XL >3 weeks.
 
-**Kind:** `BUG` confirmed in repo · `INFER` needs validation ·
-`PROD` product recommendation · `FUTURE` opportunity.
+**Kind** `BUG` confirmed · `INFER` needs validation · `PROD` recommendation ·
+`FUTURE` opportunity.
+
+Security items carry full detail in
+[`security-remediation.md`](./security-remediation.md) and are summarised here.
+
+---
+
+## Revisions from the first pass
+
+| Item       | Was                              | Now                             | Why                                                                        |
+| ---------- | -------------------------------- | ------------------------------- | -------------------------------------------------------------------------- |
+| `SITE-001` | "Replace the site-data stub" — M | **Delete dead code** — S        | `getSiteData` has zero callers; the real pipeline works (audit §7)         |
+| `SITE-003` | "Add versioned snapshots" — M    | **Rollback UI only** — S        | Versioning already exists; `Publication` is immutable, republish = new row |
+| `SEC-004`  | "Enable RLS"                     | **Fix fail-open design first**  | Policies permit all when the GUC is unset (audit §8.3)                     |
+| `GLOB-002` | "Verify minor units" — M         | **Money is `Decimal(_,2)`** — L | Hard-codes a 2-decimal assumption; JPY/KWD do not fit (audit §14)          |
+| —          | —                                | **`OPS-005` added**             | `/health` returns static `ok`; cannot fail, so it is not a probe           |
+| —          | —                                | **`SEC-006` added**             | No cross-tenant negative tests exist at all                                |
 
 ---
 
 ## Phase 0 — Security and operational correctness
 
-_Nothing in Phase 1+ should start before P0 items land. These protect data and
-prevent silent wrong behaviour._
+_Nothing in Phase 1+ should start before these land._
 
----
+| ID       | Title                                    | Pri | Kind | Effort |
+| -------- | ---------------------------------------- | --- | ---- | ------ |
+| SEC-002  | Admin authorization fail-closed          | P0  | BUG  | M      |
+| SEC-001  | Idempotency primitive + two replay fixes | P0  | BUG  | L      |
+| SEC-003  | Wire support-access enforcement          | P0  | BUG  | M      |
+| OPS-001  | Environment/database ambiguity           | P0  | BUG  | S      |
+| OPS-003  | Production migration readiness           | P0  | PROD | S      |
+| DATA-001 | Realistic seed data                      | P0  | PROD | S      |
+| OPS-002  | Baseline observability                   | P0  | PROD | M      |
+| OPS-005  | Real health/readiness probe              | P0  | BUG  | S      |
 
-### SEC-001 · Idempotency primitive, and fix the two replay defects
+### SEC-002 · Admin authorization fail-closed
 
-**P0 · BUG · L**
+**P0 · BUG · M** — full detail in `security-remediation.md` §SEC-002.
 
-**User problem.** An operator retries a rollout change during an incident; the
-API reports success and the flag does not move. A support session that was
-revoked can be replayed back into what looks like an active grant.
+`platform-permission.guard.ts:32` returns `true` on missing metadata; the
+contract test is a hand-maintained list. Nothing is exposed today, but the
+default for the next route is ungated.
+**Depends on** nothing. **Do first** — smallest blast radius of the three P0s.
+**Acceptance** adding a route without metadata fails a test, not production.
 
-**Technical problem.** Idempotency is per-endpoint string concatenation. The key
-identifies a _retry_ but nothing proves the retry is _identical_, so a different
-payload under the same key is silently swallowed. See audit §2.1, §2.2.
+### SEC-001 · Idempotency primitive
 
-**Proposed solution.** A shared primitive, then migrate both call sites onto it:
+**P0 · BUG · L** — full detail in `security-remediation.md` §SEC-001.
 
-- `IdempotencyService` + interceptor/decorator.
-- Record: operation, method, scope (tenant or platform), client key, **canonical
-  request fingerprint**, status (`processing|completed|failed`), stored response,
-  resource ref, expiry.
-- Same key + same fingerprint → replay the stored response.
-- Same key + **different** fingerprint → `409`, never a silent success.
-- Concurrency via a DB unique index; loser waits or returns the winner's result.
-- Replay must not bypass domain preconditions (the `admin-access` bug).
+Key identifies a retry but nothing proves it is _identical_. Reproduced: same
+key + opposite payload returns `200` and changes nothing. Same class of bug in
+`admin-access` returns a revoked session as a fresh grant.
+**Depends on** nothing. **Migration** new `IdempotencyRecord` table.
+**Acceptance** both reproductions fail to reproduce; mismatch → `409`;
+concurrent duplicates never 500.
 
-**Affected.** `apps/api.saroh.in/src/common/*` (new), `modules/feature-flags/`,
-`modules/admin/`, `packages/database` (new model + migration).
+### SEC-003 · Wire support-access enforcement
 
-**Migration.** New `IdempotencyRecord` table. Existing `AdminAuditEvent.
-idempotencyKey` unique index stays as a backstop.
+**P0 · BUG · M** — full detail in `security-remediation.md` §SEC-003.
 
-**Security.** Stored responses must not retain secrets; reuse the audit
-metadata redaction rules.
+`authorize()` has zero production callers; the ledger claims a control that does
+not exist; `expire()` is unreachable so sessions never expire. Includes SEC-007
+(cross-staff revocation) and SEC-008 (denials audit fail-closed).
+**Depends on** SEC-001 for the replay half.
 
-**Testing.** Identical replay · mismatched-fingerprint 409 · concurrent duplicate
-· failed execution not cached as success · replay after resource state change
-(the revoked-session case) · audit written exactly once.
-
-**Acceptance.** The two reproductions in audit §2.1/§2.2 both fail to reproduce;
-mismatched replay returns 409; concurrent duplicates never 500.
-
----
-
-### SEC-002 · Make admin authorization fail closed
-
-**P0 · BUG · M**
-
-**Technical problem.** `platform-permission.guard.ts:32` returns `true` when
-route metadata is absent, and the contract test is a hand-maintained method list
-that a new handler is simply missing from. Audit §2.3.
-
-**Proposed solution.**
-
-- Deny when a route under `/admin/*` has no permission metadata.
-- Explicit `@PlatformIdentityOnly()` (or similar) for the deliberate exceptions
-  (`/admin/me`).
-- Replace the hand-maintained spec with a test that **reflects over
-  `AdminController.prototype`** and asserts every `@Get/@Post/@Put/@Delete`
-  handler carries either permission metadata or the explicit marker.
-
-**Alternatives considered.** A global default-deny guard across the whole API —
-rejected for now: the public surfaces (`/public/*`) are deliberately guardless
-and would need blanket opt-outs, widening blast radius beyond this fix.
-
-**Acceptance.** Adding a route without metadata fails a test, not production.
-
----
-
-### SEC-003 · Wire or delete support-access enforcement
-
-**P0 · BUG · M**
-
-**Technical problem.** `AdminAccessService.authorize()` has zero production
-callers; the ledger asserts a control that does not exist. `expire()` is
-unreachable, so sessions never expire. Audit §2.4.
-
-**Proposed solution.** Either wire `authorize()` into a guard that every future
-org-data admin route must carry, **or** delete it and the audit events that
-imply it. Do not leave the ledger claiming an unenforced control. Preferred:
-wire it, as a `@RequireOrganizationAccessSession()` guard, since §4 of the brief
-needs it. Add the expiry sweep as a job.
-
-**Also fix here:** allow a `staff:grant`-holder to revoke another staff member's
-session; move `deny()` off the swallowing `recordRead()` path (audit §2.5).
-
-**Acceptance.** No `/admin/*` route can read tenant data without an active,
-unexpired, correct-organization, read-only session; denials are durably audited.
-
----
-
-### OPS-001 · Fix environment/database ambiguity
+### OPS-001 · Environment/database ambiguity
 
 **P0 · BUG · S**
 
-**Technical problem.** Root `.env` points at `neondb`; the API points at
-`saroh-dev`. Root-level `pnpm db:seed` / `db:migrate:deploy` hits the wrong
-database. Audit §5.
-
-**Proposed solution.** One documented ownership model: the API owns
-`DATABASE_URL`; root scripts either delegate to it or refuse to run without an
-explicit `--env` argument. Add a guard that refuses to seed/migrate when the
-target DB name does not match an allowlist for the current `NODE_ENV`.
-
+**Problem.** Root `.env` → `neondb`; API `.env` → `saroh-dev`. Root-level
+`pnpm db:seed`/`db:migrate:deploy` targets the wrong database (audit §9).
+**Impact.** Data-integrity: a seed against the wrong DB is unrecoverable
+without a restore.
+**Change.** One documented ownership model; a guard that refuses to seed or
+migrate unless the target DB name matches an allowlist for the current
+`NODE_ENV`.
+**Alternative.** Delete the root `.env` entirely — rejected, other tooling reads
+it; the guard is the safer fix.
 **Acceptance.** No command can migrate or seed a database the caller did not
-name explicitly.
-
----
-
-### OPS-002 · Baseline observability
-
-**P0 · PROD · M**
-
-Structured logs already exist with correlation IDs. Add: error aggregation
-(Sentry or equivalent), request/latency/error-rate metrics, queue depth and
-job-failure metrics, health/readiness endpoints wired to a probe, release
-version metadata.
-
-**Constraint.** No PII, secrets, session tokens, payment credentials or message
-contents in telemetry.
-
-**Acceptance.** A failed job, a 5xx spike and a stuck queue are each detectable
-without SSH.
-
----
+explicitly name.
 
 ### OPS-003 · Production migration readiness
 
 **P0 · PROD · S**
 
-Two admin migrations plus the waitlist migration are applied to dev only.
-Production has no migration-status visibility and no documented deploy order.
-
-**Acceptance.** `prisma migrate status` runs in CI against each environment;
-deploy docs state the order and the rollback position.
-
----
+Three migrations are dev-only. No migration-status visibility in any pipeline;
+two sat unapplied and undetected until this session.
+**Acceptance.** `prisma migrate status` runs in CI per environment; deploy order
+and rollback position are documented.
 
 ### DATA-001 · Realistic seed data
 
 **P0 · PROD · S**
 
-The dev DB has 0 contacts, 0 services, 0 bookings, 3 products, 2 orders. This
-blocks demos, screenshots, and any UX work on populated states — every screen
-under review is an empty state.
-
+0 contacts, 0 services, 0 bookings, 3 products, 2 orders. **Blocks all
+populated-state UX work** — every screen reviewed was an empty state. Also
+blocks demos and screenshots.
+**Note.** `packages/database/src/seed.ts` exists but creates no credential, so
+the seeded user cannot log in.
 **Acceptance.** One command produces a believable multi-module organization;
 another removes it cleanly.
+
+### OPS-002 · Baseline observability
+
+**P0 · PROD · M**
+
+**Present already:** correlation IDs, structured JSON logger, redaction
+(`authorization`, `cookie`, `x-api-key`, `password*`, `token`), guard-denial
+logging. **Absent:** metrics, tracing, error aggregation.
+**Change.** Error aggregation; request/latency/error-rate, queue-depth and
+job-failure metrics; release version metadata.
+**Constraint.** No PII, secrets, tokens, payment credentials or message contents
+in telemetry.
+**Acceptance.** A failed job, a 5xx spike and a stuck queue are each detectable
+without SSH.
+
+### OPS-005 · Real health/readiness probe
+
+**P0 · BUG · S**
+
+`modules/health/health.controller.ts` returns a static object — `status:"ok"`
+unconditionally, with no DB or queue check. **It cannot fail**, so an
+orchestrator will route traffic to an instance that cannot reach Postgres.
+**Change.** Split liveness (process up) from readiness (DB reachable, migrations
+applied, queue reachable).
+**Acceptance.** Readiness fails when the DB is unreachable.
 
 ---
 
 ## Phase 1 — Product architecture and terminology
 
----
+| ID       | Title                                          | Pri | Kind | Effort |
+| -------- | ---------------------------------------------- | --- | ---- | ------ |
+| ARCH-001 | Customer Core from `Contact`                   | P1  | PROD | M      |
+| SEC-005  | `Customer.organizationId` NOT NULL + auto-link | P1  | BUG  | M      |
+| ARCH-003 | Resolve `Project` vs `Store` (ADR)             | P1  | PROD | M      |
+| SEC-006  | Cross-tenant negative tests                    | P1  | BUG  | M      |
+| SEC-004  | RLS: fix fail-open, then enable                | P1  | PROD | XL     |
+| ARCH-004 | Domain events                                  | P1  | PROD | L      |
 
-### ARCH-001 · Extract Customer Core from `Contact`
+### ARCH-001 · Customer Core from `Contact`
 
-**P1 · PROD · M** _(much cheaper than the brief assumes — see audit §1.1)_
+**P1 · PROD · M** _(cheaper than the brief assumes — audit §4.1)_
 
-**User problem.** A merchant who only wants bookings is told they need a CRM,
-and sees pipeline concepts they will never use.
+**User problem.** A studio that only takes bookings is told it needs a CRM.
+**Technical.** `Contact` already is the org-level person record owning bookings,
+messages and consent. Only the registry couples the modules to CRM.
+**Change.** Always-on `CUSTOMERS` capability; retarget three `dependencies`
+edges; scope `CRM` to `Lead`/`Pipeline`. **No table rename** — that is ARCH-003.
+**Alternative.** Rename `Contact` → `Customer` now — rejected, collides with the
+existing `Customer` model and forces ARCH-002 early.
+**Risk.** Low; registry + readiness only, no data migration.
+**Acceptance.** Enabling Appointments does not surface Sales-CRM.
 
-**Technical problem.** `Contact` already _is_ the org-level person record owning
-bookings, messages and consent. Only the module registry couples Appointments
-and Communications to CRM.
+### SEC-005 · `Customer.organizationId` NOT NULL + auto-link
 
-**Proposed solution.** Introduce a `CUSTOMERS` core capability that is always on
-and not user-selectable; retarget `APPOINTMENTS`, `COMMUNICATIONS`,
-`AUTOMATIONS` dependencies from `CRM` to it; scope the `CRM` module to
-`Lead`/`Pipeline` only. **No table rename in this item** — naming is ARCH-003.
+**P1 · BUG · M** — detail in `security-remediation.md` §SEC-005.
 
-**Risk.** Low. Registry + readiness change; no data migration.
-
-**Acceptance.** Enabling Appointments does not enable Sales-CRM surfaces.
-
----
-
-### ARCH-002 · Unify `Customer` and `Contact` identity
-
-**P1 · BUG+PROD · L**
-
-**User problem.** The marketing site now claims "the same customer record is
-behind an order and a booking". Today that is **false** unless a human pressed a
-link button. Audit §1.2.
-
-**Technical problem.** `Customer` is Store-scoped with a **nullable**
-`organizationId`; reconciliation is manual via `CustomerIdentityLink.
-linkedByUserId`.
-
-**Proposed solution, staged:**
-
-1. Backfill and make `Customer.organizationId` **required** _(also unblocks
-   RLS — see SEC-004)_.
-2. Auto-link on write: creating a `Customer` with an email matching an org
-   `Contact` creates the link automatically; keep manual link for ambiguity.
-3. Read model: one customer view merging commerce + CRM + bookings.
-4. Only then consider collapsing the models.
-
-**Risk.** Medium-high — touches live commerce data. Each step independently
-shippable and reversible.
-
-**Acceptance.** A person who books and then orders appears once, with no manual
-action.
-
----
+Nullable tenant key on the most sensitive table. **Hard prerequisite for
+SEC-004.** Staged: backfill → require → auto-link on write → _only then_
+consider collapsing models.
+**Acceptance.** No null `organizationId`; a commerce customer links to a
+matching contact with no manual action.
 
 ### ARCH-003 · Resolve `Project` vs `Store`
 
 **P1 · PROD · M**
 
-**Technical problem.** Two competing sub-org containers: module selection hangs
-off `Project`, commerce data off `Store`. `Project` has no other domain meaning
-(audit §1.4).
+Two competing sub-org containers (audit §5). Three options in
+[`domain-boundaries.md`](./domain-boundaries.md) §4.
+**Requires a product decision.** ADR before any rename; migration consequences
+written down first.
 
-**Proposed solution.** Decide whether `Store` is a _kind of_ Project, or Project
-disappears into Organization for single-location merchants. **Analysis and ADR
-first — no rename before the migration consequences are written down.** Expose a
-concrete label (Store / Location / Brand) in the UI regardless of the internal
-model.
+### SEC-006 · Cross-tenant negative tests
 
-**Acceptance.** An ADR states what each container means and what merchants see.
+**P1 · BUG · M**
 
----
+No test attempts a cross-tenant read or write. Isolation is the core safety
+property and nothing asserts it.
+**Depends on** a provisioned test database.
+**Acceptance.** Cross-tenant read/write/update/delete/traversal all denied;
+tests fail if scoping is removed from a service.
 
-### SEC-004 · Phased RLS rollout
+### SEC-004 · RLS: fix fail-open, then enable
 
-**P1 · PROD · XL**
+**P1 · PROD · XL** — detail in `security-remediation.md` §SEC-004.
 
-**Prerequisite: ARCH-002 step 1.** A nullable `Customer.organizationId` cannot
-be protected by a tenant policy (audit §3.2).
-
-Runtime role loses `BYPASSRLS`; separate roles for migration and break-glass;
-**transaction-local** tenant context (pooled connections make session-local
-unsafe); start with Customers, Contacts, Orders, Payments, Bookings, Messages,
-Sites; keep application-layer scoping as well; add a policy-coverage report so a
-new tenant table cannot silently ship unprotected.
-
-**Testing.** Cross-tenant read/write/update/delete/relation-traversal negatives,
-plus jobs, webhooks and public endpoints. **This coverage does not exist today**
-(audit §6).
-
----
+113 policies across 65 tables already exist, with a correct transaction-local
+proxy. Two blockers: policies **permit all** when the GUC is unset, and the
+runtime role has `BYPASSRLS`.
+**Depends on** SEC-005 (hard), SEC-006 (to make rollout safe).
 
 ### ARCH-004 · Domain events
 
 **P1 · PROD · L**
 
-Typed event registry emitted transactionally with business mutations
-(outbox-style) on the existing durable queue, so Automations consume stable
-events instead of reaching into modules.
+Typed events emitted transactionally with their mutation (outbox), on the
+existing durable queue, so Automations consume a stable contract. Event set
+proposed in `domain-boundaries.md` §5.
 
 ---
 
 ## Phase 2 — Activation and merchant workspace
 
-- **UX-001 · P1 · L** — Outcome-based navigation. The vocabulary already exists
-  in `/onboarding/modules` ("Sell products", "Show up online") but is abandoned
-  after onboarding; the sidebar is the module registry rendered as nav
-  (audit §4.2). Carry the onboarding language into the shell.
-- **UX-002 · P1 · L** — Merchant command centre: attention, exceptions, next
-  action. Home already lists next-best-actions; extend rather than replace.
-- **UX-003 · P1 · M** — Empty-state system. Blocked on DATA-001 for anything
-  populated.
-- **UX-004 · P2 · M** — Standard patterns: filters, bulk actions, drawers,
-  permission-denied. Partially present via `@saroh/ui` `DataTable`/`EmptyState`.
-- **UX-005 · P2 · S** — Fix 28 pre-existing lint errors in `app.saroh.in`
-  without behaviour change.
-- **PROD-001 · P2 · M** — Activation funnel instrumentation.
+| ID       | Title                                  | Pri | Kind | Effort |
+| -------- | -------------------------------------- | --- | ---- | ------ |
+| UX-001   | Outcome-based navigation               | P1  | PROD | L      |
+| UX-002   | Merchant command centre                | P1  | PROD | L      |
+| UX-006   | Unified customer record screen         | P1  | PROD | M      |
+| UX-003   | Empty-state system                     | P1  | PROD | M      |
+| PROD-001 | Activation funnel instrumentation      | P2  | PROD | M      |
+| UX-004   | Standard interaction patterns          | P2  | PROD | M      |
+| UX-005   | Clear 28 lint errors in `app.saroh.in` | P2  | BUG  | S      |
+
+**UX-001** is the highest value-per-effort item in the whole backlog: the
+outcome vocabulary already exists in `/onboarding/modules` and is discarded
+after onboarding (audit §6.2). This is largely renaming and regrouping.
+
+**UX-006** depends on SEC-005 — the screen cannot be built while the two
+identity records are linked only manually.
+
+**UX-003** depends on DATA-001.
 
 ---
 
-## Phase 3 — Commerce and website experience
+## Phase 3 — Commerce and website
 
-- **SITE-001 · P1 · M** — Replace the `getSiteData` stub
-  (`fetchers.ts:51` returns `null` always).
-- **SITE-002 · P1 · L** — Brand fields on the publication snapshot. The
-  `--site-*` render layer already exists and is fed by defaults (commit
-  `2b2add5`); nothing populates it. Logo, colours, fonts, radius, theme mode.
-- **SITE-003 · P2 · M** — Versioned snapshots, draft vs published, rollback.
-- **SITE-004 · P2 · S** — Contrast validation on merchant brand colours; the
-  token checker written for the design system is directly reusable.
-- **SITE-005 · P2 · S** — Storefront error states that do not leak tenant info.
+| ID       | Title                                         | Pri | Kind | Effort |
+| -------- | --------------------------------------------- | --- | ---- | ------ |
+| SITE-002 | Brand fields on the publication snapshot      | P1  | PROD | L      |
+| SITE-001 | Delete dead `getSiteData`                     | P2  | BUG  | S      |
+| SITE-003 | Publication rollback UI                       | P2  | PROD | S      |
+| SITE-004 | Contrast validation on merchant brand colours | P2  | PROD | S      |
+| SITE-005 | Storefront error states                       | P2  | PROD | S      |
+
+**SITE-002** is the real gap. The pipeline, versioning and `--site-*` render
+layer all exist; the snapshot simply carries no brand fields, so every
+merchant's site renders in identical greys.
+
+**SITE-003** is now S, not M — `Publication` is immutable and republish creates
+a new row, so rollback is a pointer move. Only the UI is missing.
+
+**SITE-004** can reuse the token contrast checker written for the design system.
 
 ---
 
 ## Phase 4 — Global readiness and launch
 
-- **GLOB-001 · P2 · S** — Change the lone `@default("INR")`
-  (`schema.prisma:2385`) and the one hardcoded `₹`
-  (`create-service-form.tsx`). **This is nearly the whole of §9** — see audit §1.3.
-- **GLOB-002 · P2 · M** — Verify money is stored in minor units everywhere;
-  derive all formatting from org/store settings.
-- **GLOB-003 · P3 · L** — Provider adapter contracts for payments and shipping.
-- **OPS-004 · P1 · M** — CD pipeline, after OPS-001/003 make deploys safe.
-- **LAUNCH-001 · P1 · S** — Reconcile marketing claims with reality: the site
-  says "waitlist" while the product looks built, and now claims unified customer
-  records that ARCH-002 has not delivered yet.
+| ID         | Title                                   | Pri | Kind   | Effort |
+| ---------- | --------------------------------------- | --- | ------ | ------ |
+| GLOB-002   | Money representation                    | P1  | BUG    | L      |
+| OPS-004    | CD pipeline                             | P1  | PROD   | M      |
+| LAUNCH-001 | Reconcile marketing claims with reality | P1  | PROD   | S      |
+| GLOB-001   | Last India-specific residue             | P2  | BUG    | S      |
+| GLOB-003   | Provider adapter contracts              | P3  | FUTURE | L      |
+
+### GLOB-002 · Money representation
+
+**P1 · BUG · L** _(upgraded from the first pass)_
+
+Money is `Decimal(_,2)` with a fixed 2-dp renderer
+(`apps/api.saroh.in/src/common/money.ts`). Safe from float error, but it
+**hard-codes a two-decimal assumption**: JPY/KRW (0 dp) and KWD/BHD (3 dp) do
+not fit. A genuine blocker for markets outside the 2-dp majority.
+**Alternative.** Keep `Decimal` and carry a per-currency exponent — viable, and
+cheaper than a minor-units migration. Decide before implementing.
+
+### GLOB-001 · India-specific residue
+
+**P2 · BUG · S** — one `@default("INR")` (`schema.prisma:2385`) and one
+hardcoded `₹` (`create-service-form.tsx`). That is the entire remaining set.
+
+### LAUNCH-001 · Reconcile marketing claims
+
+**P1 · PROD · S** — the site says "waitlist" while the product looks built, and
+now claims a unified customer record that SEC-005 has not delivered.
 
 ---
 
 ## Sequencing
 
 ```
-SEC-001 ─┐
-SEC-002 ─┼─ Phase 0 (parallel) ─→ ARCH-001 ─→ UX-001/002 ─→ SITE-001/002
-SEC-003 ─┤                        ARCH-002 ─→ SEC-004
-OPS-001 ─┤                          │
-OPS-002 ─┤                          └─→ ARCH-003 (ADR first)
-OPS-003 ─┤
-DATA-001 ┘  (unblocks all UX work)
+Phase 0 ── SEC-002 ─→ SEC-001 ─→ SEC-003
+           OPS-001, OPS-003, OPS-005, OPS-002, DATA-001   (parallel)
+                 │
+Phase 1 ──── ARCH-001 ──────────────→ UX-001, UX-002
+             SEC-005 ─→ SEC-006 ─→ SEC-004
+                │
+                └─→ UX-006 (unified customer record)
+             ARCH-003 (ADR — needs product decision)
+             ARCH-004 ─→ Automations on stable events
+                 │
+Phase 3 ──── SITE-002 (brand fields) ─→ SITE-003, SITE-004
+Phase 4 ──── GLOB-002, OPS-004, LAUNCH-001
 ```
 
-**Hard prerequisites:** ARCH-002 step 1 before SEC-004 · OPS-001/003 before
-OPS-004 · DATA-001 before UX-003.
+**Hard prerequisites**
+
+| Blocked  | Blocker          | Why                                                  |
+| -------- | ---------------- | ---------------------------------------------------- |
+| SEC-004  | SEC-005          | Nullable tenant key cannot be protected by policy    |
+| UX-003   | DATA-001         | Cannot design populated states against an empty DB   |
+| UX-006   | SEC-005          | Screen requires the identities to be linked          |
+| OPS-004  | OPS-001, OPS-003 | Do not automate deploys that can target the wrong DB |
+| ARCH-003 | product decision | Not an engineering call                              |
+| SEC-006  | test database    | Not provisioned locally                              |
