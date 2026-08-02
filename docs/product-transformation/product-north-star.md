@@ -39,15 +39,19 @@ what is built.
 > sell, manage customers, automate operations and build their online presence
 > from one workspace.**
 
-Refinement the evidence supports:
+What is live on `saroh.in` today (commit `c3f8d43`), and true:
 
-> **Run your whole business from one place — switch on only what you need.**
-> Sell products, take bookings, keep every customer in one record, and publish
-> the site that fronts it. Add capabilities as the business grows; turn them off
-> without losing the data.
+> **Run your whole business from one place.**
+> Website, commerce, appointments and CRM in one system — switch on only the
+> modules you need, and add the rest when the business is ready for them.
 
-The second version is already live on `saroh.in` (commit `c3f8d43`) and is
-grounded in the module registry rather than aspiration.
+Where it should get to, **once the product supports it**:
+
+> …Sell products, take bookings, **keep every customer in one record**, and
+> publish the site that fronts it.
+
+The emphasised clause is deliberately **not** on the site — see §6.1. Restore it
+when auto-linking ships, not before.
 
 ### What Saroh is not
 
@@ -55,8 +59,8 @@ grounded in the module registry rather than aspiration.
 - Not a CRM with invoicing.
 - Not a suite of separate tools sharing a login.
 
-The claim that distinguishes it: **one customer record behind an order and a
-booking.** See §6 — that claim is not yet true.
+The claim that will distinguish it: **one customer record behind an order and a
+booking.** Not yet true (§6.1), and worth making true.
 
 ---
 
