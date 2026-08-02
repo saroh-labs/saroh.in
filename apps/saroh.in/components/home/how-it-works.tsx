@@ -7,7 +7,14 @@ const STEPS = [
     {
         n: "02",
         title: "Set it up once",
-        body: "Your catalog, services, contacts and domain live in one place, so the same customer record is behind an order and a booking.",
+        // Deliberately does NOT claim "the same customer record is behind an
+        // order and a booking". It reads well and it is the product's strongest
+        // differentiator, but it is not true yet: commerce `Customer` is
+        // store-scoped and the CRM `Contact` is org-scoped, and the two are
+        // reconciled only when a human clicks link (CustomerIdentityLink
+        // .linkedByUserId). Restore the stronger claim once auto-linking ships
+        // — see docs/product-transformation/ SEC-005 / ARCH-002.
+        body: "Your catalog, services, contacts and domain live in one system, so you set the business up once instead of stitching four tools together.",
     },
     {
         n: "03",

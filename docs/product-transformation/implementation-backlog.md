@@ -295,8 +295,16 @@ hardcoded `₹` (`create-service-form.tsx`). That is the entire remaining set.
 
 ### LAUNCH-001 · Reconcile marketing claims
 
-**P1 · PROD · S** — the site says "waitlist" while the product looks built, and
-now claims a unified customer record that SEC-005 has not delivered.
+**P1 · PROD · S** — **partially done 2026-08-02.**
+
+- ✅ The unified-customer-record claim was removed from `how-it-works.tsx`. It
+  was the one place the site over-claimed; a comment at the edit site records
+  why, so it is not innocently restored before SEC-005 lands.
+- Remaining: keep the waitlist framing accurate as the product changes, and
+  restore the stronger customer claim once auto-linking ships.
+
+Waitlist stays deliberately (decision 4), so this item no longer includes
+switching to open signup.
 
 ---
 

@@ -141,14 +141,26 @@ Items 4 and 7 are **not currently achievable** (§6).
 
 These matter because the marketing site now makes one of them.
 
-### 6.1 "One customer record behind an order and a booking" — currently false
+### 6.1 "One customer record behind an order and a booking" — RESOLVED for now
 
 `Customer` is store-scoped with a nullable `organizationId`; reconciliation to a
 `Contact` is manual (`CustomerIdentityLink.linkedByUserId`). Someone has to
 press a button. Audit §4.2.
 
-**Either** fix it (SEC-005 → auto-linking) **or** stop claiming it. The first is
-better; it is the strongest differentiator the product has.
+> **Decision (2026-08-02): soften the copy now, fix the product later.**
+> The claim was removed from `saroh.in` rather than left standing while the
+> code catches up. Restore it once auto-linking ships (SEC-005 → ARCH-002).
+
+The clause was dropped from step 02 of `how-it-works.tsx`; the surrounding
+"one system, set it up once" framing is true today and stays. A comment at the
+edit site records why, so the stronger sentence is not innocently restored.
+
+**This remains the strongest differentiator the product has** — Shopify will not
+show a customer's booking history and a salon tool will not show what they
+bought. It is the claim that justifies a modular platform existing. It should be
+made true, not abandoned. Option B (multiple Projects per Organization, Stores
+under a Project) strengthens the case: a customer of _the business_ should not
+fragment across its stores either.
 
 ### 6.2 "Your branded storefront" — partially false
 

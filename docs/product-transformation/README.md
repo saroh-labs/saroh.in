@@ -51,7 +51,7 @@ Recorded 2026-08-02.
 | --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Positioning            | **Commerce-led.** Commerce leads marketing, defaults and the first-run path; service and hybrid businesses stay supported.                        |
 | 2   | Container model        | **Option B.** Organization → Project (owns modules + access) → Store (a Commerce child). See `domain-boundaries.md` §4.1. **ARCH-003 unblocked.** |
-| 3   | Unified-customer claim | **Open** — see `product-north-star.md` §6.1. The marketing site currently makes a claim the code does not deliver.                                |
+| 3   | Unified-customer claim | **Soften the copy now, fix the product later.** Claim removed from `saroh.in`; restore once auto-linking ships (SEC-005 → ARCH-002).              |
 | 4   | Launch mode            | **Waitlist for now.** UX work lands before open signup. LAUNCH-001 reduces to keeping copy honest.                                                |
 | 5   | Pricing                | **Parked.** No entitlement reshaping this cycle.                                                                                                  |
 | 6   | Money                  | **Keep `Decimal` with a per-currency exponent**, 2 dp remaining the common case. No minor-units migration. GLOB-002 drops from L to M.            |
