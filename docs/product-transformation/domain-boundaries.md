@@ -167,11 +167,16 @@ scoping the `CRM` module to `Lead`/`Pipeline` surfaces only.
 
 ---
 
-## 4. Organization vs Project vs Store — unresolved
+## 4. Organization vs Project vs Store — DECIDED
 
-**RECOMMENDATION — requires a product decision before an ADR.**
+> **Decision (2026-08-02, product owner): Option B.**
+> An Organization may hold multiple Projects; a Project may hold Stores,
+> depending on the business type. `Project` stays the container that owns module
+> selection and access; `Store` becomes a child of the Commerce capability.
+>
+> Consequences captured in §4.1 below. ARCH-003 is unblocked.
 
-Three coherent options:
+Three options were considered:
 
 ### Option A — `Store` becomes the merchant-facing container; `Project` retires
 
@@ -200,11 +205,39 @@ an advanced concept surfaced only for multi-location merchants.
 - **For.** Best default UX — no one is asked to name a "Project" on day one.
 - **Against.** Two code paths, or a hidden default container.
 
-**Recommendation: C for the interface, B for the data model.** Keep `Project`
-internally, auto-create one, never say the word "Project" to a merchant, and
-surface a container picker only when a second one exists.
+### 4.1 What Option B commits us to
 
-**This needs product-owner approval before any ADR is written.**
+**Chosen.** The resulting shape:
+
+```
+Organization              the business / the account
+   └── Project            a brand, business unit or location
+         ├── modules      capability selection + access   (already true)
+         └── Store        a Commerce child — only exists if Commerce is on
+               └── Product · Order · Customer
+```
+
+**Follows from the decision:**
+
+1. **`Store` stops being a peer of `Project`.** Today they are siblings under
+   Organization with no relation between them. `Store` gains a `projectId`.
+   _Migration: backfill from each Store's Organization → its default Project._
+2. **A merchant with no shop never sees a Store.** Website-only and
+   bookings-only businesses have a Project and no Store — which is the awkwardness
+   Option A could not avoid.
+3. **The word "Project" should not appear in the merchant UI.** It is an internal
+   container name. Surface a concrete label per business type (Brand, Location,
+   Business) and hide the picker entirely until a second one exists. This part of
+   the earlier Option-C recommendation still applies and costs nothing.
+4. **`Customer.storeId` remains store-scoped**, so this decision does **not**
+   resolve the identity split on its own — that is SEC-005 / ARCH-002, which
+   stays a separate and still-required piece of work.
+
+**Open sub-question for the ADR.** Should `Customer` move from `storeId` to
+`projectId` (or to `organizationId`) as part of ARCH-002? Option B makes
+org-scoping the natural target, since a person who buys from two of a merchant's
+stores is one customer of that business. Recommended, but it is a data migration
+and belongs in the ARCH-002 staging, not here.
 
 ---
 

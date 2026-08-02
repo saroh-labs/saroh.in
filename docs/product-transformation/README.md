@@ -43,16 +43,18 @@ Six, of which two are corrections to this project's own earlier pass.
 6. **The outcome vocabulary already exists** in `/onboarding/modules` and is
    discarded the moment onboarding ends. Highest value-per-effort in the backlog.
 
-## Decisions required from the product owner
+## Product-owner decisions
 
-| #   | Decision                                                                                             | Blocks                             |
-| --- | ---------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| 1   | Commerce-**led** or commerce-**only**? The code is genuinely module-neutral.                         | IA, marketing, onboarding defaults |
-| 2   | `Project` vs `Store` — which container do merchants see? Three options in `domain-boundaries.md` §4. | ARCH-003                           |
-| 3   | Fix the unified-customer claim, or stop making it? It is currently false.                            | LAUNCH-001, SEC-005 priority       |
-| 4   | Waitlist or open signup?                                                                             | Launch readiness, marketing CTAs   |
-| 5   | Pricing shape — base + capabilities + usage?                                                         | Entitlements, packaging            |
-| 6   | Money: migrate to minor units, or keep `Decimal` with a per-currency exponent?                       | GLOB-002                           |
+Recorded 2026-08-02.
+
+| #   | Decision               | Outcome                                                                                                                                           |
+| --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Positioning            | **Commerce-led.** Commerce leads marketing, defaults and the first-run path; service and hybrid businesses stay supported.                        |
+| 2   | Container model        | **Option B.** Organization → Project (owns modules + access) → Store (a Commerce child). See `domain-boundaries.md` §4.1. **ARCH-003 unblocked.** |
+| 3   | Unified-customer claim | **Open** — see `product-north-star.md` §6.1. The marketing site currently makes a claim the code does not deliver.                                |
+| 4   | Launch mode            | **Waitlist for now.** UX work lands before open signup. LAUNCH-001 reduces to keeping copy honest.                                                |
+| 5   | Pricing                | **Parked.** No entitlement reshaping this cycle.                                                                                                  |
+| 6   | Money                  | **Keep `Decimal` with a per-currency exponent**, 2 dp remaining the common case. No minor-units migration. GLOB-002 drops from L to M.            |
 
 ## Ground rules
 

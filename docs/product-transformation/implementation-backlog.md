@@ -268,14 +268,25 @@ a new row, so rollback is a pointer move. Only the UI is missing.
 
 ### GLOB-002 · Money representation
 
-**P1 · BUG · L** _(upgraded from the first pass)_
+**P1 · BUG · M** _(approach decided 2026-08-02; was L under the minor-units
+option)_
 
 Money is `Decimal(_,2)` with a fixed 2-dp renderer
 (`apps/api.saroh.in/src/common/money.ts`). Safe from float error, but it
 **hard-codes a two-decimal assumption**: JPY/KRW (0 dp) and KWD/BHD (3 dp) do
-not fit. A genuine blocker for markets outside the 2-dp majority.
-**Alternative.** Keep `Decimal` and carry a per-currency exponent — viable, and
-cheaper than a minor-units migration. Decide before implementing.
+not fit.
+
+**Decision.** Keep `Decimal`; carry a **per-currency exponent** and drive
+formatting from it. Two decimals remains the common case and the default — this
+is additive, not a migration. Rejected: converting every money column to integer
+minor units, which touches all of commerce, payments and billing for a
+correctness property `Decimal` already provides.
+
+**Scope.** A currency-metadata table or constant (code → exponent, symbol,
+position); `toMoneyString` takes the exponent instead of assuming 2; all
+formatting derives from the org/store currency rather than a literal.
+**Acceptance.** A JPY store renders `¥1200`, not `¥1200.00`; a KWD store renders
+3 dp; an INR/USD store is unchanged.
 
 ### GLOB-001 · India-specific residue
 

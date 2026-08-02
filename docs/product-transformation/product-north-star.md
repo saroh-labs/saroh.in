@@ -194,12 +194,36 @@ Published within 7 days · % who add a second capability within 30 days.
 
 ---
 
-## 9. Decisions required
+## 9. Decisions
 
-| #   | Decision                                           | Blocks                                 |
-| --- | -------------------------------------------------- | -------------------------------------- |
-| 1   | Commerce-**led** or commerce-**only**? (§1)        | IA, marketing, onboarding defaults     |
-| 2   | Is the D2C-brand persona right? (§4)               | Onboarding paths, seed data, templates |
-| 3   | Fix the unified-customer claim, or drop it? (§6.1) | Marketing copy, SEC-005 priority       |
-| 4   | Waitlist or open signup?                           | Launch readiness, marketing CTAs       |
-| 5   | Pricing shape — base + capabilities + usage?       | Entitlements, packaging                |
+Recorded 2026-08-02.
+
+| #   | Decision                                           | Outcome                                                                       |
+| --- | -------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1   | Commerce-**led** or commerce-**only**? (§1)        | **Commerce-led.** §1's recommendation adopted — service/hybrid stay supported |
+| 2   | Is the D2C-brand persona right? (§4)               | **Open** — not yet confirmed                                                  |
+| 3   | Fix the unified-customer claim, or drop it? (§6.1) | **Open** — see §6.1                                                           |
+| 4   | Waitlist or open signup?                           | **Waitlist**, with UX work landing before open signup                         |
+| 5   | Pricing shape — base + capabilities + usage?       | **Parked** — no entitlement work this cycle                                   |
+
+### What "commerce-led" changes
+
+Now settled, so it can be acted on:
+
+- The marketing site leads with selling; service and hybrid businesses appear as
+  supported, not as the headline.
+- Onboarding **defaults** to the sell-products path; other outcomes stay one
+  click away and equally functional.
+- Navigation puts `Sell` above `Bookings`
+  ([`information-architecture.md`](./information-architecture.md) §2).
+- Seed data (DATA-001) models a product business first.
+
+**What it does not change.** No capability is downgraded, no schema favours
+Commerce, and the module registry stays neutral. This is positioning and
+defaults — reversible.
+
+### Consequence of the waitlist decision
+
+LAUNCH-001 shrinks: nothing needs switching to open signup. It reduces to
+keeping the marketing site honest — which currently means §6.1, since the site
+claims a unified customer record the code does not deliver.
