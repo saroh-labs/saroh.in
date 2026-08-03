@@ -38,7 +38,13 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en">
+        // `suppressHydrationWarning` is required by next-themes, not optional
+        // politeness: its blocking script stamps the resolved theme class onto
+        // <html> before React hydrates, so a visitor whose OS prefers dark
+        // always mismatches the server's `defaultTheme`. The other apps already
+        // had it; this one did not. It suppresses the warning on this element
+        // only, not on its subtree.
+        <html lang="en" suppressHydrationWarning>
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
             >

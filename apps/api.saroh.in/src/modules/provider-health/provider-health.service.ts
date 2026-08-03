@@ -28,6 +28,16 @@ export interface ProviderHealth {
     actionHref: string;
 }
 
+/**
+ * Where a merchant actually configures providers. Payments and Communications
+ * both resolve here: `/payments` and `/communications` were emitted for years
+ * and neither has ever been a route in `app.saroh.in`, so every "connect a
+ * provider" call to action 404'd. `scripts/check-app-routes.mjs` now fails the
+ * build if a destination we emit has no page behind it.
+ */
+const PROVIDERS_HREF = "/settings/providers";
+const SITES_HREF = "/sites";
+
 @Injectable()
 export class ProviderHealthService {
     constructor(@Optional() private readonly db: typeof prisma = prisma) {}
@@ -54,39 +64,49 @@ export class ProviderHealthService {
         ]);
 
         return [
-            connectedHealth(
-                "PAYMENTS",
-                "Payments",
-                payments.map((p) => p.status),
-                "Connect a payment provider to accept payments.",
-                "Payments are ready.",
-                "A connected provider is disabled — re-enable it to take payments.",
-                "/payments",
-            ),
-            connectedHealth(
-                "COMMUNICATIONS",
-                "Communications",
-                comms.map((c) => c.status),
-                "Connect a provider to send messages.",
-                "Messaging is ready.",
-                "A connected provider is disabled — re-enable it to send messages.",
-                "/communications",
-            ),
+            connectedHealth({
+                key: "PAYMENTS",
+                label: "Payments",
+                statuses: payments.map((p) => p.status),
+                notConfigured: "Connect a payment provider to accept payments.",
+                active: "Payments are ready.",
+                degraded:
+                    "A connected provider is disabled — re-enable it to take payments.",
+                actionHref: PROVIDERS_HREF,
+            }),
+            connectedHealth({
+                key: "COMMUNICATIONS",
+                label: "Communications",
+                statuses: comms.map((c) => c.status),
+                notConfigured: "Connect a provider to send messages.",
+                active: "Messaging is ready.",
+                degraded:
+                    "A connected provider is disabled — re-enable it to send messages.",
+                actionHref: PROVIDERS_HREF,
+            }),
             domainHealth(domains.map((d) => d.status)),
         ];
     }
 }
 
 /** Health for a CONNECTED|DISABLED provider set. */
-function connectedHealth(
-    key: ProviderHealth["key"],
-    label: string,
-    statuses: string[],
-    notConfigured: string,
-    active: string,
-    degraded: string,
-    actionHref: string,
-): ProviderHealth {
+function connectedHealth({
+    key,
+    label,
+    statuses,
+    notConfigured,
+    active,
+    degraded,
+    actionHref,
+}: {
+    key: ProviderHealth["key"];
+    label: string;
+    statuses: string[];
+    notConfigured: string;
+    active: string;
+    degraded: string;
+    actionHref: string;
+}): ProviderHealth {
     if (statuses.length === 0)
         return {
             key,
@@ -106,7 +126,7 @@ function domainHealth(statuses: string[]): ProviderHealth {
     const base = {
         key: "DOMAINS" as const,
         label: "Domains",
-        actionHref: "/sites",
+        actionHref: SITES_HREF,
     };
     if (statuses.length === 0)
         return {

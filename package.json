@@ -12,6 +12,7 @@
         "lint": "turbo run lint",
         "typecheck": "turbo run typecheck",
         "check:cycles": "madge --circular --extensions ts,tsx --exclude 'node_modules|\\.next|dist|\\.turbo' apps packages",
+        "check:routes": "node scripts/check-app-routes.mjs",
         "format": "prettier --write \"**/*.{js,jsx,ts,tsx,md}\""
     },
     "prisma": {

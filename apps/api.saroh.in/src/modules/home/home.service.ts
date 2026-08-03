@@ -118,7 +118,7 @@ export class HomeService {
                 actions.push({
                     code: "COMMERCE_OPEN_ORDERS",
                     title: `Fulfil ${open} open order${open === 1 ? "" : "s"}`,
-                    href: "/stores",
+                    href: "/commerce",
                     severity: "OVERDUE",
                     moduleKey: "COMMERCE",
                 });
@@ -126,7 +126,7 @@ export class HomeService {
                 actions.push({
                     code: "COMMERCE_SUGGEST_PRODUCT",
                     title: "Add a product to your catalog",
-                    href: "/stores",
+                    href: "/commerce",
                     severity: "SUGGESTION",
                     moduleKey: "COMMERCE",
                 });
