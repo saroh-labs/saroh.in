@@ -19,35 +19,8 @@
  * or:
  *   pnpm db:seed            (from the repo root — turbo)
  */
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-// --- env bootstrap -------------------------------------------------------
-// turbo/tsx do not auto-load `.env` into process.env, and `dotenv` is not a
-// dependency of this package. Load packages/database/.env by hand (only the
-// keys we need) when DATABASE_URL is not already provided by the environment.
-// This module is CommonJS (no "type": "module"), so `__dirname` is available.
-function loadEnvFallback(): void {
-    if (process.env.DATABASE_URL) return;
-    const envPath = resolve(__dirname, "..", ".env");
-    if (!existsSync(envPath)) return;
-    for (const rawLine of readFileSync(envPath, "utf8").split("\n")) {
-        const line = rawLine.trim();
-        if (!line || line.startsWith("#")) continue;
-        const eq = line.indexOf("=");
-        if (eq === -1) continue;
-        const key = line.slice(0, eq).trim();
-        if (process.env[key]) continue;
-        let value = line.slice(eq + 1).trim();
-        if (
-            (value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))
-        ) {
-            value = value.slice(1, -1);
-        }
-        process.env[key] = value;
-    }
-}
+import { assertDatabaseTarget } from "./database-target";
+import { loadEnvFallback } from "./load-env";
 
 loadEnvFallback();
 
@@ -55,6 +28,20 @@ if (!process.env.DATABASE_URL) {
     console.error(
         "[seed] DATABASE_URL is not set (and no packages/database/.env found). " +
             "Point DATABASE_URL at a local/dev database and re-run.",
+    );
+    process.exit(1);
+}
+
+// Which database this writes to depends on whether the developer sourced the
+// root `.env` earlier in the same shell — `loadEnvFallback` above deliberately
+// yields to an already-set DATABASE_URL, and the root `.env` names a different
+// Neon project. Confirm the target before writing anything.
+try {
+    const target = assertDatabaseTarget();
+    console.log(`[seed] target: ${target.database} on ${target.host}`);
+} catch (error) {
+    console.error(
+        `\n[seed] ${error instanceof Error ? error.message : String(error)}\n`,
     );
     process.exit(1);
 }
