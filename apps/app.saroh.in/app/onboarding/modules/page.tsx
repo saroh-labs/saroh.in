@@ -16,10 +16,10 @@ export default async function OnboardingModulesPage() {
     const modules = await listModules();
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        <main className="mx-auto w-full max-w-2xl px-6 py-16">
             <PageHeader
                 title="What does your business need to do?"
-                description="Turn on the capabilities you need now — add or remove them anytime without losing data. This isn't about size; it's about the work you do."
+                description="Pick what you need to start with. Nothing is locked in — add or remove capabilities later without losing data."
             />
             <ModuleGoalPicker modules={modules} />
         </main>

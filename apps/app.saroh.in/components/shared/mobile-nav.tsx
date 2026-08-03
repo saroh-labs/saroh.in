@@ -29,10 +29,11 @@ import {
  */
 export function MobileNav({
     unread = 0,
-    moduleKeys = [],
+    moduleKeys = null,
 }: {
     unread?: number;
-    moduleKeys?: string[];
+    /** `null` = availability unknown; see `filterNavGroups`. */
+    moduleKeys?: string[] | null;
 }) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();

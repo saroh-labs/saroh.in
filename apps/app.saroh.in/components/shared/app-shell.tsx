@@ -47,13 +47,18 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // Capability-aware chrome (ADR-003): fetch effective module availability
     // once here and pass the available keys (serializable strings — icons are
     // client refs and can't cross the boundary) to the nav so it reflects the
-    // Organization's enabled modules. Fail-open during dark rollout is handled
-    // in filterNavGroups. Never let a modules-fetch failure blank the shell.
+    // Organization's enabled modules.
+    //
+    // `null` on failure, NOT `[]`: the two mean different things to
+    // `filterNavGroups`. A failed fetch is "we don't know" and must fail open so
+    // a transient API error never blanks the shell; a successful fetch that
+    // returns nothing is "nothing is enabled yet", which a new Organization
+    // should see reflected in its nav rather than papered over.
     const moduleKeys = await listModules()
         .then((modules) =>
             modules.filter((m) => m.readiness !== "DISABLED").map((m) => m.key),
         )
-        .catch(() => [] as string[]);
+        .catch(() => null);
 
     return (
         <div className="flex min-h-screen">

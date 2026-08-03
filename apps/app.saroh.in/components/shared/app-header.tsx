@@ -30,7 +30,8 @@ type AppHeaderProps =
           organizations: Organization[];
           activeOrg: Organization | null;
           unread: number;
-          moduleKeys: string[];
+          /** `null` = availability unknown; see `filterNavGroups`. */
+          moduleKeys: string[] | null;
       };
 
 export function AppHeader(props: AppHeaderProps) {

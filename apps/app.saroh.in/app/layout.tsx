@@ -1,4 +1,3 @@
-import { AppShell } from "@/components/shared/app-shell";
 import "@saroh/ui/globals.css";
 import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
@@ -26,6 +25,13 @@ export const metadata: Metadata = {
         "Manage your storefronts, sites, leads, bookings and more with Saroh.",
 };
 
+/**
+ * Document-level only. The app chrome lives in `(shell)/layout.tsx` so that
+ * first-run routes under `/onboarding` can render without a sidebar full of
+ * capabilities the merchant has not chosen yet — asking "what does your
+ * business need to do?" beside a nav that already lists the answers is a
+ * contradiction. Route groups keep every URL unchanged.
+ */
 export default function RootLayout({
     children,
 }: {
@@ -43,7 +49,7 @@ export default function RootLayout({
                         enableSystem
                         disableTransitionOnChange
                     >
-                        <AppShell>{children}</AppShell>
+                        {children}
                     </ThemeProvider>
                 </Providers>
             </body>

@@ -21,10 +21,11 @@ import {
  */
 export function AppSidebar({
     unread = 0,
-    moduleKeys = [],
+    moduleKeys = null,
 }: {
     unread?: number;
-    moduleKeys?: string[];
+    /** `null` = availability unknown; see `filterNavGroups`. */
+    moduleKeys?: string[] | null;
 }) {
     const pathname = usePathname();
     const groups = filterNavGroups(NAV_GROUPS, moduleKeys);

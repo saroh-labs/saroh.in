@@ -26,7 +26,11 @@ export function openCommandMenu() {
  * page gets keyboard-driven jump-to-anywhere, the fastest "one product"
  * navigation affordance.
  */
-export function CommandMenu({ moduleKeys = [] }: { moduleKeys?: string[] }) {
+export function CommandMenu({
+    moduleKeys = null,
+}: {
+    moduleKeys?: string[] | null;
+}) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const groups = filterNavGroups(NAV_GROUPS, moduleKeys);
