@@ -19,6 +19,7 @@ import {
     NOTIFICATIONS_HREF,
     filterNavGroups,
     isNavItemActive,
+    showsGroupLabel,
 } from "@/components/shared/nav-items";
 
 /**
@@ -61,7 +62,7 @@ export function MobileNav({
                             key={group.label ?? `group-${index}`}
                             className="flex flex-col gap-1"
                         >
-                            {group.label && (
+                            {showsGroupLabel(group) && (
                                 <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                     {group.label}
                                 </p>

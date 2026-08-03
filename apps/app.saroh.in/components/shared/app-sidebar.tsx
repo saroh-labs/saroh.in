@@ -10,6 +10,7 @@ import {
     NOTIFICATIONS_HREF,
     filterNavGroups,
     isNavItemActive,
+    showsGroupLabel,
 } from "@/components/shared/nav-items";
 
 /**
@@ -31,7 +32,10 @@ export function AppSidebar({
     const groups = filterNavGroups(NAV_GROUPS, moduleKeys);
 
     return (
-        <aside className="hidden w-60 shrink-0 flex-col border-r lg:flex">
+        // `sticky top-0 h-screen` so the rail stays put on a long page. Without
+        // it the aside is only as tall as the flex row, and navigation scrolls
+        // away the moment a list runs past one viewport.
+        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r lg:flex">
             <div className="flex h-14 items-center border-b px-6">
                 <Link href="/" aria-label="Saroh">
                     <Wordmark />
@@ -44,9 +48,12 @@ export function AppSidebar({
                 {groups.map((group, index) => (
                     <div
                         key={group.label ?? `group-${index}`}
-                        className="flex flex-col gap-1"
+                        className={cn(
+                            "flex flex-col gap-1",
+                            group.pinToBottom && "mt-auto",
+                        )}
                     >
-                        {group.label && (
+                        {showsGroupLabel(group) && (
                             <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                 {group.label}
                             </p>

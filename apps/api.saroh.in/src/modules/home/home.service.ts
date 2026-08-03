@@ -13,16 +13,22 @@ import { ModuleAvailabilityService } from "../capabilities/module-availability.s
  * effective-availability projection the shell uses) with a few cheap operational
  * counts, and ranks by severity so the most important thing is always first.
  *
- * Rank: ATTENTION (a dependency is unhealthy) → SETUP (an enabled module isn't
- * ready) → OVERDUE (operational work past due) → SUGGESTION (a healthy nudge).
+ * Rank: ATTENTION (a dependency is unhealthy) → OVERDUE (operational work past
+ * due) → SETUP (an enabled module isn't ready) → SUGGESTION (a healthy nudge).
  * Actions for disabled/unavailable modules are never emitted (no leakage).
+ *
+ * OVERDUE outranks SETUP because someone outside the business is waiting on it.
+ * The order used to be the other way round, which pushed "Fulfil 1 open order"
+ * — a paying customer whose thing has not shipped — below "Connect a provider to
+ * send messages". Configuration can wait for a quiet moment; an unfulfilled
+ * order cannot, and a merchant who scans only the top of Home must not miss it.
  */
 export type HomeSeverity = "ATTENTION" | "SETUP" | "OVERDUE" | "SUGGESTION";
 
 const SEVERITY_RANK: Record<HomeSeverity, number> = {
     ATTENTION: 0,
-    SETUP: 1,
-    OVERDUE: 2,
+    OVERDUE: 1,
+    SETUP: 2,
     SUGGESTION: 3,
 };
 

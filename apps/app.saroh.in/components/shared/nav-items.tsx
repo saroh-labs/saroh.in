@@ -38,7 +38,20 @@ export interface NavGroup {
      * omitted, the group is always shown (core navigation).
      */
     moduleKey?: string;
+    /** Render at the foot of the rail rather than in reading order. */
+    pinToBottom?: boolean;
     items: NavItem[];
+}
+
+/**
+ * A heading earns its line only when it groups something. "COMMERCE" above a
+ * lone "Commerce" is the same word twice, and "WEBSITE" above "Sites" spends a
+ * line to say less than the item already does — three of these cost six lines
+ * of rail for three destinations. Single-item groups render as a bare item; the
+ * `moduleKey` filtering above is unaffected either way.
+ */
+export function showsGroupLabel(group: NavGroup): boolean {
+    return Boolean(group.label) && group.items.length > 1;
 }
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -87,8 +100,12 @@ export const NAV_GROUPS: NavGroup[] = [
     // Both destinations degrade by role on the server (Modules is read-only for
     // non-managers; Providers renders an owners/admins-only empty state), so
     // showing them to every actor leaks nothing.
+    // Pinned to the foot of the rail: configuration is where you go on purpose,
+    // not something to scan past on the way to the work. It also keeps Settings
+    // in the same place whether an Organization has one capability or eight.
     {
         label: "Settings",
+        pinToBottom: true,
         items: [
             {
                 href: "/settings/organization",

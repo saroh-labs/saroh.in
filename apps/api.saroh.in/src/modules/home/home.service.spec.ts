@@ -61,6 +61,34 @@ describe("HomeService ranking", () => {
         );
     });
 
+    it("puts an unfulfilled order before a module still awaiting setup", async () => {
+        // The pair that was ranked backwards: a paying customer waiting on an
+        // order outranks configuration a merchant can do whenever.
+        const svc = build(
+            [
+                { key: "COMMERCE", label: "Commerce", readiness: "ACTIVE" },
+                {
+                    key: "COMMUNICATIONS",
+                    label: "Communications",
+                    readiness: "SETUP_REQUIRED",
+                    blockers: [
+                        { code: "NO_PROVIDER", message: "Connect a provider." },
+                    ],
+                },
+            ],
+            { order: 1 },
+        );
+        const model = await svc.build(INPUT);
+        expect(model.primaryAction?.code).toBe("COMMERCE_OPEN_ORDERS");
+        const codes = model.actions.map((a) => a.code);
+        expect(
+            model.actions.findIndex((a) => a.severity === "OVERDUE"),
+        ).toBeLessThan(codes.length);
+        expect(
+            model.actions.findIndex((a) => a.severity === "OVERDUE"),
+        ).toBeLessThan(model.actions.findIndex((a) => a.severity === "SETUP"));
+    });
+
     it("emits no appointment actions when Appointments is disabled", async () => {
         const svc = build([
             {
