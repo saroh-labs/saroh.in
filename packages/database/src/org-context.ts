@@ -1,4 +1,8 @@
 import { prisma } from "./client";
+import type { TransactionClient } from "./transaction";
+
+// Re-exported so the many call sites that import it from here keep working.
+export type { TransactionClient };
 
 /**
  * Transaction-local Organization context for PostgreSQL row-level security
@@ -44,8 +48,3 @@ export async function withoutOrgContext<T>(
 ): Promise<T> {
     return prisma.$transaction((tx) => fn(tx));
 }
-
-/** The interactive-transaction client shape Prisma passes to `$transaction`. */
-export type TransactionClient = Parameters<
-    Parameters<typeof prisma.$transaction>[0]
->[0];

@@ -1,32 +1,28 @@
-import { forwardRef, Module } from "@nestjs/common";
+import { Module } from "@nestjs/common";
 
-import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { AuditModule } from "../audit/audit.module";
-import { OrganizationContextService } from "./organization-context.service";
+import { OrganizationContextModule } from "./organization-context.module";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
 import { OrganizationSettingsService } from "./organization-settings.service";
 import { OrganizationsController } from "./organizations.controller";
 
 /**
- * Organization authorization layer (S1-003) + onboarding (S1-004). Exports the
- * context service so other modules can resolve an `OrganizationContext`;
- * provides the guard so Nest DI can inject the service into it, and the
- * onboarding service that atomically creates an org with its OWNER.
+ * Organization onboarding and settings (S1-003 / S1-004).
  *
- * Imports {@link AuditModule} (S1-009) so onboarding can emit audit events.
- * The dependency is bidirectional — AuditModule needs this module's
- * `OrganizationContextService` for its guarded read endpoint — so both sides
- * use `forwardRef` to break the module-resolution cycle.
+ * The context service and guard now live in {@link OrganizationContextModule}.
+ * This module re-exports it, so the twenty-odd modules that import
+ * `OrganizationsModule` purely to reach `OrganizationContextService` continue to
+ * resolve it with no change on their side.
+ *
+ * Imports {@link AuditModule} (S1-009) so onboarding can emit audit events. That
+ * used to be mutual — AuditModule imported this module back for the context
+ * service — and both sides wrapped it in `forwardRef`. With the primitive
+ * extracted the dependency runs one way and the `forwardRef` is gone.
  */
 @Module({
-    imports: [forwardRef(() => AuditModule)],
+    imports: [OrganizationContextModule, AuditModule],
     controllers: [OrganizationsController],
-    providers: [
-        OrganizationContextService,
-        OrganizationOnboardingService,
-        OrganizationSettingsService,
-        OrganizationGuard,
-    ],
-    exports: [OrganizationContextService],
+    providers: [OrganizationOnboardingService, OrganizationSettingsService],
+    exports: [OrganizationContextModule],
 })
 export class OrganizationsModule {}

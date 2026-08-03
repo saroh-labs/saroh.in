@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import type { PrismaClient } from "@prisma/client";
 
-import type { TransactionClient } from "./org-context";
+import type { TransactionClient } from "./transaction";
 
 /**
  * RLS enforcement layer (the "enforcement half" of S1-011 that was never built).
