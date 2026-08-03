@@ -57,8 +57,14 @@ export function AppHeader(props: AppHeaderProps) {
     const { organizations, activeOrg, unread, moduleKeys, user } = props;
 
     return (
-        <header className="flex h-14 items-center justify-between gap-4 border-b px-4 sm:px-6">
-            <div className="flex items-center gap-2 sm:gap-3">
+        // On a 390px phone this bar used to overflow by 40px and push the
+        // account menu — the only route to sign-out — entirely off-screen.
+        // The cause was flex children defaulting to `min-width: auto`, so
+        // nothing could give while the org switcher reserved a flat 16rem.
+        // Now the trailing controls hold their size and the switcher absorbs
+        // whatever is left, truncating its label to fit any width.
+        <header className="flex h-14 items-center justify-between gap-3 border-b px-4 sm:gap-4 sm:px-6">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                 <MobileNav unread={unread} moduleKeys={moduleKeys} />
                 <Link
                     href="/"
@@ -69,15 +75,17 @@ export function AppHeader(props: AppHeaderProps) {
                 </Link>
                 <CommandTrigger />
             </div>
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-4">
                 {activeOrg && (
                     <OrganizationSwitcher
                         organizations={organizations}
                         activeOrgId={activeOrg.id}
                     />
                 )}
-                <ThemeToggle />
-                <UserMenu name={user.name} email={user.email} />
+                <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+                    <ThemeToggle />
+                    <UserMenu name={user.name} email={user.email} />
+                </div>
             </div>
         </header>
     );

@@ -65,7 +65,12 @@ export function OrganizationSwitcher({
                     size="sm"
                     disabled={pending}
                     aria-label="Switch organization"
-                    className="max-w-[16rem] justify-between gap-2"
+                    // `min-w-0` lets the trigger shrink below its content so
+                    // the label can truncate; without it the button holds its
+                    // intrinsic width and shoves the account menu off a phone
+                    // screen. The cap stays for wide viewports, where a long
+                    // org name should not sprawl.
+                    className="min-w-0 max-w-[16rem] justify-between gap-2"
                 >
                     <span className="truncate">{active.name}</span>
                     <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
