@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { trimmedOr } from "@/lib/forms/values";
 import { updateStore } from "@/lib/stores/actions";
 
 interface StoreFields {
@@ -50,8 +51,8 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
         const res = await updateStore(store.id, {
             name: values.name,
             slug: values.slug,
-            description: values.description?.trim() || null,
-            logo: values.logo?.trim() || null,
+            description: trimmedOr(values.description, null),
+            logo: trimmedOr(values.logo, null),
         });
         if (!res.ok) {
             if (

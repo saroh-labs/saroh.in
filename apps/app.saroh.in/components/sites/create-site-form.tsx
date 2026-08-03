@@ -23,6 +23,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { trimmedOr } from "@/lib/forms/values";
 import { createSite } from "@/lib/sites/actions";
 import type { Template } from "@/lib/sites/service";
 
@@ -68,7 +69,7 @@ export function CreateSiteForm({ templates }: { templates: Template[] }) {
                 : templates.find((t) => t.id === values.templateId);
         const res = await createSite({
             name: values.name,
-            subdomain: values.subdomain?.trim() || undefined,
+            subdomain: trimmedOr(values.subdomain, undefined),
             templateId: template?.id,
             templateVersion: template?.version,
         });

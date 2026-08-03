@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { trimmedOr } from "@/lib/forms/values";
 import { createStore } from "@/lib/stores/actions";
 import { slugify } from "@/lib/stores/slug";
 
@@ -47,8 +48,8 @@ export function CreateStoreForm() {
     async function onSubmit(values: FormValues) {
         const res = await createStore({
             name: values.name,
-            slug: values.slug?.trim() || undefined,
-            description: values.description?.trim() || undefined,
+            slug: trimmedOr(values.slug, undefined),
+            description: trimmedOr(values.description, undefined),
         });
         if (!res.ok) {
             if (res.field === "slug" || res.field === "name") {

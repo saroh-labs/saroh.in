@@ -18,6 +18,7 @@ import { z } from "zod";
 
 import { createCustomer, updateCustomer } from "@/lib/customers/actions";
 import type { Customer } from "@/lib/customers/service";
+import { trimmedOr } from "@/lib/forms/values";
 
 const formSchema = z.object({
     email: z.string().trim().min(1, { message: "Email is required" }),
@@ -60,13 +61,13 @@ export function CustomerForm({
     async function onSubmit(values: FormValues) {
         const input = {
             email: values.email.trim(),
-            firstName: values.firstName?.trim() || null,
-            lastName: values.lastName?.trim() || null,
-            phone: values.phone?.trim() || null,
-            country: values.country?.trim() || null,
-            state: values.state?.trim() || null,
-            city: values.city?.trim() || null,
-            zipCode: values.zipCode?.trim() || null,
+            firstName: trimmedOr(values.firstName, null),
+            lastName: trimmedOr(values.lastName, null),
+            phone: trimmedOr(values.phone, null),
+            country: trimmedOr(values.country, null),
+            state: trimmedOr(values.state, null),
+            city: trimmedOr(values.city, null),
+            zipCode: trimmedOr(values.zipCode, null),
         };
         const res =
             editing && customer

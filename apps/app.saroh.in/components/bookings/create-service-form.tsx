@@ -18,6 +18,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { trimmedOr } from "@/lib/forms/values";
 import { createService } from "@/lib/services/actions";
 
 /**
@@ -93,7 +94,7 @@ export function CreateServiceForm() {
             : undefined;
         const res = await createService({
             name: values.name.trim(),
-            description: values.description?.trim() || undefined,
+            description: trimmedOr(values.description, undefined),
             durationMinutes: Number(values.durationMinutes),
             bufferBeforeMinutes: Number(values.bufferBefore) || 0,
             bufferAfterMinutes: Number(values.bufferAfter) || 0,

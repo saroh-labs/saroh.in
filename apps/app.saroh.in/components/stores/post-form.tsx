@@ -23,6 +23,7 @@ import type {
     PostDetail,
     PostStatus,
 } from "@/lib/content/service";
+import { trimmedOr } from "@/lib/forms/values";
 
 const STATUSES: PostStatus[] = ["DRAFT", "PUBLISHED", "ARCHIVED"];
 
@@ -70,22 +71,22 @@ export function PostForm({
     async function onSubmit(values: FormValues) {
         const input = {
             title: values.title.trim(),
-            excerpt: values.excerpt?.trim() || null,
+            excerpt: trimmedOr(values.excerpt, null),
             content: values.content,
             categoryId: values.categoryId || null,
             status: values.status,
             featured: values.featured,
-            image: values.image?.trim() || null,
+            image: trimmedOr(values.image, null),
         };
         const res =
             editing && post
                 ? await updatePost(storeId, post.id, {
                       ...input,
-                      slug: values.slug?.trim() || post.slug,
+                      slug: trimmedOr(values.slug, post.slug),
                   })
                 : await createPost(storeId, {
                       ...input,
-                      slug: values.slug?.trim() || undefined,
+                      slug: trimmedOr(values.slug, undefined),
                   });
 
         if (!res.ok) {

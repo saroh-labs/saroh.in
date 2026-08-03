@@ -1,6 +1,7 @@
 "use client";
 
-import { type ColumnDef, DataTable } from "@saroh/ui/data-table";
+import type { ColumnDef } from "@saroh/ui/data-table";
+import { DataTable } from "@saroh/ui/data-table";
 import { useRouter } from "next/navigation";
 
 import type { Customer } from "@/lib/customers/service";

@@ -1,7 +1,8 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
-import { type ColumnDef, DataTable } from "@saroh/ui/data-table";
+import type { ColumnDef } from "@saroh/ui/data-table";
+import { DataTable } from "@saroh/ui/data-table";
 import { useRouter } from "next/navigation";
 
 import type { Product } from "@/lib/products/service";

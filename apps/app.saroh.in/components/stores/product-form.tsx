@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { trimmedOr } from "@/lib/forms/values";
 import {
     createProduct,
     deleteProduct,
@@ -72,18 +73,18 @@ export function ProductForm({
     async function onSubmit(values: FormValues) {
         const input = {
             name: values.name,
-            slug: values.slug?.trim() || undefined,
+            slug: trimmedOr(values.slug, undefined),
             price: values.price.trim(),
             currency: values.currency,
             status: values.status,
             categoryId: values.categoryId || null,
-            description: values.description?.trim() || null,
+            description: trimmedOr(values.description, null),
         };
         const res =
             editing && product
                 ? await updateProduct(storeId, product.id, {
                       ...input,
-                      slug: values.slug?.trim() || product.slug,
+                      slug: trimmedOr(values.slug, product.slug),
                   })
                 : await createProduct(storeId, input);
 

@@ -78,9 +78,7 @@ export function CreateOrganizationForm() {
         const entries = PROFILE_FIELDS.map(
             (key) => [key, values[key]?.trim() ?? ""] as const,
         ).filter(([, value]) => value !== "");
-        return entries.length
-            ? (Object.fromEntries(entries) as OrganizationProfileInput)
-            : undefined;
+        return entries.length ? Object.fromEntries(entries) : undefined;
     }
 
     async function onSubmit(values: FormValues) {

@@ -74,6 +74,24 @@ export default tseslint.config(
                 },
             ],
             "@typescript-eslint/no-non-null-assertion": "error",
+            // better-auth's `APIError` IS an Error at runtime — verified:
+            // `new APIError(...) instanceof Error === true`, prototype chain
+            // APIError -> Error. Its shipped type declarations just do not say
+            // so, which the rule reads as "throwing a non-Error". Allowing the
+            // one type by name keeps the rule enforcing everywhere else; the
+            // alternative was an inline disable at every throw site.
+            "@typescript-eslint/only-throw-error": [
+                "error",
+                {
+                    allow: [
+                        {
+                            from: "package",
+                            package: "better-auth",
+                            name: "APIError",
+                        },
+                    ],
+                },
+            ],
             "import/consistent-type-specifier-style": [
                 "error",
                 "prefer-top-level",

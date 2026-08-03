@@ -6,7 +6,8 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
+import type { FieldErrors } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -26,6 +27,16 @@ interface CustomerLite {
 
 const money = (cents: number) => (cents / 100).toFixed(2);
 const toCents = (s: string) => Math.round((Number(s) || 0) * 100);
+
+/**
+ * A quantity that is safe to multiply.
+ *
+ * `valueAsNumber` gives `NaN` for an emptied number input, and a watched row
+ * can be `undefined` for a tick after one is appended. Neither is nullish, so
+ * `?? 0` would let `NaN` through and turn the whole order total into `NaN`.
+ */
+const quantityOf = (quantity: number | undefined) =>
+    quantity !== undefined && Number.isFinite(quantity) ? quantity : 0;
 
 const formSchema = z.object({
     customerId: z.string().min(1, { message: "Pick a customer" }),
@@ -87,8 +98,10 @@ export function OrderForm({
 
     const priceOf = (id: string) =>
         toCents(products.find((p) => p.id === id)?.price ?? "0");
-    const subtotalCents = (watchedLines ?? []).reduce(
-        (sum, l) => sum + priceOf(l.productId) * (l.quantity || 0),
+    // No `?? []`: `lines` has a default value and RHF types the watched result
+    // as the schema's array, so the fallback was unreachable.
+    const subtotalCents = watchedLines.reduce(
+        (sum, l) => sum + priceOf(l.productId) * quantityOf(l.quantity),
         0,
     );
     const totalCents = Math.max(
@@ -176,47 +189,56 @@ export function OrderForm({
 
             <div className="space-y-3">
                 <Label>Items</Label>
-                {fields.map((line, i) => (
-                    <div key={line.id} className="flex items-center gap-2">
-                        <select
-                            aria-label="Product"
-                            disabled={isSubmitting}
-                            className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-                            {...form.register(`lines.${i}.productId`)}
-                        >
-                            {products.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                    {p.name} — {p.price}
-                                </option>
-                            ))}
-                        </select>
-                        <Input
-                            aria-label="Quantity"
-                            type="number"
-                            min={1}
-                            disabled={isSubmitting}
-                            className="w-20"
-                            {...form.register(`lines.${i}.quantity`, {
-                                valueAsNumber: true,
-                            })}
-                        />
-                        <span className="w-20 text-right text-sm tabular-nums text-muted-foreground">
-                            {money(
-                                priceOf(watchedLines?.[i]?.productId ?? "") *
-                                    (watchedLines?.[i]?.quantity || 0),
-                            )}
-                        </span>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={isSubmitting || fields.length === 1}
-                            onClick={() => remove(i)}
-                        >
-                            ✕
-                        </Button>
-                    </div>
-                ))}
+                {fields.map((line, i) => {
+                    // `.at(i)` rather than `[i]`: it returns `T | undefined`,
+                    // which is the truth. `fields` (from useFieldArray) and
+                    // `watchedLines` update on different ticks, so just after a
+                    // row is added this index really can be missing — indexing
+                    // with `[i]` only *looked* safe because the project does not
+                    // set `noUncheckedIndexedAccess`.
+                    const watched = watchedLines.at(i);
+                    return (
+                        <div key={line.id} className="flex items-center gap-2">
+                            <select
+                                aria-label="Product"
+                                disabled={isSubmitting}
+                                className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                                {...form.register(`lines.${i}.productId`)}
+                            >
+                                {products.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name} — {p.price}
+                                    </option>
+                                ))}
+                            </select>
+                            <Input
+                                aria-label="Quantity"
+                                type="number"
+                                min={1}
+                                disabled={isSubmitting}
+                                className="w-20"
+                                {...form.register(`lines.${i}.quantity`, {
+                                    valueAsNumber: true,
+                                })}
+                            />
+                            <span className="w-20 text-right text-sm tabular-nums text-muted-foreground">
+                                {money(
+                                    priceOf(watched?.productId ?? "") *
+                                        quantityOf(watched?.quantity),
+                                )}
+                            </span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                disabled={isSubmitting || fields.length === 1}
+                                onClick={() => remove(i)}
+                            >
+                                ✕
+                            </Button>
+                        </div>
+                    );
+                })}
                 <Button
                     type="button"
                     variant="outline"
