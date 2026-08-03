@@ -12,6 +12,7 @@ import {
 } from "@nestjs/common";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { IdentityOnly } from "../../common/decorators/identity-only.decorator";
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
@@ -61,6 +62,7 @@ export class AdminController {
      * from `ADMIN_ALLOWLIST` config instead of a recorded grant.
      */
     @Get("me")
+    @IdentityOnly()
     me(
         @CurrentUser() user: AuthUser,
         @PlatformAdminContext() ctx: PlatformAdminInfo,
