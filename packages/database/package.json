@@ -25,7 +25,8 @@
         "postinstall": "prisma generate",
         "test": "vitest run",
         "typecheck": "tsc --noEmit",
-        "db:guard": "tsx src/database-target.cli.ts"
+        "db:guard": "tsx src/database-target.cli.ts",
+        "db:seed:reset": "tsx src/seed.ts --reset"
     },
     "dependencies": {
         "@prisma/adapter-pg": "7.4.0",
@@ -44,6 +45,7 @@
         "tsup": "^8.5.1",
         "tsx": "^4.22.3",
         "typescript": "catalog:",
-        "vitest": "^3.2.4"
+        "vitest": "^3.2.4",
+        "better-auth": "^1.6.11"
     }
 }
