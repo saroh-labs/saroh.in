@@ -138,6 +138,16 @@ const config = {
                 warning: {
                     DEFAULT: "hsl(var(--warning))",
                     foreground: "hsl(var(--warning-foreground))",
+                    // The tinted pair, matching `brand` and `highlight`.
+                    // `--warning` is a FILL — a mid-amber sized to carry white
+                    // or near-black text on top of it. Used as text on a pale
+                    // tint (the obvious `bg-warning/15 text-warning`) it lands
+                    // at 2.3:1 in every light skin, which is unreadable. These
+                    // two exist so "someone is waiting" can be said quietly
+                    // without saying it illegibly.
+                    subtle: "hsl(var(--warning-subtle))",
+                    "subtle-foreground":
+                        "hsl(var(--warning-subtle-foreground))",
                 },
                 info: {
                     DEFAULT: "hsl(var(--info))",
