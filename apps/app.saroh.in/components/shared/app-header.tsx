@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
 import { CommandTrigger } from "@/components/shared/command-trigger";
 import { MobileNav } from "@/components/shared/mobile-nav";
+import type { NavCounts } from "@/components/shared/nav-items";
 import { SkinSwitcher } from "@/components/shared/skin-switcher";
 import { UserMenu } from "@/components/shared/user-menu";
 import type { Organization } from "@/lib/organizations/service";
@@ -33,6 +34,8 @@ type AppHeaderProps =
           unread: number;
           /** `null` = availability unknown; see `filterNavGroups`. */
           moduleKeys: string[] | null;
+          /** Work waiting behind a route; see `NavCounts`. */
+          counts?: NavCounts;
       };
 
 export function AppHeader(props: AppHeaderProps) {
@@ -58,7 +61,8 @@ export function AppHeader(props: AppHeaderProps) {
         );
     }
 
-    const { organizations, activeOrg, unread, moduleKeys, user } = props;
+    const { organizations, activeOrg, unread, moduleKeys, counts, user } =
+        props;
 
     return (
         // On a 390px phone this bar used to overflow by 40px and push the
@@ -69,7 +73,11 @@ export function AppHeader(props: AppHeaderProps) {
         // whatever is left, truncating its label to fit any width.
         <header className="flex h-14 items-center justify-between gap-3 border-b px-4 sm:gap-4 sm:px-6">
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                <MobileNav unread={unread} moduleKeys={moduleKeys} />
+                <MobileNav
+                    unread={unread}
+                    moduleKeys={moduleKeys}
+                    counts={counts}
+                />
                 <Link
                     href="/"
                     aria-label="Saroh"

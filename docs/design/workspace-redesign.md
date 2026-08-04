@@ -84,12 +84,32 @@ whole page, not one query per contact, each gated on the actor's own permission
 for the data it reads (`lead:read`, `booking:read`) rather than riding on
 `contact:read`.
 
-**There is no "last order", on purpose.** Orders hang off a commerce `Customer`,
-joined to a CRM `Contact` only through a hand-made `CustomerIdentityLink` (#120).
-Matching the two by email instead IS the auto-linking SEC-005 / ARCH-001 have not
-approved, and rendering the column from today's sparse links would print "no
-orders" against customers who have ordered. A wrong fact drawn confidently is
-worse than an absent one.
+**Last order is a READ-TIME reconciliation** (added 2026-08-04 on an explicit
+decision to build it after the risk was raised). Orders hang off a commerce
+`Customer`, joined to a CRM `Contact` two ways: an explicit
+`CustomerIdentityLink` (#120), or an exact case-insensitive email match within
+the same Organization.
+
+The second is the part that matters. It is computed per request and **never
+written back** — no link row is created, nothing is merged, and turning it off is
+deleting a query rather than unpicking data. That is what makes it shippable
+while SEC-005 / ARCH-001 are open: those decide what a PERSISTED unified customer
+record means and who may act on it. This decides only what one merchant sees on
+one screen, from two records they already own in one Organization they already
+administer.
+
+It can **under-report** — someone who ordered under a different address shows
+nothing — but it never mis-attributes: the final read is narrowed to the exact
+newest instants and the customer+instant pair is re-checked in code, so an order
+that merely shares a timestamp with another customer's latest is discarded. An
+empty cell means "no order we can attribute", not "never bought", which is why it
+renders as a known absence rather than a zero.
+
+Four bounded queries, none scaling with order volume: links, email-matched
+customers, `groupBy` for the newest instant per customer, then one narrowed
+`findMany`. Gated on `order:read` in its own right, so a role that may read
+contacts but not orders sees the column empty rather than populated by a join it
+was not entitled to.
 
 **Done when:** a merchant can answer "who is worth calling today" without
 leaving the screen. ✅
@@ -139,6 +159,20 @@ Two changes, both about work rather than places:
   beneath it, and two of the three linked to the _same_ route, so "Availability"
   landed somewhere that never mentions the word. Its counts moved to Home. The
   URL redirects to `/bookings`, so no bookmark breaks.
+- **The rail's spacing was rebuilt** (2026-08-04). It put a full `gap-6` between
+  every group, but five groups hold a single item each (Home, Sell, Website,
+  Insights, Notifications) — so ~120px of the rail was gaps around lone rows,
+  separating things that were never in different categories. Space now belongs to
+  headings: a labelled group gets margin above it, a lone item flows tight.
+- **Settings is separated, not pinned.** `mt-auto` really did glue it to the foot
+  of a full-height rail, and with twelve destinations that left a vertical hole in
+  the middle of the navigation big enough to read as a rendering fault. A hairline
+  says "configuration is a different kind of thing" in two pixels instead of two
+  hundred, and Settings is still always last — which is what muscle memory
+  actually keys on.
+- **The drawer mirrors all of it**, including the work counts it never had, so
+  the two navigations cannot drift into different mental models. Its rows stay
+  taller: that one is driven by a thumb.
 
 ### 5. The remaining list screens ✅
 
@@ -214,6 +248,12 @@ and each would come straight back if the reasoning is lost.
 - **Bookings said "Unknown booker" for people the CRM knew.** The list endpoint
   did not join the contact while Home did, so the two screens disagreed about who
   a booking belonged to on the same visit.
+- **Nested anchors in every list row.** `DataView` wrapped the row in a link for
+  the tap target while the primary cell carried its own — invalid HTML, and React
+  reported it on all five list screens. A primitive that silently forbids a link
+  in a cell would be a trap, since the TABLE needs one there, so the row's tap
+  target is now a sibling link stretched over the row, `aria-hidden` and out of
+  the tab order. One accessible name, one focus stop, whole row still tappable.
 
 ## Open
 
@@ -235,5 +275,9 @@ and each would come straight back if the reasoning is lost.
 - **Panel's light `--highlight` clears the floor at 4.70:1** — a pass, but the
   slimmest one on the board. Deepening the fill would buy headroom at the cost of
   changing the identity, so it is flagged rather than changed.
-- **Contacts still has no "last order"** — blocked on SEC-005 / ARCH-001, see
-  step 2.
+- **The last-order email match is read-time, and should stay that way** until
+  SEC-005 / ARCH-001 land. If a future change starts WRITING
+  `CustomerIdentityLink` rows from it, that is the auto-linking decision being
+  made — it needs to be made on purpose, not as an optimisation. The
+  under-reporting case (ordered under a different address) is the honest cost of
+  not making it yet.

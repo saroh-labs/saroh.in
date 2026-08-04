@@ -114,6 +114,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     activeOrg={activeOrg}
                     unread={unread}
                     moduleKeys={moduleKeys}
+                    counts={counts}
                 />
                 {/*
                  * `tabIndex={-1}` makes this a valid focus target: following the

@@ -12,22 +12,21 @@ import type {
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { ContactListItem } from "@/lib/contacts/service";
 import { contactName } from "@/lib/crm/format";
-import { formatMoney } from "@/lib/format/money";
+import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
 
 /**
  * Contacts as a customer record, not an address book.
  *
  * Twenty-four identical name-and-email cards made the merchant click to learn
- * anything. The rollup columns are the point of the screen: open pipeline value
- * and the next booking are what answer *who is worth calling today* without
- * leaving it.
+ * anything. The rollup columns are the point of the screen: open pipeline, the
+ * next booking and the last order are what answer _who is worth calling today_
+ * without leaving it.
  *
- * WHAT IS STILL MISSING, and deliberately not faked: there is no "last order".
- * Orders belong to a commerce Customer, joined to a CRM Contact only through an
- * explicit identity link a human makes (#120). Matching the two by email would
- * be the auto-linking SEC-005 / ARCH-001 have not approved, and rendering the
- * column from today's sparse links would print "no orders" against customers
- * who have ordered. See `docs/design/workspace-redesign.md`.
+ * "Last order" is a read-time reconciliation on the API (explicit identity links
+ * plus a same-org email match, never written back). It can be silent for someone
+ * who ordered under a different address, so an empty cell here means "no order
+ * we can attribute", not "never bought" — which is why it renders as a known
+ * absence rather than a zero.
  */
 
 /** A known absence, drawn so it cannot be mistaken for a failed render. */
@@ -44,6 +43,11 @@ const FILTERS: DataFilter<ContactListItem>[] = [
         id: "booked",
         label: "Booked in",
         predicate: (c) => c.nextBookingAt !== null,
+    },
+    {
+        id: "buyers",
+        label: "Have bought",
+        predicate: (c) => c.lastOrderAt !== null,
     },
 ];
 
@@ -63,7 +67,10 @@ export function ContactsView({
             cell: (c) => (
                 <Link
                     href={`/contacts/${c.id}`}
-                    className="font-medium underline-offset-4 hover:text-brand hover:underline"
+                    // A person's name is the row's handle; breaking it across
+                    // two lines to save horizontal space costs a whole extra
+                    // row of height on EVERY row to buy a few pixels on one.
+                    className="whitespace-nowrap font-medium underline-offset-4 hover:text-brand hover:underline"
                 >
                     {contactName(c)}
                 </Link>
@@ -76,7 +83,12 @@ export function ContactsView({
             sortValue: (c) => (c.company ?? "").toLowerCase(),
             // An em dash, not blank: a blank cell reads as a rendering bug,
             // while a dash reads as "we know, and there isn't one".
-            cell: (c) => c.company ?? <Missing />,
+            cell: (c) =>
+                c.company ? (
+                    <span className="whitespace-nowrap">{c.company}</span>
+                ) : (
+                    <Missing />
+                ),
         },
         {
             id: "pipeline",
@@ -133,12 +145,51 @@ export function ContactsView({
                 ),
         },
         {
+            id: "lastOrder",
+            header: "Last order",
+            priority: "secondary",
+            numeric: true,
+            // Sorted by RECENCY, not amount: "who has gone quiet" is the
+            // question this column exists to answer, and never-ordered sorts
+            // last ascending rather than pretending to be the oldest.
+            sortValue: (c) =>
+                c.lastOrderAt
+                    ? new Date(c.lastOrderAt).getTime()
+                    : Number.MAX_SAFE_INTEGER,
+            cell: (c) =>
+                c.lastOrderAt ? (
+                    <span className="whitespace-nowrap">
+                        {formatMoneyMajor(
+                            c.lastOrderTotal,
+                            c.lastOrderCurrency,
+                        )}{" "}
+                        {/* A real space, not just `ml-1.5`: margin separates
+                            the two visually but leaves the text nodes adjacent,
+                            so anything reading the row aloud or copying it gets
+                            "₹6,3729 Jul 2026". */}
+                        <ViewerDate
+                            iso={c.lastOrderAt}
+                            className="ml-0.5 text-xs text-muted-foreground"
+                        />
+                    </span>
+                ) : (
+                    <Missing />
+                ),
+        },
+        {
             id: "email",
             header: "Email",
             priority: "detail",
             sortValue: (c) => c.email.toLowerCase(),
+            // The one column allowed to give up space: an address is recognised
+            // from its start, and the full value is a click away on the row.
+            // The cap only lifts at `2xl`, where the other seven columns fit
+            // without it — releasing it at `xl` pushed "Added" off the edge on a
+            // 1440px screen, which is the commonest desktop this will run on.
             cell: (c) => (
-                <span className="text-muted-foreground">{c.email}</span>
+                <span className="block max-w-[16ch] truncate text-muted-foreground 2xl:max-w-none">
+                    {c.email}
+                </span>
             ),
         },
         {

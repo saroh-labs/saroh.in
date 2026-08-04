@@ -23,10 +23,12 @@ export interface Contact {
  * A contact as the list screen receives it: the record plus the rollup that
  * decides whether it is worth calling today.
  *
- * There is no `lastOrderAt` here because there is none on the API either —
- * orders join to a contact only through a hand-made identity link (#120), and
- * matching by email instead would be the auto-linking SEC-005 / ARCH-001 have
- * not approved. See `ContactsService` in api.saroh.in.
+ * `lastOrder*` is a READ-TIME reconciliation on the API — explicit identity
+ * links (#120) plus a same-organization email match, computed per request and
+ * never written back. It can under-report (someone who ordered under a
+ * different address shows nothing) but never mis-attributes. See
+ * `ContactsService` in api.saroh.in for why that distinction is what makes it
+ * shippable while SEC-005 / ARCH-001 are open.
  */
 export interface ContactListItem extends Contact {
     /** Sum of OPEN lead values in MINOR units; null when none, or none valued. */
@@ -34,6 +36,11 @@ export interface ContactListItem extends Contact {
     openLeadCount: number;
     /** ISO start of the next confirmed booking, or null. */
     nextBookingAt: string | null;
+    /** ISO instant of the most recent order, or null. */
+    lastOrderAt: string | null;
+    /** That order's total in MAJOR units as a decimal string, and its currency. */
+    lastOrderTotal: string | null;
+    lastOrderCurrency: string | null;
 }
 
 /** A lead as embedded in a contact's detail (its current stage + pipeline). */

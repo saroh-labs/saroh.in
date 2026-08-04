@@ -41,8 +41,18 @@ export interface NavGroup {
      * omitted, the group is always shown (core navigation).
      */
     moduleKey?: string;
-    /** Render at the foot of the rail rather than in reading order. */
-    pinToBottom?: boolean;
+    /**
+     * Set the group off from the ones above it with a rule.
+     *
+     * This used to be `pinToBottom`, and `mt-auto` really did glue Settings to
+     * the foot of a full-height rail. With twelve destinations that left a
+     * vertical hole in the middle of the navigation big enough to read as a
+     * rendering fault — the rail looked broken rather than organised. A hairline
+     * says "configuration is a different kind of thing" in two pixels instead of
+     * two hundred, and Settings is still always last, which is what muscle
+     * memory actually keys on.
+     */
+    separated?: boolean;
     items: NavItem[];
 }
 
@@ -128,12 +138,11 @@ export const NAV_GROUPS: NavGroup[] = [
     // Both destinations degrade by role on the server (Modules is read-only for
     // non-managers; Providers renders an owners/admins-only empty state), so
     // showing them to every actor leaks nothing.
-    // Pinned to the foot of the rail: configuration is where you go on purpose,
-    // not something to scan past on the way to the work. It also keeps Settings
-    // in the same place whether an Organization has one capability or eight.
+    // Set off by a rule, and always last: configuration is where you go on
+    // purpose, not something to scan past on the way to the work.
     {
         label: "Settings",
-        pinToBottom: true,
+        separated: true,
         items: [
             {
                 href: "/settings/organization",

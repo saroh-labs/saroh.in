@@ -45,20 +45,33 @@ export function AppSidebar({
                     <Wordmark />
                 </Link>
             </div>
+            {/*
+             * `gap-0.5` on the nav, and space bought back only where it means
+             * something.
+             *
+             * The rail used to put a full `gap-6` between every group — but five
+             * of them (Home, Sell, Website, Insights, Notifications) hold a
+             * single item each, so 120px of the rail was gaps around lone rows,
+             * separating things that were never in different categories. A
+             * heading earns the space above it; a lone item does not.
+             */}
             <nav
                 aria-label="Primary"
-                className="flex flex-1 flex-col gap-6 overflow-y-auto p-4"
+                className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4"
             >
                 {groups.map((group, index) => (
                     <div
                         key={group.label ?? `group-${index}`}
                         className={cn(
-                            "flex flex-col gap-1",
-                            group.pinToBottom && "mt-auto",
+                            "flex flex-col gap-0.5",
+                            // Space belongs to headings, not to every group.
+                            showsGroupLabel(group) && "mt-4 first:mt-0",
+                            group.separated &&
+                                "mt-4 border-t border-border pt-4",
                         )}
                     >
                         {showsGroupLabel(group) && (
-                            <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            <p className="px-2.5 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                                 {group.label}
                             </p>
                         )}
@@ -78,13 +91,19 @@ export function AppSidebar({
                                     href={item.href}
                                     aria-current={active ? "page" : undefined}
                                     className={cn(
-                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                                        // Tighter rows than the drawer's: this
+                                        // rail is `lg`-and-up only, so it is
+                                        // always driven by a pointer, and the
+                                        // 44px touch target that MobileNav needs
+                                        // would only spread twelve items over a
+                                        // screen's worth of height here.
+                                        "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
                                         active
                                             ? "bg-accent font-medium text-foreground"
                                             : "text-muted-foreground hover:bg-accent hover:text-foreground",
                                     )}
                                 >
-                                    <Icon className="h-4 w-4 shrink-0" />
+                                    <Icon className="size-4 shrink-0" />
                                     <span className="flex-1">{item.label}</span>
                                     {waiting > 0 ? (
                                         /* Amber, not `bg-primary`. In the Panel

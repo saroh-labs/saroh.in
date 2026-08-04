@@ -401,26 +401,46 @@ export function DataView<TRow>({
                             </div>
                         );
                         return (
-                            // Actions sit as a SIBLING of the link, never
-                            // inside it: a button nested in an anchor navigates
-                            // as well as acts, and on touch that means a cancel
-                            // tap also leaves the screen.
                             <li
                                 key={rowKey(row)}
-                                className="flex items-center gap-2 pr-3 hover:bg-accent/50"
+                                className="relative flex items-center gap-2 pr-3 hover:bg-accent/50"
                             >
+                                {/*
+                                 * An OVERLAY link, not a wrapper.
+                                 *
+                                 * Wrapping the row nested the caller's own cell
+                                 * anchor inside it — invalid HTML, and React
+                                 * reported it as a hydration error on every list
+                                 * render. Callers put a link in the primary cell
+                                 * because the TABLE needs one there, and a
+                                 * primitive that silently forbids that would be
+                                 * a trap.
+                                 *
+                                 * So the row's tap target is a sibling stretched
+                                 * over the row, `aria-hidden` and out of the tab
+                                 * order: the cell's real link stays the single
+                                 * accessible name and the single focus stop,
+                                 * while the whole row remains tappable, which is
+                                 * what one-handed and gloved use needs.
+                                 */}
                                 {href ? (
                                     <Link
                                         href={href}
-                                        className="block min-w-0 flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                                    >
-                                        {body}
-                                    </Link>
-                                ) : (
-                                    <div className="min-w-0 flex-1">{body}</div>
-                                )}
+                                        aria-hidden
+                                        tabIndex={-1}
+                                        className="absolute inset-0"
+                                    />
+                                ) : null}
+                                {/* Clicks fall through to the overlay EXCEPT on
+                                    the caller's own interactive elements, which
+                                    keep theirs. */}
+                                <div className="pointer-events-none relative min-w-0 flex-1 [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+                                    {body}
+                                </div>
                                 {rowActions ? (
-                                    <div className="shrink-0">
+                                    // Actions sit outside the overlay's reach: a
+                                    // cancel tap must not also navigate.
+                                    <div className="relative shrink-0">
                                         {rowActions(row)}
                                     </div>
                                 ) : null}
