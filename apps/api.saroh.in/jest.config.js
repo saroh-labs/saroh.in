@@ -33,6 +33,10 @@ module.exports = {
         // #123 provider health: state derivation + credential redaction, mocked
         // Prisma.
         "<rootDir>/src/modules/provider-health/**/*.spec.ts",
+        // #140 health: liveness/readiness with a jest-mocked Prisma — proves
+        // readiness FAILS on an unreachable database, an unfinished migration,
+        // and an unreadable queue. Never touches a DB.
+        "<rootDir>/src/modules/health/**/*.spec.ts",
         // #124 saved views + safe bulk contract (mocked Prisma / pure helper).
         "<rootDir>/src/modules/saved-views/**/*.spec.ts",
         // #112 (ADR-003) capabilities: the pure module-registry validator —
