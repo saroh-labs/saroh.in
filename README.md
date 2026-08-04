@@ -195,14 +195,12 @@ a hosted service. Without it, a single contributed file can block a commercial
 licence covering the whole codebase — and that is much harder to unpick later
 than to agree at the start.
 
-### Supporting the work
+### A note on pace
 
 This is built part-time, mostly to learn in the open and to be useful to people
-building small businesses. There is no paid tier and no plan for one.
-
-If it has helped you and you want to put something back, sponsorship is welcome
-and never a condition of anything. Telling someone else it was useful helps just
-as much.
+running small businesses. Issues and pull requests may sit a while before they
+get proper attention — that is not disinterest, and a nudge after a week or two
+is entirely fair.
 
 ## Contact
 
