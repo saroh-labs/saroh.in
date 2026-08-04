@@ -175,7 +175,8 @@ model Organization {
   // Stage 7 — SaaS billing (S7-005). One current subscription per org.
   subscription Subscription?
 
-  createdAt DateTime @default(now())
+  createdAt          DateTime            @default(now())
+  idempotencyRecords IdempotencyRecord[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -2481,4 +2482,47 @@ model WaitlistSignup {
 
   @@index([createdAt])
   @@index([invitedAt])
+}
+
+/// A record of a completed or in-flight idempotent operation.
+///
+/// An idempotency key says "this is a retry". It does NOT say "this is the SAME
+/// request" — and nothing was checking. A second call carrying the same key but
+/// a different payload was treated as a duplicate and silently dropped, so the
+/// caller received 200 and believed their new instruction had been applied when
+/// it had been discarded (reproduced 2026-07-31: same key, opposite `enabled`,
+/// flag unchanged).
+///
+/// `fingerprint` closes that: it is a hash of the canonical request, so a
+/// mismatch against a stored key is a conflict rather than a duplicate.
+model IdempotencyRecord {
+  id String @id @default(cuid())
+
+  /// Operation namespace, e.g. "flags.global.set". Keys are only unique within one.
+  scope String
+  /// The client-supplied key.
+  key   String
+
+  /// Who performed it; a key from one actor must never satisfy another's.
+  actorUserId    String
+  /// Present for tenant-scoped operations, null for platform-level ones.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// sha256 of the canonical request. Different payload, same key -> 409.
+  fingerprint String
+
+  /// IN_PROGRESS until the operation completes, then COMPLETED.
+  status   String @default("IN_PROGRESS")
+  /// The original response, replayed verbatim to an identical retry.
+  response Json?
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  /// Retention horizon; records past this are safe to prune.
+  expiresAt   DateTime
+
+  @@unique([scope, key, actorUserId])
+  @@index([expiresAt])
+  @@index([organizationId])
 }

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { PlatformAdminGuard } from "../../common/guards/platform-admin.guard";
 import { PlatformPermissionGuard } from "../../common/guards/platform-permission.guard";
+import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditService } from "./admin-audit.service";
@@ -18,6 +19,7 @@ import { AdminController } from "./admin.controller";
     imports: [FeatureFlagModule],
     controllers: [AdminController],
     providers: [
+        IdempotencyService,
         AdminFlagsService,
         AdminAccessService,
         AdminAuditService,

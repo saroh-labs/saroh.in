@@ -19,6 +19,7 @@ import { RequireAdminPermission } from "../../common/decorators/require-admin-pe
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { PlatformAdminGuard } from "../../common/guards/platform-admin.guard";
 import { PlatformPermissionGuard } from "../../common/guards/platform-permission.guard";
+import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import type { AuthUser } from "../../common/types/store-context";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { FlagKey } from "../feature-flags/flags";
@@ -54,6 +55,7 @@ export class AdminController {
         private readonly metrics: AdminMetricsService,
         private readonly adminAudit: AdminAuditService,
         private readonly adminAccess: AdminAccessService,
+        private readonly idempotency: IdempotencyService,
     ) {}
 
     /**
@@ -176,29 +178,44 @@ export class AdminController {
         @Param("flagKey") flagKey: string,
         @Body() dto: SetFlagDto,
     ) {
-        await this.flags.setGlobal(
-            assertKnownFlag(flagKey),
-            dto.enabled,
-            user.id,
-            dto.reason,
+        // Gated by the idempotency primitive BEFORE the service's own
+        // audit-key short-circuit. That short-circuit keys on actor, operation
+        // and target but not the VALUE, so a retry carrying the opposite
+        // `enabled` used to be dropped as a duplicate and answered 200. The
+        // fingerprint below covers the payload, so that case is now a 409.
+        return this.idempotency.run(
             {
+                scope: "flags.global.set",
+                key: dto.idempotencyKey,
                 actorUserId: user.id,
-                permission: AdminPermission.FlagsPublish,
-                action: "flags.global.set",
-                targetType: "feature_flag",
-                targetId: flagKey,
-                reason: dto.reason,
-                outcome: AdminAuditOutcome.Success,
-                idempotencyKey: [
+            },
+            { flagKey, enabled: dto.enabled, reason: dto.reason },
+            async () => {
+                await this.flags.setGlobal(
+                    assertKnownFlag(flagKey),
+                    dto.enabled,
                     user.id,
-                    "flags.global.set",
-                    flagKey,
-                    dto.idempotencyKey,
-                ].join(":"),
-                metadata: { enabled: dto.enabled },
+                    dto.reason,
+                    {
+                        actorUserId: user.id,
+                        permission: AdminPermission.FlagsPublish,
+                        action: "flags.global.set",
+                        targetType: "feature_flag",
+                        targetId: flagKey,
+                        reason: dto.reason,
+                        outcome: AdminAuditOutcome.Success,
+                        idempotencyKey: [
+                            user.id,
+                            "flags.global.set",
+                            flagKey,
+                            dto.idempotencyKey,
+                        ].join(":"),
+                        metadata: { enabled: dto.enabled },
+                    },
+                );
+                return { ok: true };
             },
         );
-        return { ok: true };
     }
 
     /** Set one Organization's override — the targeted-rollout lever. */
@@ -210,32 +227,48 @@ export class AdminController {
         @Param("organizationId") organizationId: string,
         @Body() dto: SetFlagDto,
     ) {
-        await this.flags.setOverride(
-            assertKnownFlag(flagKey),
-            organizationId,
-            dto.enabled,
-            user.id,
-            dto.reason,
+        return this.idempotency.run(
             {
+                scope: "flags.organization.set",
+                key: dto.idempotencyKey,
                 actorUserId: user.id,
-                permission: AdminPermission.FlagsPublish,
-                action: "flags.organization.set",
-                targetType: "feature_flag",
-                targetId: flagKey,
                 organizationId,
+            },
+            {
+                flagKey,
+                organizationId,
+                enabled: dto.enabled,
                 reason: dto.reason,
-                outcome: AdminAuditOutcome.Success,
-                idempotencyKey: [
-                    user.id,
-                    "flags.organization.set",
-                    flagKey,
+            },
+            async () => {
+                await this.flags.setOverride(
+                    assertKnownFlag(flagKey),
                     organizationId,
-                    dto.idempotencyKey,
-                ].join(":"),
-                metadata: { enabled: dto.enabled },
+                    dto.enabled,
+                    user.id,
+                    dto.reason,
+                    {
+                        actorUserId: user.id,
+                        permission: AdminPermission.FlagsPublish,
+                        action: "flags.organization.set",
+                        targetType: "feature_flag",
+                        targetId: flagKey,
+                        organizationId,
+                        reason: dto.reason,
+                        outcome: AdminAuditOutcome.Success,
+                        idempotencyKey: [
+                            user.id,
+                            "flags.organization.set",
+                            flagKey,
+                            organizationId,
+                            dto.idempotencyKey,
+                        ].join(":"),
+                        metadata: { enabled: dto.enabled },
+                    },
+                );
+                return { ok: true };
             },
         );
-        return { ok: true };
     }
 
     /** Drop an override so the Organization follows the global default again. */
@@ -247,30 +280,41 @@ export class AdminController {
         @Param("organizationId") organizationId: string,
         @Body() dto: ClearFlagOverrideDto,
     ) {
-        await this.flags.clearOverride(
-            assertKnownFlag(flagKey),
-            organizationId,
-            user.id,
-            dto.reason,
+        return this.idempotency.run(
             {
+                scope: "flags.organization.clear",
+                key: dto.idempotencyKey,
                 actorUserId: user.id,
-                permission: AdminPermission.FlagsPublish,
-                action: "flags.organization.clear",
-                targetType: "feature_flag",
-                targetId: flagKey,
                 organizationId,
-                reason: dto.reason,
-                outcome: AdminAuditOutcome.Success,
-                idempotencyKey: [
-                    user.id,
-                    "flags.organization.clear",
-                    flagKey,
+            },
+            { flagKey, organizationId, reason: dto.reason },
+            async () => {
+                await this.flags.clearOverride(
+                    assertKnownFlag(flagKey),
                     organizationId,
-                    dto.idempotencyKey,
-                ].join(":"),
+                    user.id,
+                    dto.reason,
+                    {
+                        actorUserId: user.id,
+                        permission: AdminPermission.FlagsPublish,
+                        action: "flags.organization.clear",
+                        targetType: "feature_flag",
+                        targetId: flagKey,
+                        organizationId,
+                        reason: dto.reason,
+                        outcome: AdminAuditOutcome.Success,
+                        idempotencyKey: [
+                            user.id,
+                            "flags.organization.clear",
+                            flagKey,
+                            organizationId,
+                            dto.idempotencyKey,
+                        ].join(":"),
+                    },
+                );
+                return { ok: true };
             },
         );
-        return { ok: true };
     }
 }
 
