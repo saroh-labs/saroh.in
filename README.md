@@ -184,6 +184,17 @@ The [Open Source Definition](https://opensource.org/osd) does not allow
 restrictions on field of use, and the hosted-service limitation is one. So this
 is source-available. Said plainly here rather than left for someone to discover.
 
+### Contributing
+
+Contributions are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+
+One thing to know before you start: a first pull request needs the one-line
+agreement in **[CLA.md](CLA.md)**. You keep your copyright; it grants permission
+to include your work in the commercial licences sold to anyone running Saroh as
+a hosted service. Without it, a single contributed file can block a commercial
+licence covering the whole codebase — and that is much harder to unpick later
+than to agree at the start.
+
 ### Supporting the work
 
 This is built part-time, mostly to learn in the open and to be useful to people
