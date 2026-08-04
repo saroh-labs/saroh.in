@@ -3,12 +3,14 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
 } from "@nestjs/common";
 import type { AdminAccessSession } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import type { AdminAuditInput } from "./admin-audit.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPermission } from "./admin-permissions";
 
@@ -91,6 +93,8 @@ type AccessSessionWithGrant = AdminAccessSession & {
  */
 @Injectable()
 export class AdminAccessService {
+    private readonly logger = new Logger(AdminAccessService.name);
+
     constructor(private readonly audit: AdminAuditService) {}
 
     async open(input: OpenAdminAccessInput) {
@@ -230,10 +234,13 @@ export class AdminAccessService {
             const session = await tx.adminAccessSession.findUnique({
                 where: { id: input.sessionId },
             });
-            if (
-                session?.organizationId !== input.organizationId ||
-                session.actorUserId !== input.staff.userId
-            ) {
+            // SEC-007: scoped to the Organization, NOT to the opener. This
+            // used to also require `session.actorUserId === input.staff.userId`,
+            // so a staff member's session could only be closed by that same
+            // staff member — nobody could shut down a colleague's access, which
+            // is the one revocation that matters during an incident.
+            // OrganizationViewAs is already required to reach this method.
+            if (session?.organizationId !== input.organizationId) {
                 throw new ForbiddenException(
                     "Organization access session unavailable",
                 );
@@ -296,11 +303,22 @@ export class AdminAccessService {
         });
     }
 
+    /**
+     * Refuse access, and make sure the refusal is on the record.
+     *
+     * SEC-008: this used to go through `recordRead`, which swallows audit
+     * failures by design — a reasonable trade for a read that SUCCEEDED, since
+     * an audit outage should not turn a good response into an error. A DENIAL is
+     * the opposite case: it is the security-relevant event, and losing it
+     * quietly leaves an incident with no evidence it happened. The request is
+     * refused either way; what changes is that a failed write now escalates
+     * instead of passing as a log line nobody reads.
+     */
     private async deny(
         input: AuthorizeAdminAccessInput,
         reasonCode: string,
     ): Promise<never> {
-        await this.audit.recordRead({
+        await this.recordDenial({
             actorUserId: input.staff.userId,
             permission: AdminPermission.OrganizationViewAs,
             action: "organization.access.denied",
@@ -314,6 +332,23 @@ export class AdminAccessService {
             },
         });
         throw new ForbiddenException("Organization access session unavailable");
+    }
+
+    /** Write a denial, escalating rather than swallowing a failure. */
+    private async recordDenial(input: AdminAuditInput): Promise<void> {
+        try {
+            await this.audit.write(prisma, input);
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : "unknown audit error";
+            // Loud, and distinguishable from the read-audit path: an operator
+            // grepping for denials must be able to tell "none happened" from
+            // "we could not write them down".
+            this.logger.error(
+                `UNRECORDED DENIAL of Organization support access ` +
+                    `(actor=${input.actorUserId} session=${input.targetId ?? "?"}): ${message}`,
+            );
+        }
     }
 }
 

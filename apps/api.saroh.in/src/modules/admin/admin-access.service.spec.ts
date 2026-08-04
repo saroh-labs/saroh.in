@@ -238,7 +238,13 @@ describe("AdminAccessService", () => {
                 intent: "WRITE",
             }),
         ).rejects.toBeInstanceOf(ForbiddenException);
-        expect(audit.recordRead).toHaveBeenCalledWith(
+        // SEC-008: denials go through `write`, not `recordRead`. `recordRead`
+        // swallows audit failures — a fair trade for a read that SUCCEEDED,
+        // since an audit outage should not turn a good response into an error.
+        // A denial is the opposite: it is the security-relevant event, and
+        // losing it quietly leaves an incident with no evidence it happened.
+        expect(audit.write).toHaveBeenCalledWith(
+            expect.anything(),
             expect.objectContaining({
                 action: "organization.access.denied",
                 outcome: "DENIED",
@@ -324,6 +330,96 @@ describe("AdminAccessService", () => {
             expect.objectContaining({
                 action: "organization.access.close",
                 outcome: "SUCCESS",
+            }),
+        );
+    });
+});
+
+describe("cross-staff revocation (SEC-007)", () => {
+    let service: AdminAccessService;
+    let audit: { write: jest.Mock; recordRead: jest.Mock };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        audit = { write: jest.fn(), recordRead: jest.fn() };
+        service = new AdminAccessService(audit as unknown as AdminAuditService);
+    });
+
+    /** A second staff member, holding the same permission. */
+    const otherStaff: PlatformAdminInfo = {
+        userId: "staff_2",
+        platformAdminId: "platform_admin_2",
+        roles: ["PLATFORM_OWNER"],
+        permissions: ["organization:view-as"],
+        viaBootstrap: false,
+    };
+
+    it("lets one staff member revoke another's session", async () => {
+        // Previously `revoke` required session.actorUserId === staff.userId, so
+        // a session could only be closed by the person who opened it. Nobody
+        // could shut down a colleague's access — the one revocation that
+        // matters during an incident.
+        sessionFindUnique.mockResolvedValue({
+            ...activeSession,
+            actorUserId: "staff_1",
+        });
+        sessionUpdate.mockResolvedValue({});
+
+        await expect(
+            service.revoke({
+                sessionId: "access_1",
+                organizationId: "org_1",
+                staff: otherStaff,
+                reason: "Colleague went off shift mid-incident",
+                idempotencyKey: undefined,
+            }),
+        ).resolves.toBeUndefined();
+
+        expect(sessionUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    revokedByUserId: "staff_2",
+                }),
+            }),
+        );
+    });
+
+    it("still refuses a session belonging to a different Organization", async () => {
+        // Widening to any staff member must not widen across tenants.
+        sessionFindUnique.mockResolvedValue({
+            ...activeSession,
+            organizationId: "org_OTHER",
+        });
+
+        await expect(
+            service.revoke({
+                sessionId: "access_1",
+                organizationId: "org_1",
+                staff: otherStaff,
+                reason: "Should not be permitted",
+                idempotencyKey: undefined,
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(sessionUpdate).not.toHaveBeenCalled();
+    });
+
+    it("records the revoker, not the opener, in the audit trail", async () => {
+        sessionFindUnique.mockResolvedValue(activeSession);
+        sessionUpdate.mockResolvedValue({});
+
+        await service.revoke({
+            sessionId: "access_1",
+            organizationId: "org_1",
+            staff: otherStaff,
+            reason: "Closing a colleague's stale session",
+            idempotencyKey: undefined,
+        });
+
+        expect(audit.write).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                action: "organization.access.close",
+                actorUserId: "staff_2",
             }),
         );
     });
