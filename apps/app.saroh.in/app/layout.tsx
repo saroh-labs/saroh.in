@@ -45,20 +45,31 @@ export default function RootLayout({
         // had it; this one did not. It suppresses the warning on this element
         // only, not on its subtree.
         <html lang="en" suppressHydrationWarning>
-            {/*
-             * Apply the stored skin BEFORE first paint. Without this the page
-             * renders in the default world and then snaps to the chosen one on
-             * hydration — a flash that is worse the more the two skins differ,
-             * and these differ a lot. Same trick next-themes uses for dark.
-             */}
-            <script
-                dangerouslySetInnerHTML={{
-                    __html: `(function(){try{var s=localStorage.getItem("saroh-skin");var ok=["panel","instrument","stockroom"];document.documentElement.dataset.skin=ok.indexOf(s)>-1?s:"panel"}catch(e){document.documentElement.dataset.skin="panel"}})()`,
-                }}
-            />
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
             >
+                {/*
+                 * Apply the stored skin BEFORE first paint. Without this the
+                 * page renders in the default world and then snaps to the
+                 * chosen one on hydration — a flash that is worse the more the
+                 * two skins differ, and these differ a lot. Same trick
+                 * next-themes uses for dark.
+                 *
+                 * It is the FIRST CHILD OF <body>, not a sibling of it. A raw
+                 * <script> between <html> and <body> is not valid document
+                 * structure: the browser hoists it into <head>, so the DOM React
+                 * hydrates against no longer matches the tree it rendered, and
+                 * every page logged a hydration mismatch. `suppressHydrationWarning`
+                 * on <html> does not cover it — that flag applies to the element's
+                 * own attributes, not to a child that moved. Here it still runs
+                 * before any content paints, because the stylesheet in <head> is
+                 * render-blocking and nothing below has been parsed yet.
+                 */}
+                <script
+                    dangerouslySetInnerHTML={{
+                        __html: `(function(){try{var s=localStorage.getItem("saroh-skin");var ok=["panel","instrument","stockroom"];document.documentElement.dataset.skin=ok.indexOf(s)>-1?s:"panel"}catch(e){document.documentElement.dataset.skin="panel"}})()`,
+                    }}
+                />
                 <Providers>
                     <ThemeProvider
                         attribute="class"

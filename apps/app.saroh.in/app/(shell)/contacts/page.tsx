@@ -1,9 +1,9 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { ContactsView } from "@/components/contacts/contacts-view";
-import type { Contact } from "@/lib/contacts/service";
 import { listContacts } from "@/lib/contacts/service";
 import { requireSession } from "@/lib/session";
+import { viewParam } from "@/lib/views/search-params";
 
 /**
  * Contacts index for the active organization (S3-005).
@@ -15,10 +15,17 @@ import { requireSession } from "@/lib/session";
  */
 export const metadata = { title: "Contacts" };
 
-export default async function ContactsPage() {
+export default async function ContactsPage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     await requireSession();
 
-    const contacts: Contact[] = await listContacts();
+    const [contacts, params] = await Promise.all([
+        listContacts(),
+        searchParams,
+    ]);
 
     return (
         // Wider than the old `max-w-5xl`: this is a table now, and a dashboard
@@ -30,7 +37,10 @@ export default async function ContactsPage() {
                 description="Everyone who has enquired, booked or bought."
             />
             <div className="mt-6">
-                <ContactsView contacts={contacts} />
+                <ContactsView
+                    contacts={contacts}
+                    initialView={viewParam(params)}
+                />
             </div>
         </main>
     );

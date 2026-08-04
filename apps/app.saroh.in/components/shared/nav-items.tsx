@@ -6,7 +6,6 @@ import {
     Briefcase,
     Building2,
     CalendarClock,
-    CalendarDays,
     Globe,
     Home,
     KanbanSquare,
@@ -89,12 +88,18 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Bookings",
         moduleKey: "APPOINTMENTS",
         items: [
-            // `/appointments` is the hub — "your schedule, services, and
-            // availability" — so Schedule names it better than the module did.
-            { href: "/appointments", label: "Schedule", icon: CalendarDays },
+            // Two destinations, two questions: "what is booked?" and "what can
+            // be booked?".
+            //
+            // `/appointments` used to sit above these as a third. It was a hub
+            // page of link cards pointing at Schedule, Services and
+            // "Availability" — and the last two were the SAME route, so the rail
+            // spent a line on a menu that duplicated the two lines beneath it
+            // and lied about one of them. Its two counts now live on Home, where
+            // numbers belong. The URL still resolves (it redirects here), so no
+            // bookmark breaks.
+            { href: "/bookings", label: "Schedule", icon: CalendarClock },
             { href: "/services", label: "Services", icon: Briefcase },
-            // `/bookings` lists upcoming reservations grouped by day.
-            { href: "/bookings", label: "Upcoming", icon: CalendarClock },
         ],
     },
     {
@@ -176,3 +181,17 @@ export function isNavItemActive(pathname: string, href: string): boolean {
 
 /** The Notifications item carries a live unread badge; identify it by route. */
 export const NOTIFICATIONS_HREF = "/notifications";
+
+/**
+ * Work waiting behind a destination, keyed by route.
+ *
+ * This is what turns the rail from a filing cabinet into a workspace: "Leads"
+ * names a place, "Leads 4" names a job. The numbers come from the SAME Home
+ * read model that ranks the actions, so the rail and Home can never disagree
+ * about how much is outstanding — and a count only ever appears for a module
+ * the actor can see, because the Home model already gates on availability.
+ *
+ * Deliberately sparse. A badge on every item is a badge on nothing; only routes
+ * with something genuinely waiting get one.
+ */
+export type NavCounts = Readonly<Record<string, number | undefined>>;

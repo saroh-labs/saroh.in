@@ -22,12 +22,17 @@ export default async function Home() {
     const home = await getHome();
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        // A dashboard, so the width matches the other data screens rather than
+        // the old reading measure — the schedule column needs room to sit
+        // beside the work instead of below it.
+        <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">
             <PageHeader
                 title="Home"
-                description="Your next best actions across the modules you use."
+                description="What needs you, what's coming up, and where everything stands."
             />
-            <HomeDashboard home={home} />
+            <div className="mt-6">
+                <HomeDashboard home={home} />
+            </div>
         </main>
     );
 }

@@ -1,27 +1,40 @@
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@saroh/ui/card";
-import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import type { Service } from "@/lib/services/service";
+import { ServicesView } from "@/components/services/services-view";
 import { listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
+import { viewParam } from "@/lib/views/search-params";
 
 /**
- * Services index for the active organization (S4-003). Lists the org's bookable
- * services (newest first), each showing its duration, capacity and status;
- * cards link to the service editor (terms + availability windows). A link to
- * the bookings calendar sits alongside. Mirrors the leads/sites index shells.
+ * Services index for the active organization (S4-003).
+ *
+ * The page fetches; `ServicesView` decides how to render. Duration, price,
+ * capacity and status are columns rather than one run-on description, so two
+ * services can be compared without reading two sentences.
+ *
+ * "New service" is now shown unconditionally. It used to be hidden when the
+ * list was empty, on the theory that the empty state's own button covered it —
+ * but `DataView` owns the empty state, and a merchant with zero services is
+ * precisely the one who needs the create action visible.
  */
-export default async function ServicesPage() {
+export const metadata = { title: "Services" };
+
+export default async function ServicesPage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     await requireSession();
 
-    const services: Service[] = await listServices();
+    const [services, params] = await Promise.all([
+        listServices(),
+        searchParams,
+    ]);
 
     return (
-        <main className="mx-auto max-w-5xl p-8">
+        <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">
             <PageHeader
                 title="Services"
                 description="Bookable services visitors can reserve from your sites."
@@ -30,58 +43,18 @@ export default async function ServicesPage() {
                         <Button asChild variant="outline">
                             <Link href="/bookings">Bookings</Link>
                         </Button>
-                        {services.length > 0 && (
-                            <Button asChild variant="brand">
-                                <Link href="/services/new">New service</Link>
-                            </Button>
-                        )}
+                        <Button asChild variant="brand">
+                            <Link href="/services/new">New service</Link>
+                        </Button>
                     </>
                 }
             />
-
-            {services.length === 0 ? (
-                <EmptyState
-                    title="No services yet"
-                    description="Create a bookable service, add availability windows, then drop a Booking section onto a site so visitors can book."
-                    action={
-                        <Button asChild variant="brand">
-                            <Link href="/services/new">Create a service</Link>
-                        </Button>
-                    }
+            <div className="mt-6">
+                <ServicesView
+                    services={services}
+                    initialView={viewParam(params)}
                 />
-            ) : (
-                <div className="grid gap-3">
-                    {services.map((service) => (
-                        <Link key={service.id} href={`/services/${service.id}`}>
-                            <Card className="transition-colors hover:bg-muted/40">
-                                <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-                                    <div>
-                                        <CardTitle className="text-base">
-                                            {service.name}
-                                        </CardTitle>
-                                        <CardDescription>
-                                            {service.durationMinutes} min
-                                            {service.capacity > 1
-                                                ? ` · capacity ${service.capacity}`
-                                                : ""}{" "}
-                                            · {service.timezone}
-                                        </CardDescription>
-                                    </div>
-                                    <Badge
-                                        variant={
-                                            service.status === "ACTIVE"
-                                                ? "default"
-                                                : "outline"
-                                        }
-                                    >
-                                        {service.status}
-                                    </Badge>
-                                </CardHeader>
-                            </Card>
-                        </Link>
-                    ))}
-                </div>
-            )}
+            </div>
         </main>
     );
 }

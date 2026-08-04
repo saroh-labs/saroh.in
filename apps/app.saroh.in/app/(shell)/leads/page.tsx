@@ -1,87 +1,46 @@
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@saroh/ui/card";
-import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { contactName, formatValue } from "@/lib/crm/format";
-import type { LeadListItem } from "@/lib/leads/service";
+import { LeadsView } from "@/components/leads/leads-view";
 import { listLeads } from "@/lib/leads/service";
 import { requireSession } from "@/lib/session";
+import { viewParam } from "@/lib/views/search-params";
 
 /**
- * Leads index for the active organization (S3-005). Lists the org's leads
- * (newest first), each showing its current stage + contact; cards link to the
- * lead detail (where the owner can move stages / change status). A link to the
- * pipeline board sits alongside for the column view of the same data.
+ * Leads index for the active organization (S3-005).
+ *
+ * The page fetches; `LeadsView` decides how to render. Sorting, search, the
+ * status filters and the density toggle all live in the shared `DataView`, so
+ * this file stays a data boundary. `?view=` is read here rather than in the
+ * client component so the primitive needs no Suspense boundary — and this is
+ * the destination Home's "Open leads" tile links to.
  */
-export default async function LeadsPage() {
+export const metadata = { title: "Leads" };
+
+export default async function LeadsPage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     await requireSession();
 
-    const leads: LeadListItem[] = await listLeads();
+    const [leads, params] = await Promise.all([listLeads(), searchParams]);
 
     return (
-        <main className="mx-auto max-w-5xl p-8">
+        <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">
             <PageHeader
                 title="Leads"
-                description="Opportunities in your pipeline, newest first."
+                description="Opportunities in your pipeline — what they're worth, and how long they've waited."
                 actions={
                     <Button asChild variant="outline">
                         <Link href="/pipeline">Pipeline board</Link>
                     </Button>
                 }
             />
-
-            {leads.length === 0 ? (
-                <EmptyState
-                    title="No leads yet"
-                    description="Leads appear here as enquiries come in. You can also create one by hand from a contact."
-                />
-            ) : (
-                <div className="grid gap-3">
-                    {leads.map((lead) => {
-                        const amount = formatValue(lead.value);
-                        return (
-                            <Link key={lead.id} href={`/leads/${lead.id}`}>
-                                <Card className="transition-colors hover:bg-muted/40">
-                                    <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-                                        <div>
-                                            <CardTitle className="text-base">
-                                                {lead.title}
-                                            </CardTitle>
-                                            <CardDescription>
-                                                {lead.contact
-                                                    ? contactName(lead.contact)
-                                                    : "Unknown contact"}
-                                                {amount ? ` · ${amount}` : ""}
-                                            </CardDescription>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {lead.stage && (
-                                                <Badge variant="secondary">
-                                                    {lead.stage.name}
-                                                </Badge>
-                                            )}
-                                            <Badge
-                                                variant={
-                                                    lead.status === "WON"
-                                                        ? "default"
-                                                        : lead.status === "LOST"
-                                                          ? "destructive"
-                                                          : "outline"
-                                                }
-                                            >
-                                                {lead.status}
-                                            </Badge>
-                                        </div>
-                                    </CardHeader>
-                                </Card>
-                            </Link>
-                        );
-                    })}
-                </div>
-            )}
+            <div className="mt-6">
+                <LeadsView leads={leads} initialView={viewParam(params)} />
+            </div>
         </main>
     );
 }

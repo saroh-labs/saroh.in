@@ -61,6 +61,19 @@ export interface Booking {
     bookerPhone: string | null;
     createdAt: string;
     cancelledAt: string | null;
+    /**
+     * The CRM contact this booking belongs to, when one is linked.
+     *
+     * Preferred over `bookerName` for display: the typed-in name is whatever the
+     * booker put in a public form, while the contact is the record the business
+     * actually keeps. Null for a walk-in booked without a contact.
+     */
+    contact: {
+        id: string;
+        firstName: string | null;
+        lastName: string | null;
+        email: string;
+    } | null;
 }
 
 /** A booking joined with a light snapshot of its owning Service. */

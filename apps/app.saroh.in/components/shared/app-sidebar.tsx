@@ -5,6 +5,7 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import type { NavCounts } from "@/components/shared/nav-items";
 import {
     NAV_GROUPS,
     NOTIFICATIONS_HREF,
@@ -23,10 +24,13 @@ import {
 export function AppSidebar({
     unread = 0,
     moduleKeys = null,
+    counts,
 }: {
     unread?: number;
     /** `null` = availability unknown; see `filterNavGroups`. */
     moduleKeys?: string[] | null;
+    /** Work waiting behind a route; see `NavCounts`. */
+    counts?: NavCounts;
 }) {
     const pathname = usePathname();
     const groups = filterNavGroups(NAV_GROUPS, moduleKeys);
@@ -61,6 +65,13 @@ export function AppSidebar({
                         {group.items.map((item) => {
                             const active = isNavItemActive(pathname, item.href);
                             const Icon = item.icon;
+                            // Notifications counts unread; everything else
+                            // counts work waiting. Both mean "something here
+                            // wants you", so both are drawn the same way.
+                            const waiting =
+                                item.href === NOTIFICATIONS_HREF
+                                    ? unread
+                                    : (counts?.[item.href] ?? 0);
                             return (
                                 <Link
                                     key={item.href}
@@ -75,12 +86,22 @@ export function AppSidebar({
                                 >
                                     <Icon className="h-4 w-4 shrink-0" />
                                     <span className="flex-1">{item.label}</span>
-                                    {item.href === NOTIFICATIONS_HREF &&
-                                        unread > 0 && (
-                                            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
-                                                {unread}
-                                            </span>
-                                        )}
+                                    {waiting > 0 ? (
+                                        /* Amber, not `bg-primary`. In the Panel
+                                           and Instrument skins `--primary` is the
+                                           luminous ACTION colour, so a count of
+                                           things you have not done yet was
+                                           rendering in the same green as the
+                                           button you press when you are done —
+                                           and outshouting it. Amber is the
+                                           workspace's "someone is waiting". */
+                                        <span
+                                            aria-label={`${waiting} waiting`}
+                                            className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-warning/30 bg-warning-subtle px-1.5 text-xs font-medium tabular-nums text-warning-subtle-foreground"
+                                        >
+                                            {waiting}
+                                        </span>
+                                    ) : null}
                                 </Link>
                             );
                         })}

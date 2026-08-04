@@ -37,11 +37,14 @@ export function DataView<TRow>({
     columns,
     rowKey,
     rowHref,
+    rowActions,
     modes = ["table", "list"],
     defaultMode = "table",
     renderCard,
     empty,
     searchableColumnIds,
+    filters,
+    initialFilterId,
     isLoading = false,
     error = null,
 }: DataViewProps<TRow>) {
@@ -51,8 +54,39 @@ export function DataView<TRow>({
         null,
     );
 
+    /*
+     * An unknown `?view=` falls back to the first filter rather than showing
+     * nothing. A stale bookmark, or a filter renamed since the link was sent,
+     * must not present as an empty dataset — that reads as "you have no leads",
+     * which is a far more alarming lie than "here is everything".
+     */
+    const known = filters?.some((f) => f.id === initialFilterId) ?? false;
+    const [filterId, setFilterId] = useState<string | undefined>(
+        known ? initialFilterId : filters?.[0]?.id,
+    );
+    const activeFilter = filters?.find((f) => f.id === filterId);
+
+    const chooseFilter = (next: string) => {
+        setFilterId(next);
+        /*
+         * The URL is updated but NOT navigated: `history.replaceState` keeps the
+         * address shareable and the back button honest without a server round
+         * trip that would re-fetch rows we already hold. `router.replace` would
+         * re-render the whole route to change one query param.
+         */
+        if (typeof window === "undefined") return;
+        const url = new URL(window.location.href);
+        if (next === filters?.[0]?.id) url.searchParams.delete("view");
+        else url.searchParams.set("view", next);
+        window.history.replaceState(null, "", url.toString());
+    };
+
     const visible = useMemo(() => {
         let out = rows;
+
+        if (activeFilter?.predicate) {
+            out = out.filter(activeFilter.predicate);
+        }
 
         if (query.trim() && (searchableColumnIds?.length ?? 0) > 0) {
             const needle = query.trim().toLowerCase();
@@ -88,7 +122,7 @@ export function DataView<TRow>({
         }
 
         return out;
-    }, [rows, columns, query, searchableColumnIds, sort]);
+    }, [rows, columns, query, searchableColumnIds, sort, activeFilter]);
 
     const toggleSort = (col: DataColumn<TRow>) => {
         if (!col.sortValue) return;
@@ -103,26 +137,66 @@ export function DataView<TRow>({
 
     /** Normalised once so the guards below are plain length checks. */
     const searchable = searchableColumnIds ?? [];
+    // One filter is not a filter — a lone chip nobody can switch away from is
+    // chrome that costs a row of height and answers nothing.
+    const hasFilters = (filters?.length ?? 0) > 1;
     const listColumns = columns.filter((c) => c.priority !== "detail");
     const tableColumns = columns.filter((c) => !c.tableHidden);
 
     return (
         <div className="space-y-4">
-            {/* Controls. Search and density sit together because they are the
-                same job: getting to the rows that matter. */}
-            {searchable.length > 0 || modes.length > 1 ? (
+            {/* Controls. Search, subset and density sit together because they
+                are the same job: getting to the rows that matter. */}
+            {searchable.length > 0 || modes.length > 1 || hasFilters ? (
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    {searchable.length > 0 ? (
-                        <Input
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search…"
-                            aria-label="Search this view"
-                            className="h-9 max-w-xs"
-                        />
-                    ) : (
-                        <span />
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                        {searchable.length > 0 ? (
+                            <Input
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Search…"
+                                aria-label="Search this view"
+                                className="h-9 w-full max-w-xs sm:w-64"
+                            />
+                        ) : null}
+
+                        {hasFilters ? (
+                            <div
+                                role="group"
+                                aria-label="Filter"
+                                className="flex flex-wrap items-center gap-1"
+                            >
+                                {filters?.map((f) => {
+                                    const on = f.id === filterId;
+                                    // The count is on the chip because the
+                                    // question "how many are overdue?" is
+                                    // usually the reason for reaching for it.
+                                    const n = f.predicate
+                                        ? rows.filter(f.predicate).length
+                                        : rows.length;
+                                    return (
+                                        <button
+                                            key={f.id}
+                                            type="button"
+                                            aria-pressed={on}
+                                            onClick={() => chooseFilter(f.id)}
+                                            className={cn(
+                                                "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
+                                                on
+                                                    ? "border-brand/50 bg-brand/10 text-foreground"
+                                                    : "border-border text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                                            )}
+                                        >
+                                            {f.label}
+                                            <span className="tabular-nums opacity-60">
+                                                {n}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : null}
+                    </div>
 
                     {modes.length > 1 ? (
                         <div
@@ -177,9 +251,13 @@ export function DataView<TRow>({
                 </div>
             ) : visible.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border px-6 py-12 text-center text-sm text-muted-foreground">
+                    {/* Naming the narrowing matters: an empty result under an
+                        active filter must not read as "you have no leads". */}
                     {query.trim()
                         ? `Nothing matches “${query.trim()}”.`
-                        : (empty ?? "Nothing here yet.")}
+                        : activeFilter?.predicate && rows.length > 0
+                          ? `Nothing in “${activeFilter.label}”. ${rows.length} ${rows.length === 1 ? "row" : "rows"} in total.`
+                          : (empty ?? "Nothing here yet.")}
                 </div>
             ) : mode === "table" ? (
                 // Horizontal scroll is on the wrapper, never the page: a table
@@ -233,6 +311,14 @@ export function DataView<TRow>({
                                         </th>
                                     );
                                 })}
+                                {rowActions ? (
+                                    <th
+                                        scope="col"
+                                        className="w-px px-3 py-2.5"
+                                    >
+                                        <span className="sr-only">Actions</span>
+                                    </th>
+                                ) : null}
                             </tr>
                         </thead>
                         <tbody>
@@ -253,15 +339,28 @@ export function DataView<TRow>({
                                             {col.cell(row)}
                                         </td>
                                     ))}
+                                    {rowActions ? (
+                                        <td className="whitespace-nowrap px-3 py-2.5 text-right align-middle">
+                                            {rowActions(row)}
+                                        </td>
+                                    ) : null}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
             ) : mode === "grid" && renderCard ? (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                // `[&>*]:h-full` reaches through whatever the caller returns —
+                // usually a Link wrapping a Card. Without it the card's own
+                // `h-full` resolves against a link that is only as tall as its
+                // text, so a row of cards with different amounts of content
+                // ends up ragged. Enforced here rather than asked of every
+                // caller, because it is a property of the grid, not the card.
+                <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {visible.map((row) => (
-                        <div key={rowKey(row)}>{renderCard(row)}</div>
+                        <div key={rowKey(row)} className="[&>*]:h-full">
+                            {renderCard(row)}
+                        </div>
                     ))}
                 </div>
             ) : (
@@ -302,17 +401,29 @@ export function DataView<TRow>({
                             </div>
                         );
                         return (
-                            <li key={rowKey(row)}>
+                            // Actions sit as a SIBLING of the link, never
+                            // inside it: a button nested in an anchor navigates
+                            // as well as acts, and on touch that means a cancel
+                            // tap also leaves the screen.
+                            <li
+                                key={rowKey(row)}
+                                className="flex items-center gap-2 pr-3 hover:bg-accent/50"
+                            >
                                 {href ? (
                                     <Link
                                         href={href}
-                                        className="block hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                                        className="block min-w-0 flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                                     >
                                         {body}
                                     </Link>
                                 ) : (
-                                    body
+                                    <div className="min-w-0 flex-1">{body}</div>
                                 )}
+                                {rowActions ? (
+                                    <div className="shrink-0">
+                                        {rowActions(row)}
+                                    </div>
+                                ) : null}
                             </li>
                         );
                     })}

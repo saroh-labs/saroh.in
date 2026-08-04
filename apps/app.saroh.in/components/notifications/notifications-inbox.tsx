@@ -6,21 +6,30 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import {
     markAllNotificationsRead,
     markNotificationRead,
 } from "@/lib/notifications/actions";
 import type { Notification } from "@/lib/notifications/service";
 
-/** Format an ISO timestamp as a short, locale-friendly date-time. */
+/**
+ * Format an ISO timestamp as a short date-time.
+ *
+ * The locale is pinned, not inherited: this component server-renders and then
+ * hydrates, and `undefined` resolves to the runtime's own locale — Node's on the
+ * server, the browser's on the client. When the two disagree React fails
+ * hydration and discards the tree. See `lib/format/locale.ts`.
+ */
 function formatWhen(iso: string): string {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleString(undefined, {
+    return d.toLocaleString(DISPLAY_LOCALE, {
         month: "short",
         day: "numeric",
         hour: "numeric",
         minute: "2-digit",
+        hour12: true,
     });
 }
 

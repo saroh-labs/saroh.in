@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { CommandMenu } from "@/components/shared/command-menu";
+import type { NavCounts } from "@/components/shared/nav-items";
+import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
 import { unreadNotificationCount } from "@/lib/notifications/service";
 import {
@@ -42,23 +44,48 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
     // Reuse the already-fetched list instead of re-fetching it (#102).
     const activeOrg = await resolveActiveOrganization(organizations);
-    const unread = await unreadNotificationCount();
 
-    // Capability-aware chrome (ADR-003): fetch effective module availability
-    // once here and pass the available keys (serializable strings — icons are
-    // client refs and can't cross the boundary) to the nav so it reflects the
-    // Organization's enabled modules.
+    // Concurrently, because none of the three depends on another. They used to
+    // run one after the next, which cost the sum of three round trips on every
+    // page in the app rather than the slowest one.
+    //
+    // Capability-aware chrome (ADR-003): `moduleKeys` is the effective module
+    // availability, passed to the nav as serializable strings (icons are client
+    // refs and can't cross the boundary).
     //
     // `null` on failure, NOT `[]`: the two mean different things to
     // `filterNavGroups`. A failed fetch is "we don't know" and must fail open so
     // a transient API error never blanks the shell; a successful fetch that
     // returns nothing is "nothing is enabled yet", which a new Organization
     // should see reflected in its nav rather than papered over.
-    const moduleKeys = await listModules()
-        .then((modules) =>
-            modules.filter((m) => m.readiness !== "DISABLED").map((m) => m.key),
-        )
-        .catch(() => null);
+    const [unread, moduleKeys, home] = await Promise.all([
+        unreadNotificationCount(),
+        listModules()
+            .then((modules) =>
+                modules
+                    .filter((m) => m.readiness !== "DISABLED")
+                    .map((m) => m.key),
+            )
+            .catch(() => null),
+        // The rail's work counts come from the same ranked read model Home uses,
+        // so the two can never disagree. Non-fatal: a rail without badges is a
+        // working rail, and this renders on every page.
+        getHome().catch(() => null),
+    ]);
+
+    /*
+     * Only actions that represent OUTSTANDING WORK become badges.
+     *
+     * A SETUP or SUGGESTION action is advice, not a queue — badging "Add a
+     * product to your catalog" as a 1 next to Sell would train merchants to
+     * ignore the badges within a week, which is precisely what makes the count
+     * on Leads worth reading when it does appear.
+     */
+    const counts: NavCounts = Object.fromEntries(
+        (home?.actions ?? [])
+            .filter((a) => a.severity === "OVERDUE" && (a.count ?? 0) > 0)
+            .map((a) => [a.href, a.count]),
+    );
 
     return (
         <div className="flex min-h-screen">
@@ -75,7 +102,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 Skip to content
             </a>
             <CommandMenu moduleKeys={moduleKeys} />
-            <AppSidebar unread={unread} moduleKeys={moduleKeys} />
+            <AppSidebar
+                unread={unread}
+                moduleKeys={moduleKeys}
+                counts={counts}
+            />
             <div className="flex min-w-0 flex-1 flex-col">
                 <AppHeader
                     user={session.user}
