@@ -1,0 +1,90 @@
+---
+title: "Database"
+---
+
+## Database
+
+PostgreSQL via [Prisma](https://www.prisma.io). The schema lives at
+`packages/database/prisma/schema.prisma`, and `api.saroh.in` is the only service
+that connects to it.
+
+## Commands
+
+All of these run from the repository root.
+
+```bash
+pnpm --filter @saroh/database db:migrate:deploy   # apply migrations
+pnpm --filter @saroh/database db:migrate:dev      # create one from schema edits
+pnpm --filter @saroh/database db:push             # push without a migration
+pnpm --filter @saroh/database db:seed             # seed a demo business
+pnpm --filter @saroh/database generate            # regenerate the client
+```
+
+## The target guard
+
+`db:migrate:deploy`, `db:migrate:dev` and `db:push` all run `db:guard` first.
+
+It parses `DATABASE_URL`, reads the database **name**, and refuses to continue
+unless that name is one this `NODE_ENV` is allowed to touch:
+
+| `NODE_ENV`    | Allowed database names     |
+| ------------- | -------------------------- |
+| `development` | `saroh-dev`                |
+| `test`        | `saroh-test`, `saroh-dev`  |
+
+Anything else — production included — has no entry, so the guard refuses by
+default rather than by omission.
+
+This is not paranoia about typos. It is that `DATABASE_URL` is one shell
+variable away from being production while you believe you are on a branch, and
+`prisma migrate dev` will happily reset a database it thinks is out of sync.
+
+To go somewhere the table does not list, you must say so explicitly:
+
+```bash
+DATABASE_TARGET_CONFIRM=<database-name> pnpm --filter @saroh/database db:migrate:deploy
+```
+
+Naming the database you mean is impossible to do by accident, which is the point.
+
+## Seeding
+
+```bash
+pnpm --filter @saroh/database db:seed
+```
+
+Creates **Northwind Supply**: 24 contacts, 16 leads carrying real values, 4
+overdue follow-up tasks, 3 services with 10 bookings, 12 products and 10 orders
+across a store. Sign in as `demo@saroh.dev` / `demo-password-123`.
+
+The point is not volume, it is that every surface has something true to show —
+Home's evidence rows, the contact rollups, the command palette, the filters. An
+empty database makes all of those look like they do not work.
+
+Every row carries a `seed_` id prefix, so teardown is exact rather than
+best-effort.
+
+## Migrations, and one trap
+
+Prisma tracks applied migrations in `_prisma_migrations`. When a migration is
+retried it inserts a **new row** and marks the old one `rolled_back_at`, rather
+than updating in place.
+
+So a health check that flags "any row with `rolled_back_at IS NOT NULL`" reports
+a permanently unhealthy database after a single retried migration. The readiness
+check groups by name and asks whether *any* attempt succeeded:
+
+```sql
+SELECT migration_name FROM _prisma_migrations
+GROUP BY migration_name
+HAVING bool_or(finished_at IS NOT NULL AND rolled_back_at IS NULL) = false
+```
+
+If you write tooling against that table, group first.
+
+## Row-level security
+
+RLS policies exist for organization isolation but are **not the live enforcement
+path** — the application-level `OrganizationContext` is. Treat RLS as
+defence-in-depth being rolled out, not as the thing currently keeping tenants
+apart, and do not remove an application-level check because "RLS covers it".

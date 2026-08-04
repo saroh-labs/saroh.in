@@ -3,6 +3,7 @@ import { HowItWorks } from "@/components/home/how-it-works";
 import JoinWaitlist from "@/components/home/join-waitlist";
 import { ModulesSection } from "@/components/home/modules-section";
 import { ProductShowcase } from "@/components/home/product-showcase";
+import { SiteFooter } from "@/components/home/site-footer";
 
 /**
  * The marketing page.
@@ -24,6 +25,7 @@ export default function Page() {
             <ProductShowcase />
             <HowItWorks />
             <JoinWaitlist />
+            <SiteFooter />
         </main>
     );
 }

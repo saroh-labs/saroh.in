@@ -33,7 +33,12 @@ const STEPS = [
  */
 export function HowItWorks() {
     return (
-        <section className="border-t bg-background px-6 py-24 sm:py-28">
+        <section
+            // The footer links here, so the anchor has to exist. A confident
+            // link with no target is the same defect as a 404, just quieter.
+            id="how-it-works"
+            className="scroll-mt-8 border-t bg-background px-6 py-24 sm:py-28"
+        >
             <div className="mx-auto max-w-6xl">
                 <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
                     How it works

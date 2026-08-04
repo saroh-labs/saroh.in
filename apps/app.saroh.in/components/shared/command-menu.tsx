@@ -10,6 +10,7 @@ import {
 } from "@saroh/ui/command";
 import {
     CalendarPlus,
+    CircleHelp,
     Globe,
     Receipt,
     Store,
@@ -19,6 +20,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import type { HelpTopic } from "@/lib/help/links";
+import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 
 import { NAV_GROUPS, filterNavGroups } from "./nav-items";
@@ -46,6 +49,46 @@ const KIND_META: Record<
 };
 
 const KIND_ORDER: SearchKind[] = ["contact", "lead", "order"];
+
+/**
+ * Help articles, reachable from the same box as everything else.
+ *
+ * Someone who does not know how bookings work does not know to look under
+ * Bookings — they know the word "booking". Putting the articles here means the
+ * question they can actually phrase reaches the answer, instead of requiring
+ * them to already know the shape of the product.
+ *
+ * Labels carry the plain word first ("Booking", "Payment") because that is what
+ * gets typed, not our section names.
+ */
+const HELP_ITEMS: { label: string; topic: HelpTopic }[] = [
+    { label: "Help: getting started", topic: HELP_TOPICS.gettingStarted },
+    {
+        label: "Help: search, filters and views",
+        topic: HELP_TOPICS.findingYourWay,
+    },
+    {
+        label: "Help: contacts, leads and customers",
+        topic: HELP_TOPICS.customers,
+    },
+    { label: "Help: selling, products and orders", topic: HELP_TOPICS.selling },
+    {
+        label: "Help: bookings, services and availability",
+        topic: HELP_TOPICS.bookings,
+    },
+    {
+        label: "Help: your website and enquiry forms",
+        topic: HELP_TOPICS.website,
+    },
+    {
+        label: "Help: your team, roles and providers",
+        topic: HELP_TOPICS.organisation,
+    },
+    {
+        label: "Help: turning capabilities on and off",
+        topic: HELP_TOPICS.capabilities,
+    },
+];
 
 /**
  * Things you can DO, not just places you can go. Each is gated on the module
@@ -202,6 +245,11 @@ export function CommandMenu({
     const matches = (label: string) =>
         !needle || label.toLowerCase().includes(needle);
     const visibleActions = actions.filter((a) => matches(a.label));
+    // Only once something is typed: eight help rows in an empty palette would
+    // bury the navigation it is mostly used for.
+    const visibleHelp = needle
+        ? HELP_ITEMS.filter((h) => matches(h.label))
+        : [];
 
     return (
         <CommandDialog
@@ -277,8 +325,16 @@ export function CommandMenu({
                 ) : null}
 
                 {groups.map((group, i) => {
-                    const items = group.items.filter((item) =>
-                        matches(item.label),
+                    // Matched on the group's name as well as the item's.
+                    // Someone looking for their calendar types "booking", not
+                    // "Schedule" — the section is called Bookings and the item
+                    // inside it is not, so filtering on the item alone made the
+                    // most obvious search term miss its own section.
+                    const groupMatches = group.label
+                        ? matches(group.label)
+                        : false;
+                    const items = group.items.filter(
+                        (item) => groupMatches || matches(item.label),
                     );
                     if (items.length === 0) return null;
                     return (
@@ -299,6 +355,31 @@ export function CommandMenu({
                         </CommandGroup>
                     );
                 })}
+                {visibleHelp.length > 0 ? (
+                    <CommandGroup heading="Help">
+                        {visibleHelp.map((item) => (
+                            <CommandItem
+                                key={item.topic}
+                                value={item.topic}
+                                onSelect={() => {
+                                    setOpen(false);
+                                    setQuery("");
+                                    // A new tab, so reading an answer never
+                                    // costs the merchant the screen they were
+                                    // stuck on.
+                                    window.open(
+                                        helpUrl(item.topic),
+                                        "_blank",
+                                        "noopener,noreferrer",
+                                    );
+                                }}
+                            >
+                                <CircleHelp className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                                {item.label}
+                            </CommandItem>
+                        ))}
+                    </CommandGroup>
+                ) : null}
             </CommandList>
         </CommandDialog>
     );

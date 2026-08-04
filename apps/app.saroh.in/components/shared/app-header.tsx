@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
 import { CommandTrigger } from "@/components/shared/command-trigger";
+import { HelpLink } from "@/components/shared/help-link";
 import { MobileNav } from "@/components/shared/mobile-nav";
 import type { NavCounts } from "@/components/shared/nav-items";
 import { SkinSwitcher } from "@/components/shared/skin-switcher";
@@ -94,7 +95,8 @@ export function AppHeader(props: AppHeaderProps) {
                         activeOrgId={activeOrg.id}
                     />
                 )}
-                <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+                <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                    <HelpLink />
                     <SkinSwitcher />
                     <ThemeToggle />
                     <UserMenu name={user.name} email={user.email} />

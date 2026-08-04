@@ -18,7 +18,17 @@ const navbar = (
     />
 );
 
-const footer = <Footer>MIT {new Date().getFullYear()} © Saroh.in</Footer>;
+// See the note in help.saroh.in's layout: there is no LICENSE file, so no
+// licence is claimed here. The Introduction page says so explicitly, because
+// these docs describe how to run Saroh yourself and that is exactly the reader
+// who needs to know the terms are unsettled.
+const footer = (
+    <Footer>
+        © {new Date().getFullYear()} Saroh ·{" "}
+        <a href="https://saroh.in">saroh.in</a> ·{" "}
+        <a href="https://help.saroh.in">Using Saroh? Help centre</a>
+    </Footer>
+);
 
 export default async function RootLayout({ children }) {
     return (

@@ -18,7 +18,16 @@ const navbar = (
     />
 );
 
-const footer = <Footer>MIT {new Date().getFullYear()} © Saroh.in</Footer>;
+// No LICENSE file exists in the repository and `package.json` carries no
+// `license` field, so the previous "MIT ©" footer stated terms that have never
+// been granted. A copyright line is true; a licence claim was not.
+const footer = (
+    <Footer>
+        © {new Date().getFullYear()} Saroh ·{" "}
+        <a href="https://saroh.in">saroh.in</a> ·{" "}
+        <a href="https://docs.saroh.in">Developer docs</a>
+    </Footer>
+);
 
 export default async function RootLayout({ children }) {
     return (

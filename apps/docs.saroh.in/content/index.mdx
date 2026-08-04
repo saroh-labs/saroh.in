@@ -1,46 +1,61 @@
 ---
-title: "Introduction "
+title: "Saroh developer documentation"
 ---
 
-## Introduction
+## Saroh, for developers
 
-[Saroh.in](https://saroh.in) is an open-source project built with Next.js, Tailwind CSS, a NestJS API, PostgreSQL, and Better Auth. It is a monorepo maintained with Turborepo.
+These are the docs for **running and working on Saroh yourself**. If you use
+Saroh on our hosted platform and want to know how to take a booking or chase a
+lead, you want [help.saroh.in](https://help.saroh.in) instead.
 
-Saroh.io is a multi-tenant application builder repository, which you can use to create your own multi-tenant applications.
+Saroh is a business workspace: one place a small business sells, takes bookings,
+follows up on enquiries, and keeps a website in step. It is a
+[pnpm](https://pnpm.io) + [Turborepo](https://turbo.build) monorepo of Next.js
+frontends around a single NestJS API.
 
-The name "Saroh" is taken from the word "`Sāruṁ` (Gujarati: સારું)" which means "good". So it means I'm building something good and when uses it, they will also say it is good.
+## The one rule worth knowing first
 
-This is currently in its initial state and not ready for production use. It might not look good yet but soon, in the coming days, it will become better.
+**`api.saroh.in` is the only service that talks to PostgreSQL.** Every frontend
+reaches data through it over HTTP, and none of them import `@saroh/database`.
 
-The Purpose of this project is to help people to build their own website with a few clicks and for aspiring developers it will be a good learning resource. I will try to keep the code as simple as possible so that it will be easy to understand so that anyone can easily understand what is happening here.
+That is not a style preference. It is what makes tenant isolation checkable in
+one place: every org-scoped read resolves an `OrganizationContext` from a proven
+session, and the role policy is enforced there rather than in nine apps that
+would each drift. If you are adding a feature and reaching for Prisma inside a
+Next.js app, the feature belongs behind an endpoint.
 
-Later on, I will be adding more detailed docs here.
+## What is in the repository
 
-## App features
+| Path                     | What it is                                         |
+| ------------------------ | -------------------------------------------------- |
+| `apps/api.saroh.in`      | NestJS API. Hosts Better Auth. The only DB client. |
+| `apps/app.saroh.in`      | The merchant workspace.                            |
+| `apps/accounts.saroh.in` | Sign-in / sign-up UI.                              |
+| `apps/admin.saroh.in`    | Internal control plane (staff only).               |
+| `apps/saroh.in`          | Marketing site.                                    |
+| `apps/sites.saroh.in`    | Renders merchants' published sites.                |
+| `apps/docs.saroh.in`     | This site.                                         |
+| `apps/help.saroh.in`     | Merchant help centre.                              |
+| `packages/database`      | Prisma schema, client, migrations, seed.           |
+| `packages/ui`            | Shared components and the design tokens.           |
+| `packages/auth`          | Better Auth client and shared middleware.          |
 
--   [x] Authentication
--   [x] Applicaiton Dashboard.
--   [x] Free subdomain (\*.saroh.site), so that users can preview their published sites.
--   [ ] Site Templates, so that users can choose the style of site they want to build.
--   [ ] Custom domain, so they can add their own domain.
--   [ ] To be able to create Post, Blogs, Products and web stories.
--   [ ] Adding Web analytics.
--   [ ] Send Emails related to user events in the application.
+## Where to go next
 
-The tech stack used will be:
+- [Getting started](/getting-started) — run the whole thing locally.
+- [Architecture](/architecture) — how the pieces fit, and why.
+- [Database](/database) — migrations, the target guard, seeding.
+- [Authentication](/authentication) — the single-identity model.
+- [Contributing](/contributing) — the checks that must pass.
 
--   [Next.js](https://nextjs.org/), frontend framework for the apps.
--   [NestJS](https://nestjs.com/), the single backend API (`api.saroh.in`).
--   [Tailwind CSS](https://tailwindcss.com/), for styling the application.
--   [PostgreSQL](https://www.postgresql.org/) (AWS RDS), for the database.
--   [Better Auth](https://www.better-auth.com/), for authentication.
--   [Vercel](https://vercel.com/), for hosting the frontends.
--   [Resend](https://resend.com/), for email notifications.
--   [Prisma](https://www.prisma.io/), for database ORM. (Maintaing the database schema)
--   [Turborepo](https://turbo.build/), for managing the monorepo.
--   [Nextra](https://nextra.site/), for the docs site deployed on [docs.saroh.in](https://docs.saroh.in).
--   [Github](https://github.com), for hosting the source code of the application.
+## Status, honestly
 
-## Contributing
+This is under active development and the schema still moves. Read
+[Contributing](/contributing) before relying on any of it in production.
 
-Right now, I will not accept any contributions until the above features are completed. After that if you can help me improve the project, you are welcome to do so.
+**There is no `LICENSE` file in the repository yet**, and no `license` field in
+`package.json`. Until one exists, the terms on which you may run, modify or
+redistribute this are not settled — so treat everything here as a description of
+how it works, not as a grant of permission. If you are reading this because you
+want to run your own copy, open an issue and ask; that is the fastest way to get
+the question decided.

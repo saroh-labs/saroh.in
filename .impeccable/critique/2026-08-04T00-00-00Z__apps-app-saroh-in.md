@@ -1,10 +1,10 @@
 ---
 target: apps/app.saroh.in (merchant workspace)
-total_score: 29
+total_score: 32
 max_score: 40
 na_heuristics:
 p0_count: 0
-p1_count: 2
+p1_count: 1
 timestamp: 2026-08-04T00-00-00Z
 slug: apps-app-saroh-in
 supersedes: 2026-08-02T11-15-54Z__apps-app-saroh-in.md
@@ -18,19 +18,19 @@ Walked authenticated as an org owner against the seeded Northwind Supply data
 
 ## Design Health Score
 
-| #         | Heuristic                       | Was       | Now       | What moved it                                                                                                                                                                           |
-| --------- | ------------------------------- | --------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1         | Visibility of System Status     | 2         | 3         | No CTA 404s. Home carries evidence rows, not bare counts. `loading.tsx` on 10 of 12 list routes. Numbers on Home and counts on the rail share one source.                               |
-| 2         | Match System / Real World       | 1         | 2         | "Fix" only where something is broken; "Set up" where nothing is connected. Provider states read Connected / Not connected / Not working. Still: "modules", "capabilities", "readiness". |
-| 3         | User Control and Freedom        | 2         | 3         | Onboarding is a real, reversible choice. Density and filter choices persist and are shareable via `?view=`. Still no breadcrumbs.                                                       |
-| 4         | Consistency and Standards       | 1         | 3         | Every list screen renders through one `DataView`; widths unified at `max-w-7xl`. Page titles on every route. Status colour maps to tokens everywhere.                                   |
-| 5         | Error Prevention                | 2         | 2         | Unchanged this pass. The 15-same-weight-buttons problem on `/settings/modules` stands.                                                                                                  |
-| 6         | Recognition Rather Than Recall  | 2         | 3         | ⌘K recalls contacts, leads and orders by name. Home rows name what they are about. Still: two Home rows can share a destination.                                                        |
-| 7         | Flexibility and Efficiency      | 1         | 4         | The palette searches entities and offers create actions. Filters, sort, density toggle and deep links on every list. Still no saved views or bulk actions.                              |
-| 8         | Aesthetic and Minimalist Design | 2         | 3         | Home fills the viewport as a dashboard. Borders are visible. Still no icons in empty states.                                                                                            |
-| 9         | Error Recovery                  | 1         | 3         | The three dead-end paths resolve. Filtered-empty states name the narrowing rather than reading as "you have none".                                                                      |
-| 10        | Help and Documentation          | 1         | 1         | **Unchanged.** No help link, docs link, tooltip or support contact anywhere. `docs.saroh.in` and `help.saroh.in` exist and are linked from nowhere.                                     |
-| **Total** |                                 | **15/40** | **29/40** | Into the normal band (20–32), at the upper end.                                                                                                                                         |
+| #         | Heuristic                       | Was       | Now       | What moved it                                                                                                                                                                                             |
+| --------- | ------------------------------- | --------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1         | Visibility of System Status     | 2         | 3         | No CTA 404s. Home carries evidence rows, not bare counts. `loading.tsx` on 10 of 12 list routes. Numbers on Home and counts on the rail share one source.                                                 |
+| 2         | Match System / Real World       | 1         | 2         | "Fix" only where something is broken; "Set up" where nothing is connected. Provider states read Connected / Not connected / Not working. Still: "modules", "capabilities", "readiness".                   |
+| 3         | User Control and Freedom        | 2         | 3         | Onboarding is a real, reversible choice. Density and filter choices persist and are shareable via `?view=`. Still no breadcrumbs.                                                                         |
+| 4         | Consistency and Standards       | 1         | 3         | Every list screen renders through one `DataView`; widths unified at `max-w-7xl`. Page titles on every route. Status colour maps to tokens everywhere.                                                     |
+| 5         | Error Prevention                | 2         | 2         | Unchanged this pass. The 15-same-weight-buttons problem on `/settings/modules` stands.                                                                                                                    |
+| 6         | Recognition Rather Than Recall  | 2         | 3         | ⌘K recalls contacts, leads and orders by name. Home rows name what they are about. Still: two Home rows can share a destination.                                                                          |
+| 7         | Flexibility and Efficiency      | 1         | 4         | The palette searches entities and offers create actions. Filters, sort, density toggle and deep links on every list. Still no saved views or bulk actions.                                                |
+| 8         | Aesthetic and Minimalist Design | 2         | 3         | Home fills the viewport as a dashboard. Borders are visible. Still no icons in empty states.                                                                                                              |
+| 9         | Error Recovery                  | 1         | 3         | The three dead-end paths resolve. Filtered-empty states name the narrowing rather than reading as "you have none".                                                                                        |
+| 10        | Help and Documentation          | 1         | 4         | A help centre written for merchants, developer docs written for developers, and links to both from the workspace top bar, ⌘K and a new marketing footer. Still no in-context tooltips or support contact. |
+| **Total** |                                 | **15/40** | **32/40** | Top of the normal band (20–32).                                                                                                                                                                           |
 
 ## What was already fixed before this pass
 
@@ -109,10 +109,12 @@ than a heavier `--border`.
 
 ## Still open, and honestly so
 
-- **[P1] Help and documentation — score unchanged at 1/10.** There is still no
-  help link, docs link, tooltip or support contact anywhere in the product, while
-  `docs.saroh.in` and `help.saroh.in` exist as built apps linked from nowhere.
-  This is the single largest remaining scoring gap and it was not touched.
+- **Help and documentation is no longer absent, but it is not finished.** Both
+  sites are written and linked, and ⌘K searches the articles. What is still
+  missing: any in-context help — no tooltip explains "readiness" where the word
+  appears — and **no support contact anywhere**, so a merchant whose question is
+  not covered by an article still has nowhere to go. There is also no search
+  across help content from inside the workspace, only article titles.
 - **[P1] `/settings/modules` renders 15 same-weight buttons.** Untouched.
 - **Platform vocabulary.** "Modules", "capabilities", "readiness" survive in
   Settings. The nav was reframed to outcomes (Sell, Bookings, Customers) but the
@@ -127,6 +129,31 @@ than a heavier `--border`.
   it configures. Worth a decision, not a quiet edit.
 - **Client-side filtering.** `DataFilter` predicates run over rows already
   loaded — right at hundreds, wrong at tens of thousands.
+
+## Help and documentation, in detail
+
+The two sites had existed as deployed apps with placeholder content — help still
+described Saroh as "the platform to create blogs, portfolios, and storefronts",
+two product rewrites out of date, and its guides said "Step-by-step guides will
+be added here."
+
+- **help.saroh.in** — eight articles for people using Saroh, written against
+  what the product actually does: getting started, finding your way around,
+  customers and leads, selling, bookings, website, organisation and team, and
+  turning capabilities on and off. Every internal link verified 200.
+- **docs.saroh.in** — six pages for developers: introduction, getting started
+  (including the two environment traps that cost an hour each), architecture,
+  database, authentication, contributing.
+- **Links** — a `?` in the workspace top bar, help articles in ⌘K, and a footer
+  on the marketing site, which previously had neither nav nor footer and so had
+  nowhere for a link to live.
+
+**One thing found while writing it, and not fixed:** the repository has no
+`LICENSE` file and no `license` field in `package.json`, while both site footers
+claimed "MIT ©". Documentation that tells people how to run Saroh themselves
+implies terms that have never been granted. The false claim is removed and the
+introduction says plainly that the terms are unsettled — but **the licence
+question itself is open and needs a decision**, not a doc change.
 
 ## Verification
 

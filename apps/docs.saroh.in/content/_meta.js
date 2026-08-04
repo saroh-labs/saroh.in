@@ -1,4 +1,8 @@
 export default {
-	index: "Introduction to Saroh.io",
-	authentication: "Getting Started with Authentication",
+    index: "Introduction",
+    "getting-started": "Getting started",
+    architecture: "Architecture",
+    database: "Database",
+    authentication: "Authentication",
+    contributing: "Contributing",
 };
