@@ -18,9 +18,10 @@ const navbar = (
     />
 );
 
-// No LICENSE file exists in the repository and `package.json` carries no
-// `license` field, so the previous "MIT ©" footer stated terms that have never
-// been granted. A copyright line is true; a licence claim was not.
+// The footer once read "MIT ©" while no LICENSE file existed. Terms exist now
+// (LICENSE.md — source-available, not open source), but this is the merchant
+// help centre: someone reading it is using the hosted product and has no
+// licensing question, so it stays out of their way.
 const footer = (
     <Footer>
         © {new Date().getFullYear()} Saroh ·{" "}

@@ -18,15 +18,17 @@ const navbar = (
     />
 );
 
-// See the note in help.saroh.in's layout: there is no LICENSE file, so no
-// licence is claimed here. The Introduction page says so explicitly, because
-// these docs describe how to run Saroh yourself and that is exactly the reader
-// who needs to know the terms are unsettled.
+// Developers ARE the audience with a licensing question, so unlike the help
+// centre this footer links the terms directly. The Introduction covers them in
+// full: source-available, free to evaluate and modify, paid for commercial use.
 const footer = (
     <Footer>
         © {new Date().getFullYear()} Saroh ·{" "}
         <a href="https://saroh.in">saroh.in</a> ·{" "}
-        <a href="https://help.saroh.in">Using Saroh? Help centre</a>
+        <a href="https://help.saroh.in">Help centre</a> ·{" "}
+        <a href="https://github.com/saroh-io/saroh.io/blob/main/LICENSE.md">
+            Licence
+        </a>
     </Footer>
 );
 

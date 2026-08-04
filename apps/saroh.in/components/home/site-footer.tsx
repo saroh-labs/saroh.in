@@ -93,10 +93,15 @@ export function SiteFooter() {
 
                 <div className="mt-14 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between">
                     <p>© {new Date().getFullYear()} Saroh</p>
-                    {/* No licence is claimed: the repository has no LICENSE
-                        file and no `license` field, so stating one here would
-                        grant terms nobody has agreed. */}
-                    <p>Built in India.</p>
+                    <p className="flex items-center gap-3">
+                        <Link
+                            href="https://github.com/saroh-io/saroh.io/blob/main/LICENSE.md"
+                            className="rounded transition-colors hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-highlight focus-visible:ring-offset-2 focus-visible:ring-offset-brand-surface"
+                        >
+                            Licence
+                        </Link>
+                        <span>Built in India.</span>
+                    </p>
                 </div>
             </div>
         </footer>
