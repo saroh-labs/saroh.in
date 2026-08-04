@@ -319,11 +319,22 @@ export class BookingsService {
 
     // ── Bookings (management) ──────────────────────────────────────────────
 
-    /** List the org's bookings (optionally for one service), newest slot first. `booking:read`. */
-    async listBookings(
-        ctx: OrganizationContext,
-        serviceId?: string,
-    ): Promise<Booking[]> {
+    /**
+     * List the org's bookings (optionally for one service), newest slot first.
+     * `booking:read`.
+     *
+     * The linked Contact travels with each row. A booking's `bookerName` is only
+     * populated when someone typed one into the public form, so the management
+     * screen was showing "Unknown booker" for bookings whose person the CRM knew
+     * perfectly well — and Home, which does join the contact, named them on the
+     * same visit. Two screens disagreeing about who a booking belongs to is
+     * worse than either being sparse.
+     *
+     * Only the name parts and email are selected. A booking list has no business
+     * carrying a contact's phone or company, and `booking:read` is not
+     * `contact:read`.
+     */
+    async listBookings(ctx: OrganizationContext, serviceId?: string) {
         authorize(ctx, "booking:read");
         if (serviceId) {
             // Ensure the service is owned before filtering by it (404 otherwise).
@@ -335,6 +346,16 @@ export class BookingsService {
                 ...(serviceId ? { serviceId } : {}),
             },
             orderBy: { startAt: "desc" },
+            include: {
+                contact: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                    },
+                },
+            },
         });
     }
 

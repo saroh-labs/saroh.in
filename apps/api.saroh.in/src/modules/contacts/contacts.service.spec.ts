@@ -1,5 +1,6 @@
 // DB-free unit tests: the database package is mocked so nothing touches a real
-// Postgres. Only the contact delegate is exercised here.
+// Postgres. The lead/booking delegates are here because the list rollup reads
+// them — see ContactListItem.
 jest.mock("@saroh/database", () => {
     return {
         prisma: {
@@ -8,6 +9,8 @@ jest.mock("@saroh/database", () => {
                 findUnique: jest.fn(),
                 update: jest.fn(),
             },
+            lead: { groupBy: jest.fn() },
+            booking: { groupBy: jest.fn() },
         },
     };
 });
@@ -21,6 +24,16 @@ import { ContactsService } from "./contacts.service";
 const findMany = prisma.contact.findMany as jest.Mock;
 const findUnique = prisma.contact.findUnique as jest.Mock;
 const update = prisma.contact.update as jest.Mock;
+const leadGroupBy = prisma.lead.groupBy as jest.Mock;
+const bookingGroupBy = prisma.booking.groupBy as jest.Mock;
+
+const CONTACT = {
+    id: "c_1",
+    organizationId: "org_1",
+    email: "ananya@example.com",
+    firstName: "Ananya",
+    lastName: "Rao",
+};
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -32,7 +45,11 @@ function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
 }
 
 describe("ContactsService.list", () => {
-    beforeEach(() => jest.clearAllMocks());
+    beforeEach(() => {
+        jest.clearAllMocks();
+        leadGroupBy.mockResolvedValue([]);
+        bookingGroupBy.mockResolvedValue([]);
+    });
 
     it("scopes to the ctx org, newest first", async () => {
         const service = new ContactsService();
@@ -52,6 +69,89 @@ describe("ContactsService.list", () => {
             service.list(ctx({ role: "MEMBER" })),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(findMany).not.toHaveBeenCalled();
+    });
+
+    it("runs no rollup queries at all for an empty org", async () => {
+        // A `contactId: { in: [] }` aggregate is a round trip that can only
+        // return nothing.
+        const service = new ContactsService();
+        findMany.mockResolvedValue([]);
+
+        await service.list(ctx());
+
+        expect(leadGroupBy).not.toHaveBeenCalled();
+        expect(bookingGroupBy).not.toHaveBeenCalled();
+    });
+
+    it("attaches open pipeline value and the next booking to each row", async () => {
+        const service = new ContactsService();
+        findMany.mockResolvedValue([CONTACT]);
+        leadGroupBy.mockResolvedValue([
+            { contactId: "c_1", _sum: { value: 4500000 }, _count: { _all: 2 } },
+        ]);
+        const startAt = new Date("2026-08-06T09:00:00.000Z");
+        bookingGroupBy.mockResolvedValue([
+            { contactId: "c_1", _min: { startAt } },
+        ]);
+
+        const [row] = await service.list(ctx());
+
+        expect(row).toMatchObject({
+            id: "c_1",
+            openLeadValue: 4500000,
+            openLeadCount: 2,
+            nextBookingAt: startAt,
+        });
+    });
+
+    it("aggregates the whole page in one query per relation, not one per contact", async () => {
+        const service = new ContactsService();
+        findMany.mockResolvedValue([
+            CONTACT,
+            { ...CONTACT, id: "c_2" },
+            { ...CONTACT, id: "c_3" },
+        ]);
+
+        await service.list(ctx());
+
+        expect(leadGroupBy).toHaveBeenCalledTimes(1);
+        expect(bookingGroupBy).toHaveBeenCalledTimes(1);
+        expect(leadGroupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    contactId: { in: ["c_1", "c_2", "c_3"] },
+                    status: "OPEN",
+                }),
+            }),
+        );
+    });
+
+    it("keeps a null total distinct from zero when leads carry no value", async () => {
+        // `Lead.value` is optional. Two open leads with no amount recorded is
+        // not "₹0 of pipeline" — collapsing it would invent a fact.
+        const service = new ContactsService();
+        findMany.mockResolvedValue([CONTACT]);
+        leadGroupBy.mockResolvedValue([
+            { contactId: "c_1", _sum: { value: null }, _count: { _all: 2 } },
+        ]);
+
+        const [row] = await service.list(ctx());
+
+        expect(row?.openLeadValue).toBeNull();
+        expect(row?.openLeadCount).toBe(2);
+    });
+
+    it("drops bookings that belong to no contact", async () => {
+        // A walk-in books without a Contact, so the groupBy key is null.
+        const service = new ContactsService();
+        findMany.mockResolvedValue([CONTACT]);
+        bookingGroupBy.mockResolvedValue([
+            { contactId: null, _min: { startAt: new Date() } },
+        ]);
+
+        const [row] = await service.list(ctx());
+
+        expect(row?.nextBookingAt).toBeNull();
     });
 });
 
