@@ -11,6 +11,9 @@ jest.mock("@saroh/database", () => {
             },
             lead: { groupBy: jest.fn() },
             booking: { groupBy: jest.fn() },
+            customerIdentityLink: { findMany: jest.fn() },
+            customer: { findMany: jest.fn() },
+            order: { groupBy: jest.fn(), findMany: jest.fn() },
         },
     };
 });
@@ -26,6 +29,13 @@ const findUnique = prisma.contact.findUnique as jest.Mock;
 const update = prisma.contact.update as jest.Mock;
 const leadGroupBy = prisma.lead.groupBy as jest.Mock;
 const bookingGroupBy = prisma.booking.groupBy as jest.Mock;
+const linkFindMany = prisma.customerIdentityLink.findMany as jest.Mock;
+const customerFindMany = prisma.customer.findMany as jest.Mock;
+const orderGroupBy = prisma.order.groupBy as jest.Mock;
+const orderFindMany = prisma.order.findMany as jest.Mock;
+
+/** A Prisma Decimal serialises via `toString`; the mock must do the same. */
+const decimal = (v: string) => ({ toString: () => v });
 
 const CONTACT = {
     id: "c_1",
@@ -49,6 +59,10 @@ describe("ContactsService.list", () => {
         jest.clearAllMocks();
         leadGroupBy.mockResolvedValue([]);
         bookingGroupBy.mockResolvedValue([]);
+        linkFindMany.mockResolvedValue([]);
+        customerFindMany.mockResolvedValue([]);
+        orderGroupBy.mockResolvedValue([]);
+        orderFindMany.mockResolvedValue([]);
     });
 
     it("scopes to the ctx org, newest first", async () => {
@@ -81,6 +95,9 @@ describe("ContactsService.list", () => {
 
         expect(leadGroupBy).not.toHaveBeenCalled();
         expect(bookingGroupBy).not.toHaveBeenCalled();
+        expect(linkFindMany).not.toHaveBeenCalled();
+        expect(customerFindMany).not.toHaveBeenCalled();
+        expect(orderGroupBy).not.toHaveBeenCalled();
     });
 
     it("attaches open pipeline value and the next booking to each row", async () => {
@@ -139,6 +156,165 @@ describe("ContactsService.list", () => {
 
         expect(row?.openLeadValue).toBeNull();
         expect(row?.openLeadCount).toBe(2);
+    });
+
+    it("finds the last order through an explicit identity link", async () => {
+        const service = new ContactsService();
+        findMany.mockResolvedValue([CONTACT]);
+        linkFindMany.mockResolvedValue([
+            { contactId: "c_1", customerId: "cust_1" },
+        ]);
+        const at = new Date("2026-07-30T10:00:00.000Z");
+        orderGroupBy.mockResolvedValue([
+            { customerId: "cust_1", _max: { createdAt: at } },
+        ]);
+        orderFindMany.mockResolvedValue([
+            {
+                customerId: "cust_1",
+                createdAt: at,
+                total: decimal("1250.50"),
+                currency: "INR",
+            },
+        ]);
+
+        const [row] = await service.list(ctx());
+
+        expect(row).toMatchObject({
+            lastOrderAt: at,
+            lastOrderTotal: "1250.50",
+            lastOrderCurrency: "INR",
+        });
+    });
+
+    it("matches a customer by email regardless of case", async () => {
+        // Neither table normalises email on write, so a case-sensitive test
+        // would report "never ordered" for someone who has.
+        const service = new ContactsService();
+        findMany.mockResolvedValue([
+            { ...CONTACT, email: "Ananya@Example.com" },
+        ]);
+        customerFindMany.mockResolvedValue([
+            { id: "cust_2", email: "ananya@example.COM" },
+        ]);
+        const at = new Date("2026-07-28T10:00:00.000Z");
+        orderGroupBy.mockResolvedValue([
+            { customerId: "cust_2", _max: { createdAt: at } },
+        ]);
+        orderFindMany.mockResolvedValue([
+            {
+                customerId: "cust_2",
+                createdAt: at,
+                total: decimal("400"),
+                currency: "INR",
+            },
+        ]);
+
+        const [row] = await service.list(ctx());
+
+        expect(row?.lastOrderAt).toEqual(at);
+        expect(customerFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    organizationId: "org_1",
+                    email: expect.objectContaining({ mode: "insensitive" }),
+                }),
+            }),
+        );
+    });
+
+    it("takes the latest across stores when one person matches several customers", async () => {
+        // `Customer.email` is unique per STORE, so one contact legitimately
+        // matches more than one customer record.
+        const service = new ContactsService();
+        findMany.mockResolvedValue([CONTACT]);
+        customerFindMany.mockResolvedValue([
+            { id: "cust_a", email: CONTACT.email },
+            { id: "cust_b", email: CONTACT.email },
+        ]);
+        const older = new Date("2026-06-01T00:00:00.000Z");
+        const newer = new Date("2026-07-31T00:00:00.000Z");
+        orderGroupBy.mockResolvedValue([
+            { customerId: "cust_a", _max: { createdAt: older } },
+            { customerId: "cust_b", _max: { createdAt: newer } },
+        ]);
+        orderFindMany.mockResolvedValue([
+            {
+                customerId: "cust_a",
+                createdAt: older,
+                total: decimal("100"),
+                currency: "INR",
+            },
+            {
+                customerId: "cust_b",
+                createdAt: newer,
+                total: decimal("900"),
+                currency: "INR",
+            },
+        ]);
+
+        const [row] = await service.list(ctx());
+
+        expect(row?.lastOrderAt).toEqual(newer);
+        expect(row?.lastOrderTotal).toBe("900");
+    });
+
+    it("never attributes an order that merely shares a timestamp", async () => {
+        // The final read is `createdAt IN (collected instants)`, so a collision
+        // between two customers would cross-attribute without the pair re-check.
+        const service = new ContactsService();
+        findMany.mockResolvedValue([CONTACT]);
+        linkFindMany.mockResolvedValue([
+            { contactId: "c_1", customerId: "cust_mine" },
+        ]);
+        const at = new Date("2026-07-30T10:00:00.000Z");
+        orderGroupBy.mockResolvedValue([
+            { customerId: "cust_mine", _max: { createdAt: at } },
+        ]);
+        orderFindMany.mockResolvedValue([
+            {
+                customerId: "cust_someone_else",
+                createdAt: at,
+                total: decimal("99999"),
+                currency: "INR",
+            },
+        ]);
+
+        const [row] = await service.list(ctx());
+
+        expect(row?.lastOrderAt).toBeNull();
+        expect(row?.lastOrderTotal).toBeNull();
+    });
+
+    it("writes nothing — the reconciliation is read-time only", async () => {
+        // The point of the whole design: turning this off is deleting a query,
+        // not unpicking merged data. No CustomerIdentityLink is ever created.
+        const service = new ContactsService();
+        findMany.mockResolvedValue([CONTACT]);
+        customerFindMany.mockResolvedValue([
+            { id: "cust_2", email: CONTACT.email },
+        ]);
+        orderGroupBy.mockResolvedValue([]);
+
+        await service.list(ctx());
+
+        expect(prisma.customerIdentityLink).not.toHaveProperty("create");
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("leaves the order column empty for a role that cannot read orders", async () => {
+        const service = new ContactsService();
+        findMany.mockResolvedValue([CONTACT]);
+
+        // MEMBER cannot read contacts at all, so exercise the gate directly:
+        // the rollup must not be the hole that leaks commerce to a CRM role.
+        const { can } = jest.requireActual<
+            typeof import("../organizations/organization-policy")
+        >("../organizations/organization-policy");
+        expect(can("ADMIN", "order:read")).toBe(true);
+        expect(can("MEMBER", "order:read")).toBe(false);
+
+        await service.list(ctx());
+        expect(linkFindMany).toHaveBeenCalled();
     });
 
     it("drops bookings that belong to no contact", async () => {

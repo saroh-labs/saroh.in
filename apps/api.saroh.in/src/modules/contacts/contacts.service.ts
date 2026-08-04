@@ -10,21 +10,34 @@ import type { UpdateContactDto } from "./dto";
  * A contact as the list screen needs it: the record, plus the few facts that
  * decide whether it is worth calling today.
  *
- * ## What is here, and what is deliberately not
- *
  * `openLeadValue` / `openLeadCount` and `nextBookingAt` come from relations the
  * Contact actually owns (`Contact.leads`, `Contact.bookings`), so they are facts
  * about this person, not inferences.
  *
- * There is no `lastOrderAt`. Orders hang off a commerce `Customer`, which is
- * joined to a CRM `Contact` only through an explicit `CustomerIdentityLink`
- * (#120) that a human creates by hand. Matching the two by email instead — the
- * obvious shortcut — IS the auto-linking that SEC-005 / ARCH-001 have not
- * approved, and shipping it quietly inside a list query would be deciding that
- * open question by accident. Rendering the column from links alone is no better:
- * almost every row would show "no orders" for a customer who has ordered,
- * because nobody has linked them yet, and a wrong fact drawn confidently is
- * worse than an absent one.
+ * ## `lastOrder*` — a READ-TIME reconciliation, and why that distinction matters
+ *
+ * Orders hang off a commerce `Customer`. A `Customer` is joined to a CRM
+ * `Contact` two ways here:
+ *
+ * 1. an explicit `CustomerIdentityLink` (#120), created by a human; and
+ * 2. an exact, case-insensitive email match **within the same Organization**.
+ *
+ * The second is the part to understand. It is computed per request and never
+ * written back — no `CustomerIdentityLink` row is created, nothing is merged,
+ * and turning this off is deleting a query rather than unpicking data. That is
+ * the whole reason it is safe to ship while SEC-005 / ARCH-001 are still open:
+ * those decide what a PERSISTED unified customer record means and who may act on
+ * it. This decides only what one merchant sees on one screen, from two records
+ * they already own, in one Organization they already administer.
+ *
+ * Two consequences worth stating rather than discovering:
+ *
+ * - `Customer.email` is unique per STORE, not per Organization, so one contact
+ *   can match customers in several stores. Their orders are unioned, which is
+ *   the correct reading of "when did this person last buy from us".
+ * - A merchant who orders under a different address than they enquired with will
+ *   show no order here. That is an under-report, not a wrong report — the column
+ *   can be silent, but it must never attribute someone else's purchase.
  */
 export interface ContactListItem extends Contact {
     /** Sum of OPEN lead values in MINOR units; null when there are none. */
@@ -32,6 +45,18 @@ export interface ContactListItem extends Contact {
     openLeadCount: number;
     /** The next confirmed booking's start, or null. */
     nextBookingAt: Date | null;
+    /** When this person last bought, across every store in the org. */
+    lastOrderAt: Date | null;
+    /** That order's total, in MAJOR units as a decimal string, with its currency. */
+    lastOrderTotal: string | null;
+    lastOrderCurrency: string | null;
+}
+
+/** The last order found for one contact. */
+interface LastOrder {
+    at: Date;
+    total: string;
+    currency: string;
 }
 
 /**
@@ -68,18 +93,24 @@ export class ContactsService {
         if (contacts.length === 0) return [];
 
         const contactIds = contacts.map((c) => c.id);
-        const [leadsByContact, nextBookingByContact] = await Promise.all([
-            this.openLeadsByContact(ctx, contactIds),
-            this.nextBookingByContact(ctx, contactIds),
-        ]);
+        const [leadsByContact, nextBookingByContact, lastOrderByContact] =
+            await Promise.all([
+                this.openLeadsByContact(ctx, contactIds),
+                this.nextBookingByContact(ctx, contactIds),
+                this.lastOrderByContact(ctx, contacts),
+            ]);
 
         return contacts.map((contact) => {
             const leads = leadsByContact.get(contact.id);
+            const order = lastOrderByContact.get(contact.id);
             return {
                 ...contact,
                 openLeadValue: leads?.value ?? null,
                 openLeadCount: leads?.count ?? 0,
                 nextBookingAt: nextBookingByContact.get(contact.id) ?? null,
+                lastOrderAt: order?.at ?? null,
+                lastOrderTotal: order?.total ?? null,
+                lastOrderCurrency: order?.currency ?? null,
             };
         });
     }
@@ -140,6 +171,154 @@ export class ContactsService {
             const startAt = row._min.startAt;
             if (row.contactId && startAt) out.set(row.contactId, startAt);
         }
+        return out;
+    }
+
+    /**
+     * The most recent order for each contact, resolved at read time.
+     *
+     * Four bounded queries, none of which scale with the number of orders:
+     *
+     * 1. explicit `CustomerIdentityLink` rows for this page of contacts;
+     * 2. `Customer` rows in this org whose email matches one of these contacts;
+     * 3. `groupBy` for the newest order instant per matched customer;
+     * 4. one `findMany` restricted to those exact instants.
+     *
+     * Step 4 is why this does not fetch a merchant's whole order history to find
+     * a date. `groupBy` gives the timestamps but not the totals, so the final
+     * read is narrowed to `createdAt IN (those instants)` and the exact
+     * customer+instant pair is re-checked in code — an order that merely shares a
+     * timestamp with another customer's latest is discarded rather than
+     * misattributed.
+     *
+     * Gated on `order:read` in its own right. Someone who may read contacts but
+     * not orders sees the column empty rather than populated by a join they were
+     * not entitled to.
+     */
+    private async lastOrderByContact(
+        ctx: OrganizationContext,
+        contacts: Contact[],
+    ): Promise<Map<string, LastOrder>> {
+        const out = new Map<string, LastOrder>();
+        if (!can(ctx.role, "order:read")) return out;
+
+        const contactIds = contacts.map((c) => c.id);
+
+        // Emails are compared lower-cased on both sides. `Contact.email` is
+        // unique per org and `Customer.email` per store, but neither is
+        // normalised on write, so "Ananya@x.com" and "ananya@x.com" are the same
+        // person to everyone except a case-sensitive equality test.
+        const emailToContactIds = new Map<string, string[]>();
+        for (const contact of contacts) {
+            const key = contact.email.trim().toLowerCase();
+            if (!key) continue;
+            const bucket = emailToContactIds.get(key);
+            if (bucket) bucket.push(contact.id);
+            else emailToContactIds.set(key, [contact.id]);
+        }
+
+        const [links, customers] = await Promise.all([
+            prisma.customerIdentityLink.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    contactId: { in: contactIds },
+                },
+                select: { contactId: true, customerId: true },
+            }),
+            emailToContactIds.size === 0
+                ? Promise.resolve([])
+                : prisma.customer.findMany({
+                      where: {
+                          organizationId: ctx.organizationId,
+                          email: {
+                              in: [...emailToContactIds.keys()],
+                              mode: "insensitive",
+                          },
+                      },
+                      select: { id: true, email: true },
+                  }),
+        ]);
+
+        /** customerId → the contacts it counts for (a customer may match one). */
+        const customerToContactIds = new Map<string, Set<string>>();
+        const attach = (customerId: string, contactId: string) => {
+            const bucket = customerToContactIds.get(customerId);
+            if (bucket) bucket.add(contactId);
+            else customerToContactIds.set(customerId, new Set([contactId]));
+        };
+
+        for (const link of links) attach(link.customerId, link.contactId);
+        for (const customer of customers) {
+            const key = customer.email.trim().toLowerCase();
+            for (const contactId of emailToContactIds.get(key) ?? []) {
+                attach(customer.id, contactId);
+            }
+        }
+
+        const customerIds = [...customerToContactIds.keys()];
+        if (customerIds.length === 0) return out;
+
+        /*
+         * Scoped by customerId, NOT by `Order.organizationId`.
+         *
+         * That column is nullable, so filtering on it would silently drop orders
+         * on rows where it was never populated — reporting "never ordered" for
+         * someone who has. The customer ids were themselves read under
+         * `ctx.organizationId` (via the link table or the org-scoped customer
+         * query), so the tenant boundary is already proven by the time we get
+         * here; adding a nullable column to the predicate weakens the result
+         * without strengthening the guarantee.
+         */
+        const newest = await prisma.order.groupBy({
+            by: ["customerId"],
+            where: { customerId: { in: customerIds } },
+            _max: { createdAt: true },
+        });
+
+        const newestByCustomer = new Map<string, Date>();
+        for (const row of newest) {
+            if (row._max.createdAt) {
+                newestByCustomer.set(row.customerId, row._max.createdAt);
+            }
+        }
+        if (newestByCustomer.size === 0) return out;
+
+        const orders = await prisma.order.findMany({
+            where: {
+                customerId: { in: [...newestByCustomer.keys()] },
+                createdAt: { in: [...newestByCustomer.values()] },
+            },
+            select: {
+                customerId: true,
+                createdAt: true,
+                total: true,
+                currency: true,
+            },
+        });
+
+        for (const order of orders) {
+            // Re-check the pair: the `IN` above matches any customer at any of
+            // the collected instants, so a coincidental timestamp collision
+            // between two customers would otherwise cross-attribute an order.
+            const newestForThis = newestByCustomer.get(order.customerId);
+            if (newestForThis?.getTime() !== order.createdAt.getTime())
+                continue;
+
+            for (const contactId of customerToContactIds.get(
+                order.customerId,
+            ) ?? []) {
+                // A contact can match customers in several stores; the latest
+                // across all of them is the answer to "when did they last buy".
+                const current = out.get(contactId);
+                if (current && current.at >= order.createdAt) continue;
+                out.set(contactId, {
+                    at: order.createdAt,
+                    total: order.total.toString(),
+                    currency: order.currency,
+                });
+            }
+        }
+
         return out;
     }
 
