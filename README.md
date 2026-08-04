@@ -1,8 +1,11 @@
-# Saroh.io
+# Saroh.in
 
-Open-source, multi-tenant SaaS platform for building online businesses —
-**websites, blogs, portfolios, and e-commerce storefronts** — with team
-collaboration, a CRM, bookings, payments and communications on the roadmap.
+**Source-available** business platform: one place a small business sells, takes
+bookings, follows up on enquiries, and keeps a website in step.
+
+Free to use, modify and self-host — including to run your own business. The one
+thing you may not do is offer it to other people as a hosted service. See
+[Licence](#licence) below.
 
 A pnpm + Turborepo monorepo: a set of Next.js apps and a single NestJS API, all
 built on one Better Auth identity system and one PostgreSQL database.
@@ -142,6 +145,54 @@ was reconciled to this canonical host in S0-008; the only remaining
 migration plans under `docs/plans/` (kept as an accurate record). Advanced
 Better Auth plugins (org, 2FA, OTP, API keys, admin roles) are a later milestone.
 
-## License & contact
+## Licence
 
-Educational/open-source. Contact: <mohit@saroh.io>.
+Saroh is licensed under the **[Elastic License 2.0](LICENSE.md)** (ELv2).
+
+| What you want to do                                      | Allowed?              |
+| -------------------------------------------------------- | --------------------- |
+| Read it, learn from it, take ideas from it               | Yes                   |
+| Modify it, self-host it, run your own business on it     | Yes                   |
+| Build client work on it, run it inside a company         | Yes                   |
+| Offer it to third parties as a hosted or managed service | Not without asking us |
+
+No fee, no registration, nothing to tell us. The single restriction exists so
+that the hosted Saroh service — which funds the time that goes into this — is
+not simply resold by someone else. If that is what you want to build,
+[get in touch](mailto:mohit@saroh.in); it is a conversation, not a refusal.
+
+**Two clauses that need context.** ELv2 forbids circumventing "license key
+functionality" — Saroh has none, so that limitation is inert. And it requires
+you to keep licensing and copyright notices intact in the source, and to mark
+modified copies as modified.
+
+### Credit
+
+Keep the licence and copyright notices in the source. That is the only
+requirement.
+
+A "Built with Saroh" line in your README, or a link from your project page, is
+genuinely appreciated and entirely optional.
+
+**Nothing is required on your customers' websites.** Sites built with Saroh
+carry no Saroh branding by design — your customers should see your business, not
+the tool behind it — and the licence does not ask you to change that.
+
+### Source-available, not open source
+
+The [Open Source Definition](https://opensource.org/osd) does not allow
+restrictions on field of use, and the hosted-service limitation is one. So this
+is source-available. Said plainly here rather than left for someone to discover.
+
+### Supporting the work
+
+This is built part-time, mostly to learn in the open and to be useful to people
+building small businesses. There is no paid tier and no plan for one.
+
+If it has helped you and you want to put something back, sponsorship is welcome
+and never a condition of anything. Telling someone else it was useful helps just
+as much.
+
+## Contact
+
+<mohit@saroh.in>

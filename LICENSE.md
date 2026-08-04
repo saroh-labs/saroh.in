@@ -1,181 +1,102 @@
-# Saroh Licence
+# Elastic License 2.0 (ELv2)
 
-**Version 1.0 — 4 August 2026**
+**Licensor: Saroh** · Copyright © 2026 Saroh
 
-Copyright © 2026 Saroh. All rights reserved.
+Source: <https://www.elastic.co/licensing/elastic-license>
 
-> **Plain-English summary — not the licence.** The numbered terms below are what
-> counts; this box is only here so you can tell quickly which one applies to you.
->
-> | What you are doing                                                | What you need        |
-> | ----------------------------------------------------------------- | -------------------- |
-> | Trying it, learning from it, developing on it, running it at home | Nothing. Go ahead.   |
-> | Teaching with it, or using it for a registered non-profit         | Nothing. Go ahead.   |
-> | Running it to operate **your own** business                       | A Commercial Licence |
-> | Offering it **to other people** as a hosted or managed service    | Talk to us first     |
-> | Selling it, or shipping it inside something you sell              | Talk to us first     |
->
-> You may read, modify and self-host the software in every tier above. What
-> changes between tiers is whether a fee is due and whether you may put it in
-> front of third parties.
+> This is the standard, unmodified text of the Elastic License 2.0. Plain-English
+> notes on what it means for Saroh — and on the parts that do not apply to us —
+> are in [`README.md`](README.md), deliberately kept out of the licence itself so
+> the terms stay word-for-word identical to the published ones.
 
 ---
 
-## 1. Definitions
+## Acceptance
 
-**"Software"** means the Saroh source code, documentation and assets in this
-repository, and any modified version of them.
+By using the software, you agree to all of the terms and conditions below.
 
-**"We", "us", "our"** means Saroh, the copyright holder.
+## Copyright License
 
-**"You"** means the individual or legal entity exercising rights under this
-Licence, together with any entity that controls, is controlled by, or is under
-common control with it.
+The licensor grants you a non-exclusive, royalty-free, worldwide,
+non-sublicensable, non-transferable license to use, copy, distribute, make
+available, and prepare derivative works of the software, in each case subject to
+the limitations and conditions below.
 
-**"Commercial Use"** means using the Software in the course of, or to support,
-any activity intended to generate revenue. It includes running the Software to
-operate a business, and using it internally at an organisation that trades. It
-does **not** include the uses listed in Section 2.
+## Limitations
 
-**"Service Use"** means making the Software, or any substantial part of its
-functionality, available to any third party as a hosted, managed or
-multi-tenant service — whether or not a fee is charged.
+You may not provide the software to third parties as a hosted or managed
+service, where the service provides users with access to any substantial set of
+the features or functionality of the software.
 
-**"Commercial Licence"** means a current, paid licence granted by us under
-Section 4.
+You may not move, change, disable, or circumvent the license key functionality
+in the software, and you may not remove or obscure any functionality in the
+software that is protected by the license key.
 
-**"Licensed Version"** means the version of the Software you obtained during a
-period in which your Commercial Licence was current.
+You may not alter, remove, or obscure any licensing, copyright, or other notices
+of the licensor in the software. Any use of the licensor's trademarks is subject
+to applicable law.
 
-## 2. Free use
+## Patents
 
-You may use, copy, modify and self-host the Software at no charge, for:
+The licensor grants you a license, under any patent claims the licensor can
+license, or becomes able to license, to make, have made, use, sell, offer for
+sale, import and have imported the software, in each case subject to the
+limitations and conditions in this license. This license does not cover any
+patent claims that you cause to be infringed by modifications or additions to
+the software. If you or your company make any written claim that the software
+infringes or contributes to infringement of any patent, your patent license for
+the software granted under these terms ends immediately. If your company makes
+such a claim, your patent license ends immediately for work on behalf of your
+company.
 
-- **a.** personal use, and use by a single individual not trading as a business;
-- **b.** evaluation, development, testing and staging, provided it is not used
-  to operate a live business;
-- **c.** education, academic research and teaching;
-- **d.** use by a registered charity or non-profit organisation, for its own
-  operations;
-- **e.** contributing to the Software itself.
+## Notices
 
-No fee is due for any use in this section, and none of it requires you to tell
-us anything.
+You must ensure that anyone who gets a copy of any part of the software from you
+also gets a copy of these terms.
 
-## 3. Commercial use requires a licence
+If you modify the software, you must include in any modified copies of the
+software prominent notices stating that you have modified the software.
 
-If your use is Commercial Use and is not covered by Section 2, you need a
-Commercial Licence before you put the Software into production.
+## No Other Rights
 
-## 4. Commercial Licence
+These terms do not imply any licenses other than those expressly granted in
+these terms.
 
-**Fee: ₹10,000 per year, per licensed entity**, payable in advance, covering an
-unlimited number of installations operated by that entity for its own business.
+## Termination
 
-A Commercial Licence:
+If you use the software in violation of these terms, such use is not licensed,
+and your licenses will automatically terminate. If the licensor provides you
+with a notice of your violation, and you cease all violation of this license no
+later than 30 days after you receive that notice, your licenses will be
+reinstated retroactively. However, if you violate these terms after such
+reinstatement, any additional violation of these terms will cause your licenses
+to terminate automatically and permanently.
 
-- **a.** is granted for a term of twelve (12) months and renews only if you
-  choose to renew it;
-- **b.** covers the licensed entity and its wholly-owned subsidiaries;
-- **c.** does **not** cover Service Use (see Section 5);
-- **d.** entitles you to use any version of the Software released during your
-  term, indefinitely.
+## No Liability
 
-**Point (d) matters and is deliberate.** If you stop paying, you do not have to
-stop working. You keep the right to run the Licensed Version for as long as you
-like. What lapses is your right to run versions released after your term ended.
-We would rather you left on good terms and came back than be forced to rip out
-a system your business runs on.
+_As far as the law allows, the software comes as is, without any warranty or
+condition, and the licensor will not be liable to you for any damages arising
+out of these terms or the use or nature of the software, under any kind of legal
+claim._
 
-Fees are exclusive of any taxes, which are your responsibility.
+## Definitions
 
-## 5. Service use requires a separate agreement
+The **licensor** is the entity offering these terms, and the **software** is the
+software the licensor makes available under these terms, including any portion
+of it.
 
-You may **not**, without a separate written agreement with us:
+**you** refers to the individual or entity agreeing to these terms.
 
-- **a.** make the Software available to third parties as a hosted, managed or
-  multi-tenant service;
-- **b.** sell, resell, sublicense or rent the Software;
-- **c.** distribute the Software, modified or not, as part of a product or
-  service you supply to others;
-- **d.** remove, disable or circumvent any licensing, attribution or usage
-  notice in the Software.
+**your company** is any legal entity, sole proprietorship, or other kind of
+organization that you work for, plus all organizations that have control over,
+are under the control of, or are under common control with that organization.
+**control** means ownership of substantially all the assets of an entity, or the
+power to direct its management and policies by vote, contract, or otherwise.
+Control can be direct or indirect.
 
-This is the restriction that protects the hosted Saroh service, which is how
-this project is funded. It is not negotiable in the abstract, but it is
-negotiable in person — if you want to build something on Saroh and offer it to
-others, contact us. We would rather find terms than find out.
+**your licenses** are all the licenses granted to you for the software under
+these terms.
 
-## 6. Modification
+**use** means anything you do with the software requiring one of your licenses.
 
-You may modify the Software in any tier of this Licence, including for
-Commercial Use, and you are under no obligation to publish your modifications.
-
-Modified versions remain subject to this Licence in full. You may not apply
-different terms to them or sublicense them.
-
-## 7. Attribution
-
-You must keep all copyright, licence and attribution notices intact in the
-source. You are not required to display Saroh branding in a user interface you
-build on the Software.
-
-## 8. Trademarks
-
-This Licence grants no rights in the Saroh name, logo or wordmark. You may state
-factually that your product is built on Saroh. You may not present a modified
-version as being Saroh, or imply that we endorse or support it.
-
-## 9. Contributions
-
-If you contribute to the Software, you grant us a perpetual, worldwide,
-irrevocable, royalty-free licence to use, modify, sublicense and relicense your
-contribution as part of the Software, including under commercial terms.
-
-You confirm that you have the right to grant this — in particular, that your
-employer has no claim to the work.
-
-## 10. Termination
-
-This Licence terminates automatically if you breach it and do not remedy the
-breach within thirty (30) days of us notifying you.
-
-On termination you must stop using the Software and destroy your copies. The
-disclaimers in Sections 11 and 12 survive.
-
-## 11. No warranty
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
-
-## 12. Limitation of liability
-
-TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL WE BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-
-Where liability cannot lawfully be excluded, our total aggregate liability is
-limited to the fees you paid us in the twelve months before the claim arose.
-
-## 13. Governing law
-
-This Licence is governed by the laws of India. The courts of India have
-exclusive jurisdiction.
-
----
-
-## Getting a Commercial Licence
-
-Email **licensing@saroh.in** with your legal entity name, your registered
-address, and roughly what you are building. We will send an invoice and a
-licence certificate.
-
-## This is not an open-source licence
-
-Saroh is **source-available**, not open source. The
-[Open Source Definition](https://opensource.org/osd) does not permit
-restrictions on field of use, and Sections 3 and 5 are exactly that.
-
-We call it source-available so nobody has to find that out the hard way.
+**trademark** means trademarks, service marks, and similar rights.

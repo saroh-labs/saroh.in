@@ -18,10 +18,10 @@ const navbar = (
     />
 );
 
-// The footer once read "MIT ©" while no LICENSE file existed. Terms exist now
-// (LICENSE.md — source-available, not open source), but this is the merchant
-// help centre: someone reading it is using the hosted product and has no
-// licensing question, so it stays out of their way.
+// No licence link here on purpose. Saroh is source-available under ELv2, but
+// someone reading the help centre is using the hosted product and has no
+// licensing question — the terms belong in the developer docs, where the reader
+// who needs them actually is.
 const footer = (
     <Footer>
         © {new Date().getFullYear()} Saroh ·{" "}
