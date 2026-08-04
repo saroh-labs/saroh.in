@@ -25,6 +25,7 @@ import { join, relative, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const APP_DIR = join(ROOT, "apps/app.saroh.in/app");
+const APP_ROOT = join(ROOT, "apps/app.saroh.in");
 const API_SRC = join(ROOT, "apps/api.saroh.in/src");
 
 /** Walk a directory tree, yielding absolute file paths. */
@@ -72,7 +73,16 @@ function appRoutePatterns() {
     return patterns;
 }
 
-/** Destinations the API emits, with the file and line that emit them. */
+/** Skipped destinations, reported so silence never reads as coverage. */
+const skipped = [];
+
+/**
+ * Destinations the API emits, with the file and line that emit them.
+ *
+ * Only `href:` / `actionHref:` OBJECT KEYS count. The API is full of unrelated
+ * path strings — its own endpoint paths, `/stores` among them — and flagging
+ * those would make the check worthless.
+ */
 function emittedHrefs() {
     const found = [];
     for (const file of walk(API_SRC)) {
@@ -93,24 +103,78 @@ function emittedHrefs() {
     return found;
 }
 
+/**
+ * Destinations the app links to itself.
+ *
+ * The API is only one source of broken links; a `<Link href="/stores">` in the
+ * app 404s just as hard. This reads `href="..."` on JSX and `router.push("...")`
+ * / `redirect("...")` calls.
+ *
+ * Deliberately confined to app.saroh.in's own components and routes, and to
+ * STRING LITERALS. `href={\`/stores/${id}\`}` cannot be resolved statically, so
+ * it is counted and reported rather than guessed at — a checker that silently
+ * ignores what it cannot parse invites the belief that everything was checked.
+ */
+function inAppLinks() {
+    const found = [];
+    for (const file of walk(APP_ROOT)) {
+        if (!/\.tsx?$/.test(file) || /\.spec\.tsx?$/.test(file)) continue;
+        if (/[/\\](node_modules|\.next)[/\\]/.test(file)) continue;
+        const lines = readFileSync(file, "utf8").split("\n");
+        lines.forEach((line, i) => {
+            // Template literals and expressions: count, do not guess.
+            for (const _ of line.matchAll(
+                /(?:href=\{`|router\.push\(`|redirect\(`)/g,
+            )) {
+                skipped.push({ file: relative(ROOT, file), line: i + 1 });
+            }
+            for (const m of line.matchAll(
+                /(?:href="(\/[^"]*)"|(?:router\.push|redirect)\(\s*"(\/[^"]*)")/g,
+            )) {
+                const href = m[1] ?? m[2];
+                if (href === undefined) continue;
+                found.push({
+                    href,
+                    file: relative(ROOT, file),
+                    line: i + 1,
+                });
+            }
+        });
+    }
+    return found;
+}
+
 const patterns = appRoutePatterns();
 if (patterns.length === 0) {
     console.error(`No routes found under ${relative(ROOT, APP_DIR)}.`);
     process.exit(1);
 }
 
-const broken = emittedHrefs().filter(({ href }) => {
+/** Paths that are real but owned by something other than the app router. */
+const NOT_APP_ROUTES = [
+    /^\/api\//, // Next route handlers and the API proxy
+    /^\/_next\//,
+    /^\/#/, // in-page anchors
+];
+
+const all = [
+    ...emittedHrefs().map((h) => ({ ...h, source: "api.saroh.in" })),
+    ...inAppLinks().map((h) => ({ ...h, source: "app.saroh.in" })),
+];
+
+const broken = all.filter(({ href }) => {
     // Compare paths only; a query string or fragment does not change the route.
     const path = href.split(/[?#]/)[0].replace(/\/$/, "") || "/";
+    if (NOT_APP_ROUTES.some((re) => re.test(href))) return false;
     return !patterns.some((p) => p.regex.test(path));
 });
 
 if (broken.length > 0) {
     console.error(
-        `\n${broken.length} destination(s) emitted by api.saroh.in have no route in app.saroh.in:\n`,
+        `\n${broken.length} destination(s) have no route in app.saroh.in:\n`,
     );
-    for (const { href, file, line } of broken) {
-        console.error(`  ${href}\n      ${file}:${line}`);
+    for (const { href, file, line, source } of broken) {
+        console.error(`  ${href}   (${source})\n      ${file}:${line}`);
     }
     console.error(
         "\nEither add the route, or point the href at one that exists.\n",
@@ -119,5 +183,6 @@ if (broken.length > 0) {
 }
 
 console.log(
-    `check-app-routes: ${emittedHrefs().length} emitted destination(s) all resolve against ${patterns.length} app route(s).`,
+    `check-app-routes: ${all.length} destination(s) resolve against ${patterns.length} app route(s) ` +
+        `(${skipped.length} dynamic link(s) not statically checkable).`,
 );

@@ -107,6 +107,12 @@ jobs:
       - name: Circular dependency check
         run: pnpm run check:cycles
 
+      # Every destination the API emits and every static in-app link must
+      # resolve to a real route. Three shipped hrefs (/payments,
+      # /communications, /stores) 404'd for merchants before this existed.
+      - name: Route destination check
+        run: pnpm run check:routes
+
       - name: Typecheck
         run: pnpm run typecheck
 
