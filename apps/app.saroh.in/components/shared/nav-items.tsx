@@ -17,11 +17,15 @@ import {
 } from "lucide-react";
 
 /**
- * Single source of truth for the goal-based primary navigation, shared by the
- * desktop `AppSidebar` and the mobile `MobileNav` drawer so the two never drift.
- * Groups mirror the goals in `docs/design-system/02_INFORMATION_ARCHITECTURE.md`
- * (Customers / Appointments / Website / Insights); Home is an ungrouped anchor.
- * Only routes that exist today are listed — no speculative destinations.
+ * Single source of truth for the primary navigation, shared by the desktop
+ * `AppSidebar`, the mobile `MobileNav` drawer and the command menu, so the three
+ * can never drift. Home is an ungrouped anchor.
+ *
+ * Only routes that exist today are listed — no speculative destinations. The
+ * proposed IA in `docs/product-transformation/information-architecture.md` §2
+ * names sub-pages (Orders, Collections, Branding, Segments…) that have not been
+ * built; listing them here would put 404s in the rail, which is the defect
+ * `scripts/check-app-routes.mjs` now fails the build over.
  */
 export interface NavItem {
     href: string;
@@ -54,8 +58,45 @@ export function showsGroupLabel(group: NavGroup): boolean {
     return Boolean(group.label) && group.items.length > 1;
 }
 
+/**
+ * Navigation, named for what the merchant came to do.
+ *
+ * Onboarding asks "What does your business need to do?" and the merchant answers
+ * in outcomes — *Sell products*, *Take appointments*, *Show up online*. The shell
+ * then discarded that vocabulary entirely and handed back module and entity
+ * names — Commerce, Sites, Analytics — that nobody chose and nothing taught.
+ * These labels are the onboarding answer, carried forward.
+ *
+ * Presentation only. No route, module key or schema changes: the same
+ * capability gating applies, and every URL is untouched.
+ *
+ * Commerce leads, per the product decision of 2026-08-02 and
+ * `information-architecture.md` §2 — Sell sits above Bookings.
+ *
+ * `Contacts` deliberately keeps its name. The unified customer record is not
+ * built yet (SEC-005 / ARCH-001 are open), so calling it "All customers" would
+ * promise a merge that has not happened — the same over-claim that was removed
+ * from the marketing site.
+ */
 export const NAV_GROUPS: NavGroup[] = [
     { items: [{ href: "/", label: "Home", icon: Home }] },
+    {
+        label: "Sell",
+        moduleKey: "COMMERCE",
+        items: [{ href: "/commerce", label: "Sell", icon: Store }],
+    },
+    {
+        label: "Bookings",
+        moduleKey: "APPOINTMENTS",
+        items: [
+            // `/appointments` is the hub — "your schedule, services, and
+            // availability" — so Schedule names it better than the module did.
+            { href: "/appointments", label: "Schedule", icon: CalendarDays },
+            { href: "/services", label: "Services", icon: Briefcase },
+            // `/bookings` lists upcoming reservations grouped by day.
+            { href: "/bookings", label: "Upcoming", icon: CalendarClock },
+        ],
+    },
     {
         label: "Customers",
         moduleKey: "CRM",
@@ -66,32 +107,14 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
     },
     {
-        label: "Appointments",
-        moduleKey: "APPOINTMENTS",
-        items: [
-            {
-                href: "/appointments",
-                label: "Appointments",
-                icon: CalendarDays,
-            },
-            { href: "/services", label: "Services", icon: Briefcase },
-            { href: "/bookings", label: "Bookings", icon: CalendarClock },
-        ],
-    },
-    {
-        label: "Commerce",
-        moduleKey: "COMMERCE",
-        items: [{ href: "/commerce", label: "Commerce", icon: Store }],
-    },
-    {
         label: "Website",
         moduleKey: "WEBSITE",
-        items: [{ href: "/sites", label: "Sites", icon: Globe }],
+        items: [{ href: "/sites", label: "Website", icon: Globe }],
     },
     {
         label: "Insights",
         moduleKey: "INSIGHTS",
-        items: [{ href: "/analytics", label: "Analytics", icon: BarChart3 }],
+        items: [{ href: "/analytics", label: "Insights", icon: BarChart3 }],
     },
     // Notifications is core chrome (not a module), so it is always available.
     { items: [{ href: "/notifications", label: "Notifications", icon: Bell }] },
