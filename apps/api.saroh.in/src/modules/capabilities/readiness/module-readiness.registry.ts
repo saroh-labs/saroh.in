@@ -39,6 +39,32 @@ function setup(
 }
 
 /**
+ * A dependency the merchant already configured has stopped working.
+ *
+ * Distinct from `setup()`, and the distinction is the whole point: SETUP means
+ * "you have not connected this yet" — expected, unhurried, part of onboarding.
+ * ATTENTION means "you connected it and it is no longer functioning" — nothing
+ * is being onboarded, something is broken, and money or messages are being lost
+ * right now.
+ *
+ * Nothing emitted this severity before, so `ATTENTION_REQUIRED` was a state the
+ * types allowed, the UI rendered, and the product could not produce.
+ */
+function attention(
+    code: string,
+    message: string,
+    actionHref?: string,
+): ReadinessResult {
+    return {
+        readiness: "ATTENTION_REQUIRED",
+        blockers: [{ code, message, severity: "ATTENTION", actionHref }],
+    };
+}
+
+/** Providers the merchant connected and has not switched off. */
+const CONNECTED = "CONNECTED";
+
+/**
  * The readiness registry. Holds one adapter per module and resolves readiness /
  * deactivation for any enabled module. Missing adapters default to ACTIVE with
  * no deactivation blockers (safe pause), so a new module is never wrongly
@@ -191,12 +217,28 @@ export class ModuleReadinessRegistry {
         return {
             key: "PAYMENTS",
             evaluate: async ({ organizationId }) => {
-                if (
-                    (await this.db.merchantPaymentProvider.count({
+                // Counting rows is not the same question as "can this merchant
+                // take a payment?". This adapter used to count providers and
+                // ignore their status, so an organization whose only provider
+                // was DISABLED read as ACTIVE while `/provider-health` correctly
+                // reported DEGRADED — two subsystems contradicting each other
+                // about the same row, with the merchant-facing one wrong.
+                const [total, connected] = await Promise.all([
+                    this.db.merchantPaymentProvider.count({
                         where: { organizationId },
-                    })) > 0
-                )
-                    return active();
+                    }),
+                    this.db.merchantPaymentProvider.count({
+                        where: { organizationId, status: CONNECTED },
+                    }),
+                ]);
+
+                if (connected > 0) return active();
+                if (total > 0)
+                    return attention(
+                        "PAYMENTS_PROVIDER_DISABLED",
+                        "A connected provider is disabled — re-enable it to take payments.",
+                        "/settings/providers",
+                    );
                 return setup(
                     "PAYMENTS_NO_PROVIDER",
                     "Connect a payment provider to accept payments.",
@@ -211,12 +253,25 @@ export class ModuleReadinessRegistry {
         return {
             key: "COMMUNICATIONS",
             evaluate: async ({ organizationId }) => {
-                if (
-                    (await this.db.communicationProvider.count({
+                // Same count-only defect as PAYMENTS, same fix. A merchant whose
+                // only messaging provider is switched off is not "active"; their
+                // follow-ups are silently not being sent.
+                const [total, connected] = await Promise.all([
+                    this.db.communicationProvider.count({
                         where: { organizationId },
-                    })) > 0
-                )
-                    return active();
+                    }),
+                    this.db.communicationProvider.count({
+                        where: { organizationId, status: CONNECTED },
+                    }),
+                ]);
+
+                if (connected > 0) return active();
+                if (total > 0)
+                    return attention(
+                        "COMMUNICATIONS_PROVIDER_DISABLED",
+                        "A connected provider is disabled — re-enable it to send messages.",
+                        "/settings/providers",
+                    );
                 return setup(
                     "COMMUNICATIONS_NO_PROVIDER",
                     "Connect a provider to send messages.",
