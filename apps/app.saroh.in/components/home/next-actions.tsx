@@ -5,17 +5,33 @@ import Link from "next/link";
 
 import type { HomeAction, HomeSeverity } from "@/lib/home/service";
 
-const SEVERITY: Record<
-    HomeSeverity,
-    {
-        label: string;
-        variant: "default" | "secondary" | "destructive" | "outline";
-    }
-> = {
-    ATTENTION: { label: "Attention", variant: "destructive" },
-    SETUP: { label: "Setup", variant: "secondary" },
-    OVERDUE: { label: "Overdue", variant: "default" },
-    SUGGESTION: { label: "Suggested", variant: "outline" },
+/**
+ * Severity reads as colour before it reads as a word.
+ *
+ * Mapped to tokens, not to shadcn badge variants: `variant="default"` resolves
+ * to `--primary`, which in the Panel and Instrument skins is the LUMINOUS
+ * ACTION colour — so "Overdue" rendered green, directly contradicting the rule
+ * the skins are built on (green means you can act, amber means someone is
+ * waiting). A semantic label must name its own colour rather than inherit
+ * whatever a generic variant happens to point at.
+ */
+const SEVERITY: Record<HomeSeverity, { label: string; className: string }> = {
+    ATTENTION: {
+        label: "Attention",
+        className: "bg-highlight text-highlight-foreground",
+    },
+    OVERDUE: {
+        label: "Overdue",
+        className: "bg-warning text-warning-foreground",
+    },
+    SETUP: {
+        label: "Setup",
+        className: "bg-secondary text-secondary-foreground",
+    },
+    SUGGESTION: {
+        label: "Suggested",
+        className: "border-border text-muted-foreground border bg-transparent",
+    },
 };
 
 /**
@@ -35,7 +51,7 @@ export function NextActions({
             <Card>
                 <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
                     <CardTitle className="text-base">Do this next</CardTitle>
-                    <Badge variant={SEVERITY[primary.severity].variant}>
+                    <Badge className={SEVERITY[primary.severity].className}>
                         {SEVERITY[primary.severity].label}
                     </Badge>
                 </CardHeader>
@@ -56,7 +72,9 @@ export function NextActions({
                         >
                             <div className="flex items-center gap-3">
                                 <Badge
-                                    variant={SEVERITY[action.severity].variant}
+                                    className={
+                                        SEVERITY[action.severity].className
+                                    }
                                 >
                                     {SEVERITY[action.severity].label}
                                 </Badge>

@@ -36,11 +36,12 @@ export function Wordmark({ suffix, style, ...props }: WordmarkProps) {
         >
             <span
                 style={{
-                    backgroundImage:
-                        "linear-gradient(96deg, hsl(var(--brand-800, 222 58% 22%)) 0%, hsl(var(--brand-500, 222 52% 44%)) 100%)",
-                    WebkitBackgroundClip: "text",
-                    backgroundClip: "text",
-                    color: "transparent",
+                    // Solid, and reading the SEMANTIC brand token rather than
+                    // a ramp step: skins redefine `--brand`, so the wordmark
+                    // follows whichever world is selected. The old gradient
+                    // pinned it to a ramp no skin overrides, which is why it
+                    // stayed navy while everything around it changed.
+                    color: "hsl(var(--brand, 222 58% 22%))",
                 }}
             >
                 Saroh

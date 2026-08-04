@@ -45,6 +45,17 @@ export default function RootLayout({
         // had it; this one did not. It suppresses the warning on this element
         // only, not on its subtree.
         <html lang="en" suppressHydrationWarning>
+            {/*
+             * Apply the stored skin BEFORE first paint. Without this the page
+             * renders in the default world and then snaps to the chosen one on
+             * hydration — a flash that is worse the more the two skins differ,
+             * and these differ a lot. Same trick next-themes uses for dark.
+             */}
+            <script
+                dangerouslySetInnerHTML={{
+                    __html: `(function(){try{var s=localStorage.getItem("saroh-skin");var ok=["panel","instrument","stockroom"];document.documentElement.dataset.skin=ok.indexOf(s)>-1?s:"panel"}catch(e){document.documentElement.dataset.skin="panel"}})()`,
+                }}
+            />
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
             >

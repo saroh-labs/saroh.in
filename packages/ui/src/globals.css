@@ -248,3 +248,243 @@
         scroll-behavior: auto !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKINS — user-selectable visual worlds.
+   ═══════════════════════════════════════════════════════════════════════════
+
+   A skin is a token scope, nothing more. Components never learn about skins:
+   they keep reading `bg-background`, `text-foreground`, `bg-highlight`, and the
+   values underneath them change. That is the whole reason this is affordable —
+   adding a fourth skin is a palette block, not a refactor.
+
+   `data-skin` sits alongside `class="dark"` on <html>, so the two axes compose:
+   `[data-skin=x]` is that skin's light register, `.dark[data-skin=x]` its dark
+   one. All three worlds below are DARK-FIRST — dark is where they were designed
+   and where they are strongest; the light registers are honest translations,
+   not inversions, because a merchant on a bright shop floor needs one.
+
+   One rule is shared across all three: --highlight is the loudest token in the
+   system and is spent on exactly one element per view. A second highlighted
+   element flattens the ranking that Home exists to create.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── B · STOCKROOM ── black nylon, stockroom white, hazard orange.
+       Wayfinding is reading: every zone carries its literal name. ─── */
+[data-skin="stockroom"] {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 4%;
+    --card: 0 0% 99%;
+    --card-foreground: 0 0% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 4%;
+    --primary: 0 0% 4%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 95%;
+    --muted-foreground: 0 0% 34%;
+    --accent: 0 0% 92%;
+    --accent-foreground: 0 0% 8%;
+    --border: 0 0% 86%;
+    --input: 0 0% 46%;
+    --ring: 21 100% 42%;
+    --brand: 0 0% 4%;
+    --brand-foreground: 0 0% 100%;
+    --brand-surface: 0 0% 4%;
+    --brand-surface-foreground: 0 0% 100%;
+    --brand-subtle: 0 0% 94%;
+    --brand-subtle-foreground: 0 0% 10%;
+    --highlight: 21 100% 46%;
+    --highlight-foreground: 0 0% 100%;
+    --highlight-border: 21 100% 38%;
+    --highlight-subtle: 24 100% 93%;
+    --highlight-subtle-foreground: 21 96% 30%;
+    --warning: 38 96% 44%;
+    --warning-foreground: 0 0% 100%;
+    --success: 150 60% 26%;
+    --success-foreground: 0 0% 100%;
+    --radius: 0rem;
+    --shadow-color: 0 0% 8%;
+}
+.dark[data-skin="stockroom"] {
+    --background: 0 0% 4%;
+    --foreground: 60 8% 95%;
+    --card: 0 0% 7%;
+    --card-foreground: 60 8% 95%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 60 8% 95%;
+    --primary: 60 8% 95%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 60 8% 93%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 60 3% 62%;
+    --accent: 0 0% 16%;
+    --accent-foreground: 60 8% 95%;
+    --border: 0 0% 15%;
+    --input: 0 0% 42%;
+    --ring: 21 100% 56%;
+    --brand: 60 8% 95%;
+    --brand-foreground: 0 0% 4%;
+    --brand-surface: 0 0% 7%;
+    --brand-surface-foreground: 60 8% 95%;
+    --brand-subtle: 0 0% 14%;
+    --brand-subtle-foreground: 60 6% 88%;
+    --highlight: 21 100% 50%;
+    --highlight-foreground: 0 0% 100%;
+    --highlight-border: 21 100% 50%;
+    --highlight-subtle: 21 60% 15%;
+    --highlight-subtle-foreground: 24 100% 72%;
+    --warning: 38 96% 56%;
+    --warning-foreground: 38 90% 8%;
+    --success: 150 52% 52%;
+    --success-foreground: 150 60% 7%;
+}
+
+/* ─── C · INSTRUMENT ── matte panel, luminous markings, amber and red held
+       back for caution. Each reading owns one truth. ─── */
+[data-skin="instrument"] {
+    --background: 160 14% 97%;
+    --foreground: 200 16% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 200 16% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 16% 10%;
+    --primary: 158 62% 20%;
+    --primary-foreground: 160 20% 98%;
+    --secondary: 160 14% 92%;
+    --secondary-foreground: 200 16% 14%;
+    --muted: 160 14% 93%;
+    --muted-foreground: 200 8% 34%;
+    --accent: 160 14% 90%;
+    --accent-foreground: 200 16% 12%;
+    --border: 180 10% 84%;
+    --input: 190 8% 46%;
+    --ring: 158 62% 30%;
+    --brand: 158 62% 24%;
+    --brand-foreground: 160 20% 98%;
+    --brand-surface: 190 30% 12%;
+    --brand-surface-foreground: 160 20% 96%;
+    --brand-subtle: 158 34% 91%;
+    --brand-subtle-foreground: 158 62% 18%;
+    --highlight: 4 78% 46%;
+    --highlight-foreground: 0 0% 100%;
+    --highlight-border: 4 78% 38%;
+    --highlight-subtle: 6 84% 94%;
+    --highlight-subtle-foreground: 4 74% 32%;
+    --warning: 39 96% 42%;
+    --warning-foreground: 0 0% 100%;
+    --success: 158 58% 26%;
+    --success-foreground: 0 0% 100%;
+    --radius: 0.375rem;
+    --shadow-color: 195 30% 10%;
+}
+.dark[data-skin="instrument"] {
+    --background: 210 11% 4%;
+    --foreground: 156 10% 89%;
+    --card: 210 12% 7%;
+    --card-foreground: 156 10% 89%;
+    --popover: 210 12% 9%;
+    --popover-foreground: 156 10% 89%;
+    --primary: 145 100% 74%;
+    --primary-foreground: 160 60% 6%;
+    --secondary: 205 11% 14%;
+    --secondary-foreground: 156 10% 89%;
+    --muted: 205 11% 13%;
+    --muted-foreground: 162 5% 62%;
+    --accent: 205 11% 17%;
+    --accent-foreground: 156 10% 91%;
+    --border: 205 11% 13%;
+    --input: 200 8% 42%;
+    --ring: 145 100% 70%;
+    --brand: 145 100% 74%;
+    --brand-foreground: 160 60% 6%;
+    --brand-surface: 200 20% 10%;
+    --brand-surface-foreground: 156 12% 92%;
+    --brand-subtle: 160 22% 14%;
+    --brand-subtle-foreground: 145 80% 76%;
+    --highlight: 4 100% 62%;
+    --highlight-foreground: 0 0% 100%;
+    --highlight-border: 4 100% 62%;
+    --highlight-subtle: 4 50% 16%;
+    --highlight-subtle-foreground: 6 100% 76%;
+    --warning: 39 100% 56%;
+    --warning-foreground: 39 90% 8%;
+    --success: 145 70% 60%;
+    --success-foreground: 150 60% 6%;
+}
+
+/* ─── D · PANEL ── the fusion, and the default. C's calm luminous
+       instrumentation, B's structural rigour. Luminous green means
+       ACTIONABLE; amber means waiting; orange means broken. ─── */
+[data-skin="panel"] {
+    --background: 156 16% 97%;
+    --foreground: 198 18% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 198 18% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 198 18% 10%;
+    --primary: 156 60% 20%;
+    --primary-foreground: 156 20% 98%;
+    --secondary: 156 14% 92%;
+    --secondary-foreground: 198 18% 14%;
+    --muted: 156 14% 93%;
+    --muted-foreground: 198 8% 33%;
+    --accent: 156 14% 89%;
+    --accent-foreground: 198 18% 12%;
+    --border: 190 10% 84%;
+    --input: 195 8% 45%;
+    --ring: 156 60% 30%;
+    --brand: 156 60% 22%;
+    --brand-foreground: 156 20% 98%;
+    --brand-surface: 198 24% 11%;
+    --brand-surface-foreground: 156 18% 96%;
+    --brand-subtle: 156 32% 91%;
+    --brand-subtle-foreground: 156 60% 17%;
+    --highlight: 21 100% 46%;
+    --highlight-foreground: 0 0% 100%;
+    --highlight-border: 21 100% 38%;
+    --highlight-subtle: 24 100% 93%;
+    --highlight-subtle-foreground: 21 96% 30%;
+    --warning: 39 96% 42%;
+    --warning-foreground: 0 0% 100%;
+    --success: 156 56% 26%;
+    --success-foreground: 0 0% 100%;
+    --radius: 0.125rem;
+    --shadow-color: 198 26% 10%;
+}
+.dark[data-skin="panel"] {
+    --background: 204 12% 4%;
+    --foreground: 156 15% 91%;
+    --card: 204 12% 7%;
+    --card-foreground: 156 15% 91%;
+    --popover: 204 12% 9%;
+    --popover-foreground: 156 15% 91%;
+    --primary: 145 84% 69%;
+    --primary-foreground: 160 60% 6%;
+    --secondary: 198 12% 14%;
+    --secondary-foreground: 156 15% 91%;
+    --muted: 198 12% 13%;
+    --muted-foreground: 158 6% 62%;
+    --accent: 198 12% 17%;
+    --accent-foreground: 156 15% 93%;
+    --border: 198 12% 16%;
+    --input: 198 8% 44%;
+    --ring: 145 84% 66%;
+    --brand: 145 84% 69%;
+    --brand-foreground: 160 60% 6%;
+    --brand-surface: 198 20% 10%;
+    --brand-surface-foreground: 156 16% 93%;
+    --brand-subtle: 158 20% 14%;
+    --brand-subtle-foreground: 145 70% 74%;
+    --highlight: 21 100% 50%;
+    --highlight-foreground: 0 0% 100%;
+    --highlight-border: 21 100% 50%;
+    --highlight-subtle: 21 55% 15%;
+    --highlight-subtle-foreground: 24 100% 72%;
+    --warning: 39 100% 56%;
+    --warning-foreground: 39 90% 8%;
+    --success: 145 70% 60%;
+    --success-foreground: 150 60% 6%;
+}
