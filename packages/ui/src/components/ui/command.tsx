@@ -5,7 +5,12 @@ import { Command as CommandPrimitive } from "cmdk";
 import { Search } from "lucide-react";
 import * as React from "react";
 import { cn } from "../../lib/utils";
-import { Dialog, DialogContent } from "./dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from "./dialog";
 
 const Command = React.forwardRef<
     React.ElementRef<typeof CommandPrimitive>,
@@ -22,13 +27,55 @@ const Command = React.forwardRef<
 ));
 Command.displayName = CommandPrimitive.displayName;
 
-type CommandDialogProps = DialogProps;
+type CommandDialogProps = DialogProps & {
+    /**
+     * Forwarded to cmdk. Set `false` when the ITEMS ARE ALREADY THE ANSWER to
+     * the query — server-side search results, say. cmdk otherwise re-filters
+     * them against its own fuzzy match on each item's `value`, which silently
+     * hides rows the server said matched because the client's idea of a match
+     * is narrower. Was not forwarded at all before, so that behaviour could not
+     * be turned off from a consumer.
+     */
+    shouldFilter?: boolean;
+    /** Accessible name for the search dialog. Rendered visually hidden. */
+    label?: string;
+    /** Accessible description. Rendered visually hidden. */
+    description?: string;
+};
 
-function CommandDialog({ children, ...props }: CommandDialogProps) {
+function CommandDialog({
+    children,
+    shouldFilter,
+    label = "Command menu",
+    description = "Search and jump to anywhere in the app.",
+    ...props
+}: CommandDialogProps) {
     return (
         <Dialog {...props}>
-            <DialogContent className="overflow-hidden p-0 shadow-lg">
-                <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+            {/*
+             * `focus:outline-none` because Radix moves focus to the dialog on
+             * open, and without it the browser paints ITS OWN focus ring — the
+             * default blue — around the search box. That is the one place in the
+             * app where a raw browser ring is guaranteed to be seen, since it
+             * appears every single time the palette opens.
+             */}
+            <DialogContent className="overflow-hidden p-0 shadow-lg focus:outline-none">
+                {/*
+                 * Radix errors without a title and warns without a description,
+                 * and both warnings are right: a dialog that opens with no
+                 * accessible name announces as nothing at all. They are hidden
+                 * visually because the input's placeholder already says this to
+                 * anyone who can see it.
+                 */}
+                <DialogTitle className="sr-only">{label}</DialogTitle>
+                <DialogDescription className="sr-only">
+                    {description}
+                </DialogDescription>
+                <Command
+                    shouldFilter={shouldFilter}
+                    label={label}
+                    className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
+                >
                     {children}
                 </Command>
             </DialogContent>

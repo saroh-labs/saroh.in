@@ -39,6 +39,9 @@ module.exports = {
         "<rootDir>/src/modules/health/**/*.spec.ts",
         // #124 saved views + safe bulk contract (mocked Prisma / pure helper).
         "<rootDir>/src/modules/saved-views/**/*.spec.ts",
+        // Command-palette cross-entity search: per-entity permission gating,
+        // org scoping, result caps and href construction. Mocked Prisma.
+        "<rootDir>/src/modules/search/**/*.spec.ts",
         // #112 (ADR-003) capabilities: the pure module-registry validator —
         // uniqueness, dependency validity, cycle detection, absolute routes,
         // known rollout/entitlement keys, and the AI exclusion (DEC-015). No
