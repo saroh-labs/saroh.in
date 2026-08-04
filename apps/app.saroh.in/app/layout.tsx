@@ -21,8 +21,11 @@ export const metadata: Metadata = {
         default: "Saroh",
         template: "%s · Saroh",
     },
+    // "storefronts" appeared nowhere in the UI — the product calls them stores,
+    // and a description that uses a word the app never says is a small lie
+    // search engines repeat. Named for what a merchant does, not for our nouns.
     description:
-        "Manage your storefronts, sites, leads, bookings and more with Saroh.",
+        "Run your business from one place — sell, take bookings, follow up on enquiries, and keep your website in step.",
 };
 
 /**

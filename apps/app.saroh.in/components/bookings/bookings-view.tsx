@@ -156,7 +156,7 @@ export function BookingsView({
                     className={cn(
                         "text-[0.625rem] font-medium uppercase tracking-wider",
                         b.status === "CONFIRMED"
-                            ? "border border-brand/30 bg-brand/15 text-brand"
+                            ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
                             : b.status === "CANCELLED"
                               ? "border border-border bg-transparent text-muted-foreground"
                               : "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",

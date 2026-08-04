@@ -33,7 +33,7 @@ const STATUS: Record<LeadStatus, string> = {
     // is for; lost is muted rather than destructive — a lost lead is a normal
     // result, not an error the merchant should be alarmed by.
     OPEN: "border-border text-foreground bg-transparent border",
-    WON: "bg-brand/15 text-brand border-brand/30 border",
+    WON: "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground",
     LOST: "text-muted-foreground border-border bg-transparent border",
 };
 

@@ -33,8 +33,10 @@ const OPEN_STATUSES = ["PENDING", "PROCESSING"];
 const Missing = () => <span className="text-muted-foreground/60">—</span>;
 
 const STATUS_CLASS: Record<string, string> = {
-    DELIVERED: "border border-brand/30 bg-brand/15 text-brand",
-    SHIPPED: "border border-brand/30 bg-brand/15 text-brand",
+    DELIVERED:
+        "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground",
+    SHIPPED:
+        "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground",
     PROCESSING:
         "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
     PENDING:
@@ -135,7 +137,7 @@ export function OrdersTable({
                     className={cn(
                         "text-[0.625rem] font-medium uppercase tracking-wider",
                         o.paymentStatus === "PAID"
-                            ? "border border-brand/30 bg-brand/15 text-brand"
+                            ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
                             : o.paymentStatus === "REFUNDED"
                               ? "border border-border bg-transparent text-muted-foreground"
                               : "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",

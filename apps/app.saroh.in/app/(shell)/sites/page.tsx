@@ -12,6 +12,12 @@ import { listSites } from "@/lib/sites/service";
  * with a call-to-action to create the first one; each card links to the
  * site editor. Mirrors the dashboard home list-page shell (app/page.tsx).
  */
+/**
+ * A page title is how a merchant with six tabs open finds this one.
+ * Without it the tab reads the bare default, "Saroh", on every route.
+ */
+export const metadata = { title: "Website" };
+
 export default async function SitesPage() {
     await requireSession();
 

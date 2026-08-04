@@ -30,6 +30,12 @@ function isoDaysAgo(daysBack: number): string {
  * range selector (7/30/90 days) drives the `from` filter; the API guarantees
  * every row belongs to the active org.
  */
+/**
+ * A page title is how a merchant with six tabs open finds this one.
+ * Without it the tab reads the bare default, "Saroh", on every route.
+ */
+export const metadata = { title: "Insights" };
+
 export default async function AnalyticsPage({
     searchParams,
 }: {

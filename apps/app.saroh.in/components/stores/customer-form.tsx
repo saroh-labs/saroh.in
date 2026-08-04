@@ -98,6 +98,7 @@ export function CustomerForm({
                             <FormControl>
                                 <Input
                                     type="email"
+                                    autoComplete="email"
                                     disabled={isSubmitting}
                                     {...field}
                                 />
@@ -114,7 +115,11 @@ export function CustomerForm({
                             <FormItem>
                                 <FormLabel>First name</FormLabel>
                                 <FormControl>
-                                    <Input disabled={isSubmitting} {...field} />
+                                    <Input
+                                        autoComplete="given-name"
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -127,7 +132,11 @@ export function CustomerForm({
                             <FormItem>
                                 <FormLabel>Last name</FormLabel>
                                 <FormControl>
-                                    <Input disabled={isSubmitting} {...field} />
+                                    <Input
+                                        autoComplete="family-name"
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -141,7 +150,11 @@ export function CustomerForm({
                         <FormItem>
                             <FormLabel>Phone</FormLabel>
                             <FormControl>
-                                <Input disabled={isSubmitting} {...field} />
+                                <Input
+                                    autoComplete="tel"
+                                    disabled={isSubmitting}
+                                    {...field}
+                                />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

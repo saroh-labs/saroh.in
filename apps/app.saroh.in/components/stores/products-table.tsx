@@ -29,7 +29,8 @@ import type { Product } from "@/lib/products/service";
 const Missing = () => <span className="text-muted-foreground/60">—</span>;
 
 const STATUS_CLASS: Record<string, string> = {
-    PUBLISHED: "border border-brand/30 bg-brand/15 text-brand",
+    PUBLISHED:
+        "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground",
     DRAFT: "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
     ARCHIVED: "border border-border bg-transparent text-muted-foreground",
 };

@@ -191,6 +191,7 @@ export function CreateOrganizationForm() {
                                     <FormControl>
                                         <Input
                                             type="email"
+                                            autoComplete="email"
                                             placeholder="hello@acme.com"
                                             {...field}
                                         />

@@ -39,7 +39,10 @@ export function AppSidebar({
         // `sticky top-0 h-screen` so the rail stays put on a long page. Without
         // it the aside is only as tall as the flex row, and navigation scrolls
         // away the moment a list runs past one viewport.
-        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r lg:flex">
+        <aside
+            aria-label="Workspace"
+            className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r lg:flex"
+        >
             <div className="flex h-14 items-center border-b px-6">
                 <Link href="/" aria-label="Saroh">
                     <Wordmark />
@@ -98,6 +101,12 @@ export function AppSidebar({
                                         // would only spread twelve items over a
                                         // screen's worth of height here.
                                         "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+                                        // The design system's ring, not
+                                        // Chrome's default blue: the focus ring
+                                        // is a keyboard user's cursor, and it
+                                        // was inconsistent in exactly the place
+                                        // navigation happens most.
+                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                                         active
                                             ? "bg-accent font-medium text-foreground"
                                             : "text-muted-foreground hover:bg-accent hover:text-foreground",

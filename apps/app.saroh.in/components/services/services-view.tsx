@@ -112,7 +112,7 @@ export function ServicesView({
                     className={cn(
                         "text-[0.625rem] font-medium uppercase tracking-wider",
                         s.status === "ACTIVE"
-                            ? "border border-brand/30 bg-brand/15 text-brand"
+                            ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
                             : "border border-border bg-transparent text-muted-foreground",
                     )}
                 >

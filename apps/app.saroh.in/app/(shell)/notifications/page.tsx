@@ -12,6 +12,12 @@ import { requireSession } from "@/lib/session";
  * notifications through the API (membership + `notification:read` enforced
  * server-side) and hands them to the client inbox for mark-read interactions.
  */
+/**
+ * A page title is how a merchant with six tabs open finds this one.
+ * Without it the tab reads the bare default, "Saroh", on every route.
+ */
+export const metadata = { title: "Notifications" };
+
 export default async function NotificationsPage() {
     await requireSession();
 

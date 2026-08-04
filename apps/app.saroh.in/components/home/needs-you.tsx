@@ -127,9 +127,17 @@ function ActionBlock({
                         {action.title}
                     </h3>
                 </div>
+                {/*
+                 * Short label, specific accessible name. Home offers one of
+                 * these per action, so a screen-reader user listing the page's
+                 * links would otherwise hear "Open" five times with nothing to
+                 * choose between them — the WCAG 2.4.4 failure the audit found
+                 * on the providers page, which this surface was about to repeat.
+                 */}
                 <Link
                     href={action.href}
-                    className="shrink-0 text-xs font-medium text-brand underline-offset-4 hover:underline"
+                    aria-label={`Open: ${action.title}`}
+                    className="shrink-0 rounded text-xs font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                     Open
                 </Link>

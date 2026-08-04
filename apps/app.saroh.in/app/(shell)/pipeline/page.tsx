@@ -22,6 +22,12 @@ import { requireSession } from "@/lib/session";
  * The board shows the org's DEFAULT pipeline (or the first one) when several
  * exist; a full pipeline switcher is a later refinement.
  */
+/**
+ * A page title is how a merchant with six tabs open finds this one.
+ * Without it the tab reads the bare default, "Saroh", on every route.
+ */
+export const metadata = { title: "Pipeline" };
+
 export default async function PipelinePage() {
     await requireSession();
 

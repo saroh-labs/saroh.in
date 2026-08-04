@@ -98,6 +98,7 @@ export function MembersManager({
                         <Input
                             id="invite-email"
                             type="email"
+                            autoComplete="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="teammate@example.com"
