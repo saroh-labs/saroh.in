@@ -1,56 +1,37 @@
-import { Card, CardDescription, CardHeader, CardTitle } from "@saroh/ui/card";
-import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
+import { ContactsView } from "@/components/contacts/contacts-view";
 import type { Contact } from "@/lib/contacts/service";
 import { listContacts } from "@/lib/contacts/service";
-import { contactName } from "@/lib/crm/format";
 import { requireSession } from "@/lib/session";
 
 /**
- * Contacts index for the active organization (S3-005). Lists the org's CRM
- * contacts (newest first); each card links to the contact detail. Mirrors the
- * sites index list-page shell.
+ * Contacts index for the active organization (S3-005).
+ *
+ * The page fetches; `ContactsView` decides how to render. Sorting, search,
+ * density and the empty state all live in the shared `DataView`, so this file
+ * stays a data boundary rather than accumulating a fourth slightly-different
+ * implementation of a list.
  */
+export const metadata = { title: "Contacts" };
+
 export default async function ContactsPage() {
     await requireSession();
 
     const contacts: Contact[] = await listContacts();
 
     return (
-        <main className="mx-auto max-w-5xl p-8">
+        // Wider than the old `max-w-5xl`: this is a table now, and a dashboard
+        // that reserves a third of a monitor for margin is wasting the density
+        // the merchant came for.
+        <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">
             <PageHeader
                 title="Contacts"
-                description="People and companies in your CRM."
+                description="Everyone who has enquired, booked or bought."
             />
-
-            {contacts.length === 0 ? (
-                <EmptyState
-                    title="No contacts yet"
-                    description="Contacts appear here as enquiries come in, or when you create a lead by hand from a contact."
-                />
-            ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                    {contacts.map((contact) => (
-                        <Link key={contact.id} href={`/contacts/${contact.id}`}>
-                            <Card className="transition-colors hover:bg-muted/40">
-                                <CardHeader>
-                                    <CardTitle>
-                                        {contactName(contact)}
-                                    </CardTitle>
-                                    <CardDescription>
-                                        {contact.email}
-                                        {contact.company
-                                            ? ` · ${contact.company}`
-                                            : ""}
-                                    </CardDescription>
-                                </CardHeader>
-                            </Card>
-                        </Link>
-                    ))}
-                </div>
-            )}
+            <div className="mt-6">
+                <ContactsView contacts={contacts} />
+            </div>
         </main>
     );
 }

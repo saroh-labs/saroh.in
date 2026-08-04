@@ -1,0 +1,331 @@
+"use client";
+
+import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
+import { cn } from "@saroh/ui/lib/utils";
+import { ArrowDown, ArrowUp, LayoutGrid, List, Table2 } from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+
+import type { DataColumn, DataViewMode, DataViewProps } from "./types";
+import { useViewMode } from "./use-view-mode";
+
+const MODE_META: Record<DataViewMode, { label: string; icon: typeof Table2 }> =
+    {
+        table: { label: "Table", icon: Table2 },
+        grid: { label: "Grid", icon: LayoutGrid },
+        list: { label: "List", icon: List },
+    };
+
+/**
+ * One dataset, three densities.
+ *
+ * This exists because the app was fifteen screens of the same shape — a header
+ * and one list — each re-implementing its own empty state, its own sort, its own
+ * responsive behaviour, and each forgetting a different one. Sort, filter,
+ * empty, loading and error live here so no screen has to remember them.
+ *
+ * The density rule the callers never see: a column declares how much it MATTERS
+ * (`priority`), not where it goes. The list rendering shows primary and
+ * secondary and drops detail; the table shows everything. That is why adding a
+ * column to a screen adds it to every rendering at once, and why the phone
+ * rendering cannot silently rot into a worse version of the desktop one.
+ */
+export function DataView<TRow>({
+    viewId,
+    rows,
+    columns,
+    rowKey,
+    rowHref,
+    modes = ["table", "list"],
+    defaultMode = "table",
+    renderCard,
+    empty,
+    searchableColumnIds,
+    isLoading = false,
+    error = null,
+}: DataViewProps<TRow>) {
+    const { mode, choose } = useViewMode(viewId, modes, defaultMode);
+    const [query, setQuery] = useState("");
+    const [sort, setSort] = useState<{ id: string; desc: boolean } | null>(
+        null,
+    );
+
+    const visible = useMemo(() => {
+        let out = rows;
+
+        if (query.trim() && (searchableColumnIds?.length ?? 0) > 0) {
+            const needle = query.trim().toLowerCase();
+            const ids = searchableColumnIds ?? [];
+            const cols = columns.filter((c) => ids.includes(c.id));
+            out = out.filter((row) =>
+                cols.some((c) => {
+                    // Search the SORT value, not the rendered cell: a cell may
+                    // be a React node, and stringifying one gives "[object
+                    // Object]" — a filter that silently matches nothing.
+                    if (!c.sortValue) return false;
+                    return String(c.sortValue(row))
+                        .toLowerCase()
+                        .includes(needle);
+                }),
+            );
+        }
+
+        if (sort) {
+            const col = columns.find((c) => c.id === sort.id);
+            if (col?.sortValue) {
+                const get = col.sortValue;
+                out = [...out].sort((a, b) => {
+                    const av = get(a);
+                    const bv = get(b);
+                    const cmp =
+                        typeof av === "number" && typeof bv === "number"
+                            ? av - bv
+                            : String(av).localeCompare(String(bv));
+                    return sort.desc ? -cmp : cmp;
+                });
+            }
+        }
+
+        return out;
+    }, [rows, columns, query, searchableColumnIds, sort]);
+
+    const toggleSort = (col: DataColumn<TRow>) => {
+        if (!col.sortValue) return;
+        setSort((prev) =>
+            prev?.id === col.id
+                ? prev.desc
+                    ? null // third click clears — sorting is reversible
+                    : { id: col.id, desc: true }
+                : { id: col.id, desc: false },
+        );
+    };
+
+    /** Normalised once so the guards below are plain length checks. */
+    const searchable = searchableColumnIds ?? [];
+    const listColumns = columns.filter((c) => c.priority !== "detail");
+    const tableColumns = columns.filter((c) => !c.tableHidden);
+
+    return (
+        <div className="space-y-4">
+            {/* Controls. Search and density sit together because they are the
+                same job: getting to the rows that matter. */}
+            {searchable.length > 0 || modes.length > 1 ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    {searchable.length > 0 ? (
+                        <Input
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search…"
+                            aria-label="Search this view"
+                            className="h-9 max-w-xs"
+                        />
+                    ) : (
+                        <span />
+                    )}
+
+                    {modes.length > 1 ? (
+                        <div
+                            role="group"
+                            aria-label="View density"
+                            className="flex items-center rounded-md border border-border p-0.5"
+                        >
+                            {modes.map((m) => {
+                                const Icon = MODE_META[m].icon;
+                                const on = m === mode;
+                                return (
+                                    <Button
+                                        key={m}
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-pressed={on}
+                                        onClick={() => choose(m)}
+                                        className={cn(
+                                            "h-7 gap-1.5 rounded-sm px-2.5 text-xs font-medium",
+                                            on &&
+                                                "bg-accent text-accent-foreground",
+                                        )}
+                                    >
+                                        <Icon className="size-3.5" />
+                                        <span className="hidden sm:inline">
+                                            {MODE_META[m].label}
+                                        </span>
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+
+            {error ? (
+                <p
+                    role="alert"
+                    className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+                >
+                    {error}
+                </p>
+            ) : isLoading ? (
+                <div className="space-y-2" aria-busy="true">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                        <div
+                            key={i}
+                            className="h-12 animate-pulse rounded-md bg-muted"
+                        />
+                    ))}
+                </div>
+            ) : visible.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border px-6 py-12 text-center text-sm text-muted-foreground">
+                    {query.trim()
+                        ? `Nothing matches “${query.trim()}”.`
+                        : (empty ?? "Nothing here yet.")}
+                </div>
+            ) : mode === "table" ? (
+                // Horizontal scroll is on the wrapper, never the page: a table
+                // that widens the document breaks every other element on it.
+                <div className="overflow-x-auto rounded-md border border-border">
+                    <table className="w-full border-collapse text-sm">
+                        <thead>
+                            <tr className="border-b border-border bg-muted/60">
+                                {tableColumns.map((col) => {
+                                    const active = sort?.id === col.id;
+                                    return (
+                                        <th
+                                            key={col.id}
+                                            scope="col"
+                                            aria-sort={
+                                                active
+                                                    ? sort.desc
+                                                        ? "descending"
+                                                        : "ascending"
+                                                    : undefined
+                                            }
+                                            className={cn(
+                                                "whitespace-nowrap px-3 py-2.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground",
+                                                col.numeric && "text-right",
+                                            )}
+                                        >
+                                            {col.sortValue ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        toggleSort(col)
+                                                    }
+                                                    className={cn(
+                                                        "inline-flex items-center gap-1 hover:text-foreground",
+                                                        active &&
+                                                            "text-foreground",
+                                                    )}
+                                                >
+                                                    {col.header}
+                                                    {active ? (
+                                                        sort.desc ? (
+                                                            <ArrowDown className="size-3" />
+                                                        ) : (
+                                                            <ArrowUp className="size-3" />
+                                                        )
+                                                    ) : null}
+                                                </button>
+                                            ) : (
+                                                col.header
+                                            )}
+                                        </th>
+                                    );
+                                })}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {visible.map((row) => (
+                                <tr
+                                    key={rowKey(row)}
+                                    className="border-b border-border last:border-b-0 hover:bg-accent/50"
+                                >
+                                    {tableColumns.map((col) => (
+                                        <td
+                                            key={col.id}
+                                            className={cn(
+                                                "px-3 py-2.5 align-middle",
+                                                col.numeric &&
+                                                    "text-right tabular-nums",
+                                            )}
+                                        >
+                                            {col.cell(row)}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            ) : mode === "grid" && renderCard ? (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {visible.map((row) => (
+                        <div key={rowKey(row)}>{renderCard(row)}</div>
+                    ))}
+                </div>
+            ) : (
+                // List: the whole row is the target, which is what one-handed
+                // and gloved use needs. Detail columns are dropped, not hidden
+                // behind a disclosure nobody taps.
+                <ul className="divide-y rounded-md border border-border">
+                    {visible.map((row) => {
+                        // `.at()` rather than a destructure: a caller could
+                        // declare only `detail` columns, leaving this empty,
+                        // and index access would type as always-present.
+                        const primary = listColumns.at(0);
+                        const rest = listColumns.slice(1);
+                        const href = rowHref?.(row);
+                        const body = (
+                            <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 px-4 py-3">
+                                <div className="min-w-0 space-y-1">
+                                    <div className="truncate font-medium">
+                                        {primary?.cell(row)}
+                                    </div>
+                                    {rest.length ? (
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                            {rest.map((col) => (
+                                                <span
+                                                    key={col.id}
+                                                    className={cn(
+                                                        "inline-flex items-center gap-1",
+                                                        col.numeric &&
+                                                            "tabular-nums",
+                                                    )}
+                                                >
+                                                    {col.cell(row)}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+                        );
+                        return (
+                            <li key={rowKey(row)}>
+                                {href ? (
+                                    <Link
+                                        href={href}
+                                        className="block hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                                    >
+                                        {body}
+                                    </Link>
+                                ) : (
+                                    body
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+
+            {visible.length > 0 ? (
+                <p className="text-xs text-muted-foreground" aria-live="polite">
+                    {visible.length === rows.length
+                        ? `${rows.length} ${rows.length === 1 ? "row" : "rows"}`
+                        : `${visible.length} of ${rows.length} rows`}
+                </p>
+            ) : null}
+        </div>
+    );
+}
