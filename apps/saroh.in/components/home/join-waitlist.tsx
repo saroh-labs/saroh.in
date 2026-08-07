@@ -1,17 +1,17 @@
 "use client";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@saroh/ui/button";
 import {
     Form,
     FormControl,
     FormField,
     FormItem,
     FormMessage,
-} from "@/components/ui/form";
-import { toast } from "@/components/ui/use-toast";
-import { zodResolver } from "@hookform/resolvers/zod";
+} from "@saroh/ui/form";
+import { Input } from "@saroh/ui/input";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 const formSchema = z.object({
     email: z.string().email({
         message: "Please enter a valid email address!",
@@ -52,28 +52,23 @@ export default function JoinWaitlist() {
                 // either way, which is what the visitor wanted. Saying so is
                 // friendlier than the previous destructive "Email already
                 // exists" toast.
-                toast({
-                    description:
-                        json.created === false
-                            ? "You're already on the list — we'll be in touch."
-                            : "You're on the list. We'll email you when we open your batch.",
-                });
+                toast.success(
+                    json.created === false
+                        ? "You're already on the list — we'll be in touch."
+                        : "You're on the list. We'll email you when we open your batch.",
+                );
                 form.reset();
                 return;
             }
 
-            toast({
-                title:
-                    json.reason?.code === "RATE_LIMITED"
-                        ? "Too many attempts. Try again in a minute."
-                        : "Something went wrong. Please try again.",
-                variant: "destructive",
-            });
+            toast.error(
+                json.reason?.code === "RATE_LIMITED"
+                    ? "Too many attempts. Try again in a minute."
+                    : "Something went wrong. Please try again.",
+            );
             console.error("[waitlist]", json.reason);
         } catch (error: unknown) {
-            toast({
-                title: "Something went wrong. Please try again.",
-                variant: "destructive",
+            toast.error("Something went wrong. Please try again.", {
                 description: error instanceof Error ? error.message : undefined,
             });
         }

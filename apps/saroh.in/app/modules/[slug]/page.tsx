@@ -57,7 +57,15 @@ export default async function ModulePage({
                     </p>
 
                     {m.needs?.length ? (
-                        <p className="mt-6 inline-flex items-center rounded-md border border-brand/30 bg-brand/10 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-brand">
+                        /* The workspace already has one recipe for a tinted
+                           brand chip — `border-brand/30 bg-brand-subtle
+                           text-brand-subtle-foreground`, used by every status
+                           badge in the product. This pill was mixing its own
+                           (`bg-brand/10 text-brand`), which lands close enough
+                           to look intentional and then drifts the moment the
+                           subtle tokens are retuned. Same two surfaces, one
+                           recipe. */
+                        <p className="mt-6 inline-flex items-center rounded-md border border-brand/30 bg-brand-subtle px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-brand-subtle-foreground">
                             Requires{" "}
                             {m.needs
                                 .map((k) => LABEL_BY_KEY.get(k) ?? k)

@@ -1,11 +1,11 @@
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteNav } from "@/components/site/site-nav";
-import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/toaster";
 import "@saroh/ui/globals.css";
+import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Script from "next/script";
+import { Toaster } from "sonner";
 
 // Self-hosted (latin subset, variable) so the build never fetches fonts from an
 // external network. Geist carries UI/body; Bricolage Grotesque is the display
@@ -93,7 +93,17 @@ export default function RootLayout({
                   FINISH: unreviewed and undocumented is unfinished; this build
                   ends with the finish review, the verdict, and DESIGN.md.
                 */}
-                <Toaster />
+                {/*
+                 * Two toasters, swapped by CSS, is how app.saroh.in does it and
+                 * this site copies it so a toast is the same object in both
+                 * places. Sonner picks its palette from a `theme` prop, which
+                 * would mean calling next-themes' `useTheme` and re-rendering
+                 * after hydration; letting the `dark` class on <html> hide one
+                 * of the two instead means the correct toaster is already the
+                 * visible one on first paint.
+                 */}
+                <Toaster className="dark:hidden" />
+                <Toaster theme="dark" className="hidden dark:block" />
                 {/*
                  * Light AND dark, following the system by default.
                  * `forcedTheme="dark"` was removed deliberately: PRODUCT.md

@@ -34,7 +34,7 @@ export function ModuleTable() {
                     </span>
                     <span className="sm:text-right">
                         {m.needs?.length ? (
-                            <span className="inline-flex h-[22px] items-center rounded-md border border-brand/30 bg-brand/10 px-2 font-mono text-[11px] tracking-[0.06em] text-brand">
+                            <span className="inline-flex h-[22px] items-center rounded-md border border-brand/30 bg-brand-subtle px-2 font-mono text-[11px] tracking-[0.06em] text-brand-subtle-foreground">
                                 {m.needs
                                     .map((k) => LABEL_BY_KEY.get(k) ?? k)
                                     .join(" · ")}
