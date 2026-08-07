@@ -42,9 +42,11 @@ export function ForgotPasswordForm() {
 
     if (sent) {
         return (
-            <Card className="mx-auto max-w-sm">
+            <Card className="sa-panel mx-auto w-full max-w-sm">
                 <CardHeader>
-                    <CardTitle className="text-2xl">Check your email</CardTitle>
+                    <CardTitle className="font-display text-2xl">
+                        Check your email
+                    </CardTitle>
                     <CardDescription>
                         If an account exists for {email}, we&apos;ve sent a link
                         to reset your password.
@@ -77,9 +79,11 @@ export function ForgotPasswordForm() {
     }
 
     return (
-        <Card className="mx-auto max-w-sm">
+        <Card className="sa-panel mx-auto w-full max-w-sm">
             <CardHeader>
-                <CardTitle className="text-2xl">Forgot password</CardTitle>
+                <CardTitle className="font-display text-2xl">
+                    Forgot password
+                </CardTitle>
                 <CardDescription>
                     Enter your email and we&apos;ll send you a link to reset
                     your password.
@@ -88,12 +92,18 @@ export function ForgotPasswordForm() {
             <CardContent>
                 <form onSubmit={handleSubmit} className="grid gap-4">
                     {error && (
-                        <p className="text-destructive text-sm">{error}</p>
+                        <p
+                            role="alert"
+                            className="sa-alert border-destructive/40 bg-destructive/10 text-destructive-foreground rounded-md border px-3 py-2 text-sm"
+                        >
+                            {error}
+                        </p>
                     )}
                     <div className="grid gap-2">
                         <Label htmlFor="email">Email</Label>
                         <Input
                             id="email"
+                            className="sa-input"
                             type="email"
                             placeholder="m@example.com"
                             value={email}
@@ -104,7 +114,8 @@ export function ForgotPasswordForm() {
                     </div>
                     <Button
                         type="submit"
-                        className="w-full"
+                        variant="highlight"
+                        className="sa-cta mt-1 w-full font-semibold"
                         disabled={isLoading}
                     >
                         {isLoading ? "Sending…" : "Send reset link"}

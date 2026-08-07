@@ -29,9 +29,11 @@ function ResetPasswordFormInner() {
 
     if (!token) {
         return (
-            <Card className="mx-auto max-w-sm">
+            <Card className="sa-panel mx-auto w-full max-w-sm">
                 <CardHeader>
-                    <CardTitle className="text-2xl">Invalid link</CardTitle>
+                    <CardTitle className="font-display text-2xl">
+                        Invalid link
+                    </CardTitle>
                     <CardDescription>
                         This reset link is missing a token. Request a new
                         password reset from the login page.
@@ -48,9 +50,11 @@ function ResetPasswordFormInner() {
 
     if (errorParam === "INVALID_TOKEN") {
         return (
-            <Card className="mx-auto max-w-sm">
+            <Card className="sa-panel mx-auto w-full max-w-sm">
                 <CardHeader>
-                    <CardTitle className="text-2xl">Link expired</CardTitle>
+                    <CardTitle className="font-display text-2xl">
+                        Link expired
+                    </CardTitle>
                     <CardDescription>
                         This reset link is invalid or has expired. Request a new
                         one.
@@ -95,9 +99,11 @@ function ResetPasswordFormInner() {
 
     if (success) {
         return (
-            <Card className="mx-auto max-w-sm">
+            <Card className="sa-panel mx-auto w-full max-w-sm">
                 <CardHeader>
-                    <CardTitle className="text-2xl">Password reset</CardTitle>
+                    <CardTitle className="font-display text-2xl">
+                        Password reset
+                    </CardTitle>
                     <CardDescription>
                         Your password has been updated. Redirecting to login…
                     </CardDescription>
@@ -112,9 +118,11 @@ function ResetPasswordFormInner() {
     }
 
     return (
-        <Card className="mx-auto max-w-sm">
+        <Card className="sa-panel mx-auto w-full max-w-sm">
             <CardHeader>
-                <CardTitle className="text-2xl">Set new password</CardTitle>
+                <CardTitle className="font-display text-2xl">
+                    Set new password
+                </CardTitle>
                 <CardDescription>
                     Enter your new password below.
                 </CardDescription>
@@ -122,12 +130,18 @@ function ResetPasswordFormInner() {
             <CardContent>
                 <form onSubmit={handleSubmit} className="grid gap-4">
                     {error && (
-                        <p className="text-destructive text-sm">{error}</p>
+                        <p
+                            role="alert"
+                            className="sa-alert border-destructive/40 bg-destructive/10 text-destructive-foreground rounded-md border px-3 py-2 text-sm"
+                        >
+                            {error}
+                        </p>
                     )}
                     <div className="grid gap-2">
                         <Label htmlFor="newPassword">New password</Label>
                         <Input
                             id="newPassword"
+                            className="sa-input"
                             type="password"
                             placeholder="At least 8 characters"
                             value={newPassword}
@@ -143,6 +157,7 @@ function ResetPasswordFormInner() {
                         </Label>
                         <Input
                             id="confirmPassword"
+                            className="sa-input"
                             type="password"
                             placeholder="Repeat password"
                             value={confirmPassword}
@@ -154,7 +169,8 @@ function ResetPasswordFormInner() {
                     </div>
                     <Button
                         type="submit"
-                        className="w-full"
+                        variant="highlight"
+                        className="sa-cta mt-1 w-full font-semibold"
                         disabled={isLoading}
                     >
                         {isLoading ? "Resetting…" : "Reset password"}
@@ -174,7 +190,7 @@ export function ResetPasswordForm() {
     return (
         <Suspense
             fallback={
-                <Card className="mx-auto max-w-sm">
+                <Card className="sa-panel mx-auto w-full max-w-sm">
                     <CardContent className="pt-6">
                         <p className="text-muted-foreground text-sm">
                             Loading…

@@ -1,6 +1,7 @@
 import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import "./atmosphere.css";
 
 import Providers from "./providers";
 
@@ -29,17 +30,26 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
+        /* `dark` is pinned, not toggled. This app was already painting a dark
+           backdrop while its tokens resolved LIGHT, so every card rendered
+           white-on-black and the muted-foreground copy sat at the wrong end of
+           its contrast pair. accounts is pure chrome — one action per screen,
+           no data — so it commits to the dark register the design system was
+           authored in rather than carrying a theme switcher for five forms. */
+        <html lang="en" className="dark">
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
             >
                 <Providers>
-                    {/* `fixed` + `min-h-screen`, not `absolute` + `h-screen`:
-                        every screen here used to fit the viewport, so the
-                        backdrop ended at exactly 100vh. The account page is
-                        taller than that and the page below the fold rendered
-                        unstyled white. */}
-                    <div className="fixed inset-0 z-[-2] bg-neutral-950 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+                    {/* `fixed`, not `absolute` + `h-screen`: the account page is
+                        taller than the viewport, and a 100vh backdrop left
+                        everything below the fold unstyled. */}
+                    <div className="sa-atmosphere" aria-hidden="true">
+                        <div className="sa-field sa-field--brand" />
+                        <div className="sa-field sa-field--deep" />
+                        <div className="sa-field sa-field--lime" />
+                    </div>
+                    <div className="sa-grain" aria-hidden="true" />
                     <div className="relative z-10 min-h-screen w-full">
                         {children}
                     </div>

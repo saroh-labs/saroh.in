@@ -14,6 +14,12 @@ const buttonVariants = cva(
                 // Brand-accent CTA — use for the ONE primary action per screen
                 // so the accent is consistent even where --primary isn't blue.
                 brand: "bg-brand text-brand-foreground hover:bg-brand/90",
+                // The loudest control in the system. `--highlight` is budgeted
+                // at ONE element per view (see the skin notes in globals.css),
+                // so this is for the single action a screen exists to get —
+                // "Sign up", "Verify email" — never for a secondary button.
+                highlight:
+                    "bg-highlight text-highlight-foreground hover:bg-highlight/90",
                 success:
                     "bg-success text-success-foreground hover:bg-success/90",
                 destructive:

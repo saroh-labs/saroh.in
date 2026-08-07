@@ -20,11 +20,16 @@ export const env = createEnv({
     client: {
         NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
         NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url().optional(),
+        // Where a verified user is handed off to (app.saroh.in/onboarding).
+        // Optional: `lib/app-urls.ts` falls back to the standard dev/prod
+        // origins, so a fresh clone needs no extra config.
+        NEXT_PUBLIC_APP_URL: z.string().url().optional(),
     },
     runtimeEnv: {
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+        NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     },
     emptyStringAsUndefined: true,
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,
