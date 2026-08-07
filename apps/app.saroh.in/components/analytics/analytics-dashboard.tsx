@@ -54,38 +54,75 @@ function DailyViewsChart({ daily }: { daily: DailyPoint[] }) {
                         No views recorded in this range yet.
                     </p>
                 ) : (
-                    <div className="flex h-40 items-end gap-1">
-                        {daily.map((d) => (
+                    <div className="flex h-40 gap-1">
+                        {daily.map((d, i) => (
                             <div
                                 key={d.date}
-                                className="flex flex-1 flex-col items-center gap-1"
+                                /*
+                                 * `h-full`, and the row is no longer
+                                 * `items-end`. That combination is what broke
+                                 * this chart: `items-end` stops the flex row
+                                 * from stretching its children, so each column
+                                 * was only as tall as the date label under it
+                                 * (34px), and the bar's `height: N%` had no
+                                 * definite height to resolve against — every
+                                 * bar rendered at exactly 0px. It looked like
+                                 * an empty card with an x-axis. Nobody caught
+                                 * it because until this workspace had analytics
+                                 * data the card showed its empty state instead.
+                                 */
+                                className="flex h-full flex-1 flex-col"
                                 title={`${d.date}: ${d.views} views, ${d.uniques} unique`}
                             >
                                 {/*
-                                 * `--chart-1`, not `--primary`: two of the
-                                 * three skins re-point `--primary` to their
-                                 * luminous action green, which painted every
-                                 * bar in the button colour. The chart tokens
-                                 * are the series colours and stay chromatic on
-                                 * purpose (see @saroh/ui/globals.css).
+                                 * The bar lives in its own flex-1 track rather
+                                 * than sharing the column with the label. Flex
+                                 * resolves this box to a definite height, which
+                                 * is what makes the percentage below legal —
+                                 * and it keeps a 100% bar from being pushed
+                                 * over the top of the card by the label's own
+                                 * height.
                                  */}
-                                <div
-                                    className="w-full rounded-t bg-chart-1"
-                                    style={{
-                                        height: `${
-                                            max > 0
-                                                ? Math.max(
-                                                      2,
-                                                      Math.round(
-                                                          (d.views / max) * 100,
-                                                      ),
-                                                  )
-                                                : 2
-                                        }%`,
-                                    }}
-                                />
-                                <span className="text-[10px] text-muted-foreground">
-                                    {d.date.slice(5)}
+                                <div className="flex min-h-0 flex-1 items-end">
+                                    {/*
+                                     * `--chart-1`, not `--primary`: two of the
+                                     * three skins re-point `--primary` to their
+                                     * own action colour, which painted every
+                                     * bar in the button colour. The chart
+                                     * tokens are the series colours and stay
+                                     * chromatic on purpose (see
+                                     * @saroh/ui/globals.css).
+                                     */}
+                                    <div
+                                        className="w-full rounded-t bg-chart-1"
+                                        style={{
+                                            height: `${
+                                                max > 0
+                                                    ? Math.max(
+                                                          2,
+                                                          Math.round(
+                                                              (d.views / max) *
+                                                                  100,
+                                                          ),
+                                                      )
+                                                    : 2
+                                            }%`,
+                                        }}
+                                    />
+                                </div>
+                                {/*
+                                 * Every label at 10px across 30 days wrapped
+                                 * "07-08" onto two lines and turned the axis
+                                 * into a grey smear. Roughly six ticks is
+                                 * enough to read a month; the rest keep their
+                                 * slot (so the bars stay aligned) and render
+                                 * nothing. The full date is still on every
+                                 * bar's `title`.
+                                 */}
+                                <span className="mt-1 h-4 truncate text-center text-[10px] leading-4 text-muted-foreground">
+                                    {i % Math.ceil(daily.length / 6) === 0
+                                        ? d.date.slice(5)
+                                        : ""}
                                 </span>
                             </div>
                         ))}

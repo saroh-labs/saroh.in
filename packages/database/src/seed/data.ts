@@ -22,15 +22,21 @@ export const STORE_SLUG = "demo-store";
 export const CURRENCY = "INR";
 
 /**
- * Module states, chosen to exercise every readiness the product can currently
- * PRODUCE: ACTIVE, SETUP_REQUIRED and DISABLED. `ATTENTION_REQUIRED` is absent
- * on purpose — no readiness adapter emits it today (the registry reserves it for
- * provider-health signals that are not wired yet), so no fixture can create it.
+ * Which capabilities the org has turned on.
  *
- * Readiness is DERIVED by the API from blockers, not stored — so enabling
- * Payments without connecting a provider is what actually produces
- * SETUP_REQUIRED. The seed sets up the conditions rather than asserting the
- * outcome, which means it keeps telling the truth if the rules change.
+ * Readiness is DERIVED by the API from evidence, never stored — a module is
+ * ACTIVE because a publication, a pipeline or a connected provider exists, not
+ * because anything here says so. The seed therefore sets up conditions and lets
+ * the adapters draw their own conclusion, which means it keeps telling the truth
+ * when the rules change.
+ *
+ * The consequence, now that the fixture also carries sites, analytics and live
+ * providers: every ENABLED module below evaluates to ACTIVE. AUTOMATIONS is the
+ * one capability left genuinely absent, and it short-circuits at the
+ * "configured" gate rather than on readiness — so `SETUP_REQUIRED` and
+ * `ATTENTION_REQUIRED` are no longer reachable from this fixture. Reaching them
+ * again means removing evidence (drop the publications, or set every payment
+ * provider to DISABLED), not adding a flag.
  */
 export const MODULE_STATES: readonly {
     key: string;
@@ -49,12 +55,12 @@ export const MODULE_STATES: readonly {
     {
         key: "PAYMENTS",
         status: "ENABLED",
-        why: "provider present but DISABLED -> provider-health DEGRADED",
+        why: "one live provider plus a retired one still on the account",
     },
     {
         key: "COMMUNICATIONS",
         status: "ENABLED",
-        why: "no provider connected -> SETUP_REQUIRED",
+        why: "a connected email sender exists",
     },
     {
         key: "AUTOMATIONS",
@@ -579,4 +585,434 @@ export const POSTS: readonly {
         excerpt: "Where the savings actually are.",
         status: "DRAFT",
     },
+];
+
+// --- Billing -------------------------------------------------------------
+
+/**
+ * The plan Northwind is on.
+ *
+ * Not decoration: `EntitlementService` caps an unsubscribed org at ONE site and
+ * refuses a custom-domain claim outright (`FREE_ENTITLEMENTS`). Without a
+ * subscription the three sites and the domain claim below are states the
+ * product would never have let this org reach, and a fixture that cannot exist
+ * is the kind that produces confident, wrong findings.
+ */
+export const PLAN = {
+    key: "business",
+    version: 1,
+    name: "Business",
+    /** Paise, matching the schema's minor-unit convention — ₹1,499 a month. */
+    priceCents: 149900,
+    interval: "month",
+    entitlements: { sites: 5, teamMembers: 10, customDomain: true },
+} as const;
+
+// --- Providers -----------------------------------------------------------
+
+/**
+ * A second payment provider, this one live.
+ *
+ * The RAZORPAY row the seed already writes is DISABLED, which on its own makes
+ * `/settings/providers` report Payments as "Not working" — a true reading of a
+ * merchant who has connected nothing that works, but not the state most of them
+ * are in. Adding CASHFREE as CONNECTED (rather than editing the Razorpay row)
+ * leaves that deliberate fixture intact and tells a story merchants recognise:
+ * they switched processor and never removed the old connection.
+ */
+export const LIVE_PAYMENT_PROVIDER = {
+    provider: "CASHFREE",
+    status: "CONNECTED",
+} as const;
+
+/** The org's sending identity, so Communications reports a real connection. */
+export const COMMUNICATION_PROVIDER = {
+    channel: "EMAIL",
+    provider: "RESEND",
+    status: "CONNECTED",
+    fromAddress: "orders@northwindsupply.in",
+} as const;
+
+/**
+ * A custom domain part-way through DNS verification — the third state the
+ * provider-health surface can report, and the one a merchant hits on the day
+ * they buy a domain. Left PENDING rather than VERIFIED so the screen shows
+ * something other than three identical green cards.
+ */
+export const DOMAIN = {
+    hostname: "northwindsupply.in",
+    status: "PENDING",
+    /** The published TXT value, not a credential — safe to keep in the fixture. */
+    verificationToken: "saroh-site-verification=northwind-supply-demo",
+    /** Index into {@link SITES} — the site the hostname will route to. */
+    site: 0,
+} as const;
+
+// --- Website -------------------------------------------------------------
+
+/** A field descriptor shared by an `enquiry` section and its backing Form. */
+export interface SeedFormField {
+    name: string;
+    label: string;
+    type: "text" | "email" | "tel" | "textarea";
+    required?: boolean;
+}
+
+/**
+ * One authored section. `enquiry` and `booking` carry a reference rather than an
+ * id because the thing they point at is created by the seed itself: the seed
+ * resolves `form` into a real Form id and `service` into a real Service id
+ * before writing, exactly as the editor does on save.
+ */
+export type SeedSection =
+    | {
+          type: "hero";
+          content: {
+              heading: string;
+              subheading?: string;
+              cta?: {
+                  label: string;
+                  href: string;
+                  style: "primary" | "secondary" | "link";
+              };
+          };
+      }
+    | { type: "richText"; content: { format: "html"; value: string } }
+    | {
+          type: "cta";
+          content: {
+              label: string;
+              href: string;
+              style: "primary" | "secondary" | "link";
+          };
+      }
+    | {
+          type: "enquiry";
+          /** Becomes a Form row; its id is written back into the section. */
+          form: { name: string; fields: readonly SeedFormField[] };
+          content: {
+              title: string;
+              description: string;
+              submitLabel: string;
+              successMessage: string;
+          };
+      }
+    | {
+          type: "booking";
+          /** Index into {@link SERVICES}. */
+          service: number;
+          content: {
+              title: string;
+              description: string;
+              submitLabel: string;
+              successMessage: string;
+          };
+      };
+
+/** The enquiry form Northwind uses everywhere it asks a visitor for details. */
+const ENQUIRY_FIELDS: readonly SeedFormField[] = [
+    { name: "name", label: "Your name", type: "text", required: true },
+    { name: "email", label: "Email", type: "email", required: true },
+    { name: "phone", label: "Phone", type: "tel" },
+    { name: "company", label: "Business name", type: "text" },
+    {
+        name: "message",
+        label: "What do you need?",
+        type: "textarea",
+        required: true,
+    },
+];
+
+/**
+ * The org's websites.
+ *
+ * Three, in the two states the list page can distinguish: two live on a
+ * saroh.in subdomain and one still being written, which is why the third has no
+ * subdomain — the card falls back to the slug, and a merchant should see both
+ * renderings rather than three identical ones.
+ *
+ * No section here carries an image. The shipped starter template points at
+ * `/templates/starter/*.jpg`, and those files do not exist in any app's
+ * `public/` — seeding them would put broken images in the editor.
+ */
+export const SITES: readonly {
+    slug: string;
+    name: string;
+    subdomain: string | null;
+    /** Published sites get a Publication and a live pointer; drafts do not. */
+    published: boolean;
+    /** Days before today the site was created, so the list is not all "just now". */
+    createdDaysAgo: number;
+    pages: readonly {
+        path: string;
+        title: string;
+        isHome?: boolean;
+        sections: readonly SeedSection[];
+    }[];
+}[] = [
+    {
+        slug: "northwind-supply",
+        name: "Northwind Supply",
+        subdomain: "northwind",
+        published: true,
+        createdDaysAgo: 213,
+        pages: [
+            {
+                path: "/",
+                title: "Home",
+                isHome: true,
+                sections: [
+                    {
+                        type: "hero",
+                        content: {
+                            heading: "Packaging, storage and safety supplies",
+                            subheading:
+                                "Cartons, tape, crates and protective kit for workshops and warehouses across Karnataka. Order by 2pm and stocked lines go out the same day.",
+                            cta: {
+                                label: "Browse the catalogue",
+                                href: "/products",
+                                style: "primary",
+                            },
+                        },
+                    },
+                    {
+                        type: "richText",
+                        content: {
+                            format: "html",
+                            value:
+                                "<h2>What we hold</h2>" +
+                                "<p>Around nine hundred lines across packaging, storage and safety, " +
+                                "kept in our Peenya warehouse rather than ordered in when you ask. " +
+                                "Bulk and custom runs are quoted within one working day.</p>" +
+                                "<h2>Trade accounts</h2>" +
+                                "<p>Businesses ordering monthly can open a 30-day account. Tiered " +
+                                "pricing applies from the second order onwards, and your rates stay " +
+                                "on the account rather than needing to be asked for each time.</p>",
+                        },
+                    },
+                    {
+                        type: "cta",
+                        content: {
+                            label: "Open a trade account",
+                            href: "/contact",
+                            style: "primary",
+                        },
+                    },
+                ],
+            },
+            {
+                path: "/about",
+                title: "About",
+                sections: [
+                    {
+                        type: "hero",
+                        content: {
+                            heading: "About Northwind Supply",
+                            subheading:
+                                "Family-run since 2014, supplying the small manufacturers around us.",
+                        },
+                    },
+                    {
+                        type: "richText",
+                        content: {
+                            format: "html",
+                            value:
+                                "<h2>Our story</h2>" +
+                                "<p>Northwind began as a single-shutter shop on Tumkur Road selling " +
+                                "cartons to the workshops either side of it. Ten years on we hold " +
+                                "nine hundred lines in Peenya and deliver across the state, but the " +
+                                "way we work has not changed: real stock on the shelf, lead times we " +
+                                "can actually meet, and someone who answers the phone.</p>",
+                        },
+                    },
+                ],
+            },
+            {
+                path: "/contact",
+                title: "Contact",
+                sections: [
+                    {
+                        type: "hero",
+                        content: {
+                            heading: "Tell us what you need",
+                            subheading:
+                                "Send the sizes and quantities and we will come back with stock and pricing within one working day.",
+                        },
+                    },
+                    {
+                        type: "enquiry",
+                        form: {
+                            name: "Website enquiry",
+                            fields: ENQUIRY_FIELDS,
+                        },
+                        content: {
+                            title: "Send an enquiry",
+                            description:
+                                "Rough quantities are fine — we will tell you what is on the shelf and what needs a lead time.",
+                            submitLabel: "Send enquiry",
+                            successMessage:
+                                "Thanks — we will be in touch within one working day.",
+                        },
+                    },
+                ],
+            },
+            {
+                path: "/book",
+                title: "Book a walkthrough",
+                sections: [
+                    {
+                        type: "hero",
+                        content: {
+                            heading: "See the stock before you commit",
+                            subheading:
+                                "Worth an hour if you are placing a bulk order for the first time.",
+                        },
+                    },
+                    {
+                        type: "booking",
+                        service: 1 /* Warehouse walkthrough */,
+                        content: {
+                            title: "Book a warehouse walkthrough",
+                            description:
+                                "An hour at the Peenya warehouse with someone from the trade counter. Bring your specifications.",
+                            submitLabel: "Request a slot",
+                            successMessage:
+                                "Slot requested — we will confirm by email once it is in the diary.",
+                        },
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        slug: "monsoon-stock-up-2026",
+        name: "Monsoon Stock-Up 2026",
+        subdomain: "monsoon",
+        published: true,
+        createdDaysAgo: 41,
+        pages: [
+            {
+                path: "/",
+                title: "Monsoon stock-up",
+                isHome: true,
+                sections: [
+                    {
+                        type: "hero",
+                        content: {
+                            heading: "Stock up before the rains",
+                            subheading:
+                                "Moisture-resistant cartons, sealed crates and desiccant packs, ordered together and delivered together.",
+                            cta: {
+                                label: "See what is in the bundle",
+                                href: "#bundle",
+                                style: "primary",
+                            },
+                        },
+                    },
+                    {
+                        type: "richText",
+                        content: {
+                            format: "html",
+                            value:
+                                "<h2>Why now</h2>" +
+                                "<p>Damp gets into stock through the packaging long before it gets " +
+                                "into the building. Every year we watch customers lose cartons that " +
+                                "were fine in March, so we put the three lines that actually prevent " +
+                                "it into one order.</p>" +
+                                "<h2>In the bundle</h2>" +
+                                "<ul>" +
+                                "<li>Stackable crates with sealed lids, 30 and 50 litre</li>" +
+                                "<li>Pallet wrap, 23 micron, one metre longer per pass than standard</li>" +
+                                "<li>Silica desiccant packs, sized for a full crate</li>" +
+                                "</ul>",
+                        },
+                    },
+                    {
+                        type: "enquiry",
+                        form: {
+                            name: "Monsoon stock-up enquiry",
+                            fields: ENQUIRY_FIELDS,
+                        },
+                        content: {
+                            title: "Reserve a bundle",
+                            description:
+                                "Tell us how many pallets you are protecting and we will size it for you.",
+                            submitLabel: "Reserve a bundle",
+                            successMessage:
+                                "Reserved — we will call to confirm quantities before dispatch.",
+                        },
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        slug: "trade-counter-whitefield",
+        name: "Trade Counter — Whitefield",
+        subdomain: null,
+        published: false,
+        createdDaysAgo: 9,
+        pages: [
+            {
+                path: "/",
+                title: "Trade counter",
+                isHome: true,
+                sections: [
+                    {
+                        type: "hero",
+                        content: {
+                            heading: "Trade counter, Whitefield",
+                            subheading:
+                                "Walk-in collection for the lines people run out of mid-job.",
+                        },
+                    },
+                    {
+                        type: "richText",
+                        content: {
+                            format: "html",
+                            value:
+                                "<h2>Opening this quarter</h2>" +
+                                "<p>Off Whitefield Main Road, five minutes from the industrial " +
+                                "estate. Tape, stretch film, gloves and the common carton sizes on " +
+                                "the shelf; everything else on next-day transfer from Peenya.</p>" +
+                                "<p>Opening hours and the exact address go here once the lease is " +
+                                "signed.</p>",
+                        },
+                    },
+                ],
+            },
+        ],
+    },
+];
+
+// --- Analytics -----------------------------------------------------------
+
+/**
+ * How far back the daily aggregates go. The dashboard's widest quick range is
+ * 90 days, so anything shorter leaves that button showing a truncated chart.
+ */
+export const ANALYTICS_DAYS = 90;
+
+/**
+ * Paths the traffic is split across, weighted. Every one of these is somewhere
+ * this business actually publishes — a seeded CMS page, a seeded product, or a
+ * seeded post — so the top-pages table cannot name a page that does not exist.
+ *
+ * There are exactly ten because the table shows the top ten; an eleventh would
+ * be written and never read.
+ *
+ * The weights sum to 1 and the seed hands the rounding remainder to `/`, so the
+ * paths always add up to the day's total views rather than drifting past it.
+ */
+export const ANALYTICS_PATHS: readonly { path: string; weight: number }[] = [
+    { path: "/", weight: 0.3 },
+    { path: "/products", weight: 0.17 },
+    { path: "/products/kraft-mailer-box", weight: 0.11 },
+    { path: "/products/stackable-crate", weight: 0.08 },
+    { path: "/products/safety-gloves", weight: 0.07 },
+    { path: "/contact", weight: 0.07 },
+    { path: "/about", weight: 0.06 },
+    { path: "/blog/warehouse-safety-basics", weight: 0.05 },
+    { path: "/book", weight: 0.05 },
+    { path: "/blog/choosing-the-right-mailer", weight: 0.04 },
 ];

@@ -150,6 +150,14 @@ export interface SiteSummary {
     slug: string;
     subdomain?: string | null;
     status?: string;
+    /**
+     * Null until the site has been published once. The API has always sent
+     * this — `SitesService.listSites` selects it — but this interface did not
+     * declare it, so the index had no way to tell a live site from a draft and
+     * simply did not say. A merchant with three sites could not see which of
+     * them the public could actually reach.
+     */
+    currentPublicationId?: string | null;
 }
 
 export interface SitePage {

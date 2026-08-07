@@ -1,3 +1,4 @@
+import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@saroh/ui/card";
 import { EmptyState } from "@saroh/ui/empty-state";
@@ -49,20 +50,57 @@ export default async function SitesPage() {
                 />
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
-                    {sites.map((site) => (
-                        <Link key={site.id} href={`/sites/${site.id}`}>
-                            <Card className="transition-colors hover:bg-muted/40">
-                                <CardHeader>
-                                    <CardTitle>{site.name}</CardTitle>
-                                    <CardDescription>
-                                        {site.subdomain
-                                            ? `${site.subdomain}.saroh.in`
-                                            : `/${site.slug}`}
-                                    </CardDescription>
-                                </CardHeader>
-                            </Card>
-                        </Link>
-                    ))}
+                    {sites.map((site, index) => {
+                        const live = Boolean(site.currentPublicationId);
+                        return (
+                            <Link key={site.id} href={`/sites/${site.id}`}>
+                                <Card
+                                    className="wk-surface h-full"
+                                    style={
+                                        {
+                                            "--wk-i": index,
+                                        } as React.CSSProperties
+                                    }
+                                >
+                                    <CardHeader>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <CardTitle className="min-w-0">
+                                                {site.name}
+                                            </CardTitle>
+                                            {/*
+                                             * Whether the public can reach this
+                                             * site is the first thing a
+                                             * merchant wants from a list of
+                                             * sites, and the card used to show
+                                             * only a name and an address —
+                                             * which a draft has too. "Live" is
+                                             * the word the publish flow already
+                                             * uses; "Draft" is `secondary`
+                                             * rather than a warning because an
+                                             * unpublished site is a normal
+                                             * state, not a problem.
+                                             */}
+                                            <Badge
+                                                variant={
+                                                    live
+                                                        ? "default"
+                                                        : "secondary"
+                                                }
+                                                className="shrink-0"
+                                            >
+                                                {live ? "Live" : "Draft"}
+                                            </Badge>
+                                        </div>
+                                        <CardDescription>
+                                            {site.subdomain
+                                                ? `${site.subdomain}.saroh.in`
+                                                : `/${site.slug}`}
+                                        </CardDescription>
+                                    </CardHeader>
+                                </Card>
+                            </Link>
+                        );
+                    })}
                 </div>
             )}
         </main>

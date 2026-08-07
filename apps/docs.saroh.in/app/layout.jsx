@@ -2,10 +2,12 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import localFont from "next/font/local";
 import { Footer, Layout, Navbar } from "nextra-theme-docs";
 import "nextra-theme-docs/style.css";
-// After the theme, never before: globals.css restyles Nextra by overriding the
-// variables its stylesheet declares.
 import { Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
+// Must load AFTER nextra-theme-docs/style.css above, never before: this file
+// restyles Nextra by overriding the variables that stylesheet declares, and
+// CSS import order is what decides which wins. The lint rule sorts imports
+// alphabetically, which happens to preserve that — do not rely on it silently.
 import "./globals.css";
 
 // Self-hosted (latin subset, variable) so the build never fetches fonts from an
