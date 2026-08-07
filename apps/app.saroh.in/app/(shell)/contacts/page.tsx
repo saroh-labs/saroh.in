@@ -28,7 +28,7 @@ export default async function ContactsPage({
     ]);
 
     return (
-        // Wider than the old `max-w-5xl`: this is a table now, and a dashboard
+        // Wider than the old `max-w-7xl`: this is a table now, and a dashboard
         // that reserves a third of a monitor for margin is wasting the density
         // the merchant came for.
         <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">

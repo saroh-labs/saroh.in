@@ -22,7 +22,7 @@ export default async function CommercePage() {
     const stores = await listStores();
 
     return (
-        <main className="mx-auto max-w-4xl p-8">
+        <main className="mx-auto max-w-5xl p-8">
             <PageHeader
                 title="Commerce"
                 description="Your sales channels — catalog, orders, and fulfilment live inside each store."

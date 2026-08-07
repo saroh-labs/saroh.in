@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { ArrowDown, ArrowUp, LayoutGrid, List, Table2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -242,15 +243,15 @@ export function DataView<TRow>({
                 </p>
             ) : isLoading ? (
                 <div className="space-y-2" aria-busy="true">
+                    {/* The shared Skeleton, not a local animate-pulse block:
+                        a route-level loading.tsx and an in-view refresh should
+                        not animate differently on the same screen. */}
                     {[0, 1, 2, 3, 4].map((i) => (
-                        <div
-                            key={i}
-                            className="h-12 animate-pulse rounded-md bg-muted"
-                        />
+                        <Skeleton key={i} className="h-12" />
                     ))}
                 </div>
             ) : visible.length === 0 ? (
-                <div className="rounded-md border border-dashed border-border px-6 py-12 text-center text-sm text-muted-foreground">
+                <div className="rounded-xl border border-dashed border-border px-6 py-12 text-center text-sm text-muted-foreground">
                     {/* Naming the narrowing matters: an empty result under an
                         active filter must not read as "you have no leads". */}
                     {query.trim()
@@ -262,7 +263,7 @@ export function DataView<TRow>({
             ) : mode === "table" ? (
                 // Horizontal scroll is on the wrapper, never the page: a table
                 // that widens the document breaks every other element on it.
-                <div className="overflow-x-auto rounded-md border border-border">
+                <div className="overflow-x-auto rounded-xl border border-border">
                     <table className="w-full border-collapse text-sm">
                         <thead>
                             <tr className="border-b border-border bg-muted/60">
@@ -322,10 +323,20 @@ export function DataView<TRow>({
                             </tr>
                         </thead>
                         <tbody>
-                            {visible.map((row) => (
+                            {/* `wk-item` staggers rows in (workspace.css caps
+                                the delay at 12 items, so a 200-row table's
+                                last row never waits). Transitions stay on
+                                colour only — a table that moves on hover is
+                                unreadable while scanning. */}
+                            {visible.map((row, rowIndex) => (
                                 <tr
                                     key={rowKey(row)}
-                                    className="border-b border-border last:border-b-0 hover:bg-accent/50"
+                                    style={
+                                        {
+                                            "--wk-i": rowIndex,
+                                        } as React.CSSProperties
+                                    }
+                                    className="wk-item border-b border-border transition-colors last:border-b-0 hover:bg-accent/50"
                                 >
                                     {tableColumns.map((col) => (
                                         <td
@@ -367,8 +378,8 @@ export function DataView<TRow>({
                 // List: the whole row is the target, which is what one-handed
                 // and gloved use needs. Detail columns are dropped, not hidden
                 // behind a disclosure nobody taps.
-                <ul className="divide-y rounded-md border border-border">
-                    {visible.map((row) => {
+                <ul className="divide-y rounded-xl border border-border">
+                    {visible.map((row, rowIndex) => {
                         // `.at()` rather than a destructure: a caller could
                         // declare only `detail` columns, leaving this empty,
                         // and index access would type as always-present.
@@ -403,7 +414,12 @@ export function DataView<TRow>({
                         return (
                             <li
                                 key={rowKey(row)}
-                                className="relative flex items-center gap-2 pr-3 hover:bg-accent/50"
+                                style={
+                                    {
+                                        "--wk-i": rowIndex,
+                                    } as React.CSSProperties
+                                }
+                                className="wk-item relative flex items-center gap-2 pr-3 transition-colors hover:bg-accent/50"
                             >
                                 {/*
                                  * An OVERLAY link, not a wrapper.

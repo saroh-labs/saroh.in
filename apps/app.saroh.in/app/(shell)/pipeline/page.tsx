@@ -35,7 +35,7 @@ export default async function PipelinePage() {
 
     if (pipelines.length === 0) {
         return (
-            <main className="mx-auto max-w-6xl p-8">
+            <main className="mx-auto max-w-7xl p-8">
                 <Header />
                 <EmptyState
                     title="No pipeline yet"

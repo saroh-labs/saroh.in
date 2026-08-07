@@ -28,20 +28,28 @@ export function PageHeader({
     return (
         <div
             className={cn(
-                "mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
+                // `mb-8`, not `mb-6`: this is the one gap on every page in the
+                // product, and the old value sat closer to the content than the
+                // description sat to its own title — the header read as part of
+                // the first row rather than as the page's own block.
+                "mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between",
                 className,
             )}
             {...props}
         >
-            <div className="space-y-1">
+            <div className="min-w-0">
                 {/* The display face is reserved for page-level titles. Component
                     titles (CardTitle, DialogTitle) stay on the UI face — a
-                    display cut at 14px reads as noise in dense screens. */}
-                <h1 className="font-display text-2xl font-semibold tracking-tight">
+                    display cut at 14px reads as noise in dense screens.
+
+                    Tracking tightens with size here to match the marketing
+                    surface's ramp, so a merchant moving from saroh.in into the
+                    workspace reads the same typographic voice. */}
+                <h1 className="truncate font-display text-[1.625rem] font-semibold leading-[1.15] tracking-[-0.025em]">
                     {title}
                 </h1>
                 {description ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="mt-1.5 max-w-[68ch] text-[13.5px] leading-relaxed text-muted-foreground">
                         {description}
                     </p>
                 ) : null}
