@@ -10,6 +10,12 @@
  */
 export const SKINS = [
     {
+        id: "mono",
+        name: "Mono",
+        blurb: "Pure black and white, one blue for links. Contrast is the accent.",
+        swatch: ["#000000", "#FFFFFF", "#0070F3", "#8F8F8F", "#EAEAEA"],
+    },
+    {
         id: "panel",
         name: "Panel",
         blurb: "Instrument calm, stockroom rigour. Green means actionable.",
@@ -32,10 +38,32 @@ export const SKINS = [
 
 export type SkinId = (typeof SKINS)[number]["id"];
 
-/** The fusion leads: it is the one both other worlds were folded into. */
-export const DEFAULT_SKIN: SkinId = "panel";
+/**
+ * Mono leads and is the default.
+ *
+ * It is the only skin with NO `[data-skin]` block in globals.css — it IS the
+ * base `:root` / `.dark` register, so selecting it means "add no overrides".
+ * That is deliberate: the base tokens are the monochrome ones now, and giving
+ * mono its own block would mean maintaining the same palette in two places and
+ * letting them drift.
+ */
+export const DEFAULT_SKIN: SkinId = "mono";
 
-export const SKIN_STORAGE_KEY = "saroh-skin";
+/**
+ * Versioned deliberately.
+ *
+ * `DEFAULT_SKIN` only applies to someone with NOTHING stored, so bumping the
+ * default alone would have left every existing user on Panel — the old default
+ * — and they would never have seen the monochrome identity at all. Panel was
+ * what people were handed, not something most of them chose, so carrying it
+ * forward preserves an accident rather than a preference.
+ *
+ * Bumping the key retires the old value in one move: everyone lands on Mono,
+ * and a skin picked from here on is a real choice and is kept. The old
+ * `saroh-skin` entry is simply ignored — not read, not migrated, not deleted
+ * (clearing other people's storage keys is not this component's business).
+ */
+export const SKIN_STORAGE_KEY = "saroh-skin-v2";
 
 export function isSkinId(value: unknown): value is SkinId {
     return SKINS.some((skin) => skin.id === value);

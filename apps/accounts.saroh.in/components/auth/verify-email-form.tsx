@@ -224,7 +224,7 @@ export function VerifyEmailForm() {
                             {notice && (
                                 <p
                                     role="status"
-                                    className="sa-alert border-highlight/30 bg-highlight/10 text-highlight-subtle-foreground rounded-md border px-3 py-2 text-sm"
+                                    className="sa-alert bg-muted text-muted-foreground rounded-md border px-3 py-2 text-sm"
                                 >
                                     {notice}
                                 </p>
@@ -253,11 +253,11 @@ export function VerifyEmailForm() {
                                 />
                             </div>
 
-                            {/* Deliberately NOT the highlight variant. This
-                                screen spends its one --highlight on the active
-                                code box, which is where the user has to act —
-                                the code auto-submits on the sixth digit, so
-                                this button is the fallback, not the hero. */}
+                            {/* Deliberately secondary. The code auto-submits on
+                                the sixth digit, so the field is the action and
+                                this button is the fallback — giving it the
+                                filled black treatment would make the fallback
+                                the loudest thing on the screen. */}
                             <Button
                                 type="submit"
                                 variant="secondary"
@@ -314,7 +314,11 @@ function SuccessMark() {
     return (
         <svg
             viewBox="0 0 48 48"
-            className="text-highlight size-14"
+            // `--success`, not the CTA token. Status colours are the one place
+            // this system stays chromatic on purpose: hue is carrying the
+            // meaning, and a monochrome "you succeeded" is indistinguishable
+            // from a monochrome "something failed".
+            className="text-success size-14"
             fill="none"
             aria-hidden="true"
         >

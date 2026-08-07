@@ -1,7 +1,7 @@
 import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import "./atmosphere.css";
+import "./auth.css";
 
 import Providers from "./providers";
 
@@ -30,26 +30,39 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        /* `dark` is pinned, not toggled. This app was already painting a dark
-           backdrop while its tokens resolved LIGHT, so every card rendered
-           white-on-black and the muted-foreground copy sat at the wrong end of
-           its contrast pair. accounts is pure chrome — one action per screen,
-           no data — so it commits to the dark register the design system was
-           authored in rather than carrying a theme switcher for five forms. */
-        <html lang="en" className="dark">
+        // `suppressHydrationWarning` because the script below stamps the theme
+        // class onto <html> before React hydrates, so a visitor whose OS prefers
+        // dark always mismatches what the server rendered. It suppresses the
+        // warning on this element's own attributes only, not on its subtree.
+        <html lang="en" suppressHydrationWarning>
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
             >
+                {/*
+                 * Follow the OS, pre-paint. accounts has no theme toggle and
+                 * needs none — there is nothing to remember across five forms —
+                 * so this is a media query, not `next-themes`. That library
+                 * exists to persist a CHOICE and it is not even resolvable from
+                 * this app under pnpm's strict layout; adding a dependency to
+                 * read `prefers-color-scheme` would be a poor trade.
+                 *
+                 * It must run before first paint or a dark-mode visitor gets a
+                 * white flash. As the FIRST CHILD OF <body> it does: the
+                 * stylesheet in <head> is render-blocking and nothing below has
+                 * been parsed yet. It is not a sibling of <body>, because a raw
+                 * <script> between <html> and <body> gets hoisted into <head>
+                 * and the hydrated DOM would no longer match the rendered tree.
+                 */}
+                <script
+                    dangerouslySetInnerHTML={{
+                        __html: `(function(){try{if(matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark")}catch(e){}})()`,
+                    }}
+                />
                 <Providers>
                     {/* `fixed`, not `absolute` + `h-screen`: the account page is
                         taller than the viewport, and a 100vh backdrop left
                         everything below the fold unstyled. */}
-                    <div className="sa-atmosphere" aria-hidden="true">
-                        <div className="sa-field sa-field--brand" />
-                        <div className="sa-field sa-field--deep" />
-                        <div className="sa-field sa-field--lime" />
-                    </div>
-                    <div className="sa-grain" aria-hidden="true" />
+                    <div className="sa-page" aria-hidden="true" />
                     <div className="relative z-10 min-h-screen w-full">
                         {children}
                     </div>

@@ -71,7 +71,11 @@ export default function RootLayout({
                  */}
                 <script
                     dangerouslySetInnerHTML={{
-                        __html: `(function(){try{var s=localStorage.getItem("saroh-skin");var ok=["panel","instrument","stockroom"];document.documentElement.dataset.skin=ok.indexOf(s)>-1?s:"panel"}catch(e){document.documentElement.dataset.skin="panel"}})()`,
+                        // Key and fallback MUST match `lib/skins.ts`
+                        // (SKIN_STORAGE_KEY / DEFAULT_SKIN). It is duplicated
+                        // rather than imported because this has to be an inline
+                        // string that runs before any module loads.
+                        __html: `(function(){try{var s=localStorage.getItem("saroh-skin-v2");var ok=["mono","panel","instrument","stockroom"];document.documentElement.dataset.skin=ok.indexOf(s)>-1?s:"mono"}catch(e){document.documentElement.dataset.skin="mono"}})()`,
                     }}
                 />
                 <Providers>

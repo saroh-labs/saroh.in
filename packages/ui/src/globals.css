@@ -42,112 +42,140 @@
 
 @layer base {
     :root {
-        /* ---- ramps: brand (midnight navy) ---- */
-        --brand-50: 222 44% 96%;
-        --brand-100: 222 46% 91%;
-        --brand-200: 222 44% 83%;
-        --brand-300: 222 42% 71%;
-        --brand-400: 222 46% 56%;
-        --brand-500: 222 52% 44%;
-        --brand-600: 222 58% 34%;
-        --brand-700: 222 60% 27%;
-        --brand-800: 222 58% 22%;
-        --brand-900: 222 56% 17%;
-        --brand-950: 222 55% 11%;
+        /* ---- ramps: brand (interactive blue) ----
+           The one chromatic thing left in the system. It is for LINKS, focus
+           rings and emphasis — never for the primary button, which is the
+           inverted black/white control below. Anchored on #0070f3. */
+        --brand-50: 212 100% 97%;
+        --brand-100: 212 100% 93%;
+        --brand-200: 212 100% 86%;
+        --brand-300: 212 100% 76%;
+        --brand-400: 212 100% 64%;
+        --brand-500: 212 100% 55%;
+        --brand-600: 212 100% 48%;
+        --brand-700: 212 96% 40%;
+        --brand-800: 212 92% 32%;
+        --brand-900: 212 88% 25%;
+        --brand-950: 212 90% 16%;
 
-        /* ---- ramps: highlight (lime) ---- */
-        --highlight-50: 78 70% 95%;
-        --highlight-100: 78 72% 88%;
-        --highlight-200: 78 74% 78%;
-        --highlight-300: 78 76% 66%;
-        --highlight-400: 78 78% 56%;
-        --highlight-500: 78 78% 48%;
-        --highlight-600: 78 80% 40%;
-        --highlight-700: 78 82% 31%;
-        --highlight-800: 78 72% 25%;
-        --highlight-900: 78 68% 19%;
-        --highlight-950: 78 70% 11%;
+        /* ---- ramps: highlight (achromatic) ----
+           `--highlight` is the loudest token and stays budgeted at one element
+           per view, but in a monochrome system "loudest" is CONTRAST, not hue:
+           a near-black fill on a white page, inverted in dark. That is why this
+           ramp is grey rather than a colour. */
+        --highlight-50: 0 0% 98%;
+        --highlight-100: 0 0% 95%;
+        --highlight-200: 0 0% 90%;
+        --highlight-300: 0 0% 83%;
+        --highlight-400: 0 0% 64%;
+        --highlight-500: 0 0% 45%;
+        --highlight-600: 0 0% 32%;
+        --highlight-700: 0 0% 25%;
+        --highlight-800: 0 0% 15%;
+        --highlight-900: 0 0% 9%;
+        --highlight-950: 0 0% 4%;
 
-        /* ---- ramps: neutral (navy-tinted, never pure grey) ---- */
-        --neutral-50: 222 22% 99%;
-        --neutral-100: 222 18% 96%;
-        --neutral-200: 222 15% 91%;
-        --neutral-300: 222 14% 84%;
-        --neutral-400: 222 12% 66%;
-        --neutral-500: 222 10% 48%;
-        --neutral-600: 222 10% 40%;
-        --neutral-700: 222 12% 28%;
-        --neutral-800: 222 14% 18%;
-        --neutral-900: 222 16% 12%;
-        --neutral-950: 222 20% 7%;
+        /* ---- ramps: neutral (true grey) ----
+           Previously navy-tinted on purpose. That tint is exactly what made the
+           workspace read as dull: every surface carried a cast, so nothing was
+           ever actually white. Pure greys are what give the crisp register. */
+        --neutral-50: 0 0% 98%;
+        --neutral-100: 0 0% 96%;
+        --neutral-200: 0 0% 92%;
+        --neutral-300: 0 0% 87%;
+        --neutral-400: 0 0% 64%;
+        --neutral-500: 0 0% 45%;
+        --neutral-600: 0 0% 40%;
+        --neutral-700: 0 0% 25%;
+        --neutral-800: 0 0% 15%;
+        --neutral-900: 0 0% 9%;
+        --neutral-950: 0 0% 4%;
 
-        /* ---- semantic: surfaces ---- */
-        --background: 222 22% 99%;
-        --foreground: 222 20% 10%;
+        /* ---- semantic: surfaces ----
+           Pure white, not an off-white. The page and the card are the SAME
+           colour; separation comes from a 1px line, not from a tint. That is
+           the whole trick of this register — take the tint away and borders
+           have to do real work, which is why they are tuned so carefully. */
+        --background: 0 0% 100%;
+        --foreground: 0 0% 9%;
         --card: 0 0% 100%;
-        --card-foreground: 222 20% 10%;
+        --card-foreground: 0 0% 9%;
         --popover: 0 0% 100%;
-        --popover-foreground: 222 20% 10%;
+        --popover-foreground: 0 0% 9%;
 
-        /* ---- semantic: actions ---- */
-        --primary: 222 58% 22%;
+        /* ---- semantic: actions ----
+           The primary control is near-black with white text, and inverts in
+           dark. Contrast is the emphasis; there is no coloured button. */
+        --primary: 0 0% 9%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 222 18% 96%;
-        --secondary-foreground: 222 30% 20%;
-        --muted: 222 18% 96%;
-        --muted-foreground: 222 10% 40%;
+        --secondary: 0 0% 96%;
+        --secondary-foreground: 0 0% 9%;
+        --muted: 0 0% 96%;
+        --muted-foreground: 0 0% 45%; /* 4.74:1 on white */
 
         /* Neutral hover/selected surface — see rule 1. Not the brand accent. */
-        --accent: 222 18% 94%;
-        --accent-foreground: 222 30% 18%;
+        --accent: 0 0% 96%;
+        --accent-foreground: 0 0% 9%;
 
-        --destructive: 358 68% 46%;
+        --destructive: 0 84% 45%;
         --destructive-foreground: 0 0% 100%;
 
         /* ---- semantic: lines ---- */
-        --border: 222 14% 82%; /* decorative */
-        --input: 222 14% 58%; /* form control boundary — must meet 3:1 */
-        --ring: 222 58% 40%;
+        --border: 0 0% 92%; /* decorative */
+        --input: 0 0% 56%; /* form control boundary — 3.23:1 on white */
+        --ring: 212 100% 48%;
 
-        /* ---- brand ---- */
-        --brand: 222 58% 32%; /* interactive: links, emphasis */
+        /* ---- brand (interactive blue) ---- */
+        --brand: 212 100% 42%; /* links + emphasis; 4.6:1 on white */
         --brand-foreground: 0 0% 100%;
-        --brand-surface: 222 56% 17%; /* fill: heroes, filled chrome */
+        --brand-surface: 0 0% 9%; /* fill: heroes, filled chrome */
         --brand-surface-foreground: 0 0% 100%;
-        --brand-subtle: 222 44% 95%; /* tinted background */
-        --brand-subtle-foreground: 222 58% 26%;
+        --brand-subtle: 212 100% 97%; /* tinted background */
+        --brand-subtle-foreground: 212 92% 32%;
 
-        /* ---- highlight (the lime accent) ---- */
-        --highlight: 78 78% 48%;
-        --highlight-foreground: 78 82% 10%;
-        --highlight-border: 78 82% 34%; /* CTA boundary on light surfaces */
-        --highlight-subtle: 78 70% 90%;
-        --highlight-subtle-foreground: 78 80% 20%;
+        /* ---- highlight (the once-per-view CTA — contrast, not colour) ---- */
+        --highlight: 0 0% 9%;
+        --highlight-foreground: 0 0% 100%;
+        --highlight-border: 0 0% 9%; /* CTA boundary on light surfaces */
+        --highlight-subtle: 0 0% 96%;
+        --highlight-subtle-foreground: 0 0% 25%;
 
-        /* ---- status. Hues held >=40 apart from --highlight so a lime CTA can
-               never be mistaken for a warning. ---- */
-        --success: 152 62% 30%;
+        /* ---- status. These stay chromatic on purpose: red/amber/green are the
+               only things on screen carrying MEANING in their hue, and a
+               monochrome error state is an error state nobody sees. The old
+               "hold hues 40 apart from --highlight" rule is retired — the
+               highlight is achromatic now, so there is no hue to collide with.
+               ---- */
+        --success: 145 63% 30%;
         --success-foreground: 0 0% 100%;
-        --warning: 38 94% 50%;
+        --warning: 38 92% 45%;
         --warning-foreground: 38 90% 10%;
-        --warning-subtle: 38 92% 92%;
+        --warning-subtle: 38 92% 94%;
         --warning-subtle-foreground: 32 96% 26%;
-        --info: 210 80% 38%;
+        --info: 212 100% 42%;
         --info-foreground: 0 0% 100%;
 
-        /* ---- chart series: brand -> highlight, perceptually stepped ---- */
-        --chart-1: 222 58% 34%;
-        --chart-2: 196 66% 38%;
-        --chart-3: 168 58% 36%;
-        --chart-4: 118 46% 40%;
-        --chart-5: 78 78% 38%;
+        /* ---- chart series. Deliberately NOT monochrome: a series is only
+               readable if its members are distinguishable, and five greys are
+               not. Restrained hues at even steps, anchored on the brand blue.
+               ---- */
+        --chart-1: 212 100% 45%;
+        --chart-2: 262 62% 55%;
+        --chart-3: 190 80% 38%;
+        --chart-4: 340 70% 50%;
+        --chart-5: 38 88% 45%;
 
-        /* ---- shape ---- */
-        --radius: 0.625rem;
+        /* ---- shape. The ANCHOR, not the button radius: the scale in
+               tailwind.config.ts derives 4/6/8/12/16px from this, so controls
+               land on 6px and cards on 12px — the two values this register
+               actually cares about. The old 10px anchor read soft next to 1px
+               borders and tight type. ---- */
+        --radius: 0.5rem;
 
-        /* ---- elevation. Tinted with the brand hue rather than pure black, so
-               shadows sit in the palette instead of greying it. ---- */
-        --shadow-color: 222 40% 12%;
+        /* ---- elevation. Neutral black: with no tint anywhere else, a coloured
+               shadow would be the only hue on the surface and would read as a
+               smudge. ---- */
+        --shadow-color: 0 0% 0%;
         --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.05);
         --shadow-sm:
             0 1px 3px 0 hsl(var(--shadow-color) / 0.08),
@@ -172,61 +200,67 @@
     }
 
     .dark {
-        --background: 222 20% 7%;
-        --foreground: 222 12% 96%;
-        --card: 222 18% 9%;
-        --card-foreground: 222 12% 96%;
-        --popover: 222 18% 11%;
-        --popover-foreground: 222 12% 96%;
+        /* TRUE black, not a dark grey. This is the half of the register people
+           actually recognise, and it only works if the page is #000 and the
+           raised surface is a hair above it (#0a0a0a) — the card reads as lit
+           BY its border rather than by being lighter. */
+        --background: 0 0% 0%;
+        --foreground: 0 0% 93%;
+        --card: 0 0% 4%;
+        --card-foreground: 0 0% 93%;
+        --popover: 0 0% 7%;
+        --popover-foreground: 0 0% 93%;
 
-        --primary: 222 52% 50%;
-        --primary-foreground: 0 0% 100%;
-        --secondary: 222 14% 16%;
-        --secondary-foreground: 222 12% 94%;
-        --muted: 222 14% 15%;
-        --muted-foreground: 222 10% 64%;
+        /* Inverted: the primary control is white on black here. */
+        --primary: 0 0% 93%;
+        --primary-foreground: 0 0% 4%;
+        --secondary: 0 0% 12%;
+        --secondary-foreground: 0 0% 93%;
+        --muted: 0 0% 12%;
+        --muted-foreground: 0 0% 63%; /* 8.1:1 on black */
 
-        --accent: 222 14% 17%;
-        --accent-foreground: 222 12% 94%;
+        --accent: 0 0% 14%;
+        --accent-foreground: 0 0% 93%;
 
-        --destructive: 358 62% 48%;
-        --destructive-foreground: 0 0% 100%;
+        --destructive: 0 90% 60%;
+        --destructive-foreground: 0 0% 4%;
 
-        --border: 222 12% 27%;
-        --input: 222 10% 42%;
-        --ring: 222 60% 60%;
+        --border: 0 0% 18%;
+        --input: 0 0% 42%; /* 3.94:1 on black */
+        --ring: 212 100% 60%;
 
         /* Lightened for legibility ON dark; the surface token below does not
            move, so heroes stay deep. See rule 2. */
-        --brand: 222 64% 72%;
-        --brand-foreground: 222 58% 12%;
-        --brand-surface: 222 52% 14%;
-        --brand-surface-foreground: 0 0% 100%;
-        --brand-subtle: 222 32% 18%;
-        --brand-subtle-foreground: 222 60% 80%;
+        --brand: 212 100% 62%;
+        --brand-foreground: 0 0% 4%;
+        --brand-surface: 0 0% 9%;
+        --brand-surface-foreground: 0 0% 93%;
+        --brand-subtle: 212 60% 14%;
+        --brand-subtle-foreground: 212 100% 78%;
 
-        --highlight: 78 76% 56%;
-        --highlight-foreground: 78 82% 10%;
-        --highlight-border: 78 76% 56%;
-        --highlight-subtle: 78 40% 18%;
-        --highlight-subtle-foreground: 78 72% 68%;
+        /* The CTA inverts with the page: white fill, black label. */
+        --highlight: 0 0% 93%;
+        --highlight-foreground: 0 0% 4%;
+        --highlight-border: 0 0% 93%;
+        --highlight-subtle: 0 0% 14%;
+        --highlight-subtle-foreground: 0 0% 88%;
 
-        --success: 152 48% 52%;
-        --success-foreground: 152 60% 8%;
-        --warning: 38 86% 60%;
+        --success: 145 58% 55%;
+        --success-foreground: 145 60% 6%;
+        --warning: 38 92% 62%;
         --warning-foreground: 38 80% 8%;
-        --warning-subtle: 34 60% 15%;
-        --warning-subtle-foreground: 40 96% 66%;
-        --info: 210 70% 60%;
-        --info-foreground: 210 60% 8%;
+        --warning-subtle: 34 50% 14%;
+        --warning-subtle-foreground: 40 96% 70%;
+        --info: 212 100% 62%;
+        --info-foreground: 212 60% 6%;
 
-        --chart-1: 222 64% 66%;
-        --chart-2: 196 66% 58%;
-        --chart-3: 168 56% 52%;
-        --chart-4: 118 46% 56%;
-        --chart-5: 78 76% 56%;
+        --chart-1: 212 100% 62%;
+        --chart-2: 262 75% 70%;
+        --chart-3: 190 85% 52%;
+        --chart-4: 340 80% 65%;
+        --chart-5: 38 92% 60%;
 
-        --shadow-color: 222 60% 2%;
+        --shadow-color: 0 0% 0%;
     }
 }
 

@@ -131,7 +131,7 @@ export default function AppsListPage() {
                                         cue that the link leaves this app. */}
                                     <span
                                         aria-hidden
-                                        className="text-muted-foreground group-hover:text-highlight translate-x-0 transition-all duration-200 group-hover:translate-x-0.5"
+                                        className="text-muted-foreground group-hover:text-foreground translate-x-0 transition-all duration-200 group-hover:translate-x-0.5"
                                     >
                                         →
                                     </span>

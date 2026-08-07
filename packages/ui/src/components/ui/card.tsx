@@ -8,7 +8,12 @@ const Card = React.forwardRef<
     <div
         ref={ref}
         className={cn(
-            "bg-card text-card-foreground rounded-lg border shadow-sm",
+            // `rounded-xl` (12px) and NO shadow. A card in this register is
+            // defined by its 1px border, not by floating above the page — and
+            // with the page and the card both pure white, a drop shadow was the
+            // only thing implying depth that isn't there. Surfaces that really
+            // are above the page (popovers, dialogs, dropdowns) keep theirs.
+            "rounded-xl border bg-card text-card-foreground",
             className,
         )}
         {...props}
@@ -51,7 +56,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <p
         ref={ref}
-        className={cn("text-muted-foreground text-sm", className)}
+        className={cn("text-sm text-muted-foreground", className)}
         {...props}
     />
 ));

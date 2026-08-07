@@ -91,8 +91,10 @@
 
 .wk-surface:hover {
     transform: translateY(-2px);
-    border-color: hsl(var(--brand) / 0.4);
-    box-shadow: 0 10px 24px -14px hsl(var(--shadow-color) / 0.5);
+    /* Hover darkens the LINE rather than tinting it. A blue edge on hover would
+       put the link colour on something that is a surface, not a link. */
+    border-color: hsl(var(--foreground) / 0.24);
+    box-shadow: 0 10px 24px -14px hsl(var(--shadow-color) / 0.28);
 }
 
 /* Press feedback for buttons and any control that commits something. */
@@ -125,8 +127,11 @@
     transform: translateY(-1px);
 }
 
+/* Selection reads as a doubled edge — the border plus a 1px ring in the page's
+   own ink. In a monochrome register that is what "chosen" looks like; a tinted
+   fill would be the only colour on the page and would shout. */
 .wk-choice[data-selected="true"] {
-    box-shadow: 0 0 0 1px hsl(var(--brand) / 0.5);
+    box-shadow: 0 0 0 1px hsl(var(--foreground) / 0.55);
     animation: wk-choose 260ms var(--wk-spring);
 }
 
@@ -161,7 +166,10 @@
     height: 1.125rem;
     width: 2px;
     border-radius: 1px;
-    background: hsl(var(--brand));
+    /* `--foreground`, not `--brand`: in the monochrome register the blue is
+       reserved for things you click THROUGH (links), and the active-page marker
+       is a statement about where you are, not a link. */
+    background: hsl(var(--foreground));
     transform: translateY(-50%) scaleY(0);
     transition: transform 220ms var(--wk-spring);
 }

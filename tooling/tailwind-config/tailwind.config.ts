@@ -187,10 +187,27 @@ const config = {
                 base: "var(--duration-base)",
                 slow: "var(--duration-slow)",
             },
+            /*
+             * Five steps, not three.
+             *
+             * shadcn ships lg/md/sm derived from a single `--radius` with a
+             * 2px spread, which cannot express the shape this system wants:
+             * CONTROLS at 6px and CARDS at 12px. Two extra steps above the
+             * anchor give that range while everything still moves together if
+             * `--radius` changes — a skin can restyle the whole app's corners
+             * from one value, which is why the scale is derived rather than
+             * hardcoded.
+             *
+             * At the default `--radius: 0.5rem`:
+             *   sm 4px · md 6px (buttons, inputs) · lg 8px
+             *   xl 12px (cards, panels) · 2xl 16px (modals, sheets)
+             */
             borderRadius: {
                 lg: "var(--radius)",
                 md: "calc(var(--radius) - 2px)",
                 sm: "calc(var(--radius) - 4px)",
+                xl: "calc(var(--radius) + 4px)",
+                "2xl": "calc(var(--radius) + 8px)",
             },
             keyframes: {
                 "accordion-down": {

@@ -36,12 +36,18 @@ export function Wordmark({ suffix, style, ...props }: WordmarkProps) {
         >
             <span
                 style={{
-                    // Solid, and reading the SEMANTIC brand token rather than
-                    // a ramp step: skins redefine `--brand`, so the wordmark
-                    // follows whichever world is selected. The old gradient
-                    // pinned it to a ramp no skin overrides, which is why it
-                    // stayed navy while everything around it changed.
-                    color: "hsl(var(--brand, 222 58% 22%))",
+                    // `--foreground`, not `--brand`. `--brand` is the
+                    // interactive blue now, and a logo rendered in the link
+                    // colour reads as a link — it sat in the sidebar looking
+                    // clickable-in-the-wrong-way. A wordmark should be the
+                    // page's ink: black on white, white on black, inverting
+                    // with the register like everything else.
+                    //
+                    // Still a semantic token, so skins that DO want a coloured
+                    // wordmark only have to move `--foreground`… or override
+                    // this deliberately. The fallback keeps it legible in the
+                    // Nextra docs/help apps, which load no tokens at all.
+                    color: "hsl(var(--foreground, 0 0% 9%))",
                 }}
             >
                 Saroh
