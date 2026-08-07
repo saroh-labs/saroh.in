@@ -81,7 +81,10 @@ export function SkinSwitcher() {
                         <DropdownMenuItem
                             key={option.id}
                             onSelect={() => choose(option.id)}
-                            className="items-start gap-3 py-2.5"
+                            // Press feedback: choosing a skin commits — it
+                            // writes `data-skin` and persists it — so unlike a
+                            // link this row deserves the acknowledgement.
+                            className="wk-press items-start gap-3 py-2.5"
                         >
                             {/*
                              * Swatches, not a colour name. "Panel" tells you

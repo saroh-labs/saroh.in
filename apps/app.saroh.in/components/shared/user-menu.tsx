@@ -98,6 +98,10 @@ export function UserMenu({
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
+                    // The only row in this menu that COMMITS rather than
+                    // navigates, so it is the only one that gets press
+                    // feedback (workspace.css).
+                    className="wk-press"
                     onSelect={() => {
                         void authClient.signOut().then(() => {
                             window.location.href = accountsLoginUrl;

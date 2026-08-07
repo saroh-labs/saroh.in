@@ -67,11 +67,14 @@ export function IdentityLinkDialog({
                         No matching commerce customers found.
                     </p>
                 ) : (
-                    <ul className="divide-y rounded-lg border">
-                        {suggestions.map((s) => (
+                    <ul className="divide-y rounded-xl border">
+                        {suggestions.map((s, index) => (
                             <li
                                 key={s.customerId}
-                                className="flex items-center justify-between gap-4 p-3"
+                                style={
+                                    { "--wk-i": index } as React.CSSProperties
+                                }
+                                className="wk-item flex items-center justify-between gap-4 p-3"
                             >
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-medium">
@@ -84,6 +87,7 @@ export function IdentityLinkDialog({
                                 </div>
                                 <Button
                                     size="sm"
+                                    className="wk-press"
                                     disabled={pending}
                                     onClick={() => confirm(s.customerId)}
                                 >

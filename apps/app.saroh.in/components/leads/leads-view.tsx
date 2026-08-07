@@ -168,7 +168,11 @@ export function LeadsView({
             empty="Leads appear here as enquiries come in. You can also create one by hand from a contact."
             renderCard={(l) => (
                 <Link href={`/leads/${l.id}`} className="block">
-                    <Card className="h-full transition-colors hover:border-brand/40">
+                    {/* `wk-surface`, not a brand-tinted hover edge: the card is a
+                        surface, not a link, and the link colour on its border
+                        read as though the outline itself were clickable. The
+                        shared hover darkens the line and lifts instead. */}
+                    <Card className="wk-surface h-full">
                         <CardContent className="space-y-1 p-4">
                             <p className="font-medium">{l.title}</p>
                             <p className="text-sm text-muted-foreground">

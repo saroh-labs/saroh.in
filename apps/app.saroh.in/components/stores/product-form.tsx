@@ -278,7 +278,11 @@ export function ProductForm({
                 />
 
                 <div className="flex items-center gap-3">
-                    <Button type="submit" disabled={isSubmitting}>
+                    <Button
+                        type="submit"
+                        className="wk-press"
+                        disabled={isSubmitting}
+                    >
                         {isSubmitting
                             ? "Saving…"
                             : editing
@@ -291,7 +295,7 @@ export function ProductForm({
                             variant="ghost"
                             disabled={deleting}
                             onClick={onDelete}
-                            className="text-destructive"
+                            className="wk-press text-destructive"
                         >
                             {deleting ? "Deleting…" : "Delete"}
                         </Button>

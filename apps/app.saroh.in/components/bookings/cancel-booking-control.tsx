@@ -36,6 +36,7 @@ export function CancelBookingControl({ bookingId }: { bookingId: string }) {
             size="sm"
             onClick={onCancel}
             disabled={busy}
+            className="wk-press"
         >
             {busy ? "Cancelling…" : "Cancel"}
         </Button>

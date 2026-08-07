@@ -108,6 +108,7 @@ export function TaskForm({ leadId }: { leadId: string }) {
                         type="submit"
                         size="sm"
                         variant="secondary"
+                        className="wk-press"
                         disabled={isSubmitting || !body.trim() || !due}
                     >
                         {isSubmitting ? "Scheduling…" : "Add follow-up"}

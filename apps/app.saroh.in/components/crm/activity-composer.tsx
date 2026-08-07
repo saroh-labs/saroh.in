@@ -46,7 +46,12 @@ export function ActivityComposer({ leadId }: { leadId: string }) {
                 rows={3}
             />
             <div className="flex justify-end">
-                <Button type="submit" size="sm" disabled={busy || !body.trim()}>
+                <Button
+                    type="submit"
+                    size="sm"
+                    className="wk-press"
+                    disabled={busy || !body.trim()}
+                >
                     {busy ? "Saving…" : "Add note"}
                 </Button>
             </div>

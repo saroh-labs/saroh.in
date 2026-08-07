@@ -25,17 +25,25 @@ function activityLabel(type: string): string {
     }
 }
 
-/** The accent colour for each activity type's timeline marker. */
+/**
+ * The marker for each activity type's timeline rule.
+ *
+ * Weight of one ink, not four hues. The monochrome register has no palette to
+ * spend on categories, and the previous amber/blue/violet/emerald set was a
+ * fixed-lightness literal that inverted badly against the dark surface. Weight
+ * also encodes something hue did not: an open commitment reads darkest, the
+ * records the system wrote for you read lightest.
+ */
 function accent(type: string): string {
     switch (type) {
         case "TASK":
-            return "border-amber-400";
+            return "border-foreground";
         case "NOTE":
-            return "border-blue-400";
+            return "border-muted-foreground";
         case "STAGE_CHANGED":
-            return "border-violet-400";
+            return "border-muted-foreground/50";
         case "CREATED":
-            return "border-emerald-400";
+            return "border-border";
         default:
             return "border-muted";
     }
@@ -69,6 +77,7 @@ function CompleteTaskButton({
             type="button"
             size="sm"
             variant="outline"
+            className="wk-press"
             disabled={busy}
             onClick={onClick}
         >
@@ -99,13 +108,14 @@ export function ActivityTimeline({
 
     return (
         <ol className="space-y-3">
-            {activities.map((entry) => {
+            {activities.map((entry, index) => {
                 const isTask = entry.type === "TASK";
                 const done = Boolean(entry.completedAt);
                 return (
                     <li
                         key={entry.id}
-                        className={`flex flex-wrap items-start justify-between gap-3 border-l-2 pl-4 ${accent(
+                        style={{ "--wk-i": index } as React.CSSProperties}
+                        className={`wk-item flex flex-wrap items-start justify-between gap-3 border-l-2 pl-4 ${accent(
                             entry.type,
                         )}`}
                     >

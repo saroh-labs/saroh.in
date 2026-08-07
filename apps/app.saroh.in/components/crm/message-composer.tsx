@@ -120,7 +120,12 @@ export function MessageComposer({
             )}
 
             <div className="flex justify-end">
-                <Button type="submit" size="sm" disabled={busy || !body.trim()}>
+                <Button
+                    type="submit"
+                    size="sm"
+                    className="wk-press"
+                    disabled={busy || !body.trim()}
+                >
                     {busy ? "Sending…" : "Send message"}
                 </Button>
             </div>

@@ -14,8 +14,24 @@ import type {
 } from "@/lib/analytics/service";
 
 /** A single headline metric card (delegates to the shared @saroh/ui StatCard). */
-function StatCard({ label, value }: { label: string; value: number }) {
-    return <UIStatCard label={label} value={value.toLocaleString()} />;
+function StatCard({
+    label,
+    value,
+    index,
+}: {
+    label: string;
+    value: number;
+    /** Position in the tile row, so the four stagger in rather than snap. */
+    index: number;
+}) {
+    return (
+        <UIStatCard
+            label={label}
+            value={value.toLocaleString()}
+            className="wk-item"
+            style={{ "--wk-i": index } as React.CSSProperties}
+        />
+    );
 }
 
 /**
@@ -45,8 +61,16 @@ function DailyViewsChart({ daily }: { daily: DailyPoint[] }) {
                                 className="flex flex-1 flex-col items-center gap-1"
                                 title={`${d.date}: ${d.views} views, ${d.uniques} unique`}
                             >
+                                {/*
+                                 * `--chart-1`, not `--primary`: two of the
+                                 * three skins re-point `--primary` to their
+                                 * luminous action green, which painted every
+                                 * bar in the button colour. The chart tokens
+                                 * are the series colours and stay chromatic on
+                                 * purpose (see @saroh/ui/globals.css).
+                                 */}
                                 <div
-                                    className="w-full rounded-t bg-primary/80"
+                                    className="w-full rounded-t bg-chart-1"
                                     style={{
                                         height: `${
                                             max > 0
@@ -119,13 +143,22 @@ export function AnalyticsDashboard({ view }: { view: AnalyticsView }) {
     return (
         <div className="grid gap-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Site views" value={summary.siteViews} />
+                <StatCard
+                    label="Site views"
+                    value={summary.siteViews}
+                    index={0}
+                />
                 <StatCard
                     label="Unique visitors"
                     value={summary.uniqueVisitors}
+                    index={1}
                 />
-                <StatCard label="Enquiries" value={summary.enquiries} />
-                <StatCard label="Orders" value={summary.orders} />
+                <StatCard
+                    label="Enquiries"
+                    value={summary.enquiries}
+                    index={2}
+                />
+                <StatCard label="Orders" value={summary.orders} index={3} />
             </div>
             <DailyViewsChart daily={daily} />
             <TopPagesTable pages={topPages} />

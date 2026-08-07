@@ -128,7 +128,11 @@ export function CreateStoreForm() {
                         </FormItem>
                     )}
                 />
-                <Button type="submit" disabled={isSubmitting || !name.trim()}>
+                <Button
+                    type="submit"
+                    className="wk-press"
+                    disabled={isSubmitting || !name.trim()}
+                >
                     {isSubmitting ? "Creating…" : "Create store"}
                 </Button>
             </form>

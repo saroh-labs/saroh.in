@@ -129,7 +129,11 @@ export function ProductVariants({
                             {inventory.reserved} reserved
                         </p>
                     )}
-                    <Button type="submit" disabled={savingStock}>
+                    <Button
+                        type="submit"
+                        className="wk-press"
+                        disabled={savingStock}
+                    >
                         {savingStock ? "Saving…" : "Save stock"}
                     </Button>
                 </form>
@@ -138,11 +142,12 @@ export function ProductVariants({
             <section className="space-y-3">
                 <h3 className="text-sm font-medium">Variants</h3>
                 {variants.length > 0 && (
-                    <ul className="divide-y rounded-lg border">
-                        {variants.map((v) => (
+                    <ul className="divide-y rounded-xl border">
+                        {variants.map((v, i) => (
                             <li
                                 key={v.id}
-                                className="flex items-center justify-between gap-3 p-3"
+                                style={{ "--wk-i": i } as React.CSSProperties}
+                                className="wk-item flex items-center justify-between gap-3 p-3"
                             >
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-medium">
@@ -157,6 +162,7 @@ export function ProductVariants({
                                     type="button"
                                     variant="ghost"
                                     size="sm"
+                                    className="wk-press"
                                     disabled={busy === v.id}
                                     onClick={() => onRemoveVariant(v.id)}
                                 >
@@ -169,7 +175,7 @@ export function ProductVariants({
 
                 <form
                     onSubmit={onAddVariant}
-                    className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+                    className="flex flex-wrap items-end gap-3 rounded-xl border p-4"
                 >
                     <div className="grid gap-2">
                         <Label htmlFor="sku">SKU</Label>
@@ -206,7 +212,11 @@ export function ProductVariants({
                             className="w-28"
                         />
                     </div>
-                    <Button type="submit" disabled={addingVariant}>
+                    <Button
+                        type="submit"
+                        className="wk-press"
+                        disabled={addingVariant}
+                    >
                         {addingVariant ? "Adding…" : "Add variant"}
                     </Button>
                 </form>

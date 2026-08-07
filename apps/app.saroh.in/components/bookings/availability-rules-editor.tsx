@@ -121,15 +121,18 @@ export function AvailabilityRulesEditor({
     return (
         <div className="grid gap-3">
             {rows.length === 0 && (
-                <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
                     No availability yet. Add a window so visitors can book.
                 </p>
             )}
 
             {rows.map((row, index) => (
+                // Each window is a panel (12px), not a control; `wk-item`
+                // staggers them so adding a row reads as one arriving.
                 <div
                     key={index}
-                    className="flex flex-wrap items-end gap-3 rounded-md border p-3"
+                    style={{ "--wk-i": index } as React.CSSProperties}
+                    className="wk-item flex flex-wrap items-end gap-3 rounded-xl border p-3"
                 >
                     <div className="grid gap-1.5">
                         <Label htmlFor={`day-${index}`}>Day</Label>
@@ -201,7 +204,12 @@ export function AvailabilityRulesEditor({
                 >
                     + Add window
                 </Button>
-                <Button type="button" onClick={onSave} disabled={saving}>
+                <Button
+                    type="button"
+                    onClick={onSave}
+                    disabled={saving}
+                    className="wk-press"
+                >
                     {saving ? "Saving…" : "Save availability"}
                 </Button>
             </div>

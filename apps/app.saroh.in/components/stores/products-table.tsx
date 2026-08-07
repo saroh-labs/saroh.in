@@ -118,7 +118,10 @@ export function ProductsTable({
             empty="Add your first product to start building the catalog."
             renderCard={(p) => (
                 <Link href={`${base}/${p.id}`} className="block">
-                    <Card className="h-full overflow-hidden transition-colors hover:border-brand/40">
+                    {/* wk-surface rather than a brand-tinted hover edge: brand is
+                        the colour of things you click THROUGH, and tinting the
+                        card's own border made the surface read as a link. */}
+                    <Card className="wk-surface h-full overflow-hidden">
                         {p.image ? (
                             <div className="aspect-[4/3] w-full bg-muted">
                                 {/* A plain <img>, not next/image, on purpose:

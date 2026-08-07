@@ -239,7 +239,11 @@ export function ContactsView({
             empty="Contacts appear here as enquiries come in, or when you create a lead by hand."
             renderCard={(c) => (
                 <Link href={`/contacts/${c.id}`} className="block">
-                    <Card className="h-full transition-colors hover:border-brand/40">
+                    {/* `wk-surface`, not a brand-tinted hover edge: the card is a
+                        surface, not a link, and the link colour on its border
+                        read as though the outline itself were clickable. The
+                        shared hover darkens the line and lifts instead. */}
+                    <Card className="wk-surface h-full">
                         <CardContent className="space-y-1 p-4">
                             <p className="font-medium">{contactName(c)}</p>
                             <p className="truncate text-sm text-muted-foreground">

@@ -131,7 +131,11 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
                         </FormItem>
                     )}
                 />
-                <Button type="submit" disabled={isSubmitting}>
+                <Button
+                    type="submit"
+                    className="wk-press"
+                    disabled={isSubmitting}
+                >
                     {isSubmitting ? "Saving…" : "Save changes"}
                 </Button>
             </form>

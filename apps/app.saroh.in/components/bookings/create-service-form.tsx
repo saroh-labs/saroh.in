@@ -127,7 +127,12 @@ export function CreateServiceForm() {
                     control={form.control}
                     name="name"
                     render={({ field }) => (
-                        <FormItem>
+                        // `wk-item` staggers the form's arrival (workspace.css);
+                        // `--wk-i` is the block's position, not the field's.
+                        <FormItem
+                            className="wk-item"
+                            style={{ "--wk-i": 0 } as React.CSSProperties}
+                        >
                             <FormLabel>Service name</FormLabel>
                             <FormControl>
                                 <Input
@@ -145,7 +150,10 @@ export function CreateServiceForm() {
                     control={form.control}
                     name="description"
                     render={({ field }) => (
-                        <FormItem>
+                        <FormItem
+                            className="wk-item"
+                            style={{ "--wk-i": 1 } as React.CSSProperties}
+                        >
                             <FormLabel>Description (optional)</FormLabel>
                             <FormControl>
                                 <Textarea
@@ -160,7 +168,10 @@ export function CreateServiceForm() {
                     )}
                 />
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div
+                    className="wk-item grid gap-4 sm:grid-cols-2"
+                    style={{ "--wk-i": 2 } as React.CSSProperties}
+                >
                     <FormField
                         control={form.control}
                         name="durationMinutes"
@@ -242,7 +253,10 @@ export function CreateServiceForm() {
                     control={form.control}
                     name="timezone"
                     render={({ field }) => (
-                        <FormItem>
+                        <FormItem
+                            className="wk-item"
+                            style={{ "--wk-i": 3 } as React.CSSProperties}
+                        >
                             <FormLabel>Timezone (IANA)</FormLabel>
                             <FormControl>
                                 <Input
@@ -260,7 +274,10 @@ export function CreateServiceForm() {
                     )}
                 />
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div
+                    className="wk-item grid gap-4 sm:grid-cols-2"
+                    style={{ "--wk-i": 4 } as React.CSSProperties}
+                >
                     <FormField
                         control={form.control}
                         name="price"
@@ -304,7 +321,8 @@ export function CreateServiceForm() {
                 <Button
                     type="submit"
                     disabled={isSubmitting || !name.trim()}
-                    className="justify-self-start"
+                    style={{ "--wk-i": 5 } as React.CSSProperties}
+                    className="wk-item wk-press justify-self-start"
                 >
                     {isSubmitting ? "Creating…" : "Create service"}
                 </Button>

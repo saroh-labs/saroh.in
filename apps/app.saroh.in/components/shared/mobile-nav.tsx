@@ -111,7 +111,16 @@ export function MobileNav({
                                             active ? "page" : undefined
                                         }
                                         className={cn(
-                                            "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                                            // `wk-nav` is the same leading-edge
+                                            // marker the rail carries
+                                            // (workspace.css). Below `lg` this
+                                            // drawer is the ONLY navigation, so
+                                            // without it the active page loses
+                                            // the one cue the desktop nav uses
+                                            // to say where you are — and the
+                                            // two navigations are meant to be
+                                            // the same mental model.
+                                            "wk-nav flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                                             active
                                                 ? "bg-accent font-medium text-foreground"

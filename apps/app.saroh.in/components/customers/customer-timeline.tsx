@@ -28,7 +28,11 @@ export function CustomerTimeline({ events }: { events: TimelineEvent[] }) {
     return (
         <ol className="relative space-y-4 border-l pl-6">
             {events.map((event, i) => (
-                <li key={`${event.type}-${event.at}-${i}`} className="relative">
+                <li
+                    key={`${event.type}-${event.at}-${i}`}
+                    style={{ "--wk-i": i } as React.CSSProperties}
+                    className="wk-item relative"
+                >
                     <span
                         aria-hidden
                         className="absolute -left-[27px] top-1.5 size-2 rounded-full bg-primary"

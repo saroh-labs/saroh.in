@@ -24,7 +24,7 @@ export function CommandTrigger() {
         >
             <Search className="h-4 w-4" />
             <span className="hidden md:inline">Search…</span>
-            <kbd className="hidden rounded bg-muted px-1.5 py-0.5 text-xs font-medium md:inline">
+            <kbd className="hidden rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium md:inline">
                 ⌘K
             </kbd>
         </button>

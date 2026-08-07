@@ -91,7 +91,7 @@ export function MembersManager({
             {canManage && (
                 <form
                     onSubmit={onInvite}
-                    className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+                    className="flex flex-wrap items-end gap-3 rounded-xl border p-4"
                 >
                     <div className="grid min-w-[200px] flex-1 gap-2">
                         <Label htmlFor="invite-email">Invite by email</Label>
@@ -124,7 +124,11 @@ export function MembersManager({
                             ))}
                         </select>
                     </div>
-                    <Button type="submit" disabled={inviting}>
+                    <Button
+                        type="submit"
+                        className="wk-press"
+                        disabled={inviting}
+                    >
                         {inviting ? "Sending…" : "Send invite"}
                     </Button>
                 </form>
@@ -132,11 +136,12 @@ export function MembersManager({
 
             <section className="space-y-3">
                 <h3 className="text-sm font-medium">Team</h3>
-                <ul className="divide-y rounded-lg border">
-                    {members.map((m) => (
+                <ul className="divide-y rounded-xl border">
+                    {members.map((m, i) => (
                         <li
                             key={`${m.kind}-${m.userId}`}
-                            className="flex flex-wrap items-center justify-between gap-3 p-3"
+                            style={{ "--wk-i": i } as React.CSSProperties}
+                            className="wk-item flex flex-wrap items-center justify-between gap-3 p-3"
                         >
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-medium">
@@ -178,6 +183,7 @@ export function MembersManager({
                                             type="button"
                                             variant="ghost"
                                             size="sm"
+                                            className="wk-press"
                                             disabled={busy === m.userId}
                                             onClick={() => onRemove(m.userId)}
                                         >
@@ -196,11 +202,12 @@ export function MembersManager({
             {canManage && invitations.length > 0 && (
                 <section className="space-y-3">
                     <h3 className="text-sm font-medium">Pending invitations</h3>
-                    <ul className="divide-y rounded-lg border">
-                        {invitations.map((inv) => (
+                    <ul className="divide-y rounded-xl border">
+                        {invitations.map((inv, i) => (
                             <li
                                 key={inv.id}
-                                className="flex flex-wrap items-center justify-between gap-3 p-3"
+                                style={{ "--wk-i": i } as React.CSSProperties}
+                                className="wk-item flex flex-wrap items-center justify-between gap-3 p-3"
                             >
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-medium">
@@ -214,6 +221,7 @@ export function MembersManager({
                                     type="button"
                                     variant="ghost"
                                     size="sm"
+                                    className="wk-press"
                                     disabled={busy === inv.id}
                                     onClick={() => onRevoke(inv.id)}
                                 >

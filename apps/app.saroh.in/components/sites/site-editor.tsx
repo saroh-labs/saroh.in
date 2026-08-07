@@ -312,12 +312,17 @@ export function SiteEditor({
                     )}
                     <Button
                         variant="outline"
+                        className="wk-press"
                         onClick={onSave}
                         disabled={saving || !dirty}
                     >
                         {saving ? "Saving…" : "Save draft"}
                     </Button>
-                    <Button onClick={onPublish} disabled={publishing || dirty}>
+                    <Button
+                        className="wk-press"
+                        onClick={onPublish}
+                        disabled={publishing || dirty}
+                    >
                         {publishing ? "Publishing…" : "Publish"}
                     </Button>
                 </div>
@@ -327,7 +332,7 @@ export function SiteEditor({
                 {/* Editor */}
                 <div className="space-y-4">
                     {sections.length === 0 && (
-                        <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                        <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
                             No sections yet. Add one below to start building the
                             page.
                         </p>
@@ -337,7 +342,7 @@ export function SiteEditor({
                         <div
                             key={index}
                             className={
-                                "rounded-lg border p-4" +
+                                "rounded-xl border p-4" +
                                 (errorIndex === index
                                     ? " border-destructive"
                                     : "")

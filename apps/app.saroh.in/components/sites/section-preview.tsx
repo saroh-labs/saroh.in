@@ -13,7 +13,7 @@ function SectionPreview({ section }: { section: Section }) {
         case "hero": {
             const { heading, subheading, cta, image } = section.content;
             return (
-                <section className="rounded-lg border bg-muted/30 p-8 text-center">
+                <section className="rounded-xl border bg-muted/30 p-8 text-center">
                     {image?.src && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -41,7 +41,7 @@ function SectionPreview({ section }: { section: Section }) {
         case "richText": {
             const { format, value } = section.content;
             return (
-                <section className="rounded-lg border p-6">
+                <section className="rounded-xl border p-6">
                     {format === "html" ? (
                         <div
                             className="prose prose-sm max-w-none"
@@ -58,7 +58,7 @@ function SectionPreview({ section }: { section: Section }) {
         case "cta": {
             const { label } = section.content;
             return (
-                <section className="rounded-lg border p-8 text-center">
+                <section className="rounded-xl border p-8 text-center">
                     <span className="inline-block rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground">
                         {label}
                     </span>
@@ -68,7 +68,7 @@ function SectionPreview({ section }: { section: Section }) {
         case "gallery": {
             const { images, layout } = section.content;
             return (
-                <section className="rounded-lg border p-6">
+                <section className="rounded-xl border p-6">
                     <div
                         className={
                             layout === "carousel"
@@ -106,7 +106,7 @@ function SectionPreview({ section }: { section: Section }) {
         case "enquiry": {
             const { title, description, submitLabel, fields } = section.content;
             return (
-                <section className="rounded-lg border p-6">
+                <section className="rounded-xl border p-6">
                     {title && (
                         <h3 className="text-lg font-semibold">{title}</h3>
                     )}
@@ -146,7 +146,7 @@ function SectionPreview({ section }: { section: Section }) {
             const { title, description, serviceId, submitLabel } =
                 section.content;
             return (
-                <section className="rounded-lg border p-6">
+                <section className="rounded-xl border p-6">
                     {title && (
                         <h3 className="text-lg font-semibold">{title}</h3>
                     )}
@@ -194,7 +194,7 @@ function SectionPreview({ section }: { section: Section }) {
 export function DraftPreview({ sections }: { sections: Section[] }) {
     if (sections.length === 0) {
         return (
-            <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+            <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
                 No sections yet. Add one to preview it here.
             </p>
         );

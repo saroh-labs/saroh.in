@@ -47,14 +47,15 @@ export function ConsentToggle({
 
     return (
         <ul className="grid gap-2">
-            {MESSAGE_CHANNELS.map((channel) => {
+            {MESSAGE_CHANNELS.map((channel, index) => {
                 const status = consent[channel];
                 const revoked = status === "REVOKED";
                 const next: ConsentStatus = revoked ? "GRANTED" : "REVOKED";
                 return (
                     <li
                         key={channel}
-                        className="flex items-center justify-between gap-3"
+                        style={{ "--wk-i": index } as React.CSSProperties}
+                        className="wk-item flex items-center justify-between gap-3"
                     >
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">
@@ -70,6 +71,7 @@ export function ConsentToggle({
                             type="button"
                             size="sm"
                             variant="outline"
+                            className="wk-press"
                             disabled={busy === channel}
                             onClick={() => toggle(channel, next)}
                         >

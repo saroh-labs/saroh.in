@@ -137,7 +137,11 @@ export function ServicesView({
             empty="Create a bookable service, add availability windows, then drop a Booking section onto a site so visitors can book."
             renderCard={(s) => (
                 <Link href={`/services/${s.id}`} className="block">
-                    <Card className="h-full transition-colors hover:border-brand/40">
+                    {/* The card is the link target, so it gets the hover lift.
+                        The local transition + brand hover border are dropped:
+                        wk-surface owns both, and a blue edge would put the link
+                        colour on something that is a surface, not a link. */}
+                    <Card className="wk-surface h-full">
                         <CardContent className="space-y-1 p-4">
                             <p className="font-medium">{s.name}</p>
                             <p className="text-sm text-muted-foreground">

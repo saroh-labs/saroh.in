@@ -157,7 +157,11 @@ export function CreateSiteForm({ templates }: { templates: Template[] }) {
                         )}
                     />
                 )}
-                <Button type="submit" disabled={isSubmitting || !name.trim()}>
+                <Button
+                    type="submit"
+                    className="wk-press"
+                    disabled={isSubmitting || !name.trim()}
+                >
                     {isSubmitting ? "Creating…" : "Create site"}
                 </Button>
             </form>

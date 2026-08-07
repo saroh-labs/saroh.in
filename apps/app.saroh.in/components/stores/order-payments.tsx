@@ -35,7 +35,7 @@ export function OrderPayments({
         intents.some((i) => i.status === "SUCCEEDED");
 
     return (
-        <div className="rounded-lg border">
+        <div className="rounded-xl border">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b p-3">
                 <h3 className="text-sm font-medium">Payments</h3>
                 {refundable ? <RefundButton orderId={orderId} /> : null}
@@ -47,8 +47,12 @@ export function OrderPayments({
                 </p>
             ) : (
                 <ul className="divide-y">
-                    {intents.map((intent) => (
-                        <li key={intent.id} className="space-y-2 p-3">
+                    {intents.map((intent, i) => (
+                        <li
+                            key={intent.id}
+                            style={{ "--wk-i": i } as React.CSSProperties}
+                            className="wk-item space-y-2 p-3"
+                        >
                             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                                 <span className="font-medium">
                                     {intent.provider}
@@ -85,9 +89,15 @@ export function OrderPayments({
                             {intent.refunds.length > 0 ? (
                                 <ul className="space-y-1 text-xs">
                                     {intent.refunds.map((r) => (
+                                        // `warning-subtle-foreground`, not
+                                        // `warning`: --warning is a FILL sized to
+                                        // carry text ON it, and as text on the
+                                        // card it lands ~2.3:1. This is the pair
+                                        // that stays legible in both registers,
+                                        // which a literal amber could not.
                                         <li
                                             key={r.id}
-                                            className="flex justify-between gap-2 text-amber-700 dark:text-amber-400"
+                                            className="flex justify-between gap-2 text-warning-subtle-foreground"
                                         >
                                             <span>Refund · {r.status}</span>
                                             <span className="tabular-nums">

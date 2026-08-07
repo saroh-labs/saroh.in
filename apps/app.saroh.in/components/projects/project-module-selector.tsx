@@ -26,12 +26,13 @@ export function ProjectModuleSelector({
     modules: ModuleView[];
 }) {
     return (
-        <ul className="divide-y rounded-lg border">
-            {modules.map((module) => (
+        <ul className="divide-y rounded-xl border">
+            {modules.map((module, index) => (
                 <ProjectModuleRow
                     key={module.key}
                     projectId={projectId}
                     module={module}
+                    index={index}
                 />
             ))}
         </ul>
@@ -41,9 +42,12 @@ export function ProjectModuleSelector({
 function ProjectModuleRow({
     projectId,
     module,
+    index,
 }: {
     projectId: string;
     module: ModuleView;
+    /** Position in the list, for the staggered entrance only. */
+    index: number;
 }) {
     const [pending, startTransition] = useTransition();
     const orgEnabled = module.lifecycle === "ENABLED";
@@ -66,7 +70,10 @@ function ProjectModuleRow({
     };
 
     return (
-        <li className="flex items-center justify-between gap-4 p-4">
+        <li
+            style={{ "--wk-i": index } as React.CSSProperties}
+            className="wk-item flex items-center justify-between gap-4 p-4"
+        >
             <div className="min-w-0">
                 <p className="text-sm font-medium">{module.label}</p>
                 {!orgEnabled ? (

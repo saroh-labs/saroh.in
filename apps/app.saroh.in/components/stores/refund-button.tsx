@@ -40,7 +40,7 @@ export function RefundButton({ orderId }: { orderId: string }) {
             type="button"
             onClick={onRefund}
             disabled={busy}
-            className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+            className="wk-press h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
         >
             {busy ? "Refunding…" : "Refund"}
         </button>

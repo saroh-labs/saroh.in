@@ -140,7 +140,7 @@ export function OrderForm({
 
     if (products.length === 0 || customers.length === 0) {
         return (
-            <div className="rounded-lg border p-6 text-sm">
+            <div className="rounded-xl border p-6 text-sm">
                 <p className="text-muted-foreground">
                     You need at least one{" "}
                     {products.length === 0 ? "product" : "customer"} before
@@ -294,7 +294,11 @@ export function OrderForm({
                         Total {money(totalCents)}
                     </p>
                 </div>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button
+                    type="submit"
+                    className="wk-press"
+                    disabled={isSubmitting}
+                >
                     {isSubmitting ? "Creating…" : "Create order"}
                 </Button>
             </div>

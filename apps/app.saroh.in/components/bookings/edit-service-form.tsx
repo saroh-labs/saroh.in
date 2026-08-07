@@ -111,7 +111,12 @@ export function EditServiceForm({ service }: { service: Service }) {
                     control={form.control}
                     name="name"
                     render={({ field }) => (
-                        <FormItem>
+                        // `wk-item` staggers the form's arrival (workspace.css);
+                        // `--wk-i` is the block's position, not the field's.
+                        <FormItem
+                            className="wk-item"
+                            style={{ "--wk-i": 0 } as React.CSSProperties}
+                        >
                             <FormLabel>Service name</FormLabel>
                             <FormControl>
                                 <Input disabled={isSubmitting} {...field} />
@@ -125,7 +130,10 @@ export function EditServiceForm({ service }: { service: Service }) {
                     control={form.control}
                     name="description"
                     render={({ field }) => (
-                        <FormItem>
+                        <FormItem
+                            className="wk-item"
+                            style={{ "--wk-i": 1 } as React.CSSProperties}
+                        >
                             <FormLabel>Description</FormLabel>
                             <FormControl>
                                 <Textarea
@@ -139,7 +147,10 @@ export function EditServiceForm({ service }: { service: Service }) {
                     )}
                 />
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div
+                    className="wk-item grid gap-4 sm:grid-cols-2"
+                    style={{ "--wk-i": 2 } as React.CSSProperties}
+                >
                     <FormField
                         control={form.control}
                         name="durationMinutes"
@@ -221,7 +232,10 @@ export function EditServiceForm({ service }: { service: Service }) {
                     control={form.control}
                     name="timezone"
                     render={({ field }) => (
-                        <FormItem>
+                        <FormItem
+                            className="wk-item"
+                            style={{ "--wk-i": 3 } as React.CSSProperties}
+                        >
                             <FormLabel>Timezone (IANA)</FormLabel>
                             <FormControl>
                                 <Input disabled={isSubmitting} {...field} />
@@ -231,10 +245,14 @@ export function EditServiceForm({ service }: { service: Service }) {
                     )}
                 />
 
-                <div className="flex flex-wrap items-center gap-3 pt-2">
+                <div
+                    className="wk-item flex flex-wrap items-center gap-3 pt-2"
+                    style={{ "--wk-i": 4 } as React.CSSProperties}
+                >
                     <Button
                         type="submit"
                         disabled={isSubmitting || !name.trim()}
+                        className="wk-press"
                     >
                         {isSubmitting ? "Saving…" : "Save changes"}
                     </Button>
@@ -244,6 +262,7 @@ export function EditServiceForm({ service }: { service: Service }) {
                             variant="outline"
                             onClick={onArchive}
                             disabled={archiving}
+                            className="wk-press"
                         >
                             {archiving ? "Archiving…" : "Archive service"}
                         </Button>

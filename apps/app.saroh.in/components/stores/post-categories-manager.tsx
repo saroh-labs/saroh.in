@@ -57,7 +57,7 @@ export function PostCategoriesManager({
         <div className="space-y-6">
             <form
                 onSubmit={onAdd}
-                className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+                className="flex flex-wrap items-end gap-3 rounded-xl border p-4"
             >
                 <div className="grid min-w-[180px] flex-1 gap-2">
                     <Label htmlFor="cat-name">New category</Label>
@@ -70,7 +70,7 @@ export function PostCategoriesManager({
                         disabled={adding}
                     />
                 </div>
-                <Button type="submit" disabled={adding}>
+                <Button type="submit" className="wk-press" disabled={adding}>
                     {adding ? "Adding…" : "Add category"}
                 </Button>
             </form>
@@ -80,11 +80,12 @@ export function PostCategoriesManager({
                     No categories yet.
                 </p>
             ) : (
-                <ul className="divide-y rounded-lg border">
-                    {categories.map((c) => (
+                <ul className="divide-y rounded-xl border">
+                    {categories.map((c, i) => (
                         <li
                             key={c.id}
-                            className="flex items-center justify-between gap-3 p-3"
+                            style={{ "--wk-i": i } as React.CSSProperties}
+                            className="wk-item flex items-center justify-between gap-3 p-3"
                         >
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-medium">
@@ -98,6 +99,7 @@ export function PostCategoriesManager({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
+                                className="wk-press"
                                 disabled={busy === c.id}
                                 onClick={() => onDelete(c.id)}
                             >

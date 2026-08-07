@@ -62,13 +62,14 @@ export function MessageHistory({ messages }: { messages: LeadMessage[] }) {
 
     return (
         <ol className="space-y-3">
-            {messages.map((message) => {
+            {messages.map((message, index) => {
                 const { status, at } = displayStatus(message);
                 const latest = message.deliveries.at(-1);
                 return (
                     <li
                         key={message.id}
-                        className="grid gap-1 rounded-lg border p-3"
+                        style={{ "--wk-i": index } as React.CSSProperties}
+                        className="wk-item grid gap-1 rounded-xl border p-3"
                     >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">

@@ -215,7 +215,11 @@ export function CustomerForm({
                     />
                 </div>
                 <div>
-                    <Button type="submit" disabled={isSubmitting}>
+                    <Button
+                        type="submit"
+                        className="wk-press"
+                        disabled={isSubmitting}
+                    >
                         {isSubmitting
                             ? "Saving…"
                             : editing

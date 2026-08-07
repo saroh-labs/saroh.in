@@ -91,13 +91,14 @@ export function NotificationsInbox({
                     size="sm"
                     onClick={markAll}
                     disabled={!hasUnread || pending}
+                    className="wk-press"
                 >
                     Mark all read
                 </Button>
             </div>
 
-            <ul className="divide-y rounded-lg border">
-                {notifications.map((n) => {
+            <ul className="divide-y rounded-xl border border-border">
+                {notifications.map((n, index) => {
                     const unread = !n.readAt;
                     const body = (
                         <div className="flex items-start gap-3">
@@ -132,7 +133,8 @@ export function NotificationsInbox({
                     return (
                         <li
                             key={n.id}
-                            className="flex items-center justify-between gap-4 p-4"
+                            style={{ "--wk-i": index } as React.CSSProperties}
+                            className="wk-item flex items-center justify-between gap-4 p-4"
                         >
                             {n.leadId ? (
                                 <Link
@@ -150,6 +152,7 @@ export function NotificationsInbox({
                                     size="sm"
                                     onClick={() => markOne(n.id)}
                                     disabled={busyId === n.id || pending}
+                                    className="wk-press"
                                 >
                                     Mark read
                                 </Button>

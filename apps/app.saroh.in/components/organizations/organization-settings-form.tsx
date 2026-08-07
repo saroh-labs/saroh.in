@@ -116,7 +116,12 @@ export function OrganizationSettingsForm({
                     control={form.control}
                     name="name"
                     render={({ field }) => (
-                        <FormItem>
+                        // `wk-item` staggers the form's arrival (workspace.css);
+                        // `--wk-i` is the block's position, not the field's.
+                        <FormItem
+                            className="wk-item"
+                            style={{ "--wk-i": 0 } as React.CSSProperties}
+                        >
                             <FormLabel>Organization name</FormLabel>
                             <FormControl>
                                 <Input {...field} maxLength={120} />
@@ -131,7 +136,10 @@ export function OrganizationSettingsForm({
                     )}
                 />
 
-                <div className="grid gap-4">
+                <div
+                    className="wk-item grid gap-4"
+                    style={{ "--wk-i": 1 } as React.CSSProperties}
+                >
                     <h2 className="text-sm font-medium">Business profile</h2>
                     {PROFILE_FIELDS.map(({ key, label }) => (
                         <FormField
@@ -155,7 +163,12 @@ export function OrganizationSettingsForm({
                     </p>
                 </div>
 
-                <Button type="submit" disabled={isSubmitting} className="w-fit">
+                <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    style={{ "--wk-i": 2 } as React.CSSProperties}
+                    className="wk-item wk-press w-fit"
+                >
                     {isSubmitting ? "Saving…" : "Save changes"}
                 </Button>
             </form>
