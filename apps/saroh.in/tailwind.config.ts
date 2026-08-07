@@ -100,10 +100,20 @@ const config = {
                 lg: "var(--shadow-lg)",
                 xl: "var(--shadow-xl)",
             },
+            /*
+             * Must mirror tooling/tailwind-config. This app keeps its own
+             * Tailwind config (it has plugins the shared preset would break),
+             * and it had only sm/md/lg — so `rounded-xl` on every card and
+             * screenshot frame silently fell through to Tailwind's DEFAULT
+             * 0.75rem instead of tracking `--radius`, and the marketing site's
+             * corners drifted from the product's.
+             */
             borderRadius: {
                 lg: "var(--radius)",
                 md: "calc(var(--radius) - 2px)",
                 sm: "calc(var(--radius) - 4px)",
+                xl: "calc(var(--radius) + 4px)",
+                "2xl": "calc(var(--radius) + 8px)",
             },
             keyframes: {
                 "accordion-down": {

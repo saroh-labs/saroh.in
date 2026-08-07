@@ -71,3 +71,8 @@ dist
 # parallel subagent worktrees
 .claude/worktrees/
 .worktrees/
+
+# Impeccable design-session artifacts (decision pages, sketches, transcripts).
+# The durable outputs are DESIGN.md and its sidecar, which ARE committed.
+.impeccable/questions/
+.impeccable/sketches/

@@ -86,19 +86,20 @@ export default function JoinWaitlist() {
     const submitting = form.formState.isSubmitting;
 
     return (
+        // No coloured panel. This is the page's SECONDARY ask, sitting under
+        // the primary one, so it is a bordered card in the same register as
+        // everything else — the old `bg-brand-surface` block with a lime blur
+        // belonged to a palette that no longer exists, and its hardcoded
+        // `text-white` was unreadable in the light theme.
         <section
-            id="waitlist"
-            className="relative isolate scroll-mt-16 overflow-hidden bg-brand-surface px-6 py-24 sm:py-28"
+            id="waitlist-form"
+            className="scroll-mt-16 rounded-xl border border-border bg-card px-6 py-10 sm:px-10"
         >
-            <div
-                aria-hidden
-                className="absolute -bottom-48 left-[-10%] h-[30rem] w-[30rem] rounded-full bg-highlight/15 blur-3xl"
-            />
-            <div className="relative mx-auto max-w-xl text-center">
-                <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                    Be there when it opens
+            <div className="mx-auto max-w-xl text-center">
+                <h2 className="font-display text-[22px] font-semibold tracking-[-0.02em]">
+                    Not ready yet? Be there when it opens.
                 </h2>
-                <p className="mx-auto mt-4 max-w-[46ch] text-base text-white/70">
+                <p className="mx-auto mt-3 max-w-[46ch] text-[14.5px] leading-relaxed text-muted-foreground">
                     We are onboarding businesses in small batches so each one
                     gets set up properly. Leave your email and we will get in
                     touch when it is your turn.
@@ -107,7 +108,7 @@ export default function JoinWaitlist() {
                 <Form {...form}>
                     <form
                         onSubmit={form.handleSubmit(onSubmit)}
-                        className="mx-auto mt-9 flex max-w-md flex-col gap-3 sm:flex-row"
+                        className="mx-auto mt-7 flex max-w-md flex-col gap-2.5 sm:flex-row"
                     >
                         <FormField
                             control={form.control}
@@ -120,29 +121,25 @@ export default function JoinWaitlist() {
                                             autoComplete="email"
                                             placeholder="you@yourbusiness.in"
                                             aria-label="Email address"
-                                            className="h-11 w-full rounded-lg border-white/20 bg-white/5 text-white placeholder:text-white/40 focus-visible:ring-2 focus-visible:ring-highlight focus-visible:ring-offset-0"
+                                            className="h-10 w-full rounded-md border-input bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
                                             {...field}
                                         />
                                     </FormControl>
-                                    <FormMessage className="text-highlight" />
+                                    <FormMessage />
                                 </FormItem>
                             )}
                         />
                         <Button
                             type="submit"
                             disabled={!email || submitting}
-                            // Disabled is a neutral wash rather than a faded
-                            // lime: bg-highlight at low opacity over the navy
-                            // surface reads olive, which looks like a different
-                            // (broken) colour instead of an inactive control.
-                            className="h-11 shrink-0 rounded-lg bg-highlight px-6 font-semibold text-highlight-foreground hover:bg-highlight hover:opacity-90 disabled:bg-white/10 disabled:text-white/40 disabled:opacity-100"
+                            className="h-10 shrink-0 rounded-md bg-primary px-5 text-[13.5px] font-medium text-primary-foreground hover:opacity-90"
                         >
                             {submitting ? "Joining…" : "Join the waitlist"}
                         </Button>
                     </form>
                 </Form>
 
-                <p className="mt-5 text-xs text-white/45">
+                <p className="mt-4 text-[12px] text-muted-foreground/70">
                     One email when we open your batch. No newsletter.
                 </p>
             </div>

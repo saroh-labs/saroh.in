@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-07T00:00:00Z",
+  "title": "Design System: Saroh Marketing (saroh.in)",
+  "extensions": {
+    "colorMeta": {
+      "background": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "hsl(0 0% 100%)",
+        "note": "Pure white in light, pure black (hsl(0 0% 0%)) in dark. Identical to `card` in light — separation is a hairline, not a tint.",
+        "tonalRamp": [
+          "hsl(0 0% 4%)",
+          "hsl(0 0% 9%)",
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 25%)",
+          "hsl(0 0% 45%)",
+          "hsl(0 0% 64%)",
+          "hsl(0 0% 87%)",
+          "hsl(0 0% 98%)"
+        ]
+      },
+      "primary": {
+        "role": "primary",
+        "displayName": "Ink",
+        "canonical": "hsl(0 0% 9%)",
+        "note": "The fill of every solid button and the colour of body ink. Inverts to hsl(0 0% 93%) in dark. Never a hue.",
+        "tonalRamp": [
+          "hsl(0 0% 4%)",
+          "hsl(0 0% 9%)",
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 25%)",
+          "hsl(0 0% 45%)",
+          "hsl(0 0% 64%)",
+          "hsl(0 0% 87%)",
+          "hsl(0 0% 98%)"
+        ]
+      },
+      "brand": {
+        "role": "secondary",
+        "displayName": "Signal Blue",
+        "canonical": "hsl(212 100% 42%)",
+        "note": "Anchored on #0070f3. Interactive and relational only — links, focus rings, the dependency chip, one hero dot and one faint hero field. Lightens to hsl(212 100% 62%) in dark so it stays legible on black. Never a button fill.",
+        "tonalRamp": [
+          "hsl(212 90% 16%)",
+          "hsl(212 88% 25%)",
+          "hsl(212 92% 32%)",
+          "hsl(212 96% 40%)",
+          "hsl(212 100% 48%)",
+          "hsl(212 100% 64%)",
+          "hsl(212 100% 86%)",
+          "hsl(212 100% 97%)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "hsl(0 0% 92%)",
+        "note": "The system's primary structural device. hsl(0 0% 18%) in dark. Deliberately held below 3:1 — a heavier rule between every table row reads as a spreadsheet cage — but raised until unmistakably present at arm's length.",
+        "tonalRamp": [
+          "hsl(0 0% 4%)",
+          "hsl(0 0% 9%)",
+          "hsl(0 0% 18%)",
+          "hsl(0 0% 25%)",
+          "hsl(0 0% 45%)",
+          "hsl(0 0% 64%)",
+          "hsl(0 0% 92%)",
+          "hsl(0 0% 98%)"
+        ]
+      },
+      "input": {
+        "role": "neutral",
+        "displayName": "Control Boundary",
+        "canonical": "hsl(0 0% 56%)",
+        "note": "Form-control edges only, deliberately much darker than --border. Verified 3.23:1 on white and 3.94:1 on black (hsl(0 0% 42%)) for WCAG 1.4.11.",
+        "tonalRamp": [
+          "hsl(0 0% 4%)",
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 25%)",
+          "hsl(0 0% 42%)",
+          "hsl(0 0% 56%)",
+          "hsl(0 0% 64%)",
+          "hsl(0 0% 87%)",
+          "hsl(0 0% 98%)"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Quiet Ink",
+        "canonical": "hsl(0 0% 45%)",
+        "note": "Carries most text on the site: ledes, body, nav at rest, all micro labels. 4.74:1 on white; hsl(0 0% 63%) at 8.1:1 on black.",
+        "tonalRamp": [
+          "hsl(0 0% 4%)",
+          "hsl(0 0% 9%)",
+          "hsl(0 0% 25%)",
+          "hsl(0 0% 40%)",
+          "hsl(0 0% 45%)",
+          "hsl(0 0% 63%)",
+          "hsl(0 0% 87%)",
+          "hsl(0 0% 96%)"
+        ]
+      },
+      "destructive": {
+        "role": "tertiary",
+        "displayName": "Fault Red",
+        "canonical": "hsl(0 84% 45%)",
+        "note": "The only status hue this surface reaches, and only via the failed-submission toast. Status colours stay chromatic in the inherited system because hue is the information there.",
+        "tonalRamp": [
+          "hsl(0 84% 12%)",
+          "hsl(0 84% 20%)",
+          "hsl(0 84% 30%)",
+          "hsl(0 84% 45%)",
+          "hsl(0 88% 55%)",
+          "hsl(0 90% 68%)",
+          "hsl(0 90% 84%)",
+          "hsl(0 90% 96%)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display-hero": {
+        "displayName": "Display / Hero",
+        "purpose": "The single hero headline on the home page. Bricolage Grotesque with opsz 32, capped at 16ch, tracking -0.038em."
+      },
+      "display-page": {
+        "displayName": "Display / Page",
+        "purpose": "The h1 on /modules and each module page. Capped at 22ch."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section h2s, capped at 24ch. The centred closing headline runs one step larger at clamp(1.75rem, 3.2vw, 2.5rem)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Step headings and tile links. Set in Geist, not the display face — below ~22px Bricolage stops paying for itself."
+      },
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "The muted paragraph under a headline. Capped at 52-58ch."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Section and cell copy, 14-16px, always --muted-foreground."
+      },
+      "control": {
+        "displayName": "Control",
+        "purpose": "Button labels, nav links and chips at 13-13.5px / 500."
+      },
+      "micro-label": {
+        "displayName": "Micro Label",
+        "purpose": "Table column headers, figure captions, footer meta, step ordinals. Renders in the platform monospace stack — no mono file is shipped and --font-mono is deliberately unset."
+      }
+    },
+    "shadows": [
+      {
+        "name": "none",
+        "value": "none",
+        "purpose": "The resting state of every element in the page flow. This surface uses no elevation at all."
+      },
+      {
+        "name": "overlay",
+        "value": "var(--shadow-lg)",
+        "purpose": "Toasts and true overlays only — the single shadow this surface renders. Resolves to 0 14px 32px -8px hsl(0 0% 0% / 0.13), 0 4px 10px -4px hsl(0 0% 0% / 0.06)."
+      },
+      {
+        "name": "blur-chrome",
+        "value": "backdrop-filter: blur(24px); background: hsl(var(--background) / 0.7)",
+        "purpose": "The sticky nav. The only place on the site where content is visibly behind something."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "purpose": "The suite's single easing curve; duration carries the meaning, not the curve."
+      },
+      {
+        "name": "duration-fast",
+        "value": "120ms",
+        "purpose": "Colour and opacity transitions on hover — every interactive element on this surface uses Tailwind's default 150ms transition-colors / transition-opacity, which sits in this band."
+      },
+      {
+        "name": "duration-base",
+        "value": "200ms",
+        "purpose": "Accordion and enter/exit animations in the shared primitives."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation-duration: 0.01ms; transition-duration: 0.01ms; scroll-behavior: auto",
+        "purpose": "globals.css clamps all motion under prefers-reduced-motion (WCAG 2.3.3). Any new animation inherits this for free."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "container", "value": "1152px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The only filled control on the site. Near-black on white, near-white on black — never coloured.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">Start free</a>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; height: 38px; padding: 0 18px; border-radius: 6px; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-family: var(--font-sans), ui-sans-serif, system-ui; font-size: 13.5px; font-weight: 500; text-decoration: none; transition: opacity 150ms cubic-bezier(0.32, 0.72, 0, 1); } .ds-btn-primary:hover { opacity: 0.9; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--ring)); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The outlined partner to every primary. Transparent on the page ground with a 1px hairline; fills to the neutral hover surface.",
+      "html": "<a class=\"ds-btn-secondary\" href=\"#\">See the modules</a>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; height: 38px; padding: 0 18px; border-radius: 6px; border: 1px solid hsl(var(--border)); background: transparent; color: hsl(var(--foreground)); font-family: var(--font-sans), ui-sans-serif, system-ui; font-size: 13.5px; font-weight: 500; text-decoration: none; transition: background-color 150ms cubic-bezier(0.32, 0.72, 0, 1); } .ds-btn-secondary:hover { background: hsl(var(--accent)); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--ring)); }"
+    },
+    {
+      "name": "Theme Toggle",
+      "kind": "button",
+      "refersTo": "button-nav",
+      "description": "The site's only icon button: a 32px square in the nav, muted at rest. Renders a fixed-size placeholder until mounted so the icon never shifts the layout.",
+      "html": "<button class=\"ds-btn-ghost-icon\" type=\"button\" aria-label=\"Toggle theme\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z\"/></svg></button>",
+      "css": ".ds-btn-ghost-icon { display: grid; place-items: center; width: 32px; height: 32px; border: none; border-radius: 6px; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; transition: color 150ms, background-color 150ms; } .ds-btn-ghost-icon:hover { color: hsl(var(--foreground)); background: hsl(var(--accent)); } .ds-btn-ghost-icon:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--ring)); }"
+    },
+    {
+      "name": "Dependency Chip",
+      "kind": "chip",
+      "refersTo": "chip-dependency",
+      "description": "The one chromatic element in the module table, and the component carrying the site's argument: this module needs that one first.",
+      "html": "<span class=\"ds-chip-dependency\">CRM</span>",
+      "css": ".ds-chip-dependency { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid hsl(var(--brand) / 0.3); background: hsl(var(--brand) / 0.1); color: hsl(var(--brand)); font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.06em; }"
+    },
+    {
+      "name": "Hero Tag Pill",
+      "kind": "chip",
+      "refersTo": "tag-pill",
+      "description": "Exactly one exists on the site, above the hero headline. The 5px blue dot is one of the four places --brand is spent.",
+      "html": "<span class=\"ds-tag-pill\"><span class=\"ds-tag-dot\"></span>Modular business platform</span>",
+      "css": ".ds-tag-pill { display: inline-flex; align-items: center; gap: 8px; height: 26px; padding: 0 12px; border-radius: 9999px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--muted-foreground)); font-family: var(--font-sans), ui-sans-serif, system-ui; font-size: 12px; } .ds-tag-dot { display: block; width: 5px; height: 5px; border-radius: 9999px; background: hsl(var(--brand)); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A 12px bordered container on the same ground as the page. Its border is its entire definition — no shadow, no tint.",
+      "html": "<section class=\"ds-card\"><h2 class=\"ds-card-title\">Not ready yet? Be there when it opens.</h2><p class=\"ds-card-body\">We are onboarding businesses in small batches so each one gets set up properly.</p></section>",
+      "css": ".ds-card { border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsl(var(--card)); padding: 40px 24px; text-align: center; } .ds-card-title { margin: 0; font-family: var(--font-display), ui-sans-serif, system-ui; font-variation-settings: 'opsz' 32; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: hsl(var(--card-foreground)); } .ds-card-body { margin: 12px auto 0; max-width: 46ch; font-family: var(--font-sans), ui-sans-serif, system-ui; font-size: 14.5px; line-height: 1.625; color: hsl(var(--muted-foreground)); }"
+    },
+    {
+      "name": "Email Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "40px field with the deliberately darker --input boundary, and a focus ring that sits flush on the edge rather than offset from it.",
+      "html": "<input class=\"ds-input\" type=\"email\" placeholder=\"you@yourbusiness.in\" aria-label=\"Email address\" />",
+      "css": ".ds-input { display: flex; width: 100%; height: 40px; padding: 8px 12px; border: 1px solid hsl(var(--input)); border-radius: 6px; background: hsl(var(--background)); color: hsl(var(--foreground)); font-family: var(--font-sans), ui-sans-serif, system-ui; font-size: 14px; } .ds-input::placeholder { color: hsl(var(--muted-foreground)); } .ds-input:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--ring)); } .ds-input:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Site Nav",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "56px sticky chrome: one hairline, a translucent blurred ground, 13px muted links. In this register the chrome is the quietest thing on screen.",
+      "html": "<header class=\"ds-nav\"><nav class=\"ds-nav-inner\"><span class=\"ds-wordmark\">Saroh</span><div class=\"ds-nav-links\"><a href=\"#\">Modules</a><a href=\"#\">Product</a><a href=\"#\">How it works</a></div></nav></header>",
+      "css": ".ds-nav { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--background) / 0.7); backdrop-filter: blur(24px); } .ds-nav-inner { display: flex; align-items: center; justify-content: space-between; height: 56px; max-width: 1152px; margin: 0 auto; padding: 0 24px; } .ds-wordmark { font-family: var(--font-display), ui-sans-serif, system-ui; font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.03em; color: hsl(var(--foreground)); } .ds-nav-links { display: flex; align-items: center; gap: 20px; } .ds-nav-links a { font-family: var(--font-sans), ui-sans-serif, system-ui; font-size: 13px; color: hsl(var(--muted-foreground)); text-decoration: none; transition: color 150ms; } .ds-nav-links a:hover { color: hsl(var(--foreground)); }"
+    },
+    {
+      "name": "Module Table",
+      "kind": "custom",
+      "refersTo": "table-row",
+      "description": "The site's signature component. Eight modules as a ruled sheet with a Requires column — showing enforced dependencies as data rather than claiming integration in a paragraph. Each row is one focusable link.",
+      "html": "<div class=\"ds-table\"><div class=\"ds-table-head\"><span>Module</span><span>What it does</span><span class=\"ds-right\">Requires</span></div><a class=\"ds-table-row\" href=\"#\"><span class=\"ds-table-label\">Commerce</span><span class=\"ds-table-blurb\">Catalog, inventory, carts and orders.</span><span class=\"ds-right\"><span class=\"ds-chip-dependency\">CRM</span></span></a><a class=\"ds-table-row\" href=\"#\"><span class=\"ds-table-label\">Website</span><span class=\"ds-table-blurb\">Pages, templates, forms and your own domain.</span><span class=\"ds-right\"><span class=\"ds-table-none\">&mdash;</span></span></a></div>",
+      "css": ".ds-table { border: 1px solid hsl(var(--border)); border-radius: 12px; overflow: hidden; } .ds-table-head { display: grid; grid-template-columns: 170px 1fr 110px; gap: 16px; padding: 12px 20px; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--muted) / 0.4); color: hsl(var(--muted-foreground)); font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; } .ds-table-row { display: grid; grid-template-columns: 170px 1fr 110px; gap: 16px; align-items: center; padding: 16px 20px; border-bottom: 1px solid hsl(var(--border)); text-decoration: none; transition: background-color 150ms; } .ds-table-row:last-child { border-bottom: none; } .ds-table-row:hover { background: hsl(var(--muted) / 0.4); } .ds-table-row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px hsl(var(--ring)); } .ds-table-label { font-family: var(--font-sans), ui-sans-serif, system-ui; font-size: 14.5px; font-weight: 500; color: hsl(var(--foreground)); } .ds-table-blurb { font-family: var(--font-sans), ui-sans-serif, system-ui; font-size: 14px; color: hsl(var(--muted-foreground)); } .ds-right { text-align: right; } .ds-table-none { font-family: ui-monospace, monospace; font-size: 11px; color: hsl(var(--muted-foreground) / 0.6); } .ds-chip-dependency { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid hsl(var(--brand) / 0.3); background: hsl(var(--brand) / 0.1); color: hsl(var(--brand)); font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.06em; }"
+    },
+    {
+      "name": "Product Shot Frame",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "A 12px bordered bezel with 6px padding around a 6px-cornered screenshot, captioned in mono micro type. Both theme variants are always rendered and swapped in CSS, never JavaScript.",
+      "html": "<figure class=\"ds-shot\"><div class=\"ds-shot-frame\"><div class=\"ds-shot-img\"></div></div><figcaption class=\"ds-shot-caption\">The workspace &middot; seeded demo data</figcaption></figure>",
+      "css": ".ds-shot { margin: 56px 0 0; } .ds-shot-frame { border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsl(var(--card)); padding: 6px; } .ds-shot-img { width: 100%; aspect-ratio: 16 / 10; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); background: hsl(var(--muted)); } .ds-shot-caption { margin-top: 12px; text-align: center; font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }"
+    },
+    {
+      "name": "Gutter Tile Grid",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Equal-tile groups where the 1px gap IS the divider: a border-coloured container with gap-px and page-coloured children, clipped by the parent radius. No per-tile borders to double up at the seams.",
+      "html": "<ol class=\"ds-tiles\"><li class=\"ds-tile\"><span class=\"ds-tile-n\">01</span><h3 class=\"ds-tile-h\">Say what your business does</h3><p class=\"ds-tile-p\">You answer in outcomes, not module names.</p></li><li class=\"ds-tile\"><span class=\"ds-tile-n\">02</span><h3 class=\"ds-tile-h\">The workspace changes shape</h3><p class=\"ds-tile-p\">Navigation shows only what you switched on.</p></li><li class=\"ds-tile\"><span class=\"ds-tile-n\">03</span><h3 class=\"ds-tile-h\">Add the rest later</h3><p class=\"ds-tile-p\">Switch it off and nothing is deleted.</p></li></ol>",
+      "css": ".ds-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0; padding: 0; list-style: none; border: 1px solid hsl(var(--border)); border-radius: 12px; overflow: hidden; background: hsl(var(--border)); } @media (max-width: 640px) { .ds-tiles { grid-template-columns: 1fr; } } .ds-tile { background: hsl(var(--background)); padding: 24px; } .ds-tile-n { font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.14em; color: hsl(var(--muted-foreground) / 0.7); } .ds-tile-h { margin: 12px 0 0; font-family: var(--font-sans), ui-sans-serif, system-ui; font-size: 15.5px; font-weight: 600; letter-spacing: -0.01em; color: hsl(var(--foreground)); } .ds-tile-p { margin: 8px 0 0; font-family: var(--font-sans), ui-sans-serif, system-ui; font-size: 14px; line-height: 1.625; color: hsl(var(--muted-foreground)); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Registry Sheet",
+    "overview": "This surface argues by tabulation, not by illustration. Saroh is eight capability modules with enforced dependencies between them, and the site shows that as a ruled table with a Requires column — because the honest form for structured, verifiable data is a sheet, not eight marketing cards. Everything visual follows from that decision: the ground is a single flat colour, the divisions are 1px rules, and the only hue on the page marks the one thing that is a relationship rather than a label.\n\nThe palette is inherited, not invented here. packages/ui/src/globals.css (\"Midnight & Lime\") and the Tailwind colour mappings are shared with the merchant workspace, the accounts app and the admin plane; the marketing site consumes exactly the same semantic tokens the product renders itself with. That is the whole point of the screenshots — the site and the software in the screenshots are the same visual system, so the frame around the product shot and the product inside it agree.\n\nDensity is low and the rhythm is large: a 1152px measure, 112px between sections, and headlines capped at 16–24 characters. Nothing floats. The register is deliberately Linear/Vercel — precise, achromatic, tight-tracked — and it refuses the category-page hero: no angled floating device, no gradient confetti, no logo cloud, no illustrated abstractions. Light and dark are equal halves, following the OS by default with a toggle in the nav; the dark register is true #000 with a #0a0a0a raised surface, so a card reads as lit by its border rather than by being paler.",
+    "keyCharacteristics": [
+      "Pure white / pure black grounds; page and card are the same colour",
+      "1px hairlines do all separation — no tint, no shadow, no elevation",
+      "One chromatic token (--brand, a blue) spent in four places on the whole site",
+      "Filled buttons are near-black inverting to near-white — never coloured",
+      "Bricolage Grotesque for headings, Geist for everything else, both self-hosted",
+      "Two radii only: 6px controls, 12px containers",
+      "Every claim on screen is registry-backed; screenshots are labelled as demo data"
+    ],
+    "rules": [
+      {
+        "name": "The Same-Ground Rule",
+        "body": "The page and the card are the same colour. Separation is a 1px hairline, never a tint, never a shadow. If you find yourself reaching for an off-white panel to make a block \"sit apart\", draw a border instead.",
+        "section": "colors"
+      },
+      {
+        "name": "The Blue-Is-Not-A-Button Rule",
+        "body": "--brand is for things you click through or that mark a relationship — links, focus rings, the dependency chip. Filled buttons take --primary. A blue CTA on this site is a bug, not a variant.",
+        "section": "colors"
+      },
+      {
+        "name": "The Four-Spends Rule",
+        "body": "The blue appears roughly four times on the whole site. Its rarity is what makes the dependency chip read as information rather than decoration. Adding a fifth chromatic element costs the fourth its meaning.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Face Rule",
+        "body": "Bricolage carries headings at 22px and above and nothing else — including the wordmark, which is --font-display at 700/-0.03em. Geist carries every other word on the site. There is no third weight of decision here.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tightening Rule",
+        "body": "Negative tracking scales with size: -0.01em at 15.5px, -0.02em at 22px, -0.03em at section headlines, -0.038em at the hero. Large type without negative tracking reads loose against 1px hairlines.",
+        "section": "typography"
+      },
+      {
+        "name": "The Measure Rule",
+        "body": "Headlines are capped in ch, not pixels — 16ch for the hero, 22–24ch for page and section headings, 46–58ch for prose. A headline that runs the full 1152px container has lost the left-aligned rhythm the page is built on.",
+        "section": "typography"
+      },
+      {
+        "name": "The Full-Bleed Rule Rule",
+        "body": "Section separation is a border-t on the section element itself, so the hairline crosses the full viewport while the content inside stays capped at 1152px. Sections never separate by background colour.",
+        "section": "layout"
+      },
+      {
+        "name": "The Gutter-Is-The-Border Rule",
+        "body": "Equal-tile groups are built as a bg-border container with gap-px and bg-background children inside a rounded-xl border overflow-hidden wrapper. The 1px gap is the divider — there are no per-tile borders to double up at the seams.",
+        "section": "layout"
+      },
+      {
+        "name": "The No-Lift Rule",
+        "body": "Nothing in the page flow casts a shadow. Only elements that genuinely float above the document — toasts, dialogs, popovers, dropdowns — may take one, and they take it from the shared scale. A card with a shadow on a white-on-white ground is implying depth that isn't there.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Two-Radius Rule",
+        "body": "6px if you press it, 12px if it holds things. A pill only for a status tag or a dot. Any third radius on this surface is a drift.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do separate with a 1px --border hairline. It is the system's primary device and it works because the grounds are flat.",
+      "Do use --primary for any filled button, and let it invert with the theme rather than picking a colour.",
+      "Do reserve --brand for relationships, links and focus. If a new element wants blue, ask what relationship it is expressing; if there isn't one, it gets ink.",
+      "Do use --input (not --border) for form-control edges, so the 3:1 boundary that WCAG 1.4.11 requires survives.",
+      "Do keep to two radii: 6px on controls, 12px on containers.",
+      "Do cap headlines in ch (16–24ch) and prose at 46–58ch, left-aligned, and use the display face only at 22px and above.",
+      "Do ship both theme variants of any screenshot and swap them in CSS.",
+      "Do build equal-tile groups as bg-border + gap-px + bg-background children so the gutter is the divider.",
+      "Do set section rhythm at 96–112px with a full-bleed border-t, content capped at max-w-6xl px-6.",
+      "Do state on screen that screenshots show seeded demo data — the footer does, and every new screenshot context should."
+    ],
+    "donts": [
+      "Don't put a shadow on anything that sits in the page flow. Shadows belong to toasts, dialogs, popovers and dropdowns only.",
+      "Don't tint a panel to make it separate from the page. Both grounds are pure by design; draw the line instead.",
+      "Don't colour a call to action. There is no blue, green or gradient button in this system.",
+      "Don't repoint --accent at the brand — it is shadcn's neutral hover surface with 32 component usages and every menu hover would follow it.",
+      "Don't use --warning as a text colour on a pale tint; the --warning-subtle / --warning-subtle-foreground pair exists for that. Same for --brand and --highlight.",
+      "Don't introduce status hue (success/warning/destructive) decoratively. This surface earns its calm by having almost none; use it only when something is genuinely wrong or waiting.",
+      "Don't add a third radius, a second easing curve, or a second display weight. The scale is small on purpose.",
+      "Don't hide navigation behind a hamburger here; drop links and keep the footer complete instead.",
+      "Don't select a theme-dependent asset in JavaScript — it flashes the wrong variant on first paint.",
+      "Don't claim a capability the module registry in lib/modules.ts does not carry, and do not reintroduce the \"one customer record behind an order and a booking\" claim until auto-linking ships."
+    ]
+  }
+}

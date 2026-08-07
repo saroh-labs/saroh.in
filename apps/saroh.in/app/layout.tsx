@@ -1,3 +1,5 @@
+import { SiteFooter } from "@/components/site/site-footer";
+import { SiteNav } from "@/components/site/site-nav";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import "@saroh/ui/globals.css";
@@ -71,15 +73,56 @@ export default function RootLayout({
 
   gtag('config', 'G-L19ZLH2N5K');`}
                 </Script>
+                {/*
+                  THESIS: A modular business system shown as a registry, not a
+                  feature list. Refuses the category hero — no floating angled
+                  screenshot, no gradient confetti, no logo cloud.
+                  OWN-WORLD: Shared @saroh/ui mono tokens. Pure black / pure
+                  white ground, 1px hairlines doing all separation, one blue
+                  spent ~3 times, Geist + Bricolage, 6px controls / 12px cards.
+                  Identical system to the product itself.
+                  STORY: The visitor sees eight capabilities with real
+                  dependencies, sees the product actually running, and starts
+                  free — or joins the waitlist if not ready.
+                  FIRST VIEWPORT: Left-aligned tag, headline, lede, two
+                  buttons; the live Home screenshot seated in a bordered frame
+                  directly below, theme-matched to the site.
+                  FORM: "D · Precise" — Linear/Vercel register, user-selected
+                  after re-rolls; concept-seed.mjs was non-functional in this
+                  install (missing catalog), substituted CSPRNG, disclosed.
+                  FINISH: unreviewed and undocumented is unfinished; this build
+                  ends with the finish review, the verdict, and DESIGN.md.
+                */}
                 <Toaster />
+                {/*
+                 * Light AND dark, following the system by default.
+                 * `forcedTheme="dark"` was removed deliberately: PRODUCT.md
+                 * names "shop floor / warehouse, bright ambient light" as one of
+                 * four primary scenes, and a dark-only marketing site
+                 * misrepresents a product whose workspace serves that scene.
+                 */}
                 <ThemeProvider
                     attribute="class"
-                    defaultTheme="dark"
+                    defaultTheme="system"
                     enableSystem
                     disableTransitionOnChange
-                    forcedTheme="dark"
+                    /*
+                     * Versioned key. This site previously shipped
+                     * `forcedTheme="dark"`, and next-themes persisted "dark"
+                     * for every visitor who ever loaded it. A stored value
+                     * beats `defaultTheme`, so without this bump those
+                     * visitors would be pinned to dark forever and would never
+                     * see the light variant that now exists — the site would
+                     * look broken-by-omission to exactly the returning
+                     * audience it most wants to impress. Verified live: a
+                     * profile with `theme: "dark"` rendered dark under a
+                     * light system preference.
+                     */
+                    storageKey="saroh-site-theme"
                 >
-                    {children}
+                    <SiteNav />
+                    <main>{children}</main>
+                    <SiteFooter />
                 </ThemeProvider>
             </body>
         </html>
