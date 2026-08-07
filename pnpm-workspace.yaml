@@ -18,7 +18,13 @@ catalog:
     typescript: ^5
     "react-icons": ^5.2.1
     eslint-config-next: ^16.1.6
-    "@hookform/resolvers": ^3.6.0
+    # v5, not v3. `app.saroh.in` and `packages/ui` both moved off this catalog
+    # entry to ^5.4.0 and left it stale, so `saroh.in` — the only consumer still
+    # on `catalog:` — was resolving 3.10.0. That version declares no `zod`
+    # dependency at all, so pnpm handed it whichever zod sat at the store root
+    # (4.4.3, pulled in by better-auth) and it typed `zodResolver` against zod
+    # v4 while the app writes schemas with zod v3. v5 accepts both majors.
+    "@hookform/resolvers": ^5.4.0
     "lucide-react": ^0.394.0
     "date-fns": ^3.6.0
     "react-hook-form": ^7.51.5
