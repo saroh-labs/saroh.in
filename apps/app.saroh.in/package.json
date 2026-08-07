@@ -49,7 +49,6 @@
     "cmdk": "^1.1.1",
     "date-fns": "catalog:",
     "focus-trap-react": "^12.0.2",
-    "framer-motion": "^12.40.0",
     "lucide-react": "catalog:",
     "next": "catalog:next16",
     "next-themes": "^0.4.6",

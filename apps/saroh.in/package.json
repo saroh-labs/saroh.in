@@ -23,7 +23,6 @@
         "@tsparticles/slim": "^3.3.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
-        "framer-motion": "^12.40.0",
         "lucide-react": "catalog:",
         "mini-svg-data-uri": "^1.4.4",
         "next": "^16.2.6",

@@ -35,7 +35,10 @@ export function ProductShot({
         priority,
         // The frame is capped at ~1040px and the image is 2x that.
         sizes: "(max-width: 1100px) 100vw, 1040px",
-        className: "block w-full rounded-md border border-white/[0.06]",
+        // `border-border`, not a hardcoded white at 6% — that was written when
+        // the site was dark-only, and against a light screenshot on a light
+        // card it drew nothing, leaving the shot bleeding into its own frame.
+        className: "block w-full rounded-md border border-border",
     };
 
     return (

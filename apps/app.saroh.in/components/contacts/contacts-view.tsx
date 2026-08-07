@@ -255,7 +255,17 @@ export function ContactsView({
                                 </p>
                             ) : null}
                             {c.openLeadCount > 0 ? (
-                                <p className="pt-1 text-xs font-medium text-brand">
+                                /* `text-foreground`, not `text-brand`. Brand is
+                                   the link colour everywhere else in the
+                                   product, and this line sits INSIDE a link
+                                   whose target is the whole card — colouring
+                                   one line blue said "this line is the link",
+                                   which is not where the click goes. The
+                                   emphasis it needs is contrast against the
+                                   muted lines above it, and full-strength
+                                   foreground at medium weight already gives
+                                   that without spending a hue. */
+                                <p className="pt-1 text-xs font-medium text-foreground">
                                     {formatMoney(c.openLeadValue, null) ??
                                         "Unvalued"}{" "}
                                     open
