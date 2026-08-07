@@ -67,6 +67,19 @@ export function SkinSwitcher() {
                 <Button
                     variant="ghost"
                     size="icon"
+                    /*
+                     * The selected skin only exists on the client — the server
+                     * cannot read localStorage, so it renders DEFAULT_SKIN
+                     * while the client renders whatever is stored. React does
+                     * NOT patch up mismatched attributes ("this won't be
+                     * patched up"), so without this the label stayed frozen at
+                     * the server's guess and screen-reader users were told the
+                     * wrong skin was active — an accessibility bug, not just a
+                     * console warning. suppressHydrationWarning exists for
+                     * exactly this: a value that is legitimately
+                     * client-derived.
+                     */
+                    suppressHydrationWarning
                     aria-label={`Theme: ${active.name}. Change theme`}
                 >
                     <Palette className="size-5" />

@@ -18,21 +18,21 @@ export const SKINS = [
     {
         id: "panel",
         name: "Panel",
-        blurb: "Instrument calm, stockroom rigour. Green means actionable.",
+        blurb: "Razor-edged and deep. Ink violet means actionable.",
         /** Swatches for the picker: ground, then the signal colours. */
-        swatch: ["#0A0D0F", "#F2F2F0", "#6EF3A5", "#FFB020", "#FF5A00"],
+        swatch: ["#0B0A0E", "#F5F4F7", "#7C4DE8", "#F5A524", "#E5484D"],
     },
     {
         id: "instrument",
         name: "Instrument",
-        blurb: "Matte panel, luminous markings. Amber and red mean caution.",
-        swatch: ["#08090A", "#DFE5E2", "#7CFFB2", "#FFB020", "#FF4D3D"],
+        blurb: "Matte panel, luminous markings. Teal means actionable.",
+        swatch: ["#08090A", "#DDE3E3", "#3FE0DC", "#F5A524", "#E5484D"],
     },
     {
         id: "stockroom",
         name: "Stockroom",
-        blurb: "Black nylon, stockroom white, hazard orange. Labels name things.",
-        swatch: ["#0B0B0B", "#FFFFFF", "#FF5A00", "#8C8C88", "#262626"],
+        blurb: "Carbon, stockroom white, rust. Labels name things.",
+        swatch: ["#0B0B0B", "#FFFFFF", "#E85A16", "#8C8880", "#262626"],
     },
 ] as const;
 
