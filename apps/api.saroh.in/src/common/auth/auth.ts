@@ -1,11 +1,11 @@
 import type { Auth } from "@saroh/auth";
-import { createAuth } from "@saroh/auth";
+import { createAuth, VERIFICATION_OTP_EXPIRY_SECONDS } from "@saroh/auth";
 
 import {
     sendChangeEmailConfirmationEmail,
     sendDeleteAccountEmail,
     sendPasswordResetEmail,
-    sendVerificationEmail,
+    sendVerificationOtpEmail,
 } from "../email";
 
 /**
@@ -14,7 +14,15 @@ import {
  * reset email (relocated here from accounts, which is now just the UI).
  */
 export const auth: Auth = createAuth({
-    sendVerificationEmail: ({ to, url }) => sendVerificationEmail(to, url),
+    // Email verification is code-based (see the emailOTP plugin in @saroh/auth):
+    // no verification LINK is sent, so there is no link sender to inject.
+    sendVerificationOTP: ({ to, otp, type }) =>
+        sendVerificationOtpEmail(
+            to,
+            otp,
+            type,
+            VERIFICATION_OTP_EXPIRY_SECONDS,
+        ),
     sendResetPassword: ({ to, url }) => sendPasswordResetEmail(to, url),
     sendChangeEmailConfirmation: ({ to, newEmail, url }) =>
         sendChangeEmailConfirmationEmail(to, url, newEmail),

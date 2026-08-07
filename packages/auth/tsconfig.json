@@ -3,9 +3,17 @@
     "include": ["."],
     "exclude": ["dist", "build", "node_modules"],
     "compilerOptions": {
-        "baseUrl": "."
-        //     // "paths": {
-        //     //     "src/*": ["src/*"]
-        //     // }
+        "baseUrl": ".",
+        // tsc never emits this package's types: `dist/server.d.ts` is built by
+        // tsup, and every other entry (./client, ./constants, ./middleware,
+        // ./next, ./auth-status) is exported as SOURCE and typed by the Next app
+        // that transpiles it. Leaving the base's `declaration: true` on would
+        // make `tsc --noEmit` fail on declaration-emit-only errors for types it
+        // is never asked to write — notably TS2742 on `authClient`, whose
+        // plugin-derived type names zod through a pnpm-internal path (the same
+        // reason `createAuth` carries an explicit return type). tsup's dts build
+        // still enforces portability for the one entry that is actually emitted.
+        "declaration": false,
+        "declarationMap": false
     }
 }

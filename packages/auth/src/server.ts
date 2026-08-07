@@ -1,12 +1,28 @@
 import { prisma } from "@saroh/database";
+import type {
+    Auth as BetterAuthInstance,
+    BetterAuthOptions,
+} from "better-auth";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
+import { emailOTP } from "better-auth/plugins";
 
+import {
+    VERIFICATION_OTP_EXPIRY_SECONDS,
+    VERIFICATION_OTP_LENGTH,
+} from "./constants";
 import { getTrustedOrigins } from "./origins";
 
 // Re-export so existing consumers (api) keep importing it from @saroh/auth.
 export { getTrustedOrigins, isTrustedOrigin } from "./origins";
+// Server-side callers (the api's email sender) read the expiry from here; the
+// browser must import these from `@saroh/auth/constants` instead — see the note
+// in that file.
+export {
+    VERIFICATION_OTP_EXPIRY_SECONDS,
+    VERIFICATION_OTP_LENGTH,
+} from "./constants";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
@@ -59,7 +75,24 @@ type EmailSender = (args: {
 }) => Promise<void> | void;
 
 export interface CreateAuthOptions {
-    sendVerificationEmail?: EmailSender;
+    /**
+     * Deliver a one-time verification CODE. This — not the link sender below —
+     * is what a signing-up user actually receives, because `emailOTP` is
+     * configured with `overrideDefaultEmailVerification`, which swaps the
+     * built-in link mail for a code.
+     *
+     * `type` distinguishes the flows that share the OTP machinery, so the mail
+     * copy can say what the code is for.
+     */
+    sendVerificationOTP?: (args: {
+        to: string;
+        otp: string;
+        type:
+            | "sign-in"
+            | "email-verification"
+            | "forget-password"
+            | "change-email";
+    }) => Promise<void> | void;
     sendResetPassword?: EmailSender;
     /**
      * Approve an email change. Sent to the account's CURRENT address (not the
@@ -132,12 +165,22 @@ async function assertNotSoleOwner(userId: string): Promise<void> {
  * session validation.
  *
  * Milestone 1: core only (email/password + verification + reset, GitHub +
- * Google OAuth). Advanced plugins are layered on per M2 slice.
+ * Google OAuth) plus `emailOTP` for code-based verification. Advanced plugins
+ * are layered on per M2 slice.
+ *
+ * The explicit `BetterAuthOptions` / `BetterAuthInstance` annotations below are
+ * required, not stylistic: plugin endpoints are typed with zod schemas, so an
+ * INFERRED instance type names `zod/v4/core` through a pnpm-internal
+ * `.pnpm/zod@x.y.z/...` path that cannot be written down in a .d.ts (TS2742),
+ * and the dts build fails. Pinning the options to the general type keeps the
+ * emitted signature nameable. Nothing is lost in practice: server-side callers
+ * only touch `auth.api.getSession` / `auth.handler`, and the browser gets its
+ * plugin-aware types from `createAuthClient` in ./client instead.
  */
-export function createAuth(opts: CreateAuthOptions = {}) {
+export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
     const secret = resolveAuthSecret();
 
-    return betterAuth({
+    const options: BetterAuthOptions = {
         secret,
         baseURL: process.env.BETTER_AUTH_URL,
         trustedOrigins: getTrustedOrigins(),
@@ -161,13 +204,24 @@ export function createAuth(opts: CreateAuthOptions = {}) {
         },
         emailVerification: {
             sendOnSignUp: true,
-            sendVerificationEmail: async ({ user, url, token }) => {
-                await opts.sendVerificationEmail?.({
-                    to: user.email,
-                    url,
-                    token,
-                });
-            },
+            // Someone who signed up, missed the code and came back to log in
+            // gets a fresh one automatically — so the 403 below is always
+            // actionable. The login form reads EMAIL_NOT_VERIFIED and forwards
+            // them to the verify screen, where that code is already waiting.
+            sendOnSignIn: true,
+            // Verifying the code IS the sign-in. Without this, a user who just
+            // proved mailbox control would be bounced to /login to retype the
+            // password they entered ninety seconds ago — the dead end this
+            // flow exists to remove.
+            autoSignInAfterVerification: true,
+            // `sendVerificationEmail` is deliberately NOT set here. The
+            // `emailOTP` plugin installs its own through its `init` hook, and
+            // Better Auth merges the two with `defu(userOptions, pluginOptions)`
+            // — first argument wins — so anything defined here would silently
+            // beat the plugin and mail a LINK instead of a code. Leaving it out
+            // is what makes every core path that "sends a verification email"
+            // (sign-up, sign-in, the send-verification-email endpoint) emit the
+            // code the verify screen is built to accept.
         },
         user: {
             changeEmail: {
@@ -224,7 +278,31 @@ export function createAuth(opts: CreateAuthOptions = {}) {
                 ? { enabled: true, domain: ".saroh.in" }
                 : { enabled: false },
         },
-    });
+        plugins: [
+            emailOTP({
+                // Replace the built-in verification LINK with a code. The link
+                // flow could not work here: it is sent by the api, so its
+                // callbackURL resolves against the api's own origin and drops
+                // the user on a bare JSON host instead of back in the product.
+                // A code keeps the user in the tab they started in.
+                overrideDefaultEmailVerification: true,
+                otpLength: VERIFICATION_OTP_LENGTH,
+                expiresIn: VERIFICATION_OTP_EXPIRY_SECONDS,
+                // Codes are short and guessable by construction, so the lockout
+                // — not the entropy — is the control. 5 tries, then the code is
+                // burned and the user must request a new one.
+                allowedAttempts: 5,
+                // Never store a usable code at rest: a DB leak must not hand an
+                // attacker a working second factor for every pending signup.
+                storeOTP: "hashed",
+                sendVerificationOTP: async ({ email, otp, type }) => {
+                    await opts.sendVerificationOTP?.({ to: email, otp, type });
+                },
+            }),
+        ],
+    };
+
+    return betterAuth(options);
 }
 
 export type Auth = ReturnType<typeof createAuth>;

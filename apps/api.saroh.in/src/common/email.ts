@@ -68,27 +68,86 @@ export function sendPasswordResetEmail(
     return Promise.resolve();
 }
 
-export function sendVerificationEmail(
+/** A code, rendered big and monospaced so it is easy to read off and retype. */
+function codeEmail(
+    heading: string,
+    body: string,
+    otp: string,
+    minutes: number,
+) {
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>${heading}</h2>
+  <p>${body}</p>
+  <p style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:8px;padding:16px 0">${otp}</p>
+  <p style="color:#666;font-size:12px">This code expires in ${minutes} minutes. If you didn't request it, you can ignore this email.</p>
+</div>`;
+}
+
+const OTP_COPY: Record<
+    VerificationOtpType,
+    { subject: string; heading: string; body: string }
+> = {
+    "email-verification": {
+        subject: "Your Saroh verification code",
+        heading: "Verify your email",
+        body: "Enter this code to finish setting up your Saroh account.",
+    },
+    "sign-in": {
+        subject: "Your Saroh sign-in code",
+        heading: "Sign in to Saroh",
+        body: "Enter this code to sign in.",
+    },
+    "forget-password": {
+        subject: "Your Saroh password reset code",
+        heading: "Reset your password",
+        body: "Enter this code to choose a new password.",
+    },
+    "change-email": {
+        subject: "Your Saroh email change code",
+        heading: "Confirm your new email",
+        body: "Enter this code to confirm the change to your account's email address.",
+    },
+};
+
+export type VerificationOtpType =
+    | "sign-in"
+    | "email-verification"
+    | "forget-password"
+    | "change-email";
+
+/**
+ * Deliver a one-time code. This is what a signing-up user actually receives —
+ * the link sender below is no longer on the signup path (see the `emailOTP`
+ * plugin config in @saroh/auth).
+ *
+ * The console fallback prints the code so local dev, which has no SMTP, can
+ * still complete a signup.
+ */
+export function sendVerificationOtpEmail(
     to: string,
-    verifyUrl: string,
+    otp: string,
+    type: VerificationOtpType,
+    expiresInSeconds: number,
 ): Promise<void> {
+    const copy = OTP_COPY[type];
+    const minutes = Math.max(1, Math.round(expiresInSeconds / 60));
     if (!transporter) {
-        console.info(`[Verify email] (no SMTP) ${to}: ${verifyUrl}`);
+        console.info(`[${copy.heading}] (no SMTP) ${to}: code ${otp}`);
         return Promise.resolve();
     }
     void transporter.sendMail({
         from: FROM,
         to,
-        subject: "Verify your Saroh email",
-        html: actionEmail(
-            "Verify your email",
-            "Confirm your email address to finish setting up your Saroh account.",
-            verifyUrl,
-            "Verify email",
-        ),
+        subject: copy.subject,
+        html: codeEmail(copy.heading, copy.body, otp, minutes),
     });
     return Promise.resolve();
 }
+
+// A link-based `sendVerificationEmail` used to live here. Email verification is
+// now code-based end to end (see `sendVerificationOtpEmail` above and the
+// emailOTP plugin in @saroh/auth), and defining a link sender at all would have
+// suppressed the plugin's code sender — so it is gone rather than left unused.
 
 /**
  * Approve an email change. Deliberately addressed to the account's CURRENT
