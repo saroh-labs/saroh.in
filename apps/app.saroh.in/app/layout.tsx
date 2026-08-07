@@ -3,6 +3,7 @@ import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Providers } from "./providers";
+import "./workspace.css";
 
 const fontSans = localFont({
     src: "../../../packages/ui/fonts/Geist-latin.woff2",

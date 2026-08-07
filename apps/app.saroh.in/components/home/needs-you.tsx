@@ -1,6 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
+import { EmptyState } from "@saroh/ui/empty-state";
 import { cn } from "@saroh/ui/lib/utils";
-import { ChevronRight } from "lucide-react";
+import { CheckCircle2, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { formatOverdue, formatWaiting } from "@/lib/format/datetime";
@@ -91,10 +92,13 @@ function ActionBlock({
     action,
     now,
     primary,
+    index,
 }: {
     action: HomeAction;
     now: Date;
     primary: boolean;
+    /** Position in the list, used only to stagger the arrival. */
+    index: number;
 }) {
     const severity = SEVERITY[action.severity];
     const evidence = action.evidence ?? [];
@@ -102,8 +106,9 @@ function ActionBlock({
 
     return (
         <section
+            style={{ "--wk-i": index } as React.CSSProperties}
             className={cn(
-                "relative overflow-hidden rounded-md border border-border bg-card",
+                "wk-item relative overflow-hidden rounded-md border border-border bg-card",
                 // The primary action is the one thing the page is for. It earns
                 // a brighter edge rather than a bigger font: the merchant scans
                 // the same list either way, and shouting distorts the ranking.
@@ -178,15 +183,16 @@ export function NeedsYou({
 }) {
     if (actions.length === 0) {
         return (
-            <div className="rounded-md border border-dashed border-border px-6 py-10 text-center">
-                <p className="text-sm font-medium">
-                    You&rsquo;re all caught up
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Nothing needs your attention right now. New work shows up
-                    here.
-                </p>
-            </div>
+            <EmptyState
+                // A SUCCESS state, not an absence — so it gets a tick rather
+                // than a crossed-out glyph, and no action: there is nothing the
+                // merchant should be doing here, and inventing a CTA would
+                // manufacture work out of a clean queue.
+                icon={<CheckCircle2 className="text-success" />}
+                title="You're all caught up"
+                description="Nothing needs your attention right now. New work shows up here."
+                className="py-10"
+            />
         );
     }
 
@@ -198,6 +204,7 @@ export function NeedsYou({
                     action={action}
                     now={now}
                     primary={i === 0}
+                    index={i}
                 />
             ))}
         </div>

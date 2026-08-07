@@ -100,7 +100,13 @@ export function AppSidebar({
                                         // 44px touch target that MobileNav needs
                                         // would only spread twelve items over a
                                         // screen's worth of height here.
-                                        "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+                                        // `wk-nav` grows a brand bar on the
+                                        // leading edge when this row is the
+                                        // current page (workspace.css). It
+                                        // scales from the centre rather than
+                                        // fading, so changing page reads as the
+                                        // marker travelling down the rail.
+                                        "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
                                         // The design system's ring, not
                                         // Chrome's default blue: the focus ring
                                         // is a keyboard user's cursor, and it

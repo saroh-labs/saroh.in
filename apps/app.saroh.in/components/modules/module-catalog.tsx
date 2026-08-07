@@ -65,8 +65,18 @@ export function ModuleCatalog({ modules }: { modules: ModuleView[] }) {
                             </p>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            {group.items.map((module) => (
-                                <ModuleCard key={module.key} module={module} />
+                            {group.items.map((module, index) => (
+                                <div
+                                    key={module.key}
+                                    className="wk-item"
+                                    style={
+                                        {
+                                            "--wk-i": index,
+                                        } as React.CSSProperties
+                                    }
+                                >
+                                    <ModuleCard module={module} />
+                                </div>
                             ))}
                         </div>
                     </section>

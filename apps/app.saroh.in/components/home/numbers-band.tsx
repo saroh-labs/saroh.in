@@ -21,17 +21,18 @@ export function NumbersBand({ numbers }: { numbers: HomeNumber[] }) {
 
     return (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {numbers.map((n) => (
+            {numbers.map((n, index) => (
                 <Link
                     key={n.key}
                     href={n.href}
-                    className="group rounded-md border border-border bg-card px-4 py-3 transition-colors hover:border-brand/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    style={{ "--wk-i": index } as React.CSSProperties}
+                    className="wk-item wk-surface group rounded-md border border-border bg-card px-4 py-3 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <span className="flex items-center justify-between gap-2">
                         <span className="text-2xl font-semibold tabular-nums leading-none">
                             {formatCount(n.value)}
                         </span>
-                        <ArrowUpRight className="size-3.5 text-muted-foreground/40 transition-colors group-hover:text-brand" />
+                        <ArrowUpRight className="size-3.5 text-muted-foreground/40 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand" />
                     </span>
                     <span className="mt-1.5 block truncate text-xs text-muted-foreground">
                         {n.label}

@@ -1,6 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/empty-state";
+import { BellOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -73,11 +75,11 @@ export function NotificationsInbox({
 
     if (notifications.length === 0) {
         return (
-            <div className="rounded-lg border border-dashed p-10 text-center">
-                <p className="text-sm text-muted-foreground">
-                    No notifications yet. New enquiries will show up here.
-                </p>
-            </div>
+            <EmptyState
+                icon={<BellOff />}
+                title="No notifications yet"
+                description="When an enquiry comes in or something needs you, it lands here."
+            />
         );
     }
 

@@ -253,6 +253,46 @@
     }
 }
 
+/* ─── Skeleton shimmer ───────────────────────────────────────────────────────
+   A directional sweep instead of a whole-block opacity pulse.
+
+   `animate-pulse` fades the entire placeholder in and out, which reads as "this
+   is broken / flashing" rather than "this is arriving" — and on a page of six
+   stacked skeletons, six blocks breathing in unison is genuinely distracting.
+   A sweep has a direction, so it reads as loading and the eye can ignore it.
+
+   Token-driven, so it works in both themes and all three skins: the highlight
+   is the page's own foreground at low alpha, never a literal white.
+
+   Under `prefers-reduced-motion` the sweep is clamped by the rule below and the
+   pseudo-element simply parks off-screen, leaving a plain `bg-muted` block —
+   which is the correct resting state.
+   ─── */
+.skeleton-sweep {
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-sweep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        hsl(var(--foreground) / 0.07),
+        transparent
+    );
+    animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
 /* Honour the OS "reduce motion" setting across the whole suite: near-instant
    animations/transitions and no smooth scroll (WCAG 2.3.3). */
 @media (prefers-reduced-motion: reduce) {

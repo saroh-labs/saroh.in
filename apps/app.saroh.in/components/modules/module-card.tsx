@@ -79,7 +79,7 @@ export function ModuleCard({ module }: { module: ModuleView }) {
     const setupBlocker = isEnabled ? module.blockers[0] : undefined;
 
     return (
-        <Card>
+        <Card className="wk-surface h-full">
             <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
                 <CardTitle className="text-base">{module.label}</CardTitle>
                 <Badge variant={state.variant}>{state.label}</Badge>
@@ -103,6 +103,7 @@ export function ModuleCard({ module }: { module: ModuleView }) {
                     {module.lifecycle !== "ENABLED" ? (
                         <Button
                             variant="brand"
+                            className="wk-press"
                             disabled={pending}
                             onClick={() =>
                                 run("ENABLED", `${module.label} enabled`)
@@ -113,7 +114,11 @@ export function ModuleCard({ module }: { module: ModuleView }) {
                     ) : (
                         <>
                             {setupBlocker?.actionHref ? (
-                                <Button asChild variant="brand">
+                                <Button
+                                    asChild
+                                    variant="brand"
+                                    className="wk-press"
+                                >
                                     <Link href={setupBlocker.actionHref}>
                                         Finish setup
                                     </Link>

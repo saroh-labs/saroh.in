@@ -108,7 +108,12 @@ export function CreateOrganizationForm() {
                     control={form.control}
                     name="name"
                     render={({ field }) => (
-                        <FormItem>
+                        // `wk-item` staggers the form's arrival (workspace.css);
+                        // `--wk-i` is the block's position, not the field's.
+                        <FormItem
+                            className="wk-item"
+                            style={{ "--wk-i": 0 } as React.CSSProperties}
+                        >
                             <FormLabel>Organization name</FormLabel>
                             <FormControl>
                                 <Input
@@ -122,7 +127,11 @@ export function CreateOrganizationForm() {
                     )}
                 />
 
-                <fieldset className="grid gap-4" disabled={isSubmitting}>
+                <fieldset
+                    className="wk-item grid gap-4"
+                    style={{ "--wk-i": 1 } as React.CSSProperties}
+                    disabled={isSubmitting}
+                >
                     <legend className="text-sm font-medium text-muted-foreground">
                         Business profile (optional)
                     </legend>
@@ -223,7 +232,8 @@ export function CreateOrganizationForm() {
                 <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="justify-self-start"
+                    style={{ "--wk-i": 2 } as React.CSSProperties}
+                    className="wk-item wk-press justify-self-start"
                 >
                     {isSubmitting ? "Creating…" : "Create organization"}
                 </Button>

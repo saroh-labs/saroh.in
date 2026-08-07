@@ -218,7 +218,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                         Choose what to set up first
                     </legend>
 
-                    {choosable.map((goal) => {
+                    {choosable.map((goal, index) => {
                         const isSelected = selected.has(goal.moduleKey);
                         const deps = hiddenDepsFor(goal.moduleKey);
                         const labelId = `goal-${goal.moduleKey}-label`;
@@ -232,7 +232,17 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                             // checkbox" rather than the row's entire prose.
                             <label
                                 key={goal.moduleKey}
-                                className={`flex cursor-pointer items-start gap-4 rounded-lg border p-4 transition-colors hover:border-brand/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 ${
+                                // `wk-choice` + `data-selected` carry the commit
+                                // motion (workspace.css): the row settles with a
+                                // small overshoot when chosen, so the most
+                                // consequential click in the funnel is felt and
+                                // not just recoloured. `wk-item` staggers the
+                                // initial arrival.
+                                data-selected={isSelected}
+                                style={
+                                    { "--wk-i": index } as React.CSSProperties
+                                }
+                                className={`wk-choice wk-item flex cursor-pointer items-start gap-4 rounded-lg border p-4 hover:border-brand/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 ${
                                     isSelected
                                         ? "border-brand bg-brand-subtle/40"
                                         : "border-border"
@@ -329,6 +339,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                 <div className="flex items-center gap-2">
                     <Button
                         variant="ghost"
+                        className="wk-press"
                         onClick={() => router.push("/")}
                         disabled={pending}
                     >
@@ -336,6 +347,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                     </Button>
                     <Button
                         variant="brand"
+                        className="wk-press"
                         onClick={confirm}
                         disabled={pending}
                     >
