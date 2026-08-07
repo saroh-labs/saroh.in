@@ -8,10 +8,14 @@
 > assumption. Screens marked **[read]** were read in full during this audit;
 > screens marked **[read via extraction]** were read in full by a sub-agent and
 > reported back verbatim; a handful of leaf behaviours that live inside client
-> components (e.g. the field list inside `ProductForm`) are marked **[inferred
-> > from component surface]** because the `page.tsx` only mounts the component —
-> those are called out honestly rather than invented. Container widths, heading
-> tags, and component imports are quoted exactly from source.
+> components (e.g. the field list inside `ProductForm`) are marked \*\*[inferred
+>
+> > from component surface]\*\* because the `page.tsx` only mounts the component —
+> > those are called out honestly rather than invented. Container widths, heading
+> > tags, and component imports are quoted exactly from source.
+>
+> **2026-08-08:** the live-site address quoted below as `{subdomain}.saroh.in` is now
+> `{subdomain}.saroh.app` — merchant sites moved off `saroh.in`.
 
 ---
 

@@ -55,7 +55,7 @@ jobs:
       NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
-      NEXT_PUBLIC_ROOT_DOMAIN: saroh.in
+      NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
       NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
 
     # Postgres for the integration tests. The test DB name contains "test" so

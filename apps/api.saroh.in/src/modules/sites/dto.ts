@@ -28,7 +28,7 @@ const SUBDOMAIN_MSG =
  *
  * `name` is the only hard requirement. `templateId`/`templateVersion` select
  * the source template (defaulting to the latest starter). `slug` overrides the
- * name-derived slug, and `subdomain` optionally reserves an `<x>.saroh.in`
+ * name-derived slug, and `subdomain` optionally reserves an `<x>.saroh.app`
  * label (format-checked here; claim/verification is S2-007).
  */
 export class CreateSiteFromTemplateDto {

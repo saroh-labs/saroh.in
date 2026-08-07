@@ -4,7 +4,7 @@
 
 Use a modular monolith: Next.js applications for channel-specific UI, one NestJS API as the authorization and business boundary, PostgreSQL as the system of record, Prisma as the shared persistence implementation, and Better Auth as the only identity system. Do not split into microservices. Introduce durable jobs and an outbox behind ports only for work that is genuinely asynchronous.
 
-`saroh.in` should be the canonical product/runtime domain. `api.saroh.in` hosts Better Auth and business APIs; `accounts.saroh.in` is an authentication UI; `app.saroh.in` is the customer dashboard; `sites.saroh.in`/custom domains serve published sites.
+`saroh.in` should be the canonical product/runtime domain for Saroh's own surfaces. `api.saroh.in` hosts Better Auth and business APIs; `accounts.saroh.in` is an authentication UI; `app.saroh.in` is the customer dashboard; `saroh.app` (`*.saroh.app`)/custom domains serve published sites.
 
 ## Ownership model
 

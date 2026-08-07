@@ -46,18 +46,18 @@ implemented**. See
 
 ### Apps (`apps/*`) — 10 total
 
-| App                  | Domain                                         | Role                                                                                         |
-| -------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `accounts.saroh.in`  | accounts.saroh.in                              | **Auth UI** — login, signup, verification, password reset, OAuth (auth server runs in `api`) |
-| `api.saroh.in`       | api.saroh.in                                   | NestJS backend; **hosts Better Auth** and owns all business logic + DB access                |
-| `app.saroh.in`       | app.saroh.in                                   | Main product dashboard (stores, members, catalog, orders, customers, content)                |
-| `admin.saroh.in`     | admin.saroh.in                                 | Platform admin (session-gated, allowlisted) — scaffold                                       |
-| `sites.saroh.in`     | sites.saroh.in, `*.saroh.site`, custom domains | Public renderer for user sites — placeholder (fetchers return no data)                       |
-| `templates.saroh.in` | templates.saroh.in                             | Design showcase — scaffold                                                                   |
-| `ui.saroh.in`        | ui.saroh.in                                    | Design-system / component showcase                                                           |
-| `docs.saroh.in`      | docs.saroh.in                                  | Developer documentation (Nextra)                                                             |
-| `help.saroh.in`      | help.saroh.in                                  | End-user help guides (Nextra)                                                                |
-| `saroh.in`           | saroh.in                                       | Marketing site + waitlist                                                                    |
+| App                  | Domain                                   | Role                                                                                         |
+| -------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `accounts.saroh.in`  | accounts.saroh.in                        | **Auth UI** — login, signup, verification, password reset, OAuth (auth server runs in `api`) |
+| `api.saroh.in`       | api.saroh.in                             | NestJS backend; **hosts Better Auth** and owns all business logic + DB access                |
+| `app.saroh.in`       | app.saroh.in                             | Main product dashboard (stores, members, catalog, orders, customers, content)                |
+| `admin.saroh.in`     | admin.saroh.in                           | Platform admin (session-gated, allowlisted) — scaffold                                       |
+| `saroh.app`          | saroh.app, `*.saroh.app`, custom domains | Public renderer for user sites — placeholder (fetchers return no data)                       |
+| `templates.saroh.in` | templates.saroh.in                       | Design showcase — scaffold                                                                   |
+| `ui.saroh.in`        | ui.saroh.in                              | Design-system / component showcase                                                           |
+| `docs.saroh.in`      | docs.saroh.in                            | Developer documentation (Nextra)                                                             |
+| `help.saroh.in`      | help.saroh.in                            | End-user help guides (Nextra)                                                                |
+| `saroh.in`           | saroh.in                                 | Marketing site + waitlist                                                                    |
 
 ### Shared packages (`packages/*`)
 

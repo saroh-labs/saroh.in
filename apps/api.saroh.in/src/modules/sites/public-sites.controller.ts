@@ -18,7 +18,7 @@ import { SitesService } from "./sites.service";
 export class PublicSitesController {
     constructor(private readonly sites: SitesService) {}
 
-    /** Current publication snapshot for the site on `<subdomain>.saroh.in`. */
+    /** Current publication snapshot for the site on `<subdomain>.saroh.app`. */
     @Get("by-subdomain/:subdomain")
     bySubdomain(@Param("subdomain") subdomain: string) {
         return this.sites.getPublicationBySubdomain(subdomain);

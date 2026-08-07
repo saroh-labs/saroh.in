@@ -2,6 +2,11 @@
 
 Unless an entry says otherwise, its status is **Proposed — requires audit review**.
 
+> **2026-08-08:** merchant sites moved off `saroh.in`. The public renderer named
+> `sites.saroh.in` below is now `apps/saroh.app`, served from `saroh.app`, and tenant
+> sites hang off `*.saroh.app`. `saroh.in` stays canonical for Saroh's own surfaces
+> (DEC-001) and the domain-as-application-name rule (DEC-002) is unchanged.
+
 ## DEC-001 Canonical product domain
 
 **Status: Accepted — 2026-07-17**

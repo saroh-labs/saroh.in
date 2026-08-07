@@ -7,6 +7,10 @@
 > **Status: steps 1–6 built and verified (2026-08-04).** What each step actually
 > shipped, and what it deliberately did not, is recorded under it. The open
 > items that survived are collected at the foot of the file.
+>
+> **2026-08-08:** the merchant-site renderer named `sites.saroh.in` below is now
+> `apps/saroh.app`; merchant sites hang off `*.saroh.app`. The constraint it
+> appears in — merchant sites never inherit Saroh's brand — is unchanged.
 
 ## The problem this fixes
 

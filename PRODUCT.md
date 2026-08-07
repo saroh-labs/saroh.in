@@ -53,7 +53,7 @@ auto-linking ships.
 - `app.saroh.in` — the merchant workspace (this surface, **Operate** mode)
 - `accounts.saroh.in` — the single identity provider
 - `admin.saroh.in` — internal staff control plane
-- `sites.saroh.in` — renders **merchants' own** public sites
+- `saroh.app` — renders **merchants' own** public sites (`*.saroh.app`)
 - `saroh.in` — marketing (Persuade mode)
 
 Navigation is capability-gated: a merchant with Commerce off never sees Sell.
@@ -77,7 +77,7 @@ SUGGESTION — so the first thing on screen is the most consequential.
 The name **Saroh** and its wordmark stay. Everything else — palette,
 typography, shape, density, motion — is explicitly open (confirmed 2026-08-04).
 
-**Merchant sites must stay neutral.** `sites.saroh.in` renders merchants'
+**Merchant sites must stay neutral.** `saroh.app` renders merchants'
 storefronts and must never inherit Saroh's brand. The `--site-*` token layer is
 separate by design and stays that way.
 

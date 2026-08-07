@@ -3,6 +3,8 @@
 > **Status:** Target design (docs-only). Grounded in the real `app.saroh.in` App Router routes as of 2026‑07‑20.
 > **Anchor:** _Saroh Canvas_ — calm, one product, **one primary action per screen**, progressive disclosure, minimize clicks, empty states teach, success states explain what's next, AI assists inline.
 > **Scope:** the eleven core end‑to‑end journeys. Each contrasts the **current** flow (with real file/route citations) against the **ideal** flow, and gives a **click‑count before/after with the WHY**.
+>
+> **2026-08-08:** merchant sites moved off `saroh.in` — the live URL in the publish journey is now `subdomain.saroh.app` (e.g. `acme.saroh.app`), rendered by `apps/saroh.app`.
 
 ## How to read this doc
 

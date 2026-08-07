@@ -5,8 +5,16 @@ import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
+import { env } from "@/env";
 import { requireSession } from "@/lib/session";
 import { listSites } from "@/lib/sites/service";
+
+/**
+ * Where a merchant's subdomain lives. Falls back to the production host so a
+ * developer without the variable set still sees a plausible address rather than
+ * "northwind.undefined" — the renderer defaults the same way.
+ */
+const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
 
 /**
  * Sites index for the active organization (S2-004). Lists the org's CMS sites
@@ -93,7 +101,7 @@ export default async function SitesPage() {
                                         </div>
                                         <CardDescription>
                                             {site.subdomain
-                                                ? `${site.subdomain}.saroh.in`
+                                                ? `${site.subdomain}.${ROOT_DOMAIN}`
                                                 : `/${site.slug}`}
                                         </CardDescription>
                                     </CardHeader>

@@ -8,7 +8,7 @@ import { getPublicationForHost } from "@/lib/publication";
  * Tenant site layout (S2-006).
  *
  * Middleware rewrites an incoming tenant hostname to `/[domain]/<path>`, so the
- * `domain` route param IS the full request hostname (e.g. `demo.saroh.in`). We
+ * `domain` route param IS the full request hostname (e.g. `demo.saroh.app`). We
  * resolve it to a publication via the public read API; a `null` snapshot means
  * nothing is published for this host (drafts are never reachable), so we render
  * a clean 404. There is no legacy DB / font mapping here — everything the

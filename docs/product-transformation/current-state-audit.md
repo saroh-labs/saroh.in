@@ -5,6 +5,9 @@
 > modified during this cycle.
 >
 > Where this audit contradicts the transformation brief, **the repository won**.
+>
+> **2026-08-08:** `apps/sites.saroh.in` below is now `apps/saroh.app`, served from
+> `saroh.app`; merchant sites hang off `*.saroh.app`.
 
 **Confidence legend**
 

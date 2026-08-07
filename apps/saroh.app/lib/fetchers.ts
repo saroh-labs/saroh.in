@@ -4,7 +4,7 @@ import type { MDXRemoteProps } from "next-mdx-remote";
  * Storefront/blog data for the public site renderer.
  *
  * Per the single-backend refactor, only api.saroh.in may touch the database.
- * sites.saroh.in is a public renderer scaffold that is not yet rebuilt against
+ * saroh.app is a public renderer scaffold that is not yet rebuilt against
  * api, so these fetchers are DB-free stubs: they return no data (sites render
  * notFound / empty) until api exposes storefront endpoints. Wire them to
  * `fetch(`${API_URL}/sites/...`)` when those land — the signatures and the

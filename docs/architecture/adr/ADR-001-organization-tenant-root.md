@@ -6,6 +6,8 @@
 
 This ADR codifies the tenant vocabulary so every subsequent ticket uses the same names, ownership rules, and legacy-compatibility mapping. It changes **no schema yet** — it is the contract the migration (S1-002) implements.
 
+> **2026-08-08:** the public renderer called `sites.saroh.in` below is now `apps/saroh.app`, served from `saroh.app`; merchant sites hang off `*.saroh.app`. The tenant vocabulary is unaffected.
+
 ---
 
 ## 1. Context — where we are today

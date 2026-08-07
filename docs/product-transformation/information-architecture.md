@@ -3,6 +3,9 @@
 > Audit-only cycle. **Proposal requiring approval.** No navigation was changed.
 > Current-state claims verified in-browser 2026-07-31 as an org owner with all
 > eight modules enabled.
+>
+> **2026-08-08:** the merchant-site renderer named `sites.saroh.in` below is now
+> `saroh.app`; merchant sites hang off `*.saroh.app`.
 
 ---
 

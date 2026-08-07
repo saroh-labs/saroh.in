@@ -4,6 +4,8 @@
 **Status:** Approved
 **Scope:** Every Saroh frontend, shared UI package, route, state, viewport, and theme
 
+> **2026-08-08:** the renderer listed below as `sites.saroh.in` is now `apps/saroh.app`, served from `saroh.app`; merchant sites hang off `*.saroh.app`.
+
 ## Objective
 
 Create a complete, evidence-backed product-design audit and a coherent design-system specification before changing production UI. The output must make redesign work independently actionable while preserving the architectural decisions already accepted in `docs/architecture/DECISIONS.md`.

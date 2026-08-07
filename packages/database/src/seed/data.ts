@@ -727,9 +727,13 @@ const ENQUIRY_FIELDS: readonly SeedFormField[] = [
  * The org's websites.
  *
  * Three, in the two states the list page can distinguish: two live on a
- * saroh.in subdomain and one still being written, which is why the third has no
- * subdomain — the card falls back to the slug, and a merchant should see both
- * renderings rather than three identical ones.
+ * saroh.app subdomain and one still being written, which is why the third has
+ * no subdomain — the card falls back to the slug, and a merchant should see
+ * both renderings rather than three identical ones.
+ *
+ * Only the bare label is stored ("northwind"), never the full host. The suffix
+ * is composed at render time from NEXT_PUBLIC_ROOT_DOMAIN, which is why moving
+ * tenants from saroh.in to saroh.app needed no data migration at all.
  *
  * No section here carries an image. The shipped starter template points at
  * `/templates/starter/*.jpg`, and those files do not exist in any app's

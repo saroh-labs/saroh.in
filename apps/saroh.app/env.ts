@@ -2,7 +2,7 @@ import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
 /**
- * Typed, validated environment for sites.saroh.in (the multi-tenant storefront
+ * Typed, validated environment for saroh.app (the multi-tenant storefront
  * renderer).
  *
  * `NEXT_PUBLIC_ROOT_DOMAIN` drives hostname → tenant resolution in middleware

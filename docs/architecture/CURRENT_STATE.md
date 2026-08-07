@@ -12,6 +12,10 @@ Audit date: 2026-07-17. Scope: the full pnpm/Turborepo monorepo at `saroh-labs/s
 > (`.github/workflows/ci.yml` exists). **For current status, use the live per-stage tables
 > in [`IMPLEMENTATION_BACKLOG.md`](./IMPLEMENTATION_BACKLOG.md).** Read this file as
 > historical context only.
+>
+> **2026-08-08:** the public renderer named `sites.saroh.in` below is now `apps/saroh.app`,
+> served from `saroh.app`; merchant sites hang off `*.saroh.app`, not `*.saroh.in`.
+> `saroh.in` is the marketing site only.
 
 ## Architecture summary
 

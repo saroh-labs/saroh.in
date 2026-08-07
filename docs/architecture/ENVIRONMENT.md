@@ -52,7 +52,7 @@ That is the **only** hard requirement to boot the stack in development.
 
 ## The Next.js apps
 
-`app.saroh.in`, `accounts.saroh.in`, `admin.saroh.in`, `sites.saroh.in`,
+`app.saroh.in`, `accounts.saroh.in`, `admin.saroh.in`, `saroh.app`,
 `saroh.in`, `docs.saroh.in`, `help.saroh.in`, `templates.saroh.in`,
 `ui.saroh.in` — **every env var is optional.** They boot with zero configuration
 and fall back to the production `*.saroh.in` URLs baked into the code.

@@ -23,7 +23,7 @@ const apps = [
         name: "Sites",
         blurb: "Published storefronts and pages.",
         devUrl: "http://localhost:3009",
-        prodUrl: "https://sites.saroh.in",
+        prodUrl: "https://saroh.app",
     },
     {
         name: "Templates",

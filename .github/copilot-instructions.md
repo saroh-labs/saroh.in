@@ -28,7 +28,7 @@ saroh.io/
 - `accounts.saroh.in` - **Auth UI** (Better Auth): login, signup, verification, password reset, OAuth (the auth server itself runs in `api`)
 - `app.saroh.in` - Main product dashboard (stores, members, catalog, orders, customers, content)
 - `admin.saroh.in` - Platform admin (session-gated, allowlisted) — scaffold
-- `sites.saroh.in` - Public renderer for user sites (`*.saroh.site`, custom domains) — placeholder
+- `saroh.app` - Public renderer for user sites (`*.saroh.app`, custom domains) — placeholder
 - `templates.saroh.in` - Design/template showcase — scaffold
 - `ui.saroh.in` - Design-system / component showcase
 - `docs.saroh.in` - Developer documentation (Nextra)

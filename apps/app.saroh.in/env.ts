@@ -21,6 +21,16 @@ export const env = createEnv({
         NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
         NEXT_PUBLIC_API_URL: z.string().url().optional(),
         NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url().optional(),
+        /**
+         * The host a merchant's subdomain hangs off — `saroh.app`, not the
+         * marketing site. The sites index used to build that address from a
+         * hardcoded `.saroh.in`, which meant the one place in the product that
+         * tells a merchant where their website lives was a string literal in a
+         * component, unrelated to the value the renderer actually resolves
+         * tenants by. It is the same variable saroh.app reads, so the two
+         * cannot disagree.
+         */
+        NEXT_PUBLIC_ROOT_DOMAIN: z.string().optional(),
         NEXT_PUBLIC_VERCEL_ENV: z
             .enum(["development", "preview", "production"])
             .optional(),
@@ -31,6 +41,7 @@ export const env = createEnv({
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+        NEXT_PUBLIC_ROOT_DOMAIN: process.env.NEXT_PUBLIC_ROOT_DOMAIN,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
     },
     emptyStringAsUndefined: true,

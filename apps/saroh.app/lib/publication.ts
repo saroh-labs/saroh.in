@@ -147,7 +147,7 @@ interface PublicSiteView {
  * Resolve an incoming host header to a platform subdomain.
  *
  * Middleware has already normalized dev hosts (`*.localhost:3003` →
- * `*.<ROOT_DOMAIN>`), so `demo.saroh.in` → `demo`. We strip the
+ * `*.<ROOT_DOMAIN>`), so `demo.saroh.app` → `demo`. We strip the
  * `.<ROOT_DOMAIN>` suffix when present; otherwise (a custom/apex domain, or a
  * bare host) we fall back to the first DNS label. Returns null when there is
  * no meaningful subdomain to look up.

@@ -12,6 +12,9 @@ Audit date: 2026-07-17. “Blocks” means unsafe or impossible to build the nam
 > no Nest bootstrap/DI test, no CD pipeline, no observability, placeholder frontends
 > shipping — are filed as GitHub issues **#90, #98–#108**. **Source of truth for status:
 > [`IMPLEMENTATION_BACKLOG.md`](./IMPLEMENTATION_BACKLOG.md).**
+>
+> **2026-08-08:** the renderer cited in **R-06** as `apps/sites.saroh.in` is now
+> `apps/saroh.app`, served from `saroh.app`; merchant sites hang off `*.saroh.app`.
 
 | ID   | Severity | Finding and evidence                                                                                                                                                                                                                                                       | Impact                                                                                                                                                         | Recommended resolution                                                                                                                                                                              | Dependencies                    | Blocks                               |
 | ---- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------ |

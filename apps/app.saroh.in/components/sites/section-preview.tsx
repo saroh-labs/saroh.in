@@ -4,7 +4,7 @@ import type { Section } from "@/lib/sites/service";
  * Lightweight presentational renderers for draft sections — used by the editor
  * to preview edits BEFORE publishing (it renders the client editor state, so no
  * network round-trip). This is intentionally simple: the real public render is
- * S2-006 in sites.saroh.in. richText HTML is NOT sanitized here because this
+ * S2-006 in saroh.app. richText HTML is NOT sanitized here because this
  * only ever shows the author their own draft, never third-party content.
  */
 

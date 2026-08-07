@@ -669,77 +669,7 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  apps/saroh.in:
-    dependencies:
-      '@hookform/resolvers':
-        specifier: 'catalog:'
-        version: 5.4.0(react-hook-form@7.71.1(react@19.2.6))
-      '@saroh/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
-      '@t3-oss/env-nextjs':
-        specifier: ^0.13.11
-        version: 0.13.11(typescript@5.9.3)(valibot@1.2.0(typescript@5.9.3))(zod@3.25.76)
-      lucide-react:
-        specifier: 'catalog:'
-        version: 0.394.0(react@19.2.6)
-      next:
-        specifier: ^16.2.6
-        version: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      next-themes:
-        specifier: ^0.4.6
-        version: 0.4.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      react:
-        specifier: ^19.2.6
-        version: 19.2.6
-      react-dom:
-        specifier: ^19.2.6
-        version: 19.2.6(react@19.2.6)
-      react-hook-form:
-        specifier: 'catalog:'
-        version: 7.71.1(react@19.2.6)
-      sonner:
-        specifier: ^2.0.7
-        version: 2.0.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      zod:
-        specifier: 'catalog:'
-        version: 3.25.76
-    devDependencies:
-      '@next/eslint-plugin-next':
-        specifier: ^16.2.6
-        version: 16.2.6
-      '@saroh/eslint-config':
-        specifier: workspace:*
-        version: link:../../tooling/eslint-config-custom
-      '@saroh/tailwind-config':
-        specifier: workspace:*
-        version: link:../../tooling/tailwind-config
-      '@saroh/tsconfig':
-        specifier: workspace:*
-        version: link:../../tooling/tsconfig
-      '@types/node':
-        specifier: 'catalog:'
-        version: 20.19.33
-      '@types/react':
-        specifier: 19.2.15
-        version: 19.2.15
-      '@types/react-dom':
-        specifier: catalog:react19
-        version: 19.2.3(@types/react@19.2.15)
-      autoprefixer:
-        specifier: 'catalog:'
-        version: 10.4.24(postcss@8.5.6)
-      postcss:
-        specifier: 'catalog:'
-        version: 8.5.6
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 3.4.19(tsx@4.22.3)(yaml@2.9.0)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-
-  apps/sites.saroh.in:
+  apps/saroh.app:
     dependencies:
       '@saroh/ui':
         specifier: workspace:*
@@ -820,6 +750,76 @@ importers:
       eslint-config-next:
         specifier: 'catalog:'
         version: 16.1.6(eslint@10.0.0(jiti@2.7.0))(typescript@5.9.3)
+      postcss:
+        specifier: 'catalog:'
+        version: 8.5.6
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 3.4.19(tsx@4.22.3)(yaml@2.9.0)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
+  apps/saroh.in:
+    dependencies:
+      '@hookform/resolvers':
+        specifier: 'catalog:'
+        version: 5.4.0(react-hook-form@7.71.1(react@19.2.6))
+      '@saroh/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@t3-oss/env-nextjs':
+        specifier: ^0.13.11
+        version: 0.13.11(typescript@5.9.3)(valibot@1.2.0(typescript@5.9.3))(zod@3.25.76)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 0.394.0(react@19.2.6)
+      next:
+        specifier: ^16.2.6
+        version: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react:
+        specifier: ^19.2.6
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.2.6
+        version: 19.2.6(react@19.2.6)
+      react-hook-form:
+        specifier: 'catalog:'
+        version: 7.71.1(react@19.2.6)
+      sonner:
+        specifier: ^2.0.7
+        version: 2.0.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@next/eslint-plugin-next':
+        specifier: ^16.2.6
+        version: 16.2.6
+      '@saroh/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint-config-custom
+      '@saroh/tailwind-config':
+        specifier: workspace:*
+        version: link:../../tooling/tailwind-config
+      '@saroh/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/tsconfig
+      '@types/node':
+        specifier: 'catalog:'
+        version: 20.19.33
+      '@types/react':
+        specifier: 19.2.15
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: catalog:react19
+        version: 19.2.3(@types/react@19.2.15)
+      autoprefixer:
+        specifier: 'catalog:'
+        version: 10.4.24(postcss@8.5.6)
       postcss:
         specifier: 'catalog:'
         version: 8.5.6
@@ -16813,11 +16813,11 @@ snapshots:
     dependencies:
       node-source-walk: 7.0.2
 
-  detective-postcss@8.0.4(postcss@8.5.15):
+  detective-postcss@8.0.4(postcss@8.5.19):
     dependencies:
       is-url-superb: 4.0.0
-      postcss: 8.5.15
-      postcss-values-parser: 6.0.2(postcss@8.5.15)
+      postcss: 8.5.19
+      postcss-values-parser: 6.0.2(postcss@8.5.19)
 
   detective-sass@6.0.2:
     dependencies:
@@ -20599,11 +20599,11 @@ snapshots:
 
   postcss-value-parser@4.2.0: {}
 
-  postcss-values-parser@6.0.2(postcss@8.5.15):
+  postcss-values-parser@6.0.2(postcss@8.5.19):
     dependencies:
       color-name: 1.1.4
       is-url-superb: 4.0.0
-      postcss: 8.5.15
+      postcss: 8.5.19
       quote-unquote: 1.0.0
 
   postcss@8.4.31:
@@ -20651,7 +20651,7 @@ snapshots:
       detective-amd: 6.1.0
       detective-cjs: 6.1.1
       detective-es6: 5.0.2
-      detective-postcss: 8.0.4(postcss@8.5.15)
+      detective-postcss: 8.0.4(postcss@8.5.19)
       detective-sass: 6.0.2
       detective-scss: 5.0.2
       detective-stylus: 5.0.1
@@ -20659,7 +20659,7 @@ snapshots:
       detective-vue2: 2.3.0(typescript@5.9.3)
       module-definition: 6.0.2
       node-source-walk: 7.0.2
-      postcss: 8.5.15
+      postcss: 8.5.19
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
@@ -22575,7 +22575,7 @@ snapshots:
       esbuild: 0.27.7
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-      postcss: 8.5.15
+      postcss: 8.5.19
       rollup: 4.60.4
       tinyglobby: 0.2.16
     optionalDependencies:
@@ -22592,7 +22592,7 @@ snapshots:
       esbuild: 0.27.7
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-      postcss: 8.5.15
+      postcss: 8.5.19
       rollup: 4.60.4
       tinyglobby: 0.2.16
     optionalDependencies:
@@ -22608,7 +22608,7 @@ snapshots:
       esbuild: 0.27.7
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-      postcss: 8.5.15
+      postcss: 8.5.19
       rollup: 4.60.4
       tinyglobby: 0.2.16
     optionalDependencies:

@@ -2,7 +2,7 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Saroh Sites",
+    title: "Saroh app",
     description: "The renderer that serves published Saroh sites.",
     robots: { index: false, follow: false },
 };
@@ -26,7 +26,7 @@ export default function RendererRoot() {
         <main className="grid min-h-screen place-items-center bg-background px-6">
             <div className="w-full max-w-md text-center">
                 <div className="mb-6 flex justify-center">
-                    <Wordmark suffix="sites" />
+                    <Wordmark suffix="app" />
                 </div>
                 <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
                     Nothing is published at this address

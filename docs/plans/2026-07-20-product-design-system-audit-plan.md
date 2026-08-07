@@ -8,6 +8,8 @@
 
 **Tech Stack:** Turborepo, pnpm, Next.js App Router, React, TypeScript, Tailwind CSS, shadcn/Radix UI, Prisma/PostgreSQL, Vitest/Jest where already configured, `agent-browser`, Markdown, JSON, CSV.
 
+> **2026-08-08:** the inspection path `apps/sites.saroh.in/**` below is now `apps/saroh.app/**`, served from `saroh.app`; merchant sites hang off `*.saroh.app`.
+
 ---
 
 ## Guardrails
