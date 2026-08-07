@@ -6,6 +6,7 @@ import { env } from "@/env";
 import type { BookingContent } from "@/lib/publication";
 import { cn } from "@/lib/utils";
 
+import { destructiveAlertClasses } from "../alert";
 import { ctaClasses } from "./cta";
 
 /**
@@ -327,7 +328,7 @@ export default function BookingSection({
                     </p>
                 ) : slotsState.kind === "error" ? (
                     <div className="mt-4">
-                        <p role="alert" className="text-sm text-red-600">
+                        <p role="alert" className={destructiveAlertClasses}>
                             {slotsState.message}
                         </p>
                         <button
@@ -411,7 +412,11 @@ export default function BookingSection({
                         className="text-sm font-medium text-site-fg"
                     >
                         Email
-                        <span aria-hidden="true" className="text-red-600">
+                        {/* Decorative and aria-hidden — the field's own
+                            `required` carries the meaning — so this marker is
+                            held to the 3:1 non-text floor on the merchant's
+                            ground, which it clears in both registers. */}
+                        <span aria-hidden="true" className="text-destructive">
                             {" *"}
                         </span>
                     </label>
@@ -445,7 +450,7 @@ export default function BookingSection({
                 </div>
 
                 {submit.kind === "error" ? (
-                    <p role="alert" className="text-sm text-red-600">
+                    <p role="alert" className={destructiveAlertClasses}>
                         {submit.message}
                     </p>
                 ) : null}

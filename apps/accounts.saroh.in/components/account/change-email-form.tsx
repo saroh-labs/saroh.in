@@ -67,7 +67,7 @@ export function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
                         <p className="text-destructive text-sm">{error}</p>
                     )}
                     {sent && (
-                        <p className="text-sm text-emerald-600">
+                        <p className="text-success text-sm">
                             Check {currentEmail} for a confirmation link. Your
                             email changes only once you follow it.
                         </p>

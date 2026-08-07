@@ -45,7 +45,12 @@
     );
     background-size: 22px 22px;
     /* Fade the grid out toward the edges so it never competes with the card or
-       draws a hard line where the pattern stops. */
+       draws a hard line where the pattern stops.
+
+       The #000 below is the one literal colour in this app and is not a colour:
+       a mask reads only the alpha channel, so the stop means "fully opaque
+       here" and any opaque value would behave identically. A token would say
+       nothing truer and would suggest the mask paints something. */
     mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000, transparent);
     -webkit-mask-image: radial-gradient(
         ellipse 70% 60% at 50% 45%,

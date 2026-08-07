@@ -132,7 +132,7 @@ function ResetPasswordFormInner() {
                     {error && (
                         <p
                             role="alert"
-                            className="sa-alert border-destructive/40 bg-destructive/10 text-destructive-foreground rounded-md border px-3 py-2 text-sm"
+                            className="sa-alert border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm"
                         >
                             {error}
                         </p>

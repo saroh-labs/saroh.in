@@ -96,7 +96,7 @@ export default function AppsListPage() {
                     {error && (
                         <p
                             role="alert"
-                            className="sa-alert border-destructive/40 bg-destructive/10 text-destructive-foreground mb-4 rounded-md border px-3 py-2 text-sm"
+                            className="sa-alert border-destructive/40 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
                         >
                             {error.message}
                         </p>

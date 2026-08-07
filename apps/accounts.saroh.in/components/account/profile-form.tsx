@@ -51,7 +51,7 @@ export function ProfileForm({ initialName }: { initialName: string }) {
                         <p className="text-destructive text-sm">{error}</p>
                     )}
                     {saved && (
-                        <p className="text-sm text-emerald-600">Name saved.</p>
+                        <p className="text-success text-sm">Name saved.</p>
                     )}
                     <div className="grid gap-2">
                         <Label htmlFor="name">Name</Label>

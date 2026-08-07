@@ -77,7 +77,7 @@ export function ChangePasswordForm() {
                         <p className="text-destructive text-sm">{error}</p>
                     )}
                     {success && (
-                        <p className="text-sm text-emerald-600">
+                        <p className="text-success text-sm">
                             Password updated.
                         </p>
                     )}

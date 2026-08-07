@@ -10,6 +10,7 @@ import type {
 import { createPaymentIntent, fetchReceipt } from "@/lib/checkout";
 import { cn } from "@/lib/utils";
 
+import { destructiveAlertClasses } from "./alert";
 import { ctaClasses } from "./sections/cta";
 
 /**
@@ -32,12 +33,29 @@ import { ctaClasses } from "./sections/cta";
  * intents.
  */
 
+/**
+ * Payment state is Saroh's chrome, not the merchant's design, so it speaks in
+ * Saroh's status tokens — but as OPAQUE FILLS with their own foreground, not as
+ * the pale tints app.saroh.in uses for the same job. Two reasons, both about
+ * standing on a ground we do not own:
+ *
+ *  - The workspace can afford a tint because it knows its own page colour. Here
+ *    the page is `--site-*`, which is already black under a dark OS and becomes
+ *    merchant data as soon as publications carry brand fields. A fill measured
+ *    against itself is the only ratio that survives that.
+ *  - `--brand-subtle` would have matched the workspace's "money received" recipe
+ *    exactly, but brand tokens are Saroh's identity and this subtree is someone
+ *    else's website. `--success` says the same thing in a hue that means a
+ *    STATE rather than a company.
+ *
+ * UNPAID stays in the merchant's own neutrals: it is the absence of a state, and
+ * the resting case should look like the site it sits in.
+ */
 const STATUS_STYLES: Record<ReceiptPaymentStatus, string> = {
-    PAID: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-    UNPAID: "bg-site-surface text-site-body ",
-    FAILED: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
-    REFUNDED:
-        "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+    PAID: "bg-success text-success-foreground",
+    UNPAID: "bg-site-surface text-site-body",
+    FAILED: "bg-destructive text-destructive-foreground",
+    REFUNDED: "bg-warning text-warning-foreground",
 };
 
 type LoadState =
@@ -133,7 +151,10 @@ export default function Checkout({ orderId }: { orderId: string }) {
             <section className="mx-auto w-full max-w-xl px-5 py-16 sm:px-8">
                 <div
                     role="alert"
-                    className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+                    className={cn(
+                        destructiveAlertClasses,
+                        "rounded-xl p-6 text-center",
+                    )}
                 >
                     {state.message}
                 </div>
@@ -196,7 +217,7 @@ export default function Checkout({ orderId }: { orderId: string }) {
             ) : (
                 <div className="mt-6 space-y-4">
                     {payError ? (
-                        <p role="alert" className="text-sm text-red-600">
+                        <p role="alert" className={destructiveAlertClasses}>
                             {payError}
                         </p>
                     ) : null}

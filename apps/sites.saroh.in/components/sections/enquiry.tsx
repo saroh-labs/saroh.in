@@ -6,6 +6,7 @@ import { env } from "@/env";
 import type { EnquiryContent } from "@/lib/publication";
 import { cn } from "@/lib/utils";
 
+import { destructiveAlertClasses } from "../alert";
 import { ctaClasses } from "./cta";
 
 /**
@@ -170,9 +171,16 @@ export default function EnquirySection({
                             >
                                 {label}
                                 {field.required ? (
+                                    // The only Saroh colour allowed to sit
+                                    // directly on the merchant's ground. It is
+                                    // aria-hidden and redundant with the
+                                    // control's own `required`, so it is a
+                                    // decorative marker held to the 3:1
+                                    // non-text floor rather than 4.5:1 — which
+                                    // it clears (5.43:1 light, 3.87:1 dark).
                                     <span
                                         aria-hidden="true"
-                                        className="text-red-600"
+                                        className="text-destructive"
                                     >
                                         {" *"}
                                     </span>
@@ -196,7 +204,7 @@ export default function EnquirySection({
                 })}
 
                 {state.kind === "error" ? (
-                    <p role="alert" className="text-sm text-red-600">
+                    <p role="alert" className={destructiveAlertClasses}>
                         {state.message}
                     </p>
                 ) : null}
