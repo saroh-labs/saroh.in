@@ -16,14 +16,14 @@
   "license": "ISC",
   "dependencies": {
     "@react-email/components": "^1.0.12",
-    "@types/nodemailer": "^8.0.0",
-    "nodemailer": "^8.0.10",
+    "@types/nodemailer": "^8.0.1",
+    "nodemailer": "^9.0.5",
     "react": "catalog:react19",
-    "react-email": "^6.5.0"
+    "react-email": "^6.9.2"
   },
   "devDependencies": {
     "@saroh/tsconfig": "workspace:*",
-    "@types/react": "catalog:react19",
+    "@types/react": "19.2.15",
     "typescript": "catalog:"
   }
 }

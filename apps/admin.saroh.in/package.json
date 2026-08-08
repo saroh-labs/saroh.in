@@ -11,24 +11,24 @@
     },
     "dependencies": {
         "@saroh/auth": "workspace:*",
+        "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
+        "lucide-react": "catalog:",
         "next": "catalog:next16",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
-        "zod": "catalog:",
-        "@saroh/ui": "workspace:*",
-        "lucide-react": "catalog:"
+        "zod": "catalog:"
     },
     "devDependencies": {
-        "typescript": "catalog:",
-        "@types/node": "catalog:",
-        "@types/react": "catalog:react19",
-        "@types/react-dom": "catalog:react19",
         "@saroh/eslint-config": "workspace:*",
-        "postcss": "catalog:",
-        "tailwindcss": "catalog:",
+        "@saroh/tailwind-config": "workspace:*",
+        "@types/node": "catalog:",
+        "@types/react": "19.2.15",
+        "@types/react-dom": "catalog:react19",
         "eslint": "catalog:",
         "eslint-config-next": "catalog:",
-        "@saroh/tailwind-config": "workspace:*"
+        "postcss": "catalog:",
+        "tailwindcss": "catalog:",
+        "typescript": "catalog:"
     }
 }

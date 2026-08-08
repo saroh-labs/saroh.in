@@ -11,22 +11,22 @@
   },
   "dependencies": {
     "@saroh/auth": "workspace:*",
-    "@saroh/ui": "workspace:*",
     "@saroh/charts": "workspace:*",
-    "react-icons": "catalog:",
+    "@saroh/ui": "workspace:*",
+    "next": "catalog:next16",
     "react": "catalog:react19",
     "react-dom": "catalog:react19",
-    "next": "catalog:next16"
+    "react-icons": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:",
-    "@types/node": "catalog:",
-    "@types/react": "catalog:react19",
-    "@types/react-dom": "catalog:react19",
     "@saroh/eslint-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "19.2.15",
+    "@types/react-dom": "catalog:react19",
+    "eslint": "catalog:",
+    "eslint-config-next": "catalog:",
     "postcss": "catalog:",
     "tailwindcss": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-next": "catalog:"
+    "typescript": "catalog:"
   }
 }

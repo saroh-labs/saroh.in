@@ -17,18 +17,17 @@
     "dependencies": {
         "@eslint/compat": "^2.1.0",
         "@eslint/js": "^10.0.1",
-        "@next/eslint-plugin-next": "^16.2.6",
+        "@next/eslint-plugin-next": "^16.3.0",
         "eslint-plugin-import": "^2.32.0",
         "eslint-plugin-jsx-a11y": "^6.10.2",
         "eslint-plugin-react": "^7.37.5",
         "eslint-plugin-react-hooks": "^7.1.1",
-        "eslint-plugin-turbo": "^2.9.16",
-        "typescript-eslint": "^8.60.0"
+        "eslint-plugin-turbo": "^2.10.9",
+        "typescript-eslint": "^8.66.0"
     },
     "devDependencies": {
         "@saroh/tsconfig": "workspace:*",
         "@types/eslint__js": "8.42.3",
-        "@vercel/style-guide": "^6.0.0",
         "eslint": "catalog:",
         "prettier": "catalog:",
         "typescript": "catalog:"

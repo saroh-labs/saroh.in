@@ -11,20 +11,20 @@
   },
   "dependencies": {
     "@saroh/ui": "workspace:*",
-    "next": "^16.2.6",
+    "next": "^16.3.0",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19"
   },
   "devDependencies": {
-    "eslint": "catalog:",
-    "@next/eslint-plugin-next": "^16.2.6",
+    "@next/eslint-plugin-next": "^16.3.0",
     "@saroh/eslint-config": "workspace:*",
     "@saroh/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "@types/react": "catalog:react19",
+    "@types/react": "19.2.15",
     "@types/react-dom": "catalog:react19",
+    "eslint": "catalog:",
     "typescript": "catalog:"
   }
 }

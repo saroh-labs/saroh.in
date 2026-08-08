@@ -39,18 +39,18 @@ catalogs:
         "@types/react-dom": 18.3.1
 
     react19:
-        react: 19.2.6
-        react-dom: 19.2.6
-        "@types/react": 19.2.14
-        "@types/react-dom": 19.2.3
+        react: 19.2.8
+        react-dom: 19.2.8
+        "@types/react": 19.2.18
+        "@types/react-dom": 19.2.4
 
     next15:
         next: 15.0.3
 
     next16:
-        next: 16.1.6
+        next: 16.3.0
 
     prisma:
-        prisma: 7.4.0
-        "@prisma/client": 7.4.0
-        "@prisma/nextjs-monorepo-workaround-plugin": 7.4.0
+        prisma: 7.9.1
+        "@prisma/client": 7.9.1
+        "@prisma/nextjs-monorepo-workaround-plugin": 7.9.1
