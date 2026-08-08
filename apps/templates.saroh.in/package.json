@@ -12,19 +12,19 @@
   "dependencies": {
     "@saroh/auth": "workspace:*",
     "@saroh/ui": "workspace:*",
+    "next": "catalog:next16",
     "react": "catalog:react19",
-    "react-dom": "catalog:react19",
-    "next": "catalog:next16"
+    "react-dom": "catalog:react19"
   },
   "devDependencies": {
-    "typescript": "catalog:",
-    "@types/node": "catalog:",
-    "@types/react": "catalog:react19",
-    "@types/react-dom": "catalog:react19",
-    "postcss": "catalog:",
     "@saroh/eslint-config": "workspace:*",
-    "tailwindcss": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "19.2.15",
+    "@types/react-dom": "catalog:react19",
     "eslint": "catalog:",
-    "eslint-config-next": "catalog:"
+    "eslint-config-next": "catalog:",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:"
   }
 }

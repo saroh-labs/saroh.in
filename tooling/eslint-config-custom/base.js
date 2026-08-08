@@ -83,24 +83,20 @@ export default tseslint.config(
                 },
             ],
             "@typescript-eslint/no-non-null-assertion": "error",
-            // better-auth's `APIError` IS an Error at runtime — verified:
-            // `new APIError(...) instanceof Error === true`, prototype chain
-            // APIError -> Error. Its shipped type declarations just do not say
-            // so, which the rule reads as "throwing a non-Error". Allowing the
-            // one type by name keeps the rule enforcing everywhere else; the
-            // alternative was an inline disable at every throw site.
-            "@typescript-eslint/only-throw-error": [
-                "error",
-                {
-                    allow: [
-                        {
-                            from: "package",
-                            package: "better-auth",
-                            name: "APIError",
-                        },
-                    ],
-                },
-            ],
+            // This used to carry an `allow` entry exempting better-auth's
+            // `APIError`, which IS an Error at runtime but whose shipped types
+            // did not say so. That exemption no longer works and has been moved
+            // to the single call site that needs it.
+            //
+            // The reason it stopped working: `allow: [{ from: "package", ... }]`
+            // matches a named class declaration. As of better-call 1.3.7,
+            // APIError is not a class — it is a type alias plus a const with a
+            // construct signature returning `InternalAPIError & { errorStack }`.
+            // There is no named class for the matcher to key on, so no package
+            // name (better-auth, @better-auth/core, better-call — all tried)
+            // matches it. Re-adding an `allow` entry here will silently do
+            // nothing; put a scoped disable at the throw site instead.
+            "@typescript-eslint/only-throw-error": "error",
             "import/consistent-type-specifier-style": [
                 "error",
                 "prefer-top-level",

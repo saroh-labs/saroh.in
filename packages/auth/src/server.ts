@@ -147,6 +147,15 @@ async function assertNotSoleOwner(userId: string): Promise<void> {
     }
 
     if (stranded.length > 0) {
+        // better-auth's APIError extends Error at runtime (prototype chain
+        // APIError -> InternalAPIError -> Error), and better-call declares
+        // `InternalAPIError extends Error`. But it exposes APIError as a const
+        // with a construct signature rather than a class, so only-throw-error
+        // cannot see the inheritance and its `allow` option has no named class
+        // to match. Scoped to this one throw — it is the only APIError throw in
+        // the repo. reportUnusedDisableDirectives is on, so this line will be
+        // flagged as unnecessary once better-auth ships types the rule accepts.
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- see above
         throw new APIError("BAD_REQUEST", {
             message:
                 `You are the only owner of ${stranded.join(", ")}. Make someone else an owner, ` +
