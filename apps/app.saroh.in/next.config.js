@@ -1,11 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     transpilePackages: ["@saroh/auth", "@saroh/ui"],
-    // Prisma 7 uses the @prisma/adapter-pg driver adapter (no binary query
-    // engine), so the old webpack @prisma/nextjs-monorepo-workaround-plugin is
-    // unnecessary — externalizing the packages is enough, and lets the default
-    // Turbopack build work.
-    serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "prisma"],
+    // No Prisma externalization here: this app has no @prisma/* dependency and
+    // imports no database code — every read and write goes to api.saroh.in over
+    // HTTP (enforced by the DB-import ban in @saroh/eslint-config/nextjs).
     reactStrictMode: false,
     // The dev-tools badge sits in the bottom-left of every screen and was
     // getting baked into the product screenshots used on the marketing site —

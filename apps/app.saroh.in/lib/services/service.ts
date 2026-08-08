@@ -1,11 +1,11 @@
-import type { CrmResult } from "@/lib/crm/http";
-import { apiFetch, orgBase, readError } from "@/lib/crm/http";
+import type { CrmResult } from "@/lib/api/http";
+import { apiFetch, orgBase, readError } from "@/lib/api/http";
 
 /**
  * Bookable Services data access for app.saroh.in (S4-003). Org-scoped Service
  * CRUD, availability-rule management and booking list / cancel, reached only
  * through api.saroh.in (the app never touches the DB). Every call rides the
- * shared CRM HTTP plumbing (`lib/crm/http`), which forwards the session cookie
+ * shared CRM HTTP plumbing (`lib/api/http`), which forwards the session cookie
  * and the active-org header so the api resolves the caller and enforces the
  * `service:*` / `booking:*` policy. Server-only: the plumbing imports
  * next/headers, so this must never reach a client component.
@@ -116,7 +116,7 @@ export interface AvailabilityRuleInput {
 
 /**
  * Send a mutation to a services route and return a {@link CrmResult}. Unlike
- * `lib/crm/http`'s `mutate`, this also carries PUT/DELETE (the rule-replace and
+ * `lib/api/http`'s `mutate`, this also carries PUT/DELETE (the rule-replace and
  * archive/cancel verbs) and paths are relative to the services base.
  */
 async function send<T>(

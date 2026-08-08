@@ -1,9 +1,8 @@
 "use server";
 
-import type { CreateLeadInput, UpdateLeadInput } from "./service";
+import type { UpdateLeadInput } from "./service";
 import {
     completeTask as completeTaskApi,
-    createLead as createLeadApi,
     createTask as createTaskApi,
     logActivity as logActivityApi,
     moveLead as moveLeadApi,
@@ -18,10 +17,6 @@ import {
  * stage; the api validates the target stage + logs a STAGE_CHANGED activity
  * atomically. Client components call these — never the api or the DB directly.
  */
-
-export async function createLead(input: CreateLeadInput) {
-    return createLeadApi(input);
-}
 
 export async function updateLead(leadId: string, input: UpdateLeadInput) {
     return updateLeadApi(leadId, input);

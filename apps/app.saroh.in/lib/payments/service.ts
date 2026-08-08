@@ -1,4 +1,4 @@
-import { apiFetch, orgBase } from "@/lib/crm/http";
+import { apiFetch, orgBase } from "@/lib/api/http";
 
 /**
  * Org-scoped payments data access for app.saroh.in (S5-004). Reads the owner

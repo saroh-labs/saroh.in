@@ -1,7 +1,7 @@
 "use server";
 
-import type { CrmResult } from "@/lib/crm/http";
-import { mutate } from "@/lib/crm/http";
+import type { CrmResult } from "@/lib/api/http";
+import { mutate } from "@/lib/api/http";
 
 /**
  * Payments Server Actions for app.saroh.in (S5-004). The refund action calls the

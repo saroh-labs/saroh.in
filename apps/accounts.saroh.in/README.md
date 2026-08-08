@@ -19,7 +19,9 @@ pnpm dev
 # or run only this app (see package.json for port)
 ```
 
-Set `DATABASE_URL`, `BETTER_AUTH_URL`, `AUTH_GITHUB_ID`, and `AUTH_GITHUB_SECRET` in env.
+Set `NEXT_PUBLIC_ACCOUNTS_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL`, and `NEXT_PUBLIC_APP_URL` in env — that is the app's entire surface (see `env.ts`).
+
+This app holds no database credentials and no OAuth secrets. It renders the auth UI and talks to Better Auth over HTTP against `api.saroh.in`, which is the only service that touches the database. `DATABASE_URL`, `BETTER_AUTH_SECRET`, and the `AUTH_GITHUB_*` / `AUTH_GOOGLE_*` pairs belong in `apps/api.saroh.in` only.
 
 **Email (React Email + Nodemailer):** Password reset and verification emails use templates from `@saroh/emails` and are sent via Nodemailer when SMTP is configured. Set either:
 

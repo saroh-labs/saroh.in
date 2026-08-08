@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 
+import { env } from "@/env";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 
 import type { CreateOrganizationInput, OrganizationResult } from "./service";
@@ -24,6 +25,10 @@ async function writeActiveOrgCookie(organizationId: string): Promise<void> {
     (await cookies()).set(ACTIVE_ORG_COOKIE, organizationId, {
         httpOnly: true,
         sameSite: "lax",
+        // Off in development so the cookie still works over plain-HTTP
+        // localhost; in production this rides the same TLS-only guarantee the
+        // session cookie already has.
+        secure: env.NODE_ENV === "production",
         path: "/",
         maxAge: ONE_YEAR,
     });

@@ -4,17 +4,26 @@ import { z } from "zod";
 /**
  * Typed, validated environment for admin.saroh.in.
  *
- * `ADMIN_ALLOWLIST` is the fail-closed admin gate (server-only, never exposed
- * to the browser). `NEXT_PUBLIC_ACCOUNTS_URL` is the identity app origin used
- * for sign-in redirects.
+ * This app has no server-only env: it decides nothing about access. /admin/*
+ * authorization lives entirely in api.saroh.in (`PlatformAdminGuard` requires
+ * an active, non-revoked grant; `PlatformPermissionGuard` fails closed). Admin
+ * forwards the session cookie and renders whatever the API allows.
+ *
+ * `ADMIN_ALLOWLIST` used to be declared here and described as "the fail-closed
+ * admin gate". It was read by exactly one local helper that nothing called, so
+ * the description pointed anyone changing admin access at the wrong service.
+ * The allowlist is an api.saroh.in break-glass bootstrap for the first or
+ * recovery platform owner; when it is the reason a request got through, the
+ * API says so via the `viaBootstrap` flag, which is what the break-glass
+ * banner renders from.
+ *
+ * `NEXT_PUBLIC_ACCOUNTS_URL` is the identity app origin used for sign-in
+ * redirects.
  *
  * Access env through this module (`import { env } from "@/env"`) — never
  * `process.env`.
  */
 export const env = createEnv({
-    server: {
-        ADMIN_ALLOWLIST: z.string().optional(),
-    },
     client: {
         NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
         // api.saroh.in origin — admin reads the control plane (/admin/*) over
@@ -23,7 +32,6 @@ export const env = createEnv({
         NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url().optional(),
     },
     runtimeEnv: {
-        ADMIN_ALLOWLIST: process.env.ADMIN_ALLOWLIST,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,

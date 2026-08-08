@@ -1,5 +1,5 @@
-import type { CrmResult } from "@/lib/crm/http";
-import { apiFetch, mutate, orgBase } from "@/lib/crm/http";
+import type { CrmResult } from "@/lib/api/http";
+import { apiFetch, mutate, orgBase } from "@/lib/api/http";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
 
 /**

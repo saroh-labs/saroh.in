@@ -13,6 +13,11 @@ import { z } from "zod";
  * `process.env`.
  */
 export const env = createEnv({
+    shared: {
+        NODE_ENV: z
+            .enum(["development", "test", "production"])
+            .default("development"),
+    },
     server: {
         API_URL: z.string().url().optional(),
         NGROK_URL: z.string().url().optional(),
@@ -36,6 +41,7 @@ export const env = createEnv({
             .optional(),
     },
     runtimeEnv: {
+        NODE_ENV: process.env.NODE_ENV,
         API_URL: process.env.API_URL,
         NGROK_URL: process.env.NGROK_URL,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
