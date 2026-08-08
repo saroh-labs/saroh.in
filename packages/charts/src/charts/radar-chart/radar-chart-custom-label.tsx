@@ -1,6 +1,7 @@
 "use client";
 
 import { TrendingUp } from "lucide-react";
+import type { SVGProps } from "react";
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart } from "recharts";
 
 import {
@@ -11,8 +12,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import type { ChartConfig } from "@saroh/ui/chart";
 import {
-    ChartConfig,
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
@@ -73,9 +74,14 @@ export function RadarChartCustomLabelExample() {
                                 x,
                                 y,
                                 textAnchor,
-                                value,
+                                value: _value,
                                 index,
                                 ...props
+                            }: Omit<SVGProps<SVGTextElement>, "x" | "y"> & {
+                                x: number;
+                                y: number;
+                                value?: string;
+                                index: number;
                             }) => {
                                 const data = chartData[index];
 
@@ -117,7 +123,7 @@ export function RadarChartCustomLabelExample() {
                 </ChartContainer>
             </CardContent>
             <CardFooter className="flex-col gap-2 text-sm">
-                <div className="flex items-center gap-2 font-medium leading-none">
+                <div className="flex items-center gap-2 leading-none font-medium">
                     Trending up by 5.2% this month{" "}
                     <TrendingUp className="h-4 w-4" />
                 </div>

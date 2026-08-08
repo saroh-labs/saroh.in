@@ -3,6 +3,35 @@ import typography from "@tailwindcss/typography";
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
 
+/**
+ * Tailwind's own default stacks, inlined.
+ *
+ * `import defaultTheme from "tailwindcss/defaultTheme"` looks tidier but breaks
+ * the build: this config is loaded through jiti (by postcss, and again by
+ * Turbopack), and jiti does not bind that CJS default export — it fails at
+ * runtime with `ReferenceError: defaultTheme is not defined`, not at typecheck.
+ * These lists are stable; inlining them keeps the config loader-agnostic.
+ */
+const FALLBACK_SANS = [
+    "ui-sans-serif",
+    "system-ui",
+    "sans-serif",
+    '"Apple Color Emoji"',
+    '"Segoe UI Emoji"',
+    '"Segoe UI Symbol"',
+    '"Noto Color Emoji"',
+];
+const FALLBACK_MONO = [
+    "ui-monospace",
+    "SFMono-Regular",
+    "Menlo",
+    "Monaco",
+    "Consolas",
+    '"Liberation Mono"',
+    '"Courier New"',
+    "monospace",
+];
+
 const config = {
     darkMode: ["class"],
     content: [
@@ -56,11 +85,129 @@ const config = {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
                 },
+                // Saroh brand — midnight navy. `brand` is INTERACTIVE (links,
+                // emphasis) and lightens in dark mode; `brand.surface` is a FILL
+                // (heroes, filled chrome) and stays deep in both themes. Do not
+                // collapse them back into one token — see @saroh/ui globals.css.
+                brand: {
+                    DEFAULT: "hsl(var(--brand))",
+                    foreground: "hsl(var(--brand-foreground))",
+                    surface: "hsl(var(--brand-surface))",
+                    "surface-foreground":
+                        "hsl(var(--brand-surface-foreground))",
+                    subtle: "hsl(var(--brand-subtle))",
+                    "subtle-foreground": "hsl(var(--brand-subtle-foreground))",
+                    50: "hsl(var(--brand-50))",
+                    100: "hsl(var(--brand-100))",
+                    200: "hsl(var(--brand-200))",
+                    300: "hsl(var(--brand-300))",
+                    400: "hsl(var(--brand-400))",
+                    500: "hsl(var(--brand-500))",
+                    600: "hsl(var(--brand-600))",
+                    700: "hsl(var(--brand-700))",
+                    800: "hsl(var(--brand-800))",
+                    900: "hsl(var(--brand-900))",
+                    950: "hsl(var(--brand-950))",
+                },
+                // The lime accent. Deliberately NOT `accent` — that name is
+                // taken by shadcn's neutral hover surface and repointing it
+                // would turn every menu hover lime.
+                highlight: {
+                    DEFAULT: "hsl(var(--highlight))",
+                    foreground: "hsl(var(--highlight-foreground))",
+                    border: "hsl(var(--highlight-border))",
+                    subtle: "hsl(var(--highlight-subtle))",
+                    "subtle-foreground":
+                        "hsl(var(--highlight-subtle-foreground))",
+                    50: "hsl(var(--highlight-50))",
+                    100: "hsl(var(--highlight-100))",
+                    200: "hsl(var(--highlight-200))",
+                    300: "hsl(var(--highlight-300))",
+                    400: "hsl(var(--highlight-400))",
+                    500: "hsl(var(--highlight-500))",
+                    600: "hsl(var(--highlight-600))",
+                    700: "hsl(var(--highlight-700))",
+                    800: "hsl(var(--highlight-800))",
+                    900: "hsl(var(--highlight-900))",
+                    950: "hsl(var(--highlight-950))",
+                },
+                success: {
+                    DEFAULT: "hsl(var(--success))",
+                    foreground: "hsl(var(--success-foreground))",
+                },
+                warning: {
+                    DEFAULT: "hsl(var(--warning))",
+                    foreground: "hsl(var(--warning-foreground))",
+                    // The tinted pair, matching `brand` and `highlight`.
+                    // `--warning` is a FILL — a mid-amber sized to carry white
+                    // or near-black text on top of it. Used as text on a pale
+                    // tint (the obvious `bg-warning/15 text-warning`) it lands
+                    // at 2.3:1 in every light skin, which is unreadable. These
+                    // two exist so "someone is waiting" can be said quietly
+                    // without saying it illegibly.
+                    subtle: "hsl(var(--warning-subtle))",
+                    "subtle-foreground":
+                        "hsl(var(--warning-subtle-foreground))",
+                },
+                info: {
+                    DEFAULT: "hsl(var(--info))",
+                    foreground: "hsl(var(--info-foreground))",
+                },
+                chart: {
+                    1: "hsl(var(--chart-1))",
+                    2: "hsl(var(--chart-2))",
+                    3: "hsl(var(--chart-3))",
+                    4: "hsl(var(--chart-4))",
+                    5: "hsl(var(--chart-5))",
+                },
             },
+            fontFamily: {
+                // The two --font-* vars are set by next/font/local in each app's
+                // root layout. --font-mono is intentionally unset (no mono file
+                // is shipped); the var resolves to nothing and the stack below
+                // takes over.
+                sans: ["var(--font-sans)", ...FALLBACK_SANS],
+                display: ["var(--font-display)", ...FALLBACK_SANS],
+                mono: ["var(--font-mono)", ...FALLBACK_MONO],
+            },
+            boxShadow: {
+                xs: "var(--shadow-xs)",
+                sm: "var(--shadow-sm)",
+                DEFAULT: "var(--shadow-sm)",
+                md: "var(--shadow-md)",
+                lg: "var(--shadow-lg)",
+                xl: "var(--shadow-xl)",
+            },
+            transitionTimingFunction: {
+                out: "var(--ease-out)",
+                "in-out": "var(--ease-in-out)",
+            },
+            transitionDuration: {
+                fast: "var(--duration-fast)",
+                base: "var(--duration-base)",
+                slow: "var(--duration-slow)",
+            },
+            /*
+             * Five steps, not three.
+             *
+             * shadcn ships lg/md/sm derived from a single `--radius` with a
+             * 2px spread, which cannot express the shape this system wants:
+             * CONTROLS at 6px and CARDS at 12px. Two extra steps above the
+             * anchor give that range while everything still moves together if
+             * `--radius` changes — a skin can restyle the whole app's corners
+             * from one value, which is why the scale is derived rather than
+             * hardcoded.
+             *
+             * At the default `--radius: 0.5rem`:
+             *   sm 4px · md 6px (buttons, inputs) · lg 8px
+             *   xl 12px (cards, panels) · 2xl 16px (modals, sheets)
+             */
             borderRadius: {
                 lg: "var(--radius)",
                 md: "calc(var(--radius) - 2px)",
                 sm: "calc(var(--radius) - 4px)",
+                xl: "calc(var(--radius) + 4px)",
+                "2xl": "calc(var(--radius) + 8px)",
             },
             keyframes: {
                 "accordion-down": {

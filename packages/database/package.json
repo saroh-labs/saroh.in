@@ -11,9 +11,9 @@
     "scripts": {
         "build": "npm run generate && tsup",
         "clean": "rimraf .turbo node_modules dist",
-        "db:migrate:deploy": "prisma migrate deploy",
-        "db:migrate:dev": "prisma migrate dev",
-        "db:push": "prisma db push",
+        "db:migrate:deploy": "npm run db:guard && prisma migrate deploy",
+        "db:migrate:dev": "npm run db:guard && prisma migrate dev",
+        "db:push": "npm run db:guard && prisma db push",
         "db:seed": "tsx src/seed.ts",
         "dev": "tsup --watch",
         "format": "prisma format",
@@ -22,13 +22,18 @@
         "prebuild": "npm run generate",
         "predev": "npm run generate",
         "studio": "prisma studio",
-        "postinstall": "prisma generate"
+        "postinstall": "prisma generate",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit",
+        "db:guard": "tsx src/database-target.cli.ts",
+        "db:seed:reset": "tsx src/seed.ts --reset"
     },
     "dependencies": {
         "@prisma/adapter-pg": "7.4.0",
         "@prisma/client": "catalog:prisma",
         "@types/node": "catalog:",
-        "pg": "^8.13.1"
+        "pg": "^8.13.1",
+        "zod": "catalog:"
     },
     "devDependencies": {
         "@types/pg": "^8.11.10",
@@ -39,6 +44,8 @@
         "tsconfig": "^7.0.0",
         "tsup": "^8.5.1",
         "tsx": "^4.22.3",
-        "typescript": "catalog:"
+        "typescript": "catalog:",
+        "vitest": "^3.2.4",
+        "better-auth": "^1.6.11"
     }
 }

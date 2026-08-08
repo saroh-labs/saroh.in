@@ -6,13 +6,18 @@
         "dev": "next dev --port=3001",
         "build": "next build",
         "start": "next start",
-        "lint": "next lint"
+        "lint": "eslint .",
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@saroh/auth": "workspace:*",
+        "@t3-oss/env-nextjs": "^0.13.11",
+        "next": "catalog:next16",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
-        "next": "catalog:next16"
+        "zod": "catalog:",
+        "@saroh/ui": "workspace:*",
+        "lucide-react": "catalog:"
     },
     "devDependencies": {
         "typescript": "catalog:",
@@ -23,6 +28,7 @@
         "postcss": "catalog:",
         "tailwindcss": "catalog:",
         "eslint": "catalog:",
-        "eslint-config-next": "catalog:"
+        "eslint-config-next": "catalog:",
+        "@saroh/tailwind-config": "workspace:*"
     }
 }

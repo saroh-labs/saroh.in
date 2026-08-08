@@ -1,6 +1,3 @@
-/* eslint-disable react/no-unstable-nested-components -- n */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access -- n */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment  -- n*/
 "use client";
 
 import {
@@ -10,12 +7,12 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import type { ChartConfig } from "@saroh/ui/chart";
 import {
     ChartContainer,
     ChartStyle,
     ChartTooltip,
     ChartTooltipContent,
-    type ChartConfig,
 } from "@saroh/ui/chart";
 import {
     Select,
@@ -26,7 +23,7 @@ import {
 } from "@saroh/ui/select";
 import * as React from "react";
 import { Label, Pie, PieChart, Sector } from "recharts";
-import { type PieSectorDataItem } from "recharts/types/polar/Pie";
+import type { PieSectorDataItem } from "recharts/types/polar/Pie";
 
 export const description = "An interactive pie chart";
 
@@ -103,10 +100,6 @@ export function PieChartInteractiveExample() {
                             const config =
                                 chartConfig[key as keyof typeof chartConfig];
 
-                            if (!config) {
-                                return null;
-                            }
-
                             return (
                                 <SelectItem
                                     key={key}
@@ -120,7 +113,7 @@ export function PieChartInteractiveExample() {
                                                 backgroundColor: `var(--color-${key})`,
                                             }}
                                         />
-                                        {config?.label}
+                                        {config.label}
                                     </div>
                                 </SelectItem>
                             );

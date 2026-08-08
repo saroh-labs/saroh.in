@@ -10,8 +10,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import type { ChartConfig } from "@saroh/ui/chart";
 import {
-    ChartConfig,
     ChartContainer,
     ChartLegend,
     ChartLegendContent,
@@ -232,7 +232,7 @@ export function AreaChartInteractiveExample() {
                             axisLine={false}
                             tickMargin={8}
                             minTickGap={32}
-                            tickFormatter={(value) => {
+                            tickFormatter={(value: string) => {
                                 const date = new Date(value);
                                 return date.toLocaleDateString("en-US", {
                                     month: "short",
@@ -244,7 +244,7 @@ export function AreaChartInteractiveExample() {
                             cursor={false}
                             content={
                                 <ChartTooltipContent
-                                    labelFormatter={(value) => {
+                                    labelFormatter={(value: string) => {
                                         return new Date(
                                             value,
                                         ).toLocaleDateString("en-US", {

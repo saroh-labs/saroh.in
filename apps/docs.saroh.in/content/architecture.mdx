@@ -1,0 +1,103 @@
+---
+title: "Architecture"
+---
+
+## Architecture
+
+Nine Next.js frontends, one NestJS API, one database. The shape exists to keep
+one question answerable: **who is allowed to see this row?**
+
+## Why one DB-facing service
+
+Every frontend reaches data over HTTP through `api.saroh.in`; none of them
+imports `@saroh/database`.
+
+If two apps could query Postgres, tenant isolation would have to be re-derived
+in both, and the moment they disagreed the difference would be a data leak
+rather than a bug. With one service, an org-scoped read looks the same
+everywhere:
+
+1. `BetterAuthGuard` proves who is asking.
+2. `OrganizationGuard` resolves an `OrganizationContext` from the `:organizationId`
+   path parameter — never from a client-supplied body or header.
+3. The service authorizes a named action (`contact:read`, `order:write`) against
+   the role in that context.
+4. A cross-tenant or missing id returns **404, not 403**, so a caller cannot
+   probe which records exist in another organization.
+
+Step 4 is easy to get wrong in a way nothing catches. A 403 on someone else's
+contact id confirms the contact exists.
+
+## Tenancy
+
+An **Organization** is the tenant. Everything a merchant owns hangs off it, and
+membership carries a role:
+
+| Role     | Can                                                            |
+| -------- | -------------------------------------------------------------- |
+| `OWNER`  | Everything, including deleting the organization.               |
+| `ADMIN`  | Day-to-day operation and member management. Not org deletion.  |
+| `MEMBER` | A read-only floor: organization, members, stores, sites, media. |
+
+CRM data — contacts, leads, activities — is **not** in the member floor. Those
+rows are customer PII, so they are OWNER/ADMIN only.
+
+## Modular capabilities
+
+The workspace is not one product; it is a set of capabilities a merchant turns
+on. Each has a key: `CRM`, `COMMERCE`, `APPOINTMENTS`, `WEBSITE`, `INSIGHTS`,
+`PAYMENTS`, `COMMUNICATIONS`, `AUTOMATIONS`.
+
+Availability is computed, not stored as a boolean. A module resolves to one of:
+
+- `DISABLED` — not turned on. Never appears anywhere in the UI.
+- `SETUP_REQUIRED` — on, but not ready to do new work (no availability windows,
+  no connected provider).
+- `ATTENTION_REQUIRED` — on, was working, something it depends on is now unhealthy.
+- `ACTIVE` — ready.
+
+Two rules follow from that, and both are easy to get backwards:
+
+- **Actions require `ACTIVE`.** Pointing a merchant at a module that is not ready
+  is sending them at a door that does not open.
+- **Read-only surfaces require only "not `DISABLED`".** Appointments with no
+  availability configured cannot take a *new* booking, but the bookings already
+  on the books are real appointments someone must turn up for. Hiding them
+  because the module is `SETUP_REQUIRED` makes the workspace contradict itself.
+
+Nav, the command palette and Home all filter on the same projection, so they
+cannot disagree about what a merchant has.
+
+## Fail open, fail closed
+
+`filterNavGroups` distinguishes two things that look alike:
+
+- `null` — "we could not find out what is available" (the fetch failed). Show
+  everything; a transient API error must never blank the workspace.
+- `[]` — "we asked, and nothing is enabled". Show only the always-on groups;
+  that is the normal state of a new organization.
+
+Collapsing those two into "empty means unknown" is how a dark rollout ends up
+showing every org every module.
+
+## Frontend data access
+
+Server components read through `lib/api/http`, which forwards the session cookie
+and the active organization id. It imports `next/headers`, so it is server-only
+by construction — a client component cannot import it, which is what stops an
+API base URL or a session header from ever reaching the browser.
+
+Where a client component genuinely needs data on every keystroke — the command
+palette — it calls a route handler on its own origin, and the handler resolves
+the organization server-side. The browser never chooses the tenant.
+
+## Build-time invariants
+
+The API composes user-facing calls to action, and the routes they name live in a
+different app. `pnpm check:routes` reads the app's real route tree and resolves
+every `href` and `actionHref` literal the API emits, plus every static
+`<Link href>` and `router.push` in the workspace. It fails the build on a
+destination with no page behind it.
+
+This exists because three primary calls to action shipped pointing at routes
+that were never built, including the only revenue-bearing action in the product.

@@ -1,5 +1,6 @@
 {
     "private": true,
+    "license": "Elastic-2.0",
     "scripts": {
         "prepare": "husky install",
         "build": "turbo run build",
@@ -10,6 +11,9 @@
         "dev:api-auth": "turbo run dev --filter=@saroh/api --filter=auth",
         "dev:apps": "turbo run dev --filter=auth --filter=admin --filter=sites",
         "lint": "turbo run lint",
+        "typecheck": "turbo run typecheck",
+        "check:cycles": "madge --circular --extensions ts,tsx --exclude 'node_modules|\\.next|dist|\\.turbo' apps packages",
+        "check:routes": "node scripts/check-app-routes.mjs",
         "format": "prettier --write \"**/*.{js,jsx,ts,tsx,md}\""
     },
     "prisma": {
@@ -21,6 +25,7 @@
         "@saroh/tsconfig": "workspace:*",
         "eslint": "^10.4.0",
         "husky": "^9.1.7",
+        "madge": "^8.0.0",
         "postcss": "^8.5.15",
         "prettier": "^3.8.3",
         "prettier-plugin-organize-imports": "^4.3.0",
@@ -38,11 +43,16 @@
         "prettier-quick": "^0.0.5"
     },
     "packageManager": "pnpm@9.9.0",
+    "engines": {
+        "node": ">=24",
+        "pnpm": ">=9.9.0"
+    },
     "name": "saroh.in",
     "pnpm": {
         "overrides": {
             "nextra>zod": "4.3.0",
-            "nextra-theme-docs>zod": "4.3.0"
+            "nextra-theme-docs>zod": "4.3.0",
+            "@types/react": "19.2.15"
         }
     }
 }

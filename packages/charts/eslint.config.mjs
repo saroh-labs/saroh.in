@@ -1,24 +1,16 @@
-import tsParser from "@typescript-eslint/parser";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import js from "@eslint/js";
-import { FlatCompat } from "@eslint/eslintrc";
+import baseConfig from "@saroh/eslint-config/base";
+import reactConfig from "@saroh/eslint-config/react";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const compat = new FlatCompat({
-    baseDirectory: __dirname,
-    recommendedConfig: js.configs.recommended,
-    allConfig: js.configs.all
-});
-
-export default [...compat.extends("eslint-config-custom/react-internal.js"), {
-    languageOptions: {
-        parser: tsParser,
+/** @type {import('typescript-eslint').Config} */
+export default [
+    { ignores: ["dist/**"] },
+    ...baseConfig,
+    ...reactConfig,
+    {
+        rules: {
+            // Chart primitives forward untyped props via spreads;
+            // the type-aware base is otherwise applied in full.
+            "no-redeclare": "off",
+        },
     },
-
-    rules: {
-        "no-redeclare": "off",
-        "@typescript-eslint/explicit-function-return-type": "off",
-    },
-}];
+];

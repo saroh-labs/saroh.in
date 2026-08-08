@@ -36,7 +36,7 @@ export function AuthStatus({ className }: { className?: string }) {
                 className ?? "flex items-center gap-3 text-sm font-medium"
             }
         >
-            <span>{session.user.name ?? session.user.email}</span>
+            <span>{session.user.name || session.user.email}</span>
             <button
                 type="button"
                 className="underline"

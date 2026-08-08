@@ -10,32 +10,41 @@ import tseslint from "typescript-eslint";
 /**
  * All packages that leverage t3-env should use this rule
  */
-export const restrictEnvAccess = tseslint.config(
-    { ignores: ["**/env.ts"] },
-    {
-        files: ["**/*.js", "**/*.ts", "**/*.tsx"],
-        rules: {
-            "no-restricted-properties": [
-                "error",
-                {
-                    object: "process",
-                    property: "env",
-                    message:
-                        "Use `import { env } from '~/env'` instead to ensure validated types.",
-                },
-            ],
-            "no-restricted-imports": [
-                "error",
-                {
-                    name: "process",
-                    importNames: ["env"],
-                    message:
-                        "Use `import { env } from '~/env'` instead to ensure validated types.",
-                },
-            ],
-        },
+export const restrictEnvAccess = tseslint.config({
+    files: ["**/*.js", "**/*.ts", "**/*.tsx"],
+    // env.ts is the one file that SHOULD read process.env — it is the
+    // validated boundary every other module imports from. Exempt it from
+    // these two rules only.
+    //
+    // This was previously a standalone `{ ignores: ["**/env.ts"] }` config
+    // object. In flat config a config object with only `ignores` is a
+    // GLOBAL ignore, not a scoped one — and because restrictEnvAccess is
+    // spread last in every app's eslint.config.mjs, it dropped every
+    // apps/*/env.ts from linting entirely. That silently exempted the exact
+    // files the frontend DB-import ban most needs to see: an env schema is
+    // where a DATABASE_URL would first appear in a frontend.
+    ignores: ["**/env.ts"],
+    rules: {
+        "no-restricted-properties": [
+            "error",
+            {
+                object: "process",
+                property: "env",
+                message:
+                    "Use `import { env } from '~/env'` instead to ensure validated types.",
+            },
+        ],
+        "no-restricted-imports": [
+            "error",
+            {
+                name: "process",
+                importNames: ["env"],
+                message:
+                    "Use `import { env } from '~/env'` instead to ensure validated types.",
+            },
+        ],
     },
-);
+});
 
 export default tseslint.config(
     // Ignore files not tracked by VCS and any config files
@@ -74,6 +83,24 @@ export default tseslint.config(
                 },
             ],
             "@typescript-eslint/no-non-null-assertion": "error",
+            // better-auth's `APIError` IS an Error at runtime — verified:
+            // `new APIError(...) instanceof Error === true`, prototype chain
+            // APIError -> Error. Its shipped type declarations just do not say
+            // so, which the rule reads as "throwing a non-Error". Allowing the
+            // one type by name keeps the rule enforcing everywhere else; the
+            // alternative was an inline disable at every throw site.
+            "@typescript-eslint/only-throw-error": [
+                "error",
+                {
+                    allow: [
+                        {
+                            from: "package",
+                            package: "better-auth",
+                            name: "APIError",
+                        },
+                    ],
+                },
+            ],
             "import/consistent-type-specifier-style": [
                 "error",
                 "prefer-top-level",

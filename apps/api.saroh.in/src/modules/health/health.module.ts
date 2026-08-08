@@ -1,11 +1,14 @@
 import { Module } from "@nestjs/common";
-import { TerminusModule } from "@nestjs/terminus";
 
 import { HealthController } from "./health.controller";
+import { HealthService } from "./health.service";
 
+/**
+ * Liveness and readiness. `TerminusModule` was imported here and never used;
+ * dropped rather than left as a dependency the module does not need.
+ */
 @Module({
-    imports: [TerminusModule],
     controllers: [HealthController],
-    providers: [],
+    providers: [HealthService],
 })
 export class HealthModule {}

@@ -1,20 +1,8 @@
-import type { Config } from "tailwindcss";
+// Re-export the shared @saroh/tailwind-config preset instead of the stock
+// scaffold config admin shipped with. Admin was the last app still on its own
+// tokens, so @saroh/ui components rendered here unstyled (and its content glob
+// was missing, purging component-only classes). Content globs resolve relative
+// to this app's dir at build time.
+import sharedConfig from "../../tooling/tailwind-config/tailwind.config";
 
-const config: Config = {
-    content: [
-        "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-        "./components/**/*.{js,ts,jsx,tsx,mdx}",
-        "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    ],
-    theme: {
-        extend: {
-            backgroundImage: {
-                "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-                "gradient-conic":
-                    "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-            },
-        },
-    },
-    plugins: [],
-};
-export default config;
+export default sharedConfig;

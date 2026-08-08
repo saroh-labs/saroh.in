@@ -11,8 +11,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import type { ChartConfig } from "@saroh/ui/chart";
 import {
-    ChartConfig,
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
@@ -89,7 +89,7 @@ export function PieChartStackedExample() {
                                     indicator="line"
                                     labelFormatter={(_, payload) => {
                                         return chartConfig[
-                                            payload?.[0]
+                                            payload[0]
                                                 .dataKey as keyof typeof chartConfig
                                         ].label;
                                     }}
@@ -111,7 +111,7 @@ export function PieChartStackedExample() {
                 </ChartContainer>
             </CardContent>
             <CardFooter className="flex-col gap-2 text-sm">
-                <div className="flex items-center gap-2 font-medium leading-none">
+                <div className="flex items-center gap-2 leading-none font-medium">
                     Trending up by 5.2% this month{" "}
                     <TrendingUp className="h-4 w-4" />
                 </div>

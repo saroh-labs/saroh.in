@@ -1,22 +1,29 @@
 "use client";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@saroh/ui/button";
 import {
     Form,
     FormControl,
     FormField,
     FormItem,
     FormMessage,
-} from "@/components/ui/form";
-import { toast } from "@/components/ui/use-toast";
-import { zodResolver } from "@hookform/resolvers/zod";
+} from "@saroh/ui/form";
+import { Input } from "@saroh/ui/input";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 const formSchema = z.object({
     email: z.string().email({
         message: "Please enter a valid email address!",
     }),
 });
+
+interface WaitlistResponse {
+    status?: "success" | "failure";
+    /** False when the address was already on the list. */
+    created?: boolean;
+    reason?: { code?: string };
+}
 
 export default function JoinWaitlist() {
     const form = useForm<z.infer<typeof formSchema>>({
@@ -25,79 +32,91 @@ export default function JoinWaitlist() {
             email: "",
         },
     });
-    function onSubmit(data: z.infer<typeof formSchema>) {
-        console.log({ data });
-        fetch("/api/waitlist", {
-            method: "POST",
-            body: JSON.stringify(data),
-            headers: {
-                "Content-Type": "application/json",
-            },
-        })
-            .then((res) => res.json())
-            .then((json) => {
-                if (json.status === "success") {
-                    toast({
-                        description:
-                            "Thanks for joining the waitlist! We'll be in touch soon.",
-                    });
 
-                    form.reset();
-                }
-                if (json.status === "failure") {
-                    if (json.reason.code === "P2002") {
-                        return toast({
-                            title: "Email already exists in the waitlist.",
-                            variant: "destructive",
-                        });
-                    }
-                    toast({
-                        title: "An error occurred. Please try again later.",
-                        variant: "destructive",
-                        // description: json.reason.,
-                    });
-                    console.error(json.reason);
-                }
-            })
-            .catch((error) => {
-                toast({
-                    title: "An error occurred. Please try again later.",
-                    variant: "destructive",
-                    description: error.message,
-                });
+    /**
+     * `async` so react-hook-form's `formState.isSubmitting` actually tracks the
+     * request — with the previous non-awaited promise chain it flipped back to
+     * false immediately and the button never showed a pending state.
+     */
+    async function onSubmit(data: z.infer<typeof formSchema>) {
+        try {
+            const res = await fetch("/api/waitlist", {
+                method: "POST",
+                body: JSON.stringify(data),
+                headers: { "Content-Type": "application/json" },
             });
+            const json = (await res.json()) as WaitlistResponse;
+
+            if (json.status === "success") {
+                // A repeat signup is not an error — the address is on the list
+                // either way, which is what the visitor wanted. Saying so is
+                // friendlier than the previous destructive "Email already
+                // exists" toast.
+                toast.success(
+                    json.created === false
+                        ? "You're already on the list — we'll be in touch."
+                        : "You're on the list. We'll email you when we open your batch.",
+                );
+                form.reset();
+                return;
+            }
+
+            toast.error(
+                json.reason?.code === "RATE_LIMITED"
+                    ? "Too many attempts. Try again in a minute."
+                    : "Something went wrong. Please try again.",
+            );
+            console.error("[waitlist]", json.reason);
+        } catch (error: unknown) {
+            toast.error("Something went wrong. Please try again.", {
+                description: error instanceof Error ? error.message : undefined,
+            });
+        }
     }
 
+    // `watch`, not `getValues`: getValues does not subscribe to changes, so the
+    // submit button stayed disabled while the user typed and only enabled on an
+    // unrelated re-render.
+    const email = form.watch("email");
+    const submitting = form.formState.isSubmitting;
+
     return (
-        <div className="relative flex h-[40rem] w-full flex-col items-center justify-center rounded-md bg-neutral-950 antialiased">
-            <div className="mx-auto max-w-2xl p-4">
-                <h1 className="relative z-10 bg-gradient-to-b from-neutral-200  to-neutral-600 bg-clip-text text-center font-sans text-lg  font-bold text-transparent md:text-7xl">
-                    Join the waitlist
-                </h1>
-                <p></p>
-                <p className="relative z-10 mx-auto my-2 max-w-lg text-center text-sm text-neutral-500">
-                    Welcome to saroh.in, a full stack platform for building your
-                    personal portfolios, blogs or storefronts with ease.
+        // No coloured panel. This is the page's SECONDARY ask, sitting under
+        // the primary one, so it is a bordered card in the same register as
+        // everything else — the old `bg-brand-surface` block with a lime blur
+        // belonged to a palette that no longer exists, and its hardcoded
+        // `text-white` was unreadable in the light theme.
+        <section
+            id="waitlist-form"
+            className="scroll-mt-16 rounded-xl border border-border bg-card px-6 py-10 sm:px-10"
+        >
+            <div className="mx-auto max-w-xl text-center">
+                <h2 className="font-display text-[22px] font-semibold tracking-[-0.02em]">
+                    Not ready yet? Be there when it opens.
+                </h2>
+                <p className="mx-auto mt-3 max-w-[46ch] text-[14.5px] leading-relaxed text-muted-foreground">
+                    We are onboarding businesses in small batches so each one
+                    gets set up properly. Leave your email and we will get in
+                    touch when it is your turn.
                 </p>
-                {/* <Input
-					type="text"
-					placeholder="Enter your email address"
-					className="rounded-lg border border-neutral-800 focus:ring-2 focus:ring-teal-500  w-full relative z-10 mt-4  bg-neutral-950 placeholder:text-neutral-700"
-				/> */}
+
                 <Form {...form}>
                     <form
                         onSubmit={form.handleSubmit(onSubmit)}
-                        className=" space-y-6"
+                        className="mx-auto mt-7 flex max-w-md flex-col gap-2.5 sm:flex-row"
                     >
                         <FormField
                             control={form.control}
                             name="email"
                             render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="flex-1 text-left">
                                     <FormControl>
                                         <Input
-                                            placeholder="Enter your email address"
-                                            className="relative z-10 mt-4 w-full rounded-lg  border border-neutral-800 bg-neutral-950 placeholder:text-neutral-700  focus:ring-2 focus:ring-teal-500"
+                                            type="email"
+                                            autoComplete="email"
+                                            placeholder="you@yourbusiness.in"
+                                            aria-label="Email address"
+                                            className="h-10 w-full rounded-md border-input bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
                                             {...field}
                                         />
                                     </FormControl>
@@ -107,13 +126,18 @@ export default function JoinWaitlist() {
                         />
                         <Button
                             type="submit"
-                            disabled={Boolean(!form.getValues("email"))}
+                            disabled={!email || submitting}
+                            className="h-10 shrink-0 rounded-md bg-primary px-5 text-[13.5px] font-medium text-primary-foreground hover:opacity-90"
                         >
-                            Submit
+                            {submitting ? "Joining…" : "Join the waitlist"}
                         </Button>
                     </form>
                 </Form>
+
+                <p className="mt-4 text-[12px] text-muted-foreground/70">
+                    One email when we open your batch. No newsletter.
+                </p>
             </div>
-        </div>
+        </section>
     );
 }

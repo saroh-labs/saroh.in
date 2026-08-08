@@ -1,24 +1,19 @@
+import { env } from "@/env";
+
 export const accountsUrl =
-    process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? "https://accounts.saroh.in";
+    env.NEXT_PUBLIC_ACCOUNTS_URL ?? "https://accounts.saroh.in";
 
 export const accountsLoginUrl = `${accountsUrl}/login`;
 
 /**
- * Fail-closed admin gate. Only emails listed in `ADMIN_ALLOWLIST`
- * (comma-separated) are admins; access is DENIED when the env is unset or
- * the email isn't listed — this is how the first admin is seeded.
+ * Authorization for /admin/* is NOT decided here. api.saroh.in owns it:
+ * `PlatformAdminGuard` requires an active, non-revoked PlatformAdmin grant and
+ * `PlatformPermissionGuard` fails closed on the specific permission. This app
+ * only forwards the session cookie and renders what the API allows.
  *
- * This is the single authorization seam: when the M2 admin plugin lands,
- * swap the allowlist check for `session.user.role === "admin"` here only.
+ * A local `isAdmin(session)` helper used to live here, reading the
+ * `ADMIN_ALLOWLIST` env. Nothing ever called it, but its docstring claimed to
+ * be "the single authorization seam" — which would send anyone changing admin
+ * access to the wrong file. The allowlist survives only as an API-side
+ * break-glass bootstrap for the first/recovery platform owner.
  */
-export function isAdmin(
-    session: { user?: { email?: string | null } | null } | null,
-): boolean {
-    const email = session?.user?.email?.toLowerCase();
-    if (!email) return false;
-    const allow = (process.env.ADMIN_ALLOWLIST ?? "")
-        .split(",")
-        .map((e) => e.trim().toLowerCase())
-        .filter(Boolean);
-    return allow.length > 0 && allow.includes(email);
-}

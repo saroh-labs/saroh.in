@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Saroh control plane
 
-## Getting Started
+`admin.saroh.in` is Saroh's internal operations and governance app. It is not an
+Organization workspace: every screen is backed by the API's platform-staff
+guard and fixed role permissions.
 
-First, run the development server:
+## Current foundation
+
+- Dashboard with platform-level aggregates
+- Permission-aware navigation and read-only states
+- Release controls for global and Organization feature flags
+- Immutable platform audit ledger with filters and cursor pagination
+- Visible staff roles and a warning when break-glass access is active
+
+The API is the authorization authority. Hiding a link or disabling a button in
+this app is only a usability aid; `/admin/*` permissions are enforced again by
+`api.saroh.in`.
+
+## Staff roles
+
+| Role            | Intended responsibility                                 |
+| --------------- | ------------------------------------------------------- |
+| Platform Owner  | Full control-plane access                               |
+| Support         | Organization support and time-bounded access sessions   |
+| Operations      | Jobs, webhooks, providers, and incidents                |
+| Billing         | Subscriptions and billing interventions                 |
+| Release Manager | Feature rollout and release controls                    |
+| Auditor         | Read-only platform, operations, staff, and audit access |
+
+A staff member may hold multiple roles. The API resolves the union of their
+active permissions on every request, so revocation and expiry take effect
+without waiting for a cached session to expire.
+
+## Local development
+
+From the repository root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+pnpm --filter admin dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The admin app runs at `http://localhost:3001` and expects:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```dotenv
+NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:3333
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+The API must also be running with the same Better Auth configuration and a
+database containing the control-plane migration.
 
-## Learn More
+### First local administrator
 
-To learn more about Next.js, take a look at the following resources:
+`ADMIN_ALLOWLIST` is a break-glass bootstrap on the API, not the normal staff
+directory. For local setup only, set it to an account you control, using a
+non-production test address:
 
--   [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
--   [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```dotenv
+ADMIN_ALLOWLIST=operator@example.test
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+Sign in with that account through `accounts.saroh.in`. The API grants temporary
+Platform Owner capabilities and the shell displays an amber break-glass banner.
+Use recorded `PlatformAdmin` role assignments for normal environments, then
+remove the bootstrap address. An unset or empty allowlist grants nobody access.
 
-## Deploy on Vercel
+Never commit a real staff address, session cookie, password, or credential.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Verification
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+```bash
+pnpm --filter admin typecheck
+pnpm --filter admin lint
+SKIP_ENV_VALIDATION=1 pnpm --filter admin build
+```
+
+The full interaction map and representative screenshots live in
+[`docs/prototypes/admin-control-plane-flow`](../../docs/prototypes/admin-control-plane-flow).

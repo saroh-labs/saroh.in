@@ -11,6 +11,55 @@ The official NestJS API backend for Saroh.io, providing authentication, store ma
 - **Validation**: class-validator + Zod
 - **Documentation**: Swagger/OpenAPI (coming soon)
 
+## Internal control plane
+
+All `GET`, `PUT`, and `DELETE` routes below `/admin` are protected in three
+layers:
+
+1. `BetterAuthGuard` requires an authenticated Saroh account.
+2. `PlatformAdminGuard` resolves active, unexpired fixed staff roles on every
+   request. Organization membership never grants platform access.
+3. `PlatformPermissionGuard` requires the permission declared by the endpoint.
+
+The fixed roles are `PLATFORM_OWNER`, `SUPPORT`, `OPERATIONS`, `BILLING`,
+`RELEASE_MANAGER`, and `AUDITOR`. Their closed permission vocabulary lives in
+`src/modules/admin/admin-permissions.ts`.
+
+Feature-flag commands require a reason and idempotency key. The flag change,
+domain `FeatureFlagAudit`, and global `AdminAuditEvent` commit in one database
+transaction. If the platform audit write fails, the operational change rolls
+back. Audit metadata rejects secret-bearing keys recursively.
+
+### Break-glass bootstrap
+
+`ADMIN_ALLOWLIST` is the recovery path for the first administrator or for a
+lockout. A matching authenticated account receives Platform Owner permissions,
+the use is logged at warning level, and `/admin/me` reports
+`viaBootstrap: true`.
+
+For local development, use a non-production test account:
+
+```dotenv
+ADMIN_ALLOWLIST=operator@example.test
+```
+
+Unset or empty means no bootstrap access. Normal staff access uses an active
+`PlatformAdmin` row with at least one active `PlatformAdminRoleAssignment`.
+Role assignment and grant revocation are append-only lifecycle records.
+
+### Database migration
+
+Deploy migrations before enabling the new control-plane API:
+
+```bash
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE \
+  pnpm --filter @saroh/database db:migrate:deploy
+```
+
+The foundation migration creates the role-assignment and global audit tables.
+Existing active `PlatformAdmin` grants are backfilled to `PLATFORM_OWNER` so
+the migration does not silently remove their access.
+
 ## Project Structure
 
 ```

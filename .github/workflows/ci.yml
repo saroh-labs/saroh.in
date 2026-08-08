@@ -1,0 +1,158 @@
+name: CI
+
+# Gates every PR (and pushes to the long-lived branches) on the same checks a
+# developer runs locally: install → prisma generate → lint → typecheck → unit
+# tests → build → integration tests. See ticket S0-002.
+#
+# NOTE FOR REPO ADMINS: this workflow only *runs* the gates. To make them
+# blocking, mark the `ci` job as a REQUIRED status check in the branch
+# protection rules for `main` and `development` (Settings → Branches). That
+# cannot be configured from a workflow file.
+
+on:
+  pull_request:
+    branches: [main, development]
+  push:
+    branches: [main, development]
+
+# Least privilege: the gates only read the checked-out tree. No job needs to
+# write to the repo, packages, or deployments, so we grant read-only at the top
+# level and do not elevate anywhere.
+permissions:
+  contents: read
+
+# Cancel superseded runs for the same ref (e.g. a force-push or a new commit on
+# an open PR) so CI does not pile up on stale commits.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint, typecheck, test & build
+    runs-on: ubuntu-latest
+
+    # Placeholder build/runtime env. The apps validate env at build time via the
+    # S0-006 typed env modules; SKIP_ENV_VALIDATION short-circuits that zod check
+    # (t3-env's recommended CI/Docker pattern) so no build/test step can fail on a
+    # required var, while the dummy values below keep any code that reads env
+    # working. None of them point at a live service, and no real secret is used.
+    #
+    # DATABASE_URL is deliberately a DIFFERENT database name ("saroh_ci_dummy")
+    # from the integration TEST_DATABASE_URL ("saroh_test") so the S0-003
+    # non-test-DB guard (which rejects TEST_DATABASE_URL == DATABASE_URL, by
+    # string or by host+db) is satisfied. Nothing ever connects to this URL:
+    # prisma generate needs no connection, and the integration globalSetup
+    # overrides DATABASE_URL with the test URL before it pushes the schema.
+    env:
+      SKIP_ENV_VALIDATION: "1"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
+      BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters
+      BETTER_AUTH_URL: http://localhost:3333
+      APP_URL: http://localhost:3003
+      CORS_ORIGIN: http://localhost:3000
+      EMAIL_FROM: Saroh <noreply@saroh.in>
+      NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3333
+      NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
+      NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
+      NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
+
+    # Postgres for the integration tests. The test DB name contains "test" so
+    # it passes the S0-003 guard; plain TCP on 5432, no SSL.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saroh_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.9.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Generate the Prisma client before anything typechecks, builds, or runs
+      # tests against @saroh/database.
+      - name: Prisma generate
+        run: pnpm --filter @saroh/database generate
+
+      - name: Lint
+        run: pnpm run lint
+
+      # Package-boundary enforcement (frontends must not import Prisma directly)
+      # is part of `lint` via the shared nextjs ESLint config. This step adds
+      # circular-dependency detection across all workspaces.
+      - name: Circular dependency check
+        run: pnpm run check:cycles
+
+      # Every destination the API emits and every static in-app link must
+      # resolve to a real route. Three shipped hrefs (/payments,
+      # /communications, /stores) 404'd for merchants before this existed.
+      - name: Route destination check
+        run: pnpm run check:routes
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      # Block only on CRITICAL advisories. The tree currently carries ~36 "high"
+      # advisories, almost all transitive dev tooling (e.g. ws DoS via
+      # react-email > socket.io in @saroh/emails) with no upstream fix yet;
+      # hard-failing on "high" would rot CI. Highs/moderates are triaged in the
+      # dependency-refresh pass, not blocked here.
+      - name: Dependency audit (critical only)
+        run: pnpm audit --audit-level critical
+
+      - name: Unit tests (api, no database)
+        run: pnpm --filter @saroh/api test:unit
+
+      - name: Build
+        run: pnpm run build
+
+      # Integration tests need the Postgres service. The globalSetup runs
+      # `pnpm exec prisma db push` in packages/database, which relies on the
+      # Prisma client generated above and on pnpm being on PATH (both true here).
+      - name: Integration tests (api, Postgres)
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_test
+        run: pnpm --filter @saroh/api test:int
+
+  # Secret scanning runs as its own job over the full git history so a secret
+  # committed in an earlier commit is still caught. gitleaks-action is free for
+  # personal/public repos; a GitHub *organization* additionally needs a
+  # GITLEAKS_LICENSE secret (uncomment below) — see gitleaks docs.
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # required only for GitHub organizations

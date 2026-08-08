@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Saroh — B, C, and the fusion</title>
+<style>
+  /* Comparison harness only. Each world below is self-contained and scoped to
+     its own class, so the three can be judged against identical content. */
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:#0b0c0d;color:#e8e8e6}
+  .harness{max-width:1240px;margin:0 auto;padding:48px 24px 96px}
+  .harness > header{padding:0 0 40px}
+  .harness h1{font-size:26px;letter-spacing:-.02em;font-weight:700}
+  .harness p.sub{color:#9b9b97;margin-top:8px;font-size:15px;max-width:64ch;line-height:1.5}
+  .slab{margin-top:56px;border-radius:8px;overflow:hidden;border:1px solid #24262a}
+  .slab > .tag{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;padding:14px 18px;background:#141618;border-bottom:1px solid #24262a}
+  .slab > .tag b{font-size:15px;letter-spacing:-.01em}
+  .slab > .tag span{color:#8e8e8a;font-size:13px}
+  .swatches{display:flex;gap:6px;margin-left:auto}
+  .swatches i{width:22px;height:22px;border-radius:3px;display:block}
+  .app{display:grid;grid-template-columns:224px 1fr;min-height:560px}
+  @media(max-width:880px){.app{grid-template-columns:1fr}.rail{display:none!important}}
+
+  /* ─────────── WORLD A — LORRY LIVERY ─────────── */
+  .w-livery{--bg:#0E1230;--panel:#161B44;--ink:#F4F1E4;--dim:#A9AECD;--line:#2B3160;
+    --vermillion:#E23B26;--marigold:#F5A312;--peacock:#0FA3A3;--leaf:#3E9B45;--rose:#D8397C;--chrome:#DCE3F0}
+  .w-livery{background:var(--bg);color:var(--ink)}
+  .w-livery .rail{background:var(--panel);border-right:3px solid var(--marigold);padding:18px 12px}
+  .w-livery .brand{font-weight:800;font-size:19px;letter-spacing:-.02em;color:var(--marigold);padding:4px 10px 18px;
+    text-shadow:0 1px 0 rgba(0,0,0,.5)}
+  .w-livery .navgrp{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--peacock);padding:16px 10px 6px;font-weight:700}
+  .w-livery .navitem{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:4px;font-size:14px;color:var(--dim);
+    border-left:3px solid transparent}
+  .w-livery .navitem.on{background:rgba(245,163,18,.14);color:var(--ink);border-left-color:var(--marigold);font-weight:600}
+  .w-livery .main{padding:28px 30px}
+  .w-livery h2{font-size:24px;font-weight:800;letter-spacing:-.02em}
+  .w-livery .subtle{color:var(--dim);font-size:14px;margin-top:5px}
+  /* The lead panel: a bordered livery block, the way a truck panel is framed. */
+  .w-livery .lead{margin-top:24px;background:var(--vermillion);border:3px solid var(--marigold);border-radius:5px;
+    padding:20px 22px;display:flex;gap:22px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+    box-shadow:0 10px 30px -14px rgba(0,0,0,.9)}
+  .w-livery .lead .kick{font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:800;color:#FFE0B8}
+  .w-livery .lead .title{font-size:22px;font-weight:800;line-height:1.15;margin-top:8px;max-width:34ch;color:#FFF7E8}
+  .w-livery .go{background:var(--chrome);color:#12142E;font-weight:800;padding:12px 26px;border-radius:4px;font-size:15px;white-space:nowrap}
+  .w-livery .rows{margin-top:22px;border:2px solid var(--line);border-radius:5px;overflow:hidden}
+  .w-livery .row{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .w-livery .row:last-child{border-bottom:0}
+  .w-livery .stock{width:8px;align-self:stretch;border-radius:2px}
+  .w-livery .chip{font-size:10px;letter-spacing:.14em;font-weight:800;text-transform:uppercase;padding:4px 8px;border-radius:3px;
+    background:rgba(255,255,255,.1);color:var(--ink)}
+  .w-livery .rowtitle{font-size:14px;flex:1;min-width:0}
+  .w-livery .open{font-size:13px;font-weight:700;color:var(--marigold)}
+
+  /* ─────────── WORLD B — STOCKROOM GRAMMAR ─────────── */
+  .w-stock{--bg:#0B0B0B;--panel:#131313;--ink:#F2F2F0;--dim:#8C8C88;--line:#262626;--orange:#FF5A00;--white:#FFFFFF}
+  .w-stock{background:var(--bg);color:var(--ink)}
+  .w-stock .rail{background:var(--panel);border-right:1px solid var(--line);padding:18px 12px;
+    background-image:repeating-linear-gradient(135deg,transparent 0 14px,rgba(255,255,255,.02) 14px 28px)}
+  .w-stock .brand{font-weight:800;font-size:18px;letter-spacing:.02em;padding:4px 10px 18px;text-transform:uppercase}
+  .w-stock .navgrp{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);padding:16px 10px 6px;font-weight:700}
+  .w-stock .navitem{display:flex;align-items:center;gap:10px;padding:9px 10px;font-size:13px;color:var(--dim);
+    text-transform:uppercase;letter-spacing:.06em}
+  .w-stock .navitem.on{background:var(--white);color:#000;font-weight:800}
+  .w-stock .main{padding:28px 30px}
+  .w-stock h2{font-size:24px;font-weight:800;text-transform:uppercase;letter-spacing:.01em}
+  .w-stock .subtle{color:var(--dim);font-size:14px;margin-top:5px}
+  .w-stock .lead{margin-top:24px;background:var(--white);color:#000;border-radius:0;padding:22px;
+    display:flex;gap:22px;align-items:center;justify-content:space-between;flex-wrap:wrap;position:relative;overflow:hidden}
+  .w-stock .lead::after{content:"";position:absolute;inset:auto 0 0 0;height:10px;
+    background:repeating-linear-gradient(135deg,#000 0 12px,var(--orange) 12px 24px)}
+  .w-stock .lead .kick{font-size:10px;letter-spacing:.2em;text-transform:uppercase;font-weight:800}
+  .w-stock .lead .title{font-size:22px;font-weight:800;line-height:1.15;margin-top:8px;max-width:34ch;text-transform:uppercase}
+  .w-stock .go{background:#000;color:var(--white);font-weight:800;padding:13px 28px;font-size:14px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+  .w-stock .rows{margin-top:22px;border:1px solid var(--line)}
+  .w-stock .row{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .w-stock .row:last-child{border-bottom:0}
+  .w-stock .stock{width:6px;align-self:stretch}
+  .w-stock .chip{font-size:10px;letter-spacing:.16em;font-weight:800;text-transform:uppercase;padding:4px 8px;
+    border:1px solid var(--dim);color:var(--ink)}
+  .w-stock .rowtitle{font-size:14px;flex:1;min-width:0}
+  .w-stock .open{font-size:12px;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:.08em}
+
+
+  /* ─────────── WORLD D — FUSION: C's instrument panel, B's stockroom discipline ───────────
+     C alone is near-black plus one glow: the rut. B alone is one accent on
+     monochrome: not vibrant. Fused, the panel keeps C's calm luminous
+     instrumentation and gains B's structural rigour — hazard stripe, literal
+     uppercase labelling, hard white surfaces — which together make a real
+     multi-colour signal system instead of a single accent.
+
+     One rule does the work: LUMINOUS GREEN MEANS ACTIONABLE. Anything you can
+     act on glows; anything merely informational does not. Amber is waiting,
+     orange is broken, and the hazard diagonal is spent exactly once per view. */
+  .w-fuse{--bg:#08090A;--panel:#101315;--panel2:#161A1D;--ink:#E6ECE9;--dim:#7F8A86;--line:#232A2D;
+    --lume:#6EF3A5;--amber:#FFB020;--orange:#FF5A00;--white:#F2F2F0}
+  .w-fuse{background:var(--bg);color:var(--ink)}
+  .w-fuse .rail{background:var(--panel);border-right:1px solid var(--line);padding:16px 10px}
+  .w-fuse .brand{font-weight:800;font-size:17px;letter-spacing:.14em;color:var(--ink);padding:6px 10px 16px;text-transform:uppercase}
+  .w-fuse .brand em{font-style:normal;color:var(--lume)}
+  .w-fuse .navgrp{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);padding:16px 10px 6px;font-weight:700}
+  .w-fuse .navitem{display:flex;align-items:center;gap:10px;padding:8px 10px;font-size:12px;color:var(--dim);
+    text-transform:uppercase;letter-spacing:.1em;font-weight:600;border-left:2px solid transparent}
+  .w-fuse .navitem.on{background:rgba(110,243,165,.09);color:var(--lume);border-left-color:var(--lume)}
+  .w-fuse .main{padding:26px 30px}
+  .w-fuse h2{font-size:13px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+  .w-fuse .subtle{color:var(--dim);font-size:13px;margin-top:6px}
+  .w-fuse .lead{margin-top:22px;background:var(--white);color:#0A0C0D;padding:22px 24px 26px;position:relative;overflow:hidden;
+    display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .w-fuse .lead::after{content:"";position:absolute;inset:auto 0 0 0;height:9px;
+    background:repeating-linear-gradient(135deg,#0A0C0D 0 11px,var(--orange) 11px 22px)}
+  .w-fuse .lead .kick{font-size:9px;letter-spacing:.24em;text-transform:uppercase;font-weight:800;color:#8A3B00}
+  .w-fuse .lead .title{font-size:21px;font-weight:700;line-height:1.2;margin-top:9px;max-width:36ch;letter-spacing:-.01em}
+  .w-fuse .go{background:#0A0C0D;color:var(--lume);font-weight:800;padding:13px 30px;font-size:12px;
+    text-transform:uppercase;letter-spacing:.16em;white-space:nowrap;border:1px solid #0A0C0D}
+  .w-fuse .rowhead{display:flex;gap:16px;padding:20px 2px 8px;font-size:9px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--dim);font-weight:700}
+  .w-fuse .rows{border:1px solid var(--line);background:var(--panel)}
+  .w-fuse .row{display:flex;align-items:stretch;gap:0;border-bottom:1px solid var(--line)}
+  .w-fuse .row:last-child{border-bottom:0}
+  .w-fuse .row:nth-child(even){background:var(--panel2)}
+  .w-fuse .stock{width:4px;flex:none}
+  .w-fuse .rowinner{display:flex;align-items:center;gap:14px;padding:12px 16px;flex:1;min-width:0}
+  .w-fuse .chip{font-size:9px;letter-spacing:.18em;font-weight:800;text-transform:uppercase;padding:4px 9px;
+    border:1px solid currentColor;flex:none;min-width:82px;text-align:center}
+  .w-fuse .rowtitle{font-size:13.5px;flex:1;min-width:0;color:var(--ink)}
+  .w-fuse .open{font-size:11px;font-weight:800;color:var(--lume);text-transform:uppercase;letter-spacing:.14em;flex:none}
+
+  /* ─────────── WORLD C — NIGHT INSTRUMENTS ─────────── */
+  .w-instr{--bg:#08090A;--panel:#0F1113;--ink:#DFE5E2;--dim:#7C8683;--line:#1E2225;
+    --lume:#7CFFB2;--amber:#FFB020;--red:#FF4D3D;--glass:#0B0E10}
+  .w-instr{background:var(--bg);color:var(--ink)}
+  .w-instr .rail{background:var(--panel);border-right:1px solid var(--line);padding:18px 12px}
+  .w-instr .brand{font-weight:700;font-size:18px;letter-spacing:.06em;color:var(--lume);padding:4px 10px 18px}
+  .w-instr .navgrp{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);padding:16px 10px 6px;font-weight:600}
+  .w-instr .navitem{display:flex;align-items:center;gap:10px;padding:9px 10px;font-size:13px;color:var(--dim);
+    border-radius:3px;font-variant-numeric:tabular-nums}
+  .w-instr .navitem.on{background:rgba(124,255,178,.1);color:var(--lume);border:1px solid rgba(124,255,178,.28)}
+  .w-instr .main{padding:28px 30px}
+  .w-instr h2{font-size:22px;font-weight:600;letter-spacing:.02em}
+  .w-instr .subtle{color:var(--dim);font-size:14px;margin-top:5px}
+  .w-instr .lead{margin-top:24px;background:var(--glass);border:1px solid var(--red);border-radius:6px;padding:20px 22px;
+    display:flex;gap:22px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+    box-shadow:inset 0 0 40px -18px var(--red)}
+  .w-instr .lead .kick{font-size:10px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--red)}
+  .w-instr .lead .title{font-size:21px;font-weight:600;line-height:1.2;margin-top:8px;max-width:34ch}
+  .w-instr .go{border:1px solid var(--lume);color:var(--lume);background:rgba(124,255,178,.08);font-weight:700;
+    padding:12px 26px;border-radius:4px;font-size:14px;letter-spacing:.06em;white-space:nowrap}
+  .w-instr .rows{margin-top:22px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .w-instr .row{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .w-instr .row:last-child{border-bottom:0}
+  .w-instr .stock{width:3px;align-self:stretch;border-radius:2px}
+  .w-instr .chip{font-size:10px;letter-spacing:.16em;font-weight:700;text-transform:uppercase;padding:3px 8px;border-radius:2px;
+    background:rgba(255,255,255,.06);color:var(--dim)}
+  .w-instr .rowtitle{font-size:14px;flex:1;min-width:0}
+  .w-instr .open{font-size:12px;font-weight:700;color:var(--lume);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="harness">
+  <header>
+    <h1>B, C, and the two fused</h1>
+    <p class="sub">B and C as you saw them, plus <b style="color:#6EF3A5">D</b> &mdash; the two fused. D keeps C&rsquo;s calm luminous instrumentation and takes B&rsquo;s structural rigour: hazard stripe, literal uppercase labelling, a hard white surface. One rule carries it &mdash; <b style="color:#6EF3A5">luminous green means actionable</b>, amber means waiting, and the hazard diagonal is spent exactly once.</p>
+  </header>
+
+  <!-- ══ B ══ -->
+  <section class="slab">
+    <div class="tag">
+      <b>B · Stockroom Grammar</b>
+      <span>challenger · black nylon, stockroom white, hazard diagonals, safety orange</span>
+      <div class="swatches"><i style="background:#0B0B0B"></i><i style="background:#FFFFFF"></i><i style="background:#FF5A00"></i><i style="background:#262626"></i></div>
+    </div>
+    <div class="app w-stock">
+      <nav class="rail">
+        <div class="brand">Saroh</div>
+        <div class="navitem on">Home</div>
+        <div class="navitem">Sell</div>
+        <div class="navgrp">Bookings</div>
+        <div class="navitem">Schedule</div>
+        <div class="navitem">Services</div>
+        <div class="navitem">Upcoming</div>
+        <div class="navgrp">Customers</div>
+        <div class="navitem">Contacts</div>
+        <div class="navitem">Leads</div>
+        <div class="navitem">Pipeline</div>
+        <div class="navgrp">&nbsp;</div>
+        <div class="navitem">Website</div>
+        <div class="navitem">Insights</div>
+      </nav>
+      <div class="main">
+        <h2>Home</h2>
+        <div class="subtle">Your next best actions across the modules you use.</div>
+        <div class="lead">
+          <div>
+            <div class="kick">"Attention" · do this next</div>
+            <div class="title">A connected provider is disabled — re-enable it to take payments.</div>
+          </div>
+          <div class="go">Go</div>
+        </div>
+        <div class="rows">
+          <div class="row"><span class="stock" style="background:#FF5A00"></span><span class="chip">Overdue</span><span class="rowtitle">Follow up on 5 overdue leads</span><span class="open">Open</span></div>
+          <div class="row"><span class="stock" style="background:#FF5A00"></span><span class="chip">Overdue</span><span class="rowtitle">Fulfil 5 open orders</span><span class="open">Open</span></div>
+          <div class="row"><span class="stock" style="background:#3A3A3A"></span><span class="chip">Setup</span><span class="rowtitle">Create a site to get started.</span><span class="open">Open</span></div>
+          <div class="row"><span class="stock" style="background:#3A3A3A"></span><span class="chip">Setup</span><span class="rowtitle">Set your availability so customers can book.</span><span class="open">Open</span></div>
+          <div class="row"><span class="stock" style="background:#3A3A3A"></span><span class="chip">Setup</span><span class="rowtitle">Connect a provider to send messages.</span><span class="open">Open</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ C ══ -->
+  <section class="slab">
+    <div class="tag">
+      <b>C · Night Instruments</b>
+      <span>challenger · matte black panel, luminous green, amber and red for caution only</span>
+      <div class="swatches"><i style="background:#08090A"></i><i style="background:#7CFFB2"></i><i style="background:#FFB020"></i><i style="background:#FF4D3D"></i></div>
+    </div>
+    <div class="app w-instr">
+      <nav class="rail">
+        <div class="brand">SAROH</div>
+        <div class="navitem on">Home</div>
+        <div class="navitem">Sell</div>
+        <div class="navgrp">Bookings</div>
+        <div class="navitem">Schedule</div>
+        <div class="navitem">Services</div>
+        <div class="navitem">Upcoming</div>
+        <div class="navgrp">Customers</div>
+        <div class="navitem">Contacts</div>
+        <div class="navitem">Leads</div>
+        <div class="navitem">Pipeline</div>
+        <div class="navgrp">&nbsp;</div>
+        <div class="navitem">Website</div>
+        <div class="navitem">Insights</div>
+      </nav>
+      <div class="main">
+        <h2>Home</h2>
+        <div class="subtle">Your next best actions across the modules you use.</div>
+        <div class="lead">
+          <div>
+            <div class="kick">Caution · do this next</div>
+            <div class="title">A connected provider is disabled — re-enable it to take payments.</div>
+          </div>
+          <div class="go">Go</div>
+        </div>
+        <div class="rows">
+          <div class="row"><span class="stock" style="background:#FFB020"></span><span class="chip">Overdue</span><span class="rowtitle">Follow up on 5 overdue leads</span><span class="open">Open</span></div>
+          <div class="row"><span class="stock" style="background:#FFB020"></span><span class="chip">Overdue</span><span class="rowtitle">Fulfil 5 open orders</span><span class="open">Open</span></div>
+          <div class="row"><span class="stock" style="background:#2A3033"></span><span class="chip">Setup</span><span class="rowtitle">Create a site to get started.</span><span class="open">Open</span></div>
+          <div class="row"><span class="stock" style="background:#2A3033"></span><span class="chip">Setup</span><span class="rowtitle">Set your availability so customers can book.</span><span class="open">Open</span></div>
+          <div class="row"><span class="stock" style="background:#2A3033"></span><span class="chip">Setup</span><span class="rowtitle">Connect a provider to send messages.</span><span class="open">Open</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- D: the fusion -->
+  <section class="slab" style="outline:2px solid #6EF3A5;outline-offset:3px">
+    <div class="tag">
+      <b>D &middot; Instrument Panel, stockroom-built</b>
+      <span>C + B fused &middot; luminous green = actionable, amber = waiting, hazard stripe spent once</span>
+      <div class="swatches"><i style="background:#08090A"></i><i style="background:#F2F2F0"></i><i style="background:#6EF3A5"></i><i style="background:#FFB020"></i><i style="background:#FF5A00"></i></div>
+    </div>
+    <div class="app w-fuse">
+      <nav class="rail">
+        <div class="brand">Sar<em>o</em>h</div>
+        <div class="navitem on">Home</div>
+        <div class="navitem">Sell</div>
+        <div class="navgrp">Bookings</div>
+        <div class="navitem">Schedule</div>
+        <div class="navitem">Services</div>
+        <div class="navitem">Upcoming</div>
+        <div class="navgrp">Customers</div>
+        <div class="navitem">Contacts</div>
+        <div class="navitem">Leads</div>
+        <div class="navitem">Pipeline</div>
+        <div class="navgrp">&nbsp;</div>
+        <div class="navitem">Website</div>
+        <div class="navitem">Insights</div>
+      </nav>
+      <div class="main">
+        <h2>Home</h2>
+        <div class="subtle">Your next best actions across the modules you use.</div>
+        <div class="lead">
+          <div>
+            <div class="kick">Attention &middot; do this next</div>
+            <div class="title">A connected provider is disabled &mdash; re-enable it to take payments.</div>
+          </div>
+          <div class="go">Go</div>
+        </div>
+        <div class="rowhead"><span>Also waiting</span></div>
+        <div class="rows">
+          <div class="row"><span class="stock" style="background:#FFB020"></span><div class="rowinner"><span class="chip" style="color:#FFB020">Overdue</span><span class="rowtitle">Follow up on 5 overdue leads</span><span class="open">Open</span></div></div>
+          <div class="row"><span class="stock" style="background:#FFB020"></span><div class="rowinner"><span class="chip" style="color:#FFB020">Overdue</span><span class="rowtitle">Fulfil 5 open orders</span><span class="open">Open</span></div></div>
+          <div class="row"><span class="stock" style="background:#394246"></span><div class="rowinner"><span class="chip" style="color:#7F8A86">Setup</span><span class="rowtitle">Create a site to get started.</span><span class="open">Open</span></div></div>
+          <div class="row"><span class="stock" style="background:#394246"></span><div class="rowinner"><span class="chip" style="color:#7F8A86">Setup</span><span class="rowtitle">Set your availability so customers can book.</span><span class="open">Open</span></div></div>
+          <div class="row"><span class="stock" style="background:#394246"></span><div class="rowinner"><span class="chip" style="color:#7F8A86">Setup</span><span class="rowtitle">Connect a provider to send messages.</span><span class="open">Open</span></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

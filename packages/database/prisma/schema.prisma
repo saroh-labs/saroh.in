@@ -27,8 +27,17 @@ model User {
 
   // Relations
   stores       StoreOwner[] // Stores they own
-  workspaces   WorkspaceMember[] // Workspaces they're in
+  memberships  Membership[] // Organizations they belong to
   storeMembers StoreMembers[] // Staff positions
+
+  // Project-level access (S1-010): team memberships and direct project grants
+  teamMemberships TeamMember[] // Teams they belong to
+  projectAccess   ProjectAccess[] // Direct project-role grants
+
+  // Saroh-staff grants (S1-012 admin). Two sides: the grant held BY this user,
+  // and the grants they have issued to others.
+  platformAdmin         PlatformAdmin?  @relation("PlatformAdminUser")
+  platformAdminsGranted PlatformAdmin[] @relation("PlatformAdminGrantedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -39,32 +48,200 @@ model User {
   @@index([email])
 }
 
-// Workspace: collection of stores (enterprise feature, Y2+)
+// Organization: the sole tenant root (DEC-005 / ADR-001). Owns Stores and
+// carries Membership. Renamed from the former optional Workspace grouping.
 
-model Workspace {
+model Organization {
   id   String @id @default(cuid())
   name String
   slug String @unique
 
-  // Relations
-  stores  Store[]
-  members WorkspaceMember[]
+  // Platform lifecycle is independent of a tenant user's membership role.
+  // Changes are made only through audited control-plane commands.
+  lifecycleStatus  String @default("ACTIVE")
+  lifecycleVersion Int    @default(1)
 
-  createdAt DateTime @default(now())
+  suspendedAt         DateTime?
+  suspendedByUserId   String?
+  suspensionReason    String?
+  deletionScheduledAt DateTime?
+  deletionScheduledBy String?
+  deletionReason      String?
+  deletedRetainedAt   DateTime?
+
+  // Relations
+  stores              Store[]
+  memberships         Membership[]
+  adminAccessSessions AdminAccessSession[]
+
+  // Optional groupings beneath the org (S1-010). Projects and Teams are NEVER
+  // a tenant/ownership/billing root — always org-scoped (ADR-001).
+  projects Project[]
+  teams    Team[]
+
+  // Organization module (capability) installations (ADR-003 / #113). One row
+  // per (org, moduleKey); lifecycle DISABLED|ENABLED|ARCHIVED. Readiness is
+  // derived, never stored here.
+  organizationModules OrganizationModule[]
+
+  // Explicit customer identity links (#120): a user-confirmed connection between
+  // a CRM Contact and a commerce Customer. Never an automatic merge.
+  customerIdentityLinks CustomerIdentityLink[]
+
+  // Saved list views (#124): per-actor, per-resource named filter sets.
+  savedViews SavedView[]
+
+  // Optional 1:1 business identity captured at onboarding (S1-004)
+  businessProfile BusinessProfile?
+
+  // Per-organization feature-flag overrides (S1-012)
+  featureFlagOverrides FeatureFlagOverride[]
+
+  // Uploaded media objects, org-owned (S2-008). Bytes live in object storage
+  // (R2); this is the tenant-scoped metadata index.
+  media Media[]
+
+  // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
+  // carries `organizationId` for tenant scoping / RLS.
+  sites        Site[]
+  pages        Page[]
+  pageVersions PageVersion[]
+  sections     Section[]
+  publications Publication[]
+
+  // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
+  // `hostname` is globally unique, so a hostname maps to at most one org.
+  domains Domain[]
+
+  // Enquiry / CRM (Stage 3 — S3-001). The public enquiry funnel and its CRM.
+  // Every entity is org-owned and carries `organizationId` for tenant scoping.
+  contacts    Contact[]
+  forms       Form[]
+  submissions Submission[]
+  pipelines   Pipeline[]
+  stages      Stage[]
+  leads       Lead[]
+  activities  Activity[]
+
+  // Durable background jobs / transactional outbox (Stage 3 — S3-003). Optional
+  // tenant scope: some jobs are org-bound (an enquiry notification), some are
+  // system-wide, so the back-relation is nullable on the Job side.
+  jobs Job[]
+
+  // In-app notification inbox (Stage 3 — S3-006). Durable per-org (optionally
+  // per-user) records surfaced in the dashboard; email is a delivery channel
+  // driven by the job worker on top of these rows.
+  notifications Notification[]
+
+  // Scheduling / bookings (Stage 4 — S4-001). Org-owned bookable Services with
+  // weekly AvailabilityRules and immutable Bookings.
+  services          Service[]
+  availabilityRules AvailabilityRule[]
+  bookings          Booking[]
+
+  // Commerce attached to the Organization (Stage 5 — S5-001). Store becomes an
+  // optional channel; catalog/orders/inventory/customers are org-owned via a
+  // denormalized organizationId (backfilled from Store), nullable during the
+  // transition.
+  products   Product[]
+  categories Category[]
+  inventory  Inventory[]
+  customers  Customer[]
+  carts      Cart[]
+  orders     Order[]
+
+  // Payments (Stage 5 — S5-002/003). Org-owned provider connections (encrypted
+  // credentials), intents/attempts/refunds, and the signed webhook inbox.
+  merchantPaymentProviders MerchantPaymentProvider[]
+  paymentIntents           PaymentIntent[]
+  paymentAttempts          PaymentAttempt[]
+  paymentRefunds           PaymentRefund[]
+  webhookEvents            WebhookEvent[]
+
+  // Communications (Stage 6 — S6-001). Org-connected email/WhatsApp providers,
+  // outbound messages, delivery records, per-contact channel consent, and the
+  // new-lead automation rules (S6-003).
+  communicationProviders CommunicationProvider[]
+  messages               Message[]
+  deliveries             Delivery[]
+  consents               Consent[]
+  automationRules        AutomationRule[]
+  automationRuns         AutomationRun[]
+
+  // Stage 7 — analytics (S7-001)
+  analyticsEvents          AnalyticsEvent[]
+  analyticsDailyAggregates AnalyticsDailyAggregate[]
+
+  // Stage 7 — SaaS billing (S7-005). One current subscription per org.
+  subscription Subscription?
+
+  createdAt          DateTime            @default(now())
+  idempotencyRecords IdempotencyRecord[]
 }
 
-model WorkspaceMember {
-  id          String    @id @default(cuid())
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+// BusinessProfile: optional 1:1 business identity for an Organization, captured
+// during onboarding (S1-004). Kept separate from Organization so the tenant root
+// stays lean while legal/tax/contact details evolve independently. All fields are
+// optional — an org can onboard with just a name and fill this in later.
+model BusinessProfile {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  legalName    String?
+  type         String? // individual, company, ...
+  country      String?
+  taxId        String?
+  contactEmail String?
+  website      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Membership: links a User to an Organization with a role (renamed from
+// WorkspaceMember). The single membership table StoreOwner/StoreMembers
+// converge on during the Stage 1 transition.
+model Membership {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   role String @default("MEMBER") // OWNER, ADMIN, MEMBER
 
-  @@unique([workspaceId, userId])
-  @@index([workspaceId])
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+}
+
+// Media: an org-owned uploaded object (S2-008). The bytes live in object
+// storage (Cloudflare R2 in prod, in-memory in dev/tests) behind the
+// `@saroh/object-storage` port; this row is the tenant-scoped metadata index.
+//
+// Lifecycle: a row is created `PENDING` when a presigned upload URL is issued,
+// then flipped to `READY` once the client confirms (via the complete endpoint)
+// that the bytes landed. `key` is the server-derived, tenant-scoped storage key
+// (`org/<organizationId>/...`) — never client-supplied — and is globally unique.
+model Media {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  key         String  @unique // object-storage key (server-derived, tenant-scoped)
+  contentType String
+  sizeBytes   Int
+  filename    String
+  purpose     String? // logical bucketing, e.g. product-image, avatar
+  status      String  @default("PENDING") // PENDING → READY
+
+  uploadedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -81,12 +258,16 @@ model Store {
   logo        String?
 
   // Ownership
-  workspaceId String?
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  // ADR-001: Store is an Organization-owned commerce channel. The nullable
+  // Stage 1 transition (dual-write + backfill) is complete; the column is now
+  // NOT NULL (B5), so every Store maps to a verified Organization.
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
   // Relations
-  owners  StoreOwner[]
-  members StoreMembers[]
+  owners      StoreOwner[]
+  members     StoreMembers[]
+  invitations StoreInvitation[]
 
   // Products & E-commerce
   products   Product[]
@@ -162,14 +343,39 @@ model StoreMembers {
   @@index([storeId])
 }
 
+// Pending invitations to join a store's team. Accepting one creates a
+// StoreMembers row for the invited user (matched by email).
+
+model StoreInvitation {
+  id      String @id @default(cuid())
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  email String // who was invited (need not have an account yet)
+  role  String @default("VIEWER") // ADMIN, MANAGER, EDITOR, VIEWER
+
+  token  String @unique // random, carried in the accept link
+  status String @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+
+  invitedById String // User.id of the inviter
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@unique([storeId, email]) // one live invite per email per store
+  @@index([storeId])
+  @@index([token])
+}
+
 // ============================================================================
 // E-COMMERCE: PRODUCTS
 // ============================================================================
 
 model Product {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   name        String
   slug        String
@@ -195,6 +401,7 @@ model Product {
   @@unique([storeId, slug])
   @@index([storeId])
   @@index([categoryId])
+  @@index([organizationId])
 }
 
 model ProductVariant {
@@ -214,9 +421,11 @@ model ProductVariant {
 }
 
 model Category {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   name     String
   slug     String
@@ -230,14 +439,17 @@ model Category {
 
   @@unique([storeId, slug])
   @@index([storeId])
+  @@index([organizationId])
 }
 
 // Inventory tracking
 
 model Inventory {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   productId String  @unique
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -249,6 +461,7 @@ model Inventory {
   updatedAt DateTime @updatedAt
 
   @@index([storeId])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -259,9 +472,11 @@ model Inventory {
 // Email is unique PER STORE, not globally
 
 model Customer {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   email     String // NOT globally unique, unique per store
   firstName String?
@@ -277,17 +492,23 @@ model Customer {
   orders Order[]
   carts  Cart[]
 
+  // Explicit links to CRM Contact records (#120).
+  identityLinks CustomerIdentityLink[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([storeId, email])
   @@index([storeId])
+  @@index([organizationId])
 }
 
 model Cart {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -302,6 +523,7 @@ model Cart {
 
   @@unique([storeId, customerId])
   @@index([storeId])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -309,9 +531,11 @@ model Cart {
 // ============================================================================
 
 model Order {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  storeId        String
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   orderId    String // Store-specific order number (ORD-001, etc)
   customerId String
@@ -334,12 +558,16 @@ model Order {
   items        OrderItem[]
   transactions Transaction[]
 
+  // Org-owned payment intents against this order (Stage 5 — S5-002).
+  paymentIntents PaymentIntent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([storeId, orderId])
   @@index([storeId])
   @@index([customerId])
+  @@index([organizationId])
 }
 
 model OrderItem {
@@ -449,8 +677,11 @@ model Post {
   excerpt String?
   content String  @db.Text // Markdown or HTML
 
-  authorId String
-  author   StoreMembers @relation(fields: [authorId], references: [id])
+  // Optional: a post is authored by a staff member (StoreMembers), but a store
+  // owner is a StoreOwner — not a member — so owner-authored posts have no
+  // author row. See StoresService: owners are deliberately kept out of members.
+  authorId String?
+  author   StoreMembers? @relation(fields: [authorId], references: [id])
 
   categoryId String?
   category   PostCategory? @relation(fields: [categoryId], references: [id])
@@ -646,6 +877,39 @@ model SecretAccessLog {
   @@index([createdAt])
 }
 
+// Organization-level immutable audit-event stream (S1-009).
+//
+// Distinct from the store-scoped `AuditLog` above: this records sensitive
+// ACTIONS taken against an Organization tenant (membership changes, Team /
+// Project access, profile edits, security-sensitive operations). It is
+// append-only BY CONVENTION — application code only ever calls
+// `prisma.auditEvent.create`; there is no update/delete path (see AuditService).
+//
+// DELIBERATELY NO RELATIONS. The compliance value of an audit trail is that it
+// outlives the things it describes: an event must survive the deletion of its
+// Organization, actor User, or Project. Foreign keys with cascade (or even a
+// restrict) would either destroy history or block deletions, so actor /
+// organization / project are stored as bare id strings, not relations.
+model AuditEvent {
+  id String @id @default(cuid())
+
+  action         String // e.g. "membership.invite", "organization.onboard", "secret.access"
+  actorUserId    String // Who performed the action (the authenticated actor)
+  organizationId String // Tenant the action belongs to
+  projectId      String? // Optional Project scope (Projects arrive in a later ticket)
+
+  targetType String? // Kind of entity acted upon, e.g. "membership", "profile"
+  targetId   String? // Id of that entity, when applicable
+
+  outcome  String // "SUCCESS" | "FAILURE" | "DENIED"
+  metadata Json? // Redacted, non-sensitive context (never secrets/PII)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId])
+}
+
 model Session {
   id        String   @id
   expiresAt DateTime
@@ -689,4 +953,1576 @@ model Verification {
   updatedAt  DateTime @updatedAt
 
   @@index([identifier])
+}
+
+// ============================================================================
+// FEATURE FLAGS (S1-012)
+// ============================================================================
+
+// Server-side feature flags. Evaluation is server-only (never trust the
+// client for flag state). A flag has a global default (FeatureFlag) which can
+// be overridden per Organization (FeatureFlagOverride). Every write is
+// recorded immutably in FeatureFlagAudit. `key` is drawn from the typed
+// registry in src/modules/feature-flags/flags.ts (e.g. ORG_AUTHORIZATION).
+
+model FeatureFlag {
+  id String @id @default(cuid())
+
+  key         String  @unique // matches FlagKey in code
+  description String?
+
+  enabledByDefault Boolean @default(false)
+
+  overrides FeatureFlagOverride[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Per-Organization override of a flag's global default.
+model FeatureFlagOverride {
+  id String @id @default(cuid())
+
+  flagKey String
+  flag    FeatureFlag @relation(fields: [flagKey], references: [key], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  enabled Boolean
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([flagKey, organizationId])
+  @@index([organizationId])
+}
+
+// Immutable, append-only audit history of every flag/override write. A null
+// organizationId denotes a change to the global default; otherwise it is the
+// affected Organization. No updates or deletes are performed in code.
+model FeatureFlagAudit {
+  id String @id @default(cuid())
+
+  flagKey        String
+  organizationId String? // null => global default change
+
+  previousValue Boolean? // null when the flag/override did not exist before
+  newValue      Boolean
+
+  actorUserId String
+
+  // Why the operator made this change. Nullable only because rows written
+  // before the admin surface existed have none; the admin API requires it.
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([flagKey])
+  @@index([organizationId])
+}
+
+// PlatformAdmin: a Saroh STAFF grant — the control-plane identity behind
+// admin.saroh.in (S1-012).
+//
+// Deliberately NOT a Membership role and NOT an Organization concept: every
+// role in `organization-policy` is scoped to one tenant, whereas this is the
+// opposite — the right to act across all of them. Keeping it in its own table
+// means a tenant OWNER can never escalate into staff by editing their own org.
+//
+// Data rather than env config, because staff access must be grantable and
+// revocable at runtime with a record of WHO granted it. `ADMIN_ALLOWLIST`
+// survives only as the break-glass bootstrap that seeds the first admin (and
+// recovers access if every grant is revoked by mistake).
+//
+// Revocation is a `revokedAt` stamp, never a delete: who held control-plane
+// access, and when, is exactly the history an incident review needs.
+model PlatformAdmin {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation("PlatformAdminUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  roleAssignments PlatformAdminRoleAssignment[]
+  accessSessions  AdminAccessSession[]
+
+  grantedByUserId String?
+  grantedBy       User?   @relation("PlatformAdminGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+
+  grantedAt DateTime  @default(now())
+  revokedAt DateTime? // null => currently active
+
+  /// Why this person has staff access (e.g. "on-call platform engineer").
+  note String?
+
+  @@index([revokedAt])
+}
+
+// Short-lived, read-only staff access to one Organization support workspace.
+// The session is never a tenant Membership and cannot authorize mutations.
+model AdminAccessSession {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Null only for ADMIN_ALLOWLIST break-glass staff.
+  platformAdminId String?
+  platformAdmin   PlatformAdmin? @relation(fields: [platformAdminId], references: [id], onDelete: SetNull)
+
+  actorUserId String
+  reason      String
+  scope       String @default("READ_ONLY")
+
+  idempotencyKey String @unique
+
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  revokedByUserId  String?
+  revocationReason String?
+
+  @@index([organizationId, expiresAt, revokedAt])
+  @@index([actorUserId, expiresAt, revokedAt])
+  @@index([platformAdminId, revokedAt])
+}
+
+// One fixed control-plane role held by a PlatformAdmin. Assignments are
+// append-only lifecycle records: revocation stamps `revokedAt`; it never
+// deletes the record. `role` is validated through the typed API registry and a
+// database CHECK constraint.
+model PlatformAdminRoleAssignment {
+  id String @id @default(cuid())
+
+  platformAdminId String
+  platformAdmin   PlatformAdmin @relation(fields: [platformAdminId], references: [id], onDelete: Cascade)
+
+  role String
+
+  // Bare actor id by design. Historical staff assignments must survive if the
+  // assigning User is later removed.
+  assignedByUserId String?
+  reason           String
+
+  assignedAt DateTime  @default(now())
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+
+  @@index([platformAdminId, revokedAt, expiresAt])
+  @@index([role, revokedAt])
+}
+
+// Global, append-only history of staff activity in the Saroh control plane.
+// Deliberately relation-free: deleting a User, Organization, or target business
+// record must never cascade into the platform audit trail.
+model AdminAuditEvent {
+  id String @id @default(cuid())
+
+  actorUserId String
+  permission  String
+  action      String
+  targetType  String
+
+  targetId       String?
+  organizationId String?
+  reason         String?
+  outcome        String
+  correlationId  String?
+  // Optional because read events are not commands. Mutation events always set
+  // this key so retries become transactionally idempotent.
+  idempotencyKey String? @unique
+
+  // Redacted operational context only. The API rejects secret-bearing keys.
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([targetType, targetId, createdAt])
+}
+
+// ============================================================================
+// PROJECTS, TEAMS & PROJECT-LEVEL ACCESS (S1-010)
+// ============================================================================
+
+// Project: an OPTIONAL grouping beneath an Organization (ADR-001). NEVER a
+// tenant/ownership/billing root — always org-scoped. OWNER/ADMIN implicitly see
+// every Project in their org; a MEMBER sees only Projects granted to them
+// directly or via a Team.
+model Project {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name String
+  slug String
+
+  access ProjectAccess[]
+
+  // Modules this Project has selected from its Organization's enabled set
+  // (ADR-003 / #113). A Project can only ever reference an OrganizationModule of
+  // its OWN Organization — enforced by the compound FK on ProjectModule.
+  modules ProjectModule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, slug])
+  // Compound-unique target so ProjectModule can carry a denormalized
+  // organizationId and reference [organizationId, id] — making it structurally
+  // impossible for a Project to select another Organization's module.
+  @@unique([organizationId, id])
+  @@index([organizationId])
+}
+
+// OrganizationModule: an Organization's installation of one capability module
+// (ADR-003 / DEC-016). The Organization is the tenant and the module owner.
+// `moduleKey` is a string (validated through the typed registry in the API
+// layer) so new modules can ship without a schema migration. `status` is the
+// persisted lifecycle — DISABLED | ENABLED | ARCHIVED (a DB CHECK constraint in
+// the migration enforces the set). Operational readiness (SETUP_REQUIRED /
+// ACTIVE / ATTENTION_REQUIRED) is DERIVED at read time and never stored.
+model OrganizationModule {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  moduleKey String
+  status    String @default("DISABLED")
+
+  enabledAt        DateTime?
+  enabledByUserId  String?
+  disabledAt       DateTime?
+  disabledByUserId String?
+
+  // Optional per-installation module configuration (opaque here; each module
+  // owns its own shape). Distinct from feature flags and entitlements.
+  config Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects ProjectModule[]
+
+  @@unique([organizationId, moduleKey])
+  // Compound-unique target for ProjectModule's org-consistency FK (see below).
+  @@unique([organizationId, id])
+  @@index([organizationId, status])
+}
+
+// ProjectModule: a Project's selection of one of its Organization's enabled
+// modules (ADR-003 / DEC-016). Organization enablement is authoritative — a
+// Project can never select a module its Organization has not enabled.
+//
+// The denormalized `organizationId` is shared by BOTH compound foreign keys, so
+// the database itself guarantees the Project and the OrganizationModule belong
+// to the SAME Organization; a cross-Organization selection cannot be written
+// even if application code is wrong. Do not rely on app code alone (plan §2).
+model ProjectModule {
+  id                   String @id @default(cuid())
+  organizationId       String
+  projectId            String
+  organizationModuleId String
+
+  project            Project            @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade)
+  organizationModule OrganizationModule @relation(fields: [organizationId, organizationModuleId], references: [organizationId, id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, organizationModuleId])
+  @@index([organizationId, projectId])
+}
+
+// CustomerIdentityLink: a user-confirmed link between a CRM Contact and a
+// commerce Customer (#120). Saroh NEVER merges people automatically on weak
+// evidence (e.g. similar names); an exact normalized email/phone only *suggests*
+// a link — a person confirms it. The record is Organization-scoped, carries the
+// actor for audit, and is reversible (deletable) without touching either
+// underlying record. It links, it does not merge: Contact and Customer keep
+// their own identity and domain ownership.
+model CustomerIdentityLink {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  linkedByUserId String
+  createdAt      DateTime @default(now())
+
+  @@unique([contactId, customerId])
+  @@index([organizationId])
+}
+
+// SavedView: a per-actor, per-resource named set of list filters (#124). The
+// `filters` payload is the SHAREABLE URL query contract (search/filter/sort/
+// page) — plain JSON, NEVER raw SQL — so a saved view can never smuggle an
+// unsafe query. Scoped to the Organization and the owner who created it.
+model SavedView {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  ownerUserId String
+  resource    String // e.g. "orders" | "leads" | "products"
+  name        String
+  filters     Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, ownerUserId, resource])
+}
+
+// Team: a named group of org members, used to grant Project access in bulk.
+// Org-scoped; deleting the Organization cascades.
+model Team {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name String
+
+  members TeamMember[]
+  access  ProjectAccess[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+// TeamMember: a User's membership in a Team. Both sides cascade on delete.
+model TeamMember {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+// ProjectAccess: a grant of a project role (MANAGER/EDITOR/VIEWER) on one
+// Project, to EITHER a User directly OR a Team — exactly one of userId/teamId is
+// set (enforced in code). Because Postgres treats NULLs as distinct, the two
+// @@unique constraints act as partial uniques: at most one grant per
+// (project, user) and per (project, team), while the unused column stays null.
+model ProjectAccess {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  role String // MANAGER, EDITOR, VIEWER
+
+  // Direct grant to a user (userId set, teamId null) ...
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // ... OR a grant to a team (teamId set, userId null). Exactly one is set.
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, userId])
+  @@unique([projectId, teamId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([teamId])
+}
+
+// ============================================================================
+// CMS: SITES, PAGES, VERSIONS, SECTIONS & PUBLICATIONS (Stage 2 — S2-001)
+// ============================================================================
+//
+// The publishing data model. Two clearly separated halves (see ADR-002):
+//
+//   1. DRAFT / working set — Site → Page → PageVersion → Section. Mutable while
+//      editing (S2-004). DRAFTS ARE PRIVATE and are never read by the public
+//      renderer.
+//   2. IMMUTABLE published set — Publication. An append-only, fully-resolved,
+//      sanitized snapshot produced at publish time (S2-005). The public
+//      renderer (S2-006) reads ONLY Publications — never the draft tables.
+//
+// Every model is Organization-owned (ADR-001): it carries `organizationId`
+// (indexed) so tenant scoping / RLS applies uniformly. `Section.content` is
+// validated against the versioned section contract in
+// `src/cms/section-contract.ts` for its (type, contractVersion).
+//
+// Note: this is NEW, distinct from the store-scoped blog `Post`/`PostCategory`
+// and store `CustomDomain`. Those are intentionally left untouched here; the
+// mapping from them into Sites/Pages is deferred (see ADR-002 §mapping).
+
+// A version's editing lifecycle. A DRAFT is the mutable working copy; PUBLISHED
+// marks the version a live Publication was snapshotted from; ARCHIVED is a
+// retired version kept for history.
+enum PageVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// Site — an Organization-owned publishing property (public web presence).
+// Distinct from Store (a commerce channel), per ADR-001.
+model Site {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name String
+  slug String // unique within the owning Organization
+
+  // Optional platform subdomain, e.g. "acme" → acme.saroh.in. Globally unique
+  // when set (NULLs are distinct, so many sites may have no subdomain).
+  subdomain String? @unique
+
+  // Reserved placeholder for the S2-007 custom-domain claim/verification flow.
+  // NOT wired to a relation here and NOT the legacy store `CustomDomain`.
+  customDomainId String?
+
+  // Pointer to the current live Publication served for the site root. Null
+  // until first publish; (re)set on publish (S2-005). SetNull keeps the Site
+  // if the pointed-at Publication ever disappears (publications are otherwise
+  // append-only and never deleted).
+  currentPublicationId String?      @unique
+  currentPublication   Publication? @relation("SiteCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
+
+  pages        Page[]
+  publications Publication[] @relation("SitePublications")
+
+  // Verified subdomain / custom-domain claims routed to this Site (S2-007).
+  // Nullable on the Domain side (Domain.siteId) — a claim exists before it is
+  // linked to a site — so onDelete is SetNull there, not a cascade.
+  claimedDomains Domain[]
+
+  // Enquiry forms bound to this site (S3-001). Nullable on the Form side, so
+  // deleting a Site does not destroy its enquiry history (SetNull there).
+  forms Form[]
+
+  // Bookable services surfaced on this site (S4-001). Nullable on the Service
+  // side (SetNull) — booking history outlives a site.
+  services Service[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+// Page — a routable page within a Site, identified by its `path`.
+model Page {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  // Denormalized tenant scope for isolation / RLS (ADR-001).
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  path   String // "/", "/about", ...
+  title  String
+  isHome Boolean @default(false)
+
+  versions PageVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([siteId, path])
+  @@index([siteId])
+  @@index([organizationId])
+}
+
+// PageVersion — a DRAFT / working version of a Page. Editing happens here; a
+// version is the source a Publication is snapshotted from at publish time.
+model PageVersion {
+  id     String @id @default(cuid())
+  pageId String
+  page   Page   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  status PageVersionStatus @default(DRAFT)
+
+  createdByUserId String? // authoring user, when known
+
+  sections Section[] // ordered content blocks (see Section.order)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pageId])
+  @@index([organizationId])
+}
+
+// Section — a typed content block within a PageVersion. `content` is JSON
+// validated against the versioned section contract keyed by
+// (type, contractVersion) — the single source of truth for what a section may
+// hold (src/cms/section-contract.ts).
+model Section {
+  id            String      @id @default(cuid())
+  pageVersionId String
+  pageVersion   PageVersion @relation(fields: [pageVersionId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type            String // registry key, e.g. "hero", "richText", "cta", "gallery"
+  contractVersion Int    @default(1) // contract version validating `content`
+  order           Int // ordering within the PageVersion
+  content         Json // validated against the contract for (type, contractVersion)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pageVersionId, order])
+  @@index([organizationId])
+}
+
+// Publication — an IMMUTABLE, APPEND-ONLY published snapshot.
+//
+// Rows are never updated or deleted: republishing inserts a NEW row (hence no
+// `updatedAt` — only `publishedAt`). `snapshot` is the fully-resolved, already
+// SANITIZED page(s) + sections captured at publish time, so it is
+// self-contained: the public renderer (S2-006) reads ONLY this table and never
+// needs the draft tables (Page/PageVersion/Section). Rich content is sanitized
+// on the way IN (during publish, S2-005) — see src/cms/section-contract.ts.
+model Publication {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation("SitePublications", fields: [siteId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Optional page-level scoping: a publication may snapshot a whole site or a
+  // single page/path.
+  pageId String?
+  path   String?
+
+  // Fully-resolved, sanitized page(s) + sections at publish time. Self-contained.
+  snapshot Json
+
+  // The template (versioned — S2-002/S2-003) the snapshot was built with.
+  templateId      String
+  templateVersion Int
+
+  publishedByUserId String?
+  publishedAt       DateTime @default(now()) // immutable; republish == new row
+
+  // Back-relation for Site.currentPublication (the live pointer above).
+  currentForSite Site? @relation("SiteCurrentPublication")
+
+  @@index([siteId, publishedAt])
+  @@index([organizationId])
+}
+
+// ============================================================================
+// DOMAINS: SUBDOMAIN / CUSTOM-DOMAIN CLAIM + VERIFICATION (Stage 2 — S2-007)
+// ============================================================================
+//
+// A Domain is an Organization's CLAIM on a single hostname (a platform
+// subdomain like "acme.saroh.in" or a custom domain like "shop.acme.com").
+//
+// `hostname` is GLOBALLY UNIQUE, which is the crux of the ownership model: a
+// second organization physically cannot insert a row for a hostname another org
+// already claimed (the DB rejects it), so the DomainsService can surface a clear
+// 409 Conflict. A claim starts PENDING and only becomes VERIFIED once the org
+// proves control by publishing the `verificationToken` in a DNS TXT record —
+// verification is NEVER asserted by the client. Routing/link to a Site happens
+// only AFTER a claim is VERIFIED, so at most one org ever controls a hostname.
+model Domain {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The subdomain or custom domain being claimed, e.g. "shop.acme.com".
+  // Globally unique: a hostname maps to at most one org (see model note).
+  hostname String @unique
+
+  // The Site this hostname routes to once VERIFIED. Nullable until linked; the
+  // Site may be attached at claim time or at verify time. SetNull so deleting a
+  // Site un-links the claim rather than destroying it.
+  siteId String?
+  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  status String @default("PENDING") // PENDING → VERIFIED (FAILED on a checked failure)
+
+  // Random token (node:crypto) the org must publish in a DNS TXT record.
+  verificationToken  String
+  verificationMethod String    @default("DNS_TXT")
+  verifiedAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([siteId])
+}
+
+// ============================================================================
+// ENQUIRY / CRM: FORMS → SUBMISSIONS → CONTACTS → LEADS → PIPELINES (Stage 3)
+// ============================================================================
+//
+// The public enquiry funnel and its CRM. Every entity is org-owned (ADR-001)
+// and carries `organizationId` for tenant scoping / RLS. A public visitor
+// submits a Form on a published Site (no auth); that atomically upserts a
+// Contact (a person, deliberately DISTINCT from the commerce `Customer`) and
+// creates one Lead placed at the first Stage of the org's default Pipeline. The
+// raw Submission is kept immutably. Owners then work Leads across Pipeline
+// Stages and log Activities on each Lead's timeline.
+
+// Contact — an org-scoped person in the CRM. DISTINCT from the commerce
+// `Customer` (store-scoped, tied to orders/carts): a Contact is a
+// marketing/sales person captured from enquiries, deduped per org by email.
+model Contact {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  email     String // deduped per org (see @@unique); the primary identity
+  firstName String?
+  lastName  String?
+  phone     String?
+  company   String?
+
+  // Free-form provenance, e.g. "enquiry:form:<id>" — where this contact first
+  // entered the CRM. Never a tenant boundary; informational only.
+  source String?
+
+  leads       Lead[]
+  submissions Submission[]
+  bookings    Booking[]
+  messages    Message[]
+  consents    Consent[]
+
+  // Explicit links to commerce Customer records (#120).
+  identityLinks CustomerIdentityLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
+  // enquiry from the same address updates the existing Contact rather than
+  // forking a duplicate. NOT globally unique — two orgs may each hold the same
+  // person independently.
+  @@unique([organizationId, email])
+  @@index([organizationId])
+}
+
+// Form — an org-owned enquiry form definition. Optionally bound to a Site so a
+// rendered enquiry section (S3-004) can target it. `fields` is the ordered set
+// of field descriptors, validated at submit time (S3-002).
+model Form {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Optional owning Site. SetNull keeps the Form (and its submissions/leads) if
+  // the Site is deleted — enquiry history is valuable and outlives a site.
+  siteId String?
+  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  name   String
+  fields Json // ordered field descriptors: [{ name, label, type, required }]
+
+  // The Pipeline new leads from this form land in. Null → the org's default.
+  pipelineId String?
+  pipeline   Pipeline? @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+
+  status String @default("ACTIVE") // ACTIVE → ARCHIVED (stops accepting)
+
+  submissions Submission[]
+  leads       Lead[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([organizationId])
+  @@index([siteId])
+}
+
+// Submission — an IMMUTABLE record of one public form submission. Append-only
+// (no updatedAt): the raw `data` as the visitor sent it, captured before any
+// CRM derivation, so there is always an audit of exactly what was submitted
+// even if the derived Contact/Lead are later edited.
+model Submission {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  formId String
+  form   Form   @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  // The derived Contact + Lead (set in the same transaction as creation). Kept
+  // as SetNull so purging a Contact/Lead never destroys the raw submission.
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  data Json // the raw submitted values, keyed by form field name
+
+  // Anti-abuse / dedupe metadata (S3-002).
+  ipHash         String? // hashed source IP, never the raw IP
+  idempotencyKey String? // client-supplied key to dedupe double-submits
+
+  createdAt DateTime @default(now()) // immutable; no updatedAt
+
+  // A given idempotency key produces at most one submission per form.
+  @@unique([formId, idempotencyKey])
+  @@index([organizationId])
+  @@index([formId])
+}
+
+// Pipeline — an org-owned sales pipeline: an ordered set of Stages a Lead moves
+// through. Exactly one Pipeline per org is the default (isDefault) that new
+// enquiry leads land in when a Form doesn't name one.
+model Pipeline {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name      String
+  isDefault Boolean @default(false)
+
+  stages Stage[]
+  leads  Lead[]
+  forms  Form[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+// Stage — one column of a Pipeline. `order` sorts the board left → right.
+model Stage {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  name  String
+  order Int // ordering within the Pipeline
+
+  leads Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([pipelineId, order])
+}
+
+// Lead — a CRM opportunity for a Contact, positioned at one Stage of a
+// Pipeline. Created from an enquiry Submission (or by hand) and worked by
+// owners; its Stage changes as it progresses. Activities log its timeline.
+model Lead {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stageId    String
+  stage      Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  // Provenance: the Form that created this lead, when it came from an enquiry
+  // (null for hand-created leads). SetNull so history survives form cleanup.
+  formId String?
+  form   Form?   @relation(fields: [formId], references: [id], onDelete: SetNull)
+
+  title  String
+  status String @default("OPEN") // OPEN → WON / LOST
+  value  Int? // optional monetary value, in minor units
+
+  submissions Submission[]
+  activities  Activity[]
+  messages    Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([pipelineId, stageId])
+  @@index([contactId])
+}
+
+// Activity — an entry on a Lead's timeline: a system event (created, stage
+// change) or a user-logged note / follow-up task (S3-007). Append-mostly; a
+// follow-up task carries an optional dueAt + completedAt.
+model Activity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  type String // "CREATED" | "STAGE_CHANGED" | "NOTE" | "TASK" | ...
+  body String? // note text / description
+
+  // Actor: the user who performed it, when done by a person (null for system
+  // events). Informational — no FK cascade concerns.
+  actorUserId String?
+
+  // Follow-up task fields (used when type == "TASK"), S3-007.
+  dueAt       DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([leadId, createdAt])
+}
+
+// ============================================================================
+// DURABLE JOBS / TRANSACTIONAL OUTBOX (Stage 3 — S3-003)
+// ============================================================================
+//
+// A persistent, at-least-once job queue behind the `JobQueue` port. Producers
+// enqueue a Job in the SAME transaction as the domain change it follows (e.g.
+// the enquiry command inserts the Lead and the "enquiry.notify" Job atomically)
+// — the transactional-outbox pattern: if the tx commits the job is durably
+// recorded, if it rolls back so does the job, so a committed lead ALWAYS has a
+// pending notification and a rolled-back one never leaves a dangling job.
+//
+// A worker claims due PENDING jobs (status+runAt), sets a visibility lock
+// (lockedAt/lockedBy) so concurrent workers don't double-run one, executes the
+// registered handler for `type`, and on failure schedules a backed-off retry
+// (attempts++/runAt) until `maxAttempts`, after which the job is FAILED
+// (dead-letter). Handlers must be idempotent (at-least-once, not exactly-once).
+model Job {
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type    String // handler key, e.g. "enquiry.notify"
+  payload Json // handler input
+
+  status      String @default("PENDING") // PENDING → PROCESSING → DONE | FAILED
+  attempts    Int    @default(0)
+  maxAttempts Int    @default(5)
+
+  runAt     DateTime  @default(now()) // earliest execution (retry backoff)
+  lockedAt  DateTime? // visibility lock — claimed but not yet finished
+  lockedBy  String? // worker id holding the lock
+  lastError String? // last failure message (dead-letter diagnostics)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  processedAt DateTime? // set when DONE or FAILED (terminal)
+
+  @@index([status, runAt])
+  @@index([organizationId])
+}
+
+// ============================================================================
+// NOTIFICATIONS (Stage 3 — S3-006)
+// ============================================================================
+//
+// A durable in-app inbox record. The enquiry.notify job handler (S3-006)
+// creates one Notification per new enquiry and, as a delivery channel, sends an
+// email — both driven by the at-least-once Job worker, so handlers must be
+// idempotent. The `(leadId, type)` unique guarantees "owner is notified once"
+// per lead+type even if the job runs twice (NULL leadId rows stay distinct).
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Recipient. Null = an org-wide notice any member/owner may see; set = a
+  // specific user's inbox item. Informational (no FK cascade wiring needed).
+  userId String?
+
+  type  String // "enquiry.new" | ...
+  title String
+  body  String?
+
+  // The subject this notice points at (a Lead, for enquiries).
+  leadId String?
+
+  readAt DateTime? // null = unread
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Idempotency backstop for the at-least-once worker: one notice per
+  // (leadId, type). NULL leadId rows are distinct, so non-lead notices are
+  // unconstrained.
+  @@unique([leadId, type])
+  @@index([organizationId, userId, readAt])
+  @@index([organizationId])
+}
+
+// ============================================================================
+// SCHEDULING / BOOKINGS (Stage 4 — S4-001)
+// ============================================================================
+//
+// Org-owned bookable Services with weekly AvailabilityRules and immutable
+// Bookings. Timezone-aware: availability windows are authored in the Service's
+// IANA `timezone`; a Booking stores absolute UTC `startAt`/`endAt` (resolved at
+// booking time, DST-correct) plus the display `timezone` the booker saw. Each
+// Booking carries an immutable `snapshot` of the Service terms at booking time,
+// so a later Service edit never rewrites booked history (same principle as
+// Publication). Capacity-one slot safety + transactional reservation land in
+// S4-002 (which may add a partial unique index on confirmed slots).
+
+// Service — an org-owned bookable offering (one provider/resource for now,
+// modeled as `capacity`).
+model Service {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Optional owning Site (for a public booking page). SetNull keeps the Service
+  // + its bookings if the Site is deleted.
+  siteId String?
+  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  name        String
+  description String?
+
+  durationMinutes     Int // length of one booking slot
+  bufferBeforeMinutes Int @default(0)
+  bufferAfterMinutes  Int @default(0)
+  capacity            Int @default(1) // max concurrent bookings per slot
+
+  priceCents Int? // optional price, minor units
+  currency   String? // ISO 4217 when priced
+
+  // IANA timezone the AvailabilityRules are expressed in, e.g. "Asia/Kolkata".
+  timezone String
+
+  status String @default("ACTIVE") // ACTIVE → ARCHIVED
+
+  availabilityRules AvailabilityRule[]
+  bookings          Booking[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([organizationId])
+  @@index([siteId])
+}
+
+// AvailabilityRule — a recurring WEEKLY availability window for a Service,
+// authored in the Service's timezone (minutes from local midnight).
+model AvailabilityRule {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  dayOfWeek   Int // 0 = Sunday … 6 = Saturday
+  startMinute Int // minutes from local midnight (0–1439), in the Service tz
+  endMinute   Int // exclusive; > startMinute
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([serviceId, dayOfWeek])
+}
+
+// Booking — an IMMUTABLE reserved slot. `startAt`/`endAt` are absolute UTC;
+// `snapshot` freezes the Service terms (+ booker) at booking time. A public
+// booking upserts a CRM Contact (booker), like an enquiry.
+model Booking {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  // Optional CRM linkage (the booker). SetNull so purging a Contact keeps the
+  // booking record + its snapshot.
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  startAt  DateTime // absolute UTC slot start
+  endAt    DateTime // absolute UTC slot end
+  timezone String // IANA tz the booker saw the slot in
+
+  status String @default("CONFIRMED") // PENDING → CONFIRMED → CANCELLED
+
+  // Immutable snapshot of the Service terms (+ booker) at booking time.
+  snapshot Json
+
+  bookerName  String?
+  bookerEmail String?
+  bookerPhone String?
+
+  idempotencyKey String? // dedupe double-submits (like Submission)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  cancelledAt DateTime?
+
+  // A given idempotency key yields at most one booking per service.
+  @@unique([serviceId, idempotencyKey])
+  @@index([organizationId])
+  @@index([serviceId, startAt])
+  @@index([contactId])
+}
+
+// ============================================================================
+// PAYMENTS (Stage 5 — S5-002 / S5-003)
+// ============================================================================
+//
+// Organization-owned payment flow, isolated from Saroh's own billing (Stage 7).
+// An org connects a merchant provider (Razorpay/Cashfree) whose API credentials
+// are stored ENCRYPTED at the app layer (AES-256-GCM: only the ciphertext + iv
+// + authTag live here, never plaintext). A PaymentIntent is created from a
+// SERVER-CALCULATED order amount (never a client-supplied total); each provider
+// interaction is a PaymentAttempt. Money-state changes are driven by the signed
+// WebhookEvent inbox (S5-003) whose `(provider, providerEventId)` unique makes
+// reconciliation idempotent — a duplicate webhook changes state exactly once.
+
+// MerchantPaymentProvider — an org's connection to a payment provider.
+model MerchantPaymentProvider {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  provider String // "RAZORPAY" | "CASHFREE"
+  status   String @default("CONNECTED") // CONNECTED | DISABLED
+
+  // Non-secret public identifier (e.g. Razorpay key_id) — safe to read back.
+  publicKey String?
+
+  // AES-256-GCM encrypted secret credentials (JSON blob). Plaintext NEVER
+  // stored; the key lives in app env. iv + authTag are needed to decrypt.
+  encryptedCredentials String
+  credentialsIv        String
+  credentialsAuthTag   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // At most one connection per provider per org.
+  @@unique([organizationId, provider])
+  @@index([organizationId])
+}
+
+// PaymentIntent — an intent to collect a SERVER-CALCULATED amount for an Order.
+model PaymentIntent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider         String // which MerchantPaymentProvider
+  providerIntentId String? // the provider's order/intent id, set after create
+
+  amountCents Int // server-calculated from the Order; minor units
+  currency    String
+
+  // CREATED → REQUIRES_PAYMENT → PROCESSING → SUCCEEDED | FAILED | CANCELLED
+  status String @default("CREATED")
+
+  idempotencyKey String? // dedupe client "create intent" calls
+
+  attempts PaymentAttempt[]
+  refunds  PaymentRefund[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, idempotencyKey])
+  @@index([organizationId])
+  @@index([orderId])
+  @@index([provider, providerIntentId])
+}
+
+// PaymentAttempt — one interaction with the provider for an intent.
+model PaymentAttempt {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  paymentIntentId String
+  paymentIntent   PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+
+  provider    String
+  providerRef String? // provider payment id
+  status      String // CREATED | AUTHORIZED | CAPTURED | FAILED
+  rawResponse Json? // provider response (sanitized), for audit
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([paymentIntentId])
+}
+
+// PaymentRefund — an org-owned refund against a PaymentIntent. Distinct from the
+// legacy store-scoped `Refund` model.
+model PaymentRefund {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  paymentIntentId String
+  paymentIntent   PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+
+  amountCents      Int
+  currency         String
+  status           String  @default("PENDING") // PENDING | SUCCEEDED | FAILED
+  providerRefundId String?
+  reason           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([paymentIntentId])
+}
+
+// WebhookEvent — the SIGNED webhook inbox (S5-003). Every provider callback is
+// recorded here first; `(provider, providerEventId)` is UNIQUE so a duplicate
+// delivery is dropped and reconciliation applies exactly once.
+model WebhookEvent {
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  provider        String
+  providerEventId String // the provider's event id (idempotency key)
+  eventType       String
+
+  // The raw signed payload + signature, kept for verification + audit.
+  payload   Json
+  signature String?
+
+  status      String    @default("RECEIVED") // RECEIVED | PROCESSED | FAILED | IGNORED
+  processedAt DateTime?
+  error       String?
+
+  createdAt DateTime @default(now())
+
+  // Idempotency backstop: one row per provider event.
+  @@unique([provider, providerEventId])
+  @@index([organizationId])
+  @@index([status])
+}
+
+// ============================================================================
+// COMMUNICATIONS (Stage 6 — S6-001/002/003)
+// ============================================================================
+//
+// Durable business messaging over the Organization's OWN connected provider
+// (email or WhatsApp), kept separate from Saroh's transactional email. A
+// Message is the intent to communicate; each provider send is a Delivery with
+// an auditable lifecycle; Consent gates who may be messaged on a channel
+// (unsubscribe/opt-out enforced before send). Provider API credentials are
+// AES-256-GCM sealed, exactly like MerchantPaymentProvider.
+
+// CommunicationProvider — an org's connection for one channel.
+model CommunicationProvider {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  channel  String // "EMAIL" | "WHATSAPP"
+  provider String // e.g. "RESEND" | "SENDGRID" | "SMTP" | "TWILIO" | "META"
+  status   String @default("CONNECTED") // CONNECTED | DISABLED
+
+  fromAddress String? // verified sender (email address / WhatsApp number)
+
+  // Sealed credentials (see crypto.ts). Plaintext never stored.
+  encryptedCredentials String
+  credentialsIv        String
+  credentialsAuthTag   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, channel])
+  @@index([organizationId])
+}
+
+// Message — an outbound business message (its intended content + context).
+model Message {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  channel String // "EMAIL" | "WHATSAPP"
+
+  // Optional CRM context.
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  toAddress String // resolved recipient (email / number)
+  subject   String?
+  body      String
+
+  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED
+
+  createdByUserId String?
+
+  deliveries Delivery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([leadId])
+  @@index([contactId])
+}
+
+// Delivery — one provider send attempt for a Message, with its final state.
+model Delivery {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  provider          String
+  providerMessageId String?
+  status            String  @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED
+  error             String?
+  attempts          Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([messageId])
+}
+
+// Consent — a contact's opt-in/out for a channel. Enforced before any send.
+model Consent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  channel String // "EMAIL" | "WHATSAPP"
+  status  String  @default("GRANTED") // GRANTED | REVOKED
+  source  String? // where consent was captured/changed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contactId, channel])
+  @@index([organizationId])
+}
+
+// AutomationRule — a constrained trigger→action rule for new leads (S6-003).
+// Enabled rules fire ONCE per matching lead (idempotency enforced by the
+// worker/outbox), and can be disabled + audited.
+model AutomationRule {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name    String
+  trigger String // e.g. "lead.created"
+  action  String // e.g. "send.message" | "create.task"
+  config  Json // action parameters (template id, channel, ...)
+
+  enabled Boolean @default(true)
+
+  createdByUserId String?
+
+  runs AutomationRun[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, trigger, enabled])
+}
+
+// AutomationRun — the ledger that makes a rule fire AT MOST ONCE per lead
+// (@@unique([ruleId, leadId])) and provides the audit trail (S6-003).
+model AutomationRun {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  ruleId String
+  rule   AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  leadId String
+  status String  @default("DONE") // DONE | FAILED | SKIPPED
+  error  String?
+
+  createdAt DateTime @default(now())
+
+  // Idempotency: one run per (rule, lead) — a rule fires once per matching lead.
+  @@unique([ruleId, leadId])
+  @@index([organizationId])
+}
+
+// AnalyticsEvent — the versioned, org-owned event taxonomy (S7-001).
+//
+// Every observable business event (a public site view, an enquiry submission, a
+// paid order) is recorded against ONE contract: the pair (type, schemaVersion)
+// selects a validator in code that the `properties` JSON must satisfy at intake
+// (S7-002). Bumping `schemaVersion` lets a type evolve without rewriting
+// history. Rows are tenant-owned (denormalized organizationId) and carry
+// consent + retention metadata so a privacy/retention job can prune withdrawn
+// or expired data.
+//
+// Site/project scoping is stored as plain ids (no FK cascade) so pruning a Site
+// never rewrites the analytics ledger; the aggregate jobs group by these.
+model AnalyticsEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  siteId    String?
+  projectId String?
+
+  // The contract selector.
+  type          String // "site.view" | "enquiry.submitted" | "order.paid" | ...
+  schemaVersion Int    @default(1)
+
+  properties Json // validated against (type, schemaVersion) at intake
+
+  // Consent basis at capture time ("anonymous" | "granted" | "revoked"). A
+  // revoked/withdrawn basis lets the retention job drop identifying rows.
+  consent String @default("anonymous")
+
+  // Coarse, NON-identifying visitor grouping for unique counts — a salted hash
+  // written by intake (S7-002), NEVER a raw IP. Null when not consented.
+  visitorHash String?
+
+  occurredAt DateTime // when the event happened (source clock, bounded at intake)
+  receivedAt DateTime @default(now()) // when Saroh accepted it (server clock)
+
+  // Retention: intake stamps an expiry from the org's retention policy; a prune
+  // job deletes rows past it. Null = no expiry configured.
+  expiresAt DateTime?
+
+  // Idempotency: an optional producer-supplied key dedupes at-least-once intake
+  // (P2002 → no-op). Nulls are distinct in Postgres, so only real keys dedupe.
+  dedupeKey String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, type, occurredAt])
+  @@index([organizationId, siteId, occurredAt])
+  @@index([expiresAt])
+}
+
+// AnalyticsDailyAggregate — pre-computed per-day rollups (S7-002 populates
+// these) so dashboards never scan the raw event ledger. One row per
+// (org, siteId, UTC day, type, dimension, dimensionValue). `siteId`/`dimension`
+// default to "" (a non-null sentinel) so the unique key backs a clean upsert —
+// "" means org-wide / the grand total for that type.
+model AnalyticsDailyAggregate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  siteId String @default("") // "" = all sites / org-wide
+
+  date           DateTime @db.Date // the UTC day bucket
+  type           String // event type this row aggregates
+  dimension      String   @default("") // "" = total; else e.g. "path" | "referrer"
+  dimensionValue String   @default("")
+
+  count       Int @default(0)
+  uniqueCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, siteId, date, type, dimension, dimensionValue])
+  @@index([organizationId, type, date])
+}
+
+// Plan — the VERSIONED catalog of Saroh subscription plans sold to
+// Organizations (S7-005). NOT org-owned: a global catalog. A published plan
+// version is immutable — changing price or entitlements means a NEW version, so
+// existing subscribers keep the terms they signed up under. `entitlements` is
+// the typed limit map the server-side EntitlementService enforces (e.g.
+// { "sites": 3, "teamMembers": 5, "customDomain": true }).
+model Plan {
+  id      String @id @default(cuid())
+  key     String // "free" | "pro" | "business"
+  version Int    @default(1)
+  name    String
+
+  priceCents Int    @default(0)
+  currency   String @default("INR")
+  interval   String @default("month") // "month" | "year"
+
+  entitlements Json // typed limit map enforced by EntitlementService
+
+  active Boolean @default(true) // offerable to NEW subscribers
+
+  subscriptions Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([key, version])
+}
+
+// Subscription — an Organization's subscription to a Plan version (S7-005).
+// Org-owned; at most one row per org (`organizationId @unique`) — the tenant's
+// current plan. Billing runs through Saroh's OWN platform Razorpay/Cashfree
+// account (env-configured, NOT stored here), NEVER an org's merchant
+// MerchantPaymentProvider — credential separation is a hard boundary: Saroh
+// billing never reads or writes org merchant-payment records.
+model Subscription {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  status String @default("ACTIVE") // TRIALING | ACTIVE | PAST_DUE | CANCELLED
+
+  provider               String? // "RAZORPAY" | "CASHFREE" (null on a free plan)
+  providerSubscriptionId String? // the provider's subscription id
+  providerCustomerId     String?
+
+  currentPeriodEnd  DateTime?
+  cancelAtPeriodEnd Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerSubscriptionId])
+  @@index([planId])
+}
+
+// BillingWebhookEvent — the idempotent inbox for Saroh's billing-provider
+// webhooks (S7-005), the SaaS analogue of the merchant WebhookEvent. Signature
+// is verified before any write; @@unique([provider, providerEventId]) makes a
+// replay a 200 no-op. Kept ENTIRELY separate from merchant payments. The
+// resolved org is a plain denormalized id (no FK) so the append-only inbox is
+// never rewritten by a tenant delete.
+model BillingWebhookEvent {
+  id              String @id @default(cuid())
+  provider        String
+  providerEventId String
+  type            String
+
+  organizationId String?
+
+  payload     Json
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  @@unique([provider, providerEventId])
+  @@index([organizationId])
+}
+
+// WaitlistSignup — pre-launch interest captured from the public marketing site.
+//
+// Deliberately NOT tied to Organization or User: nobody who signs up has either
+// yet, and that is the whole point of a waitlist. It is the only tenant-less
+// business table, which is why it carries no organizationId and is exempt from
+// RLS considerations.
+//
+// `email` is stored normalized (trimmed + lowercased by the service) and is
+// unique, so a repeat submission is an idempotent no-op rather than a duplicate
+// row or a 500. `ipHash` is a sha256 of the source IP — the raw IP is never
+// stored, matching the public enquiry surface — and exists only so abuse can be
+// investigated after the fact.
+model WaitlistSignup {
+  id String @id @default(cuid())
+
+  email String @unique
+
+  // Where the signup came from, e.g. "saroh.in". Free text, never trusted for
+  // authorization — it is analytics only.
+  source String?
+
+  ipHash String?
+
+  // Set when the batch containing this signup is opened, so "who is still
+  // waiting" is a query rather than a spreadsheet.
+  invitedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([invitedAt])
+}
+
+/// A record of a completed or in-flight idempotent operation.
+///
+/// An idempotency key says "this is a retry". It does NOT say "this is the SAME
+/// request" — and nothing was checking. A second call carrying the same key but
+/// a different payload was treated as a duplicate and silently dropped, so the
+/// caller received 200 and believed their new instruction had been applied when
+/// it had been discarded (reproduced 2026-07-31: same key, opposite `enabled`,
+/// flag unchanged).
+///
+/// `fingerprint` closes that: it is a hash of the canonical request, so a
+/// mismatch against a stored key is a conflict rather than a duplicate.
+model IdempotencyRecord {
+  id String @id @default(cuid())
+
+  /// Operation namespace, e.g. "flags.global.set". Keys are only unique within one.
+  scope String
+  /// The client-supplied key.
+  key   String
+
+  /// Who performed it; a key from one actor must never satisfy another's.
+  actorUserId    String
+  /// Present for tenant-scoped operations, null for platform-level ones.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// sha256 of the canonical request. Different payload, same key -> 409.
+  fingerprint String
+
+  /// IN_PROGRESS until the operation completes, then COMPLETED.
+  status   String @default("IN_PROGRESS")
+  /// The original response, replayed verbatim to an identical retry.
+  response Json?
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  /// Retention horizon; records past this are safe to prune.
+  expiresAt   DateTime
+
+  @@unique([scope, key, actorUserId])
+  @@index([expiresAt])
+  @@index([organizationId])
 }

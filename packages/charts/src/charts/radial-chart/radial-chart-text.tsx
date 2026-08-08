@@ -17,7 +17,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
-import { ChartConfig, ChartContainer } from "@saroh/ui/chart";
+import type { ChartConfig } from "@saroh/ui/chart";
+import { ChartContainer } from "@saroh/ui/chart";
 
 export const description = "A radial chart with text";
 
@@ -94,7 +95,7 @@ export function RadialChartTextExample() {
                                                 </tspan>
                                                 <tspan
                                                     x={viewBox.cx}
-                                                    y={(viewBox.cy || 0) + 24}
+                                                    y={(viewBox.cy ?? 0) + 24}
                                                     className="fill-muted-foreground"
                                                 >
                                                     Visitors
@@ -109,7 +110,7 @@ export function RadialChartTextExample() {
                 </ChartContainer>
             </CardContent>
             <CardFooter className="flex-col gap-2 text-sm">
-                <div className="flex items-center gap-2 font-medium leading-none">
+                <div className="flex items-center gap-2 leading-none font-medium">
                     Trending up by 5.2% this month{" "}
                     <TrendingUp className="h-4 w-4" />
                 </div>

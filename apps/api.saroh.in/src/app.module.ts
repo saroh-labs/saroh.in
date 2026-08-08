@@ -3,8 +3,44 @@ import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { auth } from "./common/auth/auth";
+import { AdminModule } from "./modules/admin/admin.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { AuditModule } from "./modules/audit/audit.module";
+import { AutomationsModule } from "./modules/automations/automations.module";
+import { BillingModule } from "./modules/billing/billing.module";
+import { BookingsModule } from "./modules/bookings/bookings.module";
+import { CapabilitiesModule } from "./modules/capabilities/capabilities.module";
+import { CategoriesModule } from "./modules/categories/categories.module";
+import { CommunicationsModule } from "./modules/communications/communications.module";
+import { ContactsModule } from "./modules/contacts/contacts.module";
+import { ContentModule } from "./modules/content/content.module";
+import { CustomerWorkspaceModule } from "./modules/customer-workspace/customer-workspace.module";
+import { CustomersModule } from "./modules/customers/customers.module";
+import { DomainsModule } from "./modules/domains/domains.module";
+import { EnquiryModule } from "./modules/enquiry/enquiry.module";
+import { FeatureFlagModule } from "./modules/feature-flags/feature-flags.module";
+import { FormsModule } from "./modules/forms/forms.module";
 import { HealthModule } from "./modules/health/health.module";
+import { HomeModule } from "./modules/home/home.module";
+import { JobsModule } from "./modules/jobs/jobs.module";
+import { LeadsModule } from "./modules/leads/leads.module";
+import { MediaModule } from "./modules/media/media.module";
+import { MembersModule } from "./modules/members/members.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
+import { OrdersModule } from "./modules/orders/orders.module";
+import { OrganizationsModule } from "./modules/organizations/organizations.module";
+import { PaymentsModule } from "./modules/payments/payments.module";
+import { PipelinesModule } from "./modules/pipelines/pipelines.module";
+import { ProductsModule } from "./modules/products/products.module";
+import { ProjectsModule } from "./modules/projects/projects.module";
+import { ProviderHealthModule } from "./modules/provider-health/provider-health.module";
+import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
+import { SearchModule } from "./modules/search/search.module";
+import { SelfTestModule } from "./modules/self-test/self-test.module";
+import { SitesModule } from "./modules/sites/sites.module";
 import { StoresModule } from "./modules/stores/stores.module";
+import { WaitlistModule } from "./modules/waitlist/waitlist.module";
+import { WebhooksModule } from "./modules/webhooks/webhooks.module";
 
 @Module({
     imports: [
@@ -19,10 +55,55 @@ import { StoresModule } from "./modules/stores/stores.module";
         AuthModule.forRoot({
             auth,
             disableGlobalAuthGuard: true,
-            bodyParser: { json: {}, urlencoded: { extended: true } },
+            // rawBody: true attaches the raw request Buffer to `req.rawBody` (via
+            // the JSON parser's `verify` hook) for every non-auth route. The
+            // public webhook endpoint (S5-003) needs those exact bytes to
+            // HMAC-verify a provider signature — the re-serialized parsed JSON
+            // would not byte-match and would break verification.
+            bodyParser: {
+                json: {},
+                urlencoded: { extended: true },
+                rawBody: true,
+            },
         }),
         HealthModule,
+        FeatureFlagModule,
+        AdminModule,
+        CapabilitiesModule,
+        HomeModule,
+        ProviderHealthModule,
+        SavedViewsModule,
+        OrganizationsModule,
+        ProjectsModule,
+        AuditModule,
         StoresModule,
+        MembersModule,
+        ProductsModule,
+        CategoriesModule,
+        CustomersModule,
+        CustomerWorkspaceModule,
+        OrdersModule,
+        ContentModule,
+        MediaModule,
+        SitesModule,
+        DomainsModule,
+        JobsModule,
+        FormsModule,
+        EnquiryModule,
+        ContactsModule,
+        SearchModule,
+        PipelinesModule,
+        LeadsModule,
+        NotificationsModule,
+        BookingsModule,
+        PaymentsModule,
+        WebhooksModule,
+        CommunicationsModule,
+        AutomationsModule,
+        AnalyticsModule,
+        BillingModule,
+        WaitlistModule,
+        SelfTestModule,
     ],
 })
 export class AppModule {}

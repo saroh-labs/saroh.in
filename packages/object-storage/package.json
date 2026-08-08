@@ -1,0 +1,62 @@
+{
+  "name": "@saroh/object-storage",
+  "version": "1.0.0",
+  "description": "Provider-agnostic object-storage boundary (ObjectStorage port + Cloudflare R2 and in-memory adapters) for Saroh.io media",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint src/",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**",
+    "src/**"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1090.0",
+    "@aws-sdk/s3-request-presigner": "3.1090.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@saroh/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "tsup": "^8.5.1",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
+  },
+  "author": "Mohit Kumar <himohitmehta>",
+  "homepage": "https://saroh.in",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/himohitmehta/saroh.io.git"
+  },
+  "bugs": {
+    "url": "https://github.com/himohitmehta/saroh.io/issues"
+  },
+  "keywords": [
+    "saroh",
+    "saroh.io",
+    "object-storage",
+    "s3",
+    "cloudflare-r2",
+    "presigned-url"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

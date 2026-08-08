@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-Saroh.io is an **educational open-source platform** for creating blogs, portfolios, and storefronts. Built as a Turborepo monorepo with pnpm workspaces, containing 15+ Next.js apps and 8 shared packages.
+Saroh.io is an **open-source, multi-tenant platform** for building online businesses — websites, blogs, portfolios and e-commerce storefronts. It is a Turborepo monorepo with pnpm workspaces: **10 Next.js apps**, a **single NestJS API**, and **7 shared packages**, all built on one Better Auth identity system and one PostgreSQL database.
 
-**Purpose**: Educational project to teach full-stack development patterns. Code is for learning purposes and may not be production-ready.
+**Architecture direction:** the accepted plan is **organization-first** (Organization as the mandatory tenant boundary, with Projects, Sites and Stores beneath it). Today the effective tenant root is still `Store`. The canonical, audited plan lives in [`docs/architecture/`](../docs/architecture/) — treat it as the source of truth and link to it rather than duplicating it here. Start with [`CURRENT_STATE.md`](../docs/architecture/CURRENT_STATE.md), [`DECISIONS.md`](../docs/architecture/DECISIONS.md) and [`TARGET_ARCHITECTURE.md`](../docs/architecture/TARGET_ARCHITECTURE.md).
 
 ---
 
@@ -14,37 +14,35 @@ Saroh.io is an **educational open-source platform** for creating blogs, portfoli
 
 ```
 saroh.io/
-├── apps/              # 15+ Next.js applications (separate subdomains)
-├── packages/          # 8 shared packages
+├── apps/              # 10 apps: 9 Next.js frontends + 1 NestJS API (separate subdomains)
+├── packages/          # 7 shared packages
 ├── tooling/           # Shared configs (eslint, tailwind, tsconfig)
-└── docs/              # Documentation and plans
+└── docs/              # Documentation and architecture plans (docs/architecture/)
 ```
 
-### Apps Directory
+### Apps Directory (10 total)
 
-Each app is a standalone Next.js application with its own subdomain:
+`api.saroh.in` is the single backend (NestJS); the other nine are Next.js apps, each with its own subdomain:
 
-- `accounts.saroh.in` - Authentication service (Better Auth) - **IN PROGRESS**
-- `dashboard.saroh.in` - Main user dashboard - **IN PROGRESS**
-- `docs.saroh.in` - Documentation (Nextra)
-- `admin.saroh.in` - Admin dashboard - **COMING SOON**
-- `chatbot.saroh.in` - Chatbot interface - **COMING SOON**
-- `email.saroh.in` - Email service - **COMING SOON**
-- `sites.saroh.in` - User site renderer (\*.saroh.site)
-- `templates.saroh.in` - Template marketplace
-- `ui.saroh.in` - UI component showcase
-- `saroh.in` - Main marketing website
-- `app.saroh.in` - **LEGACY** (old app, being replaced)
+- `api.saroh.in` - **NestJS backend**; hosts the Better Auth server and owns all business logic + DB access
+- `accounts.saroh.in` - **Auth UI** (Better Auth): login, signup, verification, password reset, OAuth (the auth server itself runs in `api`)
+- `app.saroh.in` - Main product dashboard (stores, members, catalog, orders, customers, content)
+- `admin.saroh.in` - Platform admin (session-gated, allowlisted) — scaffold
+- `saroh.app` - Public renderer for user sites (`*.saroh.app`, custom domains) — placeholder
+- `templates.saroh.in` - Design/template showcase — scaffold
+- `ui.saroh.in` - Design-system / component showcase
+- `docs.saroh.in` - Developer documentation (Nextra)
+- `help.saroh.in` - End-user help guides (Nextra)
+- `saroh.in` - Marketing site + waitlist
 
-### Packages Directory
+### Packages Directory (7 total)
 
-Shared packages using `@saroh/` namespace:
+Shared packages using the `@saroh/` namespace:
 
-- `@saroh/auth` - Authentication utilities (Better Auth integration)
-- `@saroh/database` - Prisma schemas and database client
+- `@saroh/auth` - Shared Better Auth config: server instance + browser client + Next.js middleware/session helpers
+- `@saroh/database` - Prisma schema and client (`@prisma/adapter-pg`)
 - `@saroh/ui` - Shared UI components (Shadcn + Radix UI)
-- `@saroh/charts` - Chart components (Recharts)
-- `@saroh/chatbot` - Chatbot utilities
+- `@saroh/charts` - Chart components
 - `@saroh/emails` - Email templates (React Email)
 - `@saroh/templates` - Site templates
 - `@saroh/utils` - Utility functions
@@ -261,10 +259,10 @@ export function DataComponent() {
 **Server-side Fetching**:
 
 ```tsx
-// In Server Components
+// In Server Components — fetch from the API (session-authenticated), not Prisma
 export default async function Page() {
-    const data = await prisma.post.findMany();
-    return <PostList posts={data} />;
+    const posts = await getPosts(); // Server Action -> api.saroh.in
+    return <PostList posts={posts} />;
 }
 ```
 
@@ -272,18 +270,25 @@ export default async function Page() {
 
 ## Backend Patterns
 
-### Prisma & Database
+### Data-access boundary (important)
 
-**Database**: PostgreSQL  
-**ORM**: Prisma 7.4.0  
+`api.saroh.in` (NestJS) is the **single business + authorization boundary**. It owns **all** database access and hosts the Better Auth server. Frontends are thin, session-authenticated API clients — they **do not import Prisma** and **do not open their own DB connections**. New data flows go through an API endpoint (or a Next.js Server Action that calls the API), not through direct `prisma.*` calls in an app.
+
+- Add/extend business logic in a **NestJS module** under `apps/api.saroh.in/src/modules/*`.
+- Read/write data from a frontend by calling the API and resolving the session with `getServerSession` from `@saroh/auth/next`.
+
+### Prisma & Database (API and packages only)
+
+**Database**: PostgreSQL (AWS RDS)  
+**ORM**: Prisma 7.4.0 with `@prisma/adapter-pg`  
 **Schema Location**: `packages/database/prisma/schema.prisma`
 
-**Using Prisma in Apps**:
+Prisma is consumed by the **API** and `@saroh/database` only:
 
-```tsx
+```ts
 import { prisma } from "@saroh/database";
 
-// In Server Components or API routes
+// In the NestJS API (services), not in frontend apps
 const users = await prisma.user.findMany();
 ```
 
@@ -295,42 +300,13 @@ pnpm db:migrate:deploy # Deploy migrations
 pnpm db:seed           # Seed database
 ```
 
-### API Routes
+### API endpoints (NestJS)
 
-**Location**: `apps/your-app/app/api/`
-
-**Pattern**:
-
-```tsx
-// app/api/posts/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@saroh/database";
-
-export async function GET(request: NextRequest) {
-    try {
-        const posts = await prisma.post.findMany();
-        return NextResponse.json(posts, { status: 200 });
-    } catch (error) {
-        return NextResponse.json(
-            { error: "Failed to fetch posts" },
-            { status: 500 },
-        );
-    }
-}
-
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-        const post = await prisma.post.create({ data: body });
-        return NextResponse.json(post, { status: 201 });
-    } catch (error) {
-        return NextResponse.json(
-            { error: "Failed to create post" },
-            { status: 500 },
-        );
-    }
-}
-```
+Canonical business endpoints live in the **NestJS API** as modules
+(`apps/api.saroh.in/src/modules/*` — controllers, services, DTOs), not as Next.js
+route handlers with direct Prisma access. A frontend `app/api/*` route should only
+proxy to the API or handle app-local concerns; it must not open its own DB
+connection. The HTTP conventions below apply to both.
 
 **HTTP Methods**:
 
@@ -356,33 +332,30 @@ export async function POST(request: NextRequest) {
 
 ### Better Auth
 
-**Status**: Currently migrating from Next-auth v5 to Better Auth
+**Status**: Better Auth is the **only** auth system. The NextAuth migration is
+**complete** — no NextAuth code remains in source. Do not add NextAuth. See
+[DEC-001/002/003](../docs/architecture/DECISIONS.md).
 
-**Package**: `@saroh/auth`
+**Where it runs**: the Better Auth **server is hosted by the API** (`api.saroh.in`).
+`accounts.saroh.in` is the sign-in **UI** only (login, signup, verification,
+password reset, OAuth) — not a separate auth server. In production the session
+cookie is scoped to `.saroh.in` so it works across every subdomain.
 
-**Setup** (in progress):
+**Package**: `@saroh/auth` — the single shared surface every app consumes:
 
-```tsx
-// middleware.ts
-import { auth } from "@saroh/auth";
+- `@saroh/auth/client` — browser `authClient` (`signIn`, `signOut`, `useSession`)
+- `@saroh/auth/next` — `getServerSession()` for RSC / route handlers (validates against the API over HTTP; no Prisma, no secret in the app)
+- `@saroh/auth/middleware` — Edge-safe middleware (cookie-presence / origin only)
 
-export default auth((req) => {
-    // Auth logic
-});
-
-export const config = {
-    matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
-};
-```
-
-**Protected Routes**:
+**Protected route (RSC)**:
 
 ```tsx
-import { auth } from "@saroh/auth";
+import { getServerSession } from "@saroh/auth/next";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export default async function ProtectedPage() {
-    const session = await auth();
+    const session = await getServerSession(await headers());
 
     if (!session) {
         redirect("/login");
@@ -392,7 +365,8 @@ export default async function ProtectedPage() {
 }
 ```
 
-**Authentication App**: `accounts.saroh.in` handles login/signup/password reset
+**Secret**: `BETTER_AUTH_SECRET` must be **identical** across `api` and any app
+that validates sessions, or cross-app login silently fails.
 
 ---
 
@@ -515,22 +489,21 @@ type User = z.infer<typeof userSchema>;
 
 ### Port Conventions
 
-Each app runs on a specific port:
-
-- `accounts.saroh.in`: Port 3001
-- `dashboard.saroh.in`: Port 3005
-- `admin.saroh.in`: Port 3002
-- (Check `package.json` scripts for other ports)
+Each app pins its own port in its `package.json` `dev` script (e.g. `admin` on
+3001, `app` on 3003, `accounts` on the default 3000). Check the app's
+`package.json` rather than assuming a port.
 
 ### Scripts
 
 **Root level** (affects all workspaces):
 
 ```bash
-pnpm dev                    # Run all apps in dev mode
-pnpm dev:dashboard          # Run specific apps (dashboard, sites, auth, admin)
+pnpm dev                    # Run everything (turbo, high concurrency)
+pnpm dev:api-auth           # api + accounts
+pnpm dev:apps               # accounts + admin + sites
 pnpm build                  # Build all apps
 pnpm lint                   # Lint all workspaces
+pnpm typecheck              # Typecheck all workspaces
 pnpm format                 # Format with Prettier
 ```
 
@@ -544,8 +517,7 @@ pnpm lint                   # Lint single workspace
 
 ### Git Workflow
 
-**Branch**: Currently on `better-auth` (migrating from Next-auth)  
-**Default branch**: `main`
+**Default branch**: `main` (active development on `development`)
 
 **Commit hooks**:
 
@@ -559,8 +531,9 @@ pnpm lint                   # Lint single workspace
 
 - **Next.js**: 16.1.6 (upgraded from 15.0.3)
 - **React**: 19.2.4 (upgraded from 18.3.1)
+- **NestJS**: 11 (the `api.saroh.in` backend)
 - **TypeScript**: ^5
-- **Node.js**: ^20
+- **Node.js**: **>=24** (developed on 24.14.0)
 
 ### Build & Dev Tools
 
@@ -580,13 +553,14 @@ pnpm lint                   # Lint single workspace
 
 ### Database & ORM
 
-- **Prisma**: 7.4.0 (upgraded from 5.22.0)
+- **PostgreSQL**: AWS RDS
+- **Prisma**: 7.4.0 with `@prisma/adapter-pg` (upgraded from 5.22.0)
 - **@prisma/client**: 7.4.0
 
 ### Authentication
 
-- **Next-auth**: 5.0.0-beta.19 (migrating to Better Auth)
-- **@auth/prisma-adapter**: ^2.2.0
+- **Better Auth**: 1.6.x — the only identity system, hosted by `api.saroh.in`
+  (NextAuth has been fully removed)
 
 ### Data Fetching & State
 
@@ -622,7 +596,7 @@ When generating code for this project:
 1. **Follow the monorepo structure** - use existing packages, don't duplicate
 2. **Use shared components** from `@saroh/ui` when available
 3. **Prefer Server Components** unless client interactivity is needed
-4. **Use Prisma** for database access through `@saroh/database`
+4. **Route data access through the API** — Prisma (`@saroh/database`) is used by the NestJS `api` and packages only; frontends call the API and never import Prisma
 5. **Follow TypeScript strictly** - no `any` types
 6. **Use Tailwind** for styling, not custom CSS
 7. **Validate with Zod** for forms and API inputs
@@ -656,7 +630,7 @@ These ensure components follow production-grade patterns and performance best pr
 
 - ✅ **ALWAYS use React Query (@tanstack/react-query)**
 - Never use direct `fetch()` in client components without React Query
-- Use server-side Prisma queries for Server Components instead
+- For Server Components, fetch server-side via the API (Server Actions) — DB queries live in the NestJS `api`, not in the app
 - React Query handles caching, refetching, and synchronization automatically
 
 **Example**:
@@ -688,18 +662,16 @@ const data = await fetch("/api/users");
 
 ### Database Access
 
-**For all database operations:**
+**For all database operations (in the API):**
 
-- ✅ **ALWAYS use Prisma ORM through `@saroh/database`**
-- Access via `import { prisma } from "@saroh/database"`
-- Use in Server Components or API routes
-- Never write raw SQL queries
-- Let Prisma handle type safety and migrations
+- ✅ **Access the DB only from the NestJS `api` (and `@saroh/database`)** via `import { prisma } from "@saroh/database"`
+- ✅ From a **frontend**, call the API instead of touching the DB — never import Prisma into an app
+- Never write raw SQL queries; let Prisma handle type safety and migrations
 
 **Example**:
 
-```tsx
-// ✅ Correct
+```ts
+// ✅ Correct — in a NestJS service inside apps/api.saroh.in
 import { prisma } from "@saroh/database";
 
 export async function getPostsByUser(userId: string) {
@@ -709,10 +681,7 @@ export async function getPostsByUser(userId: string) {
     });
 }
 
-// ❌ Wrong - Raw SQL
-const result = await db.query("SELECT * FROM posts WHERE user_id = $1", [
-    userId,
-]);
+// ❌ Wrong — importing Prisma into a frontend app, or writing raw SQL
 ```
 
 ---
@@ -758,7 +727,8 @@ Never run build verification prematurely. Wait for user approval on:
 
 ❌ Don't create new UI component libraries - use `@saroh/ui`  
 ❌ Don't bypass Prisma with raw SQL queries  
-❌ Don't use Next-auth (migrating to Better Auth)  
+❌ Don't use NextAuth — it is fully removed; use Better Auth via `@saroh/auth`  
+❌ Don't import Prisma in a frontend app — DB access belongs to the `api.saroh.in` (NestJS) backend  
 ❌ Don't use CSS modules or styled-components (use Tailwind)  
 ❌ Don't use `any` type in TypeScript  
 ❌ Don't add dependencies without checking catalog first  

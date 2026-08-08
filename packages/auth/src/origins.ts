@@ -1,5 +1,5 @@
 /**
- * The trusted `*.saroh.in` origins, shared by the betterAuth config, the
+ * The trusted first-party origins, shared by the betterAuth config, the
  * api CSRF guard, and the Next.js middleware. Kept in its own Prisma-free
  * module so the Edge-runtime middleware can import it without pulling in
  * the database client.
@@ -17,7 +17,7 @@ export function getTrustedOrigins(): string[] {
         "https://api.saroh.in",
         "https://app.saroh.in",
         "https://admin.saroh.in",
-        "https://sites.saroh.in",
+        "https://saroh.app",
         "https://templates.saroh.in",
         "https://docs.saroh.in",
         "https://help.saroh.in",

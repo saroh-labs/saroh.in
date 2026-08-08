@@ -1,20 +1,6 @@
-import type { Config } from "tailwindcss";
+// Re-export the shared @saroh/tailwind-config preset. This app consumes
+// @saroh/ui (Wordmark, Card), and the shared preset already includes the
+// packages/ui source glob so component-only classes are never purged (#92).
+import sharedConfig from "../../tooling/tailwind-config/tailwind.config";
 
-const config: Config = {
-    content: [
-        "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-        "./components/**/*.{js,ts,jsx,tsx,mdx}",
-        "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    ],
-    theme: {
-        extend: {
-            backgroundImage: {
-                "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-                "gradient-conic":
-                    "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-            },
-        },
-    },
-    plugins: [],
-};
-export default config;
+export default sharedConfig;

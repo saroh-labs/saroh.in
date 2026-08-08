@@ -1,31 +1,32 @@
 {
-    "name": "ui",
-    "version": "0.1.0",
-    "private": true,
-    "scripts": {
-        "dev": "next dev --port=3011",
-        "build": "next build",
-        "start": "next start",
-        "lint": "next lint"
-    },
-    "dependencies": {
-        "@saroh/auth": "workspace:*",
-        "@saroh/ui": "workspace:*",
-        "@saroh/charts": "workspace:*",
-        "react-icons":"catalog:",
-        "react": "catalog:react19",
-        "react-dom": "catalog:react19",
-        "next": "catalog:next16"
-    },
-    "devDependencies": {
-        "typescript": "catalog:",
-        "@types/node": "catalog:",
-        "@types/react": "catalog:react19",
-        "@types/react-dom": "catalog:react19",
-        "@saroh/eslint-config": "workspace:*",
-        "postcss": "catalog:",
-        "tailwindcss": "catalog:",
-        "eslint": "catalog:",
-        "eslint-config-next": "catalog:"
-    }
+  "name": "ui",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port=3011",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@saroh/auth": "workspace:*",
+    "@saroh/ui": "workspace:*",
+    "@saroh/charts": "workspace:*",
+    "react-icons": "catalog:",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19",
+    "next": "catalog:next16"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "@saroh/eslint-config": "workspace:*",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-next": "catalog:"
+  }
 }

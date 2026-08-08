@@ -14,6 +14,16 @@ import { Label } from "@saroh/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { FaGithub } from "react-icons/fa";
+
+const STAGGER_MS = 70;
+const FIELD_BASE_MS = 260;
+
+function delay(index: number): React.CSSProperties {
+    return {
+        "--sa-delay": `${FIELD_BASE_MS + index * STAGGER_MS}ms`,
+    } as React.CSSProperties;
+}
 
 export function LoginForm() {
     const router = useRouter();
@@ -30,31 +40,54 @@ export function LoginForm() {
         const { error: err } = await signIn.email(
             { email, password, callbackURL: "/apps" },
             {
-                onError: (ctx) => setError(ctx.error?.message ?? "Sign in failed"),
-            }
+                onError: (ctx) => {
+                    // Not a dead end: the server has just mailed a fresh code
+                    // (emailVerification.sendOnSignIn), so forward to the
+                    // screen that can consume it rather than showing "Email not
+                    // verified" with nowhere to go.
+                    if (ctx.error.code === "EMAIL_NOT_VERIFIED") return;
+                    setError(ctx.error.message);
+                },
+            },
         );
         setIsLoading(false);
+
+        if (err?.code === "EMAIL_NOT_VERIFIED") {
+            router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+            return;
+        }
         if (err) return;
         router.push("/apps");
     }
 
     return (
-        <Card className="mx-auto max-w-sm">
+        <Card className="sa-panel mx-auto w-full max-w-sm">
             <CardHeader>
-                <CardTitle className="text-2xl">Login</CardTitle>
-                <CardDescription>
-                    Enter your email below to login to your account
+                <CardTitle
+                    className="sa-rise font-display text-2xl"
+                    style={delay(0)}
+                >
+                    Welcome back
+                </CardTitle>
+                <CardDescription className="sa-rise" style={delay(1)}>
+                    Log in to continue to your workspace.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit} className="grid gap-4">
                     {error && (
-                        <p className="text-sm text-destructive">{error}</p>
+                        <p
+                            role="alert"
+                            className="sa-alert border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm"
+                        >
+                            {error}
+                        </p>
                     )}
-                    <div className="grid gap-2">
+                    <div className="sa-rise grid gap-2" style={delay(2)}>
                         <Label htmlFor="email">Email</Label>
                         <Input
                             id="email"
+                            className="sa-input"
                             type="email"
                             placeholder="m@example.com"
                             value={email}
@@ -63,18 +96,19 @@ export function LoginForm() {
                             disabled={isLoading}
                         />
                     </div>
-                    <div className="grid gap-2">
+                    <div className="sa-rise grid gap-2" style={delay(3)}>
                         <div className="flex items-center">
                             <Label htmlFor="password">Password</Label>
                             <Link
                                 href="/forgot-password"
-                                className="ml-auto inline-block text-sm underline"
+                                className="text-muted-foreground hover:text-foreground ml-auto inline-block text-sm underline-offset-4 transition-colors hover:underline"
                             >
                                 Forgot your password?
                             </Link>
                         </div>
                         <Input
                             id="password"
+                            className="sa-input"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
@@ -82,14 +116,35 @@ export function LoginForm() {
                             disabled={isLoading}
                         />
                     </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? "Signing in…" : "Login"}
+                    <Button
+                        type="submit"
+                        variant="highlight"
+                        className="sa-cta sa-rise mt-1 w-full font-semibold"
+                        style={delay(4)}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? "Signing in…" : "Log in"}
                     </Button>
+
+                    {/* Divider rather than a second stacked button: it makes
+                        clear that GitHub is an alternative route to the same
+                        place, not a second thing to do. */}
+                    <div
+                        className="sa-rise flex items-center gap-3"
+                        style={delay(5)}
+                    >
+                        <span className="bg-border/70 h-px flex-1" />
+                        <span className="text-muted-foreground text-xs uppercase tracking-wide">
+                            or
+                        </span>
+                        <span className="bg-border/70 h-px flex-1" />
+                    </div>
 
                     <Button
                         type="button"
                         variant="outline"
-                        className="w-full"
+                        className="sa-rise w-full gap-2 transition-transform duration-150 active:scale-[0.985]"
+                        style={delay(6)}
                         disabled={isLoading}
                         onClick={async () => {
                             setError(null);
@@ -99,12 +154,19 @@ export function LoginForm() {
                             });
                         }}
                     >
-                        Login with Github
+                        <FaGithub aria-hidden className="size-4" />
+                        Continue with GitHub
                     </Button>
                 </form>
-                <div className="mt-4 text-center text-sm">
+                <div
+                    className="sa-rise text-muted-foreground mt-5 text-center text-sm"
+                    style={delay(7)}
+                >
                     Don&apos;t have an account?{" "}
-                    <Link href="/signup" className="underline">
+                    <Link
+                        href="/signup"
+                        className="text-foreground underline-offset-4 transition-colors hover:underline"
+                    >
                         Sign up
                     </Link>
                 </div>

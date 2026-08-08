@@ -42,7 +42,27 @@ yarn-error.log*
 
 packages/database/dist
 packages/database/generated/prisma
-docs
+docs/*
+!docs/architecture/
+!docs/architecture/*.md
+!docs/plans/
+docs/plans/*
+!docs/plans/2026-07-20-product-design-system-audit-design.md
+!docs/plans/2026-07-20-product-design-system-audit-plan.md
+!docs/plans/2026-07-22-modular-product-ux-design.md
+!docs/plans/2026-07-22-modular-capabilities-implementation-plan.md
+!docs/plans/2026-07-22-cross-product-ux-implementation-plan.md
+!docs/product-transformation/
+!docs/design/
+!docs/design/**
+!docs/product-transformation/
+!docs/design/
+!docs/design/***.md
+!docs/design-system/
+!docs/design-system/**/*.md
+!docs/design-system/**/*.json
+!docs/design-system/**/*.csv
+!docs/design-system/**/*.png
 internal-decision-docs
 
 dist
@@ -50,3 +70,9 @@ dist
 .eslintcache
 # parallel subagent worktrees
 .claude/worktrees/
+.worktrees/
+
+# Impeccable design-session artifacts (decision pages, sketches, transcripts).
+# The durable outputs are DESIGN.md and its sidecar, which ARE committed.
+.impeccable/questions/
+.impeccable/sketches/

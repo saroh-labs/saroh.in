@@ -1,28 +1,30 @@
 {
-    "name": "help",
-    "version": "1.0.0",
-    "private": true,
-    "scripts": {
-        "dev": "next dev --port=3007",
-        "build": "next build",
-        "start": "next start",
-        "lint": "next lint"
-    },
-    "dependencies": {
-        "@saroh/ui": "workspace:*",
-        "next": "^16.2.6",
-        "nextra": "^4.6.1",
-        "nextra-theme-docs": "^4.6.1",
-        "react": "^19.2.6",
-        "react-dom": "^19.2.6"
-    },
-    "devDependencies": {
-        "@next/eslint-plugin-next": "^16.2.6",
-        "@saroh/eslint-config": "workspace:*",
-        "@saroh/tsconfig": "workspace:*",
-        "@types/node": "catalog:",
-        "@types/react": "catalog:react19",
-        "@types/react-dom": "catalog:react19",
-        "typescript": "catalog:"
-    }
+  "name": "help",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port=3007",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@saroh/ui": "workspace:*",
+    "next": "^16.2.6",
+    "nextra": "^4.6.1",
+    "nextra-theme-docs": "^4.6.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "eslint": "catalog:",
+    "@next/eslint-plugin-next": "^16.2.6",
+    "@saroh/eslint-config": "workspace:*",
+    "@saroh/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "typescript": "catalog:"
+  }
 }

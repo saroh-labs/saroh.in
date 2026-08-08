@@ -11,8 +11,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import type { ChartConfig } from "@saroh/ui/chart";
 import {
-    ChartConfig,
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
@@ -90,14 +90,22 @@ export function LineChartDotsColorExample() {
                             stroke="var(--color-visitors)"
                             strokeWidth={2}
                             dot={({ payload, ...props }) => {
+                                const { browser, fill } = payload as {
+                                    browser: string;
+                                    fill: string;
+                                };
+                                const { cx, cy } = props as {
+                                    cx?: number;
+                                    cy?: number;
+                                };
                                 return (
                                     <Dot
-                                        key={payload.browser}
+                                        key={browser}
                                         r={5}
-                                        cx={props.cx}
-                                        cy={props.cy}
-                                        fill={payload.fill}
-                                        stroke={payload.fill}
+                                        cx={cx}
+                                        cy={cy}
+                                        fill={fill}
+                                        stroke={fill}
                                     />
                                 );
                             }}
@@ -106,7 +114,7 @@ export function LineChartDotsColorExample() {
                 </ChartContainer>
             </CardContent>
             <CardFooter className="flex-col items-start gap-2 text-sm">
-                <div className="flex gap-2 font-medium leading-none">
+                <div className="flex gap-2 leading-none font-medium">
                     Trending up by 5.2% this month{" "}
                     <TrendingUp className="h-4 w-4" />
                 </div>

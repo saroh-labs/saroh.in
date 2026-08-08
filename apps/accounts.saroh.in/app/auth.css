@@ -1,0 +1,265 @@
+/* =============================================================================
+   AUTH MOTION — accounts.saroh.in
+   =============================================================================
+
+   This file replaces the previous "atmosphere" sheet, and the deletion is the
+   point. That version painted a drifting navy aurora with a lime hairline and a
+   grain overlay over a translucent, blurred panel. In a monochrome register
+   every one of those is wrong: there is no navy, no lime, and a blurred
+   translucent card contradicts the whole idea that separation comes from a
+   crisp 1px line rather than from depth.
+
+   What is left is the MOTION — staggered entrance, focus, shake, checkmark —
+   retuned so it reads on both a white page and a black one. Nothing here paints
+   a colour of its own; every value is a token or an alpha of one, so the same
+   rules work in light and dark without a branch.
+
+   Still CSS-only: this is the product's LCP and often a cold session's first
+   request, and shipping an animation runtime to render five form fields would
+   trade real first-paint cost for nothing.
+
+   Reduced motion is clamped suite-wide in @saroh/ui/globals.css, and every rule
+   below is written so its RESTING state is the correct one.
+   ========================================================================== */
+
+:root {
+    --sa-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --sa-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── Page ───────────────────────────────────────────────────────────────────
+   Flat. The old backdrop was three blurred radial fields plus grain; the
+   replacement is the page colour and nothing else, because that is what this
+   register looks like. The only relief is a very faint dot grid, which reads as
+   texture at normal viewing distance and disappears entirely on a phone.
+   ─── */
+
+.sa-page {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: hsl(var(--background));
+    background-image: radial-gradient(
+        hsl(var(--foreground) / 0.055) 1px,
+        transparent 1px
+    );
+    background-size: 22px 22px;
+    /* Fade the grid out toward the edges so it never competes with the card or
+       draws a hard line where the pattern stops.
+
+       The #000 below is the one literal colour in this app and is not a colour:
+       a mask reads only the alpha channel, so the stop means "fully opaque
+       here" and any opaque value would behave identically. A token would say
+       nothing truer and would suggest the mask paints something. */
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000, transparent);
+    -webkit-mask-image: radial-gradient(
+        ellipse 70% 60% at 50% 45%,
+        #000,
+        transparent
+    );
+}
+
+/* ─── Entrance ───────────────────────────────────────────────────────────── */
+
+.sa-rise {
+    animation: sa-rise 500ms var(--sa-out) backwards;
+    animation-delay: var(--sa-delay, 0ms);
+}
+
+@keyframes sa-rise {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 10px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+/* ─── Panel ──────────────────────────────────────────────────────────────────
+   Solid card, 1px border, barely-there shadow. No blur, no translucency, no
+   coloured hairline — the border does the work.
+   ─── */
+
+.sa-panel {
+    position: relative;
+    background: hsl(var(--card));
+    border-color: hsl(var(--border));
+    box-shadow:
+        0 1px 2px 0 hsl(var(--shadow-color) / 0.04),
+        0 8px 24px -16px hsl(var(--shadow-color) / 0.12);
+    animation: sa-panel-in 560ms var(--sa-out) backwards;
+}
+
+@keyframes sa-panel-in {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 14px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+/* Success exit — the panel leaves before the cross-origin redirect, so the
+   handoff reads as one motion rather than a freeze then a jump. */
+.sa-panel--leaving {
+    animation: sa-panel-out 380ms var(--sa-out) forwards;
+}
+
+@keyframes sa-panel-out {
+    to {
+        opacity: 0;
+        transform: translate3d(0, -8px, 0);
+    }
+}
+
+/* ─── Controls ───────────────────────────────────────────────────────────── */
+
+.sa-input {
+    transition:
+        border-color 150ms ease,
+        box-shadow 150ms ease;
+}
+
+/* Blue focus ring — the one chromatic thing in the system, and focus is
+   precisely what it is for. */
+.sa-input:focus-visible {
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.22);
+}
+
+/* The filled control. No sheen, no glow: this register does emphasis with
+   contrast, and a sweeping highlight on a black button reads as a gimmick. */
+.sa-cta {
+    transition:
+        transform 130ms var(--sa-spring),
+        opacity 150ms ease,
+        background-color 150ms ease;
+}
+
+.sa-cta:active:not(:disabled) {
+    transform: scale(0.985);
+}
+
+.sa-press {
+    transition:
+        transform 130ms var(--sa-spring),
+        background-color 150ms ease,
+        border-color 150ms ease;
+}
+
+.sa-press:active:not(:disabled) {
+    transform: scale(0.985);
+}
+
+/* ─── Code entry ─────────────────────────────────────────────────────────────
+   The verify screen's one job. The focused box takes the blue ring and lifts a
+   hair; a landed digit settles with overshoot. The previous version pulsed a
+   lime glow forever — an infinite animation on the one control you are already
+   looking at is noise, not guidance.
+   ─── */
+
+.sa-otp {
+    transition:
+        border-color 150ms ease,
+        box-shadow 180ms ease,
+        transform 150ms var(--sa-spring);
+}
+
+.sa-otp:focus {
+    outline: none;
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.22);
+    transform: translateY(-1px);
+}
+
+.sa-otp[data-filled="true"] {
+    border-color: hsl(var(--foreground) / 0.45);
+    animation: sa-land 200ms var(--sa-spring);
+}
+
+@keyframes sa-land {
+    0% {
+        transform: scale(1);
+    }
+    45% {
+        transform: scale(1.07);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.sa-shake {
+    animation: sa-shake 400ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes sa-shake {
+    10%,
+    90% {
+        transform: translate3d(-2px, 0, 0);
+    }
+    20%,
+    80% {
+        transform: translate3d(4px, 0, 0);
+    }
+    30%,
+    50%,
+    70% {
+        transform: translate3d(-5px, 0, 0);
+    }
+    40%,
+    60% {
+        transform: translate3d(5px, 0, 0);
+    }
+}
+
+/* ─── Feedback ───────────────────────────────────────────────────────────── */
+
+.sa-alert {
+    animation: sa-alert-in 260ms var(--sa-out);
+}
+
+@keyframes sa-alert-in {
+    from {
+        opacity: 0;
+        transform: translate3d(0, -5px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+/* Success mark — ring wipes in, then the tick draws. Two stages, because a
+   single fade cannot say "this completed" the way a travelling stroke can. */
+.sa-check-ring {
+    transform-origin: center;
+    animation: sa-ring 380ms var(--sa-spring) backwards;
+}
+
+.sa-check-path {
+    stroke-dasharray: 32;
+    stroke-dashoffset: 32;
+    animation: sa-draw 340ms var(--sa-out) 240ms forwards;
+}
+
+@keyframes sa-ring {
+    from {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes sa-draw {
+    to {
+        stroke-dashoffset: 0;
+    }
+}

@@ -1,11 +1,21 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
+import { trimmedOr } from "@/lib/forms/values";
 import { updateStore } from "@/lib/stores/actions";
 
 interface StoreFields {
@@ -16,36 +26,41 @@ interface StoreFields {
     logo: string | null;
 }
 
-export function StoreSettingsForm({ store }: { store: StoreFields }) {
-    const [name, setName] = useState(store.name);
-    const [slug, setSlug] = useState(store.slug);
-    const [description, setDescription] = useState(store.description ?? "");
-    const [logo, setLogo] = useState(store.logo ?? "");
-    const [errors, setErrors] = useState<{
-        name?: string;
-        slug?: string;
-        logo?: string;
-    }>({});
-    const [saving, setSaving] = useState(false);
+const formSchema = z.object({
+    name: z.string().min(1, { message: "Name is required" }),
+    slug: z.string().min(1, { message: "Slug is required" }),
+    description: z.string().optional(),
+    logo: z.string().optional(),
+});
 
-    async function onSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        setErrors({});
-        setSaving(true);
+type FormValues = z.infer<typeof formSchema>;
+
+export function StoreSettingsForm({ store }: { store: StoreFields }) {
+    const form = useForm<FormValues>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            name: store.name,
+            slug: store.slug,
+            description: store.description ?? "",
+            logo: store.logo ?? "",
+        },
+    });
+    const { isSubmitting } = form.formState;
+
+    async function onSubmit(values: FormValues) {
         const res = await updateStore(store.id, {
-            name,
-            slug,
-            description: description.trim() || null,
-            logo: logo.trim() || null,
+            name: values.name,
+            slug: values.slug,
+            description: trimmedOr(values.description, null),
+            logo: trimmedOr(values.logo, null),
         });
-        setSaving(false);
         if (!res.ok) {
             if (
                 res.field === "name" ||
                 res.field === "slug" ||
                 res.field === "logo"
             ) {
-                setErrors({ [res.field]: res.error });
+                form.setError(res.field, { message: res.error });
             } else {
                 toast.error(res.error);
             }
@@ -55,58 +70,75 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
     }
 
     return (
-        <form onSubmit={onSubmit} className="grid max-w-md gap-4">
-            <div className="grid gap-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    disabled={saving}
+        <Form {...form}>
+            <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="grid max-w-md gap-4"
+            >
+                <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Name</FormLabel>
+                            <FormControl>
+                                <Input disabled={isSubmitting} {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
-                {errors.name && (
-                    <p className="text-destructive text-sm">{errors.name}</p>
-                )}
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor="slug">Slug</Label>
-                <Input
-                    id="slug"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                    required
-                    disabled={saving}
+                <FormField
+                    control={form.control}
+                    name="slug"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Slug</FormLabel>
+                            <FormControl>
+                                <Input disabled={isSubmitting} {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
-                {errors.slug && (
-                    <p className="text-destructive text-sm">{errors.slug}</p>
-                )}
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor="description">Description</Label>
-                <Input
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    disabled={saving}
+                <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                                <Input disabled={isSubmitting} {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor="logo">Logo URL</Label>
-                <Input
-                    id="logo"
-                    value={logo}
-                    onChange={(e) => setLogo(e.target.value)}
-                    placeholder="https://…"
-                    disabled={saving}
+                <FormField
+                    control={form.control}
+                    name="logo"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Logo URL</FormLabel>
+                            <FormControl>
+                                <Input
+                                    placeholder="https://…"
+                                    disabled={isSubmitting}
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
-                {errors.logo && (
-                    <p className="text-destructive text-sm">{errors.logo}</p>
-                )}
-            </div>
-            <Button type="submit" disabled={saving}>
-                {saving ? "Saving…" : "Save changes"}
-            </Button>
-        </form>
+                <Button
+                    type="submit"
+                    className="wk-press"
+                    disabled={isSubmitting}
+                >
+                    {isSubmitting ? "Saving…" : "Save changes"}
+                </Button>
+            </form>
+        </Form>
     );
 }

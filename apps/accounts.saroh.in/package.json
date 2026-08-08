@@ -1,33 +1,36 @@
 {
-    "name": "auth",
-    "version": "0.1.0",
-    "private": true,
-    "scripts": {
-        "dev": "next dev",
-        "build": "next build",
-        "start": "next start",
-        "lint": "next lint"
-    },
-    "dependencies": {
-        "@saroh/auth": "workspace:*",
-        "@saroh/ui": "workspace:*",
-        "better-auth": "^1.6.11",
-        "next": "catalog:next16",
-        "react": "catalog:react19",
-        "react-dom": "catalog:react19",
-        "react-icons": "catalog:"
-    },
-    "devDependencies": {
-        "@saroh/eslint-config": "workspace:*",
-        "@saroh/tailwind-config": "workspace:*",
-        "@types/node": "catalog:",
-        "@types/react": "catalog:react19",
-        "@types/react-dom": "catalog:react19",
-        "autoprefixer": "catalog:",
-        "eslint": "catalog:",
-        "eslint-config-next": "catalog:",
-        "postcss": "catalog:",
-        "tailwindcss": "catalog:",
-        "typescript": "catalog:"
-    }
+  "name": "auth",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@saroh/auth": "workspace:*",
+    "@saroh/ui": "workspace:*",
+    "@t3-oss/env-nextjs": "^0.13.11",
+    "better-auth": "^1.6.11",
+    "next": "catalog:next16",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19",
+    "react-icons": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@saroh/eslint-config": "workspace:*",
+    "@saroh/tailwind-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "autoprefixer": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-next": "catalog:",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:"
+  }
 }

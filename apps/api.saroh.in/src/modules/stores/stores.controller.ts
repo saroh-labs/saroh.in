@@ -10,8 +10,12 @@ import {
 } from "@nestjs/common";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
+import { OrganizationGuard } from "../../common/guards/organization.guard";
+import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
+import { authorize } from "../organizations/organization-policy";
 import { CreateStoreDto, UpdateStoreDto } from "./dto";
 import { StoresService } from "./stores.service";
 
@@ -30,15 +34,32 @@ export class StoresController {
         return this.storesService.listForUser(user.id);
     }
 
+    /**
+     * Create a store under the ACTIVE organization. Org-scoped
+     * (`OrganizationGuard` resolves + proves membership from the request
+     * context, never the client body) and gated by `store:create`
+     * (OWNER/ADMIN). Since B5 a store must belong to an Organization, so the
+     * org id is required and taken from the proven context.
+     */
     @Post()
     @HttpCode(201)
-    create(@CurrentUser() user: AuthUser, @Body() dto: CreateStoreDto) {
-        return this.storesService.createForUser(user.id, dto);
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    create(
+        @CurrentUser() user: AuthUser,
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: CreateStoreDto,
+    ) {
+        authorize(ctx, "store:create");
+        return this.storesService.createForUser(
+            user.id,
+            ctx.organizationId,
+            dto,
+        );
     }
 
     @Get(":id")
     get(@CurrentUser() user: AuthUser, @Param("id") id: string) {
-        return this.storesService.getForOwner(id, user.id);
+        return this.storesService.getForUser(id, user.id);
     }
 
     @Put(":id")

@@ -5,4 +5,6 @@ const withNextra = nextra({});
 
 export default withNextra({
 	reactStrictMode: true,
+	// Consume the canonical @saroh/ui <Wordmark> as source (webpack build).
+	transpilePackages: ["@saroh/ui"],
 });

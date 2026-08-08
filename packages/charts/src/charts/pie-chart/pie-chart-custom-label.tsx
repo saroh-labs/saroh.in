@@ -1,6 +1,7 @@
 "use client";
 
 import { TrendingUp } from "lucide-react";
+import type { SVGProps } from "react";
 import { Pie, PieChart } from "recharts";
 
 import {
@@ -11,8 +12,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import type { ChartConfig } from "@saroh/ui/chart";
 import {
-    ChartConfig,
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
@@ -80,23 +81,24 @@ export function PieChartCustomLabelExample() {
                             dataKey="visitors"
                             labelLine={false}
                             label={({ payload, ...props }) => {
+                                const p = props as SVGProps<SVGTextElement>;
+                                const data = payload as {
+                                    browser: keyof typeof chartConfig;
+                                    visitors: number;
+                                };
                                 return (
                                     <text
-                                        cx={props.cx}
-                                        cy={props.cy}
-                                        x={props.x}
-                                        y={props.y}
-                                        textAnchor={props.textAnchor}
-                                        dominantBaseline={
-                                            props.dominantBaseline
-                                        }
+                                        cx={p.cx}
+                                        cy={p.cy}
+                                        x={p.x}
+                                        y={p.y}
+                                        textAnchor={p.textAnchor}
+                                        dominantBaseline={p.dominantBaseline}
                                         fill="hsla(var(--foreground))"
                                     >
-                                        {`${
-                                            chartConfig[
-                                                payload.browser as keyof typeof chartConfig
-                                            ]?.label
-                                        } (${payload.visitors})`}
+                                        {`${chartConfig[data.browser].label} (${
+                                            data.visitors
+                                        })`}
                                     </text>
                                 );
                             }}
@@ -106,7 +108,7 @@ export function PieChartCustomLabelExample() {
                 </ChartContainer>
             </CardContent>
             <CardFooter className="flex-col gap-2 text-sm">
-                <div className="flex items-center gap-2 font-medium leading-none">
+                <div className="flex items-center gap-2 leading-none font-medium">
                     Trending up by 5.2% this month{" "}
                     <TrendingUp className="h-4 w-4" />
                 </div>

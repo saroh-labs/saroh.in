@@ -1,0 +1,209 @@
+import type { Section } from "@/lib/sites/service";
+
+/**
+ * Lightweight presentational renderers for draft sections — used by the editor
+ * to preview edits BEFORE publishing (it renders the client editor state, so no
+ * network round-trip). This is intentionally simple: the real public render is
+ * S2-006 in saroh.app. richText HTML is NOT sanitized here because this
+ * only ever shows the author their own draft, never third-party content.
+ */
+
+function SectionPreview({ section }: { section: Section }) {
+    switch (section.type) {
+        case "hero": {
+            const { heading, subheading, cta, image } = section.content;
+            return (
+                <section className="rounded-xl border bg-muted/30 p-8 text-center">
+                    {image?.src && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={image.src}
+                            alt={image.alt ?? ""}
+                            className="mx-auto mb-6 max-h-56 rounded-md object-cover"
+                        />
+                    )}
+                    <h2 className="text-3xl font-bold tracking-tight">
+                        {heading}
+                    </h2>
+                    {subheading && (
+                        <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
+                            {subheading}
+                        </p>
+                    )}
+                    {cta?.label && (
+                        <span className="mt-6 inline-block rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground">
+                            {cta.label}
+                        </span>
+                    )}
+                </section>
+            );
+        }
+        case "richText": {
+            const { format, value } = section.content;
+            return (
+                <section className="rounded-xl border p-6">
+                    {format === "html" ? (
+                        <div
+                            className="prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: value }}
+                        />
+                    ) : (
+                        <pre className="whitespace-pre-wrap font-sans text-sm">
+                            {value}
+                        </pre>
+                    )}
+                </section>
+            );
+        }
+        case "cta": {
+            const { label } = section.content;
+            return (
+                <section className="rounded-xl border p-8 text-center">
+                    <span className="inline-block rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground">
+                        {label}
+                    </span>
+                </section>
+            );
+        }
+        case "gallery": {
+            const { images, layout } = section.content;
+            return (
+                <section className="rounded-xl border p-6">
+                    <div
+                        className={
+                            layout === "carousel"
+                                ? "flex gap-3 overflow-x-auto"
+                                : "grid grid-cols-2 gap-3 sm:grid-cols-3"
+                        }
+                    >
+                        {images.map((img, i) => (
+                            <div
+                                key={i}
+                                className={
+                                    layout === "carousel"
+                                        ? "h-32 w-48 shrink-0"
+                                        : "aspect-square"
+                                }
+                            >
+                                {img.src ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                        src={img.src}
+                                        alt={img.alt ?? ""}
+                                        className="h-full w-full rounded-md object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
+                                        image
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            );
+        }
+        case "enquiry": {
+            const { title, description, submitLabel, fields } = section.content;
+            return (
+                <section className="rounded-xl border p-6">
+                    {title && (
+                        <h3 className="text-lg font-semibold">{title}</h3>
+                    )}
+                    {description && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {description}
+                        </p>
+                    )}
+                    {/* A non-submitting mockup: shows the author their fields. */}
+                    <div className="mt-4 grid gap-3">
+                        {fields.map((field, i) => (
+                            <div key={i} className="grid gap-1.5">
+                                <span className="text-sm font-medium">
+                                    {[field.label, field.name].find((s) => s) ??
+                                        "Field"}
+                                    {field.required && (
+                                        <span className="text-destructive">
+                                            {" *"}
+                                        </span>
+                                    )}
+                                </span>
+                                {field.type === "textarea" ? (
+                                    <div className="h-16 rounded-md border bg-muted/30" />
+                                ) : (
+                                    <div className="h-9 rounded-md border bg-muted/30" />
+                                )}
+                            </div>
+                        ))}
+                        <span className="mt-1 inline-block w-fit rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground">
+                            {[submitLabel].find((s) => s) ?? "Send"}
+                        </span>
+                    </div>
+                </section>
+            );
+        }
+        case "booking": {
+            const { title, description, serviceId, submitLabel } =
+                section.content;
+            return (
+                <section className="rounded-xl border p-6">
+                    {title && (
+                        <h3 className="text-lg font-semibold">{title}</h3>
+                    )}
+                    {description && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {description}
+                        </p>
+                    )}
+                    {serviceId ? (
+                        <div className="mt-4 grid gap-3">
+                            {/* A non-interactive mockup of the slot picker. */}
+                            <div className="flex flex-wrap gap-2">
+                                {["9:00", "9:30", "10:00", "10:30"].map(
+                                    (slot) => (
+                                        <span
+                                            key={slot}
+                                            className="rounded-md border bg-muted/30 px-3 py-1.5 text-sm text-muted-foreground"
+                                        >
+                                            {slot}
+                                        </span>
+                                    ),
+                                )}
+                            </div>
+                            <div className="h-9 rounded-md border bg-muted/30" />
+                            <div className="h-9 rounded-md border bg-muted/30" />
+                            <span className="mt-1 inline-block w-fit rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground">
+                                {[submitLabel].find((s) => s) ?? "Book"}
+                            </span>
+                        </div>
+                    ) : (
+                        <p className="mt-4 text-sm text-muted-foreground">
+                            Pick a service for this booking section to preview
+                            its available times.
+                        </p>
+                    )}
+                </section>
+            );
+        }
+        default:
+            return null;
+    }
+}
+
+/** Render an ordered list of draft sections as a page preview. */
+export function DraftPreview({ sections }: { sections: Section[] }) {
+    if (sections.length === 0) {
+        return (
+            <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                No sections yet. Add one to preview it here.
+            </p>
+        );
+    }
+    return (
+        <div className="space-y-4">
+            {sections.map((section, i) => (
+                <SectionPreview key={i} section={section} />
+            ))}
+        </div>
+    );
+}

@@ -1,0 +1,90 @@
+---
+title: "Contributing"
+---
+
+## Contributing
+
+## Before your first pull request
+
+Read [`CLA.md`](https://github.com/saroh-io/saroh.io/blob/main/CLA.md) and add
+its one-line agreement to your pull request description. Once, not per PR.
+
+**You keep your copyright.** What it grants is permission to include your work
+in the commercial licences sold to anyone running Saroh as a hosted service —
+and to relicense it if Saroh's licence ever changes. A commercial licence has to
+cover the whole codebase, so a single file contributed without that permission
+can block one until its author is found and agrees, or the code is rewritten.
+
+The clause most worth checking before you agree: **if you are employed, many
+contracts assign everything you write to your employer by default, including
+work done on your own time.**
+
+## The checks
+
+Run these before opening a pull request. CI runs the same ones.
+
+```bash
+pnpm lint          # ESLint across every workspace
+pnpm typecheck     # tsc --noEmit
+pnpm build         # turbo build
+pnpm check:routes  # every emitted href resolves to a real page
+pnpm check:cycles  # no circular imports
+```
+
+API tests:
+
+```bash
+pnpm --filter @saroh/api test
+```
+
+### `testMatch` is an allowlist
+
+`apps/api.saroh.in/jest.config.js` lists test paths explicitly. **A new spec file
+runs zero times until its directory is added**, and Jest reports success — you
+get a green run and no coverage, which is worse than a red one.
+
+If you add tests under a new module, add the path.
+
+## Conventions worth knowing
+
+### `noUncheckedIndexedAccess` is off
+
+`array[0]` types as present even when it is not. Use `.at()` when the array can
+be empty, and give `Record` value types an explicit `| undefined` when keys are
+genuinely optional — otherwise TypeScript will tell you a guard is unnecessary
+and it will be wrong.
+
+### `||` is not always a lint error
+
+`prefer-nullish-coalescing` will suggest `??` for `value?.trim() || null`. Take
+that suggestion carefully: `""` is not nullish, so `??` returns the empty string
+where `||` returned `null`. Where "blank means not provided" is the intent, use
+an explicit length test. `lib/forms/values.ts` has a helper.
+
+Running `eslint --fix` over that rule without reading the diff will silently
+change what your data means.
+
+### Colour comes from tokens, not from variants
+
+`variant="default"` on a Badge resolves to `--primary`, which in two of the three
+skins is the luminous action colour. A semantic label — "Overdue", "Unpaid",
+"Draft" — must name its own token, or it ends up drawn in the same colour as the
+button you press when you are finished.
+
+Tinted states use the `*-subtle` / `*-subtle-foreground` pairs. Do not reach for
+`bg-warning/15 text-warning`: `--warning` is a fill, and as text on a pale tint
+of itself it measures about 2.3:1.
+
+### Contrast is measured, not eyeballed
+
+Every foreground/background pair meets WCAG AA. If you add one, measure it —
+compositing every ancestor's alpha down to the page background, because a
+`/10` tint over a card over a page is not the ratio the swatch suggests.
+
+## Commit and PR
+
+Conventional commits (`feat(scope):`, `fix(scope):`). Explain **why** in the
+body — the diff already says what.
+
+Husky runs `prettier` and `eslint --fix` on staged files, so formatting is not
+something to argue about in review.

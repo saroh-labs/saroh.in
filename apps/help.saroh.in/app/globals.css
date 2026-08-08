@@ -1,0 +1,283 @@
+/* =============================================================================
+   Saroh restyle for Nextra 4
+   =============================================================================
+
+   Imported AFTER `nextra-theme-docs/style.css` in app/layout.jsx. Everything in
+   this file is deliberately UNLAYERED: Nextra ships its Tailwind v4 build
+   wrapped in `@layer theme, base, components, utilities`, and an unlayered
+   declaration beats every layered one no matter its specificity or source
+   order. That is what lets ~120 lines of variables restyle the entire theme
+   without a single `!important` and without forking a component.
+
+   The theme is NOT rebuilt. Nextra's Read-mode chrome — sidebar, TOC,
+   breadcrumb, search, pagination, code toolbar — is the reason we use it and
+   stays exactly as shipped. What changes is the palette it draws from, the two
+   typefaces, and the handful of places where Nextra's own scale cannot express
+   a rule the rest of the product follows.
+
+   docs.saroh.in carries an identical copy of this file. Keep them in step: the
+   two sites are one visual system, and a drift between them is precisely the
+   thing this file exists to remove.
+   ========================================================================== */
+
+/* ---- 1 · Saroh tokens ------------------------------------------------------
+   Restated here rather than imported. `@saroh/ui/globals.css` is a Tailwind
+   entrypoint (`@tailwind base` …) and these two Nextra apps have no Tailwind
+   build to expand it, so importing it would emit three unprocessed at-rules and
+   no tokens. This is the subset this surface actually spends; the source of
+   truth remains packages/ui/src/globals.css.
+
+   `--foreground`, `--muted-foreground` and `--font-display` are load-bearing
+   beyond this stylesheet: <Wordmark> reads all three inline, with light-mode
+   literals as its fallbacks. Until now neither app defined them, so the
+   wordmark rendered near-black ink on the dark navbar — the logo was the one
+   thing on the page that did not invert. */
+:root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 44%;
+    --accent: 0 0% 96%;
+    --border: 0 0% 92%;
+    --input: 0 0% 56%;
+    --ring: 212 100% 48%;
+    --brand: 212 100% 42%;
+    --radius: 0.5rem;
+}
+
+.dark {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 93%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 63%;
+    --accent: 0 0% 14%;
+    --border: 0 0% 18%;
+    --input: 0 0% 42%;
+    --ring: 212 100% 60%;
+    --brand: 212 100% 62%;
+}
+
+/* ---- 2 · Nextra's greys ----------------------------------------------------
+   Nextra 4 has no semantic chrome variables. Its components are Tailwind
+   utilities (`x:text-gray-600 x:dark:text-gray-400`), so the only surface wide
+   enough to repaint the whole theme at once is Tailwind's own `--x-color-*`
+   theme scale. Repointing the three ramps Nextra uses — gray, slate, neutral —
+   is what turns the chrome monochrome.
+
+   These ramps are MODE-INDEPENDENT on purpose, and that is the one subtlety
+   worth stating. Nextra pairs a light stop with a dark stop on the same element
+   (gray-600 / gray-400), so a single ramp already serves both registers: the
+   dark half of the theme reaches for the pale end and the light half for the
+   deep end. Writing `hsl(var(--muted))` here instead of a literal would look
+   tidier and would be wrong — `--muted` flips to 12% under `.dark`, which would
+   turn `x:dark:text-gray-100` from near-white text into unreadable near-black.
+   Each literal is annotated with the Saroh token it equals in the register that
+   uses it. */
+:root {
+    /* Prose and headings. Nextra sets the article to slate-700/slate-200 and
+       every heading to slate-900/slate-100. */
+    --x-color-slate-50: hsl(0 0% 98%);
+    --x-color-slate-100: hsl(0 0% 96%); /* headings, dark */
+    --x-color-slate-200: hsl(0 0% 90%); /* body copy, dark */
+    --x-color-slate-700: hsl(0 0% 25%); /* body copy, light */
+    --x-color-slate-900: hsl(0 0% 9%); /* headings, light — --foreground */
+
+    /* Chrome: sidebar, TOC, navbar, breadcrumb, footer, code toolbar. */
+    --x-color-gray-50: hsl(0 0% 98%);
+    --x-color-gray-100: hsl(0 0% 96%); /* --muted (light) / bright text (dark) */
+    --x-color-gray-200: hsl(0 0% 92%); /* --border (light) */
+    --x-color-gray-300: hsl(0 0% 92%); /* --border again — see note below */
+    --x-color-gray-400: hsl(0 0% 64%); /* --muted-foreground (dark) */
+    --x-color-gray-600: hsl(0 0% 44%); /* --muted-foreground (light) */
+    --x-color-gray-700: hsl(0 0% 25%);
+    --x-color-gray-800: hsl(0 0% 15%);
+    --x-color-gray-900: hsl(0 0% 9%); /* --foreground */
+
+    /* gray-200 and gray-300 land on the same value deliberately. Nextra draws
+       structural rules (navbar, hr, h2 underline) from one and content rules
+       (table cells, the code-block frame) from the other; Saroh has a single
+       decorative line, `--border`, tuned so one weight works everywhere. The
+       cost is that `x:hover:border-gray-300` on <Cards> becomes a no-op, which
+       is cheap — those cards also change fill on hover, and this content uses
+       none of them. */
+
+    --x-color-neutral-50: hsl(0 0% 98%);
+    --x-color-neutral-200: hsl(0 0% 92%);
+    --x-color-neutral-300: hsl(0 0% 83%);
+    --x-color-neutral-400: hsl(0 0% 64%);
+    --x-color-neutral-500: hsl(0 0% 45%);
+    --x-color-neutral-600: hsl(0 0% 40%);
+    --x-color-neutral-700: hsl(0 0% 18%); /* --border (dark) */
+    --x-color-neutral-800: hsl(0 0% 18%); /* --border (dark) — .nextra-border */
+    --x-color-neutral-900: hsl(0 0% 4%); /* raised surface (dark) */
+}
+
+/* `--x-color-black` and `--x-color-white` are left at #000/#fff, which is not
+   an omission: they are already exactly Saroh's two grounds, and Nextra spends
+   them on the code-block fill (`x:bg-white x:dark:bg-black`) and on the
+   low-alpha inline-code and hover washes, both of which need a true endpoint
+   rather than a near-black. */
+
+/* ---- 3 · The one colour ----------------------------------------------------
+   Nextra derives a nine-step `primary` ramp from three variables that <Head>
+   writes; app/layout.jsx now feeds it Saroh's `--brand` (212 100% 42% light,
+   62% dark), so `x:text-primary-600` — every MDX link, the active TOC entry,
+   the focused search result — is the product's blue with nothing further to do.
+
+   Four stops still need moving, because Nextra spends the ramp on two jobs and
+   only one of them is ours. Blue for a link is the rule; blue for a SURFACE is
+   not — `--accent` is the neutral selected/hover surface across the product,
+   and a pale-blue pill in the sidebar is the single loudest way these two sites
+   read as a different company. */
+:root {
+    /* The focus ring. Nextra's derived primary-200 is the brand at 83%
+       lightness, which measures 1.6:1 on white — a ring nobody can see and
+       nowhere near the 3:1 that WCAG 1.4.11 wants from a focus indicator.
+       `--ring` is that same blue at focus strength (4.44:1). primary-300 is
+       the ring OFFSET, so it belongs on the page ground rather than on a
+       second, paler blue. Both stops are used for nothing else in the theme. */
+    --x-color-primary-200: hsl(var(--ring));
+    --x-color-primary-300: hsl(var(--background));
+
+    /* The sidebar's active item, light. Its label stays `text-primary-800` —
+       it is the current page's link and blue is right — but the pill it sits
+       in becomes the neutral `--accent`. */
+    --x-color-primary-100: hsl(var(--accent));
+}
+
+.dark {
+    /* Same two moves in the dark register, where Nextra swaps which stops the
+       ring and the active pill read from. primary-100 has to go back to a
+       near-white here: dark mode also spends it at 5% alpha for the sidebar
+       and copy-button hover washes, and `--accent` at 5% over black is nothing
+       at all. */
+    --x-color-primary-800: hsl(var(--ring));
+    --x-color-primary-700: hsl(var(--background));
+    --x-color-primary-100: hsl(var(--foreground));
+    --x-color-primary-400: hsl(var(--foreground));
+}
+
+/* ---- 4 · Typography --------------------------------------------------------
+   Both faces are self-hosted variable woff2 loaded by next/font/local in
+   app/layout.jsx, so the build never reaches a font CDN. Nextra funnels its
+   base font through `--x-default-font-family`, which reads `--x-font-sans`, so
+   repointing that one variable moves every word on the site onto Geist. */
+:root {
+    --x-font-sans:
+        var(--font-sans), ui-sans-serif, system-ui, sans-serif,
+        "Apple Color Emoji", "Segoe UI Emoji";
+    --x-default-font-feature-settings: "cv11" 1, "ss01" 1;
+}
+
+/* Bricolage carries headings at 22px and above and nothing else. Nextra sizes
+   h1–h3 at 36/30/24px and h4–h6 at 20px and below, which is where the display
+   face stops paying for itself and Geist takes over — so the split falls
+   exactly on Nextra's own scale. Tracking tightens with size, and h1 drops from
+   Nextra's 700 to 600 because the system has one display weight. */
+article :is(h1, h2, h3) {
+    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+    font-variation-settings: "opsz" 32;
+}
+
+article h1 {
+    font-weight: 600;
+    letter-spacing: -0.035em;
+}
+
+article h2 {
+    letter-spacing: -0.03em;
+}
+
+/* Figures in a table should align in their column and never reflow as values
+   change — the same rule the workspace runs. */
+article :is(th, td) {
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- 5 · Shape -------------------------------------------------------------
+   Nextra's radius scale already happens to be 4/6/8/12px, the same four values
+   Saroh derives from its 0.5rem anchor. Deriving them anyway means the two
+   stay married if the anchor ever moves. */
+:root {
+    --x-radius-sm: calc(var(--radius) - 4px); /* 4px */
+    --x-radius-md: calc(var(--radius) - 2px); /* 6px — controls */
+    --x-radius-lg: var(--radius); /* 8px */
+    --x-radius-xl: calc(var(--radius) + 4px); /* 12px — containers */
+}
+
+/* 6px if you press it, 12px if it holds things. Nextra gives sidebar links 4px
+   (a hardcoded `x:rounded`, not a scale step) and code blocks 6px; a nav item
+   is a control and a code block is a container, so both move one step. */
+.nextra-sidebar a {
+    border-radius: var(--x-radius-md);
+}
+
+.nextra-code > pre {
+    border-radius: var(--x-radius-xl);
+}
+
+/* A fenced block with `filename=` renders a header bar above the <pre>; the
+   radius has to travel to the outer corners of the pair rather than sit on
+   both pieces. */
+.nextra-code > :first-child:not(pre) {
+    border-start-start-radius: var(--x-radius-xl);
+    border-start-end-radius: var(--x-radius-xl);
+}
+
+.nextra-code > pre:not(:first-child) {
+    border-start-start-radius: 0;
+    border-start-end-radius: 0;
+}
+
+/* ---- 6 · Where variables cannot reach --------------------------------------
+   The four rules below are the whole of this restyle that is not a variable.
+   Each one is here because Nextra spends a single value on two jobs that Saroh
+   separates, and no remap can satisfy both at once. */
+
+/* Table and blockquote rules. In dark mode Nextra borrows these from the TEXT
+   end of the scale (gray-600 at 44%, gray-700 at 25%), so the ramp cannot make
+   them a hairline without making body copy unreadable. A table's row rule is
+   the thing that tells one row from the next, and it is `--border` everywhere
+   else in the product. */
+article :is(th, td, blockquote) {
+    border-color: hsl(var(--border));
+}
+
+/* The search field. Nextra fills it with a 5% black wash, and its placeholder
+   is the same stop as every other piece of secondary chrome — which, once that
+   stop is Saroh's `--muted-foreground`, lands at 4.42:1 against the wash while
+   measuring a comfortable 4.94:1 against the page. That gap is exactly the
+   failure this codebase has shipped once before: text checked against the page
+   rather than against the surface it actually sits on. A Saroh field is the
+   page ground inside a 1px `--input` edge (3.24:1, which is what WCAG 1.4.11
+   wants from a form control), so the placeholder is measured where it sits and
+   the field matches the workspace at the same time. */
+.nextra-search input {
+    background-color: hsl(var(--background));
+    border: 1px solid hsl(var(--input));
+    border-radius: var(--x-radius-md);
+}
+
+/* Footer links. Nextra's reset flattens <a> to `color: inherit` and the theme
+   styles links only inside MDX, so the links this app's footer renders were
+   muted grey text sitting in muted grey text — reachable by keyboard and by
+   nothing else. Underlined as well as blue, because colour alone is not a link
+   affordance (WCAG 1.4.1). */
+footer a {
+    color: hsl(var(--brand));
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+}
+
+/* Nextra lays the footer out with `display: flex`, which turns each run of text
+   and each link into its own flex item and drops the whitespace between them —
+   so the separators render as "Saroh ·saroh.in·Help centre". The spaces are in
+   the JSX and are not coming back; a column gap is what puts them on screen.
+   The bug predates this restyle and was simply invisible while the links were
+   the same grey as the text around them. Wrapping is added for the same reason:
+   a nowrap row of links overflows a phone. */
+footer {
+    flex-wrap: wrap;
+    column-gap: 0.3em;
+}

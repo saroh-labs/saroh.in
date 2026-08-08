@@ -1,45 +1,76 @@
 ---
-title: "Introduction "
+title: "Saroh developer documentation"
 ---
 
-## Introduction
+## Saroh, for developers
 
-[Saroh.in](https://saroh.in) is an open-source project built with NextJS, Tailwind CSS, PlanetScale, Next Auth, and Vercel. It is a monorepo maintained with turborepo.
+These are the docs for **running and working on Saroh yourself**. If you use
+Saroh on our hosted platform and want to know how to take a booking or chase a
+lead, you want [help.saroh.in](https://help.saroh.in) instead.
 
-Saroh.io is a multi-tenant application builder repository, which you can use to create your own multi-tenant applications.
+Saroh is a business workspace: one place a small business sells, takes bookings,
+follows up on enquiries, and keeps a website in step. It is a
+[pnpm](https://pnpm.io) + [Turborepo](https://turbo.build) monorepo of Next.js
+frontends around a single NestJS API.
 
-The name "Saroh" is taken from the word "`Sāruṁ` (Gujarati: સારું)" which means "good". So it means I'm building something good and when uses it, they will also say it is good.
+## The one rule worth knowing first
 
-This is currently in its initial state and not ready for production use. It might not look good yet but soon, in the coming days, it will become better.
+**`api.saroh.in` is the only service that talks to PostgreSQL.** Every frontend
+reaches data through it over HTTP, and none of them import `@saroh/database`.
 
-The Purpose of this project is to help people to build their own website with a few clicks and for aspiring developers it will be a good learning resource. I will try to keep the code as simple as possible so that it will be easy to understand so that anyone can easily understand what is happening here.
+That is not a style preference. It is what makes tenant isolation checkable in
+one place: every org-scoped read resolves an `OrganizationContext` from a proven
+session, and the role policy is enforced there rather than in nine apps that
+would each drift. If you are adding a feature and reaching for Prisma inside a
+Next.js app, the feature belongs behind an endpoint.
 
-Later on, I will be adding more detailed docs here.
+## What is in the repository
 
-## App features
+| Path                     | What it is                                         |
+| ------------------------ | -------------------------------------------------- |
+| `apps/api.saroh.in`      | NestJS API. Hosts Better Auth. The only DB client. |
+| `apps/app.saroh.in`      | The merchant workspace.                            |
+| `apps/accounts.saroh.in` | Sign-in / sign-up UI.                              |
+| `apps/admin.saroh.in`    | Internal control plane (staff only).               |
+| `apps/saroh.in`          | Marketing site.                                    |
+| `apps/saroh.app`         | Renders merchants' published sites.                |
+| `apps/docs.saroh.in`     | This site.                                         |
+| `apps/help.saroh.in`     | Merchant help centre.                              |
+| `packages/database`      | Prisma schema, client, migrations, seed.           |
+| `packages/ui`            | Shared components and the design tokens.           |
+| `packages/auth`          | Better Auth client and shared middleware.          |
 
--   [x] Authentication
--   [x] Applicaiton Dashboard.
--   [x] Free subdomain (\*.saroh.site), so that users can preview their published sites.
--   [ ] Site Templates, so that users can choose the style of site they want to build.
--   [ ] Custom domain, so they can add their own domain.
--   [ ] To be able to create Post, Blogs, Products and web stories.
--   [ ] Adding Web analytics.
--   [ ] Send Emails related to user events in the application.
+## Where to go next
 
-The tech stack used will be:
+- [Getting started](/getting-started) — run the whole thing locally.
+- [Architecture](/architecture) — how the pieces fit, and why.
+- [Database](/database) — migrations, the target guard, seeding.
+- [Authentication](/authentication) — the single-identity model.
+- [Contributing](/contributing) — the checks that must pass.
 
--   [NextJS](https://nextjs.org/), Frontend framework.
--   [Tailwind CSS](https://tailwindcss.com/), for styling the application.
--   [PlanetScale](https://planetscale.com/), for database.
--   [Next Auth](https://next-auth.js.org/), for authentication.
--   [Vercel](https://vercel.com/), for hosting the application.
--   [Resend](https://resend.com/), for email notifications.
--   [Prisma](https://www.prisma.io/), for database ORM. (Maintaing the database schema)
--   [Turborepo](https://turbo.build/), for managing the monorepo.
--   [Nextra](https://nextra.site/), for the docs site deployed on [docs.saroh.in](https://docs.saroh.in).
--   [Github](https://github.com), for hosting the source code of the application.
+## Status, honestly
 
-## Contributing
+This is under active development and the schema still moves. Read
+[Contributing](/contributing) before relying on any of it in production.
 
-Right now, I will not accept any contributions until the above features are completed. After that if you can help me improve the project, you are welcome to do so.
+## Licence
+
+Saroh is licensed under the
+[**Elastic License 2.0**](https://github.com/saroh-io/saroh.io/blob/main/LICENSE.md).
+
+**Free to use, modify and self-host — including to run your own business.** No
+fee, no registration, nothing to tell us.
+
+The one thing you may not do is **offer Saroh to third parties as a hosted or
+managed service**. That single restriction exists so the hosted Saroh service is
+not simply resold; everything else is open to you. If a hosted product is what
+you want to build, ask — it is a conversation, not a refusal.
+
+Keep the licence and copyright notices in the source, and mark modified copies
+as modified. That is the whole of your obligation. Nothing is required on the
+websites Saroh generates for your customers.
+
+This is **source-available, not open source**: the
+[Open Source Definition](https://opensource.org/osd) does not permit
+restrictions on field of use, and the hosted-service limitation is one. Better
+said here than discovered later.

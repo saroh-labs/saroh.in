@@ -1,0 +1,51 @@
+---
+title: "Authentication"
+---
+
+## Authentication
+
+One identity system for the whole suite, powered by
+[Better Auth](https://www.better-auth.com/).
+
+- **`api.saroh.in` hosts the auth server**, at `/api/auth/*`.
+- **`accounts.saroh.in` is the sign-in UI.** It is the only place a password is
+  entered, and the only identity provider the other apps trust.
+- Apps consume the shared `@saroh/auth` package rather than configuring auth
+  themselves, so there is one session contract instead of nine.
+
+## Sessions across subdomains
+
+Every app validates the same session, so `BETTER_AUTH_SECRET` must be identical
+everywhere one is checked. Cookies are host-scoped, which is why the whole thing
+works on bare `localhost` across different ports in development.
+
+## Two things that will trip you up locally
+
+### The secret is read at import time
+
+`createAuth()` runs when the auth module is imported, before Nest's
+`ConfigModule` has loaded `.env`. Running the built output directly therefore
+throws before it can explain itself. Source the environment first — see
+[Getting started](/getting-started).
+
+### Trusted origins exclude localhost
+
+Better Auth rejects mutating requests whose `Origin` is not trusted, and that
+includes same-origin Next.js **server actions**. The default list is
+`*.saroh.in`, so on localhost every write returns 403 while every read works —
+which looks like a permissions bug and is not.
+
+Set `BETTER_AUTH_TRUSTED_ORIGINS` in the API's `.env` and in each frontend you
+run. Production does not need it.
+
+## Verification and invitation emails
+
+With SMTP unset, links are **logged to the API console** rather than sent. That
+is deliberate for local development: sign up, read the link out of the log, and
+carry on without wiring a mail provider.
+
+## Roles
+
+Authentication answers *who*; the organization policy answers *what they may
+do*. See [Architecture](/architecture#tenancy) for the role table, and note that
+CRM data is deliberately outside the read-only floor.

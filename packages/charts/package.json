@@ -1,35 +1,36 @@
 {
-    "name": "@saroh/charts",
-    "version": "0.0.0",
-    "sideEffects": false,
-    "main": "./dist/index.js",
-    "module": "./dist/index.mjs",
-    "types": "./dist/index.d.ts",
-    "files": [
-        "dist/**"
-    ],
-    "license": "MIT",
-    "scripts": {
-        "build": "tsup",
-        "lint": "eslint src/",
-        "dev": "tsup --watch",
-        "check-types": "tsc --noEmit"
-    },
-    "dependencies": {
-        "@saroh/ui": "workspace:*",
-        "lucide-react": "catalog:",
-        "recharts": "catalog:",
-        "tsup": "^8.5.1"
-    },
-    "devDependencies": {
-        "@saroh/eslint-config": "workspace:*",
-        "@saroh/tailwind-config": "workspace:*",
-        "@saroh/tsconfig": "workspace:*",
-        "@turbo/gen": "^2.9.16",
-        "@types/node": "catalog:",
-        "@types/react": "catalog:react19",
-        "@types/react-dom": "catalog:react19",
-        "react": "catalog:react19",
-        "typescript": "catalog:"
-    }
+  "name": "@saroh/charts",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint src/",
+    "dev": "tsup --watch",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@saroh/ui": "workspace:*",
+    "lucide-react": "catalog:",
+    "recharts": "catalog:",
+    "tsup": "^8.5.1"
+  },
+  "devDependencies": {
+    "@saroh/eslint-config": "workspace:*",
+    "@saroh/tailwind-config": "workspace:*",
+    "@saroh/tsconfig": "workspace:*",
+    "@turbo/gen": "^2.9.16",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "react": "catalog:react19",
+    "typescript": "catalog:"
+  }
 }
