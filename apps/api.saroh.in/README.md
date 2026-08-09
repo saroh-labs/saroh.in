@@ -1,249 +1,234 @@
-# API - Saroh.io NestJS Backend
+# api.saroh.in
 
-The official NestJS API backend for Saroh.io, providing authentication, store management, and customer-facing endpoints.
+The single backend. A NestJS modular monolith that **hosts Better Auth** and
+owns **all** database access — every frontend in this repo is a thin,
+session-authenticated HTTP client of this service and none of them import
+`@saroh/database`.
 
-## Overview
+Dev port **3333** · package name `@saroh/api` (`pnpm --filter @saroh/api …`)
 
-- **Framework**: NestJS 10+
-- **Language**: TypeScript
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: JWT via Better Auth
-- **Validation**: class-validator + Zod
-- **Documentation**: Swagger/OpenAPI (coming soon)
+- **Framework:** NestJS 11, TypeScript, CommonJS
+- **Database:** PostgreSQL via `@saroh/database` (Prisma 7 + `@prisma/adapter-pg`)
+- **Auth:** Better Auth 1.6.x, mounted at `/api/auth/*` by `@thallesp/nestjs-better-auth`
+- **Validation:** `class-validator` DTOs (global `ValidationPipe`) and zod at the env boundary
+- **Storage:** `@saroh/object-storage` (S3-compatible), with an in-memory adapter when unconfigured
+- **Email:** Nodemailer + `@saroh/emails` React Email templates
 
-## Internal control plane
+There is no OpenAPI/Swagger surface yet.
 
-All `GET`, `PUT`, and `DELETE` routes below `/admin` are protected in three
-layers:
+## Bootstrap order matters
 
-1. `BetterAuthGuard` requires an authenticated Saroh account.
-2. `PlatformAdminGuard` resolves active, unexpired fixed staff roles on every
-   request. Organization membership never grants platform access.
-3. `PlatformPermissionGuard` requires the permission declared by the endpoint.
+[`src/main.ts`](src/main.ts) opens with a bare `import "./env"` above the sorted
+import block, and it must stay that way. `@saroh/database` builds its Postgres
+adapter at module scope from `process.env.DATABASE_URL`; if `./app.module` were
+evaluated first, dotenv would not have run yet and node-postgres would silently
+fall back to `localhost:5432`. A bare side-effect import is not pulled into the
+alphabetised block, so the formatter cannot reorder it.
 
-The fixed roles are `PLATFORM_OWNER`, `SUPPORT`, `OPERATIONS`, `BILLING`,
-`RELEASE_MANAGER`, and `AUDITOR`. Their closed permission vocabulary lives in
-`src/modules/admin/admin-permissions.ts`.
+The same file installs process guards: an `unhandledRejection` is logged and
+**not** fatal (these are overwhelmingly transient I/O — a dropped Neon socket, a
+timed-out rollback — and the process can still serve traffic), while an
+`uncaughtException` logs and exits non-zero for a supervisor to restart.
 
-Feature-flag commands require a reason and idempotency key. The flag change,
-domain `FeatureFlagAudit`, and global `AdminAuditEvent` commit in one database
-transaction. If the platform audit write fails, the operational change rolls
-back. Audit metadata rejects secret-bearing keys recursively.
+## Request pipeline
 
-### Break-glass bootstrap
+Applied globally, in order:
 
-`ADMIN_ALLOWLIST` is the recovery path for the first administrator or for a
-lockout. A matching authenticated account receives Platform Owner permissions,
-the use is logged at warning level, and `/admin/me` reports
-`viaBootstrap: true`.
+1. `correlationIdMiddleware` — first, so every request (including the mounted
+   Better Auth handler) is traceable through its logs and error envelope
+2. `helmet()`
+3. Credentialed CORS — the `*.saroh.in` trusted origins plus `localhost:3000–3012`
+   in dev, or `CORS_ORIGIN` when set. Never `*` with credentials
+4. `ValidationPipe` — `whitelist`, `forbidNonWhitelisted`, `transform`
+5. `OriginGuard` — app-layer CSRF check on unsafe methods for authenticated
+   routes; public, webhook and Better Auth routes are exempt inside the guard
+6. `OrgRlsInterceptor` → `LoggingInterceptor` — the RLS interceptor is outermost
+   so handler DB work runs inside the per-request org context (a no-op unless
+   RLS enforcement is on); then one structured log line per request
+7. `AllExceptionsFilter` — one consistent error envelope
 
-For local development, use a non-production test account:
+Body parsing is disabled at `NestFactory.create` because Better Auth needs the
+raw body, then re-added in `AppModule` for the other routes with `rawBody: true`
+— the public webhook endpoint HMAC-verifies provider signatures against those
+exact bytes, which re-serialised JSON would not match.
+
+## Authorization
+
+Guards are applied per route, not globally:
+
+| Guard                     | Enforces                                                            |
+| ------------------------- | ------------------------------------------------------------------- |
+| `BetterAuthGuard`         | An authenticated Saroh session                                      |
+| `OrganizationGuard`       | Membership in the org the request is scoped to                      |
+| `PlatformAdminGuard`      | Active, unexpired **platform staff** role (never org membership)    |
+| `PlatformPermissionGuard` | The specific permission an `/admin` endpoint declares; fails closed |
+
+Handler context comes from `@CurrentUser`, `@OrgContext`, `@PlatformAdminContext`,
+`@RequireAdminPermission` and `@IdentityOnly` in
+[`src/common/decorators/`](src/common/decorators/).
+
+### Internal control plane (`/admin/*`)
+
+Every `/admin` route stacks all three of `BetterAuthGuard` →
+`PlatformAdminGuard` → `PlatformPermissionGuard`. Organization membership never
+grants platform access. The fixed staff roles are `PLATFORM_OWNER`, `SUPPORT`,
+`OPERATIONS`, `BILLING`, `RELEASE_MANAGER` and `AUDITOR`; their closed
+permission vocabulary lives in
+[`src/modules/admin/admin-permissions.ts`](src/modules/admin/admin-permissions.ts).
+
+Feature-flag commands require a reason and an idempotency key. The flag change,
+the domain `FeatureFlagAudit` row and the global `AdminAuditEvent` row commit in
+one transaction — if the audit write fails, the operational change rolls back.
+Audit metadata rejects secret-bearing keys recursively.
+
+**Break-glass bootstrap.** `ADMIN_ALLOWLIST` is the recovery path for the first
+administrator, or for a total lockout. A matching authenticated account receives
+Platform Owner permissions, the use is logged at warning level, and `/admin/me`
+reports `viaBootstrap: true` (which is what the amber banner in
+`admin.saroh.in` renders from). Unset or empty means nobody. Normal staff access
+is an active `PlatformAdmin` row with at least one active
+`PlatformAdminRoleAssignment`; assignment and revocation are append-only.
+
+For local development use a non-production address:
 
 ```dotenv
 ADMIN_ALLOWLIST=operator@example.test
 ```
 
-Unset or empty means no bootstrap access. Normal staff access uses an active
-`PlatformAdmin` row with at least one active `PlatformAdminRoleAssignment`.
-Role assignment and grant revocation are append-only lifecycle records.
+## Modules
 
-### Database migration
+38 feature modules under [`src/modules/`](src/modules/), wired in
+[`app.module.ts`](src/app.module.ts):
 
-Deploy migrations before enabling the new control-plane API:
+- **Platform:** `health`, `admin`, `feature-flags`, `audit`, `jobs`,
+  `provider-health`, `self-test`, `webhooks`
+- **Tenancy:** `organizations`, `projects`, `capabilities` (modular
+  capabilities, ADR-003), `stores`, `members`
+- **Commerce:** `products`, `categories`, `orders`, `customers`, `payments`,
+  `billing`
+- **CRM:** `contacts`, `leads`, `pipelines`, `enquiry`, `forms`, `communications`,
+  `automations`, `notifications`
+- **Bookings:** `bookings` (plus a public controller for unauthenticated booking)
+- **Web:** `sites`, `domains`, `content`, `media` — including the public read
+  API that `saroh.app` renders publication snapshots from
+- **Other:** `analytics`, `search`, `saved-views`, `home`, `customer-workspace`,
+  `waitlist`
 
-```bash
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE \
-  pnpm --filter @saroh/database db:migrate:deploy
-```
+Public, unauthenticated controllers are named as such
+(`public-sites`, `public-bookings`, `public-payments`) so the auth boundary is
+visible in the filename.
 
-The foundation migration creates the role-assignment and global audit tables.
-Existing active `PlatformAdmin` grants are backfilled to `PLATFORM_OWNER` so
-the migration does not silently remove their access.
-
-## Project Structure
-
-```
-src/
-├── main.ts                          # Entry point with middleware setup
-├── app.module.ts                    # Root module
-├── common/
-│   ├── decorators/
-│   │   └── store.decorator.ts      # @Store() decorator for context
-│   ├── guards/
-│   │   ├── auth.guard.ts           # JWT token validation
-│   │   └── store-auth.guard.ts     # Store access control
-│   ├── interceptors/               # Response/error interceptors
-│   ├── filters/                    # Exception filters
-│   ├── middleware/                 # Custom middleware
-│   └── types/
-│       └── store-context.ts        # Type definitions
-├── modules/
-│   ├── health/                     # Health checks
-│   ├── auth/                       # Authentication (signup, login, refresh)
-│   ├── stores/                     # Store management
-│   ├── users/                      # User profiles
-│   ├── products/                   # Product catalog
-│   ├── orders/                     # Order management
-│   ├── payments/                   # Payment processing
-│   └── posts/                      # Blog/content
-└── config/                         # Configuration
-```
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js >= 20
-- pnpm >= 9.0.0
-- PostgreSQL database
-
-### Installation
+## Local development
 
 ```bash
-# Install dependencies (from monorepo root)
 pnpm install
-
-# Set up environment
-cp .env.example .env.local
-# Edit .env.local with your configuration
+pnpm --filter @saroh/database build      # generate the Prisma client first
+pnpm --filter @saroh/api dev             # http://localhost:3333, watch mode
 ```
-
-### Development
 
 ```bash
-# Start dev server with watch mode
-pnpm dev
-
-# The API will be available at http://localhost:3000
+pnpm --filter @saroh/api build
+pnpm --filter @saroh/api start           # node dist/main
 ```
 
-### Build
+### Migrations
 
 ```bash
-# Compile TypeScript
-pnpm build
-
-# Start production server
-pnpm start
+pnpm --filter @saroh/database db:push            # dev: sync schema
+DATABASE_URL=postgresql://… \
+  pnpm --filter @saroh/database db:migrate:deploy  # deploy migrations
 ```
 
-## API Endpoints
-
-### Health Check
-
-- `GET /health` - Server health status
-
-### Authentication
-
-- `POST /auth/signup` - Register new user
-- `POST /auth/login` - Authenticate user
-- `POST /auth/refresh` - Refresh access token
-
-### Stores
-
-- `GET /stores` - List user's stores
-- `POST /stores` - Create new store
-- `GET /stores/:id` - Get store details
-- `PUT /stores/:id` - Update store
-- `DELETE /stores/:id` - Delete store
-
-## Authentication
-
-The API uses JWT tokens with the following flow:
-
-1. **Access Token**: Short-lived (24h) for API requests
-2. **Refresh Token**: Long-lived (7d) for obtaining new access tokens
-
-### Usage
-
-Include the access token in request headers:
-
-```bash
-Authorization: Bearer <access_token>
-x-store-id: <store_id>
-```
-
-## Database
-
-Prisma is used for database access. See `@saroh/database` package for schema.
-
-### Running Migrations
-
-```bash
-pnpm db:push           # Push changes to dev database
-pnpm db:migrate:deploy # Deploy migrations to production
-```
+Deploy migrations **before** shipping API code that depends on them.
 
 ## Testing
 
-```bash
-# Unit tests
-pnpm test
-
-# Watch mode
-pnpm test:watch
-
-# Coverage
-pnpm test:cov
-```
-
-## Code Style
-
-- **Linting**: ESLint (@saroh/eslint-config)
-- **Formatting**: Prettier with plugin-organize-imports
-- **Pre-commit**: Husky + lint-staged
+Two Jest projects, split by whether they need a database:
 
 ```bash
-# Auto-fix linting issues
-pnpm lint --fix
-
-# Format code
-pnpm format
+pnpm --filter @saroh/api test        # UNIT — zero database, safe anywhere
+pnpm --filter @saroh/api test:int    # INTEGRATION — needs TEST_DATABASE_URL
+pnpm --filter @saroh/api test:cov
 ```
 
-## Environment Variables
+The unit project ([`jest.config.js`](jest.config.js)) runs the pure specs —
+mocked Prisma, no network — and is what CI and a fresh clone can always run.
+The integration project ([`jest.integration.config.js`](jest.integration.config.js))
+runs DB-backed specs serially against a **dedicated** test database: it
+`db push --force-reset`s the schema in `globalSetup` and truncates between
+files.
+
+There is no fallback to `DATABASE_URL`. `test/db-guard.ts` refuses to run unless
+`TEST_DATABASE_URL` is set, its database name contains `test`, and it differs
+from `DATABASE_URL` — so the tests cannot reach the dev or production database.
+Copy [`.env.test.example`](.env.test.example) and point it at a throwaway
+Postgres:
+
+```bash
+docker run -d --rm -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
+```
+
+`src/modules/e2e/first-journey.e2e.spec.ts` walks the whole signup → org →
+first-value journey through the real stack.
+
+## Environment
+
+[`src/env.ts`](src/env.ts) validates everything with zod at import time, before
+Nest bootstraps. A missing or invalid variable throws with the exact list of
+what is wrong. (`@t3-oss/env-core` is ESM-only and does not resolve cleanly from
+this CommonJS app, so the contract is reimplemented here — empty strings become
+`undefined`, same as the Next apps' `@t3-oss/env-nextjs` setup.)
 
 ### Required
 
-- `PORT` - Server port (default: 3000)
-- `NODE_ENV` - Environment (development/production)
-- `CUSTOMER_JWT_SECRET` - Secret key for JWT signing
-- `DATABASE_URL` - PostgreSQL connection string
+| Variable       | Notes                                                         |
+| -------------- | ------------------------------------------------------------- |
+| `DATABASE_URL` | The one true prerequisite — no request is servable without it |
+
+### Auth
+
+`BETTER_AUTH_SECRET` is required in production and optional elsewhere; in
+dev/test `@saroh/auth` supplies a fixed insecure fallback with a warning, so a
+fresh clone boots on `DATABASE_URL` alone. In any shared environment it must be
+**byte-identical** across the API and every session-validating app, or session
+checks silently fail. `BETTER_AUTH_URL` is this service's own origin;
+`BETTER_AUTH_TRUSTED_ORIGINS` overrides the default `*.saroh.in` allowlist.
 
 ### Optional
 
-- `CORS_ORIGIN` - Allowed origins (comma-separated)
-- `JWT_EXPIRES_IN` - Access token expiration (default: 24h)
-- `JWT_REFRESH_EXPIRES_IN` - Refresh token expiration (default: 7d)
+- `PORT` (default 3333), `NODE_ENV`, `CORS_ORIGIN`, `APP_URL` (base for
+  invitation links in email)
+- `AUTH_GITHUB_ID/SECRET`, `AUTH_GOOGLE_ID/SECRET` — email/password works
+  without them
+- `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+  `R2_PUBLIC_BASE_URL` — absent, the media module uses the network-free
+  in-memory adapter
+- `EMAIL_FROM`, `SMTP_*` (legacy `SENDER_EMAIL_ID`, `SMTP_HOSTNAME`,
+  `USER_ACCOUNT`, `USER_PASSWORD` still honoured as fallbacks)
+- `PAYMENTS_ENC_KEY` — 32-byte AES-256-GCM key (base64 or 64-hex) for merchant
+  credential encryption at rest. Optional in the schema so dev boots without
+  payments; validated **at use time** and never logged
+- `JOB_WORKER_POLL_MS`, `JOB_WORKER_BATCH`, `JOB_VISIBILITY_MS` — the durable
+  job outbox worker. The poll loop is disabled under `NODE_ENV=test` regardless
+- `ADMIN_ALLOWLIST` — break-glass only, see above
+- `SKIP_ENV_VALIDATION=1` — for builds with no runtime secrets
 
-## Security
+Set `SKIP_ENV_VALIDATION=1` to build an image without real values.
 
-- ✅ Helmet.js for HTTP headers
-- ✅ CORS configuration
-- ✅ JWT validation on protected routes
-- ✅ Store access control via x-store-id header
-- ✅ Input validation with class-validator
-- ✅ No sensitive data in logs
+## Code style
 
-## TODO
+ESLint (`@saroh/eslint-config`), Prettier with `organize-imports`, and
+Husky + lint-staged on commit.
 
-- [ ] Implement user authentication with Better Auth
-- [ ] Add Swagger/OpenAPI documentation
-- [ ] Implement database queries with Prisma
-- [ ] Add error interceptors and filters
-- [ ] Set up request logging
-- [ ] Add rate limiting
-- [ ] Implement batch operations
-- [ ] Add webhook support
-- [ ] Set up monitoring/observability
+```bash
+pnpm --filter @saroh/api lint --fix
+pnpm --filter @saroh/api format
+pnpm --filter @saroh/api typecheck
+```
 
-## Contributing
+## Related
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) in the root directory.
-
-## Resources
-
-- [NestJS Documentation](https://docs.nestjs.com)
-- [Prisma Documentation](https://www.prisma.io/docs)
-- [JWT Best Practices](https://tools.ietf.org/html/rfc8725)
-- [Saroh.io Architecture](../../internal-decision-docs/ARCHITECTURE_DECISIONS.md)
+- [Root README](../../README.md) — monorepo overview
+- [`docs/architecture/`](../../docs/architecture/) — decisions, target
+  architecture, roadmap and risk register
+- [CONTRIBUTING.md](../../CONTRIBUTING.md)
