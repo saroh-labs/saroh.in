@@ -1,28 +1,49 @@
-## Getting Started
+# docs.saroh.in
 
-First, run the development server:
+Developer documentation for the Saroh monorepo — for people contributing to the
+codebase, not for people using the product. (End-user guides live in
+[`help.saroh.in`](../help.saroh.in).)
+
+Dev port **3006** · package name `docs` (`pnpm --filter docs …`)
+
+## What's here
+
+MDX pages under [`content/`](content/), served by Nextra 4 on the App Router:
+
+| Page              | Covers                                                 |
+| ----------------- | ------------------------------------------------------ |
+| `index`           | Overview and how to navigate the docs                  |
+| `getting-started` | Clone, install, env, first run                         |
+| `architecture`    | Apps, packages, and the API-as-single-backend boundary |
+| `authentication`  | Better Auth: where it runs and how sessions flow       |
+| `database`        | Prisma schema, client, migrations                      |
+| `contributing`    | Working in the monorepo                                |
+
+Add a page by dropping an `.mdx` file into `content/` — Nextra builds the
+navigation from the page map.
+
+## Stack notes
+
+Nextra 4 configures its theme and layout in [`app/layout.jsx`](app/layout.jsx),
+**not** in `next.config.mjs` — the old `theme` / `themeConfig` options are gone.
+`@saroh/ui` is consumed as source via `transpilePackages` so the canonical
+`<Wordmark>` and the design tokens are the same ones the product apps use, and
+fonts are self-hosted from `packages/ui/fonts` so a build never reaches out to
+an external network.
+
+## Local development
 
 ```bash
-yarn dev
+pnpm install
+pnpm --filter docs dev       # http://localhost:3006
 ```
 
-Open [http://localhost:3001](http://localhost:3001) with your browser to see the result.
+No environment variables and no backend — it is a static content site.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Verification
 
-To create [API routes](https://nextjs.org/docs/app/building-your-application/routing/router-handlers) add an `api/` directory to the `app/` directory with a `route.ts` file. For individual endpoints, create a subfolder in the `api` directory, like `api/hello/route.ts` would map to [http://localhost:3001/api/hello](http://localhost:3001/api/hello).
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn/foundations/about-nextjs) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_source=github.com&utm_medium=referral&utm_campaign=turborepo-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+```bash
+pnpm --filter docs typecheck
+pnpm --filter docs lint
+pnpm --filter docs build
+```

@@ -1,28 +1,59 @@
-## Getting Started
+# saroh.in
 
-First, run the development server:
+The marketing site: what Saroh is, what each capability module does, and the
+waitlist.
+
+Dev port **3008** · package name `web` (`pnpm --filter web …`)
+
+## What's here
+
+| Route             | Purpose                                                   |
+| ----------------- | --------------------------------------------------------- |
+| `/`               | Landing page, product shots, waitlist form                |
+| `/modules`        | The capability modules a business can turn on             |
+| `/modules/[slug]` | One module in detail                                      |
+| `/api/waitlist`   | POST forwarder to the public waitlist endpoint on the API |
+
+Module copy lives in [`lib/modules.ts`](lib/modules.ts), page chrome in
+[`components/site/`](components/site/).
+
+### Why the waitlist is a route handler
+
+Only `api.saroh.in` touches the database, so `/api/waitlist` is a thin forwarder
+to the public waitlist endpoint there. It stays a server route rather than the
+form posting to the API directly: that keeps the API origin out of the browser
+bundle, avoids a CORS preflight on the conversion path, and gives one place to
+translate the API's response into the shape the client form already expects.
+
+It previously `console.log`ged the address and returned success, which meant
+every signup since launch was acknowledged to the visitor and then dropped.
+Changes here are worth testing end to end against a running API.
+
+## Local development
 
 ```bash
-yarn dev
+pnpm install
+pnpm --filter web dev        # http://localhost:3008
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The pages render without a backend; only the waitlist POST needs `api.saroh.in`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-To create [API routes](https://nextjs.org/docs/app/building-your-application/routing/router-handlers) add an `api/` directory to the `app/` directory with a `route.ts` file. For individual endpoints, create a subfolder in the `api` directory, like `api/hello/route.ts` would map to [http://localhost:3000/api/hello](http://localhost:3000/api/hello).
+See [`env.ts`](env.ts) for the validated schema.
 
-## Learn More
+```dotenv
+API_URL=http://localhost:3333                    # server-only, waitlist route only
+NEXT_PUBLIC_AUTH_APP_URL=http://localhost:3003   # hero CTA → sign-up
+```
 
-To learn more about Next.js, take a look at the following resources:
+`API_URL` is server-only on purpose: the route handler is the only thing here
+that talks to the API, and the browser has no reason to know that origin.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn/foundations/about-nextjs) - an interactive Next.js tutorial.
+## Verification
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_source=github.com&utm_medium=referral&utm_campaign=turborepo-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+```bash
+pnpm --filter web typecheck
+pnpm --filter web lint
+SKIP_ENV_VALIDATION=1 pnpm --filter web build
+```

@@ -1,31 +1,69 @@
 # accounts.saroh.in
 
-Auth app for Saroh: login, sign up, forgot password, and reset password. Uses [better-auth](https://better-auth.com) with email/password and GitHub OAuth.
+Saroh's identity app: sign in, sign up, email verification, password reset, and
+the user's own account settings. It is the **UI** for Better Auth — the auth
+server itself runs in `api.saroh.in`.
 
-## Features
+Dev port **3000** · package name `auth` (`pnpm --filter auth …`)
 
-- **Login** – Email/password and GitHub OAuth
-- **Sign up** – Email, name, password
-- **Forgot password** – Request reset link by email
-- **Reset password** – Set new password via link (token from email)
-- Cross-subdomain cookies (`.saroh.in`), rate limiting, and better-auth plugins (admin, organization, 2FA, etc.)
+## What's here
 
-## Run locally
+| Route              | Purpose                                                   |
+| ------------------ | --------------------------------------------------------- |
+| `/login`           | Email/password + GitHub and Google OAuth                  |
+| `/signup`          | Name, email, password                                     |
+| `/verify-email`    | Code-based verification (Better Auth `emailOTP` plugin)   |
+| `/forgot-password` | Request a reset link by email                             |
+| `/reset-password`  | Set a new password from the emailed token                 |
+| `/account`         | Profile, change email, change password, sessions, delete  |
+| `/apps`            | Chooser that hands a signed-in user off to the other apps |
 
-From repo root:
+`/account` acts on the **session user only**, never on an id from the URL. It
+lives here rather than in `app.saroh.in` because this app is the single identity
+provider — the product apps link to it from their user menu instead of
+duplicating it. Organization-level configuration is the other half of that
+split and belongs in `app.saroh.in/settings`.
+
+## Local development
 
 ```bash
-pnpm dev
-# or run only this app (see package.json for port)
+pnpm install
+pnpm --filter auth dev        # http://localhost:3000
 ```
 
-Set `NEXT_PUBLIC_ACCOUNTS_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL`, and `NEXT_PUBLIC_APP_URL` in env — that is the app's entire surface (see `env.ts`).
+`api.saroh.in` must be running too — this app has no auth server of its own.
+`pnpm dev:api-auth` from the repo root starts both.
 
-This app holds no database credentials and no OAuth secrets. It renders the auth UI and talks to Better Auth over HTTP against `api.saroh.in`, which is the only service that touches the database. `DATABASE_URL`, `BETTER_AUTH_SECRET`, and the `AUTH_GITHUB_*` / `AUTH_GOOGLE_*` pairs belong in `apps/api.saroh.in` only.
+## Environment
 
-**Email (React Email + Nodemailer):** Password reset and verification emails use templates from `@saroh/emails` and are sent via Nodemailer when SMTP is configured. Set either:
+Every variable is client-exposed and optional; see [`env.ts`](env.ts) for the
+validated schema.
 
-- **Generic SMTP:** `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and optionally `EMAIL_FROM`, `SMTP_SECURE`
-- **Gmail:** `USER_ACCOUNT`, `USER_PASSWORD`, and optionally `SENDER_EMAIL_ID` or `EMAIL_FROM`
+```dotenv
+NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000     # this app's own origin
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333  # api origin (the auth server)
+NEXT_PUBLIC_APP_URL=http://localhost:3003          # where a verified user lands
+```
 
-If no SMTP env is set, reset/verification links are logged to the console instead of sent.
+`NEXT_PUBLIC_APP_URL` may be omitted — [`lib/app-urls.ts`](lib/app-urls.ts)
+falls back to the standard dev and production origins, so a fresh clone needs
+no extra config.
+
+## What this app must never hold
+
+No database credentials and no OAuth secrets. It renders the auth UI and talks
+to Better Auth over HTTP against `api.saroh.in`, the only service that touches
+the database. `DATABASE_URL`, `BETTER_AUTH_SECRET`, and the `AUTH_GITHUB_*` /
+`AUTH_GOOGLE_*` pairs belong in `apps/api.saroh.in` only.
+
+Outbound email (verification, password reset) is likewise sent by the API using
+`@saroh/emails` templates over Nodemailer — the SMTP settings live there, not
+here. With no SMTP configured, the API logs the links to its console instead.
+
+## Verification
+
+```bash
+pnpm --filter auth typecheck
+pnpm --filter auth lint
+SKIP_ENV_VALIDATION=1 pnpm --filter auth build
+```

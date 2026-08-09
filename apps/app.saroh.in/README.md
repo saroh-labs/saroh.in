@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# app.saroh.in
 
-## Getting Started
+The merchant workspace — the app a business actually works in. Every screen is
+a session-authenticated client of `api.saroh.in`; this app holds no database
+access of its own.
 
-First, run the development server:
+Dev port **3003** · package name `application` (`pnpm --filter application …`)
+
+## What's here
+
+The whole app sits behind an auth gate. [`middleware.ts`](middleware.ts) uses
+`@saroh/auth`'s middleware to redirect anyone without an accounts session to
+`accounts.saroh.in`, so there are no partly-public routes to reason about.
+
+**Onboarding** (`/onboarding`) asks what the business needs to do and turns the
+answers into selected capability modules.
+
+**The shell** (`app/(shell)`) is everything else, grouped the way onboarding
+phrased it rather than by internal entity names:
+
+| Group     | Module key     | Routes                             |
+| --------- | -------------- | ---------------------------------- |
+| Sell      | `COMMERCE`     | `/commerce`, `/stores/…`           |
+| Bookings  | `APPOINTMENTS` | `/bookings`, `/services`           |
+| Customers | `CRM`          | `/contacts`, `/leads`, `/pipeline` |
+| Website   | `WEBSITE`      | `/sites`                           |
+| Insights  | `INSIGHTS`     | `/analytics`                       |
+| _(core)_  | —              | `/`, `/notifications`, `/settings` |
+
+Under a store: products and categories, orders, customers, content (posts and
+post categories), members, and store settings.
+
+[`components/shared/nav-items.tsx`](components/shared/nav-items.tsx) is the
+single source of truth for the sidebar, mobile drawer and command menu, and
+lists **only routes that exist** — `pnpm check:routes` fails the build on a nav
+entry that would 404.
+
+### Capability modules
+
+Groups carrying a `moduleKey` render only when that module is available to the
+actor (ADR-003). Settings and Notifications are core chrome and are never
+module-gated — Settings → Modules is where a module gets switched on in the
+first place. The server is the authority: [`lib/modules/`](lib/modules/) decodes
+what the API returns and the Server Actions there forward the session cookie to
+endpoints that enforce `module:manage`. Hiding a nav group is a usability aid,
+not a permission.
+
+### Settings
+
+`/settings` covers **organization** configuration — org profile, modules,
+per-project modules, payment providers. A user's own identity (name, email,
+password, sessions) is deliberately not here; it lives at
+`accounts.saroh.in/account`, which the header user menu links to.
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+pnpm --filter application dev     # http://localhost:3003
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`api.saroh.in` and `accounts.saroh.in` must be running as well — this app
+renders nothing useful without a session and an API to read.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+See [`env.ts`](env.ts) for the validated schema.
 
-## Learn More
+```dotenv
+API_URL=http://localhost:3333                      # server-only; used by lib/**/service.ts
+NEXT_PUBLIC_API_URL=http://localhost:3333          # public fallback
+NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
+NEXT_PUBLIC_ROOT_DOMAIN=saroh.app                  # where merchant subdomains live
+# NGROK_URL=                                       # dev-only tunnel origin
+```
 
-To learn more about Next.js, take a look at the following resources:
+`NEXT_PUBLIC_ROOT_DOMAIN` is `saroh.app`, **not** `saroh.in`. It is the same
+variable `saroh.app` reads to resolve tenants, so the address this app shows a
+merchant and the address the renderer actually serves cannot disagree.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Data access
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+Server modules under `lib/<domain>/service.ts` forward the session cookie to
+`api.saroh.in`; mutations go through Server Actions in the matching
+`actions.ts`. Nothing in this app imports `@saroh/database` — ESLint forbids it
+in frontends, and the API is the single authorization boundary.
 
-## Deploy on Vercel
+## Verification
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+```bash
+pnpm --filter application typecheck
+pnpm --filter application lint
+SKIP_ENV_VALIDATION=1 pnpm --filter application build
+pnpm check:routes            # from the repo root — nav entries must resolve
+```
