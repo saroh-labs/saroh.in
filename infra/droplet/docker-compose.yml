@@ -1,0 +1,110 @@
+# Saroh API — the api.saroh.in container.
+#
+# Contains ONLY the API. Postgres, Redis and the TLS-terminating reverse proxy
+# are pre-existing infrastructure services reached over the external `edge`
+# network, so `docker compose down` here takes down Saroh and nothing else.
+#
+# Two env files sit alongside this one at deploy time:
+#   .env        SAROH_DB_PASSWORD only — read by COMPOSE for interpolation
+#   .env.prod   all application secrets (chmod 600)
+#
+# The deployment path and the wider host layout are in the operator runbook,
+# not in this repository.
+
+name: saroh
+
+services:
+    api:
+        image: ${SAROH_API_IMAGE:-ghcr.io/saroh-labs/saroh-api:latest}
+        # The reverse proxy resolves this exact name on the `edge` network, so
+        # it is load-bearing config, not cosmetic. Renaming it requires the
+        # matching proxy-config change.
+        container_name: saroh-api
+        restart: unless-stopped
+
+        # No `ports:`. The proxy reaches this over `edge` and terminates TLS.
+        # Publishing 4000 would expose the API unencrypted on the host's public
+        # IP, bypassing TLS entirely.
+
+        mem_limit: 448m
+        mem_reservation: 320m
+
+        env_file:
+            - .env.prod
+
+        environment:
+            # These override .env.prod (compose applies `environment` after
+            # `env_file`) because they describe THIS deployment topology rather
+            # than the application.
+            NODE_ENV: production
+
+            # 4000, not the app's own default of 3333, because the Caddy vhost
+            # for api.saroh.in proxies to `saroh-api:4000`. Changing this
+            # requires the matching Caddyfile edit. apps/api.saroh.in/src/env.ts
+            # reads PORT, so setting it here is all that is needed.
+            PORT: "4000"
+
+            # Held well below mem_limit so V8 collects aggressively instead of
+            # growing until Docker OOM-kills the container. The ~128 MB gap
+            # covers Prisma's native query engine, socket buffers and the Node
+            # binary itself — none of which live in the V8 old space.
+            NODE_OPTIONS: "--max-old-space-size=320"
+
+            # `postgres` resolves over the edge network. sslmode is absent on
+            # purpose: this never leaves the container network.
+            #
+            # ${SAROH_DB_PASSWORD} is interpolated by COMPOSE ITSELF, which
+            # reads only the sibling `.env` and the invoking shell — NOT the
+            # `env_file:` above. So the password must be in BOTH files.
+            #
+            # WARNING — connection_limit is INERT here. @saroh/database builds
+            # its own `pg.Pool` (packages/database/src/client.ts) and hands it
+            # to @prisma/adapter-pg; `connection_limit` is a Prisma-engine
+            # parameter that node-postgres does not parse. The real pool size is
+            # pg's default of 10, not 5. Postgres is configured with
+            # max_connections=60, so this is not fatal, but do not assume the
+            # parameter is doing anything until `max` is set in createPool().
+            DATABASE_URL: postgresql://saroh_app:${SAROH_DB_PASSWORD:?set SAROH_DB_PASSWORD in the sibling .env (NOT .env.prod — compose cannot interpolate from env_file)}@postgres:5432/saroh?schema=public&connection_limit=5&pool_timeout=20&connect_timeout=10
+
+            # Logical DB 1 is Saroh's allocated index on the Redis instance.
+            # Using a dedicated index keeps `FLUSHDB` and key-pattern scans
+            # scoped to Saroh's own keys.
+            #
+            # NOTHING IN THE SAROH CODEBASE READS THIS TODAY. There is no Redis
+            # client, no BullMQ: the rate limiters in src/modules/*/
+            # rate-limiter.ts are in-memory and the job queue is the Postgres
+            # outbox in src/modules/jobs. This is set so the slot is reserved
+            # and the variable is already correct whenever that changes.
+            REDIS_URL: redis://redis:6379/1
+
+        networks:
+            - edge
+
+        healthcheck:
+            # node -e rather than wget: this image is node:24-slim (Debian) and
+            # has no wget, unlike the alpine-based infra containers.
+            test:
+                [
+                    "CMD",
+                    "node",
+                    "-e",
+                    "fetch('http://127.0.0.1:4000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+                ]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 40s
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "3"
+
+networks:
+    edge:
+        # Owned by the infrastructure stack, not created here. `external` means
+        # compose fails with a clear error if that stack is not up, rather than
+        # silently creating a second isolated network called `saroh_edge` on
+        # which nothing can find postgres.
+        external: true
