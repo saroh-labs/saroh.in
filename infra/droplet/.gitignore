@@ -1,0 +1,7 @@
+# Real, secret-bearing files. The root .gitignore already covers `.env` and
+# `.env.*` (so `.env.prod` is caught), but being explicit here keeps the rule
+# next to the templates it protects.
+.env
+.env.prod
+
+deploy.log

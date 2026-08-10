@@ -1,0 +1,107 @@
+name: Build API image
+
+# Builds apps/api.saroh.in and pushes it to GHCR.
+#
+# The build happens here rather than on the deployment host: that box also runs
+# the database, and a pnpm install plus turbo build across the workspace would
+# evict Postgres's page cache for the duration. The host only ever pulls.
+#
+# This workflow does NOT deploy. It ends with an image in the registry; rolling
+# it out is `./deploy.sh` on the VM, deliberately kept as a human action so a
+# merge to main cannot restart production on its own.
+
+on:
+    push:
+        branches: [main]
+        # Skip the build for changes that cannot affect the image. The api's own
+        # tree, everything it imports, and the build inputs are all covered.
+        paths:
+            - "apps/api.saroh.in/**"
+            - "packages/**"
+            - "tooling/**"
+            - "pnpm-lock.yaml"
+            - "pnpm-workspace.yaml"
+            - "package.json"
+            - "turbo.json"
+            - ".dockerignore"
+            - ".github/workflows/deploy-api.yml"
+    # Manual trigger, for redeploying an unchanged tree or building off a branch.
+    workflow_dispatch:
+
+env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository_owner }}/saroh-api
+
+concurrency:
+    # Never let two builds race to move the `latest` tag.
+    group: build-api-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            # Required to push to GHCR with the automatic GITHUB_TOKEN. Nothing
+            # else is granted; this job never writes to the repo.
+            packages: write
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: docker/setup-buildx-action@v3
+
+            - name: Log in to GHCR
+              uses: docker/login-action@v3
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Derive tags
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  # A moving `latest` plus an immutable `sha-<commit>`. deploy.sh
+                  # pins the SHA tag, which is what makes rollback a matter of
+                  # naming the previous one rather than rebuilding it.
+                  tags: |
+                      type=raw,value=latest,enable={{is_default_branch}}
+                      type=sha,format=long
+
+            - name: Build and push
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: apps/api.saroh.in/Dockerfile
+                  push: true
+                  # linux/amd64 only. The VM is x86_64 and so is this runner, so
+                  # this builds natively. Adding arm64 would pull in QEMU
+                  # emulation and roughly quadruple the build time for a
+                  # platform nothing runs.
+                  platforms: linux/amd64
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  # Registry-backed layer cache. The expensive layer is
+                  # `pnpm install`, and it only invalidates when a manifest or
+                  # the lockfile changes — so a typical code-only commit reuses
+                  # it and the build is a couple of minutes.
+                  cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+                  cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+                  provenance: false
+
+            - name: Summary
+              run: |
+                  {
+                    echo "### API image pushed"
+                    echo
+                    echo '```'
+                    echo "${{ steps.meta.outputs.tags }}"
+                    echo '```'
+                    echo
+                    echo "Deploy it on the VM:"
+                    echo '```bash'
+                    echo "cd /srv/saroh/infra/azure && ./deploy.sh --tag sha-${{ github.sha }}"
+                    echo '```'
+                  } >> "$GITHUB_STEP_SUMMARY"
