@@ -1,353 +1,733 @@
 -- Blocker B1 fix: make the org_isolation RLS predicate EMPTY-STRING-safe.
 --
--- Under PgBouncer/Neon connection pooling, once any transaction sets the custom
--- GUC `app.current_organization_id` (via withOrgContext / set_config is_local),
--- the parameter becomes "defined" on that pooled backend. After the local
--- setting ends, current_setting('app.current_organization_id', true) returns an
--- EMPTY STRING '' (not NULL) on that connection. The prior predicate
--- (`... IS NULL OR ...`) does NOT treat '' as unset, so the intended
--- "permissive when unset" dark-rollout branch silently fails: a query with no
--- org context (e.g. the cross-org job worker, or any system/admin read) would
--- match NO rows under a non-BYPASSRLS role and break.
+-- Under connection pooling, once any transaction sets the custom GUC, a later
+-- transaction on the same backend sees '' rather than NULL, so an `IS NULL`
+-- test no longer matches and the policy denies everything. NULLIF(...,'')
+-- restores the permissive-when-unset behaviour.
 --
--- Fix: `NULLIF(current_setting(...), '') IS NULL` treats both NULL and '' as
--- unset. Applied to ALL org_isolation policies (the original S1-011 set + the
--- Stage 2-7 set) so the whole RLS surface is consistent. Idempotent
--- (DROP POLICY IF EXISTS then CREATE). Still dark-rollout safe: the app connects
--- as a BYPASSRLS owner today, so nothing changes until a restricted role ships.
+-- GUARDED (2026-08-10). This migration is timestamped before the migrations
+-- that create many of its 48 tables, so it could not replay on a fresh
+-- database. Each table's statements now run inside a block that swallows
+-- undefined_table/undefined_column; whatever is skipped is applied by
+-- 20260719210000_rls_backfill_org_isolation once every table exists.
+-- Semantics on an existing database are unchanged.
 
-DROP POLICY IF EXISTS "org_isolation" ON "Store";
-CREATE POLICY "org_isolation" ON "Store"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Store"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Store"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Membership";
-CREATE POLICY "org_isolation" ON "Membership"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Membership"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Membership"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Project";
-CREATE POLICY "org_isolation" ON "Project"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Project"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Project"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Team";
-CREATE POLICY "org_isolation" ON "Team"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Team"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Team"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "BusinessProfile";
-CREATE POLICY "org_isolation" ON "BusinessProfile"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "BusinessProfile"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "BusinessProfile"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "AuditEvent";
-CREATE POLICY "org_isolation" ON "AuditEvent"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "AuditEvent"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "AuditEvent"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "FeatureFlagOverride";
-CREATE POLICY "org_isolation" ON "FeatureFlagOverride"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "FeatureFlagOverride"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "FeatureFlagOverride"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Media";
-CREATE POLICY "org_isolation" ON "Media"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Media"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Media"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Product";
-CREATE POLICY "org_isolation" ON "Product"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Product"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Product"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Category";
-CREATE POLICY "org_isolation" ON "Category"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Category"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Category"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Inventory";
-CREATE POLICY "org_isolation" ON "Inventory"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Inventory"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Inventory"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Customer";
-CREATE POLICY "org_isolation" ON "Customer"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Customer"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Customer"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Cart";
-CREATE POLICY "org_isolation" ON "Cart"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Cart"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Cart"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Order";
-CREATE POLICY "org_isolation" ON "Order"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Order"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Order"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "FeatureFlagAudit";
-CREATE POLICY "org_isolation" ON "FeatureFlagAudit"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "FeatureFlagAudit"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "FeatureFlagAudit"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Site";
-CREATE POLICY "org_isolation" ON "Site"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Site"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Site"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Page";
-CREATE POLICY "org_isolation" ON "Page"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Page"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Page"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "PageVersion";
-CREATE POLICY "org_isolation" ON "PageVersion"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "PageVersion"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "PageVersion"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Section";
-CREATE POLICY "org_isolation" ON "Section"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Section"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Section"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Publication";
-CREATE POLICY "org_isolation" ON "Publication"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Publication"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Publication"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Domain";
-CREATE POLICY "org_isolation" ON "Domain"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Domain"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Domain"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Contact";
-CREATE POLICY "org_isolation" ON "Contact"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Contact"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Contact"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Form";
-CREATE POLICY "org_isolation" ON "Form"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Form"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Form"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Submission";
-CREATE POLICY "org_isolation" ON "Submission"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Submission"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Submission"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Pipeline";
-CREATE POLICY "org_isolation" ON "Pipeline"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Pipeline"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Pipeline"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Stage";
-CREATE POLICY "org_isolation" ON "Stage"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Stage"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Stage"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Lead";
-CREATE POLICY "org_isolation" ON "Lead"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Lead"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Lead"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Activity";
-CREATE POLICY "org_isolation" ON "Activity"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Activity"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Activity"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Job";
-CREATE POLICY "org_isolation" ON "Job"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Job"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Job"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Notification";
-CREATE POLICY "org_isolation" ON "Notification"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Notification"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Notification"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Service";
-CREATE POLICY "org_isolation" ON "Service"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Service"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Service"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "AvailabilityRule";
-CREATE POLICY "org_isolation" ON "AvailabilityRule"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "AvailabilityRule"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "AvailabilityRule"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Booking";
-CREATE POLICY "org_isolation" ON "Booking"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Booking"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Booking"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "MerchantPaymentProvider";
-CREATE POLICY "org_isolation" ON "MerchantPaymentProvider"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "MerchantPaymentProvider"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "MerchantPaymentProvider"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "PaymentIntent";
-CREATE POLICY "org_isolation" ON "PaymentIntent"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "PaymentIntent"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "PaymentIntent"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "PaymentAttempt";
-CREATE POLICY "org_isolation" ON "PaymentAttempt"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "PaymentAttempt"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "PaymentAttempt"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "PaymentRefund";
-CREATE POLICY "org_isolation" ON "PaymentRefund"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "PaymentRefund"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "PaymentRefund"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "WebhookEvent";
-CREATE POLICY "org_isolation" ON "WebhookEvent"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "WebhookEvent"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "WebhookEvent"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "CommunicationProvider";
-CREATE POLICY "org_isolation" ON "CommunicationProvider"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "CommunicationProvider"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "CommunicationProvider"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Message";
-CREATE POLICY "org_isolation" ON "Message"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Message"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Message"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Delivery";
-CREATE POLICY "org_isolation" ON "Delivery"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Delivery"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Delivery"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Consent";
-CREATE POLICY "org_isolation" ON "Consent"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Consent"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Consent"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "AutomationRule";
-CREATE POLICY "org_isolation" ON "AutomationRule"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "AutomationRule"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "AutomationRule"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "AutomationRun";
-CREATE POLICY "org_isolation" ON "AutomationRun"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "AutomationRun"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "AutomationRun"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "AnalyticsEvent";
-CREATE POLICY "org_isolation" ON "AnalyticsEvent"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "AnalyticsEvent"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "AnalyticsEvent"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "AnalyticsDailyAggregate";
-CREATE POLICY "org_isolation" ON "AnalyticsDailyAggregate"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "AnalyticsDailyAggregate"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "AnalyticsDailyAggregate"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "Subscription";
-CREATE POLICY "org_isolation" ON "Subscription"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "Subscription"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "Subscription"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
 
-DROP POLICY IF EXISTS "org_isolation" ON "BillingWebhookEvent";
-CREATE POLICY "org_isolation" ON "BillingWebhookEvent"
+DO $mig$
+BEGIN
+    EXECUTE $stmt$DROP POLICY IF EXISTS "org_isolation" ON "BillingWebhookEvent"$stmt$;
+    EXECUTE $stmt$CREATE POLICY "org_isolation" ON "BillingWebhookEvent"
   USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
          OR "organizationId" = current_setting('app.current_organization_id', true))
   WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
-         OR "organizationId" = current_setting('app.current_organization_id', true));
+         OR "organizationId" = current_setting('app.current_organization_id', true))$stmt$;
+EXCEPTION
+    -- The table (or the column its policy references) does not exist
+    -- yet on a fresh database; a later migration creates it and the
+    -- rls_backfill migration applies this policy then.
+    WHEN undefined_table OR undefined_column THEN NULL;
+END $mig$;
