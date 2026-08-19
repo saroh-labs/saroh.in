@@ -18,10 +18,11 @@ const testDatabaseUrl = assertTestDatabase();
 process.env.DATABASE_URL = testDatabaseUrl;
 
 afterAll(async () => {
-    // Deferred imports: `@saroh/database` must not load until DATABASE_URL is
-    // set above (static imports would hoist above the assignment).
-    const { truncateAll } = await import("./truncate");
-    const { prisma } = await import("@saroh/database");
+    // Deferred import: `@saroh/database` must not load until DATABASE_URL is
+    // set above (a static import would hoist above the assignment). Both
+    // helpers resolve the REAL client internally, so this teardown still works
+    // in the files that mock the database module.
+    const { truncateAll, disconnectPrisma } = await import("./truncate");
     await truncateAll();
-    await prisma.$disconnect();
+    await disconnectPrisma();
 });

@@ -2,6 +2,7 @@ import { NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { EntitlementService } from "../billing/entitlement.service";
 import { ContactsService } from "../contacts/contacts.service";
 import { EnquiryService } from "../enquiry/enquiry.service";
 import { FormsService } from "../forms/forms.service";
@@ -31,7 +32,11 @@ import { SitesService } from "../sites/sites.service";
 describe("First journey E2E — account → org → site → enquiry → pipeline (dev DB)", () => {
     // Services constructed directly against the shared `prisma` singleton, the
     // same wiring the existing DB-backed specs use (e.g. products.service.spec).
-    const sites = new SitesService();
+    // SitesService took no dependencies when this spec was written; S7-005 gave
+    // it an EntitlementService so `createFromTemplate` can enforce the plan's
+    // `sites` cap. Without one it reached `this.entitlements.check` on
+    // undefined, and every later step failed on the site that was never made.
+    const sites = new SitesService(new EntitlementService());
     const forms = new FormsService();
     const enquiry = new EnquiryService();
     const pipelines = new PipelinesService();
