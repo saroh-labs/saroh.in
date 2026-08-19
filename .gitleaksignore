@@ -4,10 +4,21 @@
 # to the exact occurrence it was reviewed against. The same value appearing in
 # a new commit produces a new fingerprint and is reported again, which is the
 # point: this file suppresses a reviewed finding, never a rule.
+#
+# Do NOT quote a flagged value in a comment here. gitleaks scans the history of
+# this file like any other, so pasting the string in to explain it just commits
+# the string again under a new fingerprint. Describe it instead. (The second
+# entry below is exactly that mistake, already committed and therefore
+# permanent in the diff; it is kept rather than rewritten history.)
 
-# `BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters` in the CI
-# workflow's dummy env block. It is a self-describing literal placeholder,
-# committed deliberately so the S0-006 typed-env validation has a value of the
-# required length; nothing reads it and no service accepts it. gitleaks flags it
-# on entropy alone (3.60) under the catch-all generic-api-key rule.
+# BETTER_AUTH_SECRET in the CI workflow's dummy env block. The value is a
+# self-describing placeholder literal — it says in words that it is a CI
+# placeholder padded to the minimum length — committed deliberately so the
+# S0-006 typed-env validation has a value long enough to accept. Nothing reads
+# it and no service accepts it. gitleaks flags it on entropy alone (3.60) under
+# the catch-all generic-api-key rule.
 7754303f591616b640808bf581403baa6bf21078:.github/workflows/ci.yml:generic-api-key:50
+
+# The same placeholder, quoted verbatim in this file's own comment by the commit
+# that introduced it. Same value, same reasoning, new fingerprint.
+a04cd3486ee98ef36c06ce32e7c982cb882ca429:.gitleaksignore:generic-api-key:8
