@@ -1,0 +1,13 @@
+# Findings gitleaks should not fail the build on.
+#
+# Each entry is a FINGERPRINT — commit:path:rule:line — so an ignore is pinned
+# to the exact occurrence it was reviewed against. The same value appearing in
+# a new commit produces a new fingerprint and is reported again, which is the
+# point: this file suppresses a reviewed finding, never a rule.
+
+# `BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters` in the CI
+# workflow's dummy env block. It is a self-describing literal placeholder,
+# committed deliberately so the S0-006 typed-env validation has a value of the
+# required length; nothing reads it and no service accepts it. gitleaks flags it
+# on entropy alone (3.60) under the catch-all generic-api-key rule.
+7754303f591616b640808bf581403baa6bf21078:.github/workflows/ci.yml:generic-api-key:50
