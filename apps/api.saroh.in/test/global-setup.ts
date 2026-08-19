@@ -35,7 +35,10 @@ export default async function globalSetup(): Promise<void> {
             "db",
             "push",
             "--force-reset",
-            "--skip-generate",
+            // Prisma 7 removed `--skip-generate` from `prisma db push` (it no
+            // longer generates as a side effect, so there is nothing to skip).
+            // Passing it aborts the push, which took the whole integration
+            // project down with it.
             "--accept-data-loss",
         ],
         {
