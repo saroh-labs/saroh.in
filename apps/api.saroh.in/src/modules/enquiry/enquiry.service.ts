@@ -18,8 +18,27 @@ export interface EnquiryResult {
     contactId: string;
 }
 
-/** Pragmatic email shape check — good enough as a submit-time guard. */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/**
+ * Pragmatic email shape check — good enough as a submit-time guard.
+ *
+ * Written with index scans rather than /^[^\s@]+@[^\s@]+\.[^\s@]+$/, whose
+ * adjacent unbounded character classes backtrack quadratically on a crafted
+ * submission (CodeQL js/polynomial-redos) — and `data` values are neither
+ * length-capped nor authenticated, so a ~100 KB field pinned the event loop for
+ * seconds. Accepts exactly the same set as the old regex: no whitespace, one
+ * "@", a non-empty local part, and a domain holding a dot that is neither the
+ * first nor the last character (the old `[^\s@]+` could itself match dots, so
+ * "a@..b" was — and stays — valid).
+ */
+function isEmailShaped(value: string): boolean {
+    if (/\s/.test(value)) return false;
+    const at = value.indexOf("@");
+    if (at <= 0) return false;
+    if (value.includes("@", at + 1)) return false;
+    const domain = value.slice(at + 1);
+    const dot = domain.indexOf(".", 1);
+    return dot !== -1 && dot < domain.length - 1;
+}
 
 /** The default pipeline's stage names, in board order (0..4). */
 const DEFAULT_STAGES = [
@@ -265,7 +284,7 @@ export class EnquiryService {
             );
         }
         const email = (str(emailField.name) ?? "").toLowerCase();
-        if (!EMAIL_RE.test(email)) {
+        if (!isEmailShaped(email)) {
             throw new BadRequestException(
                 `Field "${emailField.name}" must be a valid email`,
             );

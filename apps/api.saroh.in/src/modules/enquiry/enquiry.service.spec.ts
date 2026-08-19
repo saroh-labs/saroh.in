@@ -286,6 +286,76 @@ describe("EnquiryService.submit — validation (nothing created on failure)", ()
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(transaction).not.toHaveBeenCalled();
     });
+
+    // Regression: the old /^[^\s@]+@[^\s@]+\.[^\s@]+$/ guard backtracked
+    // quadratically, so a ~64 KB value from this unauthenticated endpoint burned
+    // ~1s of event loop before rejecting. The check must now stay linear.
+    it("rejects a ReDoS-shaped email in linear time", async () => {
+        const service = new EnquiryService();
+        formFindUnique.mockResolvedValue(FORM);
+        // Terminating "@" both survives the service's trim() and is what makes
+        // the old pattern fail-and-backtrack instead of matching early.
+        const evil = `a@${"!.".repeat(32_000)}@`;
+
+        const started = process.hrtime.bigint();
+        await expect(
+            service.submit(
+                "form_1",
+                { email: evil, name: "Jane" },
+                undefined,
+                "iphash",
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
+
+        // Linear scan is sub-millisecond; the old regex took ~1000ms here.
+        expect(elapsedMs).toBeLessThan(250);
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
+    // The old regex's [^\s@]+ could itself match dots, so a leading-dot domain
+    // was accepted. Pinned so the rewrite is not silently stricter.
+    it("keeps the exact accepted set of the regex it replaced", async () => {
+        const service = new EnquiryService();
+        formFindUnique.mockResolvedValue(FORM);
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        for (const candidate of [
+            "jane@example.com",
+            "user+tag@sub.domain.io",
+            "a@..b",
+            "aa@..a",
+            "a@b.c",
+            "a@.com",
+            "a@com.",
+            "a@@b.com",
+            "a b@c.com",
+            "not-an-email",
+            "@example.com",
+            "a@",
+        ]) {
+            formFindUnique.mockResolvedValue(FORM);
+            const accepted = service
+                .submit(
+                    "form_1",
+                    { email: candidate, name: "Jane" },
+                    undefined,
+                    "iphash",
+                )
+                .then(
+                    () => true,
+                    (error: unknown) =>
+                        !(
+                            error instanceof BadRequestException &&
+                            error.message.includes("must be a valid email")
+                        ),
+                );
+            expect([candidate, await accepted]).toStrictEqual([
+                candidate,
+                re.test(candidate.toLowerCase()),
+            ]);
+        }
+    });
 });
 
 describe("EnquiryService.submit — form gating", () => {

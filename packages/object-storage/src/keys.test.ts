@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildObjectKey, sanitizeFilename, sanitizeSegment } from "./keys";
+import {
+    buildObjectKey,
+    sanitizeFilename,
+    sanitizeSegment,
+    stripTrailingSlashes,
+} from "./keys";
 
 describe("sanitizeFilename", () => {
     it("strips directory components and path traversal", () => {
@@ -94,5 +99,33 @@ describe("buildObjectKey", () => {
                 uuid: "u",
             }),
         ).toThrow(/organizationId/);
+    });
+});
+
+describe("stripTrailingSlashes", () => {
+    it("removes a trailing slash run and leaves everything else alone", () => {
+        expect(stripTrailingSlashes("https://cdn.example.com")).toBe(
+            "https://cdn.example.com",
+        );
+        expect(stripTrailingSlashes("https://cdn.example.com/")).toBe(
+            "https://cdn.example.com",
+        );
+        expect(stripTrailingSlashes("https://cdn.example.com///")).toBe(
+            "https://cdn.example.com",
+        );
+        expect(stripTrailingSlashes("https://cdn.example.com/a//b/")).toBe(
+            "https://cdn.example.com/a//b",
+        );
+        expect(stripTrailingSlashes("")).toBe("");
+        expect(stripTrailingSlashes("////")).toBe("");
+    });
+
+    // Regression: the /\/+$/ this replaced backtracked quadratically, taking
+    // >1s on this input (CodeQL js/polynomial-redos).
+    it("stays linear on a slash-heavy string", () => {
+        const hostile = `x${"/".repeat(200_000)}y`;
+        const started = performance.now();
+        expect(stripTrailingSlashes(hostile)).toBe(hostile);
+        expect(performance.now() - started).toBeLessThan(250);
     });
 });

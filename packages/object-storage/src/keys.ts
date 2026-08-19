@@ -6,6 +6,18 @@
  */
 
 /**
+ * Strip any trailing "/" run from a base URL.
+ *
+ * Scans backwards instead of using /\/+$/, whose anchored unbounded repeat
+ * backtracks quadratically on a slash-heavy string (CodeQL js/polynomial-redos).
+ */
+export function stripTrailingSlashes(value: string): string {
+    let end = value.length;
+    while (end > 0 && value[end - 1] === "/") end--;
+    return value.slice(0, end);
+}
+
+/**
  * Sanitize a free-form path segment (organizationId / purpose) down to
  * `[a-z0-9-]`. Any other run of characters collapses to a single dash.
  */

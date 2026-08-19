@@ -9,7 +9,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-import { buildObjectKey } from "./keys";
+import { buildObjectKey, stripTrailingSlashes } from "./keys";
 import type {
     ContentTypeAllowlist,
     CreateSignedUploadUrlInput,
@@ -109,7 +109,10 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
         config.uploadExpirySeconds ?? DEFAULT_UPLOAD_EXPIRY_SECONDS;
     const downloadExpiry =
         config.downloadExpirySeconds ?? DEFAULT_DOWNLOAD_EXPIRY_SECONDS;
-    const publicBaseUrl = config.publicBaseUrl?.replace(/\/+$/, "");
+    const publicBaseUrl =
+        config.publicBaseUrl === undefined
+            ? undefined
+            : stripTrailingSlashes(config.publicBaseUrl);
 
     const uploadSchema = buildUploadInputSchema({ allowlist, maxUploadBytes });
 
