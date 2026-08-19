@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { buildObjectKey } from "./keys";
+import { buildObjectKey, stripTrailingSlashes } from "./keys";
 import type {
     ContentTypeAllowlist,
     CreateSignedUploadUrlInput,
@@ -68,9 +68,8 @@ export function createMemoryStorage(
         config.uploadExpirySeconds ?? DEFAULT_UPLOAD_EXPIRY_SECONDS;
     const downloadExpiry =
         config.downloadExpirySeconds ?? DEFAULT_DOWNLOAD_EXPIRY_SECONDS;
-    const baseUrl = (config.publicBaseUrl ?? DEFAULT_BASE_URL).replace(
-        /\/+$/,
-        "",
+    const baseUrl = stripTrailingSlashes(
+        config.publicBaseUrl ?? DEFAULT_BASE_URL,
     );
     const generateId = config.generateId ?? randomUUID;
 
