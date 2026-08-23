@@ -9,7 +9,6 @@ const nextConfig = {
 
     images: {
         domains: [
-            "public.blob.vercel-storage.com",
             "res.cloudinary.com",
             "abs.twimg.com",
             "pbs.twimg.com",
@@ -19,18 +18,6 @@ const nextConfig = {
             "illustrations.popsy.co",
             "lh3.googleusercontent.com",
         ],
-    },
-    async rewrites() {
-        return [
-            {
-                source: "/ecommerce",
-                destination: "http://localhost:3006/ecommerce",
-            },
-            {
-                source: "/ecommerce/:path*",
-                destination: "http://localhost:3006/ecommerce/:path*",
-            },
-        ];
     },
 };
 
