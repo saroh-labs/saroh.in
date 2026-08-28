@@ -19,6 +19,15 @@ export function SiteFooter() {
                             Website, commerce, appointments and CRM in one
                             system. Switch on only what your business needs.
                         </p>
+                        {/* The one non-module link down here. A visitor who
+                            reached the footer without clicking anything is
+                            exactly the one who wants to know what this is. */}
+                        <Link
+                            href="/about"
+                            className="mt-4 inline-block text-[13.5px] text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
+                        >
+                            Sell · Arrange · Reach · Organise · Host
+                        </Link>
                     </div>
 
                     <nav aria-label="Modules">
