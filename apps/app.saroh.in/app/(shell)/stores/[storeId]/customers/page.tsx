@@ -28,9 +28,14 @@ export default async function CustomersPage({
                 title="Customers"
                 description="People who order from this store."
                 actions={
-                    <Button variant="brand" asChild>
-                        <Link href={`${base}/new`}>New customer</Link>
-                    </Button>
+                    <>
+                        <Button variant="outline" asChild>
+                            <Link href={`${base}/import`}>Import</Link>
+                        </Button>
+                        <Button variant="brand" asChild>
+                            <Link href={`${base}/new`}>New customer</Link>
+                        </Button>
+                    </>
                 }
             />
 

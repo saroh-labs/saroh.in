@@ -107,6 +107,9 @@ module.exports = {
         // OrdersService.updateStatus guard spec with a jest-mocked Prisma (never
         // touch a DB). The legacy DB-backed orders.service.spec.ts stays in the
         // integration project; these two named specs run here.
+        // #175 CSV import: the PURE planning core (what an import will do)
+        // and the CSV boundary. Neither touches a DB.
+        "<rootDir>/src/modules/imports/**/*.spec.ts",
         "<rootDir>/src/modules/orders/order-state.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         // #173 — organization stamping on create; DB-free so CI catches a

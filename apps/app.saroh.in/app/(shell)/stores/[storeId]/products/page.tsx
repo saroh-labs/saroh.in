@@ -46,6 +46,9 @@ export default async function ProductsPage({
                         <Button variant="outline" asChild>
                             <Link href={`${base}/categories`}>Categories</Link>
                         </Button>
+                        <Button variant="outline" asChild>
+                            <Link href={`${base}/import`}>Import</Link>
+                        </Button>
                         <Button variant="brand" asChild>
                             <Link href={`${base}/new`}>New product</Link>
                         </Button>
