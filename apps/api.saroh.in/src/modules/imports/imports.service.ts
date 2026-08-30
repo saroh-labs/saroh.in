@@ -11,7 +11,12 @@ import type { ApplyImportDto, PreviewImportDto } from "./dto";
 import type { ImportEntity } from "./entities";
 import { ENTITY_DESCRIPTORS } from "./entities";
 import type { ImportPlan, WritableRow } from "./import-plan";
-import { buildImportPlan, isApplicable, writableRows } from "./import-plan";
+import {
+    buildImportPlan,
+    isApplicable,
+    suggestMapping,
+    writableRows,
+} from "./import-plan";
 
 /** How many rows are written per transaction. */
 const WRITE_CHUNK = 200;
@@ -32,6 +37,14 @@ function required(row: WritableRow, field: string): string {
         );
     }
     return value;
+}
+
+export interface PreviewResult {
+    /** Column names in file order, for the mapping step. */
+    headers: string[];
+    /** The mapping actually used — the caller's, or a suggestion when none was given. */
+    mapping: Record<string, string>;
+    plan: ImportPlan;
 }
 
 export interface ApplyResult {
@@ -62,7 +75,7 @@ export class ImportsService {
         userId: string,
         entity: ImportEntity,
         dto: PreviewImportDto,
-    ): Promise<ImportPlan> {
+    ): Promise<PreviewResult> {
         await this.requireWrite(storeId, userId);
         return this.plan(storeId, entity, dto);
     }
@@ -74,7 +87,7 @@ export class ImportsService {
         dto: ApplyImportDto,
     ): Promise<ApplyResult> {
         const organizationId = await this.requireWrite(storeId, userId);
-        const plan = await this.plan(storeId, entity, dto);
+        const { plan } = await this.plan(storeId, entity, dto);
 
         if (!isApplicable(plan)) {
             throw new BadRequestException({
@@ -130,7 +143,7 @@ export class ImportsService {
         storeId: string,
         entity: ImportEntity,
         dto: PreviewImportDto,
-    ): Promise<ImportPlan> {
+    ): Promise<PreviewResult> {
         const descriptor = ENTITY_DESCRIPTORS[entity];
 
         let parsed;
@@ -146,15 +159,24 @@ export class ImportsService {
             throw err;
         }
 
-        return buildImportPlan({
+        // An empty mapping means "you choose": suggest one so the first preview
+        // is already informative rather than a wall of missing-field errors.
+        const mapping =
+            Object.keys(dto.mapping).length > 0
+                ? dto.mapping
+                : suggestMapping(parsed.headers, descriptor.mappableFields);
+
+        const plan = buildImportPlan({
             records: parsed.records,
-            mapping: dto.mapping,
+            mapping,
             policy: dto.policy ?? "SKIP",
             existingKeys: await this.existingKeys(storeId, entity),
             requiredFields: descriptor.requiredFields,
             keyOf: descriptor.keyOf,
             validateRow: descriptor.validateRow,
         });
+
+        return { headers: parsed.headers, mapping, plan };
     }
 
     private async existingKeys(

@@ -2,6 +2,7 @@ import {
     applyMapping,
     buildImportPlan,
     isApplicable,
+    suggestMapping,
     writableRows,
     type PlanInput,
 } from "./import-plan";
@@ -177,5 +178,42 @@ describe("writableRows / isApplicable", () => {
     it("does not apply when there is nothing to write", () => {
         const p = plan({ records: [{ Price: "10" }] });
         expect(isApplicable(p)).toBe(false);
+    });
+});
+
+describe("suggestMapping", () => {
+    const FIELDS = ["name", "price", "firstName", "email"] as const;
+
+    it("matches an exact header", () => {
+        expect(suggestMapping(["name", "price"], FIELDS)).toEqual({
+            name: "name",
+            price: "price",
+        });
+    });
+
+    it("matches regardless of case, spaces and separators", () => {
+        expect(
+            suggestMapping(["First Name", "E-Mail", "PRICE"], FIELDS),
+        ).toEqual({
+            "First Name": "firstName",
+            "E-Mail": "email",
+            PRICE: "price",
+        });
+    });
+
+    it("leaves an unrecognised header unmapped rather than guessing", () => {
+        // A wrong automatic mapping writes plausible data into the wrong
+        // column, which is worse than asking.
+        expect(suggestMapping(["Supplier Ref"], FIELDS)).toEqual({});
+    });
+
+    it("does not feed one field from two columns", () => {
+        const mapping = suggestMapping(["Name", "name"], FIELDS);
+        expect(Object.values(mapping)).toEqual(["name"]);
+        expect(mapping.Name).toBe("name");
+    });
+
+    it("returns an empty mapping for no headers", () => {
+        expect(suggestMapping([], FIELDS)).toEqual({});
     });
 });

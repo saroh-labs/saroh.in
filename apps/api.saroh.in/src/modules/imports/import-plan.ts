@@ -216,3 +216,41 @@ export function writableRows(plan: ImportPlan): WritableRow[] {
 export function isApplicable(plan: ImportPlan): boolean {
     return plan.fileIssues.length === 0 && writableRows(plan).length > 0;
 }
+
+/** Normalize a header or field name for fuzzy matching: "First Name" -> "firstname". */
+function normalizeName(value: string): string {
+    return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Guess a header -> field mapping so the first preview is already useful.
+ *
+ * Matches on a normalized name, so "First Name", "first_name" and "firstname"
+ * all find `firstName`. Deliberately conservative: a header that matches
+ * nothing is left unmapped rather than guessed at, because a wrong automatic
+ * mapping writes plausible data into the wrong column — worse than asking.
+ *
+ * The merchant always sees and can change the result; this is a starting point,
+ * not a decision.
+ */
+export function suggestMapping(
+    headers: readonly string[],
+    mappableFields: readonly string[],
+): Record<string, string> {
+    const byNormalized = new Map(
+        mappableFields.map((field) => [normalizeName(field), field]),
+    );
+    const mapping: Record<string, string> = {};
+    const claimed = new Set<string>();
+
+    for (const header of headers) {
+        const field = byNormalized.get(normalizeName(header));
+        // One field cannot be fed by two columns; the first header wins and the
+        // rest are left for the merchant to resolve.
+        if (field !== undefined && !claimed.has(field)) {
+            mapping[header] = field;
+            claimed.add(field);
+        }
+    }
+    return mapping;
+}
