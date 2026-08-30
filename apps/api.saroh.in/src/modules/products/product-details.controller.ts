@@ -13,6 +13,8 @@ import {
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
+import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
+import { RequireModule } from "../capabilities/require-module.decorator";
 import { UpdateInventoryDto } from "./inventory.dto";
 import { InventoryService } from "./inventory.service";
 import { CreateVariantDto, UpdateVariantDto } from "./variants.dto";
@@ -23,7 +25,8 @@ import { VariantsService } from "./variants.service";
  * store; the services delegate authorization (read/write) to ProductsService.
  */
 @Controller("stores/:storeId/products/:productId")
-@UseGuards(BetterAuthGuard)
+@UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
+@RequireModule("COMMERCE")
 export class ProductDetailsController {
     constructor(
         private readonly variants: VariantsService,

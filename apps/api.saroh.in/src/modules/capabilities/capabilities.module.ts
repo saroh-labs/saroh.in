@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { BillingModule } from "../billing/billing.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
+import { OrganizationContextModule } from "../organizations/organization-context.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { CapabilitiesController } from "./capabilities.controller";
 import { ModuleAvailabilityService } from "./module-availability.service";
@@ -18,7 +19,12 @@ import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
  * #115.
  */
 @Module({
-    imports: [FeatureFlagModule, BillingModule, OrganizationsModule],
+    imports: [
+        FeatureFlagModule,
+        BillingModule,
+        OrganizationsModule,
+        OrganizationContextModule,
+    ],
     controllers: [CapabilitiesController],
     providers: [
         ModuleReadinessRegistry,
@@ -33,8 +39,13 @@ import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
         ModuleLifecycleService,
         // Exported so any domain module can adopt @RequireModule enforcement by
         // importing CapabilitiesModule and adding ModuleEnforcementGuard to its
-        // controller's @UseGuards (after OrganizationGuard). Dark by default.
+        // controller's @UseGuards. Dark by default.
         ModuleEnforcementGuard,
+        // Re-exported with it: the guard is instantiated in the CONSUMER's
+        // injector, so OrganizationContextService must resolve there too.
+        // Without this every adopting module would have to know that internal
+        // dependency and import it itself.
+        OrganizationContextModule,
     ],
 })
 export class CapabilitiesModule {}
