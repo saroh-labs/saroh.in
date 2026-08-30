@@ -2,9 +2,11 @@ import {
     BadRequestException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import { StoresService } from "../stores/stores.service";
 import type {
     CreateOrderDto,
@@ -33,7 +35,15 @@ const CUSTOMER_SELECT = {
  */
 @Injectable()
 export class OrdersService {
-    constructor(private readonly stores: StoresService) {}
+    constructor(
+        private readonly stores: StoresService,
+        // @Optional for the same reason ModuleLifecycleService's is: this
+        // service is also constructed directly in DB-backed specs, which pass
+        // only what they exercise. Requiring it made every such construction
+        // throw on first write. `app.bootstrap.spec` asserts it IS resolved in
+        // the real graph, so optional here cannot become silently inert (#176).
+        @Optional() private readonly activation?: ActivationEvents,
+    ) {}
 
     async list(storeId: string, userId: string) {
         await this.stores.getForUser(storeId, userId);
@@ -146,6 +156,15 @@ export class OrdersService {
                     );
                     return order;
                 });
+                if (organizationId) {
+                    // Safe on every order: the ledger keeps only the first
+                    // (deterministic dedupeKey), so no "is this their first?"
+                    // query and no race between concurrent creates.
+                    await this.activation?.firstOrderCreated(
+                        organizationId,
+                        created.id,
+                    );
+                }
                 return { id: created.id };
             } catch (err) {
                 if (this.isUniqueOrderNumber(err) && attempt < 4) continue;

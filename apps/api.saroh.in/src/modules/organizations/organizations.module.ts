@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { AuditModule } from "../audit/audit.module";
 import { OrganizationContextModule } from "./organization-context.module";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
@@ -20,7 +21,7 @@ import { OrganizationsController } from "./organizations.controller";
  * extracted the dependency runs one way and the `forwardRef` is gone.
  */
 @Module({
-    imports: [OrganizationContextModule, AuditModule],
+    imports: [OrganizationContextModule, AuditModule, AnalyticsCoreModule],
     controllers: [OrganizationsController],
     providers: [OrganizationOnboardingService, OrganizationSettingsService],
     exports: [OrganizationContextModule],

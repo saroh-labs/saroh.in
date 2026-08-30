@@ -29,6 +29,7 @@ jest.mock("@saroh/database", () => {
 import { NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import type { ActivationEvents } from "../analytics/activation-events";
 import type { StoresService } from "../stores/stores.service";
 import { OrdersService } from "./orders.service";
 
@@ -54,7 +55,12 @@ function makeService(writable: { organizationId: string | null } | null) {
     const stores = {
         writableOrganization: jest.fn().mockResolvedValue(writable),
     } as unknown as StoresService;
-    return new OrdersService(stores);
+    // Activation events are fire-and-forget instrumentation (#176); a stub
+    // keeps these tests about order writes rather than about analytics.
+    const activation = {
+        firstOrderCreated: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ActivationEvents;
+    return new OrdersService(stores, activation);
 }
 
 beforeEach(() => {

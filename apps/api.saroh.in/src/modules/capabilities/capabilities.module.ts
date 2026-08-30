@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { BillingModule } from "../billing/billing.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
@@ -24,6 +25,9 @@ import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
         BillingModule,
         OrganizationsModule,
         OrganizationContextModule,
+        // Activation instrumentation (#176) — the write primitives only, so no
+        // cycle through AnalyticsModule's controllers and org guard.
+        AnalyticsCoreModule,
     ],
     controllers: [CapabilitiesController],
     providers: [

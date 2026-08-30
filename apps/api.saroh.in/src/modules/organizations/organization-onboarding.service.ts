@@ -3,9 +3,11 @@ import {
     ConflictException,
     Injectable,
     Logger,
+    Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import {
     AuditAction,
     AuditOutcome,
@@ -36,7 +38,10 @@ export interface OnboardedOrganization {
 export class OrganizationOnboardingService {
     private readonly logger = new Logger(OrganizationOnboardingService.name);
 
-    constructor(private readonly audit: AuditService) {}
+    constructor(
+        private readonly audit: AuditService,
+        @Optional() private readonly activation?: ActivationEvents,
+    ) {}
 
     async onboard(
         userId: string,
@@ -103,6 +108,11 @@ export class OrganizationOnboardingService {
             outcome: AuditOutcome.Success,
             metadata: { slug: onboarded.slug },
         });
+
+        // t0 of the activation funnel (#176). Same placement and same tradeoff
+        // as the audit write above: after the commit, and it swallows its own
+        // errors so instrumentation can never undo a committed onboarding.
+        await this.activation?.organizationCreated(onboarded.id);
 
         return onboarded;
     }

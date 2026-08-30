@@ -3,9 +3,11 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
 import type { CreateProductDto, ProductStatus, UpdateProductDto } from "./dto";
@@ -20,7 +22,15 @@ import { serializeProduct, serializeProductDetail } from "./serialize";
  */
 @Injectable()
 export class ProductsService {
-    constructor(private readonly stores: StoresService) {}
+    constructor(
+        private readonly stores: StoresService,
+        // @Optional for the same reason ModuleLifecycleService's is: this
+        // service is also constructed directly in DB-backed specs, which pass
+        // only what they exercise. Requiring it made every such construction
+        // throw on first write. `app.bootstrap.spec` asserts it IS resolved in
+        // the real graph, so optional here cannot become silently inert (#176).
+        @Optional() private readonly activation?: ActivationEvents,
+    ) {}
 
     /** Catalog for a store the caller can access, optionally filtered by status. */
     async list(storeId: string, userId: string, status?: ProductStatus) {
@@ -77,6 +87,12 @@ export class ProductsService {
                     status: dto.status ?? "DRAFT",
                 },
             });
+            if (organizationId) {
+                await this.activation?.firstProductCreated(
+                    organizationId,
+                    product.id,
+                );
+            }
             return { id: product.id };
         } catch {
             throw new ConflictException({

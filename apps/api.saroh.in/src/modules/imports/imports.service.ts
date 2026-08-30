@@ -2,9 +2,11 @@ import {
     BadRequestException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import { StoresService } from "../stores/stores.service";
 import { CsvFormatError, parseCsv } from "./csv";
 import type { ApplyImportDto, PreviewImportDto } from "./dto";
@@ -68,7 +70,15 @@ export interface ApplyResult {
  */
 @Injectable()
 export class ImportsService {
-    constructor(private readonly stores: StoresService) {}
+    constructor(
+        private readonly stores: StoresService,
+        // @Optional for the same reason ModuleLifecycleService's is: this
+        // service is also constructed directly in DB-backed specs, which pass
+        // only what they exercise. Requiring it made every such construction
+        // throw on first write. `app.bootstrap.spec` asserts it IS resolved in
+        // the real graph, so optional here cannot become silently inert (#176).
+        @Optional() private readonly activation?: ActivationEvents,
+    ) {}
 
     async preview(
         storeId: string,
@@ -114,6 +124,15 @@ export class ImportsService {
                     if (row.outcome === "CREATE") created += 1;
                     else updated += 1;
                 }
+            });
+        }
+
+        if (organizationId) {
+            await this.activation?.importCompleted(organizationId, {
+                entity,
+                created,
+                updated,
+                failed: plan.counts.ERROR,
             });
         }
 
