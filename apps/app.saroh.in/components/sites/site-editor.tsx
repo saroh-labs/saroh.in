@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { cn } from "@saroh/ui/lib/utils";
 import {
     Select,
     SelectContent,
@@ -57,6 +58,35 @@ const SECTION_LABELS: Record<SectionType, string> = {
     enquiry: "Enquiry form",
     booking: "Booking",
 };
+
+/** Preview widths. The phone value is a real handset, not a breakpoint. */
+const DEVICES = [
+    { key: "desktop", label: "Desktop" },
+    { key: "tablet", label: "Tablet" },
+    { key: "phone", label: "Phone" },
+] as const;
+type Device = (typeof DEVICES)[number]["key"];
+const DEVICE_WIDTH: Record<Device, string> = {
+    desktop: "100%",
+    tablet: "48rem",
+    phone: "23.4375rem",
+};
+
+/**
+ * A section's own words in the rail, falling back to its type.
+ *
+ * "Hero" five times is a list of types, not a page. The merchant recognises
+ * their own heading, which is what makes the rail navigable.
+ */
+function sectionTitle(section: Section): string {
+    const c = section.content as Record<string, unknown>;
+    const candidate =
+        (typeof c.heading === "string" && c.heading) ||
+        (typeof c.title === "string" && c.title) ||
+        (typeof c.label === "string" && c.label) ||
+        "";
+    return candidate.trim() || SECTION_LABELS[section.type];
+}
 
 const SECTION_ORDER: SectionType[] = [
     "hero",
@@ -157,11 +187,14 @@ export function SiteEditor({
     pageId,
     initialSections,
     siteName,
+    address,
 }: {
     siteId: string;
     pageId: string;
     initialSections: Section[];
     siteName: string;
+    /** Where this site lives, shown in the bar. Null before a subdomain exists. */
+    address?: string | null;
 }) {
     const [sections, setSections] = useState<Section[]>(initialSections);
     const [lastSavedJson, setLastSavedJson] = useState(() =>
@@ -170,6 +203,12 @@ export function SiteEditor({
     const [saving, setSaving] = useState(false);
     const [publishing, setPublishing] = useState(false);
     const [errorIndex, setErrorIndex] = useState<number | null>(null);
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(
+        initialSections.length > 0 ? 0 : null,
+    );
+    const [device, setDevice] = useState<Device>("desktop");
+    const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+    const [saveError, setSaveError] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     // The org's services for the booking-section picker. Loaded once on mount;
     // Services are authored in the service editor, never inline here.
@@ -190,6 +229,31 @@ export function SiteEditor({
     }, []);
 
     const dirty = JSON.stringify(sections) !== lastSavedJson;
+
+    /*
+     * How many sections publishing would actually change.
+     *
+     * "Publish" with no number asks the merchant to trust that something
+     * happened. This compares the current sections against the last SAVED
+     * state, section by section, so the count describes work rather than
+     * keystrokes. A length change counts the difference too — adding a section
+     * is a change even though nothing was edited.
+     */
+    const changedCount = (() => {
+        let saved: Section[];
+        try {
+            saved = JSON.parse(lastSavedJson) as Section[];
+        } catch {
+            return sections.length;
+        }
+        let n = Math.abs(sections.length - saved.length);
+        const shared = Math.min(sections.length, saved.length);
+        for (let i = 0; i < shared; i += 1) {
+            if (JSON.stringify(sections[i]) !== JSON.stringify(saved[i]))
+                n += 1;
+        }
+        return n;
+    })();
 
     function replaceAt(index: number, next: Section) {
         setSections((prev) => prev.map((s, i) => (i === index ? next : s)));
@@ -252,7 +316,7 @@ export function SiteEditor({
         return { ok: true, sections: next };
     }
 
-    async function onSave() {
+    async function onSave(auto = false) {
         setSaving(true);
         setErrorIndex(null);
         setErrorMessage(null);
@@ -275,15 +339,43 @@ export function SiteEditor({
         setSaving(false);
         if (res.ok) {
             setLastSavedJson(JSON.stringify(synced.sections));
-            toast.success("Draft saved.");
+            setLastSavedAt(new Date());
+            setSaveError(false);
+            // An autosave that announces itself every few seconds is noise; the
+            // bar already states when it last saved.
+            if (!auto) toast.success("Draft saved.");
             return;
         }
+        setSaveError(true);
         if (typeof res.index === "number") {
             setErrorIndex(res.index);
             setErrorMessage(res.error);
         }
         toast.error(res.error);
     }
+
+    /*
+     * Autosave, debounced.
+     *
+     * The design replaces an explicit Save with "Draft changes · autosaved 2m
+     * ago", which is only an improvement if failure is visible: an autosave that
+     * fails silently is worse than a Save button that visibly does. The bar
+     * therefore reads "Not saved" on failure and keeps the work in local state,
+     * so the next edit retries.
+     *
+     * Publishing is blocked while dirty or saving, so a merchant can never
+     * publish a state the server has not accepted.
+     */
+    useEffect(() => {
+        if (!dirty || saving || publishing) return;
+        const id = setTimeout(() => {
+            void onSave(true);
+        }, 1500);
+        return () => clearTimeout(id);
+        // `onSave` is redefined each render; depending on it would restart the
+        // timer on every keystroke and never fire.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dirty, saving, publishing, sections]);
 
     async function onPublish() {
         if (dirty) {
@@ -300,66 +392,177 @@ export function SiteEditor({
         toast.error(res.error);
     }
 
+    /*
+     * The selected section AND its index together, so nothing downstream has to
+     * assert that the index is still valid. Removing a section can leave the
+     * index past the end, and carrying the pair makes that a single check here
+     * rather than a non-null assertion at every use.
+     */
+    const active =
+        selectedIndex !== null && selectedIndex < sections.length
+            ? { index: selectedIndex, section: sections[selectedIndex] }
+            : null;
+
     return (
-        <div className="mt-4">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <h1 className="text-2xl font-semibold">{siteName}</h1>
-                <div className="flex items-center gap-3">
-                    {dirty && (
-                        <span className="text-sm text-muted-foreground">
-                            Unsaved changes
-                        </span>
-                    )}
-                    <Button
-                        variant="outline"
-                        className="wk-press"
-                        onClick={onSave}
-                        disabled={saving || !dirty}
+        <div className="flex h-[calc(100vh-3.5rem)] flex-col">
+            {/*
+             * Top bar. The design puts the site's identity, its state and the
+             * one irreversible action on one line — a merchant should be able to
+             * tell what will happen when they press Publish without scrolling.
+             */}
+            <header className="flex flex-wrap items-center gap-3 border-b px-4 py-2.5">
+                <Link
+                    href="/sites"
+                    className="shrink-0 rounded text-sm text-muted-foreground hover:text-foreground"
+                >
+                    ← Sites
+                </Link>
+                <span className="text-sm font-medium">{siteName}</span>
+                {address ? (
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
+                        {address}
+                    </span>
+                ) : null}
+
+                {/* Autosave state, stated rather than implied. */}
+                <span className="text-xs text-muted-foreground">
+                    {saving
+                        ? "Saving…"
+                        : saveError
+                          ? "Not saved"
+                          : dirty
+                            ? "Unsaved changes"
+                            : lastSavedAt
+                              ? `Saved ${lastSavedAt.toLocaleTimeString()}`
+                              : "Draft"}
+                </span>
+
+                <div className="ml-auto flex items-center gap-2">
+                    {/*
+                     * Device preview. §18 makes the phone co-primary for the
+                     * merchant's CUSTOMERS as much as the merchant: without this
+                     * a headline that wraps badly is discovered by a visitor.
+                     * Width only — the preview is already local, and switching
+                     * must not become a re-fetch.
+                     */}
+                    <div
+                        role="group"
+                        aria-label="Preview width"
+                        className="flex overflow-hidden rounded-md border"
                     >
-                        {saving ? "Saving…" : "Save draft"}
-                    </Button>
+                        {DEVICES.map((d) => (
+                            <button
+                                key={d.key}
+                                type="button"
+                                onClick={() => setDevice(d.key)}
+                                aria-pressed={device === d.key}
+                                className={cn(
+                                    "px-2.5 py-1 text-xs",
+                                    device === d.key
+                                        ? "bg-secondary text-secondary-foreground"
+                                        : "text-muted-foreground hover:text-foreground",
+                                )}
+                            >
+                                {d.label}
+                            </button>
+                        ))}
+                    </div>
+
                     <Button
                         className="wk-press"
+                        variant="brand"
                         onClick={onPublish}
-                        disabled={publishing || dirty}
+                        disabled={publishing || dirty || saving}
                     >
-                        {publishing ? "Publishing…" : "Publish"}
+                        {publishing
+                            ? "Publishing…"
+                            : changedCount > 0
+                              ? `Publish ${changedCount}`
+                              : "Publish"}
                     </Button>
                 </div>
-            </div>
+            </header>
 
-            <div className="grid gap-8 lg:grid-cols-2">
-                {/* Editor */}
-                <div className="space-y-4">
-                    {sections.length === 0 && (
-                        <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                            No sections yet. Add one below to start building the
-                            page.
-                        </p>
-                    )}
+            <div className="grid min-h-0 flex-1 lg:grid-cols-[15rem_20rem_minmax(0,1fr)]">
+                {/* Rail — the page as a list of sections, not a wall of fields. */}
+                <aside className="flex min-h-0 flex-col border-r">
+                    <div className="border-b px-3 py-2">
+                        <span className="text-xs font-semibold">Sections</span>
+                    </div>
+                    <ul className="min-h-0 flex-1 overflow-y-auto p-2">
+                        {sections.map((section, index) => (
+                            <li key={index}>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedIndex(index)}
+                                    className={cn(
+                                        "flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm",
+                                        selectedIndex === index
+                                            ? "bg-secondary"
+                                            : "hover:bg-muted",
+                                        errorIndex === index &&
+                                            "text-destructive",
+                                    )}
+                                >
+                                    <span className="truncate">
+                                        {sectionTitle(section)}
+                                    </span>
+                                    <span className="shrink-0 text-[0.625rem] uppercase tracking-wide text-muted-foreground">
+                                        {SECTION_LABELS[section.type]}
+                                    </span>
+                                </button>
+                            </li>
+                        ))}
+                        {sections.length === 0 ? (
+                            <li className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                No sections yet.
+                            </li>
+                        ) : null}
+                    </ul>
+                    <div className="border-t p-2">
+                        <details>
+                            <summary className="cursor-pointer rounded px-2 py-1 text-sm text-muted-foreground hover:text-foreground">
+                                + Add section
+                            </summary>
+                            <div className="flex flex-wrap gap-1 px-2 pt-2">
+                                {SECTION_ORDER.map((type) => (
+                                    <Button
+                                        key={type}
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            addSection(type);
+                                            setSelectedIndex(sections.length);
+                                        }}
+                                    >
+                                        {SECTION_LABELS[type]}
+                                    </Button>
+                                ))}
+                            </div>
+                        </details>
+                    </div>
+                </aside>
 
-                    {sections.map((section, index) => (
-                        <div
-                            key={index}
-                            className={
-                                "rounded-xl border p-4" +
-                                (errorIndex === index
-                                    ? " border-destructive"
-                                    : "")
-                            }
-                        >
-                            <div className="mb-3 flex items-center justify-between">
-                                <span className="text-sm font-medium">
-                                    {SECTION_LABELS[section.type]}
-                                </span>
+                {/* Field panel — one section at a time. */}
+                <div className="min-h-0 overflow-y-auto border-r p-4">
+                    {active ? (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between gap-2">
+                                <h2 className="text-sm font-semibold">
+                                    {SECTION_LABELS[active.section.type]}
+                                </h2>
                                 <div className="flex items-center gap-1">
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="sm"
                                         aria-label="Move section up"
-                                        disabled={index === 0}
-                                        onClick={() => move(index, -1)}
+                                        disabled={active.index === 0}
+                                        onClick={() => {
+                                            move(active.index, -1);
+                                            setSelectedIndex(active.index - 1);
+                                        }}
                                     >
                                         ↑
                                     </Button>
@@ -368,8 +571,13 @@ export function SiteEditor({
                                         variant="ghost"
                                         size="sm"
                                         aria-label="Move section down"
-                                        disabled={index === sections.length - 1}
-                                        onClick={() => move(index, 1)}
+                                        disabled={
+                                            active.index === sections.length - 1
+                                        }
+                                        onClick={() => {
+                                            move(active.index, 1);
+                                            setSelectedIndex(active.index + 1);
+                                        }}
                                     >
                                         ↓
                                     </Button>
@@ -377,8 +585,10 @@ export function SiteEditor({
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        aria-label="Remove section"
-                                        onClick={() => removeAt(index)}
+                                        onClick={() => {
+                                            removeAt(active.index);
+                                            setSelectedIndex(null);
+                                        }}
                                     >
                                         Remove
                                     </Button>
@@ -386,40 +596,35 @@ export function SiteEditor({
                             </div>
 
                             <SectionFields
-                                section={section}
+                                section={active.section}
                                 services={services}
-                                onChange={(next) => replaceAt(index, next)}
+                                onChange={(next) =>
+                                    replaceAt(active.index, next)
+                                }
                             />
 
-                            {errorIndex === index && errorMessage && (
-                                <p className="mt-3 text-sm text-destructive">
+                            {errorIndex === active.index && errorMessage ? (
+                                <p className="text-sm text-destructive">
                                     {errorMessage}
                                 </p>
-                            )}
+                            ) : null}
                         </div>
-                    ))}
-
-                    <div className="flex flex-wrap gap-2 pt-2">
-                        {SECTION_ORDER.map((type) => (
-                            <Button
-                                key={type}
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addSection(type)}
-                            >
-                                + {SECTION_LABELS[type]}
-                            </Button>
-                        ))}
-                    </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            Pick a section on the left to edit it. Changes
+                            appear in the preview as you type.
+                        </p>
+                    )}
                 </div>
 
-                {/* Live preview (no network) */}
-                <div className="lg:sticky lg:top-8 lg:self-start">
-                    <p className="mb-2 text-sm font-medium text-muted-foreground">
-                        Preview
-                    </p>
-                    <DraftPreview sections={sections} />
+                {/* Preview — width changes, data does not. */}
+                <div className="min-h-0 overflow-y-auto bg-muted/30 p-6">
+                    <div
+                        className="mx-auto transition-[max-width]"
+                        style={{ maxWidth: DEVICE_WIDTH[device] }}
+                    >
+                        <DraftPreview sections={sections} />
+                    </div>
                 </div>
             </div>
         </div>
