@@ -46,7 +46,17 @@ export async function moduleAccess(moduleKey: string): Promise<ModuleAccess> {
     const found = modules.find((m) => m.key === moduleKey);
     if (!found) return { state: "unknown" };
 
-    return found.lifecycle === "ENABLED"
+    // `readiness`, NOT `lifecycle` — and this distinction is the whole bug this
+    // guard shipped with. `lifecycle` is only the Organization's own choice;
+    // effective availability also depends on the rollout flag, the entitlement
+    // and the actor's permission, which is what `readiness` folds together.
+    //
+    // `app-shell.tsx` filters the nav on `readiness !== "DISABLED"`. Gating on
+    // `lifecycle` here meant the two disagreed: with rollout flags dark (their
+    // default) the sidebar correctly hid Sell while this let /commerce render
+    // anyway — the precise contradiction §21 exists to prevent. The nav and the
+    // route must answer "is this on?" the same way, so they read the same field.
+    return found.readiness !== "DISABLED"
         ? { state: "available" }
         : { state: "unavailable", module: found };
 }
