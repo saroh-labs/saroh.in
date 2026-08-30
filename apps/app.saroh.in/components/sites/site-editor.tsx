@@ -404,7 +404,7 @@ export function SiteEditor({
             : null;
 
     return (
-        <div className="flex h-[calc(100vh-3.5rem)] flex-col">
+        <div className="flex h-screen flex-col">
             {/*
              * Top bar. The design puts the site's identity, its state and the
              * one irreversible action on one line — a merchant should be able to
