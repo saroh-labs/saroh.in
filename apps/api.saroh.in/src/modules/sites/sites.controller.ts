@@ -126,6 +126,20 @@ export class SitesController {
         return this.sites.updateSettings(ctx, siteId, dto);
     }
 
+    /**
+     * Set the site's look (#189). Replaces rather than merges — the Style panel
+     * always sends a whole look, and merging would let two tabs produce a
+     * palette neither person chose.
+     */
+    @Put(":siteId/style")
+    updateStyle(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() body: unknown,
+    ) {
+        return this.sites.updateStyle(ctx, siteId, body);
+    }
+
     // ---------------------------------------------------------------------
     // Version history (#194)
     // ---------------------------------------------------------------------

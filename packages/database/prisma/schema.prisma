@@ -1395,6 +1395,13 @@ model Site {
   // These travel into the Publication snapshot at publish time, because the
   // public renderer reads only that. Changing one is therefore an unpublished
   // change like any section edit.
+  // The site's look: six curated colour choices and five spacing scalars
+  // (#189). Validated by `site-style.ts`, stored as CHOICE KEYS rather than raw
+  // hex so a palette can be retuned without rewriting every site, and resolved
+  // into the `--site-*` layer the renderer already defines. Null = the defaults,
+  // which reproduce today's appearance exactly.
+  style Json?
+
   seoTitle       String? // <title> / og:title
   seoDescription String? // meta description / og:description
   socialImageUrl String? // og:image — the card shown when the link is shared

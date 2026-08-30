@@ -45,6 +45,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { UpdateDraftSectionsDto } from "./dto";
+import { defaultSiteStyle } from "./site-style";
 import { SitesService } from "./sites.service";
 
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
@@ -276,7 +277,21 @@ describe("SitesService.publishSite", () => {
         expect(data.templateVersion).toBeGreaterThanOrEqual(1);
 
         // Snapshot is self-contained + the <script> was stripped before write.
-        expect(data.snapshot.site).toEqual({ name: "Acme", slug: "acme" });
+        // The snapshot carries the site's identity, its search/social fields
+        // (#188) and its look (#189) — the public renderer reads ONLY this row,
+        // so anything left out here never reaches the live site. Style is
+        // normalized to the defaults when the site has none, so a snapshot is
+        // never half-styled.
+        expect(data.snapshot.site).toMatchObject({
+            name: "Acme",
+            slug: "acme",
+        });
+        expect(data.snapshot.site.style.colours).toEqual(
+            defaultSiteStyle().colours,
+        );
+        expect(data.snapshot.site.style.scalars).toEqual(
+            defaultSiteStyle().scalars,
+        );
         const value = data.snapshot.pages[0].sections[0].content.value;
         expect(value).not.toContain("<script>");
         expect(value).not.toContain("alert");

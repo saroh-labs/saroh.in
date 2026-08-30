@@ -24,6 +24,8 @@ import type {
     UpdateSiteSettingsDto,
 } from "./dto";
 import { sanitizeSectionContent } from "./sanitize";
+import type { SiteStyle } from "./site-style";
+import { parseSiteStyle } from "./site-style";
 
 /** What creating a site returns to the caller: the new site's identity. */
 export interface CreatedSite {
@@ -102,6 +104,24 @@ function slugify(input: string): string {
  * inferred type cannot be named across the package boundary, and callers must
  * parse it against the section contract anyway rather than trusting its shape.
  */
+/** One site as the editor and settings screens read it. */
+export interface SiteDetailView {
+    id: string;
+    name: string;
+    slug: string;
+    subdomain: string | null;
+    currentPublicationId: string | null;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    socialImageUrl: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    currentPublication: { publishedAt: Date } | null;
+    pages: { id: string; path: string; title: string; isHome: boolean }[];
+    /** Always complete — absent choices are filled from the defaults. */
+    style: SiteStyle;
+}
+
 export interface PublicationDetail {
     id: string;
     publishedAt: Date;
@@ -326,7 +346,10 @@ export class SitesService {
      * belongs to another org (cross-tenant reads are indistinguishable from
      * "not found"). Requires `site:read`.
      */
-    async getSite(ctx: OrganizationContext, siteId: string) {
+    async getSite(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<SiteDetailView> {
         authorize(ctx, "site:read");
         const site = await prisma.site.findFirst({
             where: {
@@ -340,7 +363,8 @@ export class SitesService {
                 slug: true,
                 subdomain: true,
                 currentPublicationId: true,
-                // Search + social (#188).
+                // The site's look (#189) and its search + social (#188).
+                style: true,
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
@@ -364,7 +388,12 @@ export class SitesService {
         if (!site) {
             throw new NotFoundException(`Site "${siteId}" not found`);
         }
-        return site;
+        // Normalize the look on the way out (#189): the editor should never
+        // have to decide what a half-written or absent style means, and a
+        // client filling gaps itself is how the preview and the published site
+        // drift apart.
+        const { style, ...rest } = site;
+        return { ...rest, style: parseSiteStyle(style) };
     }
 
     /**
@@ -409,6 +438,36 @@ export class SitesService {
             },
         });
         return site;
+    }
+
+    /**
+     * Set a site's look (#189).
+     *
+     * Replaces rather than merges: the Style panel edits a whole look at once
+     * and always sends a complete one, and a partial merge would let two open
+     * tabs produce a palette neither person chose.
+     *
+     * Requires `site:update` — this is what the public sees. Like the search
+     * settings, it is draft state: it reaches the live site on the next publish.
+     */
+    async updateStyle(
+        ctx: OrganizationContext,
+        siteId: string,
+        input: unknown,
+    ): Promise<{ id: string; style: SiteStyle }> {
+        authorize(ctx, "site:update");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        // Validate BEFORE writing: an unknown colour key or a non-numeric
+        // slider must be a 400, not a site that renders wrong later.
+        const style = parseSiteStyle(input);
+
+        await prisma.site.update({
+            where: { id: siteId },
+            data: { style: style as unknown as Prisma.InputJsonValue },
+            select: { id: true },
+        });
+        return { id: siteId, style };
     }
 
     // -----------------------------------------------------------------------
@@ -707,6 +766,7 @@ export class SitesService {
                 id: true,
                 name: true,
                 slug: true,
+                style: true,
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
@@ -792,6 +852,12 @@ export class SitesService {
                 seoTitle: site.seoTitle,
                 seoDescription: site.seoDescription,
                 socialImageUrl: site.socialImageUrl,
+                // The look travels with the content (#189). saroh.app's
+                // SiteTheme already says it will interpolate brand fields from
+                // the snapshot when they arrive — these are those fields.
+                // Normalized here so a snapshot is always complete, never
+                // half-styled by whatever the draft happened to hold.
+                style: parseSiteStyle(site.style),
             },
             pages,
             publishedAt: publishedAt.toISOString(),
@@ -805,7 +871,10 @@ export class SitesService {
                 data: {
                     siteId: site.id,
                     organizationId: ctx.organizationId,
-                    snapshot: snapshot as Prisma.InputJsonValue,
+                    // Through `unknown`: SiteStyle is a precise interface, and
+                    // Prisma's InputJsonValue index signature does not accept
+                    // one directly even though the value is plain JSON.
+                    snapshot: snapshot as unknown as Prisma.InputJsonValue,
                     templateId: starterTemplate.id,
                     templateVersion: starterTemplate.version,
                     publishedByUserId: ctx.userId,
