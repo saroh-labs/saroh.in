@@ -95,6 +95,22 @@ function slugify(input: string): string {
  * client-supplied org. Section content is already contract-validated by
  * `instantiateTemplate`, so persistence is a straight write.
  */
+/**
+ * One past publish, as the version-history screens read it.
+ *
+ * `snapshot` is typed `unknown` rather than Prisma's JsonValue on purpose: the
+ * inferred type cannot be named across the package boundary, and callers must
+ * parse it against the section contract anyway rather than trusting its shape.
+ */
+export interface PublicationDetail {
+    id: string;
+    publishedAt: Date;
+    publishedByUserId: string | null;
+    templateId: string;
+    templateVersion: number;
+    snapshot: unknown;
+}
+
 @Injectable()
 export class SitesService {
     constructor(private readonly entitlements: EntitlementService) {}
@@ -393,6 +409,146 @@ export class SitesService {
             },
         });
         return site;
+    }
+
+    // -----------------------------------------------------------------------
+    // Version history (#194) — every publish is already kept
+    // -----------------------------------------------------------------------
+
+    /**
+     * Every publish of a site, newest first.
+     *
+     * `Publication` has been immutable and append-only since Stage 2 —
+     * republishing inserts a row, never updates one — so this history already
+     * existed and simply had no surface. Requires `site:read`.
+     *
+     * The snapshot itself is deliberately NOT selected: these rows are whole
+     * rendered sites, and a list of ten would be megabytes for a screen that
+     * shows dates.
+     */
+    async listPublications(ctx: OrganizationContext, siteId: string) {
+        authorize(ctx, "site:read");
+        const site = await this.assertSiteInOrg(ctx, siteId);
+
+        const publications = await prisma.publication.findMany({
+            where: { siteId, organizationId: ctx.organizationId },
+            orderBy: { publishedAt: "desc" },
+            select: {
+                id: true,
+                publishedAt: true,
+                publishedByUserId: true,
+                templateId: true,
+                templateVersion: true,
+            },
+        });
+
+        return publications.map((p) => ({
+            ...p,
+            // Which one the public is actually being served. Marked rather than
+            // implied by position: after a restore the live version is NOT the
+            // newest by content, only by publish time.
+            isCurrent: p.id === site.currentPublicationId,
+        }));
+    }
+
+    /** One past publish, with its snapshot, for previewing. Requires `site:read`. */
+    async getPublication(
+        ctx: OrganizationContext,
+        siteId: string,
+        publicationId: string,
+    ): Promise<PublicationDetail> {
+        authorize(ctx, "site:read");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const publication = await prisma.publication.findFirst({
+            where: {
+                id: publicationId,
+                siteId,
+                organizationId: ctx.organizationId,
+            },
+            select: {
+                id: true,
+                publishedAt: true,
+                publishedByUserId: true,
+                templateId: true,
+                templateVersion: true,
+                snapshot: true,
+            },
+        });
+        if (!publication) {
+            throw new NotFoundException(
+                `Publication "${publicationId}" not found`,
+            );
+        }
+        return publication;
+    }
+
+    /**
+     * Put a past version back (#194).
+     *
+     * APPENDS rather than reverts: a new Publication is inserted carrying the
+     * chosen snapshot, and the site points at it. Nothing is deleted, so the
+     * history stays complete and a restore can itself be restored — which is the
+     * property that makes rolling back safe to try.
+     *
+     * The DRAFT is untouched. A merchant restoring last week's site may have
+     * unrelated work in progress, and silently overwriting it would trade one
+     * lost publish for another.
+     *
+     * Requires `site:publish`: this changes what the public sees, which is the
+     * same act as publishing.
+     */
+    async restorePublication(
+        ctx: OrganizationContext,
+        siteId: string,
+        publicationId: string,
+    ) {
+        authorize(ctx, "site:publish");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const source = await prisma.publication.findFirst({
+            where: {
+                id: publicationId,
+                siteId,
+                organizationId: ctx.organizationId,
+            },
+            select: {
+                snapshot: true,
+                templateId: true,
+                templateVersion: true,
+                pageId: true,
+                path: true,
+            },
+        });
+        if (!source) {
+            throw new NotFoundException(
+                `Publication "${publicationId}" not found`,
+            );
+        }
+
+        return prisma.$transaction(async (tx) => {
+            const restored = await tx.publication.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    pageId: source.pageId,
+                    path: source.path,
+                    snapshot: source.snapshot as Prisma.InputJsonValue,
+                    templateId: source.templateId,
+                    templateVersion: source.templateVersion,
+                    publishedByUserId: ctx.userId,
+                },
+                select: { id: true, publishedAt: true },
+            });
+            await tx.site.update({
+                where: { id: siteId },
+                data: { currentPublicationId: restored.id },
+            });
+            return {
+                publicationId: restored.id,
+                publishedAt: restored.publishedAt,
+            };
+        });
     }
 
     // -----------------------------------------------------------------------
@@ -735,18 +891,23 @@ export class SitesService {
     private async assertSiteInOrg(
         ctx: OrganizationContext,
         siteId: string,
-    ): Promise<void> {
+    ): Promise<{ id: string; currentPublicationId: string | null }> {
         const site = await prisma.site.findFirst({
             where: {
                 id: siteId,
                 organizationId: ctx.organizationId,
                 deletedAt: null,
             },
-            select: { id: true },
+            // Returns the row it already had to fetch. Callers that only need
+            // the guard ignore it; version history needs to know which
+            // publication is live, and a second query for a column this one
+            // already read would be waste.
+            select: { id: true, currentPublicationId: true },
         });
         if (!site) {
             throw new NotFoundException(`Site "${siteId}" not found`);
         }
+        return site;
     }
 
     /** Prove `pageId` belongs to `siteId` in the ctx org, or 404. */

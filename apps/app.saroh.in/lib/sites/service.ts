@@ -386,3 +386,48 @@ export async function updateSiteSettings(
         ...readError(data, "Could not save these settings."),
     };
 }
+
+/** One publish in a site's history (#194). */
+export interface SitePublication {
+    id: string;
+    publishedAt: string;
+    publishedByUserId: string | null;
+    templateId: string;
+    templateVersion: number;
+    /** Whether this is the version the public is being served right now. */
+    isCurrent: boolean;
+}
+
+/** Every publish of a site, newest first. Empty if it has never been published. */
+export async function listPublications(
+    siteId: string,
+): Promise<SitePublication[]> {
+    const base = await sitesBase();
+    if (!base) return [];
+    return getList<SitePublication>(`${base}/${siteId}/publications`);
+}
+
+/**
+ * Put a past version back. Appends a new publication rather than deleting the
+ * ones after it, so this can itself be undone.
+ */
+export async function restorePublication(
+    siteId: string,
+    publicationId: string,
+): Promise<SitesResult<{ publicationId: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(
+        `${base}/${siteId}/publications/${publicationId}/restore`,
+        { method: "POST" },
+    );
+    const data = (await res.json().catch(() => null)) as {
+        publicationId?: string;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.publicationId) {
+        return { ok: true, data: { publicationId: data.publicationId } };
+    }
+    return { ok: false, ...readError(data, "Could not restore that version.") };
+}

@@ -8,6 +8,7 @@ import type {
 import {
     createSite as createSiteApi,
     publishSite as publishSiteApi,
+    restorePublication as restorePublicationApi,
     saveDraftSections as saveDraftSectionsApi,
     updateSiteSettings as updateSiteSettingsApi,
 } from "./service";
@@ -40,4 +41,11 @@ export async function updateSiteSettings(
     input: SiteSettingsInput,
 ) {
     return updateSiteSettingsApi(siteId, input);
+}
+
+export async function restorePublication(
+    siteId: string,
+    publicationId: string,
+) {
+    return restorePublicationApi(siteId, publicationId);
 }

@@ -126,6 +126,43 @@ export class SitesController {
         return this.sites.updateSettings(ctx, siteId, dto);
     }
 
+    // ---------------------------------------------------------------------
+    // Version history (#194)
+    // ---------------------------------------------------------------------
+
+    /** Every publish of this site, newest first. */
+    @Get(":siteId/publications")
+    listPublications(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.listPublications(ctx, siteId);
+    }
+
+    /** One past publish, with its snapshot, for previewing what was served. */
+    @Get(":siteId/publications/:publicationId")
+    getPublication(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("publicationId") publicationId: string,
+    ) {
+        return this.sites.getPublication(ctx, siteId, publicationId);
+    }
+
+    /**
+     * Put a past version back. Appends a new publication rather than deleting
+     * the ones after it, so the restore can itself be undone.
+     */
+    @Post(":siteId/publications/:publicationId/restore")
+    @HttpCode(200)
+    restorePublication(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("publicationId") publicationId: string,
+    ) {
+        return this.sites.restorePublication(ctx, siteId, publicationId);
+    }
+
     @Post(":siteId/publish")
     @HttpCode(200)
     publish(
