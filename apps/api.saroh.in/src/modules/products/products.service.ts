@@ -3,6 +3,7 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
@@ -23,7 +24,12 @@ import { serializeProduct, serializeProductDetail } from "./serialize";
 export class ProductsService {
     constructor(
         private readonly stores: StoresService,
-        private readonly activation: ActivationEvents,
+        // @Optional for the same reason ModuleLifecycleService's is: this
+        // service is also constructed directly in DB-backed specs, which pass
+        // only what they exercise. Requiring it made every such construction
+        // throw on first write. `app.bootstrap.spec` asserts it IS resolved in
+        // the real graph, so optional here cannot become silently inert (#176).
+        @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
     /** Catalog for a store the caller can access, optionally filtered by status. */
@@ -82,7 +88,7 @@ export class ProductsService {
                 },
             });
             if (organizationId) {
-                await this.activation.firstProductCreated(
+                await this.activation?.firstProductCreated(
                     organizationId,
                     product.id,
                 );
