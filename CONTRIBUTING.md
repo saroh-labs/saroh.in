@@ -94,6 +94,31 @@ today, and that is deliberate rather than lucky: one would make it impossible to
 license Saroh commercially at all, which is the thing that funds the time spent
 on it.
 
+## Branches and releases
+
+Two long-lived branches, and one direction of travel:
+
+```
+feature branch  ──PR──▶  development  ──PR──▶  main
+                                               (production release)
+```
+
+- **`development` is the integration branch.** Every feature, fix and doc change
+  opens its pull request against `development`. Never against `main`.
+- **`main` is the production release.** It only ever receives a pull request
+  **from `development`**, and that PR is the release. Nothing lands on `main`
+  any other way — no direct pushes, no feature branches, no hotfix shortcuts.
+- **Branch names** describe the work and reference the issue where there is one:
+  `fix/173-commerce-org-stamping`, `feat/175-csv-import`.
+- **Merge commits**, not squashes, between branches — the history reads
+  `merge(scope): what changed into development`, so a release PR shows the work
+  that went into it rather than a flat list of squashed subjects.
+
+A closing keyword (`Closes #123`) only fires against the repository's default
+branch, so an issue referenced by a PR merged into `development` stays open
+until the release reaches `main` — close it by hand when the work is done rather
+than waiting for the release to do it.
+
 ## Commits and pull requests
 
 Conventional commits — `feat(scope):`, `fix(scope):`, `docs(scope):`. Sign them:
