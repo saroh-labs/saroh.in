@@ -153,6 +153,15 @@ export interface SiteSummary {
      * them the public could actually reach.
      */
     currentPublicationId?: string | null;
+    /** When the site last went live; null if it never has. */
+    currentPublication?: { publishedAt: string } | null;
+    /**
+     * Draft work newer than what is live. A boolean, not a count — see
+     * SitesService.listSites for why the number lives with a single site.
+     */
+    hasUnpublishedChanges?: boolean;
+    /** A claimed hostname that has not verified yet, if any. */
+    pendingDomain?: string | null;
 }
 
 export interface SitePage {

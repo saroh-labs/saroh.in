@@ -231,10 +231,25 @@ export class SitesService {
         });
     }
 
-    /** List the org's non-deleted sites (newest first). Requires `site:read`. */
+    /**
+     * List the org's non-deleted sites (newest first), each with the state it is
+     * actually in (#191). Requires `site:read`.
+     *
+     * A name and an address look the same whether a site is live, never
+     * published, or waiting on a DNS record — and those are exactly the states
+     * that strand a site invisibly. So the list resolves them here rather than
+     * making the merchant open each site to find out.
+     *
+     * `hasUnpublishedChanges` compares each page's newest DRAFT against the
+     * publication that is live. It is deliberately a BOOLEAN, not a count: a
+     * precise "3 sections changed" means diffing every draft section against the
+     * snapshot for every site in the list, and a number that disagrees with the
+     * editor's would be worse than no number. The count belongs where one site
+     * is already loaded.
+     */
     async listSites(ctx: OrganizationContext) {
         authorize(ctx, "site:read");
-        return prisma.site.findMany({
+        const sites = await prisma.site.findMany({
             where: { organizationId: ctx.organizationId, deletedAt: null },
             orderBy: { createdAt: "desc" },
             select: {
@@ -245,7 +260,48 @@ export class SitesService {
                 currentPublicationId: true,
                 createdAt: true,
                 updatedAt: true,
+                currentPublication: { select: { publishedAt: true } },
+                // A claim that is not VERIFIED is the case worth surfacing: the
+                // merchant thinks they have connected a domain and nothing
+                // routes to it yet.
+                claimedDomains: { select: { hostname: true, status: true } },
+                pages: {
+                    select: {
+                        versions: {
+                            where: { status: "DRAFT" },
+                            orderBy: { updatedAt: "desc" },
+                            take: 1,
+                            select: { updatedAt: true },
+                        },
+                    },
+                },
             },
+        });
+
+        return sites.map(({ pages, claimedDomains, ...site }) => {
+            const publishedAt = site.currentPublication?.publishedAt ?? null;
+            const lastDraftEdit = pages
+                .flatMap((page) => page.versions)
+                .reduce<Date | null>(
+                    (latest, v) =>
+                        latest === null || v.updatedAt > latest
+                            ? v.updatedAt
+                            : latest,
+                    null,
+                );
+            return {
+                ...site,
+                // Unpublished work only means something once there is something
+                // to compare against; before the first publish the site's state
+                // is "never published", which says more.
+                hasUnpublishedChanges:
+                    publishedAt !== null &&
+                    lastDraftEdit !== null &&
+                    lastDraftEdit > publishedAt,
+                pendingDomain:
+                    claimedDomains.find((d) => d.status !== "VERIFIED")
+                        ?.hostname ?? null,
+            };
         });
     }
 
