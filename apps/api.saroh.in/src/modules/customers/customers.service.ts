@@ -37,10 +37,10 @@ export class CustomersService {
     }
 
     async create(storeId: string, userId: string, dto: CreateCustomerDto) {
-        await this.requireWrite(storeId, userId);
+        const organizationId = await this.requireWrite(storeId, userId);
         try {
             const customer = await prisma.customer.create({
-                data: { storeId, ...this.fields(dto) },
+                data: { storeId, organizationId, ...this.fields(dto) },
             });
             return { id: customer.id };
         } catch {
@@ -92,9 +92,23 @@ export class CustomersService {
         };
     }
 
-    private async requireWrite(storeId: string, userId: string): Promise<void> {
-        if (!(await this.stores.canWrite(storeId, userId))) {
+    /**
+     * Assert write access AND return the owning Organization id, so every
+     * create in this service can stamp `organizationId` (#173). Returning it
+     * here rather than looking it up at each call site makes the stamp hard to
+     * forget: the guard you must call already hands you the value.
+     */
+    private async requireWrite(
+        storeId: string,
+        userId: string,
+    ): Promise<string | null> {
+        const writable = await this.stores.writableOrganization(
+            storeId,
+            userId,
+        );
+        if (writable === null) {
             throw new NotFoundException("Store not found");
         }
+        return writable.organizationId;
     }
 }

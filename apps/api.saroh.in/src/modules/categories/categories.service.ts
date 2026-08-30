@@ -35,7 +35,7 @@ export class CategoriesService {
     }
 
     async create(storeId: string, userId: string, dto: CreateCategoryDto) {
-        await this.requireWrite(storeId, userId);
+        const organizationId = await this.requireWrite(storeId, userId);
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({
@@ -50,6 +50,7 @@ export class CategoriesService {
             const category = await prisma.category.create({
                 data: {
                     storeId,
+                    organizationId,
                     name: dto.name,
                     slug,
                     parentId: dto.parentId ?? null,
@@ -133,10 +134,24 @@ export class CategoriesService {
         return { id: categoryId };
     }
 
-    private async requireWrite(storeId: string, userId: string): Promise<void> {
-        if (!(await this.stores.canWrite(storeId, userId))) {
+    /**
+     * Assert write access AND return the owning Organization id, so every
+     * create in this service can stamp `organizationId` (#173). Returning it
+     * here rather than looking it up at each call site makes the stamp hard to
+     * forget: the guard you must call already hands you the value.
+     */
+    private async requireWrite(
+        storeId: string,
+        userId: string,
+    ): Promise<string | null> {
+        const writable = await this.stores.writableOrganization(
+            storeId,
+            userId,
+        );
+        if (writable === null) {
             throw new NotFoundException("Store not found");
         }
+        return writable.organizationId;
     }
 
     private async assertSlugFree(storeId: string, slug: string): Promise<void> {

@@ -51,7 +51,7 @@ export class ProductsService {
     }
 
     async create(storeId: string, userId: string, dto: CreateProductDto) {
-        await this.requireWrite(storeId, userId);
+        const organizationId = await this.requireWrite(storeId, userId);
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({
@@ -66,6 +66,7 @@ export class ProductsService {
             const product = await prisma.product.create({
                 data: {
                     storeId,
+                    organizationId,
                     name: dto.name,
                     slug,
                     description: dto.description ?? null,
@@ -142,10 +143,24 @@ export class ProductsService {
         return { id: productId };
     }
 
-    private async requireWrite(storeId: string, userId: string): Promise<void> {
-        if (!(await this.stores.canWrite(storeId, userId))) {
+    /**
+     * Assert write access AND return the owning Organization id, so every
+     * create in this service can stamp `organizationId` (#173). Returning it
+     * here rather than looking it up at each call site makes the stamp hard to
+     * forget: the guard you must call already hands you the value.
+     */
+    private async requireWrite(
+        storeId: string,
+        userId: string,
+    ): Promise<string | null> {
+        const writable = await this.stores.writableOrganization(
+            storeId,
+            userId,
+        );
+        if (writable === null) {
             throw new NotFoundException("Store not found");
         }
+        return writable.organizationId;
     }
 
     /** Assert the caller can read the store AND the product lives in it. */
@@ -163,9 +178,10 @@ export class ProductsService {
         storeId: string,
         productId: string,
         userId: string,
-    ): Promise<void> {
-        await this.requireWrite(storeId, userId);
+    ): Promise<string | null> {
+        const organizationId = await this.requireWrite(storeId, userId);
         await this.assertProductInStore(storeId, productId);
+        return organizationId;
     }
 
     private async assertProductInStore(

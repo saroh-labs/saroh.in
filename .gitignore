@@ -63,7 +63,13 @@ docs/plans/*
 !docs/design-system/**/*.json
 !docs/design-system/**/*.csv
 !docs/design-system/**/*.png
-internal-decision-docs
+!docs/PRODUCT_STRATEGY.md
+!docs/research/
+!docs/research/*.md
+
+# Private company strategy — never commit. Public product guidance belongs in
+# docs/PRODUCT_STRATEGY.md instead.
+internal-decision-docs/
 
 dist
 

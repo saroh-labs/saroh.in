@@ -109,6 +109,9 @@ module.exports = {
         // integration project; these two named specs run here.
         "<rootDir>/src/modules/orders/order-state.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
+        // #173 — organization stamping on create; DB-free so CI catches a
+        // regression without a provisioned Postgres.
+        "<rootDir>/src/modules/orders/orders.service.org-scope.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
         // missing-key) and PaymentsService specs with a jest-mocked Prisma
         // (incl. $transaction) + a fake MerchantProvider — connect stores only
