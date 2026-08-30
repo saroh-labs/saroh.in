@@ -12,13 +12,16 @@ import {
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
+import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
+import { RequireModule } from "../capabilities/require-module.decorator";
 import { ApplyImportDto, PreviewImportDto } from "./dto";
 import type { ImportEntity } from "./entities";
 import { isImportEntity } from "./entities";
 import { ImportsService } from "./imports.service";
 
 @Controller("stores/:storeId/imports")
-@UseGuards(BetterAuthGuard)
+@UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
+@RequireModule("COMMERCE")
 export class ImportsController {
     constructor(private readonly imports: ImportsService) {}
 

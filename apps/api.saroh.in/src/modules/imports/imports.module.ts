@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { StoresModule } from "../stores/stores.module";
 import { ImportsController } from "./imports.controller";
 import { ImportsService } from "./imports.service";
@@ -12,7 +13,7 @@ import { ImportsService } from "./imports.service";
  * modules' own DTOs rather than their services.
  */
 @Module({
-    imports: [StoresModule],
+    imports: [StoresModule, CapabilitiesModule],
     controllers: [ImportsController],
     providers: [ImportsService],
     exports: [ImportsService],

@@ -14,6 +14,8 @@ import {
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
+import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
+import { RequireModule } from "../capabilities/require-module.decorator";
 import type { ProductStatus } from "./dto";
 import { CreateProductDto, UpdateProductDto } from "./dto";
 import { ProductsService } from "./products.service";
@@ -24,7 +26,8 @@ import { ProductsService } from "./products.service";
  * the store membership rules (read = access, write = canWrite).
  */
 @Controller("stores/:storeId/products")
-@UseGuards(BetterAuthGuard)
+@UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
+@RequireModule("COMMERCE")
 export class ProductsController {
     constructor(private readonly products: ProductsService) {}
 
