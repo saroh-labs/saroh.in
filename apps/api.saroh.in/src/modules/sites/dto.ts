@@ -10,6 +10,7 @@ import {
     MaxLength,
     Min,
     MinLength,
+    ValidateIf,
     ValidateNested,
 } from "class-validator";
 
@@ -31,6 +32,14 @@ const SUBDOMAIN_MSG =
  * name-derived slug, and `subdomain` optionally reserves an `<x>.saroh.app`
  * label (format-checked here; claim/verification is S2-007).
  */
+/** Trim a string, mapping an emptied one to null so "" never reaches the DB. */
+const trimOrNull = ({ value }: { value: unknown }) => {
+    if (value === null) return null;
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+};
+
 export class CreateSiteFromTemplateDto {
     @Transform(trim)
     @IsString()
@@ -100,4 +109,35 @@ export class UpdateDraftSectionsDto {
     @ValidateNested({ each: true })
     @Type(() => DraftSectionInputDto)
     sections!: DraftSectionInputDto[];
+}
+
+/**
+ * Search and social settings for a site (#188).
+ *
+ * Every field is optional and nullable, and the two are different requests:
+ * ABSENT means "leave this alone", NULL means "clear it". A settings form that
+ * only sends what changed must not silently wipe the fields it omitted, and a
+ * merchant clearing a share image must be able to actually clear it.
+ */
+export class UpdateSiteSettingsDto {
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(200, { message: "Title must be at most 200 characters" })
+    seoTitle?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(500, { message: "Description must be at most 500 characters" })
+    seoDescription?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(2048)
+    socialImageUrl?: string | null;
 }

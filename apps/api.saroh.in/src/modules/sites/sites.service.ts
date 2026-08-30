@@ -18,7 +18,11 @@ import {
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { authorize } from "../organizations/organization-policy";
-import type { CreateSiteFromTemplateDto, UpdateDraftSectionsDto } from "./dto";
+import type {
+    CreateSiteFromTemplateDto,
+    UpdateDraftSectionsDto,
+    UpdateSiteSettingsDto,
+} from "./dto";
 import { sanitizeSectionContent } from "./sanitize";
 
 /** What creating a site returns to the caller: the new site's identity. */
@@ -264,8 +268,16 @@ export class SitesService {
                 slug: true,
                 subdomain: true,
                 currentPublicationId: true,
+                // Search + social (#188).
+                seoTitle: true,
+                seoDescription: true,
+                socialImageUrl: true,
                 createdAt: true,
                 updatedAt: true,
+                // When the site last went live. Read through the current
+                // publication rather than stamped on the Site, so it cannot
+                // drift from the publication history it describes.
+                currentPublication: { select: { publishedAt: true } },
                 pages: {
                     orderBy: { path: "asc" },
                     select: {
@@ -280,6 +292,50 @@ export class SitesService {
         if (!site) {
             throw new NotFoundException(`Site "${siteId}" not found`);
         }
+        return site;
+    }
+
+    /**
+     * Update a site's search and social settings (#188).
+     *
+     * ABSENT and NULL are deliberately different: a field the caller omitted is
+     * left alone, a field sent as null is cleared. A settings form that PATCHes
+     * only what changed must not wipe what it did not send, and a merchant
+     * removing a share image must be able to actually remove it.
+     *
+     * Requires `site:update` — the same gate as renaming a site, because this is
+     * what the public sees. Writing here does NOT publish: these values reach
+     * the live site only through the next publish, exactly like a section edit.
+     */
+    async updateSettings(
+        ctx: OrganizationContext,
+        siteId: string,
+        dto: UpdateSiteSettingsDto,
+    ) {
+        authorize(ctx, "site:update");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const data: {
+            seoTitle?: string | null;
+            seoDescription?: string | null;
+            socialImageUrl?: string | null;
+        } = {};
+        if (dto.seoTitle !== undefined) data.seoTitle = dto.seoTitle;
+        if (dto.seoDescription !== undefined)
+            data.seoDescription = dto.seoDescription;
+        if (dto.socialImageUrl !== undefined)
+            data.socialImageUrl = dto.socialImageUrl;
+
+        const site = await prisma.site.update({
+            where: { id: siteId },
+            data,
+            select: {
+                id: true,
+                seoTitle: true,
+                seoDescription: true,
+                socialImageUrl: true,
+            },
+        });
         return site;
     }
 
@@ -439,6 +495,9 @@ export class SitesService {
                 id: true,
                 name: true,
                 slug: true,
+                seoTitle: true,
+                seoDescription: true,
+                socialImageUrl: true,
                 pages: {
                     orderBy: { path: "asc" },
                     select: {
@@ -511,7 +570,17 @@ export class SitesService {
         });
 
         const snapshot = {
-            site: { name: site.name, slug: site.slug },
+            site: {
+                name: site.name,
+                slug: site.slug,
+                // Search + social travel INTO the snapshot (#188). The public
+                // renderer reads only this table, so a title left behind here
+                // would never reach a search engine no matter how many times
+                // the merchant saved it.
+                seoTitle: site.seoTitle,
+                seoDescription: site.seoDescription,
+                socialImageUrl: site.socialImageUrl,
+            },
             pages,
             publishedAt: publishedAt.toISOString(),
         };

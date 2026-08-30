@@ -4,6 +4,7 @@ import {
     Get,
     HttpCode,
     Param,
+    Patch,
     Post,
     Put,
     UseGuards,
@@ -14,7 +15,11 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { CreateSiteFromTemplateDto, UpdateDraftSectionsDto } from "./dto";
+import {
+    CreateSiteFromTemplateDto,
+    UpdateDraftSectionsDto,
+    UpdateSiteSettingsDto,
+} from "./dto";
 import { SitesService } from "./sites.service";
 
 /**
@@ -106,6 +111,21 @@ export class SitesController {
      * Publication (sanitizing rich fields) and repoint the live pointer.
      * Requires `site:publish`.
      */
+    /**
+     * Update a site's search and social settings (#188).
+     *
+     * PATCH, not PUT: a settings form sends what changed. An omitted field is
+     * left alone and an explicit null clears it — see UpdateSiteSettingsDto.
+     */
+    @Patch(":siteId/settings")
+    updateSettings(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: UpdateSiteSettingsDto,
+    ) {
+        return this.sites.updateSettings(ctx, siteId, dto);
+    }
+
     @Post(":siteId/publish")
     @HttpCode(200)
     publish(

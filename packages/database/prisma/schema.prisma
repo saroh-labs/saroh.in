@@ -1388,6 +1388,17 @@ model Site {
   // when set (NULLs are distinct, so many sites may have no subdomain).
   subdomain String? @unique
 
+  // Search and social (#188). Site-level rather than per-page: they describe
+  // the site, not any one page of it. Null means "not set" and MUST render as
+  // absent — never as an empty title or a broken image.
+  //
+  // These travel into the Publication snapshot at publish time, because the
+  // public renderer reads only that. Changing one is therefore an unpublished
+  // change like any section edit.
+  seoTitle       String? // <title> / og:title
+  seoDescription String? // meta description / og:description
+  socialImageUrl String? // og:image — the card shown when the link is shared
+
   // Reserved placeholder for the S2-007 custom-domain claim/verification flow.
   // NOT wired to a relation here and NOT the legacy store `CustomDomain`.
   customDomainId String?

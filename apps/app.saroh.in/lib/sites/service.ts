@@ -20,12 +20,7 @@ import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
 
 /** The section types the editor supports. */
 export type SectionType =
-    | "hero"
-    | "richText"
-    | "cta"
-    | "gallery"
-    | "enquiry"
-    | "booking";
+    "hero" | "richText" | "cta" | "gallery" | "enquiry" | "booking";
 
 /** Button style shared by hero CTA and the standalone cta section. */
 export type CtaStyle = "primary" | "secondary" | "link";
@@ -169,6 +164,27 @@ export interface SitePage {
 
 export interface SiteDetail extends SiteSummary {
     pages: SitePage[];
+    /**
+     * Search and social settings (#188). Null means "not set" and must render
+     * as absent — never as an empty title or a broken image.
+     */
+    seoTitle: string | null;
+    seoDescription: string | null;
+    socialImageUrl: string | null;
+    /** When the site last went live; null if it has never been published. */
+    currentPublication: { publishedAt: string } | null;
+}
+
+/**
+ * A settings change. Every field is optional and nullable, and the two are
+ * different requests: OMIT a field to leave it alone, send NULL to clear it.
+ * Sending the whole form every time would let a stale tab overwrite a value
+ * someone else changed.
+ */
+export interface SiteSettingsInput {
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    socialImageUrl?: string | null;
 }
 
 export interface PageDraft {
@@ -331,4 +347,33 @@ export async function publishSite(
         return { ok: true, data: { publicationId: data?.publicationId } };
     }
     return { ok: false, ...readError(data, "Could not publish the site") };
+}
+
+/**
+ * Update a site's search and social settings (#188).
+ *
+ * Sends only what the caller passed: an omitted field is left alone by the API
+ * and an explicit null clears it, so a form that PATCHes one field cannot wipe
+ * the others.
+ */
+export async function updateSiteSettings(
+    siteId: string,
+    input: SiteSettingsInput,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/settings`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return {
+        ok: false,
+        ...readError(data, "Could not save these settings."),
+    };
 }
