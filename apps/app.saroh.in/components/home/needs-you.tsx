@@ -1,8 +1,12 @@
+"use client";
+
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { CheckCircle2, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 import { formatOverdue, formatWaiting } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
@@ -23,6 +27,45 @@ import { SEVERITY } from "./severity";
  * "Showing 5 of 23" is stated rather than implied. A truncated list that looks
  * complete is worse than no list.
  */
+
+/**
+ * The verb each action offers, keyed by the API's stable action code.
+ *
+ * §4 asks Home to answer "what should I do next?", and "Open" does not answer
+ * it — five identical Opens make the merchant read every title to tell them
+ * apart, which is the work Home exists to remove. A named verb states the job
+ * at the point of decision.
+ *
+ * Kept client-side, next to the rest of the UI copy, rather than added to the
+ * read model: the label is presentation, and the API already gives a stable
+ * `code` to key it on. Anything unmapped falls back to "Open", so a new action
+ * type degrades to today's behaviour rather than rendering blank.
+ */
+const ACTION_VERB: Record<string, string> = {
+    CRM_OVERDUE_FOLLOWUPS: "Follow up",
+    COMMERCE_OPEN_ORDERS: "Fulfil orders",
+    COMMERCE_SUGGEST_PRODUCT: "Add a product",
+    INSIGHTS_VIEW: "View insights",
+};
+
+function verbFor(action: HomeAction): string {
+    return (
+        ACTION_VERB[action.code] ??
+        (action.severity === "SETUP" ? "Finish setup" : "Open")
+    );
+}
+
+/**
+ * Which actions earn a block of their own.
+ *
+ * ATTENTION and OVERDUE are work that is already late or already waiting on
+ * someone. SETUP and SUGGESTION are advice — worth offering, not worth the same
+ * weight, and stacking them as equals is what turned a ranked queue back into a
+ * list of tiles. They collapse to one line beneath the real work.
+ */
+function isConsequential(action: HomeAction): boolean {
+    return action.severity === "ATTENTION" || action.severity === "OVERDUE";
+}
 
 /** Which side of the deadline this row's timestamp describes. */
 function timing(action: HomeAction, row: HomeEvidence, now: Date) {
@@ -139,13 +182,30 @@ function ActionBlock({
                  * choose between them — the WCAG 2.4.4 failure the audit found
                  * on the providers page, which this surface was about to repeat.
                  */}
-                <Link
-                    href={action.href}
-                    aria-label={`Open: ${action.title}`}
-                    className="shrink-0 rounded text-xs font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                {/*
+                 * One CTA, named. The design shows a filled verb button beside
+                 * a secondary "Open", but both would point at the same href
+                 * here, and two buttons to one destination is noise — so the
+                 * verb replaces "Open" rather than sitting next to it.
+                 *
+                 * The accessible name still carries the action title, for the
+                 * same WCAG 2.4.4 reason the old label did: a screen-reader
+                 * user listing the page's links must be able to tell five
+                 * "Follow up" buttons apart.
+                 */}
+                <Button
+                    size="sm"
+                    variant={primary ? "brand" : "outline"}
+                    className="shrink-0"
+                    asChild
                 >
-                    Open
-                </Link>
+                    <Link
+                        href={action.href}
+                        aria-label={`${verbFor(action)}: ${action.title}`}
+                    >
+                        {verbFor(action)}
+                    </Link>
+                </Button>
             </header>
 
             {evidence.length > 0 ? (
@@ -196,9 +256,17 @@ export function NeedsYou({
         );
     }
 
+    const consequential = actions.filter(isConsequential);
+    const quiet = actions.filter((a) => !isConsequential(a));
+
+    // Everything is advice: there is no real queue to bury it under, so show it
+    // rather than collapsing a page down to a single grey line.
+    const blocks = consequential.length > 0 ? consequential : quiet;
+    const collapsed = consequential.length > 0 ? quiet : [];
+
     return (
         <div className="space-y-3">
-            {actions.map((action, i) => (
+            {blocks.map((action, i) => (
                 <ActionBlock
                     key={action.code}
                     action={action}
@@ -207,6 +275,69 @@ export function NeedsYou({
                     index={i}
                 />
             ))}
+            {collapsed.length > 0 ? <QuietActions actions={collapsed} /> : null}
+        </div>
+    );
+}
+
+/**
+ * The advice, on one line.
+ *
+ * Setup and suggestion rows are worth offering and not worth a block each —
+ * given equal weight they turn the ranked queue back into the tiled dashboard
+ * §8 asks Home not to be. Collapsed they stay available and stop competing
+ * with work that is actually late.
+ */
+function QuietActions({ actions }: { actions: HomeAction[] }) {
+    const [open, setOpen] = useState(false);
+
+    if (open) {
+        return (
+            <div className="space-y-3">
+                {actions.map((action, i) => (
+                    <ActionBlock
+                        key={action.code}
+                        action={action}
+                        now={new Date()}
+                        primary={false}
+                        index={i}
+                    />
+                ))}
+                <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="rounded px-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    Show less
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-md border border-border bg-muted/30 px-4 py-2.5">
+            <p className="min-w-0 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">
+                    {actions.length} more
+                </span>
+                {": "}
+                {/* Titles are sentences and some end in a full stop, which
+                    joined naively reads "…can book., Review this week's…".
+                    Trim the terminal punctuation so the summary reads as one
+                    list rather than a run of collided sentences. */}
+                {actions
+                    .map((a) => a.title.replace(/[.。]\s*$/, ""))
+                    .join(", ")}
+            </p>
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                // A real control, not a link: it reveals what is already on the
+                // page rather than navigating, and it must work by thumb (§17).
+                className="shrink-0 rounded px-1 py-0.5 text-xs font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                Show all
+            </button>
         </div>
     );
 }

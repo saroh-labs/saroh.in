@@ -30,6 +30,16 @@ export interface NavItem {
     href: string;
     label: string;
     icon: LucideIcon;
+    /**
+     * The capability this destination belongs to (ADR-003).
+     *
+     * Gating moved from the group to the item when the rail was regrouped by
+     * PURPOSE rather than by module: "Run the business" holds Commerce,
+     * Appointments and CRM destinations at once, so one key per group can no
+     * longer describe it. A group with no surviving items is dropped whole, so
+     * a merchant never meets an empty heading.
+     */
+    moduleKey?: string;
 }
 
 export interface NavGroup {
@@ -57,14 +67,22 @@ export interface NavGroup {
 }
 
 /**
- * A heading earns its line only when it groups something. "COMMERCE" above a
- * lone "Commerce" is the same word twice, and "WEBSITE" above "Sites" spends a
- * line to say less than the item already does — three of these cost six lines
- * of rail for three destinations. Single-item groups render as a bare item; the
- * `moduleKey` filtering above is unaffected either way.
+ * A heading earns its line when it says something the item does not.
+ *
+ * This used to also require two or more items, and that was right while groups
+ * were named after MODULES: "COMMERCE" above a lone "Commerce" is the same word
+ * twice, and "WEBSITE" above "Sites" spent a line to say less than the item
+ * already did.
+ *
+ * Regrouping by PURPOSE inverts it. "Presence" above "Website" and "Grow" above
+ * "Insights" both add the thing the item cannot say — why it is here and what
+ * it sits beside. Worse, suppressing them does not merely lose a heading: the
+ * orphaned item is read under whichever heading precedes it, so a hidden "Grow"
+ * filed Insights under "Run the business", which is a different claim about
+ * what Insights is for.
  */
 export function showsGroupLabel(group: NavGroup): boolean {
-    return Boolean(group.label) && group.items.length > 1;
+    return Boolean(group.label);
 }
 
 /**
@@ -90,60 +108,96 @@ export function showsGroupLabel(group: NavGroup): boolean {
 export const NAV_GROUPS: NavGroup[] = [
     { items: [{ href: "/", label: "Home", icon: Home }] },
     {
-        label: "Sell",
-        moduleKey: "COMMERCE",
-        items: [{ href: "/commerce", label: "Sell", icon: Store }],
+        // Grouped by PURPOSE rather than by module, following the canvas
+        // design. A merchant does not think "Commerce" and "Appointments" —
+        // they think "the public face of my business" and "the work of running
+        // it". §6: the architecture may stay modular; the interface should not
+        // make the merchant think in modules.
+        label: "Presence",
+        items: [
+            {
+                href: "/sites",
+                label: "Website",
+                icon: Globe,
+                moduleKey: "WEBSITE",
+            },
+        ],
     },
     {
-        label: "Bookings",
-        moduleKey: "APPOINTMENTS",
+        label: "Run the business",
         items: [
+            {
+                href: "/commerce",
+                label: "Sell",
+                icon: Store,
+                moduleKey: "COMMERCE",
+            },
             // Two destinations, two questions: "what is booked?" and "what can
-            // be booked?".
-            //
-            // `/appointments` used to sit above these as a third. It was a hub
-            // page of link cards pointing at Schedule, Services and
-            // "Availability" — and the last two were the SAME route, so the rail
-            // spent a line on a menu that duplicated the two lines beneath it
-            // and lied about one of them. Its two counts now live on Home, where
-            // numbers belong. The URL still resolves (it redirects here), so no
-            // bookmark breaks.
-            { href: "/bookings", label: "Schedule", icon: CalendarClock },
-            { href: "/services", label: "Services", icon: Briefcase },
+            // be booked?". They lost their own BOOKINGS heading in the regroup;
+            // the ordering keeps them adjacent so the pair still reads as one
+            // idea.
+            {
+                href: "/bookings",
+                label: "Schedule",
+                icon: CalendarClock,
+                moduleKey: "APPOINTMENTS",
+            },
+            {
+                href: "/services",
+                label: "Services",
+                icon: Briefcase,
+                moduleKey: "APPOINTMENTS",
+            },
+            {
+                href: "/contacts",
+                label: "Contacts",
+                icon: Users,
+                moduleKey: "CRM",
+            },
+            {
+                href: "/leads",
+                label: "Leads",
+                icon: Target,
+                moduleKey: "CRM",
+            },
+            {
+                href: "/pipeline",
+                label: "Pipeline",
+                icon: KanbanSquare,
+                moduleKey: "CRM",
+            },
         ],
     },
     {
-        label: "Customers",
-        moduleKey: "CRM",
+        label: "Grow",
         items: [
-            { href: "/contacts", label: "Contacts", icon: Users },
-            { href: "/leads", label: "Leads", icon: Target },
-            { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
+            {
+                href: "/analytics",
+                label: "Insights",
+                icon: BarChart3,
+                moduleKey: "INSIGHTS",
+            },
         ],
+        // The canvas design also shows Marketing, Automation and AI here as
+        // SOON. The rail deliberately has no "coming soon" state: a nav entry
+        // that cannot be opened spends a permanent line advertising absence,
+        // and §2 asks that what the UI claims match what ships. A capability
+        // appears here when it has a route.
     },
     {
-        label: "Website",
-        moduleKey: "WEBSITE",
-        items: [{ href: "/sites", label: "Website", icon: Globe }],
-    },
-    {
-        label: "Insights",
-        moduleKey: "INSIGHTS",
-        items: [{ href: "/analytics", label: "Insights", icon: BarChart3 }],
-    },
-    // Notifications is core chrome (not a module), so it is always available.
-    { items: [{ href: "/notifications", label: "Notifications", icon: Bell }] },
-    // Settings is core chrome too — and it must never be module-gated, because
-    // Settings → Modules is where a module gets turned on in the first place.
-    // Both destinations degrade by role on the server (Modules is read-only for
-    // non-managers; Providers renders an owners/admins-only empty state), so
-    // showing them to every actor leaks nothing.
-    // Set off by a rule, and always last: configuration is where you go on
-    // purpose, not something to scan past on the way to the work.
-    {
-        label: "Settings",
+        label: "Workspace",
         separated: true,
         items: [
+            // Core chrome, never module-gated. Settings in particular must
+            // always be reachable, because Settings → Modules is where a
+            // capability gets turned on in the first place. Both settings
+            // destinations degrade by role on the server, so showing them to
+            // every actor leaks nothing.
+            {
+                href: "/notifications",
+                label: "Notifications",
+                icon: Bell,
+            },
             {
                 href: "/settings/organization",
                 label: "Organization",
@@ -175,8 +229,18 @@ export function filterNavGroups(
 ): NavGroup[] {
     if (availableModuleKeys === null) return [...groups];
     const available = new Set(availableModuleKeys);
-    return groups.filter(
-        (group) => !group.moduleKey || available.has(group.moduleKey),
+    const allowed = (key?: string) => !key || available.has(key);
+
+    return (
+        groups
+            .filter((group) => allowed(group.moduleKey))
+            .map((group) => ({
+                ...group,
+                items: group.items.filter((item) => allowed(item.moduleKey)),
+            }))
+            // A heading with nothing under it is worse than no heading: it names a
+            // capability the merchant does not have and then shows them nothing.
+            .filter((group) => group.items.length > 0)
     );
 }
 
