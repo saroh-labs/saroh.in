@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import { StoresService } from "../stores/stores.service";
 import { CsvFormatError, parseCsv } from "./csv";
 import type { ApplyImportDto, PreviewImportDto } from "./dto";
@@ -68,7 +69,10 @@ export interface ApplyResult {
  */
 @Injectable()
 export class ImportsService {
-    constructor(private readonly stores: StoresService) {}
+    constructor(
+        private readonly stores: StoresService,
+        private readonly activation: ActivationEvents,
+    ) {}
 
     async preview(
         storeId: string,
@@ -114,6 +118,15 @@ export class ImportsService {
                     if (row.outcome === "CREATE") created += 1;
                     else updated += 1;
                 }
+            });
+        }
+
+        if (organizationId) {
+            await this.activation.importCompleted(organizationId, {
+                entity,
+                created,
+                updated,
+                failed: plan.counts.ERROR,
             });
         }
 

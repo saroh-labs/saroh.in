@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import { StoresService } from "../stores/stores.service";
 import type { CreateCustomerDto, UpdateCustomerDto } from "./dto";
 
@@ -15,7 +16,10 @@ import type { CreateCustomerDto, UpdateCustomerDto } from "./dto";
  */
 @Injectable()
 export class CustomersService {
-    constructor(private readonly stores: StoresService) {}
+    constructor(
+        private readonly stores: StoresService,
+        private readonly activation: ActivationEvents,
+    ) {}
 
     async list(storeId: string, userId: string) {
         await this.stores.getForUser(storeId, userId);
@@ -42,6 +46,12 @@ export class CustomersService {
             const customer = await prisma.customer.create({
                 data: { storeId, organizationId, ...this.fields(dto) },
             });
+            if (organizationId) {
+                await this.activation.firstCustomerCreated(
+                    organizationId,
+                    customer.id,
+                );
+            }
             return { id: customer.id };
         } catch {
             throw new ConflictException({

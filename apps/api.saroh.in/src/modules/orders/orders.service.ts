@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import { StoresService } from "../stores/stores.service";
 import type {
     CreateOrderDto,
@@ -33,7 +34,10 @@ const CUSTOMER_SELECT = {
  */
 @Injectable()
 export class OrdersService {
-    constructor(private readonly stores: StoresService) {}
+    constructor(
+        private readonly stores: StoresService,
+        private readonly activation: ActivationEvents,
+    ) {}
 
     async list(storeId: string, userId: string) {
         await this.stores.getForUser(storeId, userId);
@@ -146,6 +150,15 @@ export class OrdersService {
                     );
                     return order;
                 });
+                if (organizationId) {
+                    // Safe on every order: the ledger keeps only the first
+                    // (deterministic dedupeKey), so no "is this their first?"
+                    // query and no race between concurrent creates.
+                    await this.activation.firstOrderCreated(
+                        organizationId,
+                        created.id,
+                    );
+                }
                 return { id: created.id };
             } catch (err) {
                 if (this.isUniqueOrderNumber(err) && attempt < 4) continue;

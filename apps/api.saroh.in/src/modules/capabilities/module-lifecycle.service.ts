@@ -25,6 +25,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ActivationEvents } from "../analytics/activation-events";
 import { authorize } from "../organizations/organization-policy";
 import type { ModuleKey } from "./module-registry";
 import { MODULE_BY_KEY, MODULES } from "./module-registry";
@@ -35,6 +36,10 @@ export class ModuleLifecycleService {
     constructor(
         private readonly readiness: ModuleReadinessRegistry,
         @Optional() private readonly db: typeof prisma = prisma,
+        // Optional for the same reason `db` is: lifecycle is exercised in unit
+        // tests without a container, and instrumentation must never be the
+        // reason a capability cannot be switched on (#176).
+        @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
     /** Enable a module for the Organization. Requires its dependencies enabled. */
@@ -95,6 +100,11 @@ export class ModuleLifecycleService {
             });
             await this.audit(tx, ctx, "organization.module.enabled", moduleKey);
         });
+
+        // After the commit, so only a module that really is enabled is counted.
+        // `moduleEnabled` swallows its own errors — the same tradeoff the audit
+        // write makes, for the same reason.
+        await this.activation?.moduleEnabled(ctx.organizationId, moduleKey);
     }
 
     /** Disable a module. Blocked by dependents or unmet safe-deactivation. */

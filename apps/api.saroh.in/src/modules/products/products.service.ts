@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
 import type { CreateProductDto, ProductStatus, UpdateProductDto } from "./dto";
@@ -20,7 +21,10 @@ import { serializeProduct, serializeProductDetail } from "./serialize";
  */
 @Injectable()
 export class ProductsService {
-    constructor(private readonly stores: StoresService) {}
+    constructor(
+        private readonly stores: StoresService,
+        private readonly activation: ActivationEvents,
+    ) {}
 
     /** Catalog for a store the caller can access, optionally filtered by status. */
     async list(storeId: string, userId: string, status?: ProductStatus) {
@@ -77,6 +81,12 @@ export class ProductsService {
                     status: dto.status ?? "DRAFT",
                 },
             });
+            if (organizationId) {
+                await this.activation.firstProductCreated(
+                    organizationId,
+                    product.id,
+                );
+            }
             return { id: product.id };
         } catch {
             throw new ConflictException({
