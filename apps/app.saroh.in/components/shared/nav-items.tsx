@@ -40,13 +40,6 @@ export interface NavItem {
      * a merchant never meets an empty heading.
      */
     moduleKey?: string;
-    /**
-     * Planned, not built. Rendered as a quiet SOON marker and NOT a link.
-     *
-     * Used only where the work is genuinely committed — never as a teaser. §2:
-     * claims in the UI match what ships.
-     */
-    soon?: boolean;
 }
 
 export interface NavGroup {
@@ -185,16 +178,11 @@ export const NAV_GROUPS: NavGroup[] = [
                 moduleKey: "INSIGHTS",
             },
         ],
-        // The design also shows Marketing, Automation and AI here as SOON.
-        // None is added:
-        //  - Marketing is not a capability at all, and §20 admits it "only when
-        //    relevant and sufficiently mature".
-        //  - Automations IS a registered module but has no route in this app,
-        //    and `scripts/check-app-routes.mjs` fails the build on a nav entry
-        //    that 404s.
-        //  - AI is deferred by DEC-015 until Stages 0–7 operate. "SOON" would
-        //    be a promise the roadmap does not make.
-        // The `soon` flag exists for when one of these is genuinely committed.
+        // The canvas design also shows Marketing, Automation and AI here as
+        // SOON. The rail deliberately has no "coming soon" state: a nav entry
+        // that cannot be opened spends a permanent line advertising absence,
+        // and §2 asks that what the UI claims match what ships. A capability
+        // appears here when it has a route.
     },
     {
         label: "Workspace",
