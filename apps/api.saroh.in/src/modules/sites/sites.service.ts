@@ -24,8 +24,8 @@ import type {
     UpdateSiteSettingsDto,
 } from "./dto";
 import { sanitizeSectionContent } from "./sanitize";
-import type { SiteStyle } from "./site-style";
-import { parseSiteStyle } from "./site-style";
+import type { SiteStyle, SiteStyleOptions } from "./site-style";
+import { parseSiteStyle, siteStyleOptions } from "./site-style";
 
 /** What creating a site returns to the caller: the new site's identity. */
 export interface CreatedSite {
@@ -120,6 +120,12 @@ export interface SiteDetailView {
     pages: { id: string; path: string; title: string; isHome: boolean }[];
     /** Always complete — absent choices are filled from the defaults. */
     style: SiteStyle;
+    /**
+     * The palette and slider bounds. Sent with the site so the editor can
+     * resolve a choice locally as a slider moves, without carrying its own copy
+     * of the values that could drift from the server's.
+     */
+    styleOptions: SiteStyleOptions;
 }
 
 export interface PublicationDetail {
@@ -393,7 +399,11 @@ export class SitesService {
         // client filling gaps itself is how the preview and the published site
         // drift apart.
         const { style, ...rest } = site;
-        return { ...rest, style: parseSiteStyle(style) };
+        return {
+            ...rest,
+            style: parseSiteStyle(style),
+            styleOptions: siteStyleOptions(),
+        };
     }
 
     /**

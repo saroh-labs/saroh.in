@@ -4,6 +4,7 @@ import type {
     CreateSiteInput,
     SectionInput,
     SiteSettingsInput,
+    SiteStyle,
 } from "./service";
 import {
     createSite as createSiteApi,
@@ -11,6 +12,7 @@ import {
     restorePublication as restorePublicationApi,
     saveDraftSections as saveDraftSectionsApi,
     updateSiteSettings as updateSiteSettingsApi,
+    updateSiteStyle as updateSiteStyleApi,
 } from "./service";
 
 /**
@@ -48,4 +50,8 @@ export async function restorePublication(
     publicationId: string,
 ) {
     return restorePublicationApi(siteId, publicationId);
+}
+
+export async function updateSiteStyle(siteId: string, style: SiteStyle) {
+    return updateSiteStyleApi(siteId, style);
 }

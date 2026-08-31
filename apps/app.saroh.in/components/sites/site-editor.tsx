@@ -17,9 +17,14 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { DraftPreview } from "@/components/sites/section-preview";
+import { StylePanel } from "@/components/sites/style-panel";
 import { ensureFormForSection } from "@/lib/forms/actions";
 import { listServicesForPicker } from "@/lib/services/actions";
-import { publishSite, saveDraftSections } from "@/lib/sites/actions";
+import {
+    publishSite,
+    saveDraftSections,
+    updateSiteStyle,
+} from "@/lib/sites/actions";
 import type {
     BookingContent,
     CtaStyle,
@@ -34,6 +39,7 @@ import type {
     Section,
     SectionType,
 } from "@/lib/sites/service";
+import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
 /** A service as offered in the booking-section picker. */
 interface ServiceOption {
@@ -188,11 +194,15 @@ export function SiteEditor({
     initialSections,
     siteName,
     address,
+    initialStyle,
+    styleOptions,
 }: {
     siteId: string;
     pageId: string;
     initialSections: Section[];
     siteName: string;
+    initialStyle: SiteStyle;
+    styleOptions: SiteStyleOptions;
     /** Where this site lives, shown in the bar. Null before a subdomain exists. */
     address?: string | null;
 }) {
@@ -207,6 +217,12 @@ export function SiteEditor({
         initialSections.length > 0 ? 0 : null,
     );
     const [device, setDevice] = useState<Device>("desktop");
+    const [rail, setRail] = useState<"sections" | "style">("sections");
+    const [style, setStyle] = useState<SiteStyle>(initialStyle);
+    const [styleSaving, setStyleSaving] = useState(false);
+    const [savedStyleJson, setSavedStyleJson] = useState(() =>
+        JSON.stringify(initialStyle),
+    );
     const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
     const [saveError, setSaveError] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -377,6 +393,46 @@ export function SiteEditor({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dirty, saving, publishing, sections]);
 
+    /*
+     * Style autosave.
+     *
+     * Separate from the sections autosave because they are different documents
+     * on different endpoints: a colour change should not have to wait behind a
+     * section save, and a failed section save must not silently discard a
+     * palette. Debounced longer, because dragging a slider produces a value on
+     * every pixel and none of the intermediate ones is worth a request.
+     */
+    useEffect(() => {
+        if (JSON.stringify(style) === savedStyleJson) return;
+        const id = setTimeout(() => {
+            const payload = style;
+            setStyleSaving(true);
+            void updateSiteStyle(siteId, payload).then((res) => {
+                setStyleSaving(false);
+                if (res.ok) {
+                    setSavedStyleJson(JSON.stringify(payload));
+                } else {
+                    toast.error(res.error);
+                }
+            });
+        }, 700);
+        return () => clearTimeout(id);
+    }, [style, savedStyleJson, siteId]);
+
+    function resetStyle() {
+        // Back to the business's own defaults — which is what the site looked
+        // like before anyone touched the panel, not a Saroh default.
+        const defaults: SiteStyle = {
+            colours: Object.fromEntries(
+                styleOptions.rows.map((r) => [r.key, r.swatches[0]?.key ?? ""]),
+            ),
+            scalars: Object.fromEntries(
+                styleOptions.scalars.map((sc) => [sc.key, sc.default]),
+            ),
+        };
+        setStyle(defaults);
+    }
+
     async function onPublish() {
         if (dirty) {
             toast.error("You have unsaved changes — save the draft first.");
@@ -468,6 +524,23 @@ export function SiteEditor({
                         ))}
                     </div>
 
+                    {/*
+                     * Style opens from the BAR, not a rail tab. The design moved
+                     * it there because it belongs to the whole site while the
+                     * rail lists one page's sections — a tab would file a
+                     * site-wide setting under a page.
+                     */}
+                    <Button
+                        variant={rail === "style" ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                            setRail(rail === "style" ? "sections" : "style")
+                        }
+                        aria-pressed={rail === "style"}
+                    >
+                        Style
+                    </Button>
+
                     <Button
                         className="wk-press"
                         variant="brand"
@@ -486,62 +559,81 @@ export function SiteEditor({
             <div className="grid min-h-0 flex-1 lg:grid-cols-[15rem_20rem_minmax(0,1fr)]">
                 {/* Rail — the page as a list of sections, not a wall of fields. */}
                 <aside className="flex min-h-0 flex-col border-r">
-                    <div className="border-b px-3 py-2">
-                        <span className="text-xs font-semibold">Sections</span>
-                    </div>
-                    <ul className="min-h-0 flex-1 overflow-y-auto p-2">
-                        {sections.map((section, index) => (
-                            <li key={index}>
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedIndex(index)}
-                                    className={cn(
-                                        "flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm",
-                                        selectedIndex === index
-                                            ? "bg-secondary"
-                                            : "hover:bg-muted",
-                                        errorIndex === index &&
-                                            "text-destructive",
-                                    )}
-                                >
-                                    <span className="truncate">
-                                        {sectionTitle(section)}
-                                    </span>
-                                    <span className="shrink-0 text-[0.625rem] uppercase tracking-wide text-muted-foreground">
-                                        {SECTION_LABELS[section.type]}
-                                    </span>
-                                </button>
-                            </li>
-                        ))}
-                        {sections.length === 0 ? (
-                            <li className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                No sections yet.
-                            </li>
-                        ) : null}
-                    </ul>
-                    <div className="border-t p-2">
-                        <details>
-                            <summary className="cursor-pointer rounded px-2 py-1 text-sm text-muted-foreground hover:text-foreground">
-                                + Add section
-                            </summary>
-                            <div className="flex flex-wrap gap-1 px-2 pt-2">
-                                {SECTION_ORDER.map((type) => (
-                                    <Button
-                                        key={type}
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            addSection(type);
-                                            setSelectedIndex(sections.length);
-                                        }}
-                                    >
-                                        {SECTION_LABELS[type]}
-                                    </Button>
-                                ))}
+                    {rail === "style" ? (
+                        <StylePanel
+                            style={style}
+                            options={styleOptions}
+                            onChange={setStyle}
+                            onReset={resetStyle}
+                            onBack={() => setRail("sections")}
+                            saving={styleSaving}
+                        />
+                    ) : (
+                        <>
+                            <div className="border-b px-3 py-2">
+                                <span className="text-xs font-semibold">
+                                    Sections
+                                </span>
                             </div>
-                        </details>
-                    </div>
+                            <ul className="min-h-0 flex-1 overflow-y-auto p-2">
+                                {sections.map((section, index) => (
+                                    <li key={index}>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setSelectedIndex(index)
+                                            }
+                                            className={cn(
+                                                "flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm",
+                                                selectedIndex === index
+                                                    ? "bg-secondary"
+                                                    : "hover:bg-muted",
+                                                errorIndex === index &&
+                                                    "text-destructive",
+                                            )}
+                                        >
+                                            <span className="truncate">
+                                                {sectionTitle(section)}
+                                            </span>
+                                            <span className="shrink-0 text-[0.625rem] uppercase tracking-wide text-muted-foreground">
+                                                {SECTION_LABELS[section.type]}
+                                            </span>
+                                        </button>
+                                    </li>
+                                ))}
+                                {sections.length === 0 ? (
+                                    <li className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                        No sections yet.
+                                    </li>
+                                ) : null}
+                            </ul>
+                            <div className="border-t p-2">
+                                <details>
+                                    <summary className="cursor-pointer rounded px-2 py-1 text-sm text-muted-foreground hover:text-foreground">
+                                        + Add section
+                                    </summary>
+                                    <div className="flex flex-wrap gap-1 px-2 pt-2">
+                                        {SECTION_ORDER.map((type) => (
+                                            <Button
+                                                key={type}
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    addSection(type);
+                                                    setSelectedIndex(
+                                                        sections.length,
+                                                    );
+                                                }}
+                                            >
+                                                {SECTION_LABELS[type]}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </details>
+                            </div>
+                        </>
+                    )}
                 </aside>
 
                 {/* Field panel — one section at a time. */}
@@ -623,7 +715,11 @@ export function SiteEditor({
                         className="mx-auto transition-[max-width]"
                         style={{ maxWidth: DEVICE_WIDTH[device] }}
                     >
-                        <DraftPreview sections={sections} />
+                        <DraftPreview
+                            sections={sections}
+                            style={style}
+                            styleOptions={styleOptions}
+                        />
                     </div>
                 </div>
             </div>

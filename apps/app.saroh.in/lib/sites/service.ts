@@ -1,4 +1,14 @@
 import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
+import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+
+// Re-exported so callers keep one import site for "everything about a site",
+// while the pure half stays in a module a client component can reach.
+export { resolveStyleVariables } from "@/lib/sites/style";
+export type {
+    SiteStyle,
+    SiteStyleOptions,
+    StyleSwatch,
+} from "@/lib/sites/style";
 
 /**
  * CMS Sites data access for app.saroh.in (S2-004). Every call is org-scoped:
@@ -182,6 +192,9 @@ export interface SiteDetail extends SiteSummary {
     socialImageUrl: string | null;
     /** When the site last went live; null if it has never been published. */
     currentPublication: { publishedAt: string } | null;
+    /** The site's look — always complete; absent choices come back filled. */
+    style: SiteStyle;
+    styleOptions: SiteStyleOptions;
 }
 
 /**
@@ -430,4 +443,24 @@ export async function restorePublication(
         return { ok: true, data: { publicationId: data.publicationId } };
     }
     return { ok: false, ...readError(data, "Could not restore that version.") };
+}
+
+/** Replace a site's look. The panel always sends a whole style (#189). */
+export async function updateSiteStyle(
+    siteId: string,
+    style: SiteStyle,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/style`, {
+        method: "PUT",
+        body: JSON.stringify(style),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not save the style.") };
 }

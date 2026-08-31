@@ -45,6 +45,8 @@ export default async function SiteEditorPage({
             pageId={homePage.id}
             initialSections={initialSections}
             siteName={site.name}
+            initialStyle={site.style}
+            styleOptions={site.styleOptions}
             address={site.subdomain ? `${site.subdomain}.${ROOT_DOMAIN}` : null}
         />
     );
