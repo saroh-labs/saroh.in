@@ -13,7 +13,13 @@ import {
 } from "@saroh/ui/select";
 import { Textarea } from "@saroh/ui/textarea";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
 
 import { DraftPreview } from "@/components/sites/section-preview";
@@ -25,6 +31,21 @@ import {
     saveDraftSections,
     updateSiteStyle,
 } from "@/lib/sites/actions";
+import {
+    getChrome,
+    getChromeOnServer,
+    getPlace,
+    PANEL_DEFAULT,
+    PANEL_MAX,
+    PANEL_MIN,
+    placeOnServer,
+    RAIL_DEFAULT,
+    RAIL_MAX,
+    RAIL_MIN,
+    setChrome,
+    setPlace,
+    subscribe,
+} from "@/lib/sites/editor-prefs";
 import type {
     BookingContent,
     CtaStyle,
@@ -64,6 +85,87 @@ const SECTION_LABELS: Record<SectionType, string> = {
     enquiry: "Enquiry form",
     booking: "Booking",
 };
+
+/**
+ * A draggable hairline between two panels.
+ *
+ * Pointer events rather than mouse events, so a trackpad, a pen and a touch
+ * screen all work, and pointer CAPTURE so a fast drag that outruns the 1px
+ * line keeps resizing instead of stopping dead. Double-click resets, which the
+ * spec asks for and which is the only cheap way back from a width that turned
+ * out to be wrong.
+ *
+ * It is also a real control for the keyboard: a separator that can only be
+ * dragged is a separator half the people using it cannot move at all.
+ */
+function PanelDivider({
+    label,
+    width,
+    min,
+    max,
+    reset,
+    onResize,
+    onNudge,
+}: {
+    label: string;
+    width: number;
+    min: number;
+    max: number;
+    reset: number;
+    /** Absolute target width, for the drag. */
+    onResize: (px: number) => void;
+    /**
+     * A RELATIVE step, for the keyboard. Deliberately not `onResize(width + n)`:
+     * `width` is this render's prop, so a burst of key events arriving before
+     * React re-renders would each compute from the same stale number and only
+     * the last would count. A delta is applied against whatever the store
+     * currently holds, so every press lands.
+     */
+    onNudge: (delta: number) => void;
+}) {
+    const start = useRef<{ x: number; width: number } | null>(null);
+
+    return (
+        <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={label}
+            aria-valuenow={width}
+            aria-valuemin={min}
+            aria-valuemax={max}
+            tabIndex={0}
+            onPointerDown={(e) => {
+                start.current = { x: e.clientX, width };
+                e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+                const from = start.current;
+                if (from === null) return;
+                onResize(from.width + (e.clientX - from.x));
+            }}
+            onPointerUp={(e) => {
+                start.current = null;
+                e.currentTarget.releasePointerCapture(e.pointerId);
+            }}
+            onDoubleClick={() => onResize(reset)}
+            onKeyDown={(e) => {
+                // 16px a press is roughly a visible step without being so
+                // coarse that the useful widths fall between two presses.
+                if (e.key === "ArrowLeft") onNudge(-16);
+                else if (e.key === "ArrowRight") onNudge(16);
+                else if (e.key === "Home") onResize(reset);
+                else return;
+                e.preventDefault();
+            }}
+            /*
+             * 1px of line, 9px of target. `after` widens what the pointer can
+             * hit without widening what the eye sees — a hairline you have to
+             * hit exactly is a hairline nobody moves twice.
+             */
+            className="relative hidden cursor-col-resize bg-border after:absolute after:inset-y-0 after:-left-1 after:w-[9px] after:content-[''] hover:bg-ring focus-visible:bg-ring focus-visible:outline-none lg:block"
+        />
+    );
+}
 
 /** Preview widths. The phone value is a real handset, not a breakpoint. */
 const DEVICES = [
@@ -221,11 +323,51 @@ export function SiteEditor({
     const [saving, setSaving] = useState(false);
     const [publishing, setPublishing] = useState(false);
     const [errorIndex, setErrorIndex] = useState<number | null>(null);
-    const [selectedIndex, setSelectedIndex] = useState<number | null>(
-        initialSections.length > 0 ? 0 : null,
+    /*
+     * Panel widths, device and place come from the preferences store rather
+     * than component state: they belong to the browser, outlive this mount,
+     * and the server has no business guessing them. `useSyncExternalStore`
+     * renders the server snapshot (the defaults) during hydration and swaps to
+     * the stored values before paint, so the markup matches what was sent and
+     * nothing visibly jumps from 200px to whatever the merchant chose.
+     */
+    const chrome = useSyncExternalStore(
+        subscribe,
+        getChrome,
+        getChromeOnServer,
     );
-    const [device, setDevice] = useState<Device>("desktop");
-    const [rail, setRail] = useState<"sections" | "style">("sections");
+    const { railWidth, panelWidth, device } = chrome;
+
+    // The section count is what makes a remembered index meaningful, so it is
+    // bound into both snapshots rather than read inside the store.
+    const initialCount = initialSections.length;
+    // Held stable because useSyncExternalStore compares snapshots by identity.
+    const serverPlace = useMemo(
+        () => placeOnServer(initialCount),
+        [initialCount],
+    );
+    const place = useSyncExternalStore(
+        subscribe,
+        () => getPlace(siteId, initialCount),
+        () => serverPlace,
+    );
+    const { selectedIndex, rail } = place;
+
+    // Setters that keep every call site below unchanged. Writing through the
+    // store is what makes the choice survive a reload; the re-render is the
+    // store's notification, not a second source of truth.
+    const setRailWidth = (px: number) => setChrome({ railWidth: px });
+    const setPanelWidth = (px: number) => setChrome({ panelWidth: px });
+    // Relative steps read the store, not this render, so they accumulate.
+    const nudgeRail = (d: number) =>
+        setChrome({ railWidth: getChrome().railWidth + d });
+    const nudgePanel = (d: number) =>
+        setChrome({ panelWidth: getChrome().panelWidth + d });
+    const setDevice = (next: Device) => setChrome({ device: next });
+    const setSelectedIndex = (next: number | null) =>
+        setPlace(siteId, initialCount, { selectedIndex: next });
+    const setRail = (next: "sections" | "style") =>
+        setPlace(siteId, initialCount, { rail: next });
     /*
      * Drag state. `dragIndex` is the row being carried, `dropIndex` the row it
      * would land on — kept apart so the source can dim while the target draws
@@ -655,9 +797,20 @@ export function SiteEditor({
                 </div>
             </header>
 
-            <div className="grid min-h-0 flex-1 lg:grid-cols-[12.5rem_15rem_minmax(0,1fr)]">
+            <div
+                className="grid min-h-0 flex-1 lg:grid-cols-[var(--editor-cols)]"
+                style={
+                    {
+                        // The two 1px tracks are the drag handles. Giving them
+                        // real grid tracks — rather than absolutely positioning
+                        // them over a border — is what keeps the hit area and
+                        // the line the merchant is aiming at the same object.
+                        "--editor-cols": `${railWidth}px 1px ${panelWidth}px 1px minmax(0,1fr)`,
+                    } as React.CSSProperties
+                }
+            >
                 {/* Rail — the page as a list of sections, not a wall of fields. */}
-                <aside className="flex min-h-0 flex-col border-r">
+                <aside className="flex min-h-0 flex-col">
                     {rail === "style" ? (
                         <StylePanel
                             style={style}
@@ -832,24 +985,36 @@ export function SiteEditor({
                     )}
                 </aside>
 
+                <PanelDivider
+                    label="Resize the section list"
+                    width={railWidth}
+                    min={RAIL_MIN}
+                    max={RAIL_MAX}
+                    reset={RAIL_DEFAULT}
+                    onResize={setRailWidth}
+                    onNudge={nudgeRail}
+                />
+
                 {/* Field panel — one section at a time. */}
-                <div className="min-h-0 overflow-y-auto border-r p-4">
+                <div className="min-h-0 overflow-y-auto p-4">
                     {active ? (
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between gap-2">
-                                <h2 className="text-sm font-semibold">
-                                    {SECTION_LABELS[active.section.type]}
-                                </h2>
-                                <div className="flex items-center gap-1">
-                                    {/*
-                                     * The design puts visibility in this
-                                     * header, next to the section's name — it
-                                     * is a fact about the whole section, not
-                                     * one more field inside it. Labelled with
-                                     * what the section IS, not what the click
-                                     * would do, so a glance answers "is this
-                                     * on the live site?".
-                                     */}
+                            {/*
+                             * Two rows, because 240px will not hold a section
+                             * name and four controls on one line — the header
+                             * clipped its own Remove button at the design's
+                             * own panel width.
+                             *
+                             * The split is not just fitting: the design's
+                             * header carries what the section IS and whether
+                             * it is on the live site. Moving it, and deleting
+                             * it, are actions taken ON it and belong under it.
+                             */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <h2 className="min-w-0 truncate text-sm font-semibold">
+                                        {SECTION_LABELS[active.section.type]}
+                                    </h2>
                                     <Button
                                         type="button"
                                         variant="ghost"
@@ -866,7 +1031,7 @@ export function SiteEditor({
                                             toggleHidden(active.index)
                                         }
                                         className={cn(
-                                            "gap-1.5",
+                                            "h-7 shrink-0 gap-1.5 px-2 text-xs",
                                             active.section.hidden &&
                                                 "text-muted-foreground",
                                         )}
@@ -878,11 +1043,20 @@ export function SiteEditor({
                                             ? "Hidden"
                                             : "Visible"}
                                     </Button>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                    {/*
+                                     * The arrows survive the drag handle: a
+                                     * list you can only reorder by dragging is
+                                     * a list some people cannot reorder.
+                                     */}
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="sm"
                                         aria-label="Move section up"
+                                        className="h-7 w-7 p-0"
                                         disabled={active.index === 0}
                                         onClick={() => {
                                             move(active.index, -1);
@@ -896,6 +1070,7 @@ export function SiteEditor({
                                         variant="ghost"
                                         size="sm"
                                         aria-label="Move section down"
+                                        className="h-7 w-7 p-0"
                                         disabled={
                                             active.index === sections.length - 1
                                         }
@@ -910,6 +1085,7 @@ export function SiteEditor({
                                         type="button"
                                         variant="ghost"
                                         size="sm"
+                                        className="ml-auto h-7 px-2 text-xs"
                                         onClick={() => {
                                             removeAt(active.index);
                                             setSelectedIndex(null);
@@ -966,6 +1142,16 @@ export function SiteEditor({
                         </p>
                     )}
                 </div>
+
+                <PanelDivider
+                    label="Resize the field panel"
+                    width={panelWidth}
+                    min={PANEL_MIN}
+                    max={PANEL_MAX}
+                    reset={PANEL_DEFAULT}
+                    onResize={setPanelWidth}
+                    onNudge={nudgePanel}
+                />
 
                 {/*
                  * Preview — width changes, data does not.
