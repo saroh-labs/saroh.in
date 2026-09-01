@@ -505,6 +505,82 @@ export async function restorePublication(
 
 /** Replace a site's look. The panel always sends a whole style (#189). */
 // ---------------------------------------------------------------------------
+// Review — notes pinned to sections, and one approval (#193)
+// ---------------------------------------------------------------------------
+
+export interface SiteCommentView {
+    id: string;
+    pageId: string;
+    pageTitle: string | null;
+    sectionKey: string;
+    body: string;
+    resolvedAt: string | null;
+    createdAt: string;
+    author: { id: string; name: string };
+    /** The section this was about is no longer on the page. */
+    orphaned: boolean;
+}
+
+export interface ReviewState {
+    openNotes: number;
+    latestApproval: { outcome: string; at: string; by: string } | null;
+}
+
+/**
+ * Every note on a site. Empty rather than throwing on failure: the Review tab
+ * showing nothing is a worse outcome than the editor refusing to open, and
+ * notes are not what the merchant came here to do.
+ */
+export async function listComments(siteId: string): Promise<SiteCommentView[]> {
+    const base = await sitesBase();
+    if (!base) return [];
+    try {
+        const res = await apiFetch(`${base}/${siteId}/comments`);
+        if (!res.ok) return [];
+        const data = (await res.json()) as unknown;
+        return Array.isArray(data) ? (data as SiteCommentView[]) : [];
+    } catch {
+        return [];
+    }
+}
+
+export async function getReviewState(siteId: string): Promise<ReviewState> {
+    const empty: ReviewState = { openNotes: 0, latestApproval: null };
+    const base = await sitesBase();
+    if (!base) return empty;
+    try {
+        const res = await apiFetch(`${base}/${siteId}/review`);
+        if (!res.ok) return empty;
+        const data = (await res.json()) as Partial<ReviewState> | null;
+        return {
+            openNotes: typeof data?.openNotes === "number" ? data.openNotes : 0,
+            latestApproval: data?.latestApproval ?? null,
+        };
+    } catch {
+        return empty;
+    }
+}
+
+/** Mark a note settled, or reopen it. Requires `section:write` on the api. */
+export async function setCommentResolved(
+    siteId: string,
+    commentId: string,
+    resolved: boolean,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/comments/${commentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ resolved }),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+    } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not update the note.") };
+}
+
+// ---------------------------------------------------------------------------
 // Flags (spec §2, "quiet until publish")
 // ---------------------------------------------------------------------------
 

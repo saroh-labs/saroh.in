@@ -41,7 +41,7 @@ export interface EditorChrome {
 
 export interface EditorPlace {
     selectedIndex: number | null;
-    rail: "sections" | "pages" | "style";
+    rail: "sections" | "pages" | "review" | "style";
     /** Where the preview was scrolled to. In the spec's persisted list. */
     scrollTop: number;
 }
@@ -200,7 +200,9 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
                     ? i
                     : fallback.selectedIndex,
             rail:
-                o.rail === "style" || o.rail === "pages" ? o.rail : "sections",
+                o.rail === "style" || o.rail === "pages" || o.rail === "review"
+                    ? o.rail
+                    : "sections",
             // A negative or non-finite offset would scroll nowhere useful.
             scrollTop:
                 typeof o.scrollTop === "number" &&

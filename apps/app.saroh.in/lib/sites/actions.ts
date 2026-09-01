@@ -10,10 +10,13 @@ import {
     createPage as createPageApi,
     createSite as createSiteApi,
     deletePage as deletePageApi,
+    getReviewState as getReviewStateApi,
     getSiteFlags as getSiteFlagsApi,
+    listComments as listCommentsApi,
     publishSite as publishSiteApi,
     restorePublication as restorePublicationApi,
     saveDraftSections as saveDraftSectionsApi,
+    setCommentResolved as setCommentResolvedApi,
     updatePage as updatePageApi,
     updateSiteSettings as updateSiteSettingsApi,
     updateSiteStyle as updateSiteStyleApi,
@@ -82,4 +85,20 @@ export async function deletePage(siteId: string, pageId: string) {
 /** Re-read the site's flags. Called after a save, so the dots settle with it. */
 export async function getSiteFlags(siteId: string) {
     return getSiteFlagsApi(siteId);
+}
+
+export async function listComments(siteId: string) {
+    return listCommentsApi(siteId);
+}
+
+export async function getReviewState(siteId: string) {
+    return getReviewStateApi(siteId);
+}
+
+export async function setCommentResolved(
+    siteId: string,
+    commentId: string,
+    resolved: boolean,
+) {
+    return setCommentResolvedApi(siteId, commentId, resolved);
 }

@@ -4,7 +4,13 @@ import { SiteEditor } from "@/components/sites/site-editor";
 import { env } from "@/env";
 import { requireSession } from "@/lib/session";
 import type { Section } from "@/lib/sites/service";
-import { getPageDraft, getSite, getSiteFlags } from "@/lib/sites/service";
+import {
+    getPageDraft,
+    getReviewState,
+    getSite,
+    getSiteFlags,
+    listComments,
+} from "@/lib/sites/service";
 
 /**
  * Site editor host (S2-004). Resolves the site (notFound when missing / not
@@ -46,9 +52,11 @@ export default async function SiteEditorPage({
     // Flags are whole-site, so they load alongside the page rather than per
     // page — the pre-publish check groups them by page and cannot be answered
     // from the one page that happens to be open.
-    const [draft, flags] = await Promise.all([
+    const [draft, flags, comments, review] = await Promise.all([
         getPageDraft(siteId, activePage.id),
         getSiteFlags(siteId),
+        listComments(siteId),
+        getReviewState(siteId),
     ]);
     // Drop the `order` carried by DraftSection — array position is the order.
     // Everything else travels: `hidden` in particular, because a field dropped
@@ -73,6 +81,8 @@ export default async function SiteEditorPage({
             pageId={activePage.id}
             pages={site.pages}
             initialFlags={flags}
+            initialComments={comments}
+            initialReview={review}
             neverPublished={site.currentPublicationId === null}
             initialSections={initialSections}
             siteName={site.name}

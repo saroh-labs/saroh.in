@@ -25,12 +25,15 @@ import { toast } from "sonner";
 
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
+import { ReviewPanel } from "@/components/sites/review-panel";
 import { DraftPreview } from "@/components/sites/section-preview";
 import { StylePanel } from "@/components/sites/style-panel";
 import { ensureFormForSection } from "@/lib/forms/actions";
 import { listServicesForPicker } from "@/lib/services/actions";
 import {
+    getReviewState,
     getSiteFlags,
+    listComments,
     publishSite,
     saveDraftSections,
     updateSiteStyle,
@@ -50,6 +53,7 @@ import {
     setPlace,
     subscribe,
 } from "@/lib/sites/editor-prefs";
+import { exactDate } from "@/lib/sites/format-date";
 import type {
     BookingContent,
     CtaStyle,
@@ -61,9 +65,11 @@ import type {
     GalleryLayout,
     HeroContent,
     ImageValue,
+    ReviewState,
     RichTextContent,
     Section,
     SectionType,
+    SiteCommentView,
     SiteFlags,
     SitePage,
 } from "@/lib/sites/service";
@@ -104,9 +110,12 @@ const SECTION_LABELS: Record<SectionType, string> = {
 function RailTabs({
     rail,
     onSelect,
+    openNotes,
 }: {
-    rail: "sections" | "pages" | "style";
-    onSelect: (tab: "sections" | "pages") => void;
+    rail: "sections" | "pages" | "review" | "style";
+    onSelect: (tab: "sections" | "pages" | "review") => void;
+    /** Shown on the Review tab when notes are open. */
+    openNotes: number;
 }) {
     return (
         <div
@@ -114,7 +123,7 @@ function RailTabs({
             aria-label="Editor panels"
             className="flex items-center gap-1 border-b px-2 py-1.5"
         >
-            {(["sections", "pages"] as const).map((tab) => (
+            {(["sections", "pages", "review"] as const).map((tab) => (
                 <button
                     key={tab}
                     type="button"
@@ -129,6 +138,16 @@ function RailTabs({
                     )}
                 >
                     {tab}
+                    {/*
+                     * The count rides the tab rather than a separate badge:
+                     * the number only means anything next to the word it
+                     * counts, and the rail has no room for both.
+                     */}
+                    {tab === "review" && openNotes > 0 ? (
+                        <span className="ml-1 tabular-nums text-[#c99f6f]">
+                            {openNotes}
+                        </span>
+                    ) : null}
                 </button>
             ))}
         </div>
@@ -367,6 +386,8 @@ export function SiteEditor({
     pageId,
     pages,
     initialFlags,
+    initialComments,
+    initialReview,
     neverPublished,
     initialSections,
     siteName,
@@ -380,6 +401,9 @@ export function SiteEditor({
     pages: SitePage[];
     /** The site's advisory flags, as the server computed them. */
     initialFlags: SiteFlags;
+    /** Reviewer notes and the latest verdict (#193). */
+    initialComments: SiteCommentView[];
+    initialReview: ReviewState;
     /** Never-published sites say "Publish site", not "Publish changes". */
     neverPublished: boolean;
     initialSections: Section[];
@@ -404,6 +428,20 @@ export function SiteEditor({
      */
     const [siteFlags, setSiteFlags] = useState<SiteFlags>(initialFlags);
     const [checking, setChecking] = useState(false);
+    const [comments, setComments] =
+        useState<SiteCommentView[]>(initialComments);
+    const [review, setReview] = useState<ReviewState>(initialReview);
+    const openNotes = review.openNotes;
+
+    /** Re-read notes and the verdict together — they move together. */
+    async function refreshReview() {
+        const [next, state] = await Promise.all([
+            listComments(siteId),
+            getReviewState(siteId),
+        ]);
+        setComments(next);
+        setReview(state);
+    }
 
     /** Re-read flags from the server. They settle after a save, not per key. */
     async function refreshFlags() {
@@ -459,7 +497,7 @@ export function SiteEditor({
     };
     const setSelectedIndex = (next: number | null) =>
         setPlace(siteId, initialCount, { selectedIndex: next });
-    const setRail = (next: "sections" | "pages" | "style") =>
+    const setRail = (next: "sections" | "pages" | "review" | "style") =>
         setPlace(siteId, initialCount, { rail: next });
 
     /*
@@ -850,6 +888,21 @@ export function SiteEditor({
     const activeFlags =
         active === null ? [] : (flagsBySection.get(active.index) ?? []);
 
+    /*
+     * Section keys on this page carrying an unresolved note. The issue asks
+     * for it directly: "the section list should show which sections carry
+     * unresolved ones." Resolved notes do not mark anything — a settled note
+     * is history, and a dot for it would never go out.
+     */
+    const notedKeys = new Set(
+        comments
+            .filter(
+                (c) =>
+                    c.pageId === pageId && c.resolvedAt === null && !c.orphaned,
+            )
+            .map((c) => c.sectionKey),
+    );
+
     return (
         /*
          * Editor chrome, per the website spec §7 and its "dark on dark"
@@ -948,6 +1001,35 @@ export function SiteEditor({
                             : `${changedCount} sections changed`}
                     </span>
                 ) : null}
+
+                {/*
+                 * The design's "Approved by Priya Raman" line. The note count
+                 * rides it rather than forming a second badge: the spec's
+                 * "approved with notes" is ONE badge carrying both, because
+                 * approval and outstanding notes answer the same question —
+                 * is this ready.
+                 */}
+                {review.latestApproval === null ? null : (
+                    <span
+                        className={cn(
+                            "flex h-[22px] items-center gap-1.5 rounded-[3px] border px-2 text-xs",
+                            review.latestApproval.outcome === "APPROVED"
+                                ? "border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
+                                : "border-border text-muted-foreground",
+                        )}
+                        title={exactDate(review.latestApproval.at)}
+                    >
+                        {review.latestApproval.outcome === "APPROVED"
+                            ? `Approved by ${review.latestApproval.by}`
+                            : `${review.latestApproval.by} asked for changes`}
+                        {openNotes > 0 ? (
+                            <span className="tabular-nums opacity-80">
+                                · {openNotes}{" "}
+                                {openNotes === 1 ? "note" : "notes"}
+                            </span>
+                        ) : null}
+                    </span>
+                )}
 
                 <div className="ml-auto flex items-center gap-2">
                     {/*
@@ -1089,7 +1171,14 @@ export function SiteEditor({
                         // real grid tracks — rather than absolutely positioning
                         // them over a border — is what keeps the hit area and
                         // the line the merchant is aiming at the same object.
-                        "--editor-cols": `${railWidth}px 1px ${panelWidth}px 1px minmax(0,1fr)`,
+                        /*
+                         * "Review tab auto-widens the rail to 300px; the other
+                         * tabs stay at 200." The merchant's own width is not
+                         * overwritten — it comes straight back when they leave
+                         * the tab, because this widens the LAYOUT, not the
+                         * stored preference.
+                         */
+                        "--editor-cols": `${rail === "review" ? Math.max(railWidth, 300) : railWidth}px 1px ${panelWidth}px 1px minmax(0,1fr)`,
                     } as React.CSSProperties
                 }
             >
@@ -1097,12 +1186,50 @@ export function SiteEditor({
                 <aside className="flex min-h-0 flex-col">
                     {rail === "pages" ? (
                         <>
-                            <RailTabs rail={rail} onSelect={setRail} />
+                            <RailTabs
+                                rail={rail}
+                                onSelect={setRail}
+                                openNotes={openNotes}
+                            />
                             <PagesPanel
                                 siteId={siteId}
                                 pages={pages}
                                 activePageId={pageId}
                                 dirty={dirty}
+                            />
+                        </>
+                    ) : rail === "review" ? (
+                        <>
+                            <RailTabs
+                                rail={rail}
+                                onSelect={setRail}
+                                openNotes={openNotes}
+                            />
+                            <ReviewPanel
+                                siteId={siteId}
+                                pages={pages}
+                                comments={comments}
+                                onChanged={() => void refreshReview()}
+                                onJump={(jumpPageId, sectionKey) => {
+                                    /*
+                                     * A note names a section by KEY, and only
+                                     * the open page's sections are loaded — so
+                                     * a note on another page is a navigation
+                                     * first and a selection after it.
+                                     */
+                                    if (jumpPageId !== pageId) {
+                                        router.push(
+                                            `/sites/${siteId}?page=${jumpPageId}`,
+                                        );
+                                        return;
+                                    }
+                                    const index = sections.findIndex(
+                                        (sec) => sec.key === sectionKey,
+                                    );
+                                    if (index === -1) return;
+                                    setRail("sections");
+                                    setSelectedIndex(index);
+                                }}
                             />
                         </>
                     ) : rail === "style" ? (
@@ -1124,7 +1251,11 @@ export function SiteEditor({
                              * all: it opens from the bar, because it applies to
                              * the whole site while this rail lists one page.
                              */}
-                            <RailTabs rail={rail} onSelect={setRail} />
+                            <RailTabs
+                                rail={rail}
+                                onSelect={setRail}
+                                openNotes={openNotes}
+                            />
                             <ul className="min-h-0 flex-1 overflow-y-auto p-2">
                                 {sections.map((section, index) => (
                                     <li
@@ -1232,16 +1363,31 @@ export function SiteEditor({
                                                      * row.
                                                      */}
                                                     {(flagsBySection.get(index)
-                                                        ?.length ?? 0) > 0 ? (
+                                                        ?.length ?? 0) > 0 ||
+                                                    (section.key !==
+                                                        undefined &&
+                                                        notedKeys.has(
+                                                            section.key,
+                                                        )) ? (
                                                         <span
                                                             className="size-1 shrink-0 rounded-full bg-[#c99f6f]"
-                                                            title={flagsBySection
-                                                                .get(index)
-                                                                ?.map(
-                                                                    (f) =>
-                                                                        f.message,
+                                                            title={[
+                                                                ...(flagsBySection
+                                                                    .get(index)
+                                                                    ?.map(
+                                                                        (f) =>
+                                                                            f.message,
+                                                                    ) ?? []),
+                                                                ...(section.key !==
+                                                                    undefined &&
+                                                                notedKeys.has(
+                                                                    section.key,
                                                                 )
-                                                                .join("\n")}
+                                                                    ? [
+                                                                          "A reviewer has left a note on this section.",
+                                                                      ]
+                                                                    : []),
+                                                            ].join("\n")}
                                                         />
                                                     ) : null}
                                                 </span>
@@ -1602,6 +1748,7 @@ export function SiteEditor({
                     awaitingNavigation={siteFlags.awaitingNavigation}
                     publishing={publishing}
                     neverPublished={neverPublished}
+                    review={review}
                     onPublish={() => void onPublish()}
                     onClose={() => setChecking(false)}
                     onJump={(jumpPageId, sectionIndex) => {

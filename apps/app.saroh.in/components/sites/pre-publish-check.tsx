@@ -3,7 +3,12 @@
 import { Button } from "@saroh/ui/button";
 import { useEffect } from "react";
 
-import type { Flag, FlagType, SitePage } from "@/lib/sites/service";
+import type {
+    Flag,
+    FlagType,
+    ReviewState,
+    SitePage,
+} from "@/lib/sites/service";
 
 /**
  * The pre-publish check (spec §2, "Publish").
@@ -39,6 +44,7 @@ export function PrePublishCheck({
     awaitingNavigation,
     publishing,
     neverPublished,
+    review,
     onPublish,
     onClose,
     onJump,
@@ -50,6 +56,8 @@ export function PrePublishCheck({
     publishing: boolean;
     /** Never-published sites say "Publish site", not "Publish changes". */
     neverPublished: boolean;
+    /** "Approval also shows as a line in the pre-publish check" (spec §2). */
+    review: ReviewState;
     onPublish: () => void;
     onClose: () => void;
     /** Jump to a flag's section. Null pageId means a whole-site flag. */
@@ -125,6 +133,29 @@ export function PrePublishCheck({
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-2xl px-6 py-8">
+                    {/*
+                     * The approval, where the spec puts it: this is the last
+                     * look before going live, and whether someone has signed
+                     * the site off belongs beside what is still outstanding
+                     * rather than only in the editor behind it.
+                     */}
+                    {review.latestApproval === null ? null : (
+                        <p
+                            className={
+                                review.latestApproval.outcome === "APPROVED"
+                                    ? "mb-6 rounded-md border border-[#3d3020] bg-[#241d14] px-3 py-2 text-sm text-[#c99f6f]"
+                                    : "mb-6 rounded-md border px-3 py-2 text-sm text-muted-foreground"
+                            }
+                        >
+                            {review.latestApproval.outcome === "APPROVED"
+                                ? `${review.latestApproval.by} approved this site`
+                                : `${review.latestApproval.by} asked for changes`}
+                            {review.openNotes > 0
+                                ? `, with ${review.openNotes} ${review.openNotes === 1 ? "note" : "notes"} still open.`
+                                : "."}
+                        </p>
+                    )}
+
                     {total === 0 ? (
                         <p className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
                             Everything checks out. Publish when you are ready.
