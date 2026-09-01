@@ -26,6 +26,8 @@ import type {
     UpdateSiteSettingsDto,
 } from "./dto";
 import { sanitizeSectionContent } from "./sanitize";
+import type { Flag, FlagType } from "./site-flags";
+import { checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
 import { parseSiteStyle, siteStyleOptions } from "./site-style";
 
@@ -990,6 +992,90 @@ export class SitesService {
     // -----------------------------------------------------------------------
 
     /** Prove `siteId` is a live site in the ctx org, or 404. */
+    // -----------------------------------------------------------------------
+    // Flags — the pre-publish check (advisory, never blocking)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Every flag on a site. Requires `site:read` — this reports, it does not
+     * change anything, and a MEMBER who can see the site can see what is wrong
+     * with it.
+     *
+     * Computed across EVERY page, not just the one the editor has open: the
+     * pre-publish check groups flags by page, and "is this site ready" is not a
+     * question one page can answer.
+     */
+    async getSiteFlags(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<{ flags: Flag[]; awaitingNavigation: readonly FlagType[] }> {
+        authorize(ctx, "site:read");
+
+        const site = await prisma.site.findFirst({
+            where: {
+                id: siteId,
+                organizationId: ctx.organizationId,
+                deletedAt: null,
+            },
+            select: {
+                seoDescription: true,
+                currentPublicationId: true,
+                currentPublication: { select: { publishedAt: true } },
+                pages: {
+                    select: {
+                        id: true,
+                        path: true,
+                        title: true,
+                        versions: {
+                            where: { status: "DRAFT" },
+                            orderBy: { createdAt: "desc" },
+                            take: 1,
+                            select: {
+                                updatedAt: true,
+                                sections: {
+                                    orderBy: { order: "asc" },
+                                    select: {
+                                        type: true,
+                                        content: true,
+                                        hidden: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        if (!site) {
+            throw new NotFoundException(`Site "${siteId}" not found`);
+        }
+
+        const publishedAt = site.currentPublication?.publishedAt ?? null;
+        const hasUnpublishedChanges =
+            publishedAt !== null &&
+            site.pages.some((page) =>
+                page.versions.some((v) => v.updatedAt > publishedAt),
+            );
+
+        const flags = checkSite({
+            seoDescription: site.seoDescription,
+            published: site.currentPublicationId !== null,
+            hasUnpublishedChanges,
+            pages: site.pages.map((page) => ({
+                id: page.id,
+                path: page.path,
+                title: page.title,
+                // `versions` is the latest draft or empty; a page with no draft
+                // has no sections to check rather than being an error.
+                sections: page.versions.flatMap((v) => v.sections),
+            })),
+        });
+
+        // The two unimplementable types travel with the result so the editor
+        // can say what is NOT being checked rather than implying nine.
+        return { flags, awaitingNavigation: FLAGS_AWAITING_NAVIGATION };
+    }
+
     // -----------------------------------------------------------------------
     // Pages — a site is more than its home page
     // -----------------------------------------------------------------------

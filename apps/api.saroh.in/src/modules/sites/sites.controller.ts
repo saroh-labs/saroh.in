@@ -81,6 +81,19 @@ export class SitesController {
     }
 
     /**
+     * Every advisory flag on this site, for the rail dots, the publish count
+     * and the pre-publish check. Requires `site:read`. Nothing here blocks
+     * publishing — the spec is explicit that all flags are advisory.
+     */
+    @Get(":siteId/flags")
+    getFlags(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.getSiteFlags(ctx, siteId);
+    }
+
+    /**
      * Add a page to a site. Requires `site:update`.
      */
     @Post(":siteId/pages")

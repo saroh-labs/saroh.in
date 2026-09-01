@@ -13,6 +13,7 @@ import {
 } from "@saroh/ui/select";
 import { Textarea } from "@saroh/ui/textarea";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
     useEffect,
     useMemo,
@@ -23,11 +24,13 @@ import {
 import { toast } from "sonner";
 
 import { PagesPanel } from "@/components/sites/pages-panel";
+import { PrePublishCheck } from "@/components/sites/pre-publish-check";
 import { DraftPreview } from "@/components/sites/section-preview";
 import { StylePanel } from "@/components/sites/style-panel";
 import { ensureFormForSection } from "@/lib/forms/actions";
 import { listServicesForPicker } from "@/lib/services/actions";
 import {
+    getSiteFlags,
     publishSite,
     saveDraftSections,
     updateSiteStyle,
@@ -54,12 +57,14 @@ import type {
     EnquiryContent,
     EnquiryField,
     EnquiryFieldType,
+    Flag,
     GalleryLayout,
     HeroContent,
     ImageValue,
     RichTextContent,
     Section,
     SectionType,
+    SiteFlags,
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
@@ -346,6 +351,8 @@ export function SiteEditor({
     siteId,
     pageId,
     pages,
+    initialFlags,
+    neverPublished,
     initialSections,
     siteName,
     address,
@@ -356,6 +363,10 @@ export function SiteEditor({
     pageId: string;
     /** Every page on this site, for the Pages tab. */
     pages: SitePage[];
+    /** The site's advisory flags, as the server computed them. */
+    initialFlags: SiteFlags;
+    /** Never-published sites say "Publish site", not "Publish changes". */
+    neverPublished: boolean;
     initialSections: Section[];
     siteName: string;
     initialStyle: SiteStyle;
@@ -368,7 +379,21 @@ export function SiteEditor({
         JSON.stringify(initialSections),
     );
     const [saving, setSaving] = useState(false);
+    const router = useRouter();
     const [publishing, setPublishing] = useState(false);
+    /*
+     * Flags come from the server and settle after each save rather than
+     * updating per keystroke. The spec calls them "quiet until publish", and a
+     * dot that flickers as you type is the opposite of quiet — it also keeps
+     * one implementation of nine rules instead of two that can disagree.
+     */
+    const [siteFlags, setSiteFlags] = useState<SiteFlags>(initialFlags);
+    const [checking, setChecking] = useState(false);
+
+    /** Re-read flags from the server. They settle after a save, not per key. */
+    async function refreshFlags() {
+        setSiteFlags(await getSiteFlags(siteId));
+    }
     const [errorIndex, setErrorIndex] = useState<number | null>(null);
     /*
      * Panel widths, device and place come from the preferences store rather
@@ -584,6 +609,13 @@ export function SiteEditor({
             // An autosave that announces itself every few seconds is noise; the
             // bar already states when it last saved.
             if (!auto) toast.success("Draft saved.");
+            /*
+             * The flags settle here — after the save, not on every keystroke.
+             * Deliberately not awaited: the dots catching up a moment later is
+             * fine, and blocking the save's completion on an advisory check
+             * would make editing feel slower for no benefit.
+             */
+            void refreshFlags();
             return;
         }
         setSaveError(true);
@@ -657,19 +689,43 @@ export function SiteEditor({
         setStyle(defaults);
     }
 
-    async function onPublish() {
+    /**
+     * Publishing goes through the pre-publish check first — the spec makes it
+     * "its own moment before going live", not a button that fires immediately.
+     * The check itself never refuses: every flag is advisory, so the merchant
+     * can read them and publish anyway from the same screen.
+     */
+    async function openCheck() {
         if (dirty) {
             toast.error("You have unsaved changes — save the draft first.");
             return;
         }
+        setChecking(true);
+        // Re-read rather than trusting what was loaded: the merchant may have
+        // been editing for an hour, and a stale check is worse than none.
+        await refreshFlags();
+    }
+
+    async function onPublish() {
         setPublishing(true);
         const res = await publishSite(siteId);
         setPublishing(false);
-        if (res.ok) {
-            toast.success("Site published.");
+        if (!res.ok) {
+            toast.error(res.error);
             return;
         }
-        toast.error(res.error);
+        setChecking(false);
+        /*
+         * The live state names the business and its address, per the spec —
+         * "Flour & Ferment is live at flour-and-ferment.saroh.app". A bare
+         * "Published" leaves the merchant to go and check what happened.
+         */
+        toast.success(
+            address === null || address === undefined
+                ? `${siteName} is live.`
+                : `${siteName} is live at ${address}.`,
+        );
+        await refreshFlags();
     }
 
     /*
@@ -682,6 +738,21 @@ export function SiteEditor({
         selectedIndex !== null && selectedIndex < sections.length
             ? { index: selectedIndex, section: sections[selectedIndex] }
             : null;
+
+    /*
+     * Flags for the page currently open, indexed by section. The server sends
+     * flags for the whole site; the rail can only draw dots for the sections it
+     * is showing.
+     */
+    const flagsBySection = new Map<number, Flag[]>();
+    for (const flag of siteFlags.flags) {
+        if (flag.pageId !== pageId || flag.sectionIndex === null) continue;
+        const list = flagsBySection.get(flag.sectionIndex) ?? [];
+        list.push(flag);
+        flagsBySection.set(flag.sectionIndex, list);
+    }
+    const activeFlags =
+        active === null ? [] : (flagsBySection.get(active.index) ?? []);
 
     return (
         /*
@@ -767,6 +838,21 @@ export function SiteEditor({
                               : "Draft"}
                 </span>
 
+                {/*
+                 * What publishing would actually change, in the bar where the
+                 * design puts it. It used to be the badge on Publish, but the
+                 * spec gives that badge to the outstanding FLAG count — and the
+                 * two answer different questions: how much work is waiting, and
+                 * how much of it is worth a second look.
+                 */}
+                {changedCount > 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                        {changedCount === 1
+                            ? "1 section changed"
+                            : `${changedCount} sections changed`}
+                    </span>
+                ) : null}
+
                 <div className="ml-auto flex items-center gap-2">
                     {/*
                      * Device preview. §18 makes the phone co-primary for the
@@ -825,19 +911,37 @@ export function SiteEditor({
                      */}
                     <Button
                         className="wk-press h-7 rounded bg-[#8a5a3c] px-3 text-xs font-medium text-white hover:bg-[#794e34]"
-                        onClick={onPublish}
+                        onClick={() => void openCheck()}
                         disabled={publishing || dirty || saving}
                     >
-                        {publishing ? "Publishing…" : "Publish"}
+                        {publishing
+                            ? "Publishing…"
+                            : /*
+                               * "Never-published sites say Publish site, not
+                               * Publish changes" (spec §2). Before anything is
+                               * live there are no changes to publish — there is
+                               * a site to put up.
+                               */
+                              neverPublished
+                              ? "Publish site"
+                              : "Publish"}
                         {/*
                          * The count as a BADGE rather than in the label, as the
                          * design has it: "Publish" stays the same width whatever
                          * the number, so the button a merchant is about to press
                          * does not move under the cursor as they edit.
                          */}
-                        {!publishing && changedCount > 0 ? (
-                            <span className="ml-1.5 rounded bg-brand-foreground/25 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
-                                {changedCount}
+                        {/*
+                         * "Publish button carries the outstanding flag count"
+                         * (spec §2) — the flags, not the changed-section count
+                         * that used to sit here. A number next to Publish
+                         * should say what is worth looking at before going
+                         * live, and the changed count already has its own line
+                         * in the bar.
+                         */}
+                        {!publishing && siteFlags.flags.length > 0 ? (
+                            <span className="ml-1.5 rounded bg-black/30 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
+                                {siteFlags.flags.length}
                             </span>
                         ) : null}
                     </Button>
@@ -976,12 +1080,37 @@ export function SiteEditor({
                                                 >
                                                     {sectionTitle(section)}
                                                 </span>
-                                                <span className="shrink-0 text-[0.625rem] uppercase tracking-[0.06em] text-muted-foreground/70">
-                                                    {
-                                                        SECTION_LABELS[
-                                                            section.type
-                                                        ]
-                                                    }
+                                                <span className="flex shrink-0 items-center gap-1.5">
+                                                    <span className="text-[0.625rem] uppercase tracking-[0.06em] text-muted-foreground/70">
+                                                        {
+                                                            SECTION_LABELS[
+                                                                section.type
+                                                            ]
+                                                        }
+                                                    </span>
+                                                    {/*
+                                                     * The spec's flag dot: 4px,
+                                                     * amber #c99f6f (§7). It is
+                                                     * the ONLY thing flags draw
+                                                     * while editing — "quiet
+                                                     * until publish" — so it
+                                                     * carries a title rather
+                                                     * than expanding into the
+                                                     * row.
+                                                     */}
+                                                    {(flagsBySection.get(index)
+                                                        ?.length ?? 0) > 0 ? (
+                                                        <span
+                                                            className="size-1 shrink-0 rounded-full bg-[#c99f6f]"
+                                                            title={flagsBySection
+                                                                .get(index)
+                                                                ?.map(
+                                                                    (f) =>
+                                                                        f.message,
+                                                                )
+                                                                .join("\n")}
+                                                        />
+                                                    ) : null}
                                                 </span>
                                             </button>
                                         </div>
@@ -1149,6 +1278,32 @@ export function SiteEditor({
                                 }
                             />
 
+                            {/*
+                             * Per-field markers, the other half of what flags
+                             * are allowed to show while editing. Listed under
+                             * the fields rather than inline beside each one:
+                             * the field components are shared with the section
+                             * types and threading a marker through all six for
+                             * a advisory note would cost more than it is worth
+                             * until the notes need to sit on the input itself.
+                             */}
+                            {activeFlags.length > 0 ? (
+                                <ul className="grid gap-1.5 border-t pt-3">
+                                    {activeFlags.map((flag, i) => (
+                                        <li
+                                            key={i}
+                                            className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
+                                        >
+                                            <span
+                                                aria-hidden="true"
+                                                className="mt-1.5 size-1 shrink-0 rounded-full bg-[#c99f6f]"
+                                            />
+                                            <span>{flag.message}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : null}
+
                             <SectionPadding
                                 section={active.section}
                                 siteDefault={style.scalars.sectionPadding}
@@ -1219,6 +1374,42 @@ export function SiteEditor({
                     </div>
                 </div>
             </div>
+
+            {/*
+             * The pre-publish check. Rendered inside the editor rather than
+             * on its own route so nothing is torn down and rebuilt behind
+             * it — the merchant goes back to exactly the editing state they
+             * left, including unsaved selection and scroll.
+             */}
+            {checking ? (
+                <PrePublishCheck
+                    siteName={siteName}
+                    pages={pages}
+                    flags={siteFlags.flags}
+                    awaitingNavigation={siteFlags.awaitingNavigation}
+                    publishing={publishing}
+                    neverPublished={neverPublished}
+                    onPublish={() => void onPublish()}
+                    onClose={() => setChecking(false)}
+                    onJump={(jumpPageId, sectionIndex) => {
+                        setChecking(false);
+                        /*
+                         * A flag on another page needs that page loaded, which
+                         * is a navigation. One on this page is just a
+                         * selection — doing it without a round trip keeps the
+                         * jump instant where it can be.
+                         */
+                        if (jumpPageId !== null && jumpPageId !== pageId) {
+                            router.push(`/sites/${siteId}?page=${jumpPageId}`);
+                            return;
+                        }
+                        if (sectionIndex !== null) {
+                            setRail("sections");
+                            setSelectedIndex(sectionIndex);
+                        }
+                    }}
+                />
+            ) : null}
         </div>
     );
 }

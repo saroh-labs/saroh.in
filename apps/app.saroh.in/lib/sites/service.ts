@@ -497,6 +497,65 @@ export async function restorePublication(
 }
 
 /** Replace a site's look. The panel always sends a whole style (#189). */
+// ---------------------------------------------------------------------------
+// Flags (spec §2, "quiet until publish")
+// ---------------------------------------------------------------------------
+
+/**
+ * The nine advisory checks. Mirrored from the api rather than imported, on the
+ * same boundary rule as the section content types above — but the RULES are not
+ * mirrored: only the api decides what is flagged, so there is one answer to
+ * "what is wrong with this site" rather than two that can disagree.
+ */
+export type FlagType =
+    | "emptyRequiredField"
+    | "placeholderText"
+    | "missingImage"
+    | "hiddenButLinked"
+    | "pageNotInNavigation"
+    | "unpublishedChanges"
+    | "missingSeoDescription"
+    | "brokenLink"
+    | "phoneWidth";
+
+export interface Flag {
+    type: FlagType;
+    message: string;
+    pageId: string | null;
+    sectionIndex: number | null;
+    field: string | null;
+}
+
+export interface SiteFlags {
+    flags: Flag[];
+    /** Types the api cannot check yet, so the editor can say so honestly. */
+    awaitingNavigation: FlagType[];
+}
+
+/**
+ * Every flag on a site. Returns an empty set rather than throwing on failure:
+ * flags are advisory, and a check that cannot run is not a reason to stop
+ * someone editing or publishing.
+ */
+export async function getSiteFlags(siteId: string): Promise<SiteFlags> {
+    const empty: SiteFlags = { flags: [], awaitingNavigation: [] };
+    const base = await sitesBase();
+    if (!base) return empty;
+    try {
+        const res = await apiFetch(`${base}/${siteId}/flags`);
+        if (!res.ok) return empty;
+        const data = (await res.json()) as Partial<SiteFlags> | null;
+        return {
+            flags: Array.isArray(data?.flags) ? data.flags : [],
+            awaitingNavigation: Array.isArray(data?.awaitingNavigation)
+                ? data.awaitingNavigation
+                : [],
+        };
+    } catch {
+        return empty;
+    }
+}
+
 /**
  * Add a page to a site. The API decides what a legal path is and whether it is
  * free — the form does not pre-check, because a client-side answer that

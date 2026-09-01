@@ -10,6 +10,7 @@ import {
     createPage as createPageApi,
     createSite as createSiteApi,
     deletePage as deletePageApi,
+    getSiteFlags as getSiteFlagsApi,
     publishSite as publishSiteApi,
     restorePublication as restorePublicationApi,
     saveDraftSections as saveDraftSectionsApi,
@@ -76,4 +77,9 @@ export async function updatePage(
 
 export async function deletePage(siteId: string, pageId: string) {
     return deletePageApi(siteId, pageId);
+}
+
+/** Re-read the site's flags. Called after a save, so the dots settle with it. */
+export async function getSiteFlags(siteId: string) {
+    return getSiteFlagsApi(siteId);
 }
