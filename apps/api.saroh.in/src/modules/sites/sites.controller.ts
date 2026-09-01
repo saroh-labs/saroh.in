@@ -4,6 +4,7 @@ import {
     Get,
     HttpCode,
     Param,
+    Patch,
     Post,
     Put,
     UseGuards,
@@ -14,7 +15,11 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { CreateSiteFromTemplateDto, UpdateDraftSectionsDto } from "./dto";
+import {
+    CreateSiteFromTemplateDto,
+    UpdateDraftSectionsDto,
+    UpdateSiteSettingsDto,
+} from "./dto";
 import { SitesService } from "./sites.service";
 
 /**
@@ -106,6 +111,72 @@ export class SitesController {
      * Publication (sanitizing rich fields) and repoint the live pointer.
      * Requires `site:publish`.
      */
+    /**
+     * Update a site's search and social settings (#188).
+     *
+     * PATCH, not PUT: a settings form sends what changed. An omitted field is
+     * left alone and an explicit null clears it — see UpdateSiteSettingsDto.
+     */
+    @Patch(":siteId/settings")
+    updateSettings(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: UpdateSiteSettingsDto,
+    ) {
+        return this.sites.updateSettings(ctx, siteId, dto);
+    }
+
+    /**
+     * Set the site's look (#189). Replaces rather than merges — the Style panel
+     * always sends a whole look, and merging would let two tabs produce a
+     * palette neither person chose.
+     */
+    @Put(":siteId/style")
+    updateStyle(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() body: unknown,
+    ) {
+        return this.sites.updateStyle(ctx, siteId, body);
+    }
+
+    // ---------------------------------------------------------------------
+    // Version history (#194)
+    // ---------------------------------------------------------------------
+
+    /** Every publish of this site, newest first. */
+    @Get(":siteId/publications")
+    listPublications(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.listPublications(ctx, siteId);
+    }
+
+    /** One past publish, with its snapshot, for previewing what was served. */
+    @Get(":siteId/publications/:publicationId")
+    getPublication(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("publicationId") publicationId: string,
+    ) {
+        return this.sites.getPublication(ctx, siteId, publicationId);
+    }
+
+    /**
+     * Put a past version back. Appends a new publication rather than deleting
+     * the ones after it, so the restore can itself be undone.
+     */
+    @Post(":siteId/publications/:publicationId/restore")
+    @HttpCode(200)
+    restorePublication(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("publicationId") publicationId: string,
+    ) {
+        return this.sites.restorePublication(ctx, siteId, publicationId);
+    }
+
     @Post(":siteId/publish")
     @HttpCode(200)
     publish(

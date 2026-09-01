@@ -1,4 +1,14 @@
 import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
+import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+
+// Re-exported so callers keep one import site for "everything about a site",
+// while the pure half stays in a module a client component can reach.
+export { resolveStyleVariables } from "@/lib/sites/style";
+export type {
+    SiteStyle,
+    SiteStyleOptions,
+    StyleSwatch,
+} from "@/lib/sites/style";
 
 /**
  * CMS Sites data access for app.saroh.in (S2-004). Every call is org-scoped:
@@ -20,12 +30,7 @@ import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
 
 /** The section types the editor supports. */
 export type SectionType =
-    | "hero"
-    | "richText"
-    | "cta"
-    | "gallery"
-    | "enquiry"
-    | "booking";
+    "hero" | "richText" | "cta" | "gallery" | "enquiry" | "booking";
 
 /** Button style shared by hero CTA and the standalone cta section. */
 export type CtaStyle = "primary" | "secondary" | "link";
@@ -116,6 +121,21 @@ export interface SectionContentByType {
 }
 
 /**
+ * Layout every section carries, whatever its type (#189).
+ *
+ * Declared once and intersected below rather than repeated in all six content
+ * interfaces, mirroring the single `paddingOverride` in the section contract —
+ * six copies is six chances for one to drift.
+ *
+ * ABSENT means "follow the site setting". Not defaulted, because a default
+ * would freeze today's site value into the section and stop it tracking the
+ * slider afterwards.
+ */
+export interface SectionLayout {
+    padding?: number;
+}
+
+/**
  * A section discriminated on `type`, so narrowing on `type` gives the exact
  * `content` shape. Used by the editor and preview.
  */
@@ -123,7 +143,7 @@ export type Section = {
     [K in SectionType]: {
         type: K;
         contractVersion: number;
-        content: SectionContentByType[K];
+        content: SectionContentByType[K] & SectionLayout;
     };
 }[SectionType];
 
@@ -158,6 +178,15 @@ export interface SiteSummary {
      * them the public could actually reach.
      */
     currentPublicationId?: string | null;
+    /** When the site last went live; null if it never has. */
+    currentPublication?: { publishedAt: string } | null;
+    /**
+     * Draft work newer than what is live. A boolean, not a count — see
+     * SitesService.listSites for why the number lives with a single site.
+     */
+    hasUnpublishedChanges?: boolean;
+    /** A claimed hostname that has not verified yet, if any. */
+    pendingDomain?: string | null;
 }
 
 export interface SitePage {
@@ -169,6 +198,30 @@ export interface SitePage {
 
 export interface SiteDetail extends SiteSummary {
     pages: SitePage[];
+    /**
+     * Search and social settings (#188). Null means "not set" and must render
+     * as absent — never as an empty title or a broken image.
+     */
+    seoTitle: string | null;
+    seoDescription: string | null;
+    socialImageUrl: string | null;
+    /** When the site last went live; null if it has never been published. */
+    currentPublication: { publishedAt: string } | null;
+    /** The site's look — always complete; absent choices come back filled. */
+    style: SiteStyle;
+    styleOptions: SiteStyleOptions;
+}
+
+/**
+ * A settings change. Every field is optional and nullable, and the two are
+ * different requests: OMIT a field to leave it alone, send NULL to clear it.
+ * Sending the whole form every time would let a stale tab overwrite a value
+ * someone else changed.
+ */
+export interface SiteSettingsInput {
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    socialImageUrl?: string | null;
 }
 
 export interface PageDraft {
@@ -331,4 +384,98 @@ export async function publishSite(
         return { ok: true, data: { publicationId: data?.publicationId } };
     }
     return { ok: false, ...readError(data, "Could not publish the site") };
+}
+
+/**
+ * Update a site's search and social settings (#188).
+ *
+ * Sends only what the caller passed: an omitted field is left alone by the API
+ * and an explicit null clears it, so a form that PATCHes one field cannot wipe
+ * the others.
+ */
+export async function updateSiteSettings(
+    siteId: string,
+    input: SiteSettingsInput,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/settings`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return {
+        ok: false,
+        ...readError(data, "Could not save these settings."),
+    };
+}
+
+/** One publish in a site's history (#194). */
+export interface SitePublication {
+    id: string;
+    publishedAt: string;
+    publishedByUserId: string | null;
+    templateId: string;
+    templateVersion: number;
+    /** Whether this is the version the public is being served right now. */
+    isCurrent: boolean;
+}
+
+/** Every publish of a site, newest first. Empty if it has never been published. */
+export async function listPublications(
+    siteId: string,
+): Promise<SitePublication[]> {
+    const base = await sitesBase();
+    if (!base) return [];
+    return getList<SitePublication>(`${base}/${siteId}/publications`);
+}
+
+/**
+ * Put a past version back. Appends a new publication rather than deleting the
+ * ones after it, so this can itself be undone.
+ */
+export async function restorePublication(
+    siteId: string,
+    publicationId: string,
+): Promise<SitesResult<{ publicationId: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(
+        `${base}/${siteId}/publications/${publicationId}/restore`,
+        { method: "POST" },
+    );
+    const data = (await res.json().catch(() => null)) as {
+        publicationId?: string;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.publicationId) {
+        return { ok: true, data: { publicationId: data.publicationId } };
+    }
+    return { ok: false, ...readError(data, "Could not restore that version.") };
+}
+
+/** Replace a site's look. The panel always sends a whole style (#189). */
+export async function updateSiteStyle(
+    siteId: string,
+    style: SiteStyle,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/style`, {
+        method: "PUT",
+        body: JSON.stringify(style),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not save the style.") };
 }

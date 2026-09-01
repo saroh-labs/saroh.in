@@ -18,8 +18,14 @@ import {
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { authorize } from "../organizations/organization-policy";
-import type { CreateSiteFromTemplateDto, UpdateDraftSectionsDto } from "./dto";
+import type {
+    CreateSiteFromTemplateDto,
+    UpdateDraftSectionsDto,
+    UpdateSiteSettingsDto,
+} from "./dto";
 import { sanitizeSectionContent } from "./sanitize";
+import type { SiteStyle, SiteStyleOptions } from "./site-style";
+import { parseSiteStyle, siteStyleOptions } from "./site-style";
 
 /** What creating a site returns to the caller: the new site's identity. */
 export interface CreatedSite {
@@ -91,6 +97,46 @@ function slugify(input: string): string {
  * client-supplied org. Section content is already contract-validated by
  * `instantiateTemplate`, so persistence is a straight write.
  */
+/**
+ * One past publish, as the version-history screens read it.
+ *
+ * `snapshot` is typed `unknown` rather than Prisma's JsonValue on purpose: the
+ * inferred type cannot be named across the package boundary, and callers must
+ * parse it against the section contract anyway rather than trusting its shape.
+ */
+/** One site as the editor and settings screens read it. */
+export interface SiteDetailView {
+    id: string;
+    name: string;
+    slug: string;
+    subdomain: string | null;
+    currentPublicationId: string | null;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    socialImageUrl: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    currentPublication: { publishedAt: Date } | null;
+    pages: { id: string; path: string; title: string; isHome: boolean }[];
+    /** Always complete — absent choices are filled from the defaults. */
+    style: SiteStyle;
+    /**
+     * The palette and slider bounds. Sent with the site so the editor can
+     * resolve a choice locally as a slider moves, without carrying its own copy
+     * of the values that could drift from the server's.
+     */
+    styleOptions: SiteStyleOptions;
+}
+
+export interface PublicationDetail {
+    id: string;
+    publishedAt: Date;
+    publishedByUserId: string | null;
+    templateId: string;
+    templateVersion: number;
+    snapshot: unknown;
+}
+
 @Injectable()
 export class SitesService {
     constructor(private readonly entitlements: EntitlementService) {}
@@ -227,10 +273,25 @@ export class SitesService {
         });
     }
 
-    /** List the org's non-deleted sites (newest first). Requires `site:read`. */
+    /**
+     * List the org's non-deleted sites (newest first), each with the state it is
+     * actually in (#191). Requires `site:read`.
+     *
+     * A name and an address look the same whether a site is live, never
+     * published, or waiting on a DNS record — and those are exactly the states
+     * that strand a site invisibly. So the list resolves them here rather than
+     * making the merchant open each site to find out.
+     *
+     * `hasUnpublishedChanges` compares each page's newest DRAFT against the
+     * publication that is live. It is deliberately a BOOLEAN, not a count: a
+     * precise "3 sections changed" means diffing every draft section against the
+     * snapshot for every site in the list, and a number that disagrees with the
+     * editor's would be worse than no number. The count belongs where one site
+     * is already loaded.
+     */
     async listSites(ctx: OrganizationContext) {
         authorize(ctx, "site:read");
-        return prisma.site.findMany({
+        const sites = await prisma.site.findMany({
             where: { organizationId: ctx.organizationId, deletedAt: null },
             orderBy: { createdAt: "desc" },
             select: {
@@ -241,7 +302,48 @@ export class SitesService {
                 currentPublicationId: true,
                 createdAt: true,
                 updatedAt: true,
+                currentPublication: { select: { publishedAt: true } },
+                // A claim that is not VERIFIED is the case worth surfacing: the
+                // merchant thinks they have connected a domain and nothing
+                // routes to it yet.
+                claimedDomains: { select: { hostname: true, status: true } },
+                pages: {
+                    select: {
+                        versions: {
+                            where: { status: "DRAFT" },
+                            orderBy: { updatedAt: "desc" },
+                            take: 1,
+                            select: { updatedAt: true },
+                        },
+                    },
+                },
             },
+        });
+
+        return sites.map(({ pages, claimedDomains, ...site }) => {
+            const publishedAt = site.currentPublication?.publishedAt ?? null;
+            const lastDraftEdit = pages
+                .flatMap((page) => page.versions)
+                .reduce<Date | null>(
+                    (latest, v) =>
+                        latest === null || v.updatedAt > latest
+                            ? v.updatedAt
+                            : latest,
+                    null,
+                );
+            return {
+                ...site,
+                // Unpublished work only means something once there is something
+                // to compare against; before the first publish the site's state
+                // is "never published", which says more.
+                hasUnpublishedChanges:
+                    publishedAt !== null &&
+                    lastDraftEdit !== null &&
+                    lastDraftEdit > publishedAt,
+                pendingDomain:
+                    claimedDomains.find((d) => d.status !== "VERIFIED")
+                        ?.hostname ?? null,
+            };
         });
     }
 
@@ -250,7 +352,10 @@ export class SitesService {
      * belongs to another org (cross-tenant reads are indistinguishable from
      * "not found"). Requires `site:read`.
      */
-    async getSite(ctx: OrganizationContext, siteId: string) {
+    async getSite(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<SiteDetailView> {
         authorize(ctx, "site:read");
         const site = await prisma.site.findFirst({
             where: {
@@ -264,8 +369,17 @@ export class SitesService {
                 slug: true,
                 subdomain: true,
                 currentPublicationId: true,
+                // The site's look (#189) and its search + social (#188).
+                style: true,
+                seoTitle: true,
+                seoDescription: true,
+                socialImageUrl: true,
                 createdAt: true,
                 updatedAt: true,
+                // When the site last went live. Read through the current
+                // publication rather than stamped on the Site, so it cannot
+                // drift from the publication history it describes.
+                currentPublication: { select: { publishedAt: true } },
                 pages: {
                     orderBy: { path: "asc" },
                     select: {
@@ -280,7 +394,230 @@ export class SitesService {
         if (!site) {
             throw new NotFoundException(`Site "${siteId}" not found`);
         }
+        // Normalize the look on the way out (#189): the editor should never
+        // have to decide what a half-written or absent style means, and a
+        // client filling gaps itself is how the preview and the published site
+        // drift apart.
+        const { style, ...rest } = site;
+        return {
+            ...rest,
+            style: parseSiteStyle(style),
+            styleOptions: siteStyleOptions(),
+        };
+    }
+
+    /**
+     * Update a site's search and social settings (#188).
+     *
+     * ABSENT and NULL are deliberately different: a field the caller omitted is
+     * left alone, a field sent as null is cleared. A settings form that PATCHes
+     * only what changed must not wipe what it did not send, and a merchant
+     * removing a share image must be able to actually remove it.
+     *
+     * Requires `site:update` — the same gate as renaming a site, because this is
+     * what the public sees. Writing here does NOT publish: these values reach
+     * the live site only through the next publish, exactly like a section edit.
+     */
+    async updateSettings(
+        ctx: OrganizationContext,
+        siteId: string,
+        dto: UpdateSiteSettingsDto,
+    ) {
+        authorize(ctx, "site:update");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const data: {
+            seoTitle?: string | null;
+            seoDescription?: string | null;
+            socialImageUrl?: string | null;
+        } = {};
+        if (dto.seoTitle !== undefined) data.seoTitle = dto.seoTitle;
+        if (dto.seoDescription !== undefined)
+            data.seoDescription = dto.seoDescription;
+        if (dto.socialImageUrl !== undefined)
+            data.socialImageUrl = dto.socialImageUrl;
+
+        const site = await prisma.site.update({
+            where: { id: siteId },
+            data,
+            select: {
+                id: true,
+                seoTitle: true,
+                seoDescription: true,
+                socialImageUrl: true,
+            },
+        });
         return site;
+    }
+
+    /**
+     * Set a site's look (#189).
+     *
+     * Replaces rather than merges: the Style panel edits a whole look at once
+     * and always sends a complete one, and a partial merge would let two open
+     * tabs produce a palette neither person chose.
+     *
+     * Requires `site:update` — this is what the public sees. Like the search
+     * settings, it is draft state: it reaches the live site on the next publish.
+     */
+    async updateStyle(
+        ctx: OrganizationContext,
+        siteId: string,
+        input: unknown,
+    ): Promise<{ id: string; style: SiteStyle }> {
+        authorize(ctx, "site:update");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        // Validate BEFORE writing: an unknown colour key or a non-numeric
+        // slider must be a 400, not a site that renders wrong later.
+        const style = parseSiteStyle(input);
+
+        await prisma.site.update({
+            where: { id: siteId },
+            data: { style: style as unknown as Prisma.InputJsonValue },
+            select: { id: true },
+        });
+        return { id: siteId, style };
+    }
+
+    // -----------------------------------------------------------------------
+    // Version history (#194) — every publish is already kept
+    // -----------------------------------------------------------------------
+
+    /**
+     * Every publish of a site, newest first.
+     *
+     * `Publication` has been immutable and append-only since Stage 2 —
+     * republishing inserts a row, never updates one — so this history already
+     * existed and simply had no surface. Requires `site:read`.
+     *
+     * The snapshot itself is deliberately NOT selected: these rows are whole
+     * rendered sites, and a list of ten would be megabytes for a screen that
+     * shows dates.
+     */
+    async listPublications(ctx: OrganizationContext, siteId: string) {
+        authorize(ctx, "site:read");
+        const site = await this.assertSiteInOrg(ctx, siteId);
+
+        const publications = await prisma.publication.findMany({
+            where: { siteId, organizationId: ctx.organizationId },
+            orderBy: { publishedAt: "desc" },
+            select: {
+                id: true,
+                publishedAt: true,
+                publishedByUserId: true,
+                templateId: true,
+                templateVersion: true,
+            },
+        });
+
+        return publications.map((p) => ({
+            ...p,
+            // Which one the public is actually being served. Marked rather than
+            // implied by position: after a restore the live version is NOT the
+            // newest by content, only by publish time.
+            isCurrent: p.id === site.currentPublicationId,
+        }));
+    }
+
+    /** One past publish, with its snapshot, for previewing. Requires `site:read`. */
+    async getPublication(
+        ctx: OrganizationContext,
+        siteId: string,
+        publicationId: string,
+    ): Promise<PublicationDetail> {
+        authorize(ctx, "site:read");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const publication = await prisma.publication.findFirst({
+            where: {
+                id: publicationId,
+                siteId,
+                organizationId: ctx.organizationId,
+            },
+            select: {
+                id: true,
+                publishedAt: true,
+                publishedByUserId: true,
+                templateId: true,
+                templateVersion: true,
+                snapshot: true,
+            },
+        });
+        if (!publication) {
+            throw new NotFoundException(
+                `Publication "${publicationId}" not found`,
+            );
+        }
+        return publication;
+    }
+
+    /**
+     * Put a past version back (#194).
+     *
+     * APPENDS rather than reverts: a new Publication is inserted carrying the
+     * chosen snapshot, and the site points at it. Nothing is deleted, so the
+     * history stays complete and a restore can itself be restored — which is the
+     * property that makes rolling back safe to try.
+     *
+     * The DRAFT is untouched. A merchant restoring last week's site may have
+     * unrelated work in progress, and silently overwriting it would trade one
+     * lost publish for another.
+     *
+     * Requires `site:publish`: this changes what the public sees, which is the
+     * same act as publishing.
+     */
+    async restorePublication(
+        ctx: OrganizationContext,
+        siteId: string,
+        publicationId: string,
+    ) {
+        authorize(ctx, "site:publish");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const source = await prisma.publication.findFirst({
+            where: {
+                id: publicationId,
+                siteId,
+                organizationId: ctx.organizationId,
+            },
+            select: {
+                snapshot: true,
+                templateId: true,
+                templateVersion: true,
+                pageId: true,
+                path: true,
+            },
+        });
+        if (!source) {
+            throw new NotFoundException(
+                `Publication "${publicationId}" not found`,
+            );
+        }
+
+        return prisma.$transaction(async (tx) => {
+            const restored = await tx.publication.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    pageId: source.pageId,
+                    path: source.path,
+                    snapshot: source.snapshot as Prisma.InputJsonValue,
+                    templateId: source.templateId,
+                    templateVersion: source.templateVersion,
+                    publishedByUserId: ctx.userId,
+                },
+                select: { id: true, publishedAt: true },
+            });
+            await tx.site.update({
+                where: { id: siteId },
+                data: { currentPublicationId: restored.id },
+            });
+            return {
+                publicationId: restored.id,
+                publishedAt: restored.publishedAt,
+            };
+        });
     }
 
     // -----------------------------------------------------------------------
@@ -439,6 +776,10 @@ export class SitesService {
                 id: true,
                 name: true,
                 slug: true,
+                style: true,
+                seoTitle: true,
+                seoDescription: true,
+                socialImageUrl: true,
                 pages: {
                     orderBy: { path: "asc" },
                     select: {
@@ -511,7 +852,23 @@ export class SitesService {
         });
 
         const snapshot = {
-            site: { name: site.name, slug: site.slug },
+            site: {
+                name: site.name,
+                slug: site.slug,
+                // Search + social travel INTO the snapshot (#188). The public
+                // renderer reads only this table, so a title left behind here
+                // would never reach a search engine no matter how many times
+                // the merchant saved it.
+                seoTitle: site.seoTitle,
+                seoDescription: site.seoDescription,
+                socialImageUrl: site.socialImageUrl,
+                // The look travels with the content (#189). saroh.app's
+                // SiteTheme already says it will interpolate brand fields from
+                // the snapshot when they arrive — these are those fields.
+                // Normalized here so a snapshot is always complete, never
+                // half-styled by whatever the draft happened to hold.
+                style: parseSiteStyle(site.style),
+            },
             pages,
             publishedAt: publishedAt.toISOString(),
         };
@@ -524,7 +881,10 @@ export class SitesService {
                 data: {
                     siteId: site.id,
                     organizationId: ctx.organizationId,
-                    snapshot: snapshot as Prisma.InputJsonValue,
+                    // Through `unknown`: SiteStyle is a precise interface, and
+                    // Prisma's InputJsonValue index signature does not accept
+                    // one directly even though the value is plain JSON.
+                    snapshot: snapshot as unknown as Prisma.InputJsonValue,
                     templateId: starterTemplate.id,
                     templateVersion: starterTemplate.version,
                     publishedByUserId: ctx.userId,
@@ -610,18 +970,23 @@ export class SitesService {
     private async assertSiteInOrg(
         ctx: OrganizationContext,
         siteId: string,
-    ): Promise<void> {
+    ): Promise<{ id: string; currentPublicationId: string | null }> {
         const site = await prisma.site.findFirst({
             where: {
                 id: siteId,
                 organizationId: ctx.organizationId,
                 deletedAt: null,
             },
-            select: { id: true },
+            // Returns the row it already had to fetch. Callers that only need
+            // the guard ignore it; version history needs to know which
+            // publication is live, and a second query for a column this one
+            // already read would be waste.
+            select: { id: true, currentPublicationId: true },
         });
         if (!site) {
             throw new NotFoundException(`Site "${siteId}" not found`);
         }
+        return site;
     }
 
     /** Prove `pageId` belongs to `siteId` in the ctx org, or 404. */

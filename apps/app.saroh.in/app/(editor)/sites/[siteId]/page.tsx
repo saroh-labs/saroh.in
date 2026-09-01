@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { SiteEditor } from "@/components/sites/site-editor";
+import { env } from "@/env";
 import { requireSession } from "@/lib/session";
 import type { Section } from "@/lib/sites/service";
 import { getPageDraft, getSite } from "@/lib/sites/service";
@@ -12,6 +12,9 @@ import { getPageDraft, getSite } from "@/lib/sites/service";
  * editable draft, and hands the draft sections to the client SiteEditor. The
  * editing + live preview happen client-side; only Save/Publish hit the API.
  */
+/** Matches the sites index; the renderer defaults the same way. */
+const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
+
 export default async function SiteEditorPage({
     params,
 }: {
@@ -33,20 +36,18 @@ export default async function SiteEditorPage({
             ({ type, contractVersion, content }) as Section,
     );
 
+    // Full-bleed: the editor is a three-pane workspace, not a document. A
+    // centred measure would leave the preview narrower than the phone it is
+    // meant to simulate.
     return (
-        <main className="mx-auto max-w-6xl p-8">
-            <Link
-                href="/sites"
-                className="text-sm text-muted-foreground hover:underline"
-            >
-                ← Back to sites
-            </Link>
-            <SiteEditor
-                siteId={siteId}
-                pageId={homePage.id}
-                initialSections={initialSections}
-                siteName={site.name}
-            />
-        </main>
+        <SiteEditor
+            siteId={siteId}
+            pageId={homePage.id}
+            initialSections={initialSections}
+            siteName={site.name}
+            initialStyle={site.style}
+            styleOptions={site.styleOptions}
+            address={site.subdomain ? `${site.subdomain}.${ROOT_DOMAIN}` : null}
+        />
     );
 }

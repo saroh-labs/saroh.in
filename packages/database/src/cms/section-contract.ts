@@ -29,6 +29,29 @@ import { z } from "zod";
 // Shared building blocks
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-section padding override (#189).
+ *
+ * Layout rather than content, and it would be tidier on the `Section` row than
+ * inside `content` — but `content` is the only free-form field the model has,
+ * and the contract is precisely the mechanism for extending what a section may
+ * carry. A column would mean a migration plus a change to every read and write
+ * path for one optional number.
+ *
+ * ABSENT means "follow the site setting", which is why this is optional rather
+ * than defaulted: a default would bake today's site value into the section and
+ * stop it tracking the slider afterwards.
+ *
+ * Bounds match the site-level Section padding slider, so an override can never
+ * produce a spacing the site setting itself could not.
+ *
+ * Adding an optional field is not a breaking change — existing Sections and
+ * Publications still validate — so this extends v1 rather than shipping a v2.
+ * An older renderer reading a newer snapshot simply drops it and uses the site
+ * setting, which is the sane degradation.
+ */
+const paddingOverride = z.number().int().min(24).max(96).optional();
+
 const ctaSchema = z.object({
     label: z.string().min(1),
     href: z.string().min(1),
@@ -48,6 +71,7 @@ const imageSchema = z.object({
 
 /** hero v1 — a headline block with optional CTA + image. */
 const heroV1 = z.object({
+    padding: paddingOverride,
     heading: z.string().min(1),
     subheading: z.string().optional(),
     cta: ctaSchema.optional(),
@@ -60,12 +84,14 @@ const heroV1 = z.object({
  * before it reaches the immutable snapshot (see `sanitizedFields` below).
  */
 const richTextV1 = z.object({
+    padding: paddingOverride,
     format: z.enum(["html", "markdown"]).default("html"),
     value: z.string(),
 });
 
 /** cta v1 — a standalone call-to-action button. */
 const ctaV1 = z.object({
+    padding: paddingOverride,
     label: z.string().min(1),
     href: z.string().min(1),
     style: z.enum(["primary", "secondary", "link"]).default("primary"),
@@ -73,6 +99,7 @@ const ctaV1 = z.object({
 
 /** gallery v1 — an ordered set of images. */
 const galleryV1 = z.object({
+    padding: paddingOverride,
     images: z.array(imageSchema).min(1),
     layout: z.enum(["grid", "carousel", "masonry"]).default("grid"),
 });
@@ -106,6 +133,7 @@ const enquiryFieldSchema = z.object({
  */
 const enquiryV1 = z
     .object({
+        padding: paddingOverride,
         formId: z.string().min(1).optional(),
         title: z.string().optional(),
         description: z.string().optional(),
@@ -146,6 +174,7 @@ const enquiryV1 = z
  * inline. All values are plain text, so NOTHING here requires sanitization.
  */
 const bookingV1 = z.object({
+    padding: paddingOverride,
     serviceId: z.string().min(1).optional(),
     title: z.string().optional(),
     description: z.string().optional(),

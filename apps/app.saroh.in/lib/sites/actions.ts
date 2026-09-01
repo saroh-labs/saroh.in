@@ -1,10 +1,18 @@
 "use server";
 
-import type { CreateSiteInput, SectionInput } from "./service";
+import type {
+    CreateSiteInput,
+    SectionInput,
+    SiteSettingsInput,
+    SiteStyle,
+} from "./service";
 import {
     createSite as createSiteApi,
     publishSite as publishSiteApi,
+    restorePublication as restorePublicationApi,
     saveDraftSections as saveDraftSectionsApi,
+    updateSiteSettings as updateSiteSettingsApi,
+    updateSiteStyle as updateSiteStyleApi,
 } from "./service";
 
 /**
@@ -28,4 +36,22 @@ export async function saveDraftSections(
 
 export async function publishSite(siteId: string) {
     return publishSiteApi(siteId);
+}
+
+export async function updateSiteSettings(
+    siteId: string,
+    input: SiteSettingsInput,
+) {
+    return updateSiteSettingsApi(siteId, input);
+}
+
+export async function restorePublication(
+    siteId: string,
+    publicationId: string,
+) {
+    return restorePublicationApi(siteId, publicationId);
+}
+
+export async function updateSiteStyle(siteId: string, style: SiteStyle) {
+    return updateSiteStyleApi(siteId, style);
 }
