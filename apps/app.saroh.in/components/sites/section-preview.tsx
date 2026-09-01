@@ -282,13 +282,25 @@ export function DraftPreview({
     const vars: React.CSSProperties =
         style && styleOptions ? resolveStyleVariables(style, styleOptions) : {};
 
-    if (sections.length === 0) {
+    // The preview answers "what will visitors see", so a hidden section is
+    // absent here exactly as it will be absent from the published snapshot.
+    const visible = sections.filter((section) => section.hidden !== true);
+
+    if (visible.length === 0) {
         return (
             <p
                 style={vars}
                 className={`border border-dashed p-8 text-center text-sm ${RADIUS} ${MUTED}`}
             >
-                No sections yet. Add one to preview it here.
+                {sections.length === 0
+                    ? "No sections yet. Add one to preview it here."
+                    : /*
+                       * Distinguishing the two empties matters: "you have not
+                       * built anything" and "you have hidden everything you
+                       * built" call for opposite next moves, and the second is
+                       * recoverable from the rail one click away.
+                       */
+                      "Every section on this page is hidden, so visitors would see an empty page."}
             </p>
         );
     }
@@ -297,7 +309,7 @@ export function DraftPreview({
             style={vars}
             className={`space-y-4 p-[var(--site-page-margin)] ${SURFACE} ${RADIUS}`}
         >
-            {sections.map((section, i) => (
+            {visible.map((section, i) => (
                 <SectionPreview key={i} section={section} />
             ))}
         </div>

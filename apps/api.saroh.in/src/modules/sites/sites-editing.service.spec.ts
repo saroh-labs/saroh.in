@@ -194,6 +194,63 @@ describe("SitesService.replaceDraftSections", () => {
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(transaction).not.toHaveBeenCalled();
     });
+
+    it("persists a section's hidden flag, and defaults it to visible when absent", async () => {
+        // The second section omits `hidden` entirely — the shape an older
+        // client sends. Omission must mean visible, never hidden, or an
+        // upgrade would silently take sections off live sites.
+        await service.replaceDraftSections(ctx(), "site_1", "page_1", {
+            sections: [
+                {
+                    type: "hero",
+                    contractVersion: 1,
+                    content: { heading: "Parked" },
+                    hidden: true,
+                },
+                {
+                    type: "hero",
+                    contractVersion: 1,
+                    content: { heading: "Live" },
+                },
+            ],
+        });
+
+        const created = sectionCreateMany.mock.calls[0][0].data as Array<{
+            hidden: boolean;
+        }>;
+        expect(created.map((s) => s.hidden)).toEqual([true, false]);
+    });
+
+    it("keeps a hidden section's order — hiding is not deleting", async () => {
+        await service.replaceDraftSections(ctx(), "site_1", "page_1", {
+            sections: [
+                {
+                    type: "hero",
+                    contractVersion: 1,
+                    content: { heading: "First" },
+                },
+                {
+                    type: "hero",
+                    contractVersion: 1,
+                    content: { heading: "Parked" },
+                    hidden: true,
+                },
+                {
+                    type: "hero",
+                    contractVersion: 1,
+                    content: { heading: "Third" },
+                },
+            ],
+        });
+
+        const created = sectionCreateMany.mock.calls[0][0].data as Array<{
+            order: number;
+            hidden: boolean;
+        }>;
+        // The hidden one still occupies index 1: unhiding restores it in place.
+        expect(created.map((s) => s.order)).toEqual([0, 1, 2]);
+        expect(created[1].hidden).toBe(true);
+    });
 });
 
 describe("SitesService.getPageDraft", () => {
@@ -238,6 +295,28 @@ describe("SitesService.publishSite", () => {
             ],
         };
     }
+
+    it("asks the database for visible sections only — hidden work never publishes", async () => {
+        siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
+
+        await service.publishSite(ctx(), "site_1");
+
+        // The filter lives in the query, so this is where it can be proven.
+        // A snapshot is immutable once written: a hidden section that slipped
+        // in could not be taken back out without republishing.
+        const select = siteFindFirst.mock.calls[0][0].select as {
+            pages: {
+                select: {
+                    versions: {
+                        select: { sections: { where: { hidden: boolean } } };
+                    };
+                };
+            };
+        };
+        expect(select.pages.select.versions.select.sections.where).toEqual({
+            hidden: false,
+        });
+    });
 
     it("creates an immutable Publication, repoints currentPublicationId, and SANITIZES richText", async () => {
         siteFindFirst.mockResolvedValue(

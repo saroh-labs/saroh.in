@@ -144,6 +144,13 @@ export type Section = {
         type: K;
         contractVersion: number;
         content: SectionContentByType[K] & SectionLayout;
+        /**
+         * Visibility, and deliberately a sibling of `content` rather than part
+         * of it: hiding a section is not an edit to what it says. A hidden
+         * section keeps its place and its copy in the draft and is left out of
+         * the published snapshot. ABSENT means visible.
+         */
+        hidden?: boolean;
     };
 }[SectionType];
 

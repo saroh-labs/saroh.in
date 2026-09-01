@@ -31,9 +31,12 @@ export default async function SiteEditorPage({
 
     const draft = await getPageDraft(siteId, homePage.id);
     // Drop the `order` carried by DraftSection — array position is the order.
+    // Everything else travels: `hidden` in particular, because a field dropped
+    // here would come back visible after a reload and republish work the
+    // merchant had deliberately taken off the site.
     const initialSections: Section[] = (draft?.sections ?? []).map(
-        ({ type, contractVersion, content }) =>
-            ({ type, contractVersion, content }) as Section,
+        ({ type, contractVersion, content, hidden }) =>
+            ({ type, contractVersion, content, hidden }) as Section,
     );
 
     // Full-bleed: the editor is a three-pane workspace, not a document. A

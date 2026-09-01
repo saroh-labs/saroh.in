@@ -2,6 +2,7 @@ import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
     IsArray,
+    IsBoolean,
     IsDefined,
     IsInt,
     IsOptional,
@@ -95,6 +96,14 @@ export class DraftSectionInputDto {
     // object is fine — the contract decides whether that's valid content).
     @IsDefined({ message: "content is required" })
     content!: unknown;
+
+    // Visibility, not content: a hidden section stays in the draft, keeps its
+    // place, and is left out of the published snapshot. ABSENT means visible,
+    // so an older client that never sends the field cannot hide anything by
+    // omission.
+    @IsOptional()
+    @IsBoolean({ message: "hidden must be a boolean" })
+    hidden?: boolean;
 }
 
 /**

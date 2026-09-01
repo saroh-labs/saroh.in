@@ -226,6 +226,13 @@ export function SiteEditor({
     );
     const [device, setDevice] = useState<Device>("desktop");
     const [rail, setRail] = useState<"sections" | "style">("sections");
+    /*
+     * Drag state. `dragIndex` is the row being carried, `dropIndex` the row it
+     * would land on — kept apart so the source can dim while the target draws
+     * its own outline, and so an abandoned drag clears both.
+     */
+    const [dragIndex, setDragIndex] = useState<number | null>(null);
+    const [dropIndex, setDropIndex] = useState<number | null>(null);
     const [style, setStyle] = useState<SiteStyle>(initialStyle);
     const [styleSaving, setStyleSaving] = useState(false);
     const [savedStyleJson, setSavedStyleJson] = useState(() =>
@@ -294,14 +301,34 @@ export function SiteEditor({
     }
 
     function move(index: number, delta: number) {
+        moveTo(index, index + delta);
+    }
+
+    /**
+     * Move a section to an absolute position. The arrows and the drag both
+     * land here so there is one definition of what reordering means, and the
+     * array order IS the saved order — the API persists `order = index`.
+     */
+    function moveTo(from: number, to: number) {
         setSections((prev) => {
-            const target = index + delta;
-            if (target < 0 || target >= prev.length) return prev;
+            if (to < 0 || to >= prev.length || from === to) return prev;
             const next = [...prev];
-            const [item] = next.splice(index, 1);
-            next.splice(target, 0, item);
+            const [item] = next.splice(from, 1);
+            next.splice(to, 0, item);
             return next;
         });
+    }
+
+    /**
+     * Hide or show a section. Hiding is not deleting: the section keeps its
+     * place and its copy, and publish leaves it out of the snapshot. That is
+     * the whole point — a merchant can take a section off the live site
+     * without losing the work that went into it.
+     */
+    function toggleHidden(index: number) {
+        setSections((prev) =>
+            prev.map((s, i) => (i === index ? { ...s, hidden: !s.hidden } : s)),
+        );
     }
 
     /**
@@ -665,28 +692,101 @@ export function SiteEditor({
                             </div>
                             <ul className="min-h-0 flex-1 overflow-y-auto p-2">
                                 {sections.map((section, index) => (
-                                    <li key={index}>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setSelectedIndex(index)
-                                            }
+                                    <li
+                                        key={index}
+                                        /*
+                                         * The row is the drop target, not the
+                                         * handle: aiming at a 32px row is far
+                                         * easier than aiming at the grip, and
+                                         * the grip is what starts the drag.
+                                         */
+                                        onDragOver={(e) => {
+                                            if (dragIndex === null) return;
+                                            e.preventDefault();
+                                            setDropIndex(index);
+                                        }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            if (dragIndex === null) return;
+                                            moveTo(dragIndex, index);
+                                            setSelectedIndex(index);
+                                            setDragIndex(null);
+                                            setDropIndex(null);
+                                        }}
+                                        className={cn(
+                                            "rounded",
+                                            dropIndex === index &&
+                                                dragIndex !== index &&
+                                                "ring-1 ring-inset ring-ring",
+                                        )}
+                                    >
+                                        <div
                                             className={cn(
-                                                "flex h-8 w-full items-center justify-between gap-2 rounded px-2 text-left text-xs",
+                                                "group flex h-8 w-full items-center gap-1.5 rounded pr-1 text-left text-xs",
                                                 selectedIndex === index
                                                     ? "bg-secondary"
                                                     : "hover:bg-muted",
                                                 errorIndex === index &&
                                                     "text-destructive",
+                                                dragIndex === index &&
+                                                    "opacity-40",
                                             )}
                                         >
-                                            <span className="truncate">
-                                                {sectionTitle(section)}
+                                            {/*
+                                             * The grip is the drag surface. It
+                                             * carries no click of its own — a
+                                             * handle that also navigates makes
+                                             * every aborted drag a selection.
+                                             */}
+                                            <span
+                                                draggable
+                                                onDragStart={() => {
+                                                    setDragIndex(index);
+                                                    setDropIndex(index);
+                                                }}
+                                                onDragEnd={() => {
+                                                    setDragIndex(null);
+                                                    setDropIndex(null);
+                                                }}
+                                                aria-hidden="true"
+                                                className="cursor-grab select-none px-1 text-muted-foreground/50 active:cursor-grabbing group-hover:text-muted-foreground"
+                                            >
+                                                ⋮
                                             </span>
-                                            <span className="shrink-0 text-[0.625rem] uppercase tracking-[0.06em] text-muted-foreground/70">
-                                                {SECTION_LABELS[section.type]}
-                                            </span>
-                                        </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setSelectedIndex(index)
+                                                }
+                                                className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
+                                            >
+                                                <span
+                                                    className={cn(
+                                                        "truncate",
+                                                        /*
+                                                         * A hidden section is
+                                                         * dimmed rather than
+                                                         * removed: it is still
+                                                         * part of the page the
+                                                         * merchant is building,
+                                                         * just not part of the
+                                                         * one visitors get.
+                                                         */
+                                                        section.hidden &&
+                                                            "text-muted-foreground/50 line-through",
+                                                    )}
+                                                >
+                                                    {sectionTitle(section)}
+                                                </span>
+                                                <span className="shrink-0 text-[0.625rem] uppercase tracking-[0.06em] text-muted-foreground/70">
+                                                    {
+                                                        SECTION_LABELS[
+                                                            section.type
+                                                        ]
+                                                    }
+                                                </span>
+                                            </button>
+                                        </div>
                                     </li>
                                 ))}
                                 {sections.length === 0 ? (
@@ -741,6 +841,43 @@ export function SiteEditor({
                                     {SECTION_LABELS[active.section.type]}
                                 </h2>
                                 <div className="flex items-center gap-1">
+                                    {/*
+                                     * The design puts visibility in this
+                                     * header, next to the section's name — it
+                                     * is a fact about the whole section, not
+                                     * one more field inside it. Labelled with
+                                     * what the section IS, not what the click
+                                     * would do, so a glance answers "is this
+                                     * on the live site?".
+                                     */}
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-pressed={
+                                            active.section.hidden === true
+                                        }
+                                        title={
+                                            active.section.hidden
+                                                ? "Hidden — this section is left out when you publish"
+                                                : "Visible — this section publishes with the page"
+                                        }
+                                        onClick={() =>
+                                            toggleHidden(active.index)
+                                        }
+                                        className={cn(
+                                            "gap-1.5",
+                                            active.section.hidden &&
+                                                "text-muted-foreground",
+                                        )}
+                                    >
+                                        <span aria-hidden="true">
+                                            {active.section.hidden ? "○" : "●"}
+                                        </span>
+                                        {active.section.hidden
+                                            ? "Hidden"
+                                            : "Visible"}
+                                    </Button>
                                     <Button
                                         type="button"
                                         variant="ghost"

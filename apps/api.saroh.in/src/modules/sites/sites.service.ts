@@ -40,6 +40,8 @@ export interface DraftSectionView {
     contractVersion: number;
     order: number;
     content: unknown;
+    /** Hidden sections stay in the draft and are omitted from the snapshot. */
+    hidden: boolean;
 }
 
 /** A page's editable DRAFT version + its ordered sections. */
@@ -649,6 +651,7 @@ export class SitesService {
                 contractVersion: true,
                 order: true,
                 content: true,
+                hidden: true,
             },
         });
         return { pageId, pageVersionId: version.id, status: "DRAFT", sections };
@@ -699,6 +702,8 @@ export class SitesService {
                 contractVersion: section.contractVersion,
                 order: index,
                 content: result.data,
+                // Absent means visible — see DraftSectionInputDto.hidden.
+                hidden: section.hidden ?? false,
             };
         });
 
@@ -716,6 +721,7 @@ export class SitesService {
                         contractVersion: s.contractVersion,
                         order: s.order,
                         content: s.content as Prisma.InputJsonValue,
+                        hidden: s.hidden,
                     })),
                 });
             }
@@ -728,6 +734,7 @@ export class SitesService {
                     contractVersion: true,
                     order: true,
                     content: true,
+                    hidden: true,
                 },
             });
             return {
@@ -791,7 +798,13 @@ export class SitesService {
                             orderBy: { createdAt: "desc" },
                             take: 1,
                             select: {
+                                // Hidden sections do not travel. The snapshot
+                                // IS the published site, so filtering here —
+                                // rather than in the renderer — means a parked
+                                // section cannot leak through a later reader
+                                // that forgets to check the flag.
                                 sections: {
+                                    where: { hidden: false },
                                     orderBy: { order: "asc" },
                                     select: {
                                         type: true,

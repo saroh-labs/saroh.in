@@ -1505,6 +1505,11 @@ model Section {
   order           Int // ordering within the PageVersion
   content         Json // validated against the contract for (type, contractVersion)
 
+  // Visibility is structural, not content: a hidden section keeps its place and
+  // its copy in the draft, and is simply left OUT of the published snapshot.
+  // That is what lets a merchant park a section without deleting the work.
+  hidden          Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
