@@ -55,8 +55,8 @@ export default async function SiteEditorPage({
     // here would come back visible after a reload and republish work the
     // merchant had deliberately taken off the site.
     const initialSections: Section[] = (draft?.sections ?? []).map(
-        ({ type, contractVersion, content, hidden }) =>
-            ({ type, contractVersion, content, hidden }) as Section,
+        ({ type, contractVersion, content, hidden, key }) =>
+            ({ type, contractVersion, content, hidden, key }) as Section,
     );
 
     // Full-bleed: the editor is a three-pane workspace, not a document. A

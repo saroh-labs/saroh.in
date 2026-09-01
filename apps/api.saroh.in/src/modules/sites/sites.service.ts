@@ -14,11 +14,14 @@ import {
     starterTemplate,
     TemplateInstantiationError,
 } from "@saroh/templates";
+import { randomUUID } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { authorize } from "../organizations/organization-policy";
 import type {
+    CreateApprovalDto,
+    CreateCommentDto,
     CreatePageDto,
     CreateSiteFromTemplateDto,
     UpdateDraftSectionsDto,
@@ -32,9 +35,51 @@ import type { SiteStyle, SiteStyleOptions } from "./site-style";
 import { parseSiteStyle, siteStyleOptions } from "./site-style";
 
 /** What creating a site returns to the caller: the new site's identity. */
+/**
+ * Mint a section key. Opaque and random rather than derived from position or
+ * content: a key that encoded either would stop being stable the moment a
+ * section moved or was edited, which is exactly what it exists to survive.
+ */
+function newSectionKey(): string {
+    return randomUUID();
+}
+
+/**
+ * Take the key a section claims, unless something earlier in the list already
+ * claimed it. Keys are unique per page version, so two sections arriving with
+ * the same one would fail the save outright; the duplicate gets a fresh
+ * identity instead of taking down the request.
+ */
+function claimKey(seen: Set<string>, claimed: string | undefined): string {
+    const key =
+        claimed !== undefined && !seen.has(claimed) ? claimed : newSectionKey();
+    seen.add(key);
+    return key;
+}
+
 export interface CreatedSite {
     siteId: string;
     slug: string;
+}
+
+/** A reviewer's note as the Review tab shows it. */
+export interface CommentView {
+    id: string;
+    pageId: string;
+    pageTitle: string | null;
+    sectionKey: string;
+    body: string;
+    resolvedAt: Date | null;
+    createdAt: Date;
+    author: { id: string; name: string };
+    /** The section this was about is no longer on the page. */
+    orphaned: boolean;
+}
+
+/** The site's review state — the latest verdict plus what is still open. */
+export interface ReviewState {
+    openNotes: number;
+    latestApproval: { outcome: string; at: Date; by: string } | null;
 }
 
 /** A page as returned by the page endpoints and by getSite. */
@@ -54,6 +99,12 @@ export interface DraftSectionView {
     content: unknown;
     /** Hidden sections stay in the draft and are omitted from the snapshot. */
     hidden: boolean;
+    /**
+     * Stable across saves. The editor MUST send this back for a section it did
+     * not just create: it is what a reviewer's note is pinned to, and a save
+     * that dropped it would silently detach every note on the page.
+     */
+    key: string;
 }
 
 /** A page's editable DRAFT version + its ordered sections. */
@@ -269,6 +320,9 @@ export class SitesService {
                                 sections: {
                                     create: page.sections.map((section) => ({
                                         organizationId: ctx.organizationId,
+                                        // Minted here so a section has a stable
+                                        // identity from the moment it exists.
+                                        key: newSectionKey(),
                                         type: section.type,
                                         contractVersion:
                                             section.contractVersion,
@@ -664,6 +718,7 @@ export class SitesService {
                 order: true,
                 content: true,
                 hidden: true,
+                key: true,
             },
         });
         return { pageId, pageVersionId: version.id, status: "DRAFT", sections };
@@ -692,6 +747,7 @@ export class SitesService {
         await this.assertPageInSite(ctx, siteId, pageId);
 
         // Validate the entire list up front — reject before touching the DB.
+        const seenKeys = new Set<string>();
         const validated = dto.sections.map((section, index) => {
             const result = parseSectionContent(
                 section.type,
@@ -716,6 +772,19 @@ export class SitesService {
                 content: result.data,
                 // Absent means visible — see DraftSectionInputDto.hidden.
                 hidden: section.hidden ?? false,
+                /*
+                 * An absent key means a section the editor has just added, so
+                 * one is minted. A present key is carried through untouched:
+                 * that is the whole point — this row is about to be deleted and
+                 * recreated, and the key is what survives it.
+                 *
+                 * A REPEATED key is minted afresh. Keys are unique per page
+                 * version, so a duplicate would fail the whole save at the
+                 * database — and the case that produces one (duplicating a
+                 * section) should give the copy its own identity anyway, not
+                 * inherit the original's notes.
+                 */
+                key: claimKey(seenKeys, section.key),
             };
         });
 
@@ -734,6 +803,7 @@ export class SitesService {
                         order: s.order,
                         content: s.content as Prisma.InputJsonValue,
                         hidden: s.hidden,
+                        key: s.key,
                     })),
                 });
             }
@@ -747,6 +817,7 @@ export class SitesService {
                     order: true,
                     content: true,
                     hidden: true,
+                    key: true,
                 },
             });
             return {
@@ -992,6 +1063,219 @@ export class SitesService {
     // -----------------------------------------------------------------------
 
     /** Prove `siteId` is a live site in the ctx org, or 404. */
+    // -----------------------------------------------------------------------
+    // Review — notes pinned to sections, and one approval (#193)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Every note on a site, newest first, with the section each is about
+     * resolved against the CURRENT draft.
+     *
+     * A note whose section is gone comes back with `orphaned: true` rather than
+     * being filtered out. Someone wrote it, nobody acted on it, and the section
+     * it was about was deleted — dropping it would lose exactly the feedback
+     * that most needs seeing.
+     */
+    async listComments(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<CommentView[]> {
+        authorize(ctx, "site:read");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const [comments, pages] = await Promise.all([
+            prisma.siteComment.findMany({
+                where: { siteId, organizationId: ctx.organizationId },
+                orderBy: { createdAt: "desc" },
+                select: {
+                    id: true,
+                    pageId: true,
+                    sectionKey: true,
+                    body: true,
+                    resolvedAt: true,
+                    createdAt: true,
+                    author: { select: { id: true, name: true, email: true } },
+                },
+            }),
+            prisma.page.findMany({
+                where: { siteId, organizationId: ctx.organizationId },
+                select: {
+                    id: true,
+                    title: true,
+                    versions: {
+                        where: { status: "DRAFT" },
+                        orderBy: { createdAt: "desc" },
+                        take: 1,
+                        select: { sections: { select: { key: true } } },
+                    },
+                },
+            }),
+        ]);
+
+        // Which section keys still exist, per page.
+        const live = new Map<string, Set<string>>(
+            pages.map((page) => [
+                page.id,
+                new Set(
+                    page.versions.flatMap((v) => v.sections.map((x) => x.key)),
+                ),
+            ]),
+        );
+        const titles = new Map(pages.map((p) => [p.id, p.title]));
+
+        return comments.map((c) => ({
+            id: c.id,
+            pageId: c.pageId,
+            pageTitle: titles.get(c.pageId) ?? null,
+            sectionKey: c.sectionKey,
+            body: c.body,
+            resolvedAt: c.resolvedAt,
+            createdAt: c.createdAt,
+            author: {
+                id: c.author.id,
+                // A name is nicer, but an email always exists.
+                name: c.author.name ?? c.author.email,
+            },
+            orphaned: !(live.get(c.pageId)?.has(c.sectionKey) ?? false),
+        }));
+    }
+
+    /**
+     * Leave a note. Requires `site:comment` — the action a REVIEWER has and a
+     * MEMBER does not, because leaving a note is not a read.
+     */
+    async createComment(
+        ctx: OrganizationContext,
+        siteId: string,
+        dto: CreateCommentDto,
+    ): Promise<{ id: string }> {
+        authorize(ctx, "site:comment");
+        await this.assertSiteInOrg(ctx, siteId);
+        await this.assertPageInSite(ctx, siteId, dto.pageId);
+
+        const comment = await prisma.siteComment.create({
+            data: {
+                siteId,
+                pageId: dto.pageId,
+                organizationId: ctx.organizationId,
+                sectionKey: dto.sectionKey,
+                authorUserId: ctx.userId,
+                body: dto.body,
+            },
+            select: { id: true },
+        });
+        return comment;
+    }
+
+    /**
+     * Mark a note settled, or reopen it. Requires `section:write` — resolving
+     * is the OWNER's call, not the reviewer's: the spec has the owner confirm
+     * a note is addressed after editing the section it was about.
+     *
+     * Idempotent in both directions, so a double click does not toggle a note
+     * the merchant meant to close back open.
+     */
+    async setCommentResolved(
+        ctx: OrganizationContext,
+        siteId: string,
+        commentId: string,
+        resolved: boolean,
+    ): Promise<{ id: string; resolvedAt: Date | null }> {
+        authorize(ctx, "section:write");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const existing = await prisma.siteComment.findFirst({
+            where: {
+                id: commentId,
+                siteId,
+                organizationId: ctx.organizationId,
+            },
+            select: { id: true },
+        });
+        if (!existing) {
+            throw new NotFoundException(`Note "${commentId}" not found`);
+        }
+
+        return prisma.siteComment.update({
+            where: { id: commentId },
+            data: {
+                resolvedAt: resolved ? new Date() : null,
+                resolvedByUserId: resolved ? ctx.userId : null,
+            },
+            select: { id: true, resolvedAt: true },
+        });
+    }
+
+    /**
+     * Record a reviewer's verdict. Requires `site:approve`.
+     *
+     * Appended, never updated: "approved, then changes requested, then approved
+     * again" is a history worth being able to read, and a single row that
+     * flipped would erase it.
+     */
+    async createApproval(
+        ctx: OrganizationContext,
+        siteId: string,
+        dto: CreateApprovalDto,
+    ): Promise<{ id: string }> {
+        authorize(ctx, "site:approve");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        return prisma.siteApproval.create({
+            data: {
+                siteId,
+                organizationId: ctx.organizationId,
+                byUserId: ctx.userId,
+                outcome: dto.outcome,
+            },
+            select: { id: true },
+        });
+    }
+
+    /**
+     * The site's review state: the latest verdict and how many notes are still
+     * open. Together these are the spec's "approved with notes" — one badge
+     * carrying both, rather than a third outcome.
+     */
+    async getReviewState(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<ReviewState> {
+        authorize(ctx, "site:read");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const [latest, openNotes] = await Promise.all([
+            prisma.siteApproval.findFirst({
+                where: { siteId, organizationId: ctx.organizationId },
+                orderBy: { createdAt: "desc" },
+                select: {
+                    outcome: true,
+                    createdAt: true,
+                    by: { select: { name: true, email: true } },
+                },
+            }),
+            prisma.siteComment.count({
+                where: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    resolvedAt: null,
+                },
+            }),
+        ]);
+
+        return {
+            openNotes,
+            latestApproval:
+                latest === null
+                    ? null
+                    : {
+                          outcome: latest.outcome,
+                          at: latest.createdAt,
+                          by: latest.by.name ?? latest.by.email,
+                      },
+        };
+    }
+
     // -----------------------------------------------------------------------
     // Flags — the pre-publish check (advisory, never blocking)
     // -----------------------------------------------------------------------

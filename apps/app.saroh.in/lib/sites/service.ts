@@ -151,6 +151,13 @@ export type Section = {
          * the published snapshot. ABSENT means visible.
          */
         hidden?: boolean;
+        /**
+         * The section's stable identity across saves (#193). Absent only for a
+         * section the editor has just added, which the server then mints one
+         * for. It MUST be sent back for everything else: reviewer notes are
+         * pinned to it, and a save that dropped it would detach them all.
+         */
+        key?: string;
     };
 }[SectionType];
 

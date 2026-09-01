@@ -4,6 +4,7 @@ import {
     IsArray,
     IsBoolean,
     IsDefined,
+    IsIn,
     IsInt,
     IsOptional,
     IsString,
@@ -104,6 +105,23 @@ export class DraftSectionInputDto {
     @IsOptional()
     @IsBoolean({ message: "hidden must be a boolean" })
     hidden?: boolean;
+
+    /*
+     * The section's stable identity across saves. The editor sends back the key
+     * it was given for an existing section and omits it for a new one, which
+     * the server then mints.
+     *
+     * This is what a reviewer's note is pinned to, so sending the WRONG key
+     * moves someone's comment onto a different section. It is not a security
+     * boundary — everyone who can write sections can already rewrite their
+     * content — but it is why the key is a plain opaque string with no meaning
+     * to guess at, and why keys are unique per page version.
+     */
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    key?: string;
 }
 
 /**
@@ -171,6 +189,43 @@ export class UpdatePageDto {
     @Matches(PAGE_PATH_RE, { message: PAGE_PATH_MSG })
     @MaxLength(200, { message: "Path must be at most 200 characters" })
     path?: string;
+}
+
+/**
+ * A reviewer's note, pinned to a section (#193).
+ *
+ * `sectionKey` rather than a section id: ids are regenerated on every save, so
+ * a note keyed to one would detach the moment the page was edited.
+ */
+export class CreateCommentDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "A note needs something in it" })
+    @MaxLength(2000, { message: "Notes are limited to 2000 characters" })
+    body!: string;
+
+    @IsString()
+    @MinLength(1, { message: "pageId is required" })
+    pageId!: string;
+
+    @IsString()
+    @MinLength(1, { message: "sectionKey is required" })
+    @MaxLength(64)
+    sectionKey!: string;
+}
+
+/**
+ * A reviewer's verdict on the site.
+ *
+ * Two outcomes and no more. The spec's "approved with notes" is APPROVED plus
+ * an open-note count, not a third state — a workflow with states grows rounds,
+ * and this is meant to stay notes and one approval.
+ */
+export class CreateApprovalDto {
+    @IsIn(["APPROVED", "CHANGES_REQUESTED"], {
+        message: "outcome must be APPROVED or CHANGES_REQUESTED",
+    })
+    outcome!: "APPROVED" | "CHANGES_REQUESTED";
 }
 
 /**

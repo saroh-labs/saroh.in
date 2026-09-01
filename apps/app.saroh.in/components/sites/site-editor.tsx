@@ -678,7 +678,25 @@ export function SiteEditor({
             setSections(synced.sections);
         }
 
-        const res = await saveDraftSections(siteId, pageId, synced.sections);
+        /*
+         * A thrown save is a DIFFERENT failure from a rejected one, and it was
+         * the only one not handled. The service returns { ok: false } for
+         * anything the api answered — but if the api is unreachable the fetch
+         * rejects, the await throws, and `setSaving(false)` below never ran:
+         * the bar sat on "Saving…" for ever while the work stayed unsaved.
+         *
+         * The editor's own rule is that an autosave failing silently is worse
+         * than a Save button that visibly fails. An outage has to look like a
+         * failure, and the retry is the next edit.
+         */
+        const res = await saveDraftSections(
+            siteId,
+            pageId,
+            synced.sections,
+        ).catch(() => ({
+            ok: false as const,
+            error: "Could not reach Saroh — your work is still here. It will save again with your next edit.",
+        }));
         setSaving(false);
         if (res.ok) {
             setLastSavedJson(JSON.stringify(synced.sections));
@@ -697,7 +715,7 @@ export function SiteEditor({
             return;
         }
         setSaveError(true);
-        if (typeof res.index === "number") {
+        if ("index" in res && typeof res.index === "number") {
             setErrorIndex(res.index);
             setErrorMessage(res.error);
         }

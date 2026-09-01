@@ -17,6 +17,8 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import {
+    CreateApprovalDto,
+    CreateCommentDto,
     CreatePageDto,
     CreateSiteFromTemplateDto,
     UpdateDraftSectionsDto,
@@ -78,6 +80,66 @@ export class SitesController {
         @Param("siteId") siteId: string,
     ) {
         return this.sites.getSite(ctx, siteId);
+    }
+
+    /**
+     * Every note on this site, with the section each is about resolved against
+     * the current draft. Requires `site:read`.
+     */
+    @Get(":siteId/comments")
+    listComments(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.listComments(ctx, siteId);
+    }
+
+    /** Leave a note pinned to a section. Requires `site:comment`. */
+    @Post(":siteId/comments")
+    createComment(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: CreateCommentDto,
+    ) {
+        return this.sites.createComment(ctx, siteId, dto);
+    }
+
+    /**
+     * Mark a note settled, or reopen it. Requires `section:write` — resolving
+     * is the owner's call, not the reviewer's.
+     */
+    @Patch(":siteId/comments/:commentId")
+    setCommentResolved(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("commentId") commentId: string,
+        @Body() dto: { resolved?: boolean },
+    ) {
+        return this.sites.setCommentResolved(
+            ctx,
+            siteId,
+            commentId,
+            dto.resolved === true,
+        );
+    }
+
+    /** Record a reviewer's verdict. Requires `site:approve`. */
+    @Post(":siteId/approvals")
+    createApproval(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: CreateApprovalDto,
+    ) {
+        return this.sites.createApproval(ctx, siteId, dto);
+    }
+
+    /** The latest verdict plus the open-note count. Requires `site:read`. */
+    @Get(":siteId/review")
+    getReviewState(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.getReviewState(ctx, siteId);
     }
 
     /**
