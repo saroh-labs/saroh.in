@@ -468,7 +468,33 @@ export function SiteEditor({
             : null;
 
     return (
-        <div className="flex h-screen flex-col">
+        /*
+         * Editor chrome, per the website spec §7 and its "dark on dark"
+         * resolution.
+         *
+         * `dark` is forced rather than inherited: the spec says the editor
+         * chrome is always dark regardless of theme, because entering the
+         * editor is meant to feel like changing mode — and because the rendered
+         * site must be the only bright object on screen. A light editor around
+         * a light site loses that entirely.
+         *
+         * Ground and card are the SAME value (#0b0b0b), which is what "flush
+         * panels — no floating cards" means: one flat plane divided by
+         * hairlines (#1c1c1c), not a card stack floating on black like the
+         * workspace shell.
+         */
+        <div
+            className="dark flex h-screen flex-col bg-background text-foreground"
+            style={
+                {
+                    // 4.31%, not 4% — 4% rounds to #0a0a0a and the spec names
+                    // #0b0b0b exactly.
+                    "--background": "0 0% 4.3%",
+                    "--card": "0 0% 4.3%",
+                    "--border": "0 0% 11%",
+                } as React.CSSProperties
+            }
+        >
             {/*
              * Top bar. The design puts the site's identity, its state and the
              * one irreversible action on one line — a merchant should be able to
@@ -593,7 +619,7 @@ export function SiteEditor({
                 </div>
             </header>
 
-            <div className="grid min-h-0 flex-1 lg:grid-cols-[15rem_20rem_minmax(0,1fr)]">
+            <div className="grid min-h-0 flex-1 lg:grid-cols-[12.5rem_15rem_minmax(0,1fr)]">
                 {/* Rail — the page as a list of sections, not a wall of fields. */}
                 <aside className="flex min-h-0 flex-col border-r">
                     {rail === "style" ? (
@@ -648,35 +674,8 @@ export function SiteEditor({
                                             <span className="truncate">
                                                 {sectionTitle(section)}
                                             </span>
-                                            <span className="flex shrink-0 items-center gap-1.5">
-                                                <span className="text-[0.625rem] uppercase tracking-wide text-muted-foreground">
-                                                    {
-                                                        SECTION_LABELS[
-                                                            section.type
-                                                        ]
-                                                    }
-                                                </span>
-                                                {/*
-                                                 * The design's trailing dot,
-                                                 * carrying real state: filled
-                                                 * where this section overrides
-                                                 * the site's spacing, hollow
-                                                 * where it follows it. A dot
-                                                 * that meant nothing would be
-                                                 * decoration pretending to be
-                                                 * information.
-                                                 */}
-                                                <span
-                                                    aria-hidden
-                                                    className={cn(
-                                                        "size-1.5 rounded-full",
-                                                        section.content
-                                                            .padding ===
-                                                            undefined
-                                                            ? "bg-muted-foreground/30"
-                                                            : "bg-brand",
-                                                    )}
-                                                />
+                                            <span className="shrink-0 text-[0.625rem] uppercase tracking-wide text-muted-foreground">
+                                                {SECTION_LABELS[section.type]}
                                             </span>
                                         </button>
                                     </li>
@@ -822,8 +821,15 @@ export function SiteEditor({
                     )}
                 </div>
 
-                {/* Preview — width changes, data does not. */}
-                <div className="min-h-0 overflow-y-auto bg-muted/30 p-6">
+                {/*
+                 * Preview — width changes, data does not.
+                 *
+                 * The canvas ground is the SAME #0b0b0b as the chrome (spec §7),
+                 * not a lighter tray. A raised panel here would make the canvas
+                 * a second bright object competing with the one that matters:
+                 * the rendered site.
+                 */}
+                <div className="min-h-0 overflow-y-auto bg-background p-6">
                     <div
                         className="mx-auto transition-[max-width]"
                         style={{ maxWidth: DEVICE_WIDTH[device] }}
