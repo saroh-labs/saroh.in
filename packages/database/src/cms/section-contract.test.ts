@@ -264,3 +264,67 @@ describe("parseSectionContentOrThrow", () => {
         expect(() => parseSectionContentOrThrow("nope", 1, {})).toThrow();
     });
 });
+
+describe("per-section padding override (#189)", () => {
+    /** A minimal valid content body for each type, so the padding is the variable. */
+    const bodies: Record<string, Record<string, unknown>> = {
+        hero: { heading: "Hi" },
+        richText: { format: "html", value: "<p>Hi</p>" },
+        cta: { label: "Go", href: "/x" },
+        gallery: { images: [{ src: "https://x/a.jpg" }], layout: "grid" },
+        enquiry: {
+            fields: [{ name: "email", label: "Email", type: "email" }],
+        },
+        booking: {},
+    };
+
+    it("is accepted on every section type", () => {
+        for (const type of SECTION_TYPES) {
+            const result = parseSectionContent(type, 1, {
+                ...bodies[type],
+                padding: 40,
+            });
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect((result.data as { padding?: number }).padding).toBe(40);
+            }
+        }
+    });
+
+    it("stays ABSENT when not set, rather than defaulting", () => {
+        // Absent means "follow the site setting". A default would bake the
+        // site's current value into the section and stop it tracking the
+        // slider afterwards.
+        for (const type of SECTION_TYPES) {
+            const result = parseSectionContent(type, 1, bodies[type]);
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(
+                    result.data as Record<string, unknown>,
+                ).not.toHaveProperty("padding");
+            }
+        }
+    });
+
+    it("rejects a padding outside the site slider's own range", () => {
+        // An override must not reach a spacing the site-level setting could
+        // not produce.
+        for (const bad of [8, 200, 52.5]) {
+            const result = parseSectionContent("hero", 1, {
+                heading: "Hi",
+                padding: bad,
+            });
+            expect(result.success).toBe(false);
+        }
+    });
+
+    it("does not break content written before the field existed", () => {
+        // Adding an optional field is why this extends v1 instead of shipping
+        // a v2 — every existing Section and Publication must still validate.
+        const result = parseSectionContent("hero", 1, {
+            heading: "Made before padding existed",
+            subheading: "Still valid",
+        });
+        expect(result.success).toBe(true);
+    });
+});

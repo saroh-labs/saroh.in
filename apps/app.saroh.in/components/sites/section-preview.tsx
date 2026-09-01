@@ -45,12 +45,29 @@ const BUTTON =
     "inline-block rounded-[var(--site-radius)] bg-[hsl(var(--site-accent))] px-5 py-2 text-sm font-medium text-[hsl(var(--site-accent-fg))]";
 
 function SectionPreview({ section }: { section: Section }) {
+    /*
+     * A section's own padding, when it has one (#189).
+     *
+     * Set as an inline custom property rather than a class so it overrides the
+     * site-wide `--site-section-padding` for this subtree only — the same
+     * mechanism the site style uses, one level down. Absent leaves the site
+     * setting in force, which is what "Following the site setting" means.
+     */
+    const override = section.content.padding;
+    const pad: React.CSSProperties | undefined =
+        override === undefined
+            ? undefined
+            : ({
+                  "--site-section-padding": `${override}px`,
+              } as React.CSSProperties);
+
     switch (section.type) {
         case "hero": {
             const { heading, subheading, cta, image } = section.content;
             return (
                 <section
                     className={`${BORDER} ${RADIUS} ${PAD} bg-[hsl(var(--site-hero-bg))] text-center text-[hsl(var(--site-hero-fg))]`}
+                    style={pad}
                 >
                     {image?.src && (
                         // eslint-disable-next-line @next/next/no-img-element -- merchant-supplied absolute URL, not a project asset
@@ -77,7 +94,10 @@ function SectionPreview({ section }: { section: Section }) {
         case "richText": {
             const { format, value } = section.content;
             return (
-                <section className={`${SURFACE} ${BORDER} ${RADIUS} ${PAD}`}>
+                <section
+                    className={`${SURFACE} ${BORDER} ${RADIUS} ${PAD}`}
+                    style={pad}
+                >
                     {format === "html" ? (
                         <div
                             className="prose prose-sm max-w-none prose-headings:text-[hsl(var(--site-fg))] prose-p:text-[hsl(var(--site-fg)/0.8)]"
@@ -96,6 +116,7 @@ function SectionPreview({ section }: { section: Section }) {
             return (
                 <section
                     className={`${BORDER} ${RADIUS} ${PAD} bg-[hsl(var(--site-cta-bg))] text-center text-[hsl(var(--site-cta-fg))]`}
+                    style={pad}
                 >
                     <span
                         className={`inline-block rounded-[var(--site-radius)] bg-[hsl(var(--site-cta-fg))] px-6 py-2.5 text-sm font-medium text-[hsl(var(--site-cta-bg))]`}
@@ -108,7 +129,10 @@ function SectionPreview({ section }: { section: Section }) {
         case "gallery": {
             const { images, layout } = section.content;
             return (
-                <section className={`${SURFACE} ${BORDER} ${RADIUS} ${PAD}`}>
+                <section
+                    className={`${SURFACE} ${BORDER} ${RADIUS} ${PAD}`}
+                    style={pad}
+                >
                     <div
                         className={
                             layout === "carousel"
@@ -148,7 +172,10 @@ function SectionPreview({ section }: { section: Section }) {
         case "enquiry": {
             const { title, description, submitLabel, fields } = section.content;
             return (
-                <section className={`${SURFACE} ${BORDER} ${RADIUS} ${PAD}`}>
+                <section
+                    className={`${SURFACE} ${BORDER} ${RADIUS} ${PAD}`}
+                    style={pad}
+                >
                     {title && (
                         <h3 className={`${H3} font-semibold`}>{title}</h3>
                     )}
@@ -184,7 +211,10 @@ function SectionPreview({ section }: { section: Section }) {
             const { title, description, serviceId, submitLabel } =
                 section.content;
             return (
-                <section className={`${SURFACE} ${BORDER} ${RADIUS} ${PAD}`}>
+                <section
+                    className={`${SURFACE} ${BORDER} ${RADIUS} ${PAD}`}
+                    style={pad}
+                >
                     {title && (
                         <h3 className={`${H3} font-semibold`}>{title}</h3>
                     )}

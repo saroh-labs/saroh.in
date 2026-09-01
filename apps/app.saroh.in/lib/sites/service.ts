@@ -121,6 +121,21 @@ export interface SectionContentByType {
 }
 
 /**
+ * Layout every section carries, whatever its type (#189).
+ *
+ * Declared once and intersected below rather than repeated in all six content
+ * interfaces, mirroring the single `paddingOverride` in the section contract —
+ * six copies is six chances for one to drift.
+ *
+ * ABSENT means "follow the site setting". Not defaulted, because a default
+ * would freeze today's site value into the section and stop it tracking the
+ * slider afterwards.
+ */
+export interface SectionLayout {
+    padding?: number;
+}
+
+/**
  * A section discriminated on `type`, so narrowing on `type` gives the exact
  * `content` shape. Used by the editor and preview.
  */
@@ -128,7 +143,7 @@ export type Section = {
     [K in SectionType]: {
         type: K;
         contractVersion: number;
-        content: SectionContentByType[K];
+        content: SectionContentByType[K] & SectionLayout;
     };
 }[SectionType];
 
