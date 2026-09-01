@@ -100,7 +100,7 @@ function sectionTitle(section: Section): string {
  * the values a merchant is actually editing.
  */
 const FIELD_LABEL =
-    "text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground";
+    "text-[0.625rem] font-medium uppercase tracking-[0.08em] text-muted-foreground";
 
 const SECTION_ORDER: SectionType[] = [
     "hero",
@@ -500,7 +500,7 @@ export function SiteEditor({
              * one irreversible action on one line — a merchant should be able to
              * tell what will happen when they press Publish without scrolling.
              */}
-            <header className="flex flex-wrap items-center gap-3 border-b px-4 py-2.5">
+            <header className="flex h-[52px] shrink-0 flex-wrap items-center gap-3 border-b px-3.5">
                 {/*
                  * "Workspace", not "Sites" — the design's wording, and the
                  * truer one: leaving the editor returns you to the whole
@@ -512,7 +512,9 @@ export function SiteEditor({
                 >
                     ← Workspace
                 </Link>
-                <span className="text-sm font-medium">{siteName}</span>
+                {/* The design separates the way out from the site's identity. */}
+                <span aria-hidden className="h-[18px] w-px bg-border" />
+                <span className="text-[0.8125rem] font-medium">{siteName}</span>
                 {address ? (
                     <span className="hidden text-xs text-muted-foreground sm:inline">
                         {address}
@@ -530,12 +532,12 @@ export function SiteEditor({
                  */}
                 <span
                     className={cn(
-                        "shrink-0 rounded-md px-2 py-1 text-xs",
+                        "flex h-[22px] shrink-0 items-center rounded-[3px] px-2 text-[0.6875rem]",
                         saveError
                             ? "border border-destructive/30 bg-destructive/10 text-destructive"
                             : dirty || saving
-                              ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
-                              : "bg-muted text-muted-foreground",
+                              ? "border border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
+                              : "border border-[#2a2a2a] bg-[#1a1a1a] text-muted-foreground",
                     )}
                 >
                     {saving
@@ -560,7 +562,7 @@ export function SiteEditor({
                     <div
                         role="group"
                         aria-label="Preview width"
-                        className="flex overflow-hidden rounded-md border"
+                        className="flex h-7 overflow-hidden rounded border"
                     >
                         {DEVICES.map((d) => (
                             <button
@@ -569,9 +571,9 @@ export function SiteEditor({
                                 onClick={() => setDevice(d.key)}
                                 aria-pressed={device === d.key}
                                 className={cn(
-                                    "px-2.5 py-1 text-xs",
+                                    "border-l px-2.5 text-[0.6875rem] first:border-l-0",
                                     device === d.key
-                                        ? "bg-secondary text-secondary-foreground"
+                                        ? "bg-[#242424] text-foreground"
                                         : "text-muted-foreground hover:text-foreground",
                                 )}
                             >
@@ -589,6 +591,7 @@ export function SiteEditor({
                     <Button
                         variant={rail === "style" ? "secondary" : "outline"}
                         size="sm"
+                        className="h-7 rounded px-3 text-xs"
                         onClick={() =>
                             setRail(rail === "style" ? "sections" : "style")
                         }
@@ -597,9 +600,15 @@ export function SiteEditor({
                         Style
                     </Button>
 
+                    {/*
+                     * Publish carries the EDITOR's accent (#8a5a3c, spec §7),
+                     * not Saroh's brand blue. §1 is explicit that the shell
+                     * accent drops away on entering the editor: inside here the
+                     * only chromatic things should be the merchant's site and
+                     * the one action that puts it in front of the public.
+                     */}
                     <Button
-                        className="wk-press"
-                        variant="brand"
+                        className="wk-press h-7 rounded bg-[#8a5a3c] px-3 text-xs font-medium text-white hover:bg-[#794e34]"
                         onClick={onPublish}
                         disabled={publishing || dirty || saving}
                     >
@@ -663,7 +672,7 @@ export function SiteEditor({
                                                 setSelectedIndex(index)
                                             }
                                             className={cn(
-                                                "flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm",
+                                                "flex h-8 w-full items-center justify-between gap-2 rounded px-2 text-left text-xs",
                                                 selectedIndex === index
                                                     ? "bg-secondary"
                                                     : "hover:bg-muted",
@@ -674,7 +683,7 @@ export function SiteEditor({
                                             <span className="truncate">
                                                 {sectionTitle(section)}
                                             </span>
-                                            <span className="shrink-0 text-[0.625rem] uppercase tracking-wide text-muted-foreground">
+                                            <span className="shrink-0 text-[0.625rem] uppercase tracking-[0.06em] text-muted-foreground/70">
                                                 {SECTION_LABELS[section.type]}
                                             </span>
                                         </button>
