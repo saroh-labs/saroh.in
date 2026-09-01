@@ -94,6 +94,14 @@ function sectionTitle(section: Section): string {
     return candidate.trim() || SECTION_LABELS[section.type];
 }
 
+/*
+ * Field labels, as the design draws them: small, uppercase, letter-spaced and
+ * muted, so a column of them reads as a quiet index rather than competing with
+ * the values a merchant is actually editing.
+ */
+const FIELD_LABEL =
+    "text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground";
+
 const SECTION_ORDER: SectionType[] = [
     "hero",
     "richText",
@@ -467,11 +475,16 @@ export function SiteEditor({
              * tell what will happen when they press Publish without scrolling.
              */}
             <header className="flex flex-wrap items-center gap-3 border-b px-4 py-2.5">
+                {/*
+                 * "Workspace", not "Sites" — the design's wording, and the
+                 * truer one: leaving the editor returns you to the whole
+                 * workspace, not to a list of sites.
+                 */}
                 <Link
                     href="/sites"
-                    className="shrink-0 rounded text-sm text-muted-foreground hover:text-foreground"
+                    className="shrink-0 rounded-md border px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                    ← Sites
+                    ← Workspace
                 </Link>
                 <span className="text-sm font-medium">{siteName}</span>
                 {address ? (
@@ -480,16 +493,33 @@ export function SiteEditor({
                     </span>
                 ) : null}
 
-                {/* Autosave state, stated rather than implied. */}
-                <span className="text-xs text-muted-foreground">
+                {/*
+                 * Autosave state as a PILL, as the design has it.
+                 *
+                 * Tinted by what it means rather than uniformly grey: a failed
+                 * save and a saved draft should not look alike at a glance, and
+                 * this line is the only place a merchant learns their work is
+                 * safe. Grey when everything is fine, so the colour is only
+                 * ever spent on something worth reading.
+                 */}
+                <span
+                    className={cn(
+                        "shrink-0 rounded-md px-2 py-1 text-xs",
+                        saveError
+                            ? "border border-destructive/30 bg-destructive/10 text-destructive"
+                            : dirty || saving
+                              ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
+                              : "bg-muted text-muted-foreground",
+                    )}
+                >
                     {saving
                         ? "Saving…"
                         : saveError
                           ? "Not saved"
                           : dirty
-                            ? "Unsaved changes"
+                            ? "Draft changes"
                             : lastSavedAt
-                              ? `Saved ${lastSavedAt.toLocaleTimeString()}`
+                              ? `Draft changes · autosaved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
                               : "Draft"}
                 </span>
 
@@ -547,11 +577,18 @@ export function SiteEditor({
                         onClick={onPublish}
                         disabled={publishing || dirty || saving}
                     >
-                        {publishing
-                            ? "Publishing…"
-                            : changedCount > 0
-                              ? `Publish ${changedCount}`
-                              : "Publish"}
+                        {publishing ? "Publishing…" : "Publish"}
+                        {/*
+                         * The count as a BADGE rather than in the label, as the
+                         * design has it: "Publish" stays the same width whatever
+                         * the number, so the button a merchant is about to press
+                         * does not move under the cursor as they edit.
+                         */}
+                        {!publishing && changedCount > 0 ? (
+                            <span className="ml-1.5 rounded bg-brand-foreground/25 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
+                                {changedCount}
+                            </span>
+                        ) : null}
                     </Button>
                 </div>
             </header>
@@ -570,8 +607,24 @@ export function SiteEditor({
                         />
                     ) : (
                         <>
-                            <div className="border-b px-3 py-2">
-                                <span className="text-xs font-semibold">
+                            {/*
+                             * The design's rail carries Sections / Pages /
+                             * Review. Only Sections exists, so only Sections is
+                             * drawn — the same rule the workspace nav follows,
+                             * and a tab leading nowhere is worse than an absent
+                             * one. The TREATMENT is the design's, so the others
+                             * drop in beside it when #193 lands.
+                             */}
+                            <div
+                                role="tablist"
+                                aria-label="Editor panels"
+                                className="flex items-center gap-1 border-b px-2 py-1.5"
+                            >
+                                <span
+                                    role="tab"
+                                    aria-selected="true"
+                                    className="rounded bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground"
+                                >
                                     Sections
                                 </span>
                             </div>
@@ -595,8 +648,35 @@ export function SiteEditor({
                                             <span className="truncate">
                                                 {sectionTitle(section)}
                                             </span>
-                                            <span className="shrink-0 text-[0.625rem] uppercase tracking-wide text-muted-foreground">
-                                                {SECTION_LABELS[section.type]}
+                                            <span className="flex shrink-0 items-center gap-1.5">
+                                                <span className="text-[0.625rem] uppercase tracking-wide text-muted-foreground">
+                                                    {
+                                                        SECTION_LABELS[
+                                                            section.type
+                                                        ]
+                                                    }
+                                                </span>
+                                                {/*
+                                                 * The design's trailing dot,
+                                                 * carrying real state: filled
+                                                 * where this section overrides
+                                                 * the site's spacing, hollow
+                                                 * where it follows it. A dot
+                                                 * that meant nothing would be
+                                                 * decoration pretending to be
+                                                 * information.
+                                                 */}
+                                                <span
+                                                    aria-hidden
+                                                    className={cn(
+                                                        "size-1.5 rounded-full",
+                                                        section.content
+                                                            .padding ===
+                                                            undefined
+                                                            ? "bg-muted-foreground/30"
+                                                            : "bg-brand",
+                                                    )}
+                                                />
                                             </span>
                                         </button>
                                     </li>
@@ -607,9 +687,17 @@ export function SiteEditor({
                                     </li>
                                 ) : null}
                             </ul>
-                            <div className="border-t p-2">
-                                <details>
-                                    <summary className="cursor-pointer rounded px-2 py-1 text-sm text-muted-foreground hover:text-foreground">
+                            <div className="p-2">
+                                {/*
+                                 * The design draws this as a dashed outline
+                                 * spanning the rail — reading as a slot waiting
+                                 * to be filled rather than another row in the
+                                 * list, which is what it is. Still a disclosure:
+                                 * the type picker only matters once you have
+                                 * decided to add something.
+                                 */}
+                                <details className="group">
+                                    <summary className="cursor-pointer list-none rounded-md border border-dashed px-2 py-2 text-center text-sm text-muted-foreground transition-colors hover:border-solid hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                         + Add section
                                     </summary>
                                     <div className="flex flex-wrap gap-1 px-2 pt-2">
@@ -711,6 +799,20 @@ export function SiteEditor({
                                     {errorMessage}
                                 </p>
                             ) : null}
+
+                            {/*
+                             * The design closes the field panel by saying where
+                             * editing does NOT happen. Worth keeping: a merchant
+                             * who expects to change a price here would otherwise
+                             * hunt for a field that is deliberately absent,
+                             * because those values belong to the modules that
+                             * own them.
+                             */}
+                            <p className="border-t pt-3 text-xs leading-relaxed text-muted-foreground">
+                                Written copy edits here and in the preview at
+                                the same time. Prices, dates and stock come from
+                                the workspace and change there.
+                            </p>
                         </div>
                     ) : (
                         <p className="text-sm text-muted-foreground">
@@ -786,14 +888,20 @@ function SectionPadding({
 
     return (
         <div className="space-y-1 border-t pt-4">
+            <Label htmlFor="section-padding" className={FIELD_LABEL}>
+                Padding
+            </Label>
+            {/*
+             * The state on its own line under the label, as the design has it:
+             * "Following the site setting" is a sentence, and squeezing it
+             * beside the label pushed the number that actually matters out to
+             * the far edge.
+             */}
             <div className="flex items-baseline justify-between gap-2">
-                <Label htmlFor="section-padding" className="text-xs">
-                    Padding
-                </Label>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                    {following ? `Following the site setting · ` : ""}
-                    {shown}px
+                <span className="text-xs text-muted-foreground">
+                    {following ? "Following the site setting" : "This section"}
                 </span>
+                <span className="text-xs tabular-nums">{shown}px</span>
             </div>
             <input
                 id="section-padding"
@@ -806,15 +914,13 @@ function SectionPadding({
                 className="w-full accent-foreground"
             />
             {!following && (
-                <Button
+                <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto px-0 text-xs"
                     onClick={() => set(undefined)}
+                    className="rounded text-left text-xs text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     Follow the site setting
-                </Button>
+                </button>
             )}
         </div>
     );
@@ -1014,7 +1120,7 @@ function SectionFields({
                         </Select>
                     </Field>
                     <div className="grid gap-2">
-                        <Label>Images</Label>
+                        <Label className={FIELD_LABEL}>Images</Label>
                         {c.images.map((img, i) => (
                             <div key={i} className="flex items-start gap-2">
                                 <Input
@@ -1131,7 +1237,7 @@ function SectionFields({
                         />
                     </Field>
                     <div className="grid gap-2">
-                        <Label>Fields</Label>
+                        <Label className={FIELD_LABEL}>Fields</Label>
                         <p className="text-xs text-muted-foreground">
                             Include at least one email field — it identifies the
                             person who enquired.
@@ -1348,7 +1454,7 @@ function Field({
 }) {
     return (
         <div className="grid gap-1.5">
-            <Label>{label}</Label>
+            <Label className={FIELD_LABEL}>{label}</Label>
             {children}
         </div>
     );
