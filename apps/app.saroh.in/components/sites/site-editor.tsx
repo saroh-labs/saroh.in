@@ -223,6 +223,21 @@ const DEVICES = [
     { key: "phone", label: "Phone" },
 ] as const;
 type Device = (typeof DEVICES)[number]["key"];
+/** Zoom steps. "fit" is computed; the rest are literal percentages (spec §2). */
+type Zoom = 50 | 75 | 100 | "fit";
+const ZOOMS: Zoom[] = [50, 75, 100, "fit"];
+
+/**
+ * The same widths in pixels, for the Fit calculation. Desktop is null because
+ * it has no fixed width — it already takes whatever the canvas gives it, so
+ * there is nothing to scale down to make it fit.
+ */
+const DEVICE_PX: Record<Device, number | null> = {
+    desktop: null,
+    tablet: 768,
+    phone: 375,
+};
+
 const DEVICE_WIDTH: Record<Device, string> = {
     desktop: "100%",
     tablet: "48rem",
@@ -394,6 +409,7 @@ export function SiteEditor({
     async function refreshFlags() {
         setSiteFlags(await getSiteFlags(siteId));
     }
+
     const [errorIndex, setErrorIndex] = useState<number | null>(null);
     /*
      * Panel widths, device and place come from the preferences store rather
@@ -435,11 +451,73 @@ export function SiteEditor({
         setChrome({ railWidth: getChrome().railWidth + d });
     const nudgePanel = (d: number) =>
         setChrome({ panelWidth: getChrome().panelWidth + d });
-    const setDevice = (next: Device) => setChrome({ device: next });
+    const setDevice = (next: Device) => {
+        setChrome({ device: next });
+        // The dip lasts as long as the width transition it accompanies.
+        setSwitching(true);
+        setTimeout(() => setSwitching(false), 300);
+    };
     const setSelectedIndex = (next: number | null) =>
         setPlace(siteId, initialCount, { selectedIndex: next });
     const setRail = (next: "sections" | "pages" | "style") =>
         setPlace(siteId, initialCount, { rail: next });
+
+    /*
+     * "Zoom is the readout dropdown only — 50 / 75 / 100 / Fit. No ⌘scroll, no
+     * pinch, no keyboard shortcuts." The spec resolved a contradiction by
+     * making the readout the control, so there is deliberately no gesture here.
+     */
+    const [zoom, setZoom] = useState<Zoom>(100);
+    /** Briefly dimmed while a device switch animates — the cross-fade. */
+    const [switching, setSwitching] = useState(false);
+    /** Full-screen preview: everything else hides, Escape returns (spec §2). */
+    const [fullScreen, setFullScreen] = useState(false);
+    const canvasRef = useRef<HTMLDivElement | null>(null);
+    const scrollWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    /*
+     * "Fit" is the only value that is not a fixed percentage: it scales the
+     * frame down until it fits the canvas, and never scales it UP — a phone
+     * frame blown up to fill a desktop canvas would stop being a preview of a
+     * phone.
+     */
+    const [fitScale, setFitScale] = useState(1);
+    const zoomScale = zoom === "fit" ? Math.min(1, fitScale) : zoom / 100;
+    useEffect(() => {
+        const el = canvasRef.current;
+        if (el === null) return;
+        const measure = () => {
+            const frame = DEVICE_PX[device];
+            // The canvas padding (p-6 = 24px each side) is not usable width.
+            const usable = el.clientWidth - 48;
+            setFitScale(frame === null ? 1 : usable / frame);
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [device]);
+
+    /*
+     * Restore where the merchant was scrolled to. Mount-only: re-running it on
+     * a later change would yank the canvas back mid-scroll, and the stored
+     * value is already being kept up to date by the handler below.
+     */
+    useEffect(() => {
+        const el = canvasRef.current;
+        if (el === null) return;
+        el.scrollTop = place.scrollTop;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (!fullScreen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setFullScreen(false);
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [fullScreen]);
     /*
      * Drag state. `dragIndex` is the row being carried, `dropIndex` the row it
      * would land on — kept apart so the source can dim while the target draws
@@ -890,6 +968,43 @@ export function SiteEditor({
                      * rail lists one page's sections — a tab would file a
                      * site-wide setting under a page.
                      */}
+                    {/*
+                     * The zoom readout IS the control (spec §2 resolved the
+                     * contradiction that way): no ⌘scroll, no pinch, no
+                     * shortcut. A select rather than a menu because it is a
+                     * value being chosen, and a native select is the one
+                     * control every keyboard and screen reader already knows.
+                     */}
+                    <select
+                        aria-label="Zoom"
+                        value={String(zoom)}
+                        onChange={(e) =>
+                            setZoom(
+                                e.target.value === "fit"
+                                    ? "fit"
+                                    : (Number(e.target.value) as Zoom),
+                            )
+                        }
+                        className="h-7 w-[4.25rem] rounded border bg-transparent px-1.5 text-xs tabular-nums text-muted-foreground"
+                    >
+                        {ZOOMS.map((z) => (
+                            <option key={String(z)} value={String(z)}>
+                                {z === "fit" ? "Fit" : `${z}%`}
+                            </option>
+                        ))}
+                    </select>
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        aria-label="Full-screen preview"
+                        title="Full-screen preview — Escape returns"
+                        onClick={() => setFullScreen(true)}
+                    >
+                        ⤢
+                    </Button>
+
                     <Button
                         variant={rail === "style" ? "secondary" : "outline"}
                         size="sm"
@@ -1361,15 +1476,67 @@ export function SiteEditor({
                  * a second bright object competing with the one that matters:
                  * the rendered site.
                  */}
-                <div className="min-h-0 overflow-y-auto bg-background p-6">
+                <div
+                    ref={canvasRef}
+                    onScroll={(e) => {
+                        /*
+                         * Remembered per site — the spec lists preview scroll
+                         * position among the things that persist. Debounced:
+                         * a scroll fires dozens of events a second, and every
+                         * one of them writing to storage would serialise the
+                         * whole place object each time for no benefit.
+                         */
+                        const top = e.currentTarget.scrollTop;
+                        if (scrollWrite.current !== null) {
+                            clearTimeout(scrollWrite.current);
+                        }
+                        scrollWrite.current = setTimeout(() => {
+                            setPlace(siteId, initialCount, { scrollTop: top });
+                        }, 250);
+                    }}
+                    className="min-h-0 overflow-y-auto bg-background p-6"
+                >
+                    {/*
+                     * The first-run nudge (spec §5), in the spec's own words.
+                     * "It does not nag" — so it is one quiet line above the
+                     * preview, shown only until the site has been published
+                     * once, and it never reappears afterwards.
+                     */}
+                    {neverPublished ? (
+                        <p
+                            className="mx-auto mb-4 text-center text-xs text-muted-foreground"
+                            style={{ maxWidth: DEVICE_WIDTH[device] }}
+                        >
+                            Nothing&rsquo;s live yet — publish when you&rsquo;re
+                            ready, nobody can see this in the meantime.
+                        </p>
+                    ) : null}
                     <div
-                        className="mx-auto transition-[max-width]"
-                        style={{ maxWidth: DEVICE_WIDTH[device] }}
+                        /*
+                         * "Switching frames cross-fades and resizes — the frame
+                         * animates to the new width, content reflows during
+                         * it." The width transition does the resize; the brief
+                         * dip in opacity is the cross-fade, and it is what stops
+                         * a reflow mid-animation reading as a glitch.
+                         */
+                        className={`mx-auto transition-[max-width,opacity,transform] duration-300 ease-out ${
+                            switching ? "opacity-70" : "opacity-100"
+                        }`}
+                        style={{
+                            maxWidth: DEVICE_WIDTH[device],
+                            transform: `scale(${zoomScale})`,
+                            transformOrigin: "top center",
+                        }}
                     >
                         <DraftPreview
                             sections={sections}
                             style={style}
                             styleOptions={styleOptions}
+                            selectedIndex={selectedIndex}
+                            onSelect={(index) => {
+                                setRail("sections");
+                                setSelectedIndex(index);
+                            }}
                         />
                     </div>
                 </div>
@@ -1381,6 +1548,34 @@ export function SiteEditor({
              * it — the merchant goes back to exactly the editing state they
              * left, including unsaved selection and scroll.
              */}
+            {/*
+             * Full-screen preview: "hides everything; Escape returns". The
+             * frame keeps its device width, so this is the site at the size
+             * being designed for with nothing else on screen — not a
+             * maximised editor.
+             */}
+            {fullScreen ? (
+                <div className="fixed inset-0 z-40 overflow-y-auto bg-background p-6">
+                    <button
+                        type="button"
+                        onClick={() => setFullScreen(false)}
+                        className="fixed right-4 top-4 z-10 rounded border bg-background/80 px-2 py-1 text-xs text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
+                    >
+                        Escape to return
+                    </button>
+                    <div
+                        className="mx-auto transition-[max-width] duration-300"
+                        style={{ maxWidth: DEVICE_WIDTH[device] }}
+                    >
+                        <DraftPreview
+                            sections={sections}
+                            style={style}
+                            styleOptions={styleOptions}
+                        />
+                    </div>
+                </div>
+            ) : null}
+
             {checking ? (
                 <PrePublishCheck
                     siteName={siteName}

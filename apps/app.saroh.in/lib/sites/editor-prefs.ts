@@ -42,6 +42,8 @@ export interface EditorChrome {
 export interface EditorPlace {
     selectedIndex: number | null;
     rail: "sections" | "pages" | "style";
+    /** Where the preview was scrolled to. In the spec's persisted list. */
+    scrollTop: number;
 }
 
 export const CHROME_DEFAULT: EditorChrome = {
@@ -182,6 +184,7 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
     const fallback: EditorPlace = {
         selectedIndex: sectionCount > 0 ? 0 : null,
         rail: "sections",
+        scrollTop: 0,
     };
     const v = read(key);
     let value = fallback;
@@ -198,6 +201,13 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
                     : fallback.selectedIndex,
             rail:
                 o.rail === "style" || o.rail === "pages" ? o.rail : "sections",
+            // A negative or non-finite offset would scroll nowhere useful.
+            scrollTop:
+                typeof o.scrollTop === "number" &&
+                Number.isFinite(o.scrollTop) &&
+                o.scrollTop >= 0
+                    ? o.scrollTop
+                    : 0,
         };
     }
     cache.set(key, value);
@@ -216,7 +226,11 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
  * identity.
  */
 export function placeOnServer(sectionCount: number): EditorPlace {
-    return { selectedIndex: sectionCount > 0 ? 0 : null, rail: "sections" };
+    return {
+        selectedIndex: sectionCount > 0 ? 0 : null,
+        rail: "sections",
+        scrollTop: 0,
+    };
 }
 
 /** Patch a site's place. Merged against the cache, for the same reason. */

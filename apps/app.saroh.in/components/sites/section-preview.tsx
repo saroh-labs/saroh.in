@@ -272,19 +272,36 @@ export function DraftPreview({
     sections,
     style,
     styleOptions,
+    selectedIndex,
+    onSelect,
 }: {
     sections: Section[];
     style?: SiteStyle;
     styleOptions?: SiteStyleOptions;
+    /** Index into `sections` (not the visible subset) of the open section. */
+    selectedIndex?: number | null;
+    /**
+     * "Clicking a section in the preview selects it; rail and field panel
+     * follow" (spec §2). Omitted where the preview is not an editing surface.
+     */
+    onSelect?: (index: number) => void;
 }) {
     // React accepts custom properties on the style object, so the resolved
     // record needs no assertion to be used as one.
     const vars: React.CSSProperties =
         style && styleOptions ? resolveStyleVariables(style, styleOptions) : {};
 
-    // The preview answers "what will visitors see", so a hidden section is
-    // absent here exactly as it will be absent from the published snapshot.
-    const visible = sections.filter((section) => section.hidden !== true);
+    /*
+     * The preview answers "what will visitors see", so a hidden section is
+     * absent here exactly as it will be absent from the published snapshot.
+     *
+     * The ORIGINAL index travels with each one: filtering renumbers the list,
+     * and a click on the third visible section has to select the third section
+     * of the real list, not the third of what survived the filter.
+     */
+    const visible = sections
+        .map((section, index) => ({ section, index }))
+        .filter(({ section }) => section.hidden !== true);
 
     if (visible.length === 0) {
         return (
@@ -309,9 +326,30 @@ export function DraftPreview({
             style={vars}
             className={`space-y-4 p-[var(--site-page-margin)] ${SURFACE} ${RADIUS}`}
         >
-            {visible.map((section, i) => (
-                <SectionPreview key={i} section={section} />
-            ))}
+            {visible.map(({ section, index }) =>
+                onSelect === undefined ? (
+                    <SectionPreview key={index} section={section} />
+                ) : (
+                    /*
+                     * A plain div with a click, not a <button>: a section holds
+                     * headings, links and form fields, and nesting those inside
+                     * a button is invalid and breaks the keyboard. The rail is
+                     * the keyboard-reachable way to select a section; this is
+                     * the pointer shortcut for what you can already see.
+                     */
+                    <div
+                        key={index}
+                        onClick={() => onSelect(index)}
+                        className={`cursor-pointer rounded-[2px] outline-offset-2 transition-[outline-color] ${
+                            selectedIndex === index
+                                ? "outline outline-1 outline-[#8a5a3c]"
+                                : "outline outline-1 outline-transparent hover:outline-[#8a5a3c]/40"
+                        }`}
+                    >
+                        <SectionPreview section={section} />
+                    </div>
+                ),
+            )}
         </div>
     );
 }
