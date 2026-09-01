@@ -7,10 +7,13 @@ import type {
     SiteStyle,
 } from "./service";
 import {
+    createPage as createPageApi,
     createSite as createSiteApi,
+    deletePage as deletePageApi,
     publishSite as publishSiteApi,
     restorePublication as restorePublicationApi,
     saveDraftSections as saveDraftSectionsApi,
+    updatePage as updatePageApi,
     updateSiteSettings as updateSiteSettingsApi,
     updateSiteStyle as updateSiteStyleApi,
 } from "./service";
@@ -54,4 +57,23 @@ export async function restorePublication(
 
 export async function updateSiteStyle(siteId: string, style: SiteStyle) {
     return updateSiteStyleApi(siteId, style);
+}
+
+export async function createPage(
+    siteId: string,
+    input: { title: string; path: string },
+) {
+    return createPageApi(siteId, input);
+}
+
+export async function updatePage(
+    siteId: string,
+    pageId: string,
+    input: { title?: string; path?: string },
+) {
+    return updatePageApi(siteId, pageId, input);
+}
+
+export async function deletePage(siteId: string, pageId: string) {
+    return deletePageApi(siteId, pageId);
 }

@@ -17,19 +17,33 @@ const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
 
 export default async function SiteEditorPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ siteId: string }>;
+    searchParams: Promise<{ page?: string }>;
 }) {
     const { siteId } = await params;
+    const { page: requestedPageId } = await searchParams;
     await requireSession();
 
     const site = await getSite(siteId);
     if (!site) notFound();
 
     if (site.pages.length === 0) notFound();
+    /*
+     * Which page is open is a URL question, not editor state: it survives a
+     * reload, it can be linked to, and Back goes where the merchant expects.
+     *
+     * An unrecognised id falls back to home rather than 404ing — the usual way
+     * to get one is a stale link to a page that has since been deleted, and
+     * dumping someone on an error page for that is worse than opening the page
+     * every site is guaranteed to have.
+     */
     const homePage = site.pages.find((page) => page.isHome) ?? site.pages[0];
+    const activePage =
+        site.pages.find((page) => page.id === requestedPageId) ?? homePage;
 
-    const draft = await getPageDraft(siteId, homePage.id);
+    const draft = await getPageDraft(siteId, activePage.id);
     // Drop the `order` carried by DraftSection — array position is the order.
     // Everything else travels: `hidden` in particular, because a field dropped
     // here would come back visible after a reload and republish work the
@@ -44,8 +58,14 @@ export default async function SiteEditorPage({
     // meant to simulate.
     return (
         <SiteEditor
+            // Keyed on the page so switching pages remounts the editor with
+            // that page's sections. Without it the new sections would arrive as
+            // props into state seeded from the old ones, and the merchant would
+            // see the previous page's content under the new page's name.
+            key={activePage.id}
             siteId={siteId}
-            pageId={homePage.id}
+            pageId={activePage.id}
+            pages={site.pages}
             initialSections={initialSections}
             siteName={site.name}
             initialStyle={site.style}

@@ -41,7 +41,7 @@ export interface EditorChrome {
 
 export interface EditorPlace {
     selectedIndex: number | null;
-    rail: "sections" | "style";
+    rail: "sections" | "pages" | "style";
 }
 
 export const CHROME_DEFAULT: EditorChrome = {
@@ -196,7 +196,8 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
                 i < sectionCount
                     ? i
                     : fallback.selectedIndex,
-            rail: o.rail === "style" ? "style" : "sections",
+            rail:
+                o.rail === "style" || o.rail === "pages" ? o.rail : "sections",
         };
     }
     cache.set(key, value);

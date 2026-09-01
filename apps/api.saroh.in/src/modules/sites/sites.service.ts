@@ -19,8 +19,10 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { EntitlementService } from "../billing/entitlement.service";
 import { authorize } from "../organizations/organization-policy";
 import type {
+    CreatePageDto,
     CreateSiteFromTemplateDto,
     UpdateDraftSectionsDto,
+    UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
 import { sanitizeSectionContent } from "./sanitize";
@@ -31,6 +33,14 @@ import { parseSiteStyle, siteStyleOptions } from "./site-style";
 export interface CreatedSite {
     siteId: string;
     slug: string;
+}
+
+/** A page as returned by the page endpoints and by getSite. */
+export interface PageView {
+    id: string;
+    path: string;
+    title: string;
+    isHome: boolean;
 }
 
 /** A section as returned by the draft-editing endpoints. */
@@ -980,6 +990,147 @@ export class SitesService {
     // -----------------------------------------------------------------------
 
     /** Prove `siteId` is a live site in the ctx org, or 404. */
+    // -----------------------------------------------------------------------
+    // Pages — a site is more than its home page
+    // -----------------------------------------------------------------------
+
+    /**
+     * Add a page to a site. Requires `site:update` — adding a page changes what
+     * the site IS, which is an owner/admin decision, not a content edit.
+     *
+     * The new page starts with no sections at all rather than a copied
+     * template. A page pre-filled with someone else's hero is a page the
+     * merchant has to empty before they can start.
+     */
+    async createPage(
+        ctx: OrganizationContext,
+        siteId: string,
+        dto: CreatePageDto,
+    ): Promise<PageView> {
+        authorize(ctx, "site:update");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        // "/" is the home page's path and the home page already exists. Caught
+        // here so the merchant is told what is wrong rather than being handed
+        // a unique-constraint violation.
+        if (dto.path === "/") {
+            throw new BadRequestException(
+                "The path / already belongs to this site's home page. Choose another, for example /about.",
+            );
+        }
+        await this.assertPathIsFree(siteId, dto.path);
+
+        const page = await prisma.page.create({
+            data: {
+                siteId,
+                organizationId: ctx.organizationId,
+                path: dto.path,
+                title: dto.title,
+                isHome: false,
+            },
+            select: { id: true, path: true, title: true, isHome: true },
+        });
+        return page;
+    }
+
+    /**
+     * Rename a page, move it, or both. Requires `site:update`.
+     *
+     * The home page can be renamed but NOT moved: "/" is where visitors land,
+     * and a home page at /welcome is a site with no front door.
+     */
+    async updatePage(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+        dto: UpdatePageDto,
+    ): Promise<PageView> {
+        authorize(ctx, "site:update");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const page = await prisma.page.findFirst({
+            where: { id: pageId, siteId, organizationId: ctx.organizationId },
+            select: { id: true, path: true, isHome: true },
+        });
+        if (!page) {
+            throw new NotFoundException(`Page "${pageId}" not found`);
+        }
+
+        if (dto.path !== undefined && dto.path !== page.path) {
+            if (page.isHome) {
+                throw new BadRequestException(
+                    "The home page has to stay at /. Rename it if you want it called something else.",
+                );
+            }
+            if (dto.path === "/") {
+                throw new BadRequestException(
+                    "The path / already belongs to this site's home page.",
+                );
+            }
+            await this.assertPathIsFree(siteId, dto.path);
+        }
+
+        return prisma.page.update({
+            where: { id: pageId },
+            data: {
+                // ABSENT means leave alone, so each field is set only when sent.
+                ...(dto.title === undefined ? {} : { title: dto.title }),
+                ...(dto.path === undefined ? {} : { path: dto.path }),
+            },
+            select: { id: true, path: true, title: true, isHome: true },
+        });
+    }
+
+    /**
+     * Delete a page and everything under it. Requires `site:update`.
+     *
+     * The home page cannot be deleted: a site with no home page has nothing to
+     * serve at its own address, and the editor picks the home page to open.
+     *
+     * This cascades to the page's versions and their sections (schema
+     * `onDelete: Cascade`), so it destroys authored content. It does NOT touch
+     * publications: a page already published stays in every existing immutable
+     * snapshot and only disappears from the live site at the next publish,
+     * which is what makes the change reviewable before it ships.
+     */
+    async deletePage(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+    ): Promise<{ deleted: true }> {
+        authorize(ctx, "site:update");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        const page = await prisma.page.findFirst({
+            where: { id: pageId, siteId, organizationId: ctx.organizationId },
+            select: { id: true, isHome: true },
+        });
+        if (!page) {
+            throw new NotFoundException(`Page "${pageId}" not found`);
+        }
+        if (page.isHome) {
+            throw new BadRequestException(
+                "The home page cannot be deleted — it is what this site's address serves.",
+            );
+        }
+
+        await prisma.page.delete({ where: { id: pageId } });
+        return { deleted: true };
+    }
+
+    /** Refuse a path another page on this site already holds. */
+    private async assertPathIsFree(siteId: string, path: string) {
+        const clash = await prisma.page.findFirst({
+            where: { siteId, path },
+            select: { title: true },
+        });
+        if (clash) {
+            throw new BadRequestException(
+                `The path ${path} is already used by "${clash.title}".`,
+            );
+        }
+    }
+
     private async assertSiteInOrg(
         ctx: OrganizationContext,
         siteId: string,

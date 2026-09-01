@@ -261,13 +261,42 @@ async function sitesBase(): Promise<string | null> {
 }
 
 /** Extract a human message (+ optional index) from a JSON error body. */
+/**
+ * Pull a human-readable message out of an API error body.
+ *
+ * The api's envelope is `{ error: { code, message, statusCode, correlationId } }`
+ * — `error` is an OBJECT, not a string. This used to be typed as
+ * `{ error?: string }` and returned straight through, so every 400 handed the
+ * caller an object typed as a string. Toasts crashed the page with "Objects are
+ * not valid as a React child", and the editor's inline section error would have
+ * done the same. TypeScript believed the annotation; the wire disagreed.
+ *
+ * So the shape is now checked at runtime rather than declared, and the return
+ * is a string in every branch — including the one where the body is something
+ * none of this anticipated.
+ */
 function readError(
-    data: { message?: string; error?: string; index?: number } | null,
+    data: unknown,
     fallback: string,
 ): { error: string; index?: number } {
+    const body = (typeof data === "object" && data !== null ? data : {}) as {
+        message?: unknown;
+        error?: unknown;
+        index?: unknown;
+    };
+
+    const nested =
+        typeof body.error === "object" && body.error !== null
+            ? (body.error as { message?: unknown }).message
+            : undefined;
+
+    const message = [nested, body.message, body.error].find(
+        (v): v is string => typeof v === "string" && v.trim() !== "",
+    );
+
     return {
-        error: data?.message ?? data?.error ?? fallback,
-        index: typeof data?.index === "number" ? data.index : undefined,
+        error: message ?? fallback,
+        index: typeof body.index === "number" ? body.index : undefined,
     };
 }
 
@@ -468,6 +497,63 @@ export async function restorePublication(
 }
 
 /** Replace a site's look. The panel always sends a whole style (#189). */
+/**
+ * Add a page to a site. The API decides what a legal path is and whether it is
+ * free — the form does not pre-check, because a client-side answer that
+ * disagreed with the server's would be worse than one round trip.
+ */
+export async function createPage(
+    siteId: string,
+    input: { title: string; path: string },
+): Promise<SitesResult<SitePage>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/pages`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as
+        (Partial<SitePage> & { message?: string; error?: string }) | null;
+    if (res.ok && data?.id) return { ok: true, data: data as SitePage };
+    return { ok: false, ...readError(data, "Could not add the page.") };
+}
+
+/** Rename a page, move it, or both. An omitted field is left alone. */
+export async function updatePage(
+    siteId: string,
+    pageId: string,
+    input: { title?: string; path?: string },
+): Promise<SitesResult<SitePage>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/pages/${pageId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as
+        (Partial<SitePage> & { message?: string; error?: string }) | null;
+    if (res.ok && data?.id) return { ok: true, data: data as SitePage };
+    return { ok: false, ...readError(data, "Could not update the page.") };
+}
+
+/** Delete a page and everything on it. The home page cannot be deleted. */
+export async function deletePage(
+    siteId: string,
+    pageId: string,
+): Promise<SitesResult<{ deleted: true }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/pages/${pageId}`, {
+        method: "DELETE",
+    });
+    if (res.ok) return { ok: true, data: { deleted: true } };
+    const data = (await res.json().catch(() => null)) as {
+        message?: string;
+        error?: string;
+    } | null;
+    return { ok: false, ...readError(data, "Could not delete the page.") };
+}
+
 export async function updateSiteStyle(
     siteId: string,
     style: SiteStyle,

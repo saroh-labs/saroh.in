@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     Param,
@@ -16,8 +17,10 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import {
+    CreatePageDto,
     CreateSiteFromTemplateDto,
     UpdateDraftSectionsDto,
+    UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
 import { SitesService } from "./sites.service";
@@ -75,6 +78,44 @@ export class SitesController {
         @Param("siteId") siteId: string,
     ) {
         return this.sites.getSite(ctx, siteId);
+    }
+
+    /**
+     * Add a page to a site. Requires `site:update`.
+     */
+    @Post(":siteId/pages")
+    createPage(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: CreatePageDto,
+    ) {
+        return this.sites.createPage(ctx, siteId, dto);
+    }
+
+    /**
+     * Rename a page, move it, or both. Requires `site:update`.
+     */
+    @Patch(":siteId/pages/:pageId")
+    updatePage(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+        @Body() dto: UpdatePageDto,
+    ) {
+        return this.sites.updatePage(ctx, siteId, pageId, dto);
+    }
+
+    /**
+     * Delete a page and its versions/sections. Requires `site:update`. The home
+     * page cannot be deleted.
+     */
+    @Delete(":siteId/pages/:pageId")
+    deletePage(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+    ) {
+        return this.sites.deletePage(ctx, siteId, pageId);
     }
 
     /**

@@ -22,6 +22,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { PagesPanel } from "@/components/sites/pages-panel";
 import { DraftPreview } from "@/components/sites/section-preview";
 import { StylePanel } from "@/components/sites/style-panel";
 import { ensureFormForSection } from "@/lib/forms/actions";
@@ -59,6 +60,7 @@ import type {
     RichTextContent,
     Section,
     SectionType,
+    SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
@@ -85,6 +87,48 @@ const SECTION_LABELS: Record<SectionType, string> = {
     enquiry: "Enquiry form",
     booking: "Booking",
 };
+
+/**
+ * The rail's tabs. One definition, used by both panels it switches between —
+ * two copies of a tablist is two chances for the selected state to disagree
+ * with what is actually showing.
+ *
+ * Review is absent rather than disabled: it is not built, and a tab leading
+ * nowhere is worse than one that is not there.
+ */
+function RailTabs({
+    rail,
+    onSelect,
+}: {
+    rail: "sections" | "pages" | "style";
+    onSelect: (tab: "sections" | "pages") => void;
+}) {
+    return (
+        <div
+            role="tablist"
+            aria-label="Editor panels"
+            className="flex items-center gap-1 border-b px-2 py-1.5"
+        >
+            {(["sections", "pages"] as const).map((tab) => (
+                <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={rail === tab}
+                    onClick={() => onSelect(tab)}
+                    className={cn(
+                        "rounded px-2 py-1 text-xs font-medium capitalize transition-colors",
+                        rail === tab
+                            ? "bg-secondary text-secondary-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                    )}
+                >
+                    {tab}
+                </button>
+            ))}
+        </div>
+    );
+}
 
 /**
  * A draggable hairline between two panels.
@@ -301,6 +345,7 @@ function buildImage(src: string, alt: string): ImageValue | undefined {
 export function SiteEditor({
     siteId,
     pageId,
+    pages,
     initialSections,
     siteName,
     address,
@@ -309,6 +354,8 @@ export function SiteEditor({
 }: {
     siteId: string;
     pageId: string;
+    /** Every page on this site, for the Pages tab. */
+    pages: SitePage[];
     initialSections: Section[];
     siteName: string;
     initialStyle: SiteStyle;
@@ -366,7 +413,7 @@ export function SiteEditor({
     const setDevice = (next: Device) => setChrome({ device: next });
     const setSelectedIndex = (next: number | null) =>
         setPlace(siteId, initialCount, { selectedIndex: next });
-    const setRail = (next: "sections" | "style") =>
+    const setRail = (next: "sections" | "pages" | "style") =>
         setPlace(siteId, initialCount, { rail: next });
     /*
      * Drag state. `dragIndex` is the row being carried, `dropIndex` the row it
@@ -811,7 +858,17 @@ export function SiteEditor({
             >
                 {/* Rail — the page as a list of sections, not a wall of fields. */}
                 <aside className="flex min-h-0 flex-col">
-                    {rail === "style" ? (
+                    {rail === "pages" ? (
+                        <>
+                            <RailTabs rail={rail} onSelect={setRail} />
+                            <PagesPanel
+                                siteId={siteId}
+                                pages={pages}
+                                activePageId={pageId}
+                                dirty={dirty}
+                            />
+                        </>
+                    ) : rail === "style" ? (
                         <StylePanel
                             style={style}
                             options={styleOptions}
@@ -824,25 +881,13 @@ export function SiteEditor({
                         <>
                             {/*
                              * The design's rail carries Sections / Pages /
-                             * Review. Only Sections exists, so only Sections is
-                             * drawn — the same rule the workspace nav follows,
-                             * and a tab leading nowhere is worse than an absent
-                             * one. The TREATMENT is the design's, so the others
-                             * drop in beside it when #193 lands.
+                             * Review. Review is still unbuilt, so it is absent
+                             * rather than dead — a tab leading nowhere is worse
+                             * than one that is not there. Style is not a tab at
+                             * all: it opens from the bar, because it applies to
+                             * the whole site while this rail lists one page.
                              */}
-                            <div
-                                role="tablist"
-                                aria-label="Editor panels"
-                                className="flex items-center gap-1 border-b px-2 py-1.5"
-                            >
-                                <span
-                                    role="tab"
-                                    aria-selected="true"
-                                    className="rounded bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground"
-                                >
-                                    Sections
-                                </span>
-                            </div>
+                            <RailTabs rail={rail} onSelect={setRail} />
                             <ul className="min-h-0 flex-1 overflow-y-auto p-2">
                                 {sections.map((section, index) => (
                                     <li

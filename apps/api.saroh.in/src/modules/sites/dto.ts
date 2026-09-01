@@ -120,6 +120,59 @@ export class UpdateDraftSectionsDto {
     sections!: DraftSectionInputDto[];
 }
 
+// A page path is a single root-relative segment path: "/", "/about",
+// "/trade-accounts". Lowercase, hyphen-separated, no trailing slash (except the
+// root itself), no query or fragment. Pinned here so a merchant cannot author a
+// path the public renderer would never match.
+const PAGE_PATH_RE = /^\/$|^(?:\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
+const PAGE_PATH_MSG =
+    "Path must start with / and use lowercase letters, numbers and hyphens (for example /about or /trade-accounts)";
+
+/**
+ * Add a page to a site.
+ *
+ * `isHome` is deliberately ABSENT: a site's home page is decided when the site
+ * is created from its template, and a second page claiming to be home would
+ * make "which page do visitors land on" ambiguous with no way to resolve it.
+ * Moving the home page is a separate operation nobody has asked for yet.
+ */
+export class CreatePageDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "Title is required" })
+    @MaxLength(200, { message: "Title must be at most 200 characters" })
+    title!: string;
+
+    @Transform(trim)
+    @IsString()
+    @Matches(PAGE_PATH_RE, { message: PAGE_PATH_MSG })
+    @MaxLength(200, { message: "Path must be at most 200 characters" })
+    path!: string;
+}
+
+/**
+ * Rename a page, move it, or both.
+ *
+ * Both fields are optional and ABSENT means "leave this alone" — a rename that
+ * omitted the path must not move the page to an empty one. Neither is
+ * nullable: a page with no title or no path is not a state worth having.
+ */
+export class UpdatePageDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "Title is required" })
+    @MaxLength(200, { message: "Title must be at most 200 characters" })
+    title?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @Matches(PAGE_PATH_RE, { message: PAGE_PATH_MSG })
+    @MaxLength(200, { message: "Path must be at most 200 characters" })
+    path?: string;
+}
+
 /**
  * Search and social settings for a site (#188).
  *
