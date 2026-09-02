@@ -287,8 +287,8 @@ export default function BookingSection({
 
     if (submit.kind === "success") {
         return (
-            <section className="mx-auto w-full max-w-2xl px-5 py-16 sm:px-8">
-                <div className="rounded-xl border border-site-border bg-site-surface p-8 text-center">
+            <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+                <div className="rounded-[var(--site-radius)] border border-site-border bg-site-surface p-8 text-center">
                     <p className="text-lg font-medium text-site-fg">
                         {content.successMessage ?? "You're booked!"}
                     </p>
@@ -301,7 +301,7 @@ export default function BookingSection({
         slotsState.kind === "ready" ? groupByDay(slotsState.slots) : [];
 
     return (
-        <section className="mx-auto w-full max-w-2xl px-5 py-16 sm:px-8">
+        <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             {content.title ? (
                 <h2 className="text-3xl font-bold tracking-tight text-site-fg">
                     {content.title}
@@ -348,7 +348,7 @@ export default function BookingSection({
                     <div
                         role="radiogroup"
                         aria-label="Available times"
-                        className="mt-4 grid gap-5"
+                        className="mt-4 grid gap-[var(--site-grid-gap)]"
                     >
                         {groups.map((group) => (
                             <div key={group.key}>
@@ -370,7 +370,7 @@ export default function BookingSection({
                                                     setSelected(slot.startAt)
                                                 }
                                                 className={cn(
-                                                    "rounded-lg border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent disabled:opacity-60",
+                                                    "rounded-[var(--site-radius)] border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent disabled:opacity-60",
                                                     active
                                                         ? "border-site-accent bg-site-accent text-site-accent-fg"
                                                         : "border-site-border text-site-fg hover:bg-site-surface",
@@ -388,7 +388,11 @@ export default function BookingSection({
             </div>
 
             {/* Booker details */}
-            <form className="mt-8 grid gap-5" onSubmit={onSubmit} noValidate>
+            <form
+                className="mt-8 grid gap-[var(--site-grid-gap)]"
+                onSubmit={onSubmit}
+                noValidate
+            >
                 <div className="grid gap-1.5">
                     <label
                         htmlFor={`${baseId}-name`}
@@ -403,7 +407,7 @@ export default function BookingSection({
                         value={name}
                         disabled={submitting}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full max-w-full rounded-lg border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
+                        className="w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
                     />
                 </div>
                 <div className="grid gap-1.5">
@@ -428,7 +432,7 @@ export default function BookingSection({
                         value={email}
                         disabled={submitting}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full max-w-full rounded-lg border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
+                        className="w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
                     />
                 </div>
                 <div className="grid gap-1.5">
@@ -445,7 +449,7 @@ export default function BookingSection({
                         value={phone}
                         disabled={submitting}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="w-full max-w-full rounded-lg border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
+                        className="w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
                     />
                 </div>
 

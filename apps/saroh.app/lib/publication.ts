@@ -124,11 +124,41 @@ export interface PublicationPage {
 }
 
 /**
+ * The site-level fields a snapshot carries.
+ *
+ * Everything but `name`/`slug` is optional because publications are immutable
+ * and go back to Stage 2: a row written before #188 and #189 simply has none of
+ * these, and must keep rendering exactly as it does today rather than 404ing or
+ * showing the word "undefined".
+ */
+export interface PublicationSite {
+    name: string;
+    slug: string;
+    /** Search appearance (#188). Absent or null means "not set". */
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    /** The share image a link preview uses (#188). */
+    socialImageUrl?: string | null;
+    /**
+     * The merchant's look, already resolved into `--site-*` custom properties
+     * (#189).
+     *
+     * RESOLVED by the publisher, not by this app. Turning "clay" into an HSL
+     * triple here would mean keeping a second copy of the palette in the
+     * renderer, and a copy that drifts is how a merchant styles one thing and
+     * publishes another. It also keeps the snapshot honest: this is the site as
+     * it was served, so retuning a swatch later does not restyle work that is
+     * already published.
+     */
+    styleVariables?: Record<string, string> | null;
+}
+
+/**
  * The self-contained, immutable publication snapshot — the ONLY thing the
  * renderer draws from. Drafts are never part of this by design.
  */
 export interface PublicationSnapshot {
-    site: { name: string; slug: string };
+    site: PublicationSite;
     pages: PublicationPage[];
     publishedAt: string;
 }

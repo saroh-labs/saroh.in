@@ -36,7 +36,11 @@ import {
 import type { Flag, FlagType } from "./site-flags";
 import { checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
-import { parseSiteStyle, siteStyleOptions } from "./site-style";
+import {
+    parseSiteStyle,
+    siteStyleOptions,
+    siteStyleVariables,
+} from "./site-style";
 
 /** What creating a site returns to the caller: the new site's identity. */
 /**
@@ -1060,6 +1064,7 @@ export class SitesService {
             };
         });
 
+        const publishedStyle = parseSiteStyle(site.style);
         const snapshot = {
             site: {
                 name: site.name,
@@ -1071,12 +1076,29 @@ export class SitesService {
                 seoTitle: site.seoTitle,
                 seoDescription: site.seoDescription,
                 socialImageUrl: site.socialImageUrl,
-                // The look travels with the content (#189). saroh.app's
-                // SiteTheme already says it will interpolate brand fields from
-                // the snapshot when they arrive — these are those fields.
-                // Normalized here so a snapshot is always complete, never
-                // half-styled by whatever the draft happened to hold.
-                style: parseSiteStyle(site.style),
+                /*
+                 * The look travels with the content (#189). Normalized here so
+                 * a snapshot is always complete, never half-styled by whatever
+                 * the draft happened to hold.
+                 *
+                 * `style` is the merchant's CHOICES — palette keys and slider
+                 * numbers. Kept for provenance and for anything that wants to
+                 * know what was picked.
+                 */
+                style: publishedStyle,
+                /*
+                 * `styleVariables` is those choices already RESOLVED into the
+                 * `--site-*` custom properties the renderer reads.
+                 *
+                 * Resolved here rather than in the renderer for two reasons.
+                 * A Publication is meant to be self-contained, and a renderer
+                 * that had to turn "clay" into an HSL triple would need its own
+                 * copy of the palette — the exact drift `siteStyleOptions`
+                 * exists to prevent, one app further out. And a snapshot is the
+                 * site AS IT WAS SERVED: retuning a swatch later should not
+                 * silently restyle everything anyone has already published.
+                 */
+                styleVariables: siteStyleVariables(publishedStyle),
             },
             pages,
             publishedAt: publishedAt.toISOString(),

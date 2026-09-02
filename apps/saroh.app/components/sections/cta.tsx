@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  */
 export function ctaClasses(style: CtaContent["style"]): string {
     const base =
-        "inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-site-accent focus-visible:ring-offset-site-bg";
+        "inline-flex items-center justify-center rounded-[var(--site-radius)] text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-site-accent focus-visible:ring-offset-site-bg";
     switch (style) {
         case "secondary":
             return cn(
@@ -56,10 +56,16 @@ export function CtaButton({ content }: { content: CtaContent }) {
     );
 }
 
-/** `cta` v1 — a standalone, centered call-to-action button. */
+/**
+ * `cta` v1 — a standalone, centered call-to-action.
+ *
+ * Rendered as a BAND in the merchant's call-to-action colour (#189) rather than
+ * a button floating on the page ground. That colour is one of the six they
+ * choose, and until now nothing read it.
+ */
 export default function CtaSection({ content }: { content: CtaContent }) {
     return (
-        <section className="mx-auto w-full max-w-screen-xl px-5 py-12 text-center sm:px-8">
+        <section className="w-full bg-site-cta-bg px-5 py-[var(--site-section-padding)] text-center text-site-cta-fg sm:px-[var(--site-page-margin)]">
             <CtaButton content={content} />
         </section>
     );

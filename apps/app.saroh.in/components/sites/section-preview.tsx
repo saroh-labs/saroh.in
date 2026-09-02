@@ -33,8 +33,15 @@ import { resolveStyleVariables } from "@/lib/sites/style";
  * separate border swatch for the merchant to choose wrongly.
  */
 const SURFACE = "bg-[hsl(var(--site-bg))] text-[hsl(var(--site-fg))]";
-const BORDER = "border border-[hsl(var(--site-fg)/0.14)]";
-const MUTED = "text-[hsl(var(--site-fg)/0.65)]";
+/*
+ * Hairlines and muted copy read the DERIVED variables rather than an alpha of
+ * the text colour. Both approaches look right on their own; the reason to pick
+ * one is that saroh.app has its own `--site-border` and `--site-muted` tokens,
+ * and a preview using a different rule from the site it previews is a preview
+ * that lies about something small on every screen.
+ */
+const BORDER = "border border-[hsl(var(--site-border))]";
+const MUTED = "text-[hsl(var(--site-muted))]";
 const FILL = "bg-[hsl(var(--site-fg)/0.04)]";
 const RADIUS = "rounded-[var(--site-radius)]";
 const PAD = "p-[var(--site-section-padding)]";
