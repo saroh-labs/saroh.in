@@ -389,6 +389,7 @@ export function SiteEditor({
     initialComments,
     initialReview,
     neverPublished,
+    initialPendingChanges,
     initialSections,
     siteName,
     address,
@@ -406,6 +407,11 @@ export function SiteEditor({
     initialReview: ReviewState;
     /** Never-published sites say "Publish site", not "Publish changes". */
     neverPublished: boolean;
+    /**
+     * How many sections publishing would change, as the server counted it on
+     * load (#190). Null before the first publish. Refreshed by every autosave.
+     */
+    initialPendingChanges: number | null;
     initialSections: Section[];
     siteName: string;
     initialStyle: SiteStyle;
@@ -427,6 +433,21 @@ export function SiteEditor({
      * one implementation of nine rules instead of two that can disagree.
      */
     const [siteFlags, setSiteFlags] = useState<SiteFlags>(initialFlags);
+    /*
+     * How many sections publishing would change (#190).
+     *
+     * The SERVER's number, not one this component works out. It is a diff
+     * between the draft and the live publication, and the browser holds only
+     * the page it is editing — so a count computed here would speak for one
+     * page while the button it sits beside publishes the whole site. Refreshed
+     * from each save's response, which is why it is state rather than a prop.
+     *
+     * Null until the site has published once; the button says "Publish site"
+     * in that case and there is no count to give.
+     */
+    const [pendingChanges, setPendingChanges] = useState<number | null>(
+        initialPendingChanges,
+    );
     const [checking, setChecking] = useState(false);
     const [comments, setComments] =
         useState<SiteCommentView[]>(initialComments);
@@ -591,31 +612,6 @@ export function SiteEditor({
 
     const dirty = JSON.stringify(sections) !== lastSavedJson;
 
-    /*
-     * How many sections publishing would actually change.
-     *
-     * "Publish" with no number asks the merchant to trust that something
-     * happened. This compares the current sections against the last SAVED
-     * state, section by section, so the count describes work rather than
-     * keystrokes. A length change counts the difference too — adding a section
-     * is a change even though nothing was edited.
-     */
-    const changedCount = (() => {
-        let saved: Section[];
-        try {
-            saved = JSON.parse(lastSavedJson) as Section[];
-        } catch {
-            return sections.length;
-        }
-        let n = Math.abs(sections.length - saved.length);
-        const shared = Math.min(sections.length, saved.length);
-        for (let i = 0; i < shared; i += 1) {
-            if (JSON.stringify(sections[i]) !== JSON.stringify(saved[i]))
-                n += 1;
-        }
-        return n;
-    })();
-
     function replaceAt(index: number, next: Section) {
         setSections((prev) => prev.map((s, i) => (i === index ? next : s)));
     }
@@ -740,6 +736,9 @@ export function SiteEditor({
             setLastSavedJson(JSON.stringify(synced.sections));
             setLastSavedAt(new Date());
             setSaveError(false);
+            // The save recounted what publishing would change; take its answer
+            // rather than guessing at one from what was just sent.
+            setPendingChanges(res.data.pendingSectionChanges ?? null);
             // An autosave that announces itself every few seconds is noise; the
             // bar already states when it last saved.
             if (!auto) toast.success("Draft saved.");
@@ -993,12 +992,18 @@ export function SiteEditor({
                  * spec gives that badge to the outstanding FLAG count — and the
                  * two answer different questions: how much work is waiting, and
                  * how much of it is worth a second look.
+                 *
+                 * "Changed" means since the last PUBLISH, not since the last
+                 * save — the same number the settings screen and the sites list
+                 * show. What is unsaved is the pill's job, two elements to the
+                 * left, and the two together say the whole truth: your work is
+                 * safe, and this much of it is not live yet.
                  */}
-                {changedCount > 0 ? (
+                {pendingChanges !== null && pendingChanges > 0 ? (
                     <span className="text-xs text-muted-foreground">
-                        {changedCount === 1
+                        {pendingChanges === 1
                             ? "1 section changed"
-                            : `${changedCount} sections changed`}
+                            : `${pendingChanges} sections changed`}
                     </span>
                 ) : null}
 

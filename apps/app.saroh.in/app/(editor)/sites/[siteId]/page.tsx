@@ -84,6 +84,12 @@ export default async function SiteEditorPage({
             initialComments={comments}
             initialReview={review}
             neverPublished={site.currentPublicationId === null}
+            /*
+             * From the DRAFT read, not from `site`: both carry the same
+             * server-side count, and the draft's is the one that was computed
+             * after any write this request may have followed.
+             */
+            initialPendingChanges={draft?.pendingSectionChanges ?? null}
             initialSections={initialSections}
             siteName={site.name}
             initialStyle={site.style}

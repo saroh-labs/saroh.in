@@ -28,7 +28,11 @@ import type {
     UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
-import { sanitizeSectionContent } from "./sanitize";
+import {
+    countPendingSectionChanges,
+    toPendingPages,
+    toPublishableSection,
+} from "./pending-changes";
 import type { Flag, FlagType } from "./site-flags";
 import { checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
@@ -113,6 +117,22 @@ export interface PageDraftView {
     pageVersionId: string;
     status: "DRAFT";
     sections: DraftSectionView[];
+    /**
+     * How many sections publishing the whole site would change (#190), as of
+     * this save. Site-wide, not page-wide: the editor's top bar speaks for the
+     * site, and a merchant who edited two pages wants one number.
+     *
+     * Returned from the SAVE rather than recomputed in the browser so there is
+     * exactly one definition of the count. That leaves it a few seconds stale
+     * while the merchant is mid-keystroke, which costs nothing: Publish is
+     * disabled while the draft is dirty, so the number is only ever acted on
+     * when it is current, and the autosave pill is what answers "is my work
+     * safe" in the meantime.
+     *
+     * Null when the site has never been published — there is nothing to diff
+     * against, and the button says "Publish site" rather than a count.
+     */
+    pendingSectionChanges: number | null;
 }
 
 /** What a publish returns: the new immutable Publication + the live pointer. */
@@ -183,6 +203,12 @@ export interface SiteDetailView {
     updatedAt: Date;
     currentPublication: { publishedAt: Date } | null;
     pages: { id: string; path: string; title: string; isHome: boolean }[];
+    /**
+     * How many sections publishing would change (#190). Null before the first
+     * publish. See {@link SitesService.pendingSectionChanges} — every surface
+     * that shows this number reads this one computation.
+     */
+    pendingSectionChanges: number | null;
     /** Always complete — absent choices are filled from the defaults. */
     style: SiteStyle;
     /**
@@ -350,12 +376,11 @@ export class SitesService {
      * that strand a site invisibly. So the list resolves them here rather than
      * making the merchant open each site to find out.
      *
-     * `hasUnpublishedChanges` compares each page's newest DRAFT against the
-     * publication that is live. It is deliberately a BOOLEAN, not a count: a
-     * precise "3 sections changed" means diffing every draft section against the
-     * snapshot for every site in the list, and a number that disagrees with the
-     * editor's would be worse than no number. The count belongs where one site
-     * is already loaded.
+     * `pendingSectionChanges` is the real count, not a boolean — the same one
+     * the editor and settings show, from the same
+     * {@link pendingSectionChanges} computation. The earlier note here argued a
+     * count would risk disagreeing with the editor's; the answer to that was to
+     * have one count rather than to withhold it.
      */
     async listSites(ctx: OrganizationContext) {
         authorize(ctx, "site:read");
@@ -375,44 +400,110 @@ export class SitesService {
                 // merchant thinks they have connected a domain and nothing
                 // routes to it yet.
                 claimedDomains: { select: { hostname: true, status: true } },
+            },
+        });
+
+        /*
+         * The list is where a merchant decides which site needs them (#191), so
+         * it carries the same count the editor and settings show rather than a
+         * bare "has changes". One extra query for the whole page — sites per org
+         * are a handful, not a feed.
+         */
+        const pending = await this.pendingSectionChanges(
+            sites.map((s) => s.id),
+        );
+
+        return sites.map(({ claimedDomains, ...site }) => {
+            /*
+             * Null before the first publish: unpublished work only means
+             * something once there is something to compare against, and until
+             * then the site's state is "never published", which says more.
+             */
+            const pendingSectionChanges = pending.get(site.id) ?? null;
+            return {
+                ...site,
+                pendingSectionChanges,
+                /*
+                 * Derived from the diff, not from a timestamp.
+                 *
+                 * This used to compare the latest DRAFT `PageVersion.updatedAt`
+                 * against `publishedAt`, which never fired: saving a draft
+                 * replaces the page's Section rows and does not touch the
+                 * PageVersion row, so its `updatedAt` sat at whenever the
+                 * version was created. A merchant with a week of unpublished
+                 * work saw a list that said "Live" — the exact over-claim #191
+                 * exists to remove.
+                 */
+                hasUnpublishedChanges: (pendingSectionChanges ?? 0) > 0,
+                pendingDomain:
+                    claimedDomains.find((d) => d.status !== "VERIFIED")
+                        ?.hostname ?? null,
+            };
+        });
+    }
+
+    /**
+     * How many sections publishing would change, per site (#190, #191).
+     *
+     * `null` for a site that has never published: there is no baseline to diff
+     * against, and "never published" is a stronger thing to say than any number
+     * — that site does not exist to the public at all.
+     *
+     * The query mirrors {@link publishSite}'s exactly — latest DRAFT version by
+     * `createdAt`, visible sections only, in `order` — because the count is a
+     * diff against the snapshot publish would write. Any divergence here shows
+     * up as a number the merchant cannot reconcile with what publishing does.
+     */
+    private async pendingSectionChanges(
+        siteIds: string[],
+    ): Promise<Map<string, number | null>> {
+        const byId = new Map<string, number | null>();
+        if (siteIds.length === 0) return byId;
+
+        const sites = await prisma.site.findMany({
+            where: { id: { in: siteIds } },
+            select: {
+                id: true,
+                currentPublication: { select: { snapshot: true } },
                 pages: {
+                    orderBy: { path: "asc" },
                     select: {
+                        path: true,
+                        title: true,
+                        isHome: true,
                         versions: {
                             where: { status: "DRAFT" },
-                            orderBy: { updatedAt: "desc" },
+                            orderBy: { createdAt: "desc" },
                             take: 1,
-                            select: { updatedAt: true },
+                            select: {
+                                sections: {
+                                    where: { hidden: false },
+                                    orderBy: { order: "asc" },
+                                    select: {
+                                        type: true,
+                                        contractVersion: true,
+                                        content: true,
+                                    },
+                                },
+                            },
                         },
                     },
                 },
             },
         });
 
-        return sites.map(({ pages, claimedDomains, ...site }) => {
-            const publishedAt = site.currentPublication?.publishedAt ?? null;
-            const lastDraftEdit = pages
-                .flatMap((page) => page.versions)
-                .reduce<Date | null>(
-                    (latest, v) =>
-                        latest === null || v.updatedAt > latest
-                            ? v.updatedAt
-                            : latest,
-                    null,
-                );
-            return {
-                ...site,
-                // Unpublished work only means something once there is something
-                // to compare against; before the first publish the site's state
-                // is "never published", which says more.
-                hasUnpublishedChanges:
-                    publishedAt !== null &&
-                    lastDraftEdit !== null &&
-                    lastDraftEdit > publishedAt,
-                pendingDomain:
-                    claimedDomains.find((d) => d.status !== "VERIFIED")
-                        ?.hostname ?? null,
-            };
-        });
+        for (const site of sites) {
+            byId.set(
+                site.id,
+                site.currentPublication === null
+                    ? null
+                    : countPendingSectionChanges(
+                          toPendingPages(site.pages),
+                          site.currentPublication.snapshot,
+                      ),
+            );
+        }
+        return byId;
     }
 
     /**
@@ -467,8 +558,16 @@ export class SitesService {
         // client filling gaps itself is how the preview and the published site
         // drift apart.
         const { style, ...rest } = site;
+        const pending = await this.pendingSectionChanges([site.id]);
         return {
             ...rest,
+            /*
+             * What publishing would change (#190). The editor's top bar and the
+             * settings screen both render this, so neither computes its own —
+             * the whole point of the number is that a merchant can read it in
+             * two places and get the same answer.
+             */
+            pendingSectionChanges: pending.get(site.id) ?? null,
             style: parseSiteStyle(style),
             styleOptions: siteStyleOptions(),
         };
@@ -721,7 +820,15 @@ export class SitesService {
                 key: true,
             },
         });
-        return { pageId, pageVersionId: version.id, status: "DRAFT", sections };
+        const pending = await this.pendingSectionChanges([siteId]);
+        return {
+            pageId,
+            pageVersionId: version.id,
+            status: "DRAFT",
+            sections,
+            // The editor's first read of the count, before any autosave.
+            pendingSectionChanges: pending.get(siteId) ?? null,
+        };
     }
 
     /**
@@ -788,7 +895,7 @@ export class SitesService {
             };
         });
 
-        return prisma.$transaction(async (tx) => {
+        const draft = await prisma.$transaction(async (tx) => {
             const version = await this.getOrCreateDraftVersion(tx, ctx, pageId);
             await tx.section.deleteMany({
                 where: { pageVersionId: version.id },
@@ -823,10 +930,22 @@ export class SitesService {
             return {
                 pageId,
                 pageVersionId: version.id,
-                status: "DRAFT",
+                status: "DRAFT" as const,
                 sections,
             };
         });
+
+        /*
+         * Recount AFTER the transaction commits — this reads through `prisma`,
+         * not `tx`, so inside it the sections it is counting would not exist
+         * yet. The editor's top bar reads this, which is how the number stays
+         * true across a session without the browser ever computing its own.
+         */
+        const pending = await this.pendingSectionChanges([siteId]);
+        return {
+            ...draft,
+            pendingSectionChanges: pending.get(siteId) ?? null,
+        };
     }
 
     // -----------------------------------------------------------------------
@@ -912,31 +1031,25 @@ export class SitesService {
             // sections, or [] — no draft, no sections.
             const sections = page.versions.flatMap((version) =>
                 version.sections.map((section) => {
-                    // Defensive: a draft section should already be
-                    // contract-valid, but publish is the last gate before an
-                    // immutable write.
-                    const parsed = parseSectionContent(
-                        section.type,
-                        section.contractVersion,
-                        section.content,
-                    );
-                    if (!parsed.success) {
+                    /*
+                     * Defensive: a draft section should already be
+                     * contract-valid, but publish is the last gate before an
+                     * immutable write.
+                     *
+                     * Parsing and SANITIZING the contract-flagged rich fields
+                     * (e.g. richText.value) happens in `toPublishableSection`,
+                     * which the pending-change count also calls. That shared
+                     * call is deliberate: the count is a diff against this
+                     * snapshot, so it has to be computed over the same bytes
+                     * this writes, not over the raw draft.
+                     */
+                    const result = toPublishableSection(section);
+                    if (!result.ok) {
                         throw new BadRequestException(
-                            `Cannot publish: page "${page.path}" has an invalid "${section.type}" section (${parsed.error.message})`,
+                            `Cannot publish: page "${page.path}" has an invalid "${section.type}" section (${result.error})`,
                         );
                     }
-                    // SANITIZE the contract-flagged rich fields (e.g.
-                    // richText.value) BEFORE they enter the snapshot. A no-op
-                    // when the contract flags nothing.
-                    const content = sanitizeSectionContent(
-                        parsed.data,
-                        parsed.contract.sanitizedFields,
-                    );
-                    return {
-                        type: section.type,
-                        contractVersion: section.contractVersion,
-                        content,
-                    };
+                    return result.section;
                 }),
             );
             return {

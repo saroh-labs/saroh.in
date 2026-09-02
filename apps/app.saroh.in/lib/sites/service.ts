@@ -195,10 +195,20 @@ export interface SiteSummary {
     /** When the site last went live; null if it never has. */
     currentPublication?: { publishedAt: string } | null;
     /**
-     * Draft work newer than what is live. A boolean, not a count — see
-     * SitesService.listSites for why the number lives with a single site.
+     * Draft work newer than what is live. Derived server-side from
+     * `pendingSectionChanges`, so it cannot say "up to date" about a site the
+     * count disagrees with.
      */
     hasUnpublishedChanges?: boolean;
+    /**
+     * How many sections publishing would change (#190, #191). Null before the
+     * first publish — there is nothing to diff against, and "never published"
+     * is the more consequential thing to say.
+     *
+     * The editor's top bar, the settings screen and the sites list all render
+     * this same number, computed once in the API.
+     */
+    pendingSectionChanges?: number | null;
     /** A claimed hostname that has not verified yet, if any. */
     pendingDomain?: string | null;
 }
@@ -212,6 +222,8 @@ export interface SitePage {
 
 export interface SiteDetail extends SiteSummary {
     pages: SitePage[];
+    /** Always present on a detail read; null only before the first publish. */
+    pendingSectionChanges: number | null;
     /**
      * Search and social settings (#188). Null means "not set" and must render
      * as absent — never as an empty title or a broken image.
@@ -241,6 +253,8 @@ export interface SiteSettingsInput {
 export interface PageDraft {
     pageVersionId: string;
     sections: DraftSection[];
+    /** What publishing would change, site-wide, as of this read (#190). */
+    pendingSectionChanges: number | null;
 }
 
 export interface CreateSiteInput {
@@ -389,7 +403,12 @@ export async function saveDraftSections(
     siteId: string,
     pageId: string,
     sections: SectionInput[],
-): Promise<SitesResult<{ pageVersionId?: string }>> {
+): Promise<
+    SitesResult<{
+        pageVersionId?: string;
+        pendingSectionChanges?: number | null;
+    }>
+> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(
@@ -401,12 +420,24 @@ export async function saveDraftSections(
     );
     const data = (await res.json().catch(() => null)) as {
         pageVersionId?: string;
+        pendingSectionChanges?: number | null;
         message?: string;
         error?: string;
         index?: number;
     } | null;
     if (res.ok) {
-        return { ok: true, data: { pageVersionId: data?.pageVersionId } };
+        return {
+            ok: true,
+            data: {
+                pageVersionId: data?.pageVersionId,
+                /*
+                 * The save returns the recomputed count so the top bar stays
+                 * true through a long editing session without the browser ever
+                 * deciding for itself what "changed" means.
+                 */
+                pendingSectionChanges: data?.pendingSectionChanges ?? null,
+            },
+        };
     }
     return { ok: false, ...readError(data, "Could not save the sections") };
 }

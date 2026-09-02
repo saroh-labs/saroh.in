@@ -11,6 +11,10 @@ jest.mock("@saroh/database", () => {
     const client = {
         site: {
             findFirst: jest.fn(),
+            // The pending-change count (#190) re-reads the site after a draft
+            // save. Defaults to "no sites matched", which the count reads as
+            // "nothing to compare" — these tests are about the write.
+            findMany: jest.fn().mockResolvedValue([]),
             update: jest.fn(),
         },
         page: {
