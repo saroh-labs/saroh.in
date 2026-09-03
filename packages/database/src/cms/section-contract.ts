@@ -58,6 +58,96 @@ const ctaSchema = z.object({
     style: z.enum(["primary", "secondary", "link"]).default("primary"),
 });
 
+/**
+ * What a button DOES (#207). v1 carried a bare `href`, which meant the only
+ * thing a merchant could make a button do was navigate — and "call us" or
+ * "message us on WhatsApp" had to be typed as a URL by someone who knew the
+ * `tel:` and `wa.me` incantations. A discriminated union names the intent, and
+ * each kind asks for exactly the one thing it needs.
+ *
+ * `page` references a page ID rather than a path, so renaming or moving the
+ * page cannot orphan the button — the path is resolved at publish. That is also
+ * what turns "the hero button points at /products, which is not a page" from a
+ * warning into something that cannot be authored: a picker offers only pages
+ * that exist.
+ *
+ * `url` keeps relative paths legal so a v1 `href` lifts losslessly; the flag
+ * engine still checks a leading-slash url against the site's pages.
+ */
+const phone = z
+    .string()
+    .trim()
+    .min(1)
+    // Digits, with the spaces, dashes and brackets people actually type; a
+    // leading + for a country code. Normalised to E.164-ish by `ctaHref`.
+    .regex(/^\+?[0-9 ()-]{6,20}$/, "Enter a phone number with digits only");
+
+export const ctaActionSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("page"), pageId: z.string().min(1) }),
+    z.object({ kind: z.literal("url"), href: z.string().min(1) }),
+    z.object({
+        kind: z.literal("email"),
+        address: z.string().trim().email("Enter an email address"),
+        subject: z.string().max(200).optional(),
+    }),
+    z.object({ kind: z.literal("call"), number: phone }),
+    z.object({
+        kind: z.literal("whatsapp"),
+        number: phone,
+        message: z.string().max(500).optional(),
+    }),
+]);
+export type CtaAction = z.infer<typeof ctaActionSchema>;
+
+const ctaSchemaV2 = z.object({
+    label: z.string().min(1),
+    action: ctaActionSchema,
+    style: z.enum(["primary", "secondary", "link"]).default("primary"),
+});
+
+/** Digits and a leading +, nothing else — what tel: and wa.me both want. */
+function digitsOf(number: string): string {
+    const plus = number.trim().startsWith("+") ? "+" : "";
+    return plus + number.replace(/[^0-9]/g, "");
+}
+
+/**
+ * Turn an action into the href the renderer draws, or "" when it cannot be.
+ *
+ * Resolved at PUBLISH, not in the renderer: the snapshot is the site as it was
+ * served, and a renderer that had to look up page IDs would need the draft
+ * tables it must never read. `resolvePage` is the publisher's map of page id →
+ * path for the pages that will actually be in the snapshot; a page that is
+ * hidden or gone resolves to nothing, the flag engine has already said so, and
+ * the button renders as a label rather than a broken link.
+ */
+export function ctaHref(
+    action: CtaAction,
+    resolvePage: (pageId: string) => string | undefined,
+): string {
+    switch (action.kind) {
+        case "page":
+            return resolvePage(action.pageId) ?? "";
+        case "url":
+            return action.href;
+        case "email": {
+            const q = action.subject?.trim()
+                ? `?subject=${encodeURIComponent(action.subject.trim())}`
+                : "";
+            return `mailto:${action.address.trim()}${q}`;
+        }
+        case "call":
+            return `tel:${digitsOf(action.number)}`;
+        case "whatsapp": {
+            const q = action.message?.trim()
+                ? `?text=${encodeURIComponent(action.message.trim())}`
+                : "";
+            // wa.me wants the number without the +.
+            return `https://wa.me/${digitsOf(action.number).replace(/^\+/, "")}${q}`;
+        }
+    }
+}
+
 const imageSchema = z.object({
     src: z.string().min(1),
     alt: z.string().default(""),
@@ -96,6 +186,15 @@ const ctaV1 = z.object({
     href: z.string().min(1),
     style: z.enum(["primary", "secondary", "link"]).default("primary"),
 });
+
+/**
+ * cta v2 / hero v2 — the same sections with an ACTION instead of a bare href
+ * (#207). A new version rather than an in-place edit, per the module rule:
+ * every v1 Section and Publication keeps validating, and a v1 `href` lifts to
+ * `{ kind: "url", href }` the first time the editor touches it.
+ */
+const ctaV2 = ctaSchemaV2.extend({ padding: paddingOverride });
+const heroV2 = heroV1.extend({ cta: ctaSchemaV2.optional() });
 
 /** gallery v1 — an ordered set of images. */
 const galleryV1 = z.object({
@@ -237,6 +336,18 @@ const REGISTRY: Record<string, SectionContract> = {
         type: "cta",
         version: 1,
         schema: ctaV1,
+        sanitizedFields: [],
+    },
+    [key("cta", 2)]: {
+        type: "cta",
+        version: 2,
+        schema: ctaV2,
+        sanitizedFields: [],
+    },
+    [key("hero", 2)]: {
+        type: "hero",
+        version: 2,
+        schema: heroV2,
         sanitizedFields: [],
     },
     [key("gallery", 1)]: {

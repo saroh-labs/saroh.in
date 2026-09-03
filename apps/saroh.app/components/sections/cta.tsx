@@ -88,9 +88,14 @@ export function ctaClasses(
     }
 }
 
-/** True for an off-site (absolute) href — rendered as a plain anchor. */
+/**
+ * True for anything that is not a route in this app — rendered as a plain
+ * anchor so next/link never tries to route it. `tel:` used to fall through to
+ * a <Link> and worked only because next/link declines to intercept non-local
+ * URLs; it is named now rather than relied on.
+ */
 function isExternal(href: string): boolean {
-    return /^(https?:)?\/\//i.test(href) || href.startsWith("mailto:");
+    return /^(https?:)?\/\//i.test(href) || /^(mailto|tel|sms):/i.test(href);
 }
 
 /** A single CTA button/link, used standalone and embedded in the hero. */
@@ -102,6 +107,12 @@ export function CtaButton({
     surface?: CtaSurface;
 }) {
     const className = ctaClasses(content.style, surface);
+    if (content.href.trim() === "") {
+        // A v2 button whose page was hidden or removed after it was set. The
+        // flag engine told the merchant before publish; here the label draws
+        // and goes nowhere, which is the honest rendering of "nowhere".
+        return <span className={className}>{content.label}</span>;
+    }
     if (isExternal(content.href)) {
         return (
             <a

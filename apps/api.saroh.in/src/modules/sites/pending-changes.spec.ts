@@ -210,3 +210,83 @@ describe("toPendingPages", () => {
         expect(pages[0].sections).toEqual([]);
     });
 });
+
+describe("toPublishableSection — a v2 button's action becomes an href (#207)", () => {
+    const resolve = (id: string) =>
+        id === "page_about" ? "/about" : undefined;
+
+    it("resolves a page by id into the path the renderer draws", () => {
+        const result = toPublishableSection(
+            {
+                type: "cta",
+                contractVersion: 2,
+                content: {
+                    label: "About us",
+                    action: { kind: "page", pageId: "page_about" },
+                },
+            },
+            resolve,
+        );
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        // The action stays beside the href, so a later reader can still tell
+        // a call from a link; the href is what the renderer draws.
+        expect(result.section.content).toMatchObject({
+            href: "/about",
+            action: { kind: "page", pageId: "page_about" },
+        });
+    });
+
+    it("resolves a page that is hidden or gone to nothing, never to a 404", () => {
+        const result = toPublishableSection(
+            {
+                type: "cta",
+                contractVersion: 2,
+                content: {
+                    label: "Old",
+                    action: { kind: "page", pageId: "page_deleted" },
+                },
+            },
+            resolve,
+        );
+        expect(result.ok && result.section.content).toMatchObject({ href: "" });
+    });
+
+    it("writes tel: and wa.me for the merchant, and reaches a hero's embedded button", () => {
+        const result = toPublishableSection(
+            {
+                type: "hero",
+                contractVersion: 2,
+                content: {
+                    heading: "Hi",
+                    cta: {
+                        label: "Call",
+                        action: { kind: "call", number: "+91 98450 12345" },
+                    },
+                },
+            },
+            resolve,
+        );
+        expect(result.ok && result.section.content).toMatchObject({
+            cta: { href: "tel:+919845012345" },
+        });
+    });
+
+    it("leaves a v1 button exactly as it was", () => {
+        const result = toPublishableSection(
+            {
+                type: "cta",
+                contractVersion: 1,
+                content: { label: "Go", href: "/contact" },
+            },
+            resolve,
+        );
+        expect(result.ok && result.section.content).toMatchObject({
+            href: "/contact",
+        });
+        expect(
+            result.ok &&
+                (result.section.content as { action?: unknown }).action,
+        ).toBeUndefined();
+    });
+});

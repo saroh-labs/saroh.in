@@ -1,4 +1,5 @@
-import { parseSectionContent } from "@saroh/database";
+import type { CtaAction } from "@saroh/database";
+import { ctaHref, parseSectionContent } from "@saroh/database";
 
 import { sanitizeSectionContent } from "./sanitize";
 
@@ -50,6 +51,7 @@ export interface DraftSectionRow {
  */
 export function toPublishableSection(
     section: DraftSectionRow,
+    resolvePage: (pageId: string) => string | undefined = () => undefined,
 ): { ok: true; section: PublishableSection } | { ok: false; error: string } {
     const parsed = parseSectionContent(
         section.type,
@@ -64,12 +66,48 @@ export function toPublishableSection(
         section: {
             type: section.type,
             contractVersion: section.contractVersion,
-            content: sanitizeSectionContent(
-                parsed.data,
-                parsed.contract.sanitizedFields,
+            content: resolveCtaHrefs(
+                sanitizeSectionContent(
+                    parsed.data,
+                    parsed.contract.sanitizedFields,
+                ),
+                resolvePage,
             ),
         },
     };
+}
+
+/**
+ * A v2 button carries an ACTION; the renderer draws an HREF (#207).
+ *
+ * Resolved here, on the way into the snapshot, for the same reason style is
+ * resolved into `--site-*` properties: the snapshot is the site as served, and
+ * the renderer must never need the draft tables to draw it. Both publish and
+ * the pending count go through this function, so the count is a diff over the
+ * same bytes publish writes — a button whose page was renamed counts as
+ * changed, because on the live site it did.
+ *
+ * The action stays in the content beside the resolved href, so a later reader
+ * can still tell a call from a link.
+ */
+function resolveCtaHrefs(
+    content: unknown,
+    resolvePage: (pageId: string) => string | undefined,
+): unknown {
+    if (content === null || typeof content !== "object") return content;
+    const c = content as Record<string, unknown>;
+    const withHref = (cta: unknown): unknown => {
+        if (cta === null || typeof cta !== "object") return cta;
+        const action = (cta as { action?: unknown }).action;
+        if (!action || typeof action !== "object") return cta;
+        return {
+            ...(cta as Record<string, unknown>),
+            href: ctaHref(action as CtaAction, resolvePage),
+        };
+    };
+    if ("action" in c) return withHref(c);
+    if ("cta" in c) return { ...c, cta: withHref(c.cta) };
+    return content;
 }
 
 /**
@@ -187,6 +225,7 @@ function diffSectionLists(
 
 /** A draft page as the pending-count query loads it. */
 export interface DraftPageRow {
+    id: string;
     path: string;
     title: string;
     isHome: boolean;
@@ -208,13 +247,14 @@ export interface DraftPageRow {
  * true — and the pre-publish check is what tells the merchant it is broken.
  */
 export function toPendingPages(pages: DraftPageRow[]): PublishablePage[] {
+    const resolvePage = pagePathResolver(pages);
     return pages.map((page) => ({
         path: page.path,
         title: page.title,
         isHome: page.isHome,
         sections: page.versions.flatMap((version) =>
             version.sections.map((section) => {
-                const result = toPublishableSection(section);
+                const result = toPublishableSection(section, resolvePage);
                 return result.ok
                     ? result.section
                     : {
@@ -225,4 +265,18 @@ export function toPendingPages(pages: DraftPageRow[]): PublishablePage[] {
             }),
         ),
     }));
+}
+
+/**
+ * Page id → path, over the pages that will be in the snapshot.
+ *
+ * The caller passes the pages it is about to publish — already filtered to the
+ * visible ones — so a button pointing at a hidden page resolves to nothing
+ * rather than to a path the live site 404s.
+ */
+export function pagePathResolver(
+    pages: readonly { id: string; path: string }[],
+): (pageId: string) => string | undefined {
+    const byId = new Map(pages.map((p) => [p.id, p.path]));
+    return (pageId) => byId.get(pageId);
 }

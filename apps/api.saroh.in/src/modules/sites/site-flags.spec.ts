@@ -321,6 +321,126 @@ describe("whole-site flags", () => {
         expect(flags.map((f) => f.type)).toContain("unpublishedChanges");
     });
 
+    it("checks a v2 button by what it does, and names the actual problem (#207)", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([
+                        // a page that is not on the site
+                        {
+                            type: "cta",
+                            content: {
+                                label: "Go",
+                                action: { kind: "page", pageId: "nope" },
+                            },
+                        },
+                        // a phone number that is not one
+                        {
+                            type: "cta",
+                            content: {
+                                label: "Call",
+                                action: { kind: "call", number: "ring me" },
+                            },
+                        },
+                        // an address that is not one
+                        {
+                            type: "cta",
+                            content: {
+                                label: "Write",
+                                action: {
+                                    kind: "email",
+                                    address: "not-an-email",
+                                },
+                            },
+                        },
+                        // and three that are fine
+                        {
+                            type: "cta",
+                            content: {
+                                label: "Home",
+                                action: { kind: "page", pageId: "page_1" },
+                            },
+                        },
+                        {
+                            type: "cta",
+                            content: {
+                                label: "Chat",
+                                action: {
+                                    kind: "whatsapp",
+                                    number: "+91 98450 12345",
+                                },
+                            },
+                        },
+                        {
+                            type: "cta",
+                            content: {
+                                label: "Site",
+                                action: {
+                                    kind: "url",
+                                    href: "https://example.com",
+                                },
+                            },
+                        },
+                    ]),
+                ],
+            }),
+        );
+        const byIndex = (i: number) =>
+            flags.filter((f) => f.sectionIndex === i).map((f) => f.message);
+        expect(byIndex(0)).toEqual([
+            "This button points at a page that is not on this site.",
+        ]);
+        expect(byIndex(1)).toEqual([
+            "This button has no phone number to call.",
+        ]);
+        expect(byIndex(2)).toEqual([
+            "This button has no email address to write to.",
+        ]);
+        expect(byIndex(3)).toEqual([]);
+        expect(byIndex(4)).toEqual([]);
+        expect(byIndex(5)).toEqual([]);
+    });
+
+    it("treats a button pointing at a HIDDEN page as broken, because for a visitor it is", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([
+                        {
+                            type: "cta",
+                            content: {
+                                label: "About",
+                                action: { kind: "page", pageId: "page_hidden" },
+                            },
+                        },
+                    ]),
+                    page([], {
+                        id: "page_hidden",
+                        path: "/about",
+                        hidden: true,
+                    }),
+                ],
+            }),
+        );
+        expect(flags.map((f) => f.type)).toContain("brokenLink");
+    });
+
+    it("still checks a v1 button by its href, so nothing published regresses", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([
+                        {
+                            type: "cta",
+                            content: { label: "Go", href: "/missing" },
+                        },
+                    ]),
+                ],
+            }),
+        );
+        expect(flags.map((f) => f.type)).toContain("brokenLink");
+    });
+
     it("raises nothing on a hidden page", () => {
         // A hidden page is not on the live site, so its empty heading is not a
         // problem a visitor can meet. Flagging it would fill the pre-publish

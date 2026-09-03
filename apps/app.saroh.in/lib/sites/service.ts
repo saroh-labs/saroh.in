@@ -35,9 +35,25 @@ export type SectionType =
 /** Button style shared by hero CTA and the standalone cta section. */
 export type CtaStyle = "primary" | "secondary" | "link";
 
+/** What a button does (#207). Mirrors `ctaActionSchema` in the contract. */
+export type CtaAction =
+    | { kind: "page"; pageId: string }
+    | { kind: "url"; href: string }
+    | { kind: "email"; address: string; subject?: string }
+    | { kind: "call"; number: string }
+    | { kind: "whatsapp"; number: string; message?: string };
+
+export type CtaKind = CtaAction["kind"];
+
+/**
+ * A button as the editor holds it. v1 carries `href`; v2 carries `action`.
+ * Both are optional here because a section may be either, and the editor
+ * lifts v1 → v2 the first time the button is touched (see `liftCta`).
+ */
 export interface CtaValue {
     label: string;
-    href: string;
+    href?: string;
+    action?: CtaAction;
     style?: CtaStyle;
 }
 
