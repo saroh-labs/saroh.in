@@ -177,3 +177,51 @@
 .wk-nav[aria-current="page"]::before {
     transform: translateY(-50%) scaleY(1);
 }
+
+/* ---------------------------------------------------------------------------
+   The rich text editor (#208).
+
+   Tiptap draws into a plain contenteditable and styles nothing itself. The
+   `prose` classes on the editable carry the merchant's copy; these three rules
+   cover what prose cannot see — an empty editor's placeholder, a table the
+   merchant is still building, and the selection ring on an image.
+   --------------------------------------------------------------------------- */
+.ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+    color: hsl(var(--muted-foreground));
+}
+
+.ProseMirror table {
+    border-collapse: collapse;
+    width: 100%;
+}
+.ProseMirror th,
+.ProseMirror td {
+    border: 1px solid hsl(var(--border));
+    padding: 0.375rem 0.5rem;
+    vertical-align: top;
+    min-width: 3rem;
+}
+.ProseMirror th {
+    background: hsl(var(--muted));
+    font-weight: 600;
+}
+.ProseMirror .selectedCell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: hsl(var(--ring) / 0.12);
+    pointer-events: none;
+}
+.ProseMirror td,
+.ProseMirror th {
+    position: relative;
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
