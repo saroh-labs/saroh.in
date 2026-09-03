@@ -365,6 +365,55 @@ export function CommandMenu({
                         </CommandGroup>
                     );
                 })}
+                {/*
+                 * The merchant's own things, flattened out of the tree the
+                 * rail draws (#212). This menu read `group.items` alone, so
+                 * a site was never reachable here by name however it appeared
+                 * in the rail — the claim that it was, made when the tree
+                 * landed, was wrong until this block existed.
+                 */}
+                {(() => {
+                    const leaves: { label: string; href: string }[] = [];
+                    for (const group of groups) {
+                        for (const item of group.items) {
+                            for (const child of item.children ?? []) {
+                                if (child.href) {
+                                    leaves.push({
+                                        label: child.label,
+                                        href: child.href,
+                                    });
+                                    continue;
+                                }
+                                for (const leaf of child.children ?? []) {
+                                    if (!leaf.href) continue;
+                                    leaves.push({
+                                        // "Northwind Supply · Settings": the
+                                        // site is the thing searched for, the
+                                        // screen is where it lands.
+                                        label: `${child.label} · ${leaf.label}`,
+                                        href: leaf.href,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    const hits = leaves.filter((l) => matches(l.label));
+                    if (hits.length === 0) return null;
+                    return (
+                        <CommandGroup heading="Your sites">
+                            {hits.map((leaf) => (
+                                <CommandItem
+                                    key={leaf.href}
+                                    value={leaf.href}
+                                    onSelect={() => go(leaf.href)}
+                                >
+                                    <Globe className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                                    {leaf.label}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    );
+                })()}
                 {visibleHelp.length > 0 ? (
                     <CommandGroup heading="Help">
                         {visibleHelp.map((item) => (

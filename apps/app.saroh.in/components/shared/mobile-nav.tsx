@@ -115,7 +115,12 @@ export function MobileNav({
                                  */
                                 const childIsCurrent = Boolean(
                                     item.children?.some(
-                                        (child) => child.href === pathname,
+                                        (child) =>
+                                            child.href === pathname ||
+                                            (child.children ?? []).some(
+                                                (leaf) =>
+                                                    leaf.href === pathname,
+                                            ),
                                     ),
                                 );
                                 const Icon = item.icon;
@@ -177,37 +182,83 @@ export function MobileNav({
                                         key={`${item.href}-children`}
                                         className="ml-6 flex flex-col gap-1 border-l border-border pl-2"
                                     >
-                                        {item.children.map((child) => (
-                                            <Link
-                                                key={child.href}
-                                                href={child.href}
-                                                onClick={() => setOpen(false)}
-                                                aria-current={
-                                                    pathname === child.href
-                                                        ? "page"
-                                                        : undefined
-                                                }
-                                                /*
-                                                 * Taller rows than the rail's,
-                                                 * as every row in this drawer
-                                                 * is: this one is driven by a
-                                                 * thumb, and a 26px site name
-                                                 * is a miss waiting to happen.
-                                                 */
-                                                className={cn(
-                                                    "truncate rounded-md px-3 py-2.5 text-sm transition-colors",
-                                                    pathname === child.href
-                                                        ? "bg-accent font-medium text-foreground"
-                                                        : "text-muted-foreground active:bg-accent",
-                                                    child.create &&
-                                                        "text-muted-foreground/70",
-                                                )}
-                                            >
-                                                {child.create
-                                                    ? `+ ${child.label}`
-                                                    : child.label}
-                                            </Link>
-                                        ))}
+                                        {item.children.map((child) =>
+                                            !child.href ? (
+                                                <div
+                                                    key={child.label}
+                                                    className="flex flex-col gap-1"
+                                                >
+                                                    <div className="truncate px-3 pt-2 text-sm font-medium text-foreground">
+                                                        {child.label}
+                                                    </div>
+                                                    <div className="ml-3 flex flex-col gap-1 border-l border-border pl-2">
+                                                        {(
+                                                            child.children ?? []
+                                                        ).map((leaf) => (
+                                                            <Link
+                                                                key={leaf.href}
+                                                                href={
+                                                                    leaf.href ??
+                                                                    "#"
+                                                                }
+                                                                onClick={() =>
+                                                                    setOpen(
+                                                                        false,
+                                                                    )
+                                                                }
+                                                                aria-current={
+                                                                    pathname ===
+                                                                    leaf.href
+                                                                        ? "page"
+                                                                        : undefined
+                                                                }
+                                                                className={cn(
+                                                                    "truncate rounded-md px-3 py-2.5 text-sm transition-colors",
+                                                                    pathname ===
+                                                                        leaf.href
+                                                                        ? "bg-accent font-medium text-foreground"
+                                                                        : "text-muted-foreground active:bg-accent",
+                                                                )}
+                                                            >
+                                                                {leaf.label}
+                                                            </Link>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <Link
+                                                    key={child.href}
+                                                    href={child.href}
+                                                    onClick={() =>
+                                                        setOpen(false)
+                                                    }
+                                                    aria-current={
+                                                        pathname === child.href
+                                                            ? "page"
+                                                            : undefined
+                                                    }
+                                                    /*
+                                                     * Taller rows than the rail's,
+                                                     * as every row in this drawer
+                                                     * is: this one is driven by a
+                                                     * thumb, and a 26px site name
+                                                     * is a miss waiting to happen.
+                                                     */
+                                                    className={cn(
+                                                        "truncate rounded-md px-3 py-2.5 text-sm transition-colors",
+                                                        pathname === child.href
+                                                            ? "bg-accent font-medium text-foreground"
+                                                            : "text-muted-foreground active:bg-accent",
+                                                        child.create &&
+                                                            "text-muted-foreground/70",
+                                                    )}
+                                                >
+                                                    {child.create
+                                                        ? `+ ${child.label}`
+                                                        : child.label}
+                                                </Link>
+                                            ),
+                                        )}
                                     </div>
                                 ) : null,
                             )}

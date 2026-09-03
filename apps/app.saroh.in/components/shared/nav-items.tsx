@@ -35,9 +35,17 @@ import {
  * and always sits last.
  */
 export interface NavChild {
-    href: string;
+    /**
+     * Absent for a row that only NAMES something — a site whose real
+     * destinations are the rows beneath it. A label row is not a link, so
+     * two children cannot both claim to be "the site" and the current-page
+     * marker lands on the one screen the merchant is actually on.
+     */
+    href?: string;
     label: string;
     create?: boolean;
+    /** One level further: what a site holds — its content and its settings. */
+    children?: NavChild[];
 }
 
 export interface NavItem {
@@ -281,10 +289,21 @@ export function navGroupsWithSites(
                 ...item,
                 children: [
                     ...sites.map((site) => ({
-                        href: `${WEBSITE_HREF}/${site.id}`,
-                        // A site with no name yet still needs a row that can be
-                        // clicked and read aloud.
+                        // The site row names the site; the rows beneath it are
+                        // where it can be taken. Content is the editor — the
+                        // route that has no rail of its own — and Settings is
+                        // address, search, share card and footer.
                         label: site.name.trim() || "Untitled site",
+                        children: [
+                            {
+                                href: `${WEBSITE_HREF}/${site.id}`,
+                                label: "Content",
+                            },
+                            {
+                                href: `${WEBSITE_HREF}/${site.id}/settings`,
+                                label: "Settings",
+                            },
+                        ],
                     })),
                     // Last, and marked: creating is a different kind of act
                     // from opening, and putting it in the tree is what saves a

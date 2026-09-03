@@ -32,7 +32,12 @@ export default async function SiteSettingsPage({
         // action lands at the far edge of the shell while the settings sit in a
         // narrow column — which reads as a stray button and, at this width,
         // clipped off the screen entirely.
-        <div className="max-w-3xl space-y-6">
+        //
+        // A <main> with the shell's gutter, like every other page. The shell's
+        // own main carries no padding — pages own it — and this one wrapped
+        // itself in a bare div, so the heading sat flush against the rail and
+        // the top bar while the sites list next door had 32px of air.
+        <main className="mx-auto w-full max-w-3xl space-y-6 p-6 sm:p-8">
             <PageHeader
                 title="Website settings"
                 description={site.name}
@@ -43,6 +48,6 @@ export default async function SiteSettingsPage({
                 }
             />
             <SiteSettings site={site} />
-        </div>
+        </main>
     );
 }

@@ -29,6 +29,7 @@ const RichTextEditor = dynamic(
 );
 
 import { updateSiteFooter, updateSiteSettings } from "@/lib/sites/actions";
+import { exactDate } from "@/lib/sites/format-date";
 import type {
     SiteDetail,
     SiteFooter,
@@ -208,9 +209,12 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                 </Row>
                 <Row label="Last published">
                     {site.currentPublication ? (
-                        new Date(
-                            site.currentPublication.publishedAt,
-                        ).toLocaleString()
+                        // Pinned locale and zone (format-date.ts): the server
+                        // wrote "03/09/2026, 21:34:34" and the browser
+                        // "9/3/2026, 9:34:34 PM" for the same instant, and
+                        // React reported the difference as a hydration error
+                        // on every visit to this page.
+                        exactDate(site.currentPublication.publishedAt)
                     ) : (
                         <span className="text-muted-foreground/70">Never</span>
                     )}

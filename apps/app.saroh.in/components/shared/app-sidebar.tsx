@@ -88,7 +88,9 @@ export function AppSidebar({
                         {group.items.map((item) => {
                             const active = isNavItemActive(pathname, item.href);
                             /*
-                             * Only the DEEPEST match says "page".
+                             * Only the DEEPEST match says "page" — and the
+                             * deepest is now two levels down, since a site's
+                             * Content and Settings sit beneath its name.
                              *
                              * The parent matches by prefix, so on /sites/new
                              * both it and the child row claimed
@@ -99,7 +101,11 @@ export function AppSidebar({
                              */
                             const childIsCurrent = Boolean(
                                 item.children?.some(
-                                    (child) => child.href === pathname,
+                                    (child) =>
+                                        child.href === pathname ||
+                                        (child.children ?? []).some(
+                                            (leaf) => leaf.href === pathname,
+                                        ),
                                 ),
                             );
                             const Icon = item.icon;
@@ -203,6 +209,26 @@ function SiteTree({
     return (
         <div className="ml-[1.0625rem] flex flex-col gap-0.5 border-l border-border pl-2">
             {children.map((child) => {
+                if (!child.href) {
+                    // A label row: the site's name, with its destinations
+                    // nested beneath. Not a link — see NavChild.href.
+                    return (
+                        <div
+                            key={child.label}
+                            className="flex flex-col gap-0.5"
+                        >
+                            <div className="truncate px-2.5 pt-1.5 text-[0.8125rem] font-medium text-foreground">
+                                {child.label}
+                            </div>
+                            {child.children?.length ? (
+                                <SiteTree
+                                    children={child.children}
+                                    pathname={pathname}
+                                />
+                            ) : null}
+                        </div>
+                    );
+                }
                 // Exact match, not prefix: `/sites/new` must not light up the
                 // row for a site whose id happens to start the same way, and
                 // the site rows are siblings of each other rather than nested.
