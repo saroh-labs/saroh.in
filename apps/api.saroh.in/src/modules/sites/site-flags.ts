@@ -146,6 +146,7 @@ function checkSection(
     index: number,
     section: { type: string; content: unknown; hidden: boolean },
     pagePaths: Set<string>,
+    pageIds = new Set<string>(),
 ): Flag[] {
     const flags: Flag[] = [];
     const c = obj(section.content);
@@ -205,12 +206,15 @@ function checkSection(
             }
 
             const cta = obj(c.cta);
-            const href = str(cta.href);
-            if (href !== "" && isBrokenInternalLink(href, pagePaths)) {
-                at(
-                    "brokenLink",
-                    `The hero button points at ${href}, which is not a page on this site.`,
+            if (Object.keys(cta).length > 0) {
+                checkCtaTarget(
+                    cta,
                     "cta",
+                    "The hero button",
+                    at,
+                    pagePaths,
+                    pageIds,
+                    false,
                 );
             }
             break;
@@ -245,16 +249,15 @@ function checkSection(
                     "label",
                 );
             }
-            const href = str(c.href);
-            if (href.trim() === "") {
-                at("emptyRequiredField", "This button goes nowhere.", "href");
-            } else if (isBrokenInternalLink(href, pagePaths)) {
-                at(
-                    "brokenLink",
-                    `This button points at ${href}, which is not a page on this site.`,
-                    "href",
-                );
-            }
+            checkCtaTarget(
+                c,
+                "href",
+                "This button",
+                at,
+                pagePaths,
+                pageIds,
+                true,
+            );
             break;
         }
 
@@ -319,6 +322,109 @@ function checkSection(
  * slow server — or wrongly calls a live site broken — is worse than one that
  * stays quiet about links it cannot see.
  */
+/**
+ * Where a button goes, checked per KIND (#207).
+ *
+ * v1 carried a bare href, and the only thing that could be checked was whether
+ * a leading-slash path named a page. v2 names its intent, so each kind gets
+ * the check that fits it — a page that is not on the site, a phone number that
+ * is not one — and the message names the actual problem instead of "goes
+ * nowhere" for everything.
+ *
+ * `required` is the difference between a standalone button, which is nothing
+ * without a target, and a hero's optional one.
+ */
+function checkCtaTarget(
+    cta: Record<string, unknown>,
+    field: string,
+    subject: string,
+    at: (type: FlagType, message: string, field: string | null) => void,
+    pagePaths: Set<string>,
+    pageIds: Set<string>,
+    required: boolean,
+): void {
+    const action = obj(cta.action);
+    const kind = str(action.kind);
+
+    // v1: a bare href.
+    if (kind === "") {
+        const href = str(cta.href);
+        if (href.trim() === "") {
+            if (required) {
+                at("emptyRequiredField", `${subject} goes nowhere.`, field);
+            }
+        } else if (isBrokenInternalLink(href, pagePaths)) {
+            at(
+                "brokenLink",
+                `${subject} points at ${href}, which is not a page on this site.`,
+                field,
+            );
+        }
+        return;
+    }
+
+    switch (kind) {
+        case "page": {
+            const pageId = str(action.pageId);
+            if (pageId === "" || !pageIds.has(pageId)) {
+                at(
+                    "brokenLink",
+                    `${subject} points at a page that is not on this site.`,
+                    field,
+                );
+            }
+            return;
+        }
+        case "url": {
+            const href = str(action.href).trim();
+            if (href === "") {
+                at("emptyRequiredField", `${subject} has no address.`, field);
+            } else if (isBrokenInternalLink(href, pagePaths)) {
+                at(
+                    "brokenLink",
+                    `${subject} points at ${href}, which is not a page on this site.`,
+                    field,
+                );
+            } else if (!/^(https?:\/\/|\/|mailto:|tel:)/i.test(href)) {
+                at(
+                    "brokenLink",
+                    `${subject} points at "${href}", which is not a web address.`,
+                    field,
+                );
+            }
+            return;
+        }
+        case "email": {
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str(action.address))) {
+                at(
+                    "emptyRequiredField",
+                    `${subject} has no email address to write to.`,
+                    field,
+                );
+            }
+            return;
+        }
+        case "call":
+        case "whatsapp": {
+            const digits = str(action.number).replace(/[^0-9]/g, "");
+            if (digits.length < 6) {
+                at(
+                    "emptyRequiredField",
+                    `${subject} has no phone number to ${kind === "call" ? "call" : "message"}.`,
+                    field,
+                );
+            }
+            return;
+        }
+        default:
+            at(
+                "brokenLink",
+                `${subject} has an action this site cannot do.`,
+                field,
+            );
+    }
+}
+
 function isBrokenInternalLink(href: string, pagePaths: Set<string>): boolean {
     if (!href.startsWith("/")) return false;
     // Compare the path alone: /about#hours and /about are the same page.
@@ -346,9 +452,9 @@ export function checkSite(site: FlagSiteInput): Flag[] {
      * `hiddenButLinked` will do for sections once there is a navigation to be
      * linked from (§3).
      */
-    const pagePaths = new Set(
-        site.pages.filter((p) => !p.hidden).map((p) => p.path),
-    );
+    const visible = site.pages.filter((p) => !p.hidden);
+    const pagePaths = new Set(visible.map((p) => p.path));
+    const pageIds = new Set(visible.map((p) => p.id));
 
     if ((site.seoDescription ?? "").trim() === "") {
         flags.push({
@@ -385,7 +491,9 @@ export function checkSite(site: FlagSiteInput): Flag[] {
          */
         if (page.hidden) continue;
         page.sections.forEach((section, index) => {
-            flags.push(...checkSection(page, index, section, pagePaths));
+            flags.push(
+                ...checkSection(page, index, section, pagePaths, pageIds),
+            );
         });
     }
 

@@ -24,11 +24,21 @@ const API_URL =
 // Section content shapes — local replica of the v1 section contract.
 // ---------------------------------------------------------------------------
 
-/** A call-to-action button (shared building block + the `cta` section). */
+/**
+ * A call-to-action button (shared building block + the `cta` section).
+ *
+ * `href` is what this app draws, for v1 and v2 alike: a v2 button's `action`
+ * was RESOLVED into it at publish (#207), so this app never turns a page id
+ * into a path or a phone number into a tel: link — the snapshot is the site
+ * as served. `action` travels beside it so a reader can still tell a call
+ * from a link; `href` may be "" when a page the button named was hidden or
+ * removed, and then the button draws as a label rather than a broken link.
+ */
 export interface CtaContent {
     label: string;
     href: string;
     style?: "primary" | "secondary" | "link";
+    action?: { kind: "page" | "url" | "email" | "call" | "whatsapp" };
 }
 
 /** An image reference (shared building block). */

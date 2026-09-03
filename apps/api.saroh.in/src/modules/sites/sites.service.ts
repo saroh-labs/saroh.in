@@ -30,6 +30,7 @@ import type {
 } from "./dto";
 import {
     countPendingSectionChanges,
+    pagePathResolver,
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
@@ -496,6 +497,7 @@ export class SitesService {
                     where: { hidden: false },
                     orderBy: { path: "asc" },
                     select: {
+                        id: true,
                         path: true,
                         title: true,
                         isHome: true,
@@ -1071,6 +1073,7 @@ export class SitesService {
                     where: { hidden: false },
                     orderBy: { path: "asc" },
                     select: {
+                        id: true,
                         path: true,
                         title: true,
                         isHome: true,
@@ -1104,6 +1107,10 @@ export class SitesService {
         }
 
         const publishedAt = new Date();
+        // v2 buttons name a page by id; the snapshot needs its path (#207).
+        // Built from the pages this publish will write, so a hidden page
+        // resolves to nothing rather than to a path the live site 404s.
+        const resolvePage = pagePathResolver(site.pages);
         const pages = site.pages.map((page) => {
             // `versions` holds the page's latest DRAFT (query `take: 1`) or is
             // empty when the page has none; flatMap yields that draft's ordered
@@ -1122,7 +1129,7 @@ export class SitesService {
                      * snapshot, so it has to be computed over the same bytes
                      * this writes, not over the raw draft.
                      */
-                    const result = toPublishableSection(section);
+                    const result = toPublishableSection(section, resolvePage);
                     if (!result.ok) {
                         throw new BadRequestException(
                             `Cannot publish: page "${page.path}" has an invalid "${section.type}" section (${result.error})`,
