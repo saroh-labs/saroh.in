@@ -26,10 +26,34 @@ import {
  * built; listing them here would put 404s in the rail, which is the defect
  * `scripts/check-app-routes.mjs` now fails the build over.
  */
+/**
+ * A row nested under a destination — one of the merchant's OWN things.
+ *
+ * No icon: a child is identified by its name, and a column of identical globes
+ * under Website would be decoration standing in for a distinction that does not
+ * exist. `create` marks the row that makes a new one, which is drawn quietly
+ * and always sits last.
+ */
+export interface NavChild {
+    href: string;
+    label: string;
+    create?: boolean;
+}
+
 export interface NavItem {
     href: string;
     label: string;
     icon: LucideIcon;
+    /**
+     * The merchant's own things beneath this destination (their sites, today).
+     *
+     * Dynamic, so it is injected by {@link navGroupsWithSites} rather than
+     * written into `NAV_GROUPS` — but it travels through the same structure the
+     * sidebar, the drawer and the command menu all read, which is the whole
+     * point of this file. A tree that existed only in the sidebar would be a
+     * fourth navigation to keep in step.
+     */
+    children?: NavChild[];
     /**
      * The capability this destination belongs to (ADR-003).
      *
@@ -223,6 +247,59 @@ export const NAV_GROUPS: NavGroup[] = [
  * they do not have, so we show only the always-on groups and let onboarding do
  * its job. Groups without a `moduleKey` (Home, Notifications) are always kept.
  */
+/** The Website destination, the one that grows a tree today. */
+const WEBSITE_HREF = "/sites";
+
+/**
+ * Hang the merchant's own sites under Website.
+ *
+ * Reaching a site used to cost four steps from anywhere else in the workspace —
+ * rail, then the sites list, then a card, then the editor. A merchant works on
+ * one or two sites all day, so the thing they open most often was the thing
+ * furthest down. Their sites are the closest thing this product has to the
+ * spaces a project tool puts in its rail, and they belong there for the same
+ * reason: the rail should list what you have, not only what the software does.
+ *
+ * PAGES ARE NOT NESTED, deliberately. A page list means fetching every site's
+ * detail on every render of the shell — this runs on every screen in the app —
+ * and one round trip per site to save one click inside a site the merchant has
+ * already opened is the wrong trade. The editor's own Pages tab is where that
+ * belongs.
+ *
+ * Returns the groups untouched when there is nothing to hang, so a merchant
+ * with no sites sees exactly what they saw before plus a way to make one.
+ */
+export function navGroupsWithSites(
+    groups: readonly NavGroup[],
+    sites: readonly { id: string; name: string }[],
+): NavGroup[] {
+    return groups.map((group) => ({
+        ...group,
+        items: group.items.map((item) => {
+            if (item.href !== WEBSITE_HREF) return item;
+            return {
+                ...item,
+                children: [
+                    ...sites.map((site) => ({
+                        href: `${WEBSITE_HREF}/${site.id}`,
+                        // A site with no name yet still needs a row that can be
+                        // clicked and read aloud.
+                        label: site.name.trim() || "Untitled site",
+                    })),
+                    // Last, and marked: creating is a different kind of act
+                    // from opening, and putting it in the tree is what saves a
+                    // merchant going to the list page to find the button.
+                    {
+                        href: `${WEBSITE_HREF}/new`,
+                        label: "New site",
+                        create: true,
+                    },
+                ],
+            };
+        }),
+    }));
+}
+
 export function filterNavGroups(
     groups: readonly NavGroup[],
     availableModuleKeys: readonly string[] | null,

@@ -33,8 +33,11 @@ import {
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
+import { sanitizeRichHtml } from "./sanitize";
 import type { Flag, FlagType } from "./site-flags";
 import { checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
+import type { SiteFooter } from "./site-footer";
+import { parseSiteFooter } from "./site-footer";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
 import {
     parseSiteStyle,
@@ -96,6 +99,8 @@ export interface PageView {
     path: string;
     title: string;
     isHome: boolean;
+    /** Hidden pages stay in the draft and are omitted from the snapshot. */
+    hidden: boolean;
 }
 
 /** A section as returned by the draft-editing endpoints. */
@@ -206,7 +211,14 @@ export interface SiteDetailView {
     createdAt: Date;
     updatedAt: Date;
     currentPublication: { publishedAt: Date } | null;
-    pages: { id: string; path: string; title: string; isHome: boolean }[];
+    pages: {
+        id: string;
+        path: string;
+        title: string;
+        isHome: boolean;
+        /** Hidden pages stay in the draft and never reach the snapshot (#197). */
+        hidden: boolean;
+    }[];
     /**
      * How many sections publishing would change (#190). Null before the first
      * publish. See {@link SitesService.pendingSectionChanges} — every surface
@@ -215,6 +227,12 @@ export interface SiteDetailView {
     pendingSectionChanges: number | null;
     /** Always complete — absent choices are filled from the defaults. */
     style: SiteStyle;
+    /**
+     * What the merchant wrote at the foot of their site (#202). Null means they
+     * have written nothing, and nothing is what renders — not an empty band in
+     * the footer colour.
+     */
+    footer: SiteFooter | null;
     /**
      * The palette and slider bounds. Sent with the site so the editor can
      * resolve a choice locally as a slider moves, without carrying its own copy
@@ -470,6 +488,12 @@ export class SitesService {
                 id: true,
                 currentPublication: { select: { snapshot: true } },
                 pages: {
+                    // Hidden pages do not travel, on exactly the reasoning that
+                    // keeps hidden sections out below: the snapshot IS the
+                    // published site, and a Publication is immutable once
+                    // written, so a page that leaked in could not be taken back
+                    // out without republishing.
+                    where: { hidden: false },
                     orderBy: { path: "asc" },
                     select: {
                         path: true,
@@ -537,6 +561,7 @@ export class SitesService {
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
+                footer: true,
                 createdAt: true,
                 updatedAt: true,
                 // When the site last went live. Read through the current
@@ -544,12 +569,15 @@ export class SitesService {
                 // drift from the publication history it describes.
                 currentPublication: { select: { publishedAt: true } },
                 pages: {
+                    // Not filtered: this is the EDITOR's list, and a merchant
+                    // cannot unhide a page they cannot see.
                     orderBy: { path: "asc" },
                     select: {
                         id: true,
                         path: true,
                         title: true,
                         isHome: true,
+                        hidden: true,
                     },
                 },
             },
@@ -560,8 +588,9 @@ export class SitesService {
         // Normalize the look on the way out (#189): the editor should never
         // have to decide what a half-written or absent style means, and a
         // client filling gaps itself is how the preview and the published site
-        // drift apart.
-        const { style, ...rest } = site;
+        // drift apart. The footer is normalized here for the same reason — the
+        // editor reads back exactly what publish would write.
+        const { style, footer, ...rest } = site;
         const pending = await this.pendingSectionChanges([site.id]);
         return {
             ...rest,
@@ -574,6 +603,7 @@ export class SitesService {
             pendingSectionChanges: pending.get(site.id) ?? null,
             style: parseSiteStyle(style),
             styleOptions: siteStyleOptions(),
+            footer: parseSiteFooter(footer),
         };
     }
 
@@ -649,6 +679,45 @@ export class SitesService {
             select: { id: true },
         });
         return { id: siteId, style };
+    }
+
+    /**
+     * Set a site's footer (#202).
+     *
+     * Replaces rather than merges, like the style it sits beside: there is one
+     * footer and the form always sends the whole of it.
+     *
+     * Clearing the field IS the delete. `parseSiteFooter` collapses an empty or
+     * whitespace-only value to null, so a merchant who empties the box gets no
+     * footer element at all rather than an empty coloured band — there is no
+     * separate remove action to find.
+     *
+     * Requires `site:update` — this is what the public sees. Draft state like
+     * everything else here: it reaches the live site on the next publish.
+     */
+    async updateFooter(
+        ctx: OrganizationContext,
+        siteId: string,
+        input: unknown,
+    ): Promise<{ id: string; footer: SiteFooter | null }> {
+        authorize(ctx, "site:update");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        // Validate BEFORE writing, for the same reason style does: a malformed
+        // body is a 400 now rather than a footer that fails to render later.
+        const footer = parseSiteFooter(input);
+
+        await prisma.site.update({
+            where: { id: siteId },
+            data: {
+                footer:
+                    footer === null
+                        ? Prisma.DbNull
+                        : (footer as unknown as Prisma.InputJsonValue),
+            },
+            select: { id: true },
+        });
+        return { id: siteId, footer };
     }
 
     // -----------------------------------------------------------------------
@@ -993,7 +1062,13 @@ export class SitesService {
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
+                footer: true,
                 pages: {
+                    // A hidden page does not travel, for the same reason a
+                    // hidden section does not: a Publication is immutable once
+                    // written, so a page that leaked in could not be taken back
+                    // out without republishing.
+                    where: { hidden: false },
                     orderBy: { path: "asc" },
                     select: {
                         path: true,
@@ -1065,6 +1140,22 @@ export class SitesService {
         });
 
         const publishedStyle = parseSiteStyle(site.style);
+        const draftFooter = parseSiteFooter(site.footer);
+        /*
+         * The footer travels SANITIZED (#202).
+         *
+         * Same boundary as `richText.value`: authorable HTML is cleaned here,
+         * before the immutable write, so the renderer only ever reads content
+         * that is already safe and never sanitizes at read time. It runs
+         * through the sanitizer whatever the format says, rather than making
+         * the safety of a permanent write depend on a string the client sent.
+         */
+        const publishedFooter: SiteFooter | null = draftFooter
+            ? {
+                  format: draftFooter.format,
+                  value: sanitizeRichHtml(draftFooter.value),
+              }
+            : null;
         const snapshot = {
             site: {
                 name: site.name,
@@ -1099,6 +1190,7 @@ export class SitesService {
                  * silently restyle everything anyone has already published.
                  */
                 styleVariables: siteStyleVariables(publishedStyle),
+                footer: publishedFooter,
             },
             pages,
             publishedAt: publishedAt.toISOString(),
@@ -1445,6 +1537,8 @@ export class SitesService {
                         id: true,
                         path: true,
                         title: true,
+                        hidden: true,
+                        updatedAt: true,
                         versions: {
                             where: { status: "DRAFT" },
                             orderBy: { createdAt: "desc" },
@@ -1470,10 +1564,28 @@ export class SitesService {
         }
 
         const publishedAt = site.currentPublication?.publishedAt ?? null;
+        /*
+         * The page's OWN timestamp counts, not just its versions'.
+         *
+         * This compared `PageVersion.updatedAt` alone, which silently missed
+         * every change that lives on the Page row rather than inside a draft:
+         * hiding a page (#197), renaming one, moving one. All three alter the
+         * snapshot publishing would write — title and path travel in it, and a
+         * hidden page does not travel at all — so a merchant could hide a page
+         * and be told there was nothing waiting to publish, leaving it live.
+         *
+         * The authoritative answer to "how much is waiting" is the diff in
+         * `pending-changes.ts`, which the sites list already uses. This path
+         * wants a boolean rather than a count and runs on a different query, so
+         * it stays a timestamp comparison — but it now looks at both places a
+         * change can land.
+         */
         const hasUnpublishedChanges =
             publishedAt !== null &&
-            site.pages.some((page) =>
-                page.versions.some((v) => v.updatedAt > publishedAt),
+            site.pages.some(
+                (page) =>
+                    page.updatedAt > publishedAt ||
+                    page.versions.some((v) => v.updatedAt > publishedAt),
             );
 
         const flags = checkSite({
@@ -1484,6 +1596,7 @@ export class SitesService {
                 id: page.id,
                 path: page.path,
                 title: page.title,
+                hidden: page.hidden,
                 // `versions` is the latest draft or empty; a page with no draft
                 // has no sections to check rather than being an error.
                 sections: page.versions.flatMap((v) => v.sections),
@@ -1533,7 +1646,13 @@ export class SitesService {
                 title: dto.title,
                 isHome: false,
             },
-            select: { id: true, path: true, title: true, isHome: true },
+            select: {
+                id: true,
+                path: true,
+                title: true,
+                isHome: true,
+                hidden: true,
+            },
         });
         return page;
     }
@@ -1575,14 +1694,27 @@ export class SitesService {
             await this.assertPathIsFree(siteId, dto.path);
         }
 
+        if (dto.hidden === true && page.isHome) {
+            throw new BadRequestException(
+                "The home page is what your site's address serves, so it cannot be hidden.",
+            );
+        }
+
         return prisma.page.update({
             where: { id: pageId },
             data: {
                 // ABSENT means leave alone, so each field is set only when sent.
                 ...(dto.title === undefined ? {} : { title: dto.title }),
                 ...(dto.path === undefined ? {} : { path: dto.path }),
+                ...(dto.hidden === undefined ? {} : { hidden: dto.hidden }),
             },
-            select: { id: true, path: true, title: true, isHome: true },
+            select: {
+                id: true,
+                path: true,
+                title: true,
+                isHome: true,
+                hidden: true,
+            },
         });
     }
 

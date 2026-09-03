@@ -15,6 +15,7 @@ function page(
         id: "page_1",
         path: "/",
         title: "Home",
+        hidden: false,
         sections: sections.map((s) => ({ ...s, hidden: s.hidden ?? false })),
         ...over,
     };
@@ -303,6 +304,67 @@ describe("whole-site flags", () => {
         const hero = flags.find((f) => f.type === "emptyRequiredField");
         expect(seo?.pageId).toBeNull();
         expect(hero?.pageId).toBe("page_9");
+    });
+
+    it("reports unpublished changes for a change that lives on the page, not in a draft", () => {
+        // Hiding, renaming and moving a page all alter the snapshot publish
+        // would write, and none of them touch a PageVersion. The check used to
+        // compare version timestamps alone, so a merchant could hide a page and
+        // be told nothing was waiting — leaving it live.
+        const flags = checkSite(
+            site({
+                published: true,
+                hasUnpublishedChanges: true,
+                pages: [page([])],
+            }),
+        );
+        expect(flags.map((f) => f.type)).toContain("unpublishedChanges");
+    });
+
+    it("raises nothing on a hidden page", () => {
+        // A hidden page is not on the live site, so its empty heading is not a
+        // problem a visitor can meet. Flagging it would fill the pre-publish
+        // check with noise from work deliberately set aside — the same rule
+        // that already keeps hidden SECTIONS quiet.
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([{ type: "hero", content: { heading: "" } }], {
+                        id: "page_hidden",
+                        path: "/about",
+                        hidden: true,
+                    }),
+                ],
+            }),
+        );
+        expect(flags.filter((f) => f.pageId === "page_hidden")).toEqual([]);
+    });
+
+    it("treats a link to a hidden page as broken, because for a visitor it is", () => {
+        // Hiding a page that something still points at turns that button into
+        // a dead link on a live site. The merchant has to be told BEFORE they
+        // publish, not by a customer afterwards.
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([
+                        {
+                            type: "cta",
+                            content: {
+                                label: "Read about us",
+                                href: "/about",
+                            },
+                        },
+                    ]),
+                    page([], {
+                        id: "page_hidden",
+                        path: "/about",
+                        hidden: true,
+                    }),
+                ],
+            }),
+        );
+        expect(flags.map((f) => f.type)).toContain("brokenLink");
     });
 
     it("resolves links against every page on the site, not just the one being checked", () => {

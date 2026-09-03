@@ -37,6 +37,8 @@ type AppHeaderProps =
           moduleKeys: string[] | null;
           /** Work waiting behind a route; see `NavCounts`. */
           counts?: NavCounts;
+          /** The merchant's own sites, for the drawer's tree. */
+          sites?: { id: string; name: string }[];
       };
 
 export function AppHeader(props: AppHeaderProps) {
@@ -78,6 +80,7 @@ export function AppHeader(props: AppHeaderProps) {
                     unread={unread}
                     moduleKeys={moduleKeys}
                     counts={counts}
+                    sites={props.sites}
                 />
                 <Link
                     href="/"

@@ -247,6 +247,19 @@ export class SitesController {
      * always sends a whole look, and merging would let two tabs produce a
      * palette neither person chose.
      */
+    /**
+     * Set the site's footer (#202). Replaces rather than merges, and an empty
+     * value clears it — see `SitesService.updateFooter`.
+     */
+    @Put(":siteId/footer")
+    updateFooter(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() body: unknown,
+    ) {
+        return this.sites.updateFooter(ctx, siteId, body);
+    }
+
     @Put(":siteId/style")
     updateStyle(
         @OrgContext() ctx: OrganizationContext,

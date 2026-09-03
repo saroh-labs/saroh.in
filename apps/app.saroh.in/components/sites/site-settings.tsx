@@ -11,8 +11,12 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { updateSiteSettings } from "@/lib/sites/actions";
-import type { SiteDetail, SiteSettingsInput } from "@/lib/sites/service";
+import { updateSiteFooter, updateSiteSettings } from "@/lib/sites/actions";
+import type {
+    SiteDetail,
+    SiteFooter,
+    SiteSettingsInput,
+} from "@/lib/sites/service";
 
 /**
  * A site's address, search appearance and share card (#188).
@@ -96,6 +100,10 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
     const [socialImageUrl, setSocialImageUrl] = useState(
         site.socialImageUrl ?? "",
     );
+    const [footerValue, setFooterValue] = useState(site.footer?.value ?? "");
+    const [footerFormat, setFooterFormat] = useState<SiteFooter["format"]>(
+        site.footer?.format ?? "html",
+    );
     const router = useRouter();
     const [editing, setEditing] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -115,6 +123,30 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
             // props agree with it and a reload does not appear to lose the edit.
             router.refresh();
             toast.success(`${label} saved. Publish to make it public.`);
+        });
+    }
+
+    function saveFooter() {
+        startTransition(async () => {
+            // Empty IS the delete. The api collapses a blank value to null, so
+            // a merchant clears the box to remove the footer and there is no
+            // separate remove control to hunt for.
+            const next: SiteFooter | null =
+                footerValue.trim() === ""
+                    ? null
+                    : { format: footerFormat, value: footerValue };
+            const res = await updateSiteFooter(site.id, next);
+            if (!res.ok) {
+                toast.error(res.error);
+                return;
+            }
+            setEditing(null);
+            router.refresh();
+            toast.success(
+                next === null
+                    ? "Footer removed. Publish to take it off the site."
+                    : "Footer saved. Publish to make it public.",
+            );
         });
     }
 
@@ -439,6 +471,111 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                             />
                         ) : null}
                     </div>
+                </Row>
+            </Section>
+
+            <Section
+                title="Footer"
+                description="The last thing on every page. Yours to write — an address, opening hours, a way to get in touch."
+            >
+                <Row
+                    label="Text"
+                    action={
+                        editing === "footer" ? (
+                            <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    variant="brand"
+                                    disabled={pending}
+                                    onClick={saveFooter}
+                                >
+                                    Save
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={pending}
+                                    onClick={() => {
+                                        setFooterValue(
+                                            site.footer?.value ?? "",
+                                        );
+                                        setFooterFormat(
+                                            site.footer?.format ?? "html",
+                                        );
+                                        setEditing(null);
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        ) : (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditing("footer")}
+                            >
+                                {site.footer ? "Edit" : "Add"}
+                            </Button>
+                        )
+                    }
+                >
+                    {editing === "footer" ? (
+                        <div className="space-y-2">
+                            <Textarea
+                                value={footerValue}
+                                onChange={(e) => setFooterValue(e.target.value)}
+                                rows={4}
+                                placeholder={
+                                    footerFormat === "html"
+                                        ? // A mailto, not a path: the most common thing in a
+                                          // footer is a way to reach someone, and a bare
+                                          // "/contact" here is read by
+                                          // scripts/check-app-routes.mjs as an APP link —
+                                          // failing the build over a route that would
+                                          // belong to the merchant's site, not to Saroh.
+                                          '<p>Northwind Supply · Peenya, Bengaluru · <a href="mailto:hello@example.in">Email us</a></p>'
+                                        : "Northwind Supply\nPeenya, Bengaluru"
+                                }
+                                aria-label="Footer text"
+                            />
+                            {/*
+                             * The same two formats a richText section offers,
+                             * because this IS that content model — one
+                             * authoring shape, one sanitizer, and one editor to
+                             * upgrade when the rich text editor lands (#208).
+                             */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>Written as</span>
+                                {(["html", "markdown"] as const).map((f) => (
+                                    <button
+                                        key={f}
+                                        type="button"
+                                        onClick={() => setFooterFormat(f)}
+                                        aria-pressed={footerFormat === f}
+                                        className={cn(
+                                            "rounded px-2 py-0.5 transition-colors",
+                                            footerFormat === f
+                                                ? "bg-secondary text-secondary-foreground"
+                                                : "hover:text-foreground active:bg-secondary/60",
+                                        )}
+                                    >
+                                        {f === "html" ? "HTML" : "Plain text"}
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Clear the box to remove the footer. Links and
+                                basic formatting are kept; anything else is
+                                stripped when you publish.
+                            </p>
+                        </div>
+                    ) : site.footer ? (
+                        <span className="whitespace-pre-wrap break-words text-muted-foreground">
+                            {site.footer.value}
+                        </span>
+                    ) : (
+                        <Missing />
+                    )}
                 </Row>
             </Section>
 

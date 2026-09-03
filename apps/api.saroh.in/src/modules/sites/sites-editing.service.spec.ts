@@ -322,6 +322,62 @@ describe("SitesService.publishSite", () => {
         });
     });
 
+    it("SANITIZES the footer into the snapshot, on the same boundary as richText", async () => {
+        siteFindFirst.mockResolvedValue({
+            ...siteWithRichText("<p>hello</p>"),
+            footer: {
+                format: "html",
+                value: '<p>Northwind Supply</p><script>alert("xss")</script>',
+            },
+        });
+
+        await service.publishSite(ctx(), "site_1");
+
+        // The renderer draws the footer with dangerouslySetInnerHTML, and that
+        // is safe for exactly one reason: it was cleaned HERE, before the
+        // immutable write. Nothing downstream sanitizes at read time.
+        const data = publicationCreate.mock.calls[0][0].data as {
+            snapshot: { site: { footer: { value: string } | null } };
+        };
+        expect(data.snapshot.site.footer?.value).toBe(
+            "<p>Northwind Supply</p>",
+        );
+        expect(data.snapshot.site.footer?.value).not.toContain("script");
+    });
+
+    it("publishes no footer when the merchant has written none", async () => {
+        // Null must reach the snapshot as null rather than as an empty string:
+        // the renderer draws nothing for null, and an empty band in the
+        // merchant's footer colour would be inventing a footer they never asked
+        // for — the exact over-claim #202 exists to remove.
+        siteFindFirst.mockResolvedValue({
+            ...siteWithRichText("<p>hello</p>"),
+            footer: null,
+        });
+
+        await service.publishSite(ctx(), "site_1");
+
+        const data = publicationCreate.mock.calls[0][0].data as {
+            snapshot: { site: { footer: unknown } };
+        };
+        expect(data.snapshot.site.footer).toBeNull();
+    });
+
+    it("asks the database for visible pages only — a hidden page never publishes", async () => {
+        siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
+
+        await service.publishSite(ctx(), "site_1");
+
+        // Same reasoning as the section filter above, one level up. A page the
+        // merchant parked must not reach the snapshot, and the snapshot is
+        // immutable once written, so the filter has to be in the QUERY rather
+        // than in the renderer reading it back.
+        const select = siteFindFirst.mock.calls[0][0].select as {
+            pages: { where: { hidden: boolean } };
+        };
+        expect(select.pages.where).toEqual({ hidden: false });
+    });
+
     it("creates an immutable Publication, repoints currentPublicationId, and SANITIZES richText", async () => {
         siteFindFirst.mockResolvedValue(
             siteWithRichText("<p>hello</p><script>alert('xss')</script>"),

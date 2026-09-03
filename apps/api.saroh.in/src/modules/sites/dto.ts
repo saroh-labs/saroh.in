@@ -189,6 +189,17 @@ export class UpdatePageDto {
     @Matches(PAGE_PATH_RE, { message: PAGE_PATH_MSG })
     @MaxLength(200, { message: "Path must be at most 200 characters" })
     path?: string;
+
+    /**
+     * Absent means LEAVE ALONE, never "make visible".
+     *
+     * The same rule `DraftSectionInputDto.hidden` follows, for the same reason:
+     * a client that predates this field must not be able to put a deliberately
+     * parked page back on a live site simply by not mentioning it.
+     */
+    @IsOptional()
+    @IsBoolean({ message: "hidden must be a boolean" })
+    hidden?: boolean;
 }
 
 /**

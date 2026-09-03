@@ -24,7 +24,7 @@ import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 
-import { NAV_GROUPS, filterNavGroups } from "./nav-items";
+import { NAV_GROUPS, filterNavGroups, navGroupsWithSites } from "./nav-items";
 
 const OPEN_EVENT = "saroh:open-command";
 
@@ -150,15 +150,25 @@ const ACTIONS: {
  */
 export function CommandMenu({
     moduleKeys = null,
+    sites = [],
 }: {
     moduleKeys?: string[] | null;
+    /**
+     * The merchant's own sites. They join the nav results, so a site is
+     * reachable by typing its name — which is the payoff for putting the tree
+     * in `NAV_GROUPS` rather than in the sidebar alone.
+     */
+    sites?: { id: string; name: string }[];
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [hits, setHits] = useState<SearchHit[]>([]);
     const [searching, setSearching] = useState(false);
-    const groups = filterNavGroups(NAV_GROUPS, moduleKeys);
+    const groups = filterNavGroups(
+        navGroupsWithSites(NAV_GROUPS, sites),
+        moduleKeys,
+    );
 
     const available = moduleKeys === null ? null : new Set(moduleKeys);
     const actions = ACTIONS.filter(

@@ -213,11 +213,19 @@ export interface SiteSummary {
     pendingDomain?: string | null;
 }
 
+/** A site footer, the same `{ format, value }` a richText section carries. */
+export interface SiteFooter {
+    format: "html" | "markdown";
+    value: string;
+}
+
 export interface SitePage {
     id: string;
     path: string;
     title: string;
     isHome: boolean;
+    /** Hidden pages stay in the draft and are left out of the snapshot (#197). */
+    hidden: boolean;
 }
 
 export interface SiteDetail extends SiteSummary {
@@ -231,6 +239,11 @@ export interface SiteDetail extends SiteSummary {
     seoTitle: string | null;
     seoDescription: string | null;
     socialImageUrl: string | null;
+    /**
+     * What the merchant wrote at the foot of their site (#202). Null means they
+     * have written nothing, and nothing renders — see `parseSiteFooter`.
+     */
+    footer: SiteFooter | null;
     /** When the site last went live; null if it has never been published. */
     currentPublication: { publishedAt: string } | null;
     /** The site's look — always complete; absent choices come back filled. */
@@ -695,7 +708,7 @@ export async function createPage(
 export async function updatePage(
     siteId: string,
     pageId: string,
-    input: { title?: string; path?: string },
+    input: { title?: string; path?: string; hidden?: boolean },
 ): Promise<SitesResult<SitePage>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
@@ -725,6 +738,37 @@ export async function deletePage(
         error?: string;
     } | null;
     return { ok: false, ...readError(data, "Could not delete the page.") };
+}
+
+export async function updateSiteFooter(
+    siteId: string,
+    footer: SiteFooter | null,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/footer`, {
+        method: "PUT",
+        /*
+         * Always an OBJECT on the wire, never a bare `null`.
+         *
+         * Express's json parser is strict by default and accepts only objects
+         * and arrays, so `JSON.stringify(null)` is rejected as malformed before
+         * it ever reaches the handler — a 400 reading "Unexpected token 'n'"
+         * that says nothing about footers.
+         *
+         * An empty value is already how a footer is removed: `parseSiteFooter`
+         * collapses blank to null on the way in. So clearing sends an empty
+         * string and the semantics are unchanged.
+         */
+        body: JSON.stringify(footer ?? { format: "html", value: "" }),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not save the footer.") };
 }
 
 export async function updateSiteStyle(

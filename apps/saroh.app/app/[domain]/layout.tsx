@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import type { PublicationSite } from "@/lib/publication";
 import { getPublicationForHost } from "@/lib/publication";
 
 /**
@@ -95,7 +96,53 @@ export default async function SiteLayout({
             </header>
 
             <div>{children}</div>
+
+            <SiteFooter footer={snapshot.site.footer} />
         </div>
+    );
+}
+
+/**
+ * The merchant's own footer (#202).
+ *
+ * The Style panel has offered a Footer colour since #189 and this app had
+ * nothing to paint with it: `--site-footer-bg` and `--site-footer-fg` were
+ * resolved, published and read by nobody, so five swatches sat there looking
+ * exactly like the five working rows above them and did nothing at all.
+ *
+ * Nothing renders when the merchant has written nothing. An empty band in
+ * their footer colour would be this app inventing a footer they never asked
+ * for — and the colour row would still be lying, just more colourfully.
+ *
+ * SAFETY. `value` is rendered with `dangerouslySetInnerHTML` when the format is
+ * html, and that is safe for exactly one reason: publish sanitized it through
+ * the same allowlist as `richText.value` before writing the immutable snapshot,
+ * so what arrives here is already-cleaned markup. This app never receives raw
+ * author input. Markdown renders as escaped pre-wrapped text, because there is
+ * no markdown library in this app's dependencies and guessing at one would mean
+ * emitting HTML nobody cleaned.
+ */
+function SiteFooter({ footer }: { footer: PublicationSite["footer"] }) {
+    if (!footer || footer.value.trim() === "") return null;
+
+    return (
+        <footer className="w-full bg-site-footer-bg px-5 py-[var(--site-section-padding)] text-site-footer-fg sm:px-[var(--site-page-margin)]">
+            <div className="mx-auto max-w-screen-xl text-sm">
+                {footer.format === "html" ? (
+                    <div
+                        /* The merchant's footer text colour governs, not the
+                           prose defaults — the same reason richText overrides
+                           them: a chosen palette must not be repainted by a
+                           typography plugin's greys. */
+                        className="prose prose-sm max-w-none prose-headings:text-site-footer-fg prose-p:text-site-footer-fg prose-a:text-site-footer-fg prose-strong:text-site-footer-fg prose-li:text-site-footer-fg"
+                        // Sanitized at publish — see the safety note above.
+                        dangerouslySetInnerHTML={{ __html: footer.value }}
+                    />
+                ) : (
+                    <p className="whitespace-pre-wrap">{footer.value}</p>
+                )}
+            </div>
+        </footer>
     );
 }
 
