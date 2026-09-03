@@ -104,8 +104,9 @@ const SECTION_LABELS: Record<SectionType, string> = {
  * two copies of a tablist is two chances for the selected state to disagree
  * with what is actually showing.
  *
- * Review is absent rather than disabled: it is not built, and a tab leading
- * nowhere is worse than one that is not there.
+ * All three tabs lead somewhere. Review was absent while it was unbuilt — a tab
+ * leading nowhere is worse than one that is not there — and it earned its place
+ * when the notes and the approval landed behind it.
  */
 function RailTabs({
     rail,
@@ -134,7 +135,13 @@ function RailTabs({
                         "rounded px-2 py-1 text-xs font-medium capitalize transition-colors",
                         rail === tab
                             ? "bg-secondary text-secondary-foreground"
-                            : "text-muted-foreground hover:text-foreground",
+                            : // Pressing shows the surface the tab is about to
+                              // settle on. This is feedback on the PRESS, not an
+                              // animation of the switch — the switch itself stays
+                              // instant, because it happens dozens of times a
+                              // session and anything staged would make the rail
+                              // feel slower than it is.
+                              "text-muted-foreground hover:text-foreground active:bg-secondary/60 active:text-secondary-foreground",
                     )}
                 >
                     {tab}
@@ -1056,10 +1063,10 @@ export function SiteEditor({
                                 onClick={() => setDevice(d.key)}
                                 aria-pressed={device === d.key}
                                 className={cn(
-                                    "border-l px-2.5 text-[0.6875rem] first:border-l-0",
+                                    "border-l px-2.5 text-[0.6875rem] transition-colors first:border-l-0",
                                     device === d.key
                                         ? "bg-[#242424] text-foreground"
-                                        : "text-muted-foreground hover:text-foreground",
+                                        : "text-muted-foreground hover:text-foreground active:bg-[#242424] active:text-foreground",
                                 )}
                             >
                                 {d.label}
@@ -1293,10 +1300,16 @@ export function SiteEditor({
                                     >
                                         <div
                                             className={cn(
-                                                "group flex h-8 w-full items-center gap-1.5 rounded pr-1 text-left text-xs",
+                                                // A row is not a button and must not
+                                                // scale — at 32px tall a shrink reads
+                                                // as a jitter. It answers a press with
+                                                // the surface it would settle on, so
+                                                // the feedback is the outcome arriving
+                                                // early rather than a separate effect.
+                                                "group flex h-8 w-full items-center gap-1.5 rounded pr-1 text-left text-xs transition-colors",
                                                 selectedIndex === index
                                                     ? "bg-secondary"
-                                                    : "hover:bg-muted",
+                                                    : "hover:bg-muted active:bg-secondary",
                                                 errorIndex === index &&
                                                     "text-destructive",
                                                 dragIndex === index &&
@@ -1687,8 +1700,21 @@ export function SiteEditor({
                          * it." The width transition does the resize; the brief
                          * dip in opacity is the cross-fade, and it is what stops
                          * a reflow mid-animation reading as a glitch.
+                         *
+                         * This animates `max-width`, which is a LAYOUT property
+                         * and so breaks the usual transform/opacity-only rule,
+                         * deliberately. The whole point of a device preview is
+                         * showing how the site reflows at that width; a
+                         * transform would scale the content instead of
+                         * reflowing it, which is the one thing this control
+                         * exists to show. So the reflow is the work, not an
+                         * accident of implementation.
+                         *
+                         * What that buys is a duty to keep it short: 200ms
+                         * rather than the 300 it was, because every frame here
+                         * costs a layout pass over the whole rendered site.
                          */
-                        className={`mx-auto transition-[max-width,opacity,transform] duration-300 ease-out ${
+                        className={`mx-auto transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none ${
                             switching ? "opacity-70" : "opacity-100"
                         }`}
                         style={{
@@ -1733,7 +1759,7 @@ export function SiteEditor({
                         Escape to return
                     </button>
                     <div
-                        className="mx-auto transition-[max-width] duration-300"
+                        className="mx-auto transition-[max-width] duration-200 ease-out motion-reduce:transition-none"
                         style={{ maxWidth: DEVICE_WIDTH[device] }}
                     >
                         <DraftPreview

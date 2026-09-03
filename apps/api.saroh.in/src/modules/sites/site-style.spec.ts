@@ -19,6 +19,24 @@ describe("the palette itself", () => {
         }
     });
 
+    it("offers the same colour in more than one row, which is why a band's own contents may not be painted with another row's swatch", () => {
+        // Rows are NOT disjoint. `accent` and `ctaBand` both offer Clay at the
+        // identical `18 45% 45%`, so a merchant may legitimately choose it in
+        // both — and a call-to-action button painted with the accent would then
+        // be exactly the colour of the band behind it. Invisible on the live
+        // site, and perfectly visible in the editor preview, which derives the
+        // button from the band instead.
+        //
+        // saroh.app's CtaSection passes surface="band" for that reason. This
+        // test pins the fact that MAKES it necessary: if these rows are ever
+        // made disjoint the constraint has changed and the renderer can be
+        // revisited, and until then nothing may assume a swatch belongs to one
+        // row alone.
+        const accent = new Set(STYLE_ROWS.accent.map((s) => s.hsl));
+        const shared = STYLE_ROWS.ctaBand.filter((s) => accent.has(s.hsl));
+        expect(shared.map((s) => s.hsl)).toContain("18 45% 45%");
+    });
+
     it("has no duplicate keys within a row", () => {
         // A duplicate would make one option unselectable: the first match wins
         // when resolving, so the second would silently render as the first.
