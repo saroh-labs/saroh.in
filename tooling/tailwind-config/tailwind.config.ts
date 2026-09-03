@@ -33,6 +33,19 @@ const FALLBACK_MONO = [
 ];
 
 const config = {
+    /*
+     * `hover:` compiles to `@media (hover: hover)`.
+     *
+     * Without this a touch device fires hover on tap and then KEEPS it: a rail
+     * row stays lit after the finger leaves, so the interface claims a
+     * selection that is not there. Two of the four primary scenes (§18) are
+     * touch, so a hover state that sticks is a false signifier in half the
+     * product. Set here rather than per-utility because every `hover:` in every
+     * app wants it, and the ones that do not do not exist.
+     */
+    future: {
+        hoverOnlyWhenSupported: true,
+    },
     darkMode: ["class"],
     content: [
         "./pages/**/*.{ts,tsx}",

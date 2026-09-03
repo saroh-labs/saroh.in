@@ -5,7 +5,25 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-    "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+    /*
+     * `active:scale-[0.97]` is the whole reason this string carries a transform
+     * transition.
+     *
+     * A button that does not move when pressed leaves the merchant asking
+     * whether the tap registered, and the honest answer on a touch device is
+     * that nothing on screen has told them. Hover covers it on a desk; phone
+     * and shop floor are two of the four primary scenes (§18) and have no
+     * pointer at all, so press was the only feedback channel left and it was
+     * unused.
+     *
+     * The transition names its properties rather than using `all`: colour and
+     * transform are the two that change, and `all` would animate layout
+     * properties that should never be animated.
+     *
+     * Under `prefers-reduced-motion` the scale is dropped and the colour
+     * transitions stay. Reduced motion means less movement, not less feedback.
+     */
+    "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-[color,background-color,border-color,text-decoration-color,transform] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-colors motion-reduce:active:scale-100",
     {
         variants: {
             variant: {
@@ -38,7 +56,10 @@ const buttonVariants = cva(
                 secondary:
                     "bg-secondary text-secondary-foreground hover:bg-secondary/80",
                 ghost: "hover:bg-accent hover:text-accent-foreground",
-                link: "text-primary underline-offset-4 hover:underline",
+                // Not `active:scale`: this variant renders inline text, and
+                // shrinking a word inside a sentence reads as a rendering
+                // fault rather than a press. twMerge lets the variant win.
+                link: "text-primary underline-offset-4 hover:underline active:scale-100",
             },
             // 32 / 40 / 48 — the Geist control heights. `sm` was 36px and `lg`
             // 44px, which put every button between two steps and made dense
