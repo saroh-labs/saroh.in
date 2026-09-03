@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+    ConflictException,
+    Inject,
+    Injectable,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 
@@ -99,7 +104,13 @@ export class MediaService {
     async completeUpload(
         ctx: OrganizationContext,
         mediaId: string,
-    ): Promise<{ id: string; status: string; sizeBytes: number }> {
+    ): Promise<{
+        id: string;
+        status: string;
+        sizeBytes: number;
+        /** Where the object is served from, or null when nothing can serve it. */
+        url: string | null;
+    }> {
         authorize(ctx, "media:write");
 
         const media = await this.requireOwned(ctx, mediaId);
@@ -119,16 +130,42 @@ export class MediaService {
             id: updated.id,
             status: updated.status,
             sizeBytes: updated.sizeBytes,
+            /*
+             * The whole reason a merchant uploaded was to put the picture on
+             * something (#205). Until now this returned id, status and size and
+             * left them holding a key with no way to turn it into an <img src>
+             * — an upload that completed and could not be used.
+             */
+            url: this.publicUrlFor(updated.key),
         };
     }
 
     /** List the org's media, newest first. Tenant-scoped by ctx. */
     async list(ctx: OrganizationContext) {
         authorize(ctx, "media:read");
-        return prisma.media.findMany({
+        const rows = await prisma.media.findMany({
             where: { organizationId: ctx.organizationId },
             orderBy: { createdAt: "desc" },
         });
+        return rows.map((row) => ({ ...row, url: this.publicUrlFor(row.key) }));
+    }
+
+    /**
+     * The stable public URL for a key, or null when storage cannot serve it.
+     *
+     * `getPublicUrl` throws when no public base is configured. That is the
+     * right behaviour for the port — a URL nobody can fetch is worse than an
+     * error — but at this boundary it must not take a whole upload down with
+     * it. Null is an honest answer the client can act on ("storage is not set
+     * up to serve images"); an exception here would have surfaced as a 500 on
+     * an upload that succeeded.
+     */
+    private publicUrlFor(key: string): string | null {
+        try {
+            return this.storage.getPublicUrl(key);
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -142,6 +179,31 @@ export class MediaService {
         authorize(ctx, "media:write");
 
         const media = await this.requireOwned(ctx, mediaId);
+
+        /*
+         * An image a publication references cannot be deleted (#205).
+         *
+         * A Publication is immutable and is the site as it was served. Deleting
+         * an object it points at does not edit the snapshot — it leaves a
+         * broken image on a live site that nothing in the product can repair
+         * short of republishing. The key is unique and appears verbatim inside
+         * the public URL the snapshot stores, so a text search over the
+         * snapshots is exact rather than heuristic.
+         *
+         * Raw because Prisma's JSON filters address a path, not the whole
+         * document, and the image may sit in a hero, a gallery or the share
+         * card — three paths today and more tomorrow.
+         */
+        const [{ count }] = await prisma.$queryRaw<[{ count: number }]>`
+            SELECT COUNT(*)::int AS count
+            FROM "Publication"
+            WHERE snapshot::text LIKE ${"%" + media.key + "%"}
+        `;
+        if (count > 0) {
+            throw new ConflictException(
+                "This image is on a published site. Replace it there and publish again before deleting it.",
+            );
+        }
 
         await this.storage.deleteObject(media.key);
         await prisma.media.delete({ where: { id: media.id } });

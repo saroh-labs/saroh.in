@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { MediaPicker } from "@/components/sites/media-picker";
+
 import { updateSiteFooter, updateSiteSettings } from "@/lib/sites/actions";
 import type {
     SiteDetail,
@@ -460,15 +462,19 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                             </div>
                         </div>
                         {editing === "social" ? (
-                            <Input
-                                value={socialImageUrl}
-                                autoFocus
-                                placeholder="https://…"
-                                onChange={(e) =>
-                                    setSocialImageUrl(e.target.value)
-                                }
-                                aria-label="Share image URL"
-                            />
+                            <div className="grid gap-1.5">
+                                <MediaPicker
+                                    onPick={(img) => setSocialImageUrl(img.src)}
+                                />
+                                <Input
+                                    value={socialImageUrl}
+                                    placeholder="or paste an image address"
+                                    onChange={(e) =>
+                                        setSocialImageUrl(e.target.value)
+                                    }
+                                    aria-label="Share image address"
+                                />
+                            </div>
                         ) : null}
                     </div>
                 </Row>

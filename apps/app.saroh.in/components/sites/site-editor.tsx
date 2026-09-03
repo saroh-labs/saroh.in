@@ -23,6 +23,8 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { MediaPicker } from "@/components/sites/media-picker";
+
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
 import { ReviewPanel } from "@/components/sites/review-panel";
@@ -1991,7 +1993,25 @@ function SectionFields({
                             placeholder="/signup"
                         />
                     </Field>
-                    <Field label="Image source">
+                    <Field label="Image">
+                        {/*
+                         * The picture first, the address second. A merchant
+                         * has the photo on their phone; the URL field stays
+                         * for the one who genuinely has an address, but it is
+                         * no longer the only door.
+                         */}
+                        <MediaPicker
+                            onPick={(img) =>
+                                patch({
+                                    image: {
+                                        src: img.src,
+                                        alt: c.image?.alt,
+                                        width: img.width,
+                                        height: img.height,
+                                    },
+                                })
+                            }
+                        />
                         <Input
                             value={c.image?.src ?? ""}
                             onChange={(e) =>
@@ -2002,9 +2022,35 @@ function SectionFields({
                                     ),
                                 })
                             }
-                            placeholder="https://…/hero.jpg"
+                            placeholder="or paste an image address"
+                            aria-label="Image address"
+                            className="mt-1.5"
                         />
                     </Field>
+                    {c.image?.src ? (
+                        <Field label="Describe the image">
+                            {/*
+                             * Alt text is asked where the image is chosen, not
+                             * in a settings screen later. It is only shown once
+                             * there is an image to describe.
+                             */}
+                            <Input
+                                value={c.image.alt ?? ""}
+                                onChange={(e) => {
+                                    // Narrowing from the surrounding `c.image?.src`
+                                    // does not reach into this closure.
+                                    if (!c.image) return;
+                                    patch({
+                                        image: {
+                                            ...c.image,
+                                            alt: e.target.value,
+                                        },
+                                    });
+                                }}
+                                placeholder="What is in the picture, for someone who cannot see it"
+                            />
+                        </Field>
+                    ) : null}
                 </div>
             );
         }
@@ -2175,6 +2221,25 @@ function SectionFields({
                                 </Button>
                             </div>
                         ))}
+                        {/*
+                          The picker appends; the rows below stay editable by address,
+                          so a merchant can mix uploaded photographs with pictures they
+                          already host somewhere.
+                        */}
+                        <MediaPicker
+                            label="Add a photo"
+                            onPick={(img) =>
+                                setImages([
+                                    ...c.images,
+                                    {
+                                        src: img.src,
+                                        alt: "",
+                                        width: img.width,
+                                        height: img.height,
+                                    },
+                                ])
+                            }
+                        />
                         <Button
                             type="button"
                             variant="outline"
