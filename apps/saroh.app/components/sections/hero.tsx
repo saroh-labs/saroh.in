@@ -6,11 +6,20 @@ import { CtaButton } from "./cta";
  * `hero` v1 — a headline block with optional subheading, CTA and image.
  * Responsive: single column on mobile, two columns (copy + image) on large
  * screens when an image is present.
+ *
+ * Sits on the merchant's HERO BAND colour, not the page ground (#189): it is
+ * one of the six colours they pick, and it was previously unreadable by this
+ * app so the choice did nothing.
+ *
+ * The page margin applies from `sm` up only. It goes to 80px, which on a
+ * 375px-wide phone would leave the headline about half the screen — §18 makes
+ * phone a co-primary scene, so the mobile gutter stays fixed and the merchant's
+ * margin governs the widths it was chosen for.
  */
 export default function HeroSection({ content }: { content: HeroContent }) {
     const hasImage = Boolean(content.image?.src);
     return (
-        <section className="mx-auto w-full max-w-screen-xl px-5 py-16 sm:px-8 sm:py-24">
+        <section className="mx-auto w-full max-w-screen-xl bg-site-hero-bg px-5 py-[var(--site-section-padding)] text-site-hero-fg sm:px-[var(--site-page-margin)]">
             <div
                 className={
                     hasImage
@@ -19,11 +28,13 @@ export default function HeroSection({ content }: { content: HeroContent }) {
                 }
             >
                 <div className={hasImage ? "" : "flex flex-col items-center"}>
-                    <h1 className="text-4xl font-bold tracking-tight text-site-fg sm:text-5xl md:text-6xl">
+                    {/* Headings scale together, so one slider moves the whole
+                        page's voice rather than each size separately. */}
+                    <h1 className="text-[calc(2.25rem*var(--site-heading-scale))] font-bold leading-tight tracking-tight sm:text-[calc(3rem*var(--site-heading-scale))] md:text-[calc(3.75rem*var(--site-heading-scale))]">
                         {content.heading}
                     </h1>
                     {content.subheading ? (
-                        <p className="mt-6 max-w-2xl text-lg text-site-body sm:text-xl">
+                        <p className="mt-6 max-w-2xl text-lg opacity-75 sm:text-xl">
                             {content.subheading}
                         </p>
                     ) : null}
@@ -42,7 +53,7 @@ export default function HeroSection({ content }: { content: HeroContent }) {
                         alt={content.image.alt ?? ""}
                         width={content.image.width}
                         height={content.image.height}
-                        className="h-auto w-full rounded-xl object-cover"
+                        className="h-auto w-full rounded-[var(--site-radius)] object-cover"
                     />
                 ) : null}
             </div>

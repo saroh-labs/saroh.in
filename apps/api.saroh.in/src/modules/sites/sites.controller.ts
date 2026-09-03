@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     Param,
@@ -16,8 +17,12 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import {
+    CreateApprovalDto,
+    CreateCommentDto,
+    CreatePageDto,
     CreateSiteFromTemplateDto,
     UpdateDraftSectionsDto,
+    UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
 import { SitesService } from "./sites.service";
@@ -75,6 +80,117 @@ export class SitesController {
         @Param("siteId") siteId: string,
     ) {
         return this.sites.getSite(ctx, siteId);
+    }
+
+    /**
+     * Every note on this site, with the section each is about resolved against
+     * the current draft. Requires `site:read`.
+     */
+    @Get(":siteId/comments")
+    listComments(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.listComments(ctx, siteId);
+    }
+
+    /** Leave a note pinned to a section. Requires `site:comment`. */
+    @Post(":siteId/comments")
+    createComment(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: CreateCommentDto,
+    ) {
+        return this.sites.createComment(ctx, siteId, dto);
+    }
+
+    /**
+     * Mark a note settled, or reopen it. Requires `section:write` — resolving
+     * is the owner's call, not the reviewer's.
+     */
+    @Patch(":siteId/comments/:commentId")
+    setCommentResolved(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("commentId") commentId: string,
+        @Body() dto: { resolved?: boolean },
+    ) {
+        return this.sites.setCommentResolved(
+            ctx,
+            siteId,
+            commentId,
+            dto.resolved === true,
+        );
+    }
+
+    /** Record a reviewer's verdict. Requires `site:approve`. */
+    @Post(":siteId/approvals")
+    createApproval(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: CreateApprovalDto,
+    ) {
+        return this.sites.createApproval(ctx, siteId, dto);
+    }
+
+    /** The latest verdict plus the open-note count. Requires `site:read`. */
+    @Get(":siteId/review")
+    getReviewState(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.getReviewState(ctx, siteId);
+    }
+
+    /**
+     * Every advisory flag on this site, for the rail dots, the publish count
+     * and the pre-publish check. Requires `site:read`. Nothing here blocks
+     * publishing — the spec is explicit that all flags are advisory.
+     */
+    @Get(":siteId/flags")
+    getFlags(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.getSiteFlags(ctx, siteId);
+    }
+
+    /**
+     * Add a page to a site. Requires `site:update`.
+     */
+    @Post(":siteId/pages")
+    createPage(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: CreatePageDto,
+    ) {
+        return this.sites.createPage(ctx, siteId, dto);
+    }
+
+    /**
+     * Rename a page, move it, or both. Requires `site:update`.
+     */
+    @Patch(":siteId/pages/:pageId")
+    updatePage(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+        @Body() dto: UpdatePageDto,
+    ) {
+        return this.sites.updatePage(ctx, siteId, pageId, dto);
+    }
+
+    /**
+     * Delete a page and its versions/sections. Requires `site:update`. The home
+     * page cannot be deleted.
+     */
+    @Delete(":siteId/pages/:pageId")
+    deletePage(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+    ) {
+        return this.sites.deletePage(ctx, siteId, pageId);
     }
 
     /**

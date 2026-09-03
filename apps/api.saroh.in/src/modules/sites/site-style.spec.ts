@@ -183,3 +183,46 @@ describe("siteStyleOptions", () => {
         expect(options.rows[0].swatches[0]).toHaveProperty("hsl");
     });
 });
+
+describe("derived body, muted and hairline", () => {
+    const vars = (ground: string, text: string) => {
+        const style = defaultSiteStyle();
+        style.colours.pageGround = ground;
+        style.colours.text = text;
+        return siteStyleVariables(style);
+    };
+
+    it("reproduces the previous hardcoded greys for the default pairing", () => {
+        // saroh.app hardcoded 25 5% 45% / 24 6% 56% / 20 6% 90%. A site that
+        // has chosen nothing must not change appearance because these became
+        // derived, so the ratios were picked to land back on those values.
+        const v = siteStyleVariables(defaultSiteStyle());
+        expect(v["--site-body"]).toBe("24 6.1% 45.1%");
+        expect(v["--site-muted"]).toBe("24 4.9% 55.9%");
+        expect(v["--site-border"]).toBe("24 1.1% 90.1%");
+    });
+
+    it("gives a dark ground hairlines that are lighter than it, not paler than the page", () => {
+        const v = vars("slate", "chalk");
+        const lightness = (hsl: string) =>
+            Number.parseFloat(hsl.split(/\s+/)[2] ?? "0");
+        // Slate is 12% light. A fixed pale border would be invisible; a derived
+        // one sits just above the ground.
+        expect(lightness(v["--site-border"])).toBeGreaterThan(12);
+        expect(lightness(v["--site-border"])).toBeLessThan(40);
+    });
+
+    it("takes the ground's hue when the text has none", () => {
+        // "Chalk" is `0 0% 98%` — hue 0 is a placeholder, not a choice. Using
+        // it while mixing in a slate ground's saturation produced reddish
+        // hairlines on a blue site.
+        const v = vars("slate", "chalk");
+        expect(v["--site-border"].startsWith("215 ")).toBe(true);
+        expect(v["--site-body"].startsWith("215 ")).toBe(true);
+    });
+
+    it("keeps the text's own hue when it has one", () => {
+        const v = vars("bone", "navy");
+        expect(v["--site-body"].startsWith("215 ")).toBe(true);
+    });
+});

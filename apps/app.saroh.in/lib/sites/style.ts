@@ -70,6 +70,38 @@ export function contrastOk(bgHsl: string, fgHsl: string): boolean {
 }
 
 /**
+ * A colour part-way between the ground and the text, in lightness and
+ * saturation. Mirrors `mixTowardGround` in the API so the preview and the
+ * published site derive body copy, muted labels and hairlines identically; the
+ * RULE is duplicated, the palette VALUES are not.
+ *
+ * These three are derived rather than chosen: a merchant picks six colours, not
+ * nine, and a fixed pale hairline is invisible on a dark ground.
+ */
+export function mixTowardGround(
+    ground: string,
+    text: string,
+    ratio: number,
+): string {
+    const parts = (hsl: string) => hsl.trim().split(/\s+/);
+    const num = (value: string | undefined) =>
+        Number.parseFloat(value ?? "") || 0;
+
+    const g = parts(ground);
+    const t = parts(text);
+    if (g.length < 3 || t.length < 3) return text;
+
+    const mix = (from: number, to: number) => from + ratio * (to - from);
+    const textSaturation = num(t[1]);
+    const saturation = mix(num(g[1]), textSaturation);
+    const lightness = mix(num(g[2]), num(t[2]));
+    // An achromatic text swatch has no hue to lend, so whatever saturation
+    // survives the mix came from the ground and must wear the ground's hue.
+    const hue = textSaturation > 1 ? t[0] : g[0];
+    return `${hue} ${saturation.toFixed(1)}% ${lightness.toFixed(1)}%`;
+}
+
+/**
  * Resolve a style into the `--site-*` custom properties the preview reads.
  *
  * Runs in the browser so a slider re-renders the preview as it moves, using the
@@ -114,6 +146,13 @@ export function resolveStyleVariables(
     set("--site-bg", ground);
     set("--site-surface", ground);
     set("--site-fg", text);
+    // Body, muted and hairline follow the pairing rather than being three more
+    // things to choose. Same ratios as the API's resolver.
+    const stepBack = (ratio: number) =>
+        ground && text ? mixTowardGround(ground, text, ratio) : undefined;
+    set("--site-body", stepBack(0.61));
+    set("--site-muted", stepBack(0.49));
+    set("--site-border", stepBack(0.11));
     set("--site-accent", accent);
     set("--site-accent-fg", accent && readableOn(accent));
     set("--site-hero-bg", hero);

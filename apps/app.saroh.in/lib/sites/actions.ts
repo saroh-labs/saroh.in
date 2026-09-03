@@ -7,10 +7,17 @@ import type {
     SiteStyle,
 } from "./service";
 import {
+    createPage as createPageApi,
     createSite as createSiteApi,
+    deletePage as deletePageApi,
+    getReviewState as getReviewStateApi,
+    getSiteFlags as getSiteFlagsApi,
+    listComments as listCommentsApi,
     publishSite as publishSiteApi,
     restorePublication as restorePublicationApi,
     saveDraftSections as saveDraftSectionsApi,
+    setCommentResolved as setCommentResolvedApi,
+    updatePage as updatePageApi,
     updateSiteSettings as updateSiteSettingsApi,
     updateSiteStyle as updateSiteStyleApi,
 } from "./service";
@@ -54,4 +61,44 @@ export async function restorePublication(
 
 export async function updateSiteStyle(siteId: string, style: SiteStyle) {
     return updateSiteStyleApi(siteId, style);
+}
+
+export async function createPage(
+    siteId: string,
+    input: { title: string; path: string },
+) {
+    return createPageApi(siteId, input);
+}
+
+export async function updatePage(
+    siteId: string,
+    pageId: string,
+    input: { title?: string; path?: string },
+) {
+    return updatePageApi(siteId, pageId, input);
+}
+
+export async function deletePage(siteId: string, pageId: string) {
+    return deletePageApi(siteId, pageId);
+}
+
+/** Re-read the site's flags. Called after a save, so the dots settle with it. */
+export async function getSiteFlags(siteId: string) {
+    return getSiteFlagsApi(siteId);
+}
+
+export async function listComments(siteId: string) {
+    return listCommentsApi(siteId);
+}
+
+export async function getReviewState(siteId: string) {
+    return getReviewStateApi(siteId);
+}
+
+export async function setCommentResolved(
+    siteId: string,
+    commentId: string,
+    resolved: boolean,
+) {
+    return setCommentResolvedApi(siteId, commentId, resolved);
 }

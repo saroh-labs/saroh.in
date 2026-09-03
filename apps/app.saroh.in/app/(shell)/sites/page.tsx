@@ -41,6 +41,22 @@ function siteState(site: SiteSummary): {
         // Published, but the domain they think they connected routes nowhere.
         return { label: "Live · domain pending", tone: "attention" };
     }
+    /*
+     * "Live · 3 things to look at" — the design's line, and the count is the
+     * same one the editor's top bar and the settings screen show, computed
+     * once in the API (#190). Three surfaces quoting three numbers would be
+     * worse than none of them quoting any.
+     *
+     * The fallback without a number covers the case where something is waiting
+     * but no section differs: real, and not worth inventing a count for.
+     */
+    const pending = site.pendingSectionChanges ?? 0;
+    if (pending > 0) {
+        return {
+            label: `Live · ${pending} thing${pending === 1 ? "" : "s"} to look at`,
+            tone: "attention",
+        };
+    }
     if (site.hasUnpublishedChanges) {
         return { label: "Live · unpublished changes", tone: "attention" };
     }

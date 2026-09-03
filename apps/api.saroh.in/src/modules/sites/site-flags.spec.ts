@@ -1,0 +1,350 @@
+import {
+    checkPage,
+    checkSite,
+    FLAGS_AWAITING_NAVIGATION,
+    type FlagPageInput,
+    type FlagSiteInput,
+    type FlagType,
+} from "./site-flags";
+
+function page(
+    sections: { type: string; content: unknown; hidden?: boolean }[],
+    over: Partial<FlagPageInput> = {},
+): FlagPageInput {
+    return {
+        id: "page_1",
+        path: "/",
+        title: "Home",
+        sections: sections.map((s) => ({ ...s, hidden: s.hidden ?? false })),
+        ...over,
+    };
+}
+
+function site(over: Partial<FlagSiteInput> = {}): FlagSiteInput {
+    return {
+        pages: [],
+        // Set so the site-wide checks stay quiet unless a test asks for them.
+        seoDescription: "A real description.",
+        published: false,
+        hasUnpublishedChanges: false,
+        ...over,
+    };
+}
+
+const types = (flags: { type: FlagType }[]) => flags.map((f) => f.type);
+
+describe("the nine flag types", () => {
+    it("names all nine, and says which two have no data yet", () => {
+        // The vocabulary is the spec's. Two need the Navigation model from §3,
+        // which is not built — recorded rather than silently absent.
+        expect(FLAGS_AWAITING_NAVIGATION).toEqual([
+            "hiddenButLinked",
+            "pageNotInNavigation",
+        ]);
+    });
+});
+
+describe("empty required fields", () => {
+    it("flags a hero with no heading, a button with no label, and an empty form", () => {
+        const flags = checkPage(
+            page([
+                { type: "hero", content: { heading: "  " } },
+                { type: "cta", content: { label: "", href: "/about" } },
+                { type: "enquiry", content: { fields: [] } },
+            ]),
+            ["/", "/about"],
+        );
+        expect(
+            flags.filter((f) => f.type === "emptyRequiredField"),
+        ).toHaveLength(3);
+    });
+
+    it("points at the field, so the panel can mark it", () => {
+        const [flag] = checkPage(
+            page([{ type: "hero", content: { heading: "" } }]),
+            ["/"],
+        );
+        expect(flag.field).toBe("heading");
+        expect(flag.sectionIndex).toBe(0);
+    });
+});
+
+describe("placeholder text", () => {
+    it("catches text nobody ships on purpose", () => {
+        for (const heading of [
+            "Lorem ipsum dolor sit amet",
+            "Your heading here",
+            "TODO write this",
+            "xxxx",
+        ]) {
+            const flags = checkPage(
+                page([
+                    {
+                        type: "hero",
+                        content: { heading, image: { src: "x.jpg" } },
+                    },
+                ]),
+                ["/"],
+            );
+            expect(types(flags)).toContain("placeholderText");
+        }
+    });
+
+    it("stays quiet on ordinary copy", () => {
+        // A placeholder check that fires on real writing trains people to
+        // ignore every flag, which costs more than the ones it catches.
+        for (const heading of [
+            "Packaging, storage and safety supplies",
+            "Rooms available this weekend",
+            "Today at the counter",
+        ]) {
+            const flags = checkPage(
+                page([
+                    {
+                        type: "hero",
+                        content: { heading, image: { src: "x.jpg" } },
+                    },
+                ]),
+                ["/"],
+            );
+            expect(types(flags)).not.toContain("placeholderText");
+        }
+    });
+
+    it("reads the words in rich text, not the markup", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "richText",
+                    content: {
+                        format: "html",
+                        value: "<p><strong>Lorem ipsum</strong> dolor</p>",
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(flags)).toContain("placeholderText");
+    });
+
+    it("treats markup-only rich text as empty", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "richText",
+                    content: { format: "html", value: "<p></p><br/>" },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(flags)).toContain("emptyRequiredField");
+    });
+});
+
+describe("missing images", () => {
+    it("flags a hero with no image and a gallery with none", () => {
+        const flags = checkPage(
+            page([
+                { type: "hero", content: { heading: "Hello" } },
+                { type: "gallery", content: { images: [] } },
+            ]),
+            ["/"],
+        );
+        expect(flags.filter((f) => f.type === "missingImage")).toHaveLength(2);
+    });
+});
+
+describe("broken links", () => {
+    it("flags an internal link to a page that does not exist", () => {
+        const flags = checkPage(
+            page([{ type: "cta", content: { label: "Go", href: "/nope" } }]),
+            ["/", "/about"],
+        );
+        expect(types(flags)).toContain("brokenLink");
+    });
+
+    it("accepts a real page, ignoring its query and fragment", () => {
+        for (const href of ["/about", "/about#hours", "/about?utm=x", "/"]) {
+            const flags = checkPage(
+                page([{ type: "cta", content: { label: "Go", href } }]),
+                ["/", "/about"],
+            );
+            expect(types(flags)).not.toContain("brokenLink");
+        }
+    });
+
+    it("says nothing about external links", () => {
+        // Checking one means a network request: a pre-publish screen that
+        // stalls on someone else's slow server, or wrongly calls a live site
+        // broken, is worse than staying quiet.
+        const flags = checkPage(
+            page([
+                {
+                    type: "cta",
+                    content: { label: "Go", href: "https://example.com/gone" },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(flags)).not.toContain("brokenLink");
+    });
+});
+
+describe("breaks at phone width", () => {
+    it("flags a hero heading long enough to fill a handset", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: {
+                        heading:
+                            "Packaging, storage, safety supplies and everything else a working warehouse needs",
+                        image: { src: "x.jpg" },
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(flags)).toContain("phoneWidth");
+    });
+
+    it("leaves a normal heading alone — the sites do reflow", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: {
+                        heading: "Rooms available",
+                        image: { src: "x.jpg" },
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(flags)).not.toContain("phoneWidth");
+    });
+
+    it("flags a four-image grid but not a three-image one", () => {
+        const img = { src: "x.jpg" };
+        const four = checkPage(
+            page([
+                {
+                    type: "gallery",
+                    content: { layout: "grid", images: [img, img, img, img] },
+                },
+            ]),
+            ["/"],
+        );
+        const three = checkPage(
+            page([
+                {
+                    type: "gallery",
+                    content: { layout: "grid", images: [img, img, img] },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(four)).toContain("phoneWidth");
+        expect(types(three)).not.toContain("phoneWidth");
+    });
+});
+
+describe("hidden sections", () => {
+    it("raises nothing at all — a parked section is not a problem", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: { heading: "", value: "" },
+                    hidden: true,
+                },
+                { type: "gallery", content: { images: [] }, hidden: true },
+            ]),
+            ["/"],
+        );
+        // It is not on the live site, so telling the merchant its heading is
+        // empty is telling them about a problem that does not exist.
+        expect(flags).toEqual([]);
+    });
+});
+
+describe("whole-site flags", () => {
+    it("flags a missing search description", () => {
+        const flags = checkSite(site({ seoDescription: "   " }));
+        expect(types(flags)).toContain("missingSeoDescription");
+    });
+
+    it("mentions unpublished changes only once something is live", () => {
+        const never = checkSite(
+            site({ published: false, hasUnpublishedChanges: true }),
+        );
+        const live = checkSite(
+            site({ published: true, hasUnpublishedChanges: true }),
+        );
+        // Before the first publish the whole site is unpublished; saying so is
+        // not news.
+        expect(types(never)).not.toContain("unpublishedChanges");
+        expect(types(live)).toContain("unpublishedChanges");
+    });
+
+    it("carries the page each flag belongs to, and null for site-wide ones", () => {
+        const flags = checkSite(
+            site({
+                seoDescription: null,
+                pages: [
+                    page([{ type: "hero", content: { heading: "" } }], {
+                        id: "page_9",
+                        path: "/about",
+                    }),
+                ],
+            }),
+        );
+        const seo = flags.find((f) => f.type === "missingSeoDescription");
+        const hero = flags.find((f) => f.type === "emptyRequiredField");
+        expect(seo?.pageId).toBeNull();
+        expect(hero?.pageId).toBe("page_9");
+    });
+
+    it("resolves links against every page on the site, not just the one being checked", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([], { id: "p1", path: "/" }),
+                    page(
+                        [
+                            {
+                                type: "cta",
+                                content: { label: "x", href: "/contact" },
+                            },
+                        ],
+                        {
+                            id: "p2",
+                            path: "/about",
+                        },
+                    ),
+                    page([], { id: "p3", path: "/contact" }),
+                ],
+            }),
+        );
+        expect(types(flags)).not.toContain("brokenLink");
+    });
+});
+
+describe("the contract the spec sets", () => {
+    it("never throws, whatever the content is", () => {
+        // "Nothing blocks publishing. All flags are advisory." A check that
+        // could throw would be a check that blocks.
+        for (const content of [null, undefined, 42, "text", [], { a: 1 }]) {
+            expect(() =>
+                checkPage(page([{ type: "hero", content }]), ["/"]),
+            ).not.toThrow();
+        }
+    });
+
+    it("says nothing about a section type it has no checks for", () => {
+        const flags = checkPage(page([{ type: "somethingNew", content: {} }]), [
+            "/",
+        ]);
+        expect(flags).toEqual([]);
+    });
+});

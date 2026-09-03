@@ -25,6 +25,14 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
         // ADR-003: every role may read effective module availability.
         "module:read",
     ],
+    /*
+     * REVIEWER is website-only (#193) and is NOT a narrower MEMBER: it holds
+     * two actions MEMBER lacks (site:comment, site:approve) and lacks four
+     * MEMBER has (org/member/store/media:read). Written out in full here for
+     * the same reason as the rest of this table — so the test pins the
+     * intended set rather than mirroring whatever the implementation does.
+     */
+    REVIEWER: ["site:read", "site:comment", "site:approve"],
 };
 
 function ctx(role: OrgRole): OrganizationContext {
@@ -68,7 +76,9 @@ describe("organization-policy: can()", () => {
 
     it("media:read is on the floor; media:write is OWNER/ADMIN-only (S2-008)", () => {
         for (const role of ORG_ROLES) {
-            expect(can(role, "media:read")).toBe(true);
+            // REVIEWER is off the floor entirely: someone brought in to check
+            // one site's copy is not handed the org's media library.
+            expect(can(role, "media:read")).toBe(role !== "REVIEWER");
         }
         expect(can("OWNER", "media:write")).toBe(true);
         expect(can("ADMIN", "media:write")).toBe(true);

@@ -26,11 +26,37 @@ export async function generateMetadata({
         return null;
     }
 
-    const title = snapshot.site.name;
+    /*
+     * Search and social, from the snapshot (#188).
+     *
+     * These fields have travelled into every publication since #188 shipped and
+     * nothing read them: a merchant could write a search title and a share
+     * image, publish, and the page still went out titled with the bare site
+     * name and no description at all.
+     *
+     * `seoTitle` FALLS BACK to the site name rather than replacing it
+     * conditionally in the settings form — an empty search title means "I have
+     * not written one", not "publish an empty <title>".
+     */
+    const { name, seoTitle, seoDescription, socialImageUrl } = snapshot.site;
+    const title = seoTitle?.trim() ? seoTitle : name;
+    const description = seoDescription?.trim() ? seoDescription : undefined;
+    // `metadataBase` resolves a relative share image against the site's own
+    // host, so a merchant may store either form.
+    const images = socialImageUrl?.trim() ? [socialImageUrl] : undefined;
+
     return {
         title,
-        openGraph: { title },
-        twitter: { card: "summary_large_image", title },
+        description,
+        openGraph: { title, description, images },
+        twitter: {
+            // Without an image this degrades to a plain summary card, so the
+            // card type follows the picture rather than always claiming one.
+            card: images ? "summary_large_image" : "summary",
+            title,
+            description,
+            images,
+        },
         metadataBase: new URL(`https://${domain}`),
     };
 }
@@ -57,7 +83,7 @@ export default async function SiteLayout({
 
     return (
         <div className="min-h-screen bg-site-bg text-site-body">
-            <SiteTheme />
+            <SiteTheme variables={snapshot.site.styleVariables} />
             <header className="left-0 right-0 top-0 z-30 flex h-16 border-b border-site-border bg-site-surface">
                 <div className="mx-auto flex h-full max-w-screen-xl items-center justify-center space-x-5 px-10 sm:px-20">
                     <Link href="/" className="flex items-center justify-center">
@@ -74,43 +100,110 @@ export default async function SiteLayout({
 }
 
 /**
- * Per-publication theme.
+ * Per-publication theme (#189).
  *
- * These sections used to hardcode ~136 `stone-*` classes, so every merchant's
- * site rendered in the same greys with no way to express their own brand. The
- * `--site-*` layer makes the palette data rather than markup: the defaults below
- * reproduce the previous stone values exactly (this is a visual no-op today),
- * and when the publication snapshot starts carrying brand fields this component
- * interpolates them instead — no further component churn.
+ * The merchant's six colour choices and five spacing scalars, already resolved
+ * into `--site-*` custom properties by the publisher and carried in the
+ * snapshot. Until now this component hardcoded the stone defaults with a note
+ * saying it would interpolate brand fields "once the snapshot carries them" —
+ * the snapshot has carried them since #189, and the live site went on showing
+ * greys no merchant chose while the editor preview showed their actual palette.
  *
- * Deliberately NOT Saroh's brand tokens: this subtree is the merchant's website,
- * not a Saroh surface.
+ * The defaults below are still the fallback, and they matter: publications are
+ * immutable, so every site published before #189 has no `styleVariables` at all
+ * and must keep rendering exactly as it always has.
+ *
+ * Deliberately NOT Saroh's brand tokens: this subtree is the merchant's
+ * website, not a Saroh surface.
  */
-function SiteTheme() {
+function SiteTheme({
+    variables,
+}: {
+    variables?: Record<string, string> | null;
+}) {
+    const custom = cssVariables(variables);
+
     return (
         <style>{`
             :root {
                 --site-bg: 0 0% 100%;
                 --site-surface: 0 0% 100%;
                 --site-fg: 24 10% 10%;
-                --site-body: 25 5% 45%;
-                --site-muted: 24 6% 56%;
-                --site-border: 20 6% 90%;
                 --site-accent: 24 10% 10%;
                 --site-accent-fg: 0 0% 100%;
+                --site-hero-bg: 0 0% 100%;
+                --site-hero-fg: 24 10% 10%;
+                --site-cta-bg: 24 10% 10%;
+                --site-cta-fg: 0 0% 98%;
+                --site-footer-bg: 24 10% 10%;
+                --site-footer-fg: 0 0% 98%;
+                --site-page-margin: 38px;
+                --site-section-padding: 52px;
+                --site-grid-gap: 14px;
+                --site-radius: 2px;
+                --site-heading-scale: 1;
             }
-            @media (prefers-color-scheme: dark) {
+${
+    custom === null
+        ? /*
+           * The OS dark preference applies ONLY to an unstyled site.
+           *
+           * A merchant who chose a paper ground chose it for everyone; flipping
+           * their storefront to black because a visitor's laptop is in dark
+           * mode overrides a decision they made deliberately, and it is not a
+           * decision this app is entitled to make on their behalf. Sites with
+           * no palette keep the old behaviour, which is what they have always
+           * had.
+           */
+          `            @media (prefers-color-scheme: dark) {
                 :root {
                     --site-bg: 0 0% 0%;
                     --site-surface: 24 6% 10%;
                     --site-fg: 0 0% 100%;
-                    --site-body: 24 6% 83%;
-                    --site-muted: 24 5% 64%;
-                    --site-border: 25 6% 26%;
                     --site-accent: 0 0% 100%;
                     --site-accent-fg: 24 10% 10%;
+                    --site-hero-bg: 24 6% 10%;
+                    --site-hero-fg: 0 0% 100%;
+                    --site-cta-bg: 0 0% 100%;
+                    --site-cta-fg: 24 10% 10%;
+                    --site-footer-bg: 24 6% 10%;
+                    --site-footer-fg: 0 0% 100%;
                 }
-            }
+            }`
+        : `            :root {\n${custom}\n            }`
+}
         `}</style>
     );
+}
+
+/**
+ * Render a snapshot's style variables as CSS declarations, or null when there
+ * are none worth writing.
+ *
+ * Both the name and the value are checked against a tight allowlist before
+ * being interpolated. The values come from our own publisher and are resolved
+ * from a curated palette, so nothing hostile is expected here — but this is
+ * string interpolation into a `<style>` element, and a rule that only holds as
+ * long as every upstream writer stays well-behaved is not a rule. A property
+ * that fails the check is dropped, so a bad value costs its own colour rather
+ * than the whole stylesheet.
+ */
+function cssVariables(
+    variables: Record<string, string> | null | undefined,
+): string | null {
+    if (!variables) return null;
+    const safeName = /^--site-[a-z-]+$/;
+    // HSL triples ("18 45% 45%"), lengths ("38px") and bare scales ("1.05").
+    const safeValue = /^[a-zA-Z0-9 .%]{1,64}$/;
+
+    const declarations = Object.entries(variables)
+        .filter(
+            ([name, value]) =>
+                safeName.test(name) &&
+                typeof value === "string" &&
+                safeValue.test(value),
+        )
+        .map(([name, value]) => `                ${name}: ${value};`);
+
+    return declarations.length > 0 ? declarations.join("\n") : null;
 }

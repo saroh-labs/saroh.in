@@ -264,6 +264,47 @@ export function contrastOk(bgHsl: string, fgHsl: string): boolean {
 }
 
 /**
+ * A colour part-way between two swatches, in lightness and saturation.
+ *
+ * Body copy, muted labels and hairlines are not choices a merchant makes — they
+ * are the text colour stepped back toward the page ground. Deriving them means
+ * six choices instead of nine, and it means a dark palette gets hairlines that
+ * read: a fixed pale border is invisible on a dark ground, which is how a
+ * "themeable" site quietly stops having any visible structure.
+ *
+ * The three ratios below reproduce today's stone greys almost exactly for the
+ * default paper/ink pairing, so this is a visual no-op for a site that has
+ * chosen nothing.
+ *
+ * Hue comes from whichever swatch actually carries colour. Taking it from the
+ * text unconditionally is wrong when the text is achromatic: "Chalk" is
+ * `0 0% 98%`, whose hue 0 is a placeholder rather than a choice, and pairing it
+ * with saturation mixed in from a slate ground produced reddish hairlines on a
+ * blue site. When the text has a hue of its own it wins — mixing hues would
+ * take a navy body toward neutral grey and lose the reason someone picked navy.
+ */
+function mixTowardGround(ground: string, text: string, ratio: number): string {
+    const parts = (hsl: string) => hsl.trim().split(/\s+/);
+    const num = (value: string | undefined) =>
+        Number.parseFloat(value ?? "") || 0;
+
+    const g = parts(ground);
+    const t = parts(text);
+    // A swatch that is not three parts is not something to interpolate; hand
+    // back the text colour rather than emitting `NaN%` into a stylesheet.
+    if (g.length < 3 || t.length < 3) return text;
+
+    const mix = (from: number, to: number) => from + ratio * (to - from);
+    const textSaturation = num(t[1]);
+    const saturation = mix(num(g[1]), textSaturation);
+    const lightness = mix(num(g[2]), num(t[2]));
+    // Below 1% there is no hue to speak of, so the remaining saturation can
+    // only have come from the ground — and it must wear the ground's hue.
+    const hue = textSaturation > 1 ? t[0] : g[0];
+    return `${hue} ${saturation.toFixed(1)}% ${lightness.toFixed(1)}%`;
+}
+
+/**
  * Resolve a style into the `--site-*` custom properties the renderer reads.
  *
  * One implementation, used by the editor preview and by publishing, so a
@@ -295,6 +336,12 @@ export function siteStyleVariables(style: SiteStyle): Record<string, string> {
         "--site-bg": ground,
         "--site-surface": ground,
         "--site-fg": text,
+        // Body, muted and hairline: the text colour stepped back toward the
+        // ground. The ratios reproduce the previous stone defaults for the
+        // default pairing.
+        "--site-body": mixTowardGround(ground, text, 0.61),
+        "--site-muted": mixTowardGround(ground, text, 0.49),
+        "--site-border": mixTowardGround(ground, text, 0.11),
         "--site-accent": swatch("accent"),
         "--site-accent-fg": readableOn(swatch("accent")),
         "--site-hero-bg": swatch("heroBackground"),

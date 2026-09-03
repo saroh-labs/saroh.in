@@ -144,6 +144,20 @@ export type Section = {
         type: K;
         contractVersion: number;
         content: SectionContentByType[K] & SectionLayout;
+        /**
+         * Visibility, and deliberately a sibling of `content` rather than part
+         * of it: hiding a section is not an edit to what it says. A hidden
+         * section keeps its place and its copy in the draft and is left out of
+         * the published snapshot. ABSENT means visible.
+         */
+        hidden?: boolean;
+        /**
+         * The section's stable identity across saves (#193). Absent only for a
+         * section the editor has just added, which the server then mints one
+         * for. It MUST be sent back for everything else: reviewer notes are
+         * pinned to it, and a save that dropped it would detach them all.
+         */
+        key?: string;
     };
 }[SectionType];
 
@@ -181,10 +195,20 @@ export interface SiteSummary {
     /** When the site last went live; null if it never has. */
     currentPublication?: { publishedAt: string } | null;
     /**
-     * Draft work newer than what is live. A boolean, not a count — see
-     * SitesService.listSites for why the number lives with a single site.
+     * Draft work newer than what is live. Derived server-side from
+     * `pendingSectionChanges`, so it cannot say "up to date" about a site the
+     * count disagrees with.
      */
     hasUnpublishedChanges?: boolean;
+    /**
+     * How many sections publishing would change (#190, #191). Null before the
+     * first publish — there is nothing to diff against, and "never published"
+     * is the more consequential thing to say.
+     *
+     * The editor's top bar, the settings screen and the sites list all render
+     * this same number, computed once in the API.
+     */
+    pendingSectionChanges?: number | null;
     /** A claimed hostname that has not verified yet, if any. */
     pendingDomain?: string | null;
 }
@@ -198,6 +222,8 @@ export interface SitePage {
 
 export interface SiteDetail extends SiteSummary {
     pages: SitePage[];
+    /** Always present on a detail read; null only before the first publish. */
+    pendingSectionChanges: number | null;
     /**
      * Search and social settings (#188). Null means "not set" and must render
      * as absent — never as an empty title or a broken image.
@@ -227,6 +253,8 @@ export interface SiteSettingsInput {
 export interface PageDraft {
     pageVersionId: string;
     sections: DraftSection[];
+    /** What publishing would change, site-wide, as of this read (#190). */
+    pendingSectionChanges: number | null;
 }
 
 export interface CreateSiteInput {
@@ -254,13 +282,42 @@ async function sitesBase(): Promise<string | null> {
 }
 
 /** Extract a human message (+ optional index) from a JSON error body. */
+/**
+ * Pull a human-readable message out of an API error body.
+ *
+ * The api's envelope is `{ error: { code, message, statusCode, correlationId } }`
+ * — `error` is an OBJECT, not a string. This used to be typed as
+ * `{ error?: string }` and returned straight through, so every 400 handed the
+ * caller an object typed as a string. Toasts crashed the page with "Objects are
+ * not valid as a React child", and the editor's inline section error would have
+ * done the same. TypeScript believed the annotation; the wire disagreed.
+ *
+ * So the shape is now checked at runtime rather than declared, and the return
+ * is a string in every branch — including the one where the body is something
+ * none of this anticipated.
+ */
 function readError(
-    data: { message?: string; error?: string; index?: number } | null,
+    data: unknown,
     fallback: string,
 ): { error: string; index?: number } {
+    const body = (typeof data === "object" && data !== null ? data : {}) as {
+        message?: unknown;
+        error?: unknown;
+        index?: unknown;
+    };
+
+    const nested =
+        typeof body.error === "object" && body.error !== null
+            ? (body.error as { message?: unknown }).message
+            : undefined;
+
+    const message = [nested, body.message, body.error].find(
+        (v): v is string => typeof v === "string" && v.trim() !== "",
+    );
+
     return {
-        error: data?.message ?? data?.error ?? fallback,
-        index: typeof data?.index === "number" ? data.index : undefined,
+        error: message ?? fallback,
+        index: typeof body.index === "number" ? body.index : undefined,
     };
 }
 
@@ -346,7 +403,12 @@ export async function saveDraftSections(
     siteId: string,
     pageId: string,
     sections: SectionInput[],
-): Promise<SitesResult<{ pageVersionId?: string }>> {
+): Promise<
+    SitesResult<{
+        pageVersionId?: string;
+        pendingSectionChanges?: number | null;
+    }>
+> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(
@@ -358,12 +420,24 @@ export async function saveDraftSections(
     );
     const data = (await res.json().catch(() => null)) as {
         pageVersionId?: string;
+        pendingSectionChanges?: number | null;
         message?: string;
         error?: string;
         index?: number;
     } | null;
     if (res.ok) {
-        return { ok: true, data: { pageVersionId: data?.pageVersionId } };
+        return {
+            ok: true,
+            data: {
+                pageVersionId: data?.pageVersionId,
+                /*
+                 * The save returns the recomputed count so the top bar stays
+                 * true through a long editing session without the browser ever
+                 * deciding for itself what "changed" means.
+                 */
+                pendingSectionChanges: data?.pendingSectionChanges ?? null,
+            },
+        };
     }
     return { ok: false, ...readError(data, "Could not save the sections") };
 }
@@ -461,6 +535,198 @@ export async function restorePublication(
 }
 
 /** Replace a site's look. The panel always sends a whole style (#189). */
+// ---------------------------------------------------------------------------
+// Review — notes pinned to sections, and one approval (#193)
+// ---------------------------------------------------------------------------
+
+export interface SiteCommentView {
+    id: string;
+    pageId: string;
+    pageTitle: string | null;
+    sectionKey: string;
+    body: string;
+    resolvedAt: string | null;
+    createdAt: string;
+    author: { id: string; name: string };
+    /** The section this was about is no longer on the page. */
+    orphaned: boolean;
+}
+
+export interface ReviewState {
+    openNotes: number;
+    latestApproval: { outcome: string; at: string; by: string } | null;
+}
+
+/**
+ * Every note on a site. Empty rather than throwing on failure: the Review tab
+ * showing nothing is a worse outcome than the editor refusing to open, and
+ * notes are not what the merchant came here to do.
+ */
+export async function listComments(siteId: string): Promise<SiteCommentView[]> {
+    const base = await sitesBase();
+    if (!base) return [];
+    try {
+        const res = await apiFetch(`${base}/${siteId}/comments`);
+        if (!res.ok) return [];
+        const data = (await res.json()) as unknown;
+        return Array.isArray(data) ? (data as SiteCommentView[]) : [];
+    } catch {
+        return [];
+    }
+}
+
+export async function getReviewState(siteId: string): Promise<ReviewState> {
+    const empty: ReviewState = { openNotes: 0, latestApproval: null };
+    const base = await sitesBase();
+    if (!base) return empty;
+    try {
+        const res = await apiFetch(`${base}/${siteId}/review`);
+        if (!res.ok) return empty;
+        const data = (await res.json()) as Partial<ReviewState> | null;
+        return {
+            openNotes: typeof data?.openNotes === "number" ? data.openNotes : 0,
+            latestApproval: data?.latestApproval ?? null,
+        };
+    } catch {
+        return empty;
+    }
+}
+
+/** Mark a note settled, or reopen it. Requires `section:write` on the api. */
+export async function setCommentResolved(
+    siteId: string,
+    commentId: string,
+    resolved: boolean,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/comments/${commentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ resolved }),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+    } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not update the note.") };
+}
+
+// ---------------------------------------------------------------------------
+// Flags (spec §2, "quiet until publish")
+// ---------------------------------------------------------------------------
+
+/**
+ * The nine advisory checks. Mirrored from the api rather than imported, on the
+ * same boundary rule as the section content types above — but the RULES are not
+ * mirrored: only the api decides what is flagged, so there is one answer to
+ * "what is wrong with this site" rather than two that can disagree.
+ */
+export type FlagType =
+    | "emptyRequiredField"
+    | "placeholderText"
+    | "missingImage"
+    | "hiddenButLinked"
+    | "pageNotInNavigation"
+    | "unpublishedChanges"
+    | "missingSeoDescription"
+    | "brokenLink"
+    | "phoneWidth";
+
+export interface Flag {
+    type: FlagType;
+    message: string;
+    pageId: string | null;
+    sectionIndex: number | null;
+    field: string | null;
+}
+
+export interface SiteFlags {
+    flags: Flag[];
+    /** Types the api cannot check yet, so the editor can say so honestly. */
+    awaitingNavigation: FlagType[];
+}
+
+/**
+ * Every flag on a site. Returns an empty set rather than throwing on failure:
+ * flags are advisory, and a check that cannot run is not a reason to stop
+ * someone editing or publishing.
+ */
+export async function getSiteFlags(siteId: string): Promise<SiteFlags> {
+    const empty: SiteFlags = { flags: [], awaitingNavigation: [] };
+    const base = await sitesBase();
+    if (!base) return empty;
+    try {
+        const res = await apiFetch(`${base}/${siteId}/flags`);
+        if (!res.ok) return empty;
+        const data = (await res.json()) as Partial<SiteFlags> | null;
+        return {
+            flags: Array.isArray(data?.flags) ? data.flags : [],
+            awaitingNavigation: Array.isArray(data?.awaitingNavigation)
+                ? data.awaitingNavigation
+                : [],
+        };
+    } catch {
+        return empty;
+    }
+}
+
+/**
+ * Add a page to a site. The API decides what a legal path is and whether it is
+ * free — the form does not pre-check, because a client-side answer that
+ * disagreed with the server's would be worse than one round trip.
+ */
+export async function createPage(
+    siteId: string,
+    input: { title: string; path: string },
+): Promise<SitesResult<SitePage>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/pages`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as
+        (Partial<SitePage> & { message?: string; error?: string }) | null;
+    if (res.ok && data?.id) return { ok: true, data: data as SitePage };
+    return { ok: false, ...readError(data, "Could not add the page.") };
+}
+
+/** Rename a page, move it, or both. An omitted field is left alone. */
+export async function updatePage(
+    siteId: string,
+    pageId: string,
+    input: { title?: string; path?: string },
+): Promise<SitesResult<SitePage>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/pages/${pageId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as
+        (Partial<SitePage> & { message?: string; error?: string }) | null;
+    if (res.ok && data?.id) return { ok: true, data: data as SitePage };
+    return { ok: false, ...readError(data, "Could not update the page.") };
+}
+
+/** Delete a page and everything on it. The home page cannot be deleted. */
+export async function deletePage(
+    siteId: string,
+    pageId: string,
+): Promise<SitesResult<{ deleted: true }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/pages/${pageId}`, {
+        method: "DELETE",
+    });
+    if (res.ok) return { ok: true, data: { deleted: true } };
+    const data = (await res.json().catch(() => null)) as {
+        message?: string;
+        error?: string;
+    } | null;
+    return { ok: false, ...readError(data, "Could not delete the page.") };
+}
+
 export async function updateSiteStyle(
     siteId: string,
     style: SiteStyle,

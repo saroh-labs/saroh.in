@@ -13,18 +13,47 @@ import {
 } from "@saroh/ui/select";
 import { Textarea } from "@saroh/ui/textarea";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
 
+import { PagesPanel } from "@/components/sites/pages-panel";
+import { PrePublishCheck } from "@/components/sites/pre-publish-check";
+import { ReviewPanel } from "@/components/sites/review-panel";
 import { DraftPreview } from "@/components/sites/section-preview";
 import { StylePanel } from "@/components/sites/style-panel";
 import { ensureFormForSection } from "@/lib/forms/actions";
 import { listServicesForPicker } from "@/lib/services/actions";
 import {
+    getReviewState,
+    getSiteFlags,
+    listComments,
     publishSite,
     saveDraftSections,
     updateSiteStyle,
 } from "@/lib/sites/actions";
+import {
+    getChrome,
+    getChromeOnServer,
+    getPlace,
+    PANEL_DEFAULT,
+    PANEL_MAX,
+    PANEL_MIN,
+    placeOnServer,
+    RAIL_DEFAULT,
+    RAIL_MAX,
+    RAIL_MIN,
+    setChrome,
+    setPlace,
+    subscribe,
+} from "@/lib/sites/editor-prefs";
+import { exactDate } from "@/lib/sites/format-date";
 import type {
     BookingContent,
     CtaStyle,
@@ -32,12 +61,17 @@ import type {
     EnquiryContent,
     EnquiryField,
     EnquiryFieldType,
+    Flag,
     GalleryLayout,
     HeroContent,
     ImageValue,
+    ReviewState,
     RichTextContent,
     Section,
     SectionType,
+    SiteCommentView,
+    SiteFlags,
+    SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
@@ -65,6 +99,142 @@ const SECTION_LABELS: Record<SectionType, string> = {
     booking: "Booking",
 };
 
+/**
+ * The rail's tabs. One definition, used by both panels it switches between —
+ * two copies of a tablist is two chances for the selected state to disagree
+ * with what is actually showing.
+ *
+ * Review is absent rather than disabled: it is not built, and a tab leading
+ * nowhere is worse than one that is not there.
+ */
+function RailTabs({
+    rail,
+    onSelect,
+    openNotes,
+}: {
+    rail: "sections" | "pages" | "review" | "style";
+    onSelect: (tab: "sections" | "pages" | "review") => void;
+    /** Shown on the Review tab when notes are open. */
+    openNotes: number;
+}) {
+    return (
+        <div
+            role="tablist"
+            aria-label="Editor panels"
+            className="flex items-center gap-1 border-b px-2 py-1.5"
+        >
+            {(["sections", "pages", "review"] as const).map((tab) => (
+                <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={rail === tab}
+                    onClick={() => onSelect(tab)}
+                    className={cn(
+                        "rounded px-2 py-1 text-xs font-medium capitalize transition-colors",
+                        rail === tab
+                            ? "bg-secondary text-secondary-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                    )}
+                >
+                    {tab}
+                    {/*
+                     * The count rides the tab rather than a separate badge:
+                     * the number only means anything next to the word it
+                     * counts, and the rail has no room for both.
+                     */}
+                    {tab === "review" && openNotes > 0 ? (
+                        <span className="ml-1 tabular-nums text-[#c99f6f]">
+                            {openNotes}
+                        </span>
+                    ) : null}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+/**
+ * A draggable hairline between two panels.
+ *
+ * Pointer events rather than mouse events, so a trackpad, a pen and a touch
+ * screen all work, and pointer CAPTURE so a fast drag that outruns the 1px
+ * line keeps resizing instead of stopping dead. Double-click resets, which the
+ * spec asks for and which is the only cheap way back from a width that turned
+ * out to be wrong.
+ *
+ * It is also a real control for the keyboard: a separator that can only be
+ * dragged is a separator half the people using it cannot move at all.
+ */
+function PanelDivider({
+    label,
+    width,
+    min,
+    max,
+    reset,
+    onResize,
+    onNudge,
+}: {
+    label: string;
+    width: number;
+    min: number;
+    max: number;
+    reset: number;
+    /** Absolute target width, for the drag. */
+    onResize: (px: number) => void;
+    /**
+     * A RELATIVE step, for the keyboard. Deliberately not `onResize(width + n)`:
+     * `width` is this render's prop, so a burst of key events arriving before
+     * React re-renders would each compute from the same stale number and only
+     * the last would count. A delta is applied against whatever the store
+     * currently holds, so every press lands.
+     */
+    onNudge: (delta: number) => void;
+}) {
+    const start = useRef<{ x: number; width: number } | null>(null);
+
+    return (
+        <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={label}
+            aria-valuenow={width}
+            aria-valuemin={min}
+            aria-valuemax={max}
+            tabIndex={0}
+            onPointerDown={(e) => {
+                start.current = { x: e.clientX, width };
+                e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+                const from = start.current;
+                if (from === null) return;
+                onResize(from.width + (e.clientX - from.x));
+            }}
+            onPointerUp={(e) => {
+                start.current = null;
+                e.currentTarget.releasePointerCapture(e.pointerId);
+            }}
+            onDoubleClick={() => onResize(reset)}
+            onKeyDown={(e) => {
+                // 16px a press is roughly a visible step without being so
+                // coarse that the useful widths fall between two presses.
+                if (e.key === "ArrowLeft") onNudge(-16);
+                else if (e.key === "ArrowRight") onNudge(16);
+                else if (e.key === "Home") onResize(reset);
+                else return;
+                e.preventDefault();
+            }}
+            /*
+             * 1px of line, 9px of target. `after` widens what the pointer can
+             * hit without widening what the eye sees — a hairline you have to
+             * hit exactly is a hairline nobody moves twice.
+             */
+            className="relative hidden cursor-col-resize bg-border after:absolute after:inset-y-0 after:-left-1 after:w-[9px] after:content-[''] hover:bg-ring focus-visible:bg-ring focus-visible:outline-none lg:block"
+        />
+    );
+}
+
 /** Preview widths. The phone value is a real handset, not a breakpoint. */
 const DEVICES = [
     { key: "desktop", label: "Desktop" },
@@ -72,6 +242,21 @@ const DEVICES = [
     { key: "phone", label: "Phone" },
 ] as const;
 type Device = (typeof DEVICES)[number]["key"];
+/** Zoom steps. "fit" is computed; the rest are literal percentages (spec §2). */
+type Zoom = 50 | 75 | 100 | "fit";
+const ZOOMS: Zoom[] = [50, 75, 100, "fit"];
+
+/**
+ * The same widths in pixels, for the Fit calculation. Desktop is null because
+ * it has no fixed width — it already takes whatever the canvas gives it, so
+ * there is nothing to scale down to make it fit.
+ */
+const DEVICE_PX: Record<Device, number | null> = {
+    desktop: null,
+    tablet: 768,
+    phone: 375,
+};
+
 const DEVICE_WIDTH: Record<Device, string> = {
     desktop: "100%",
     tablet: "48rem",
@@ -199,6 +384,12 @@ function buildImage(src: string, alt: string): ImageValue | undefined {
 export function SiteEditor({
     siteId,
     pageId,
+    pages,
+    initialFlags,
+    initialComments,
+    initialReview,
+    neverPublished,
+    initialPendingChanges,
     initialSections,
     siteName,
     address,
@@ -207,6 +398,20 @@ export function SiteEditor({
 }: {
     siteId: string;
     pageId: string;
+    /** Every page on this site, for the Pages tab. */
+    pages: SitePage[];
+    /** The site's advisory flags, as the server computed them. */
+    initialFlags: SiteFlags;
+    /** Reviewer notes and the latest verdict (#193). */
+    initialComments: SiteCommentView[];
+    initialReview: ReviewState;
+    /** Never-published sites say "Publish site", not "Publish changes". */
+    neverPublished: boolean;
+    /**
+     * How many sections publishing would change, as the server counted it on
+     * load (#190). Null before the first publish. Refreshed by every autosave.
+     */
+    initialPendingChanges: number | null;
     initialSections: Section[];
     siteName: string;
     initialStyle: SiteStyle;
@@ -219,13 +424,166 @@ export function SiteEditor({
         JSON.stringify(initialSections),
     );
     const [saving, setSaving] = useState(false);
+    const router = useRouter();
     const [publishing, setPublishing] = useState(false);
-    const [errorIndex, setErrorIndex] = useState<number | null>(null);
-    const [selectedIndex, setSelectedIndex] = useState<number | null>(
-        initialSections.length > 0 ? 0 : null,
+    /*
+     * Flags come from the server and settle after each save rather than
+     * updating per keystroke. The spec calls them "quiet until publish", and a
+     * dot that flickers as you type is the opposite of quiet — it also keeps
+     * one implementation of nine rules instead of two that can disagree.
+     */
+    const [siteFlags, setSiteFlags] = useState<SiteFlags>(initialFlags);
+    /*
+     * How many sections publishing would change (#190).
+     *
+     * The SERVER's number, not one this component works out. It is a diff
+     * between the draft and the live publication, and the browser holds only
+     * the page it is editing — so a count computed here would speak for one
+     * page while the button it sits beside publishes the whole site. Refreshed
+     * from each save's response, which is why it is state rather than a prop.
+     *
+     * Null until the site has published once; the button says "Publish site"
+     * in that case and there is no count to give.
+     */
+    const [pendingChanges, setPendingChanges] = useState<number | null>(
+        initialPendingChanges,
     );
-    const [device, setDevice] = useState<Device>("desktop");
-    const [rail, setRail] = useState<"sections" | "style">("sections");
+    const [checking, setChecking] = useState(false);
+    const [comments, setComments] =
+        useState<SiteCommentView[]>(initialComments);
+    const [review, setReview] = useState<ReviewState>(initialReview);
+    const openNotes = review.openNotes;
+
+    /** Re-read notes and the verdict together — they move together. */
+    async function refreshReview() {
+        const [next, state] = await Promise.all([
+            listComments(siteId),
+            getReviewState(siteId),
+        ]);
+        setComments(next);
+        setReview(state);
+    }
+
+    /** Re-read flags from the server. They settle after a save, not per key. */
+    async function refreshFlags() {
+        setSiteFlags(await getSiteFlags(siteId));
+    }
+
+    const [errorIndex, setErrorIndex] = useState<number | null>(null);
+    /*
+     * Panel widths, device and place come from the preferences store rather
+     * than component state: they belong to the browser, outlive this mount,
+     * and the server has no business guessing them. `useSyncExternalStore`
+     * renders the server snapshot (the defaults) during hydration and swaps to
+     * the stored values before paint, so the markup matches what was sent and
+     * nothing visibly jumps from 200px to whatever the merchant chose.
+     */
+    const chrome = useSyncExternalStore(
+        subscribe,
+        getChrome,
+        getChromeOnServer,
+    );
+    const { railWidth, panelWidth, device } = chrome;
+
+    // The section count is what makes a remembered index meaningful, so it is
+    // bound into both snapshots rather than read inside the store.
+    const initialCount = initialSections.length;
+    // Held stable because useSyncExternalStore compares snapshots by identity.
+    const serverPlace = useMemo(
+        () => placeOnServer(initialCount),
+        [initialCount],
+    );
+    const place = useSyncExternalStore(
+        subscribe,
+        () => getPlace(siteId, initialCount),
+        () => serverPlace,
+    );
+    const { selectedIndex, rail } = place;
+
+    // Setters that keep every call site below unchanged. Writing through the
+    // store is what makes the choice survive a reload; the re-render is the
+    // store's notification, not a second source of truth.
+    const setRailWidth = (px: number) => setChrome({ railWidth: px });
+    const setPanelWidth = (px: number) => setChrome({ panelWidth: px });
+    // Relative steps read the store, not this render, so they accumulate.
+    const nudgeRail = (d: number) =>
+        setChrome({ railWidth: getChrome().railWidth + d });
+    const nudgePanel = (d: number) =>
+        setChrome({ panelWidth: getChrome().panelWidth + d });
+    const setDevice = (next: Device) => {
+        setChrome({ device: next });
+        // The dip lasts as long as the width transition it accompanies.
+        setSwitching(true);
+        setTimeout(() => setSwitching(false), 300);
+    };
+    const setSelectedIndex = (next: number | null) =>
+        setPlace(siteId, initialCount, { selectedIndex: next });
+    const setRail = (next: "sections" | "pages" | "review" | "style") =>
+        setPlace(siteId, initialCount, { rail: next });
+
+    /*
+     * "Zoom is the readout dropdown only — 50 / 75 / 100 / Fit. No ⌘scroll, no
+     * pinch, no keyboard shortcuts." The spec resolved a contradiction by
+     * making the readout the control, so there is deliberately no gesture here.
+     */
+    const [zoom, setZoom] = useState<Zoom>(100);
+    /** Briefly dimmed while a device switch animates — the cross-fade. */
+    const [switching, setSwitching] = useState(false);
+    /** Full-screen preview: everything else hides, Escape returns (spec §2). */
+    const [fullScreen, setFullScreen] = useState(false);
+    const canvasRef = useRef<HTMLDivElement | null>(null);
+    const scrollWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    /*
+     * "Fit" is the only value that is not a fixed percentage: it scales the
+     * frame down until it fits the canvas, and never scales it UP — a phone
+     * frame blown up to fill a desktop canvas would stop being a preview of a
+     * phone.
+     */
+    const [fitScale, setFitScale] = useState(1);
+    const zoomScale = zoom === "fit" ? Math.min(1, fitScale) : zoom / 100;
+    useEffect(() => {
+        const el = canvasRef.current;
+        if (el === null) return;
+        const measure = () => {
+            const frame = DEVICE_PX[device];
+            // The canvas padding (p-6 = 24px each side) is not usable width.
+            const usable = el.clientWidth - 48;
+            setFitScale(frame === null ? 1 : usable / frame);
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [device]);
+
+    /*
+     * Restore where the merchant was scrolled to. Mount-only: re-running it on
+     * a later change would yank the canvas back mid-scroll, and the stored
+     * value is already being kept up to date by the handler below.
+     */
+    useEffect(() => {
+        const el = canvasRef.current;
+        if (el === null) return;
+        el.scrollTop = place.scrollTop;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (!fullScreen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setFullScreen(false);
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [fullScreen]);
+    /*
+     * Drag state. `dragIndex` is the row being carried, `dropIndex` the row it
+     * would land on — kept apart so the source can dim while the target draws
+     * its own outline, and so an abandoned drag clears both.
+     */
+    const [dragIndex, setDragIndex] = useState<number | null>(null);
+    const [dropIndex, setDropIndex] = useState<number | null>(null);
     const [style, setStyle] = useState<SiteStyle>(initialStyle);
     const [styleSaving, setStyleSaving] = useState(false);
     const [savedStyleJson, setSavedStyleJson] = useState(() =>
@@ -254,31 +612,6 @@ export function SiteEditor({
 
     const dirty = JSON.stringify(sections) !== lastSavedJson;
 
-    /*
-     * How many sections publishing would actually change.
-     *
-     * "Publish" with no number asks the merchant to trust that something
-     * happened. This compares the current sections against the last SAVED
-     * state, section by section, so the count describes work rather than
-     * keystrokes. A length change counts the difference too — adding a section
-     * is a change even though nothing was edited.
-     */
-    const changedCount = (() => {
-        let saved: Section[];
-        try {
-            saved = JSON.parse(lastSavedJson) as Section[];
-        } catch {
-            return sections.length;
-        }
-        let n = Math.abs(sections.length - saved.length);
-        const shared = Math.min(sections.length, saved.length);
-        for (let i = 0; i < shared; i += 1) {
-            if (JSON.stringify(sections[i]) !== JSON.stringify(saved[i]))
-                n += 1;
-        }
-        return n;
-    })();
-
     function replaceAt(index: number, next: Section) {
         setSections((prev) => prev.map((s, i) => (i === index ? next : s)));
     }
@@ -294,14 +627,34 @@ export function SiteEditor({
     }
 
     function move(index: number, delta: number) {
+        moveTo(index, index + delta);
+    }
+
+    /**
+     * Move a section to an absolute position. The arrows and the drag both
+     * land here so there is one definition of what reordering means, and the
+     * array order IS the saved order — the API persists `order = index`.
+     */
+    function moveTo(from: number, to: number) {
         setSections((prev) => {
-            const target = index + delta;
-            if (target < 0 || target >= prev.length) return prev;
+            if (to < 0 || to >= prev.length || from === to) return prev;
             const next = [...prev];
-            const [item] = next.splice(index, 1);
-            next.splice(target, 0, item);
+            const [item] = next.splice(from, 1);
+            next.splice(to, 0, item);
             return next;
         });
+    }
+
+    /**
+     * Hide or show a section. Hiding is not deleting: the section keeps its
+     * place and its copy, and publish leaves it out of the snapshot. That is
+     * the whole point — a merchant can take a section off the live site
+     * without losing the work that went into it.
+     */
+    function toggleHidden(index: number) {
+        setSections((prev) =>
+            prev.map((s, i) => (i === index ? { ...s, hidden: !s.hidden } : s)),
+        );
     }
 
     /**
@@ -359,19 +712,47 @@ export function SiteEditor({
             setSections(synced.sections);
         }
 
-        const res = await saveDraftSections(siteId, pageId, synced.sections);
+        /*
+         * A thrown save is a DIFFERENT failure from a rejected one, and it was
+         * the only one not handled. The service returns { ok: false } for
+         * anything the api answered — but if the api is unreachable the fetch
+         * rejects, the await throws, and `setSaving(false)` below never ran:
+         * the bar sat on "Saving…" for ever while the work stayed unsaved.
+         *
+         * The editor's own rule is that an autosave failing silently is worse
+         * than a Save button that visibly fails. An outage has to look like a
+         * failure, and the retry is the next edit.
+         */
+        const res = await saveDraftSections(
+            siteId,
+            pageId,
+            synced.sections,
+        ).catch(() => ({
+            ok: false as const,
+            error: "Could not reach Saroh — your work is still here. It will save again with your next edit.",
+        }));
         setSaving(false);
         if (res.ok) {
             setLastSavedJson(JSON.stringify(synced.sections));
             setLastSavedAt(new Date());
             setSaveError(false);
+            // The save recounted what publishing would change; take its answer
+            // rather than guessing at one from what was just sent.
+            setPendingChanges(res.data.pendingSectionChanges ?? null);
             // An autosave that announces itself every few seconds is noise; the
             // bar already states when it last saved.
             if (!auto) toast.success("Draft saved.");
+            /*
+             * The flags settle here — after the save, not on every keystroke.
+             * Deliberately not awaited: the dots catching up a moment later is
+             * fine, and blocking the save's completion on an advisory check
+             * would make editing feel slower for no benefit.
+             */
+            void refreshFlags();
             return;
         }
         setSaveError(true);
-        if (typeof res.index === "number") {
+        if ("index" in res && typeof res.index === "number") {
             setErrorIndex(res.index);
             setErrorMessage(res.error);
         }
@@ -441,19 +822,43 @@ export function SiteEditor({
         setStyle(defaults);
     }
 
-    async function onPublish() {
+    /**
+     * Publishing goes through the pre-publish check first — the spec makes it
+     * "its own moment before going live", not a button that fires immediately.
+     * The check itself never refuses: every flag is advisory, so the merchant
+     * can read them and publish anyway from the same screen.
+     */
+    async function openCheck() {
         if (dirty) {
             toast.error("You have unsaved changes — save the draft first.");
             return;
         }
+        setChecking(true);
+        // Re-read rather than trusting what was loaded: the merchant may have
+        // been editing for an hour, and a stale check is worse than none.
+        await refreshFlags();
+    }
+
+    async function onPublish() {
         setPublishing(true);
         const res = await publishSite(siteId);
         setPublishing(false);
-        if (res.ok) {
-            toast.success("Site published.");
+        if (!res.ok) {
+            toast.error(res.error);
             return;
         }
-        toast.error(res.error);
+        setChecking(false);
+        /*
+         * The live state names the business and its address, per the spec —
+         * "Flour & Ferment is live at flour-and-ferment.saroh.app". A bare
+         * "Published" leaves the merchant to go and check what happened.
+         */
+        toast.success(
+            address === null || address === undefined
+                ? `${siteName} is live.`
+                : `${siteName} is live at ${address}.`,
+        );
+        await refreshFlags();
     }
 
     /*
@@ -466,6 +871,36 @@ export function SiteEditor({
         selectedIndex !== null && selectedIndex < sections.length
             ? { index: selectedIndex, section: sections[selectedIndex] }
             : null;
+
+    /*
+     * Flags for the page currently open, indexed by section. The server sends
+     * flags for the whole site; the rail can only draw dots for the sections it
+     * is showing.
+     */
+    const flagsBySection = new Map<number, Flag[]>();
+    for (const flag of siteFlags.flags) {
+        if (flag.pageId !== pageId || flag.sectionIndex === null) continue;
+        const list = flagsBySection.get(flag.sectionIndex) ?? [];
+        list.push(flag);
+        flagsBySection.set(flag.sectionIndex, list);
+    }
+    const activeFlags =
+        active === null ? [] : (flagsBySection.get(active.index) ?? []);
+
+    /*
+     * Section keys on this page carrying an unresolved note. The issue asks
+     * for it directly: "the section list should show which sections carry
+     * unresolved ones." Resolved notes do not mark anything — a settled note
+     * is history, and a dot for it would never go out.
+     */
+    const notedKeys = new Set(
+        comments
+            .filter(
+                (c) =>
+                    c.pageId === pageId && c.resolvedAt === null && !c.orphaned,
+            )
+            .map((c) => c.sectionKey),
+    );
 
     return (
         /*
@@ -551,6 +986,56 @@ export function SiteEditor({
                               : "Draft"}
                 </span>
 
+                {/*
+                 * What publishing would actually change, in the bar where the
+                 * design puts it. It used to be the badge on Publish, but the
+                 * spec gives that badge to the outstanding FLAG count — and the
+                 * two answer different questions: how much work is waiting, and
+                 * how much of it is worth a second look.
+                 *
+                 * "Changed" means since the last PUBLISH, not since the last
+                 * save — the same number the settings screen and the sites list
+                 * show. What is unsaved is the pill's job, two elements to the
+                 * left, and the two together say the whole truth: your work is
+                 * safe, and this much of it is not live yet.
+                 */}
+                {pendingChanges !== null && pendingChanges > 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                        {pendingChanges === 1
+                            ? "1 section changed"
+                            : `${pendingChanges} sections changed`}
+                    </span>
+                ) : null}
+
+                {/*
+                 * The design's "Approved by Priya Raman" line. The note count
+                 * rides it rather than forming a second badge: the spec's
+                 * "approved with notes" is ONE badge carrying both, because
+                 * approval and outstanding notes answer the same question —
+                 * is this ready.
+                 */}
+                {review.latestApproval === null ? null : (
+                    <span
+                        className={cn(
+                            "flex h-[22px] items-center gap-1.5 rounded-[3px] border px-2 text-xs",
+                            review.latestApproval.outcome === "APPROVED"
+                                ? "border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
+                                : "border-border text-muted-foreground",
+                        )}
+                        title={exactDate(review.latestApproval.at)}
+                    >
+                        {review.latestApproval.outcome === "APPROVED"
+                            ? `Approved by ${review.latestApproval.by}`
+                            : `${review.latestApproval.by} asked for changes`}
+                        {openNotes > 0 ? (
+                            <span className="tabular-nums opacity-80">
+                                · {openNotes}{" "}
+                                {openNotes === 1 ? "note" : "notes"}
+                            </span>
+                        ) : null}
+                    </span>
+                )}
+
                 <div className="ml-auto flex items-center gap-2">
                     {/*
                      * Device preview. §18 makes the phone co-primary for the
@@ -588,6 +1073,43 @@ export function SiteEditor({
                      * rail lists one page's sections — a tab would file a
                      * site-wide setting under a page.
                      */}
+                    {/*
+                     * The zoom readout IS the control (spec §2 resolved the
+                     * contradiction that way): no ⌘scroll, no pinch, no
+                     * shortcut. A select rather than a menu because it is a
+                     * value being chosen, and a native select is the one
+                     * control every keyboard and screen reader already knows.
+                     */}
+                    <select
+                        aria-label="Zoom"
+                        value={String(zoom)}
+                        onChange={(e) =>
+                            setZoom(
+                                e.target.value === "fit"
+                                    ? "fit"
+                                    : (Number(e.target.value) as Zoom),
+                            )
+                        }
+                        className="h-7 w-[4.25rem] rounded border bg-transparent px-1.5 text-xs tabular-nums text-muted-foreground"
+                    >
+                        {ZOOMS.map((z) => (
+                            <option key={String(z)} value={String(z)}>
+                                {z === "fit" ? "Fit" : `${z}%`}
+                            </option>
+                        ))}
+                    </select>
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        aria-label="Full-screen preview"
+                        title="Full-screen preview — Escape returns"
+                        onClick={() => setFullScreen(true)}
+                    >
+                        ⤢
+                    </Button>
+
                     <Button
                         variant={rail === "style" ? "secondary" : "outline"}
                         size="sm"
@@ -609,29 +1131,113 @@ export function SiteEditor({
                      */}
                     <Button
                         className="wk-press h-7 rounded bg-[#8a5a3c] px-3 text-xs font-medium text-white hover:bg-[#794e34]"
-                        onClick={onPublish}
+                        onClick={() => void openCheck()}
                         disabled={publishing || dirty || saving}
                     >
-                        {publishing ? "Publishing…" : "Publish"}
+                        {publishing
+                            ? "Publishing…"
+                            : /*
+                               * "Never-published sites say Publish site, not
+                               * Publish changes" (spec §2). Before anything is
+                               * live there are no changes to publish — there is
+                               * a site to put up.
+                               */
+                              neverPublished
+                              ? "Publish site"
+                              : "Publish"}
                         {/*
                          * The count as a BADGE rather than in the label, as the
                          * design has it: "Publish" stays the same width whatever
                          * the number, so the button a merchant is about to press
                          * does not move under the cursor as they edit.
                          */}
-                        {!publishing && changedCount > 0 ? (
-                            <span className="ml-1.5 rounded bg-brand-foreground/25 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
-                                {changedCount}
+                        {/*
+                         * "Publish button carries the outstanding flag count"
+                         * (spec §2) — the flags, not the changed-section count
+                         * that used to sit here. A number next to Publish
+                         * should say what is worth looking at before going
+                         * live, and the changed count already has its own line
+                         * in the bar.
+                         */}
+                        {!publishing && siteFlags.flags.length > 0 ? (
+                            <span className="ml-1.5 rounded bg-black/30 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
+                                {siteFlags.flags.length}
                             </span>
                         ) : null}
                     </Button>
                 </div>
             </header>
 
-            <div className="grid min-h-0 flex-1 lg:grid-cols-[12.5rem_15rem_minmax(0,1fr)]">
+            <div
+                className="grid min-h-0 flex-1 lg:grid-cols-[var(--editor-cols)]"
+                style={
+                    {
+                        // The two 1px tracks are the drag handles. Giving them
+                        // real grid tracks — rather than absolutely positioning
+                        // them over a border — is what keeps the hit area and
+                        // the line the merchant is aiming at the same object.
+                        /*
+                         * "Review tab auto-widens the rail to 300px; the other
+                         * tabs stay at 200." The merchant's own width is not
+                         * overwritten — it comes straight back when they leave
+                         * the tab, because this widens the LAYOUT, not the
+                         * stored preference.
+                         */
+                        "--editor-cols": `${rail === "review" ? Math.max(railWidth, 300) : railWidth}px 1px ${panelWidth}px 1px minmax(0,1fr)`,
+                    } as React.CSSProperties
+                }
+            >
                 {/* Rail — the page as a list of sections, not a wall of fields. */}
-                <aside className="flex min-h-0 flex-col border-r">
-                    {rail === "style" ? (
+                <aside className="flex min-h-0 flex-col">
+                    {rail === "pages" ? (
+                        <>
+                            <RailTabs
+                                rail={rail}
+                                onSelect={setRail}
+                                openNotes={openNotes}
+                            />
+                            <PagesPanel
+                                siteId={siteId}
+                                pages={pages}
+                                activePageId={pageId}
+                                dirty={dirty}
+                            />
+                        </>
+                    ) : rail === "review" ? (
+                        <>
+                            <RailTabs
+                                rail={rail}
+                                onSelect={setRail}
+                                openNotes={openNotes}
+                            />
+                            <ReviewPanel
+                                siteId={siteId}
+                                pages={pages}
+                                comments={comments}
+                                onChanged={() => void refreshReview()}
+                                onJump={(jumpPageId, sectionKey) => {
+                                    /*
+                                     * A note names a section by KEY, and only
+                                     * the open page's sections are loaded — so
+                                     * a note on another page is a navigation
+                                     * first and a selection after it.
+                                     */
+                                    if (jumpPageId !== pageId) {
+                                        router.push(
+                                            `/sites/${siteId}?page=${jumpPageId}`,
+                                        );
+                                        return;
+                                    }
+                                    const index = sections.findIndex(
+                                        (sec) => sec.key === sectionKey,
+                                    );
+                                    if (index === -1) return;
+                                    setRail("sections");
+                                    setSelectedIndex(index);
+                                }}
+                            />
+                        </>
+                    ) : rail === "style" ? (
                         <StylePanel
                             style={style}
                             options={styleOptions}
@@ -644,49 +1250,154 @@ export function SiteEditor({
                         <>
                             {/*
                              * The design's rail carries Sections / Pages /
-                             * Review. Only Sections exists, so only Sections is
-                             * drawn — the same rule the workspace nav follows,
-                             * and a tab leading nowhere is worse than an absent
-                             * one. The TREATMENT is the design's, so the others
-                             * drop in beside it when #193 lands.
+                             * Review. Review is still unbuilt, so it is absent
+                             * rather than dead — a tab leading nowhere is worse
+                             * than one that is not there. Style is not a tab at
+                             * all: it opens from the bar, because it applies to
+                             * the whole site while this rail lists one page.
                              */}
-                            <div
-                                role="tablist"
-                                aria-label="Editor panels"
-                                className="flex items-center gap-1 border-b px-2 py-1.5"
-                            >
-                                <span
-                                    role="tab"
-                                    aria-selected="true"
-                                    className="rounded bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground"
-                                >
-                                    Sections
-                                </span>
-                            </div>
+                            <RailTabs
+                                rail={rail}
+                                onSelect={setRail}
+                                openNotes={openNotes}
+                            />
                             <ul className="min-h-0 flex-1 overflow-y-auto p-2">
                                 {sections.map((section, index) => (
-                                    <li key={index}>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setSelectedIndex(index)
-                                            }
+                                    <li
+                                        key={index}
+                                        /*
+                                         * The row is the drop target, not the
+                                         * handle: aiming at a 32px row is far
+                                         * easier than aiming at the grip, and
+                                         * the grip is what starts the drag.
+                                         */
+                                        onDragOver={(e) => {
+                                            if (dragIndex === null) return;
+                                            e.preventDefault();
+                                            setDropIndex(index);
+                                        }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            if (dragIndex === null) return;
+                                            moveTo(dragIndex, index);
+                                            setSelectedIndex(index);
+                                            setDragIndex(null);
+                                            setDropIndex(null);
+                                        }}
+                                        className={cn(
+                                            "rounded",
+                                            dropIndex === index &&
+                                                dragIndex !== index &&
+                                                "ring-1 ring-inset ring-ring",
+                                        )}
+                                    >
+                                        <div
                                             className={cn(
-                                                "flex h-8 w-full items-center justify-between gap-2 rounded px-2 text-left text-xs",
+                                                "group flex h-8 w-full items-center gap-1.5 rounded pr-1 text-left text-xs",
                                                 selectedIndex === index
                                                     ? "bg-secondary"
                                                     : "hover:bg-muted",
                                                 errorIndex === index &&
                                                     "text-destructive",
+                                                dragIndex === index &&
+                                                    "opacity-40",
                                             )}
                                         >
-                                            <span className="truncate">
-                                                {sectionTitle(section)}
+                                            {/*
+                                             * The grip is the drag surface. It
+                                             * carries no click of its own — a
+                                             * handle that also navigates makes
+                                             * every aborted drag a selection.
+                                             */}
+                                            <span
+                                                draggable
+                                                onDragStart={() => {
+                                                    setDragIndex(index);
+                                                    setDropIndex(index);
+                                                }}
+                                                onDragEnd={() => {
+                                                    setDragIndex(null);
+                                                    setDropIndex(null);
+                                                }}
+                                                aria-hidden="true"
+                                                className="cursor-grab select-none px-1 text-muted-foreground/50 active:cursor-grabbing group-hover:text-muted-foreground"
+                                            >
+                                                ⋮
                                             </span>
-                                            <span className="shrink-0 text-[0.625rem] uppercase tracking-[0.06em] text-muted-foreground/70">
-                                                {SECTION_LABELS[section.type]}
-                                            </span>
-                                        </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setSelectedIndex(index)
+                                                }
+                                                className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
+                                            >
+                                                <span
+                                                    className={cn(
+                                                        "truncate",
+                                                        /*
+                                                         * A hidden section is
+                                                         * dimmed rather than
+                                                         * removed: it is still
+                                                         * part of the page the
+                                                         * merchant is building,
+                                                         * just not part of the
+                                                         * one visitors get.
+                                                         */
+                                                        section.hidden &&
+                                                            "text-muted-foreground/50 line-through",
+                                                    )}
+                                                >
+                                                    {sectionTitle(section)}
+                                                </span>
+                                                <span className="flex shrink-0 items-center gap-1.5">
+                                                    <span className="text-[0.625rem] uppercase tracking-[0.06em] text-muted-foreground/70">
+                                                        {
+                                                            SECTION_LABELS[
+                                                                section.type
+                                                            ]
+                                                        }
+                                                    </span>
+                                                    {/*
+                                                     * The spec's flag dot: 4px,
+                                                     * amber #c99f6f (§7). It is
+                                                     * the ONLY thing flags draw
+                                                     * while editing — "quiet
+                                                     * until publish" — so it
+                                                     * carries a title rather
+                                                     * than expanding into the
+                                                     * row.
+                                                     */}
+                                                    {(flagsBySection.get(index)
+                                                        ?.length ?? 0) > 0 ||
+                                                    (section.key !==
+                                                        undefined &&
+                                                        notedKeys.has(
+                                                            section.key,
+                                                        )) ? (
+                                                        <span
+                                                            className="size-1 shrink-0 rounded-full bg-[#c99f6f]"
+                                                            title={[
+                                                                ...(flagsBySection
+                                                                    .get(index)
+                                                                    ?.map(
+                                                                        (f) =>
+                                                                            f.message,
+                                                                    ) ?? []),
+                                                                ...(section.key !==
+                                                                    undefined &&
+                                                                notedKeys.has(
+                                                                    section.key,
+                                                                )
+                                                                    ? [
+                                                                          "A reviewer has left a note on this section.",
+                                                                      ]
+                                                                    : []),
+                                                            ].join("\n")}
+                                                        />
+                                                    ) : null}
+                                                </span>
+                                            </button>
+                                        </div>
                                     </li>
                                 ))}
                                 {sections.length === 0 ? (
@@ -732,20 +1443,78 @@ export function SiteEditor({
                     )}
                 </aside>
 
+                <PanelDivider
+                    label="Resize the section list"
+                    width={railWidth}
+                    min={RAIL_MIN}
+                    max={RAIL_MAX}
+                    reset={RAIL_DEFAULT}
+                    onResize={setRailWidth}
+                    onNudge={nudgeRail}
+                />
+
                 {/* Field panel — one section at a time. */}
-                <div className="min-h-0 overflow-y-auto border-r p-4">
+                <div className="min-h-0 overflow-y-auto p-4">
                     {active ? (
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between gap-2">
-                                <h2 className="text-sm font-semibold">
-                                    {SECTION_LABELS[active.section.type]}
-                                </h2>
+                            {/*
+                             * Two rows, because 240px will not hold a section
+                             * name and four controls on one line — the header
+                             * clipped its own Remove button at the design's
+                             * own panel width.
+                             *
+                             * The split is not just fitting: the design's
+                             * header carries what the section IS and whether
+                             * it is on the live site. Moving it, and deleting
+                             * it, are actions taken ON it and belong under it.
+                             */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <h2 className="min-w-0 truncate text-sm font-semibold">
+                                        {SECTION_LABELS[active.section.type]}
+                                    </h2>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-pressed={
+                                            active.section.hidden === true
+                                        }
+                                        title={
+                                            active.section.hidden
+                                                ? "Hidden — this section is left out when you publish"
+                                                : "Visible — this section publishes with the page"
+                                        }
+                                        onClick={() =>
+                                            toggleHidden(active.index)
+                                        }
+                                        className={cn(
+                                            "h-7 shrink-0 gap-1.5 px-2 text-xs",
+                                            active.section.hidden &&
+                                                "text-muted-foreground",
+                                        )}
+                                    >
+                                        <span aria-hidden="true">
+                                            {active.section.hidden ? "○" : "●"}
+                                        </span>
+                                        {active.section.hidden
+                                            ? "Hidden"
+                                            : "Visible"}
+                                    </Button>
+                                </div>
+
                                 <div className="flex items-center gap-1">
+                                    {/*
+                                     * The arrows survive the drag handle: a
+                                     * list you can only reorder by dragging is
+                                     * a list some people cannot reorder.
+                                     */}
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="sm"
                                         aria-label="Move section up"
+                                        className="h-7 w-7 p-0"
                                         disabled={active.index === 0}
                                         onClick={() => {
                                             move(active.index, -1);
@@ -759,6 +1528,7 @@ export function SiteEditor({
                                         variant="ghost"
                                         size="sm"
                                         aria-label="Move section down"
+                                        className="h-7 w-7 p-0"
                                         disabled={
                                             active.index === sections.length - 1
                                         }
@@ -773,6 +1543,7 @@ export function SiteEditor({
                                         type="button"
                                         variant="ghost"
                                         size="sm"
+                                        className="ml-auto h-7 px-2 text-xs"
                                         onClick={() => {
                                             removeAt(active.index);
                                             setSelectedIndex(null);
@@ -790,6 +1561,32 @@ export function SiteEditor({
                                     replaceAt(active.index, next)
                                 }
                             />
+
+                            {/*
+                             * Per-field markers, the other half of what flags
+                             * are allowed to show while editing. Listed under
+                             * the fields rather than inline beside each one:
+                             * the field components are shared with the section
+                             * types and threading a marker through all six for
+                             * a advisory note would cost more than it is worth
+                             * until the notes need to sit on the input itself.
+                             */}
+                            {activeFlags.length > 0 ? (
+                                <ul className="grid gap-1.5 border-t pt-3">
+                                    {activeFlags.map((flag, i) => (
+                                        <li
+                                            key={i}
+                                            className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
+                                        >
+                                            <span
+                                                aria-hidden="true"
+                                                className="mt-1.5 size-1 shrink-0 rounded-full bg-[#c99f6f]"
+                                            />
+                                            <span>{flag.message}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : null}
 
                             <SectionPadding
                                 section={active.section}
@@ -830,6 +1627,16 @@ export function SiteEditor({
                     )}
                 </div>
 
+                <PanelDivider
+                    label="Resize the field panel"
+                    width={panelWidth}
+                    min={PANEL_MIN}
+                    max={PANEL_MAX}
+                    reset={PANEL_DEFAULT}
+                    onResize={setPanelWidth}
+                    onNudge={nudgePanel}
+                />
+
                 {/*
                  * Preview — width changes, data does not.
                  *
@@ -838,9 +1645,95 @@ export function SiteEditor({
                  * a second bright object competing with the one that matters:
                  * the rendered site.
                  */}
-                <div className="min-h-0 overflow-y-auto bg-background p-6">
+                <div
+                    ref={canvasRef}
+                    onScroll={(e) => {
+                        /*
+                         * Remembered per site — the spec lists preview scroll
+                         * position among the things that persist. Debounced:
+                         * a scroll fires dozens of events a second, and every
+                         * one of them writing to storage would serialise the
+                         * whole place object each time for no benefit.
+                         */
+                        const top = e.currentTarget.scrollTop;
+                        if (scrollWrite.current !== null) {
+                            clearTimeout(scrollWrite.current);
+                        }
+                        scrollWrite.current = setTimeout(() => {
+                            setPlace(siteId, initialCount, { scrollTop: top });
+                        }, 250);
+                    }}
+                    className="min-h-0 overflow-y-auto bg-background p-6"
+                >
+                    {/*
+                     * The first-run nudge (spec §5), in the spec's own words.
+                     * "It does not nag" — so it is one quiet line above the
+                     * preview, shown only until the site has been published
+                     * once, and it never reappears afterwards.
+                     */}
+                    {neverPublished ? (
+                        <p
+                            className="mx-auto mb-4 text-center text-xs text-muted-foreground"
+                            style={{ maxWidth: DEVICE_WIDTH[device] }}
+                        >
+                            Nothing&rsquo;s live yet — publish when you&rsquo;re
+                            ready, nobody can see this in the meantime.
+                        </p>
+                    ) : null}
                     <div
-                        className="mx-auto transition-[max-width]"
+                        /*
+                         * "Switching frames cross-fades and resizes — the frame
+                         * animates to the new width, content reflows during
+                         * it." The width transition does the resize; the brief
+                         * dip in opacity is the cross-fade, and it is what stops
+                         * a reflow mid-animation reading as a glitch.
+                         */
+                        className={`mx-auto transition-[max-width,opacity,transform] duration-300 ease-out ${
+                            switching ? "opacity-70" : "opacity-100"
+                        }`}
+                        style={{
+                            maxWidth: DEVICE_WIDTH[device],
+                            transform: `scale(${zoomScale})`,
+                            transformOrigin: "top center",
+                        }}
+                    >
+                        <DraftPreview
+                            sections={sections}
+                            style={style}
+                            styleOptions={styleOptions}
+                            selectedIndex={selectedIndex}
+                            onSelect={(index) => {
+                                setRail("sections");
+                                setSelectedIndex(index);
+                            }}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/*
+             * The pre-publish check. Rendered inside the editor rather than
+             * on its own route so nothing is torn down and rebuilt behind
+             * it — the merchant goes back to exactly the editing state they
+             * left, including unsaved selection and scroll.
+             */}
+            {/*
+             * Full-screen preview: "hides everything; Escape returns". The
+             * frame keeps its device width, so this is the site at the size
+             * being designed for with nothing else on screen — not a
+             * maximised editor.
+             */}
+            {fullScreen ? (
+                <div className="fixed inset-0 z-40 overflow-y-auto bg-background p-6">
+                    <button
+                        type="button"
+                        onClick={() => setFullScreen(false)}
+                        className="fixed right-4 top-4 z-10 rounded border bg-background/80 px-2 py-1 text-xs text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
+                    >
+                        Escape to return
+                    </button>
+                    <div
+                        className="mx-auto transition-[max-width] duration-300"
                         style={{ maxWidth: DEVICE_WIDTH[device] }}
                     >
                         <DraftPreview
@@ -850,7 +1743,38 @@ export function SiteEditor({
                         />
                     </div>
                 </div>
-            </div>
+            ) : null}
+
+            {checking ? (
+                <PrePublishCheck
+                    siteName={siteName}
+                    pages={pages}
+                    flags={siteFlags.flags}
+                    awaitingNavigation={siteFlags.awaitingNavigation}
+                    publishing={publishing}
+                    neverPublished={neverPublished}
+                    review={review}
+                    onPublish={() => void onPublish()}
+                    onClose={() => setChecking(false)}
+                    onJump={(jumpPageId, sectionIndex) => {
+                        setChecking(false);
+                        /*
+                         * A flag on another page needs that page loaded, which
+                         * is a navigation. One on this page is just a
+                         * selection — doing it without a round trip keeps the
+                         * jump instant where it can be.
+                         */
+                        if (jumpPageId !== null && jumpPageId !== pageId) {
+                            router.push(`/sites/${siteId}?page=${jumpPageId}`);
+                            return;
+                        }
+                        if (sectionIndex !== null) {
+                            setRail("sections");
+                            setSelectedIndex(sectionIndex);
+                        }
+                    }}
+                />
+            ) : null}
         </div>
     );
 }

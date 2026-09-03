@@ -166,6 +166,27 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                         <span className="text-muted-foreground/70">Never</span>
                     )}
                 </Row>
+                {/*
+                 * What is waiting to go live (#190).
+                 *
+                 * The same number the editor's top bar shows, from the same
+                 * server-side diff — a merchant who reads "3 sections changed"
+                 * here and something else in the editor learns to trust
+                 * neither. Only shown once the site has published: before that
+                 * the status above already says nobody can reach it, and a
+                 * count of changes against nothing would be noise.
+                 */}
+                {live ? (
+                    <Row label="Waiting to publish">
+                        {site.pendingSectionChanges ? (
+                            `${site.pendingSectionChanges} section${site.pendingSectionChanges === 1 ? "" : "s"} changed since the last publish`
+                        ) : (
+                            <span className="text-muted-foreground/70">
+                                Nothing — the live site matches your draft
+                            </span>
+                        )}
+                    </Row>
+                ) : null}
             </Section>
 
             <Section
