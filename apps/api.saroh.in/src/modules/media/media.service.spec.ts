@@ -11,11 +11,18 @@ jest.mock("@saroh/database", () => {
                 update: jest.fn(),
                 delete: jest.fn(),
             },
+            // The delete guard counts publications referencing a key. Default
+            // to "none", so existing remove tests keep their meaning.
+            $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
         },
     };
 });
 
-import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import type {
     HeadObjectResult,
@@ -31,6 +38,7 @@ const findUnique = prisma.media.findUnique as jest.Mock;
 const findMany = prisma.media.findMany as jest.Mock;
 const update = prisma.media.update as jest.Mock;
 const del = prisma.media.delete as jest.Mock;
+const queryRaw = prisma.$queryRaw as unknown as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -184,6 +192,83 @@ describe("MediaService.completeUpload", () => {
             service.completeUpload(ctx(), "media_1"),
         ).rejects.toBeInstanceOf(NotFoundException);
         expect(update).not.toHaveBeenCalled();
+    });
+});
+
+describe("MediaService.completeUpload — the url", () => {
+    it("returns where the object is served from, so an upload can be used", async () => {
+        // Completing used to hand back id, status and size and nothing else:
+        // the merchant held a storage key with no way to turn it into an
+        // <img src>. The whole point of uploading is to put the picture on
+        // something.
+        findUnique.mockResolvedValue({
+            id: "m1",
+            organizationId: "org_1",
+            key: "org/org_1/site-image/a.png",
+            sizeBytes: 10,
+        });
+        update.mockResolvedValue({
+            id: "m1",
+            status: "READY",
+            sizeBytes: 10,
+            key: "org/org_1/site-image/a.png",
+        });
+        const storage = fakeStorage({
+            getPublicUrl: jest.fn((k: string) => `https://cdn.test/${k}`),
+        });
+        const svc = new MediaService(storage);
+        const out = await svc.completeUpload(ctx(), "m1");
+        expect(out.url).toBe("https://cdn.test/org/org_1/site-image/a.png");
+    });
+
+    it("returns null rather than failing when storage cannot serve it", async () => {
+        // getPublicUrl throws with no public base configured. At this boundary
+        // that must not turn a SUCCESSFUL upload into a 500 — null is an honest
+        // answer the client can act on.
+        findUnique.mockResolvedValue({
+            id: "m1",
+            organizationId: "org_1",
+            key: "k",
+            sizeBytes: 10,
+        });
+        update.mockResolvedValue({
+            id: "m1",
+            status: "READY",
+            sizeBytes: 10,
+            key: "k",
+        });
+        const storage = fakeStorage({
+            getPublicUrl: jest.fn(() => {
+                throw new Error("publicBaseUrl is not configured");
+            }),
+        });
+        const svc = new MediaService(storage);
+        const out = await svc.completeUpload(ctx(), "m1");
+        expect(out.status).toBe("READY");
+        expect(out.url).toBeNull();
+    });
+});
+
+describe("MediaService.remove — a published image stays", () => {
+    it("refuses to delete an object a publication still references", async () => {
+        // A Publication is immutable and is the site as it was served.
+        // Deleting what it points at does not edit the snapshot; it leaves a
+        // broken image on a live site that nothing can repair short of
+        // republishing.
+        findUnique.mockResolvedValue({
+            id: "m1",
+            organizationId: "org_1",
+            key: "org/org_1/site-image/hero.png",
+        });
+        queryRaw.mockResolvedValueOnce([{ count: 2 }]);
+        const storage = fakeStorage();
+        const svc = new MediaService(storage);
+
+        await expect(svc.remove(ctx(), "m1")).rejects.toThrow(
+            ConflictException,
+        );
+        expect(storage.deleteObject).not.toHaveBeenCalled();
+        expect(del).not.toHaveBeenCalled();
     });
 });
 
