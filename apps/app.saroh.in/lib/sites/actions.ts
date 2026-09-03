@@ -4,6 +4,7 @@ import type {
     CreateSiteInput,
     SectionInput,
     SiteFooter,
+    SiteNavigation,
     SiteSettingsInput,
     SiteStyle,
 } from "./service";
@@ -20,6 +21,7 @@ import {
     setCommentResolved as setCommentResolvedApi,
     updatePage as updatePageApi,
     updateSiteFooter as updateSiteFooterApi,
+    updateSiteNavigation as updateSiteNavigationApi,
     updateSiteSettings as updateSiteSettingsApi,
     updateSiteStyle as updateSiteStyleApi,
 } from "./service";
@@ -63,6 +65,13 @@ export async function restorePublication(
 
 export async function updateSiteStyle(siteId: string, style: SiteStyle) {
     return updateSiteStyleApi(siteId, style);
+}
+
+export async function updateSiteNavigation(
+    siteId: string,
+    navigation: SiteNavigation | null,
+) {
+    return updateSiteNavigationApi(siteId, navigation);
 }
 
 export async function updateSiteFooter(

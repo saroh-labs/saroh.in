@@ -173,6 +173,12 @@ export interface PublicationSite {
      * raw author input.
      */
     footer?: { format: "html" | "markdown"; value: string } | null;
+    /**
+     * The site's menu (#206), already RESOLVED by the publisher to labels and
+     * paths over the pages in this snapshot. Absent or empty means no menu;
+     * the header then shows the site name alone, as it always has.
+     */
+    navigation?: { label: string; href: string }[] | null;
 }
 
 /**

@@ -39,6 +39,8 @@ import type { Flag, FlagType } from "./site-flags";
 import { checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
 import type { SiteFooter } from "./site-footer";
 import { parseSiteFooter } from "./site-footer";
+import type { SiteNavigation } from "./site-navigation";
+import { parseSiteNavigation, resolveSiteNavigation } from "./site-navigation";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
 import {
     parseSiteStyle,
@@ -234,6 +236,8 @@ export interface SiteDetailView {
      * the footer colour.
      */
     footer: SiteFooter | null;
+    /** The site's menu (#206), by page id. Null until one is built. */
+    navigation: SiteNavigation | null;
     /**
      * The palette and slider bounds. Sent with the site so the editor can
      * resolve a choice locally as a slider moves, without carrying its own copy
@@ -564,6 +568,7 @@ export class SitesService {
                 seoDescription: true,
                 socialImageUrl: true,
                 footer: true,
+                navigation: true,
                 createdAt: true,
                 updatedAt: true,
                 // When the site last went live. Read through the current
@@ -592,7 +597,7 @@ export class SitesService {
         // client filling gaps itself is how the preview and the published site
         // drift apart. The footer is normalized here for the same reason — the
         // editor reads back exactly what publish would write.
-        const { style, footer, ...rest } = site;
+        const { style, footer, navigation, ...rest } = site;
         const pending = await this.pendingSectionChanges([site.id]);
         return {
             ...rest,
@@ -606,6 +611,7 @@ export class SitesService {
             style: parseSiteStyle(style),
             styleOptions: siteStyleOptions(),
             footer: parseSiteFooter(footer),
+            navigation: parseSiteNavigation(navigation),
         };
     }
 
@@ -720,6 +726,32 @@ export class SitesService {
             select: { id: true },
         });
         return { id: siteId, footer };
+    }
+
+    /**
+     * Set the site's menu (#206). Replaces rather than merges, like style and
+     * the footer; an empty list clears it. Requires `site:update`. Draft
+     * state: it reaches the live site on the next publish.
+     */
+    async updateNavigation(
+        ctx: OrganizationContext,
+        siteId: string,
+        input: unknown,
+    ): Promise<{ id: string; navigation: SiteNavigation | null }> {
+        authorize(ctx, "site:update");
+        await this.assertSiteInOrg(ctx, siteId);
+        const navigation = parseSiteNavigation(input);
+        await prisma.site.update({
+            where: { id: siteId },
+            data: {
+                navigation:
+                    navigation === null
+                        ? Prisma.DbNull
+                        : (navigation as unknown as Prisma.InputJsonValue),
+            },
+            select: { id: true },
+        });
+        return { id: siteId, navigation };
     }
 
     // -----------------------------------------------------------------------
@@ -1065,6 +1097,7 @@ export class SitesService {
                 seoDescription: true,
                 socialImageUrl: true,
                 footer: true,
+                navigation: true,
                 pages: {
                     // A hidden page does not travel, for the same reason a
                     // hidden section does not: a Publication is immutable once
@@ -1198,6 +1231,16 @@ export class SitesService {
                  */
                 styleVariables: siteStyleVariables(publishedStyle),
                 footer: publishedFooter,
+                /*
+                 * The menu, RESOLVED (#206): page ids become paths and default
+                 * labels, over the pages this publish writes — so a hidden
+                 * page's entry is simply absent. Same reason style and button
+                 * actions resolve here: the snapshot is the site as served.
+                 */
+                navigation: resolveSiteNavigation(
+                    parseSiteNavigation(site.navigation),
+                    site.pages,
+                ),
             },
             pages,
             publishedAt: publishedAt.toISOString(),
@@ -1539,6 +1582,7 @@ export class SitesService {
                 seoDescription: true,
                 currentPublicationId: true,
                 currentPublication: { select: { publishedAt: true } },
+                navigation: true,
                 pages: {
                     select: {
                         id: true,
@@ -1596,6 +1640,7 @@ export class SitesService {
             );
 
         const flags = checkSite({
+            navigation: parseSiteNavigation(site.navigation),
             seoDescription: site.seoDescription,
             published: site.currentPublicationId !== null,
             hasUnpublishedChanges,

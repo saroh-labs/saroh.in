@@ -39,16 +39,12 @@ export type FlagType =
     | "phoneWidth";
 
 /**
- * The two of the nine that cannot be computed yet. Both need the Navigation
- * model from spec §3, which is not built: without a navigation there is no
- * "linked from navigation" to be hidden from, and no navigation for a page to
- * be missing from. Listed here rather than silently absent so the gap is a
- * fact in the code, not something to rediscover.
+ * Flags that cannot be computed yet. Empty since #206 built the navigation
+ * model that `hiddenButLinked` and `pageNotInNavigation` were waiting on;
+ * kept as the contract the check screen reads, so a future flag that lands
+ * ahead of its data has somewhere honest to be listed.
  */
-export const FLAGS_AWAITING_NAVIGATION: readonly FlagType[] = [
-    "hiddenButLinked",
-    "pageNotInNavigation",
-];
+export const FLAGS_AWAITING_NAVIGATION: readonly FlagType[] = [];
 
 export interface Flag {
     type: FlagType;
@@ -78,6 +74,8 @@ export interface FlagPageInput {
 
 export interface FlagSiteInput {
     pages: FlagPageInput[];
+    /** The site's menu, by page id (#206). Null when none has been built. */
+    navigation: { items: { pageId: string }[] } | null;
     seoDescription: string | null;
     /** Whether the site has ever been published. */
     published: boolean;
@@ -476,6 +474,50 @@ export function checkSite(site: FlagSiteInput): Flag[] {
         flags.push({
             type: "unpublishedChanges",
             message: "There are edits here that visitors cannot see yet.",
+            pageId: null,
+            sectionIndex: null,
+            field: null,
+        });
+    }
+
+    /*
+     * The two flags that waited on the navigation model (#206).
+     *
+     * A menu entry pointing at a hidden page is a link visitors will click
+     * into nothing — the exact case the model exists to catch. And a visible
+     * page absent from the menu is reachable only by typing its address; the
+     * home page is exempt because the site's own name links to it, and a site
+     * with no menu at all gets one flag saying so rather than one per page.
+     */
+    const inMenu = new Set(site.navigation?.items.map((i) => i.pageId) ?? []);
+    for (const page of site.pages) {
+        if (page.hidden && inMenu.has(page.id)) {
+            flags.push({
+                type: "hiddenButLinked",
+                message: `"${page.title}" is in the menu but hidden, so that link goes nowhere.`,
+                pageId: page.id,
+                sectionIndex: null,
+                field: null,
+            });
+        }
+    }
+    if (site.navigation) {
+        for (const page of visible) {
+            if (page.path !== "/" && !inMenu.has(page.id)) {
+                flags.push({
+                    type: "pageNotInNavigation",
+                    message: `"${page.title}" is not in the menu, so visitors can only reach it by typing its address.`,
+                    pageId: page.id,
+                    sectionIndex: null,
+                    field: null,
+                });
+            }
+        }
+    } else if (visible.length > 1) {
+        flags.push({
+            type: "pageNotInNavigation",
+            message:
+                "This site has no menu yet, so visitors can only reach its other pages by typing their addresses.",
             pageId: null,
             sectionIndex: null,
             field: null,

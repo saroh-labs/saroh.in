@@ -229,6 +229,15 @@ export interface SiteSummary {
     pendingDomain?: string | null;
 }
 
+/** A menu entry names a page; the label is optional and defaults to its title. */
+export interface SiteNavigationItem {
+    pageId: string;
+    label?: string;
+}
+export interface SiteNavigation {
+    items: SiteNavigationItem[];
+}
+
 /** A site footer, the same `{ format, value }` a richText section carries. */
 export interface SiteFooter {
     format: "html" | "markdown";
@@ -260,6 +269,8 @@ export interface SiteDetail extends SiteSummary {
      * have written nothing, and nothing renders — see `parseSiteFooter`.
      */
     footer: SiteFooter | null;
+    /** The site's menu (#206), by page id. Null until one is built. */
+    navigation: SiteNavigation | null;
     /** When the site last went live; null if it has never been published. */
     currentPublication: { publishedAt: string } | null;
     /** The site's look — always complete; absent choices come back filled. */
@@ -754,6 +765,27 @@ export async function deletePage(
         error?: string;
     } | null;
     return { ok: false, ...readError(data, "Could not delete the page.") };
+}
+
+export async function updateSiteNavigation(
+    siteId: string,
+    navigation: SiteNavigation | null,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/navigation`, {
+        method: "PUT",
+        // Always an object on the wire — Express's json parser rejects a bare
+        // null (see updateSiteFooter). An empty items list clears the menu.
+        body: JSON.stringify(navigation ?? { items: [] }),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not save the menu.") };
 }
 
 export async function updateSiteFooter(

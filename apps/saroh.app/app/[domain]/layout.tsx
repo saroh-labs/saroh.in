@@ -85,15 +85,10 @@ export default async function SiteLayout({
     return (
         <div className="min-h-screen bg-site-bg text-site-body">
             <SiteTheme variables={snapshot.site.styleVariables} />
-            <header className="left-0 right-0 top-0 z-30 flex h-16 border-b border-site-border bg-site-surface">
-                <div className="mx-auto flex h-full max-w-screen-xl items-center justify-center space-x-5 px-10 sm:px-20">
-                    <Link href="/" className="flex items-center justify-center">
-                        <span className="inline-block truncate text-lg font-medium tracking-tight text-site-fg">
-                            {snapshot.site.name}
-                        </span>
-                    </Link>
-                </div>
-            </header>
+            <SiteHeader
+                name={snapshot.site.name}
+                navigation={snapshot.site.navigation ?? []}
+            />
 
             <div>{children}</div>
 
@@ -253,4 +248,81 @@ function cssVariables(
         .map(([name, value]) => `                ${name}: ${value};`);
 
     return declarations.length > 0 ? declarations.join("\n") : null;
+}
+
+/**
+ * The site's name and its menu (#206).
+ *
+ * With no menu the header is what it always was: the name, centred, linking
+ * home. With one, the name goes left and the menu sits beside it from `sm` up.
+ *
+ * ON A PHONE THE MENU IS A <details>. No JavaScript, no hover (§19), and it
+ * works before hydration and with scripts blocked. A horizontal row of six
+ * entries at 375px is not a menu, it is a scroll bar; a disclosure that opens
+ * a list is the same information a thumb can use.
+ */
+function SiteHeader({
+    name,
+    navigation,
+}: {
+    name: string;
+    navigation: { label: string; href: string }[];
+}) {
+    const hasMenu = navigation.length > 0;
+    const linkClass =
+        "rounded-[var(--site-radius)] px-2 py-1 text-sm text-site-body transition-colors hover:text-site-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent";
+    return (
+        <header className="left-0 right-0 top-0 z-30 border-b border-site-border bg-site-surface">
+            <div
+                className={
+                    hasMenu
+                        ? "mx-auto flex h-16 max-w-screen-xl items-center justify-between gap-6 px-5 sm:px-[var(--site-page-margin)]"
+                        : "mx-auto flex h-16 max-w-screen-xl items-center justify-center px-10 sm:px-20"
+                }
+            >
+                <Link href="/" className="flex items-center">
+                    <span className="inline-block truncate text-lg font-medium tracking-tight text-site-fg">
+                        {name}
+                    </span>
+                </Link>
+                {hasMenu ? (
+                    <>
+                        <nav
+                            aria-label="Site"
+                            className="hidden sm:flex sm:items-center sm:gap-1"
+                        >
+                            {navigation.map((item) => (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={linkClass}
+                                >
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </nav>
+                        <details className="relative sm:hidden">
+                            <summary className="cursor-pointer list-none rounded-[var(--site-radius)] border border-site-border px-3 py-1.5 text-sm text-site-fg [&::-webkit-details-marker]:hidden">
+                                Menu
+                            </summary>
+                            <nav
+                                aria-label="Site"
+                                className="absolute right-0 top-full z-40 mt-2 flex min-w-44 flex-col gap-1 rounded-[var(--site-radius)] border border-site-border bg-site-surface p-2"
+                            >
+                                {navigation.map((item) => (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className={linkClass + " block"}
+                                    >
+                                        {item.label}
+                                    </Link>
+                                ))}
+                            </nav>
+                        </details>
+                    </>
+                ) : null}
+            </div>
+        </header>
+    );
 }

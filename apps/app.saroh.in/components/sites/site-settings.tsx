@@ -28,11 +28,16 @@ const RichTextEditor = dynamic(
     },
 );
 
-import { updateSiteFooter, updateSiteSettings } from "@/lib/sites/actions";
+import {
+    updateSiteFooter,
+    updateSiteNavigation,
+    updateSiteSettings,
+} from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
 import type {
     SiteDetail,
     SiteFooter,
+    SiteNavigationItem,
     SiteSettingsInput,
 } from "@/lib/sites/service";
 
@@ -143,6 +148,40 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
             toast.success(`${label} saved. Publish to make it public.`);
         });
     }
+
+    const [menu, setMenu] = useState<SiteNavigationItem[]>(
+        site.navigation?.items ?? [],
+    );
+    const pagesById = new Map(site.pages.map((p) => [p.id, p]));
+    const inMenu = new Set(menu.map((m) => m.pageId));
+
+    function saveMenu() {
+        startTransition(async () => {
+            const res = await updateSiteNavigation(
+                site.id,
+                menu.length ? { items: menu } : null,
+            );
+            if (!res.ok) {
+                toast.error(res.error);
+                return;
+            }
+            setEditing(null);
+            router.refresh();
+            toast.success(
+                menu.length
+                    ? "Menu saved. Publish to make it public."
+                    : "Menu removed. Publish to take it off the site.",
+            );
+        });
+    }
+    const moveMenu = (i: number, d: -1 | 1) =>
+        setMenu((m) => {
+            const j = i + d;
+            if (j < 0 || j >= m.length) return m;
+            const next = [...m];
+            [next[i], next[j]] = [next[j], next[i]];
+            return next;
+        });
 
     function saveFooter() {
         startTransition(async () => {
@@ -496,6 +535,188 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                             </div>
                         ) : null}
                     </div>
+                </Row>
+            </Section>
+
+            <Section
+                title="Menu"
+                description="The links at the top of every page. Pick the pages, put them in order, and rename an entry if the page title is too long for a menu."
+            >
+                <Row
+                    label="Pages"
+                    action={
+                        editing === "menu" ? (
+                            <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    variant="brand"
+                                    disabled={pending}
+                                    onClick={saveMenu}
+                                >
+                                    Save
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={pending}
+                                    onClick={() => {
+                                        setMenu(site.navigation?.items ?? []);
+                                        setEditing(null);
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        ) : (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditing("menu")}
+                            >
+                                {site.navigation ? "Edit" : "Build"}
+                            </Button>
+                        )
+                    }
+                >
+                    {editing === "menu" ? (
+                        <div className="grid gap-3">
+                            {/* The menu, in order. */}
+                            {menu.length ? (
+                                <ol className="grid gap-1.5">
+                                    {menu.map((item, i) => {
+                                        const page = pagesById.get(item.pageId);
+                                        return (
+                                            <li
+                                                key={item.pageId}
+                                                className="flex items-center gap-2"
+                                            >
+                                                <Input
+                                                    value={item.label ?? ""}
+                                                    placeholder={
+                                                        page?.title ?? "Page"
+                                                    }
+                                                    aria-label={`Menu label for ${page?.title ?? "page"}`}
+                                                    className="h-8"
+                                                    onChange={(e) =>
+                                                        setMenu((m) =>
+                                                            m.map((x, j) =>
+                                                                j === i
+                                                                    ? {
+                                                                          pageId: x.pageId,
+                                                                          ...(e.target.value.trim()
+                                                                              ? {
+                                                                                    label: e
+                                                                                        .target
+                                                                                        .value,
+                                                                                }
+                                                                              : {}),
+                                                                      }
+                                                                    : x,
+                                                            ),
+                                                        )
+                                                    }
+                                                />
+                                                <span className="shrink-0 font-mono text-[0.6875rem] text-muted-foreground">
+                                                    {page?.path}
+                                                </span>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 w-7 p-0"
+                                                    aria-label="Move up"
+                                                    disabled={i === 0}
+                                                    onClick={() =>
+                                                        moveMenu(i, -1)
+                                                    }
+                                                >
+                                                    ↑
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 w-7 p-0"
+                                                    aria-label="Move down"
+                                                    disabled={
+                                                        i === menu.length - 1
+                                                    }
+                                                    onClick={() =>
+                                                        moveMenu(i, 1)
+                                                    }
+                                                >
+                                                    ↓
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 w-7 p-0"
+                                                    aria-label={`Remove ${page?.title ?? "page"} from the menu`}
+                                                    onClick={() =>
+                                                        setMenu((m) =>
+                                                            m.filter(
+                                                                (_, j) =>
+                                                                    j !== i,
+                                                            ),
+                                                        )
+                                                    }
+                                                >
+                                                    ×
+                                                </Button>
+                                            </li>
+                                        );
+                                    })}
+                                </ol>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">
+                                    No pages in the menu yet.
+                                </p>
+                            )}
+                            {/* Pages not yet in the menu. Hidden pages are not offered: an entry for one is the exact dead link the pre-publish check flags. */}
+                            {site.pages.filter(
+                                (p) => !inMenu.has(p.id) && !p.hidden,
+                            ).length ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {site.pages
+                                        .filter(
+                                            (p) =>
+                                                !inMenu.has(p.id) && !p.hidden,
+                                        )
+                                        .map((p) => (
+                                            <Button
+                                                key={p.id}
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 text-xs"
+                                                onClick={() =>
+                                                    setMenu((m) => [
+                                                        ...m,
+                                                        { pageId: p.id },
+                                                    ])
+                                                }
+                                            >
+                                                + {p.title}
+                                            </Button>
+                                        ))}
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : site.navigation ? (
+                        <span className="text-muted-foreground">
+                            {site.navigation.items
+                                .map(
+                                    (i) =>
+                                        i.label ??
+                                        pagesById.get(i.pageId)?.title ??
+                                        "?",
+                                )
+                                .join(" · ")}
+                        </span>
+                    ) : (
+                        <Missing />
+                    )}
                 </Row>
             </Section>
 
