@@ -1558,8 +1558,46 @@ export function SiteEditor({
                                         size="sm"
                                         className="ml-auto h-7 px-2 text-xs"
                                         onClick={() => {
+                                            /*
+                                             * Ask first, and name the section.
+                                             *
+                                             * Removing one used to be the only
+                                             * destructive action in the editor
+                                             * with no guard at all, while
+                                             * deleting a PAGE — the rarer of
+                                             * the two — has always confirmed.
+                                             * The weaker guard sat on the more
+                                             * frequent action, next to the move
+                                             * arrows a merchant is reaching for
+                                             * while reordering.
+                                             *
+                                             * Autosave then commits it, and
+                                             * version history only covers what
+                                             * has been PUBLISHED, so copy
+                                             * written since the last publish is
+                                             * gone for good. The question says
+                                             * so rather than asking "are you
+                                             * sure" about a cost it does not
+                                             * name.
+                                             *
+                                             * It also names hiding. A merchant
+                                             * reaching for Remove usually wants
+                                             * the section off the site, not
+                                             * destroyed, and the control that
+                                             * does that is two inches away —
+                                             * an error is cheaper to prevent
+                                             * than to apologise for.
+                                             */
+                                            const title = sectionTitle(
+                                                active.section,
+                                            );
+                                            const ok = window.confirm(
+                                                `Remove "${title}"? Anything written here since your last publish cannot be brought back. To take it off the site and keep the work, hide it instead.`,
+                                            );
+                                            if (!ok) return;
                                             removeAt(active.index);
                                             setSelectedIndex(null);
+                                            toast.success(`Removed ${title}.`);
                                         }}
                                     >
                                         Remove
