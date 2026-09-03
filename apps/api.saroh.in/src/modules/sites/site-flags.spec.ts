@@ -23,6 +23,7 @@ function page(
 
 function site(over: Partial<FlagSiteInput> = {}): FlagSiteInput {
     return {
+        navigation: null,
         pages: [],
         // Set so the site-wide checks stay quiet unless a test asks for them.
         seoDescription: "A real description.",
@@ -35,13 +36,11 @@ function site(over: Partial<FlagSiteInput> = {}): FlagSiteInput {
 const types = (flags: { type: FlagType }[]) => flags.map((f) => f.type);
 
 describe("the nine flag types", () => {
-    it("names all nine, and says which two have no data yet", () => {
+    it("names all nine, and none is waiting on data any more", () => {
         // The vocabulary is the spec's. Two need the Navigation model from §3,
         // which is not built — recorded rather than silently absent.
-        expect(FLAGS_AWAITING_NAVIGATION).toEqual([
-            "hiddenButLinked",
-            "pageNotInNavigation",
-        ]);
+        // Since #206 every one of the nine has the data it needs.
+        expect(FLAGS_AWAITING_NAVIGATION).toEqual([]);
     });
 });
 
@@ -439,6 +438,55 @@ describe("whole-site flags", () => {
             }),
         );
         expect(flags.map((f) => f.type)).toContain("brokenLink");
+    });
+
+    it("flags a menu entry that points at a hidden page (#206)", () => {
+        const flags = checkSite(
+            site({
+                navigation: {
+                    items: [{ pageId: "page_1" }, { pageId: "page_hidden" }],
+                },
+                pages: [
+                    page([]),
+                    page([], {
+                        id: "page_hidden",
+                        path: "/about",
+                        title: "About",
+                        hidden: true,
+                    }),
+                ],
+            }),
+        );
+        expect(flags.map((f) => f.type)).toContain("hiddenButLinked");
+    });
+
+    it("flags a visible page the menu leaves out, but never the home page", () => {
+        const flags = checkSite(
+            site({
+                navigation: { items: [{ pageId: "page_1" }] },
+                pages: [
+                    page([]),
+                    page([], { id: "page_2", path: "/about", title: "About" }),
+                ],
+            }),
+        );
+        const missing = flags.filter((f) => f.type === "pageNotInNavigation");
+        expect(missing.map((f) => f.pageId)).toEqual(["page_2"]);
+    });
+
+    it("says once that there is no menu, rather than once per page", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([]),
+                    page([], { id: "page_2", path: "/about" }),
+                    page([], { id: "page_3", path: "/book" }),
+                ],
+            }),
+        );
+        expect(
+            flags.filter((f) => f.type === "pageNotInNavigation"),
+        ).toHaveLength(1);
     });
 
     it("raises nothing on a hidden page", () => {

@@ -1425,6 +1425,13 @@ model Site {
   // `richText.value` is, before it reaches the immutable snapshot.
   footer Json?
 
+  // The site's menu (#206): `{ items: [{ pageId, label? }] }`, site-level and
+  // NOT a section. A menu that were a section would have to be added to every
+  // page and kept in step by hand. Items reference pages by ID so a rename
+  // cannot break the menu; the path and the default label are resolved into
+  // the snapshot at publish. Null means no menu has been built.
+  navigation Json?
+
   // Reserved placeholder for the S2-007 custom-domain claim/verification flow.
   // NOT wired to a relation here and NOT the legacy store `CustomDomain`.
   customDomainId String?

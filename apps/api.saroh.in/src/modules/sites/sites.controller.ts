@@ -251,6 +251,16 @@ export class SitesController {
      * Set the site's footer (#202). Replaces rather than merges, and an empty
      * value clears it — see `SitesService.updateFooter`.
      */
+    /** Set the site's menu (#206). Replaces; an empty list clears it. */
+    @Put(":siteId/navigation")
+    updateNavigation(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() body: unknown,
+    ) {
+        return this.sites.updateNavigation(ctx, siteId, body);
+    }
+
     @Put(":siteId/footer")
     updateFooter(
         @OrgContext() ctx: OrganizationContext,
