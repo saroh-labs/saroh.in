@@ -1462,6 +1462,16 @@ model Page {
   title  String
   isHome Boolean @default(false)
 
+  // Visibility, modelled exactly as `Section.hidden` is: a hidden page keeps
+  // its path, its title, its versions and its sections, and is simply left OUT
+  // of the published snapshot. Two sibling lists in the same editor must not
+  // behave differently — a merchant who learns "hide, don't delete" on sections
+  // and then finds only Delete on pages loses work to our inconsistency.
+  //
+  // The home page can never be hidden: "/" is what the site's own address
+  // serves, and a site whose front door is hidden has nothing to show.
+  hidden Boolean @default(false)
+
   versions PageVersion[]
   comments SiteComment[]
 

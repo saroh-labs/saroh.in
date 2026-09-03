@@ -96,6 +96,8 @@ export interface PageView {
     path: string;
     title: string;
     isHome: boolean;
+    /** Hidden pages stay in the draft and are omitted from the snapshot. */
+    hidden: boolean;
 }
 
 /** A section as returned by the draft-editing endpoints. */
@@ -470,6 +472,12 @@ export class SitesService {
                 id: true,
                 currentPublication: { select: { snapshot: true } },
                 pages: {
+                    // Hidden pages do not travel, on exactly the reasoning that
+                    // keeps hidden sections out below: the snapshot IS the
+                    // published site, and a Publication is immutable once
+                    // written, so a page that leaked in could not be taken back
+                    // out without republishing.
+                    where: { hidden: false },
                     orderBy: { path: "asc" },
                     select: {
                         path: true,
@@ -544,12 +552,15 @@ export class SitesService {
                 // drift from the publication history it describes.
                 currentPublication: { select: { publishedAt: true } },
                 pages: {
+                    // Not filtered: this is the EDITOR's list, and a merchant
+                    // cannot unhide a page they cannot see.
                     orderBy: { path: "asc" },
                     select: {
                         id: true,
                         path: true,
                         title: true,
                         isHome: true,
+                        hidden: true,
                     },
                 },
             },
@@ -994,6 +1005,11 @@ export class SitesService {
                 seoDescription: true,
                 socialImageUrl: true,
                 pages: {
+                    // A hidden page does not travel, for the same reason a
+                    // hidden section does not: a Publication is immutable once
+                    // written, so a page that leaked in could not be taken back
+                    // out without republishing.
+                    where: { hidden: false },
                     orderBy: { path: "asc" },
                     select: {
                         path: true,
@@ -1445,6 +1461,8 @@ export class SitesService {
                         id: true,
                         path: true,
                         title: true,
+                        hidden: true,
+                        updatedAt: true,
                         versions: {
                             where: { status: "DRAFT" },
                             orderBy: { createdAt: "desc" },
@@ -1470,10 +1488,28 @@ export class SitesService {
         }
 
         const publishedAt = site.currentPublication?.publishedAt ?? null;
+        /*
+         * The page's OWN timestamp counts, not just its versions'.
+         *
+         * This compared `PageVersion.updatedAt` alone, which silently missed
+         * every change that lives on the Page row rather than inside a draft:
+         * hiding a page (#197), renaming one, moving one. All three alter the
+         * snapshot publishing would write — title and path travel in it, and a
+         * hidden page does not travel at all — so a merchant could hide a page
+         * and be told there was nothing waiting to publish, leaving it live.
+         *
+         * The authoritative answer to "how much is waiting" is the diff in
+         * `pending-changes.ts`, which the sites list already uses. This path
+         * wants a boolean rather than a count and runs on a different query, so
+         * it stays a timestamp comparison — but it now looks at both places a
+         * change can land.
+         */
         const hasUnpublishedChanges =
             publishedAt !== null &&
-            site.pages.some((page) =>
-                page.versions.some((v) => v.updatedAt > publishedAt),
+            site.pages.some(
+                (page) =>
+                    page.updatedAt > publishedAt ||
+                    page.versions.some((v) => v.updatedAt > publishedAt),
             );
 
         const flags = checkSite({
@@ -1484,6 +1520,7 @@ export class SitesService {
                 id: page.id,
                 path: page.path,
                 title: page.title,
+                hidden: page.hidden,
                 // `versions` is the latest draft or empty; a page with no draft
                 // has no sections to check rather than being an error.
                 sections: page.versions.flatMap((v) => v.sections),
@@ -1533,7 +1570,13 @@ export class SitesService {
                 title: dto.title,
                 isHome: false,
             },
-            select: { id: true, path: true, title: true, isHome: true },
+            select: {
+                id: true,
+                path: true,
+                title: true,
+                isHome: true,
+                hidden: true,
+            },
         });
         return page;
     }
@@ -1575,14 +1618,27 @@ export class SitesService {
             await this.assertPathIsFree(siteId, dto.path);
         }
 
+        if (dto.hidden === true && page.isHome) {
+            throw new BadRequestException(
+                "The home page is what your site's address serves, so it cannot be hidden.",
+            );
+        }
+
         return prisma.page.update({
             where: { id: pageId },
             data: {
                 // ABSENT means leave alone, so each field is set only when sent.
                 ...(dto.title === undefined ? {} : { title: dto.title }),
                 ...(dto.path === undefined ? {} : { path: dto.path }),
+                ...(dto.hidden === undefined ? {} : { hidden: dto.hidden }),
             },
-            select: { id: true, path: true, title: true, isHome: true },
+            select: {
+                id: true,
+                path: true,
+                title: true,
+                isHome: true,
+                hidden: true,
+            },
         });
     }
 

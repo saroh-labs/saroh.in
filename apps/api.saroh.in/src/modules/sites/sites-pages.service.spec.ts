@@ -157,6 +157,88 @@ describe("SitesService.updatePage", () => {
         ).rejects.toThrow(/home page/i);
     });
 
+    it("hides a page without touching anything else about it", async () => {
+        pageFindFirst.mockResolvedValue({
+            id: "page_2",
+            path: "/about",
+            isHome: false,
+        });
+        pageUpdate.mockResolvedValue({
+            id: "page_2",
+            path: "/about",
+            title: "About",
+            isHome: false,
+            hidden: true,
+        });
+
+        await service.updatePage(ctx(), "site_1", "page_2", { hidden: true });
+
+        // Hiding is not an edit to what the page SAYS. Its title and path are
+        // untouched, so the merchant gets the page back exactly as they left
+        // it — which is the whole difference between hiding and deleting.
+        expect(pageUpdate.mock.calls[0][0].data).toEqual({ hidden: true });
+    });
+
+    it("leaves visibility alone when the field is absent", async () => {
+        pageFindFirst.mockResolvedValue({
+            id: "page_2",
+            path: "/about",
+            isHome: false,
+        });
+        pageUpdate.mockResolvedValue({
+            id: "page_2",
+            path: "/about",
+            title: "Our story",
+            isHome: false,
+            hidden: true,
+        });
+
+        await service.updatePage(ctx(), "site_1", "page_2", {
+            title: "Our story",
+        });
+
+        // Absent means leave alone, never "make visible". A client that
+        // predates the field must not be able to put a deliberately parked
+        // page back on a live site by not mentioning it.
+        expect(pageUpdate.mock.calls[0][0].data).toEqual({
+            title: "Our story",
+        });
+    });
+
+    it("refuses to hide the home page", async () => {
+        pageFindFirst.mockResolvedValue({
+            id: "page_1",
+            path: "/",
+            isHome: true,
+        });
+
+        await expect(
+            service.updatePage(ctx(), "site_1", "page_1", { hidden: true }),
+        ).rejects.toThrow(/home page/i);
+        expect(pageUpdate).not.toHaveBeenCalled();
+    });
+
+    it("still lets the home page be UNhidden, so a bad row can be recovered", async () => {
+        pageFindFirst.mockResolvedValue({
+            id: "page_1",
+            path: "/",
+            isHome: true,
+        });
+        pageUpdate.mockResolvedValue({
+            id: "page_1",
+            path: "/",
+            title: "Home",
+            isHome: true,
+            hidden: false,
+        });
+
+        // The guard is on hiding, not on the field. A home page that somehow
+        // ended up hidden — an older row, a bad import — must be fixable
+        // through the same endpoint rather than needing a database edit.
+        await service.updatePage(ctx(), "site_1", "page_1", { hidden: false });
+        expect(pageUpdate).toHaveBeenCalled();
+    });
+
     it("allows a no-op path (same value) without checking it for clashes", async () => {
         pageFindFirst.mockResolvedValue({
             id: "page_2",

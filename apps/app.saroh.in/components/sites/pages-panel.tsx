@@ -91,6 +91,27 @@ export function PagesPanel({
         router.refresh();
     }
 
+    async function setHidden(page: SitePage, hidden: boolean) {
+        // No confirm, deliberately. Hiding is the REVERSIBLE half of the pair
+        // this panel offers — the whole reason it exists is so that taking a
+        // page off the live site does not have to be a decision the merchant
+        // is asked to be sure about. Delete keeps its confirm; this is the
+        // thing they should reach for instead.
+        setBusy(true);
+        const res = await updatePage(siteId, page.id, { hidden });
+        setBusy(false);
+        if (!res.ok) {
+            toast.error(res.error);
+            return;
+        }
+        toast.success(
+            hidden
+                ? `${page.title} is hidden. It stays here and comes off the site when you publish.`
+                : `${page.title} is visible again. It goes back on the site when you publish.`,
+        );
+        router.refresh();
+    }
+
     async function remove(page: SitePage) {
         // Deleting a page destroys every section on it, and nothing here
         // restores it — the sections are not versioned the way publications
@@ -165,7 +186,21 @@ export function PagesPanel({
                                     }
                                     className="flex min-w-0 flex-1 items-center gap-2 text-left"
                                 >
-                                    <span className="truncate">
+                                    <span
+                                        className={cn(
+                                            "truncate",
+                                            /*
+                                             * Dimmed and struck through, the
+                                             * same as a hidden SECTION in the
+                                             * rail next door. Two lists that
+                                             * look alike must mean alike — the
+                                             * merchant should not have to learn
+                                             * a second vocabulary one tab over.
+                                             */
+                                            page.hidden &&
+                                                "text-muted-foreground/50 line-through",
+                                        )}
+                                    >
                                         {page.title}
                                     </span>
                                     {/*
@@ -177,7 +212,59 @@ export function PagesPanel({
                                         {page.path}
                                     </span>
                                 </button>
-                                <div className="flex shrink-0 items-center opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                                {/*
+                                 * Dimmed, never hidden. This tray used to be
+                                 * `opacity-0` until hover, which put every row
+                                 * action behind a pointer — and two of the four
+                                 * primary scenes (§18) have none, so on a phone
+                                 * there was no way to reach them at all. §19 is
+                                 * explicit that no functionality may be
+                                 * hover-only. Presence is the affordance;
+                                 * hover and focus only raise the contrast.
+                                 */}
+                                <div className="flex shrink-0 items-center opacity-60 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                                    {/*
+                                     * The home page has no hide control, for
+                                     * the same reason it has no delete: "/" is
+                                     * what the site's own address serves, so
+                                     * hiding it is not a thing to disable, it
+                                     * is a thing that does not exist.
+                                     */}
+                                    {page.isHome ? null : (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            aria-pressed={page.hidden}
+                                            aria-label={
+                                                page.hidden
+                                                    ? `Show ${page.title} on the site`
+                                                    : `Hide ${page.title} from the site`
+                                            }
+                                            title={
+                                                page.hidden
+                                                    ? "Hidden — left out when you publish"
+                                                    : "Visible — publishes with the site"
+                                            }
+                                            className="h-6 w-6 p-0 text-xs"
+                                            disabled={busy}
+                                            onClick={() =>
+                                                void setHidden(
+                                                    page,
+                                                    !page.hidden,
+                                                )
+                                            }
+                                        >
+                                            {/*
+                                             * Filled means on the site, hollow
+                                             * means parked — the same two marks
+                                             * the section panel uses, so the
+                                             * glyph carries the meaning rather
+                                             * than colour alone (§19).
+                                             */}
+                                            {page.hidden ? "○" : "●"}
+                                        </Button>
+                                    )}
                                     <Button
                                         type="button"
                                         variant="ghost"

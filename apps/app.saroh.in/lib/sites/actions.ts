@@ -73,7 +73,7 @@ export async function createPage(
 export async function updatePage(
     siteId: string,
     pageId: string,
-    input: { title?: string; path?: string },
+    input: { title?: string; path?: string; hidden?: boolean },
 ) {
     return updatePageApi(siteId, pageId, input);
 }

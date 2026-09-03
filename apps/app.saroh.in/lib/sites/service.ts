@@ -218,6 +218,8 @@ export interface SitePage {
     path: string;
     title: string;
     isHome: boolean;
+    /** Hidden pages stay in the draft and are left out of the snapshot (#197). */
+    hidden: boolean;
 }
 
 export interface SiteDetail extends SiteSummary {
@@ -695,7 +697,7 @@ export async function createPage(
 export async function updatePage(
     siteId: string,
     pageId: string,
-    input: { title?: string; path?: string },
+    input: { title?: string; path?: string; hidden?: boolean },
 ): Promise<SitesResult<SitePage>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };

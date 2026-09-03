@@ -71,6 +71,8 @@ export interface FlagPageInput {
     id: string;
     path: string;
     title: string;
+    /** A hidden page is not on the live site (#197). */
+    hidden: boolean;
     sections: { type: string; content: unknown; hidden: boolean }[];
 }
 
@@ -334,7 +336,19 @@ function isBrokenInternalLink(href: string, pagePaths: Set<string>): boolean {
  */
 export function checkSite(site: FlagSiteInput): Flag[] {
     const flags: Flag[] = [];
-    const pagePaths = new Set(site.pages.map((p) => p.path));
+    /*
+     * Only VISIBLE pages count as pages that exist.
+     *
+     * A button pointing at a page the merchant has hidden is broken in exactly
+     * the way `brokenLink` describes — the visitor clicking it gets nothing —
+     * so hiding a linked page has to surface here rather than quietly becoming
+     * a dead link on a live site. This is the page-level half of what
+     * `hiddenButLinked` will do for sections once there is a navigation to be
+     * linked from (§3).
+     */
+    const pagePaths = new Set(
+        site.pages.filter((p) => !p.hidden).map((p) => p.path),
+    );
 
     if ((site.seoDescription ?? "").trim() === "") {
         flags.push({
@@ -363,6 +377,13 @@ export function checkSite(site: FlagSiteInput): Flag[] {
     }
 
     for (const page of site.pages) {
+        /*
+         * A hidden page raises nothing, on the same reasoning that keeps a
+         * hidden section quiet: it is not on the live site, so flagging its
+         * empty heading reports a problem that does not exist and fills the
+         * check with noise from work deliberately set aside.
+         */
+        if (page.hidden) continue;
         page.sections.forEach((section, index) => {
             flags.push(...checkSection(page, index, section, pagePaths));
         });

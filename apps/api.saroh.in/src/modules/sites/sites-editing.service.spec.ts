@@ -322,6 +322,21 @@ describe("SitesService.publishSite", () => {
         });
     });
 
+    it("asks the database for visible pages only — a hidden page never publishes", async () => {
+        siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
+
+        await service.publishSite(ctx(), "site_1");
+
+        // Same reasoning as the section filter above, one level up. A page the
+        // merchant parked must not reach the snapshot, and the snapshot is
+        // immutable once written, so the filter has to be in the QUERY rather
+        // than in the renderer reading it back.
+        const select = siteFindFirst.mock.calls[0][0].select as {
+            pages: { where: { hidden: boolean } };
+        };
+        expect(select.pages.where).toEqual({ hidden: false });
+    });
+
     it("creates an immutable Publication, repoints currentPublicationId, and SANITIZES richText", async () => {
         siteFindFirst.mockResolvedValue(
             siteWithRichText("<p>hello</p><script>alert('xss')</script>"),
