@@ -104,8 +104,9 @@ const SECTION_LABELS: Record<SectionType, string> = {
  * two copies of a tablist is two chances for the selected state to disagree
  * with what is actually showing.
  *
- * Review is absent rather than disabled: it is not built, and a tab leading
- * nowhere is worse than one that is not there.
+ * All three tabs lead somewhere. Review was absent while it was unbuilt — a tab
+ * leading nowhere is worse than one that is not there — and it earned its place
+ * when the notes and the approval landed behind it.
  */
 function RailTabs({
     rail,
