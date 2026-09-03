@@ -1411,6 +1411,20 @@ model Site {
   seoDescription String? // meta description / og:description
   socialImageUrl String? // og:image — the card shown when the link is shared
 
+  // The footer a merchant writes for themselves (#202): `{ format, value }`,
+  // the same shape richText sections carry, so one authoring surface and one
+  // sanitizer serve both.
+  //
+  // AUTHORED, never derived. BusinessProfile holds a legal name and a contact
+  // email, but a merchant gave those for billing and tax — publishing them to
+  // the open internet would repurpose data collected for something else,
+  // without asking. So this starts empty and stays empty until someone writes
+  // in it, and an empty footer renders NO footer at all.
+  //
+  // `value` is authorable HTML and MUST be sanitized during publish, exactly as
+  // `richText.value` is, before it reaches the immutable snapshot.
+  footer Json?
+
   // Reserved placeholder for the S2-007 custom-domain claim/verification flow.
   // NOT wired to a relation here and NOT the legacy store `CustomDomain`.
   customDomainId String?

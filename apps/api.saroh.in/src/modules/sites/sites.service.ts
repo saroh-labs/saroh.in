@@ -33,8 +33,11 @@ import {
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
+import { sanitizeRichHtml } from "./sanitize";
 import type { Flag, FlagType } from "./site-flags";
 import { checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
+import type { SiteFooter } from "./site-footer";
+import { parseSiteFooter } from "./site-footer";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
 import {
     parseSiteStyle,
@@ -208,7 +211,14 @@ export interface SiteDetailView {
     createdAt: Date;
     updatedAt: Date;
     currentPublication: { publishedAt: Date } | null;
-    pages: { id: string; path: string; title: string; isHome: boolean }[];
+    pages: {
+        id: string;
+        path: string;
+        title: string;
+        isHome: boolean;
+        /** Hidden pages stay in the draft and never reach the snapshot (#197). */
+        hidden: boolean;
+    }[];
     /**
      * How many sections publishing would change (#190). Null before the first
      * publish. See {@link SitesService.pendingSectionChanges} — every surface
@@ -217,6 +227,12 @@ export interface SiteDetailView {
     pendingSectionChanges: number | null;
     /** Always complete — absent choices are filled from the defaults. */
     style: SiteStyle;
+    /**
+     * What the merchant wrote at the foot of their site (#202). Null means they
+     * have written nothing, and nothing is what renders — not an empty band in
+     * the footer colour.
+     */
+    footer: SiteFooter | null;
     /**
      * The palette and slider bounds. Sent with the site so the editor can
      * resolve a choice locally as a slider moves, without carrying its own copy
@@ -545,6 +561,7 @@ export class SitesService {
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
+                footer: true,
                 createdAt: true,
                 updatedAt: true,
                 // When the site last went live. Read through the current
@@ -571,8 +588,9 @@ export class SitesService {
         // Normalize the look on the way out (#189): the editor should never
         // have to decide what a half-written or absent style means, and a
         // client filling gaps itself is how the preview and the published site
-        // drift apart.
-        const { style, ...rest } = site;
+        // drift apart. The footer is normalized here for the same reason — the
+        // editor reads back exactly what publish would write.
+        const { style, footer, ...rest } = site;
         const pending = await this.pendingSectionChanges([site.id]);
         return {
             ...rest,
@@ -585,6 +603,7 @@ export class SitesService {
             pendingSectionChanges: pending.get(site.id) ?? null,
             style: parseSiteStyle(style),
             styleOptions: siteStyleOptions(),
+            footer: parseSiteFooter(footer),
         };
     }
 
@@ -660,6 +679,45 @@ export class SitesService {
             select: { id: true },
         });
         return { id: siteId, style };
+    }
+
+    /**
+     * Set a site's footer (#202).
+     *
+     * Replaces rather than merges, like the style it sits beside: there is one
+     * footer and the form always sends the whole of it.
+     *
+     * Clearing the field IS the delete. `parseSiteFooter` collapses an empty or
+     * whitespace-only value to null, so a merchant who empties the box gets no
+     * footer element at all rather than an empty coloured band — there is no
+     * separate remove action to find.
+     *
+     * Requires `site:update` — this is what the public sees. Draft state like
+     * everything else here: it reaches the live site on the next publish.
+     */
+    async updateFooter(
+        ctx: OrganizationContext,
+        siteId: string,
+        input: unknown,
+    ): Promise<{ id: string; footer: SiteFooter | null }> {
+        authorize(ctx, "site:update");
+        await this.assertSiteInOrg(ctx, siteId);
+
+        // Validate BEFORE writing, for the same reason style does: a malformed
+        // body is a 400 now rather than a footer that fails to render later.
+        const footer = parseSiteFooter(input);
+
+        await prisma.site.update({
+            where: { id: siteId },
+            data: {
+                footer:
+                    footer === null
+                        ? Prisma.DbNull
+                        : (footer as unknown as Prisma.InputJsonValue),
+            },
+            select: { id: true },
+        });
+        return { id: siteId, footer };
     }
 
     // -----------------------------------------------------------------------
@@ -1004,6 +1062,7 @@ export class SitesService {
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
+                footer: true,
                 pages: {
                     // A hidden page does not travel, for the same reason a
                     // hidden section does not: a Publication is immutable once
@@ -1081,6 +1140,22 @@ export class SitesService {
         });
 
         const publishedStyle = parseSiteStyle(site.style);
+        const draftFooter = parseSiteFooter(site.footer);
+        /*
+         * The footer travels SANITIZED (#202).
+         *
+         * Same boundary as `richText.value`: authorable HTML is cleaned here,
+         * before the immutable write, so the renderer only ever reads content
+         * that is already safe and never sanitizes at read time. It runs
+         * through the sanitizer whatever the format says, rather than making
+         * the safety of a permanent write depend on a string the client sent.
+         */
+        const publishedFooter: SiteFooter | null = draftFooter
+            ? {
+                  format: draftFooter.format,
+                  value: sanitizeRichHtml(draftFooter.value),
+              }
+            : null;
         const snapshot = {
             site: {
                 name: site.name,
@@ -1115,6 +1190,7 @@ export class SitesService {
                  * silently restyle everything anyone has already published.
                  */
                 styleVariables: siteStyleVariables(publishedStyle),
+                footer: publishedFooter,
             },
             pages,
             publishedAt: publishedAt.toISOString(),

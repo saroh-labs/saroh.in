@@ -151,6 +151,18 @@ export interface PublicationSite {
      * already published.
      */
     styleVariables?: Record<string, string> | null;
+    /**
+     * What the merchant wrote at the foot of their site (#202).
+     *
+     * Absent or null means they wrote nothing, and nothing renders — the site
+     * simply ends. An empty band in the footer colour would be the interface
+     * claiming a footer that does not exist.
+     *
+     * `value` is already SANITIZED: publish runs it through the same allowlist
+     * as `richText.value` before the immutable write, so this app never sees
+     * raw author input.
+     */
+    footer?: { format: "html" | "markdown"; value: string } | null;
 }
 
 /**

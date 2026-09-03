@@ -3,6 +3,7 @@
 import type {
     CreateSiteInput,
     SectionInput,
+    SiteFooter,
     SiteSettingsInput,
     SiteStyle,
 } from "./service";
@@ -18,6 +19,7 @@ import {
     saveDraftSections as saveDraftSectionsApi,
     setCommentResolved as setCommentResolvedApi,
     updatePage as updatePageApi,
+    updateSiteFooter as updateSiteFooterApi,
     updateSiteSettings as updateSiteSettingsApi,
     updateSiteStyle as updateSiteStyleApi,
 } from "./service";
@@ -61,6 +63,13 @@ export async function restorePublication(
 
 export async function updateSiteStyle(siteId: string, style: SiteStyle) {
     return updateSiteStyleApi(siteId, style);
+}
+
+export async function updateSiteFooter(
+    siteId: string,
+    footer: SiteFooter | null,
+) {
+    return updateSiteFooterApi(siteId, footer);
 }
 
 export async function createPage(
