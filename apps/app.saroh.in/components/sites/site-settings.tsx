@@ -12,6 +12,21 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { MediaPicker } from "@/components/sites/media-picker";
+import dynamic from "next/dynamic";
+
+/* On demand and browser-only, for the same reasons as in the editor. */
+const RichTextEditor = dynamic(
+    () =>
+        import("@/components/sites/rich-text-editor").then(
+            (m) => m.RichTextEditor,
+        ),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="min-h-40 animate-pulse rounded-md border bg-muted" />
+        ),
+    },
+);
 
 import { updateSiteFooter, updateSiteSettings } from "@/lib/sites/actions";
 import type {
@@ -527,23 +542,23 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                 >
                     {editing === "footer" ? (
                         <div className="space-y-2">
-                            <Textarea
-                                value={footerValue}
-                                onChange={(e) => setFooterValue(e.target.value)}
-                                rows={4}
-                                placeholder={
-                                    footerFormat === "html"
-                                        ? // A mailto, not a path: the most common thing in a
-                                          // footer is a way to reach someone, and a bare
-                                          // "/contact" here is read by
-                                          // scripts/check-app-routes.mjs as an APP link —
-                                          // failing the build over a route that would
-                                          // belong to the merchant's site, not to Saroh.
-                                          '<p>Northwind Supply · Peenya, Bengaluru · <a href="mailto:hello@example.in">Email us</a></p>'
-                                        : "Northwind Supply\nPeenya, Bengaluru"
-                                }
-                                aria-label="Footer text"
-                            />
+                            {footerFormat === "html" ? (
+                                <RichTextEditor
+                                    value={footerValue}
+                                    onChange={setFooterValue}
+                                    placeholder="Northwind Supply · Peenya, Bengaluru · how to reach you"
+                                />
+                            ) : (
+                                <Textarea
+                                    value={footerValue}
+                                    onChange={(e) =>
+                                        setFooterValue(e.target.value)
+                                    }
+                                    rows={4}
+                                    placeholder="Northwind Supply\nPeenya, Bengaluru"
+                                    aria-label="Footer text"
+                                />
+                            )}
                             {/*
                              * The same two formats a richText section offers,
                              * because this IS that content model — one

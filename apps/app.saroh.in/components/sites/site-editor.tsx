@@ -24,6 +24,25 @@ import {
 import { toast } from "sonner";
 
 import { MediaPicker } from "@/components/sites/media-picker";
+import dynamic from "next/dynamic";
+
+/*
+ * Loaded on demand. Tiptap is the largest dependency this app takes on, and
+ * only the editor route needs it — the sites list and settings must not pay
+ * for it. `ssr: false` because the editor exists only in the browser.
+ */
+const RichTextEditor = dynamic(
+    () =>
+        import("@/components/sites/rich-text-editor").then(
+            (m) => m.RichTextEditor,
+        ),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="min-h-40 animate-pulse rounded-md border bg-muted" />
+        ),
+    },
+);
 
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
@@ -2081,16 +2100,22 @@ function SectionFields({
                         </Select>
                     </Field>
                     <Field label="Content">
-                        <Textarea
-                            value={c.value}
-                            onChange={(e) => patch({ value: e.target.value })}
-                            rows={6}
-                            placeholder={
-                                c.format === "html"
-                                    ? "<p>Hello world</p>"
-                                    : "# Hello world"
-                            }
-                        />
+                        {c.format === "html" ? (
+                            <RichTextEditor
+                                value={c.value}
+                                onChange={(value) => patch({ value })}
+                                placeholder="Write about your business…"
+                            />
+                        ) : (
+                            <Textarea
+                                value={c.value}
+                                onChange={(e) =>
+                                    patch({ value: e.target.value })
+                                }
+                                rows={6}
+                                placeholder="# Hello world"
+                            />
+                        )}
                     </Field>
                 </div>
             );
