@@ -10,6 +10,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { restorePublication } from "@/lib/sites/actions";
+import { exactDate } from "@/lib/sites/format-date";
 import type { SitePublication } from "@/lib/sites/service";
 
 /**
@@ -70,7 +71,7 @@ export function SiteVersions({
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium">
-                                            {when.toLocaleString()}
+                                            {exactDate(when)}
                                         </span>
                                         {p.isCurrent ? (
                                             // Marked, not implied by position:
@@ -123,7 +124,7 @@ export function SiteVersions({
                                 <p className="border-t pt-3 text-sm text-muted-foreground">
                                     This replaces what visitors see now
                                     {current
-                                        ? ` (published ${new Date(current.publishedAt).toLocaleString()})`
+                                        ? ` (published ${exactDate(current.publishedAt)})`
                                         : ""}
                                     . Nothing is deleted — this version is
                                     published again as a new entry, so you can
