@@ -5,12 +5,13 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import type { NavCounts } from "@/components/shared/nav-items";
+import type { NavChild, NavCounts } from "@/components/shared/nav-items";
 import {
     NAV_GROUPS,
     NOTIFICATIONS_HREF,
     filterNavGroups,
     isNavItemActive,
+    navGroupsWithSites,
     showsGroupLabel,
 } from "@/components/shared/nav-items";
 
@@ -25,15 +26,21 @@ export function AppSidebar({
     unread = 0,
     moduleKeys = null,
     counts,
+    sites = [],
 }: {
     unread?: number;
     /** `null` = availability unknown; see `filterNavGroups`. */
     moduleKeys?: string[] | null;
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
+    /** The merchant's own sites, hung under Website. */
+    sites?: { id: string; name: string }[];
 }) {
     const pathname = usePathname();
-    const groups = filterNavGroups(NAV_GROUPS, moduleKeys);
+    const groups = filterNavGroups(
+        navGroupsWithSites(NAV_GROUPS, sites),
+        moduleKeys,
+    );
 
     return (
         // `sticky top-0 h-screen` so the rail stays put on a long page. Without
@@ -80,6 +87,21 @@ export function AppSidebar({
                         )}
                         {group.items.map((item) => {
                             const active = isNavItemActive(pathname, item.href);
+                            /*
+                             * Only the DEEPEST match says "page".
+                             *
+                             * The parent matches by prefix, so on /sites/new
+                             * both it and the child row claimed
+                             * aria-current="page" and a screen reader
+                             * announced two current pages. The parent still
+                             * LOOKS active — it is the section you are in —
+                             * but the child is the page you are on.
+                             */
+                            const childIsCurrent = Boolean(
+                                item.children?.some(
+                                    (child) => child.href === pathname,
+                                ),
+                            );
                             const Icon = item.icon;
                             // Notifications counts unread; everything else
                             // counts work waiting. Both mean "something here
@@ -92,7 +114,11 @@ export function AppSidebar({
                                 <Link
                                     key={item.href}
                                     href={item.href}
-                                    aria-current={active ? "page" : undefined}
+                                    aria-current={
+                                        active && !childIsCurrent
+                                            ? "page"
+                                            : undefined
+                                    }
                                     className={cn(
                                         // Tighter rows than the drawer's: this
                                         // rail is `lg`-and-up only, so it is
@@ -139,9 +165,69 @@ export function AppSidebar({
                                 </Link>
                             );
                         })}
+                        {group.items.map((item) =>
+                            item.children?.length ? (
+                                <SiteTree
+                                    key={`${item.href}-children`}
+                                    children={item.children}
+                                    pathname={pathname}
+                                />
+                            ) : null,
+                        )}
                     </div>
                 ))}
             </nav>
         </aside>
+    );
+}
+
+/**
+ * The merchant's own things, nested under the destination that owns them.
+ *
+ * Indented and unadorned: a child is identified by its NAME, and a column of
+ * identical globes under Website would spend an icon each to say the same word
+ * three times. The indent and the rule do the nesting instead.
+ *
+ * Every row is a real route. `nav-items.tsx` states that only routes that exist
+ * may be listed and `scripts/check-app-routes.mjs` fails the build over a nav
+ * entry that 404s — these point at `/sites/<id>` and `/sites/new`, both of
+ * which ship today, which is exactly why pages are not nested here as well.
+ */
+function SiteTree({
+    children,
+    pathname,
+}: {
+    children: NavChild[];
+    pathname: string;
+}) {
+    return (
+        <div className="ml-[1.0625rem] flex flex-col gap-0.5 border-l border-border pl-2">
+            {children.map((child) => {
+                // Exact match, not prefix: `/sites/new` must not light up the
+                // row for a site whose id happens to start the same way, and
+                // the site rows are siblings of each other rather than nested.
+                const active = pathname === child.href;
+                return (
+                    <Link
+                        key={child.href}
+                        href={child.href}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                            "wk-nav truncate rounded-md px-2.5 py-1 text-[0.8125rem] transition-colors",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                            active
+                                ? "bg-accent font-medium text-foreground"
+                                : "text-muted-foreground hover:bg-accent hover:text-foreground active:bg-accent",
+                            // Creating is a different kind of act from opening,
+                            // and reads quieter so the sites themselves stay
+                            // the thing the eye lands on.
+                            child.create && "text-muted-foreground/70",
+                        )}
+                    >
+                        {child.create ? `+ ${child.label}` : child.label}
+                    </Link>
+                );
+            })}
+        </div>
     );
 }

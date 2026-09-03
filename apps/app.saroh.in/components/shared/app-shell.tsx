@@ -12,6 +12,7 @@ import {
     listOrganizations,
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
+import { listSites } from "@/lib/sites/service";
 
 /**
  * The authenticated app shell, rendered once in the root layout. It is the
@@ -58,7 +59,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // a transient API error never blanks the shell; a successful fetch that
     // returns nothing is "nothing is enabled yet", which a new Organization
     // should see reflected in its nav rather than papered over.
-    const [unread, moduleKeys, home] = await Promise.all([
+    const [unread, moduleKeys, home, sites] = await Promise.all([
         unreadNotificationCount(),
         listModules()
             .then((modules) =>
@@ -71,6 +72,15 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         // so the two can never disagree. Non-fatal: a rail without badges is a
         // working rail, and this renders on every page.
         getHome().catch(() => null),
+        /*
+         * The merchant's own sites, hung under Website in the rail.
+         *
+         * Non-fatal like the counts: a rail without the tree is still a working
+         * rail, and this renders on every screen in the app. It joins the same
+         * Promise.all rather than being awaited after, so it costs the slowest
+         * of four round trips instead of adding a fifth in series.
+         */
+        listSites().catch(() => []),
     ]);
 
     /*
@@ -87,6 +97,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             .map((a) => [a.href, a.count]),
     );
 
+    /*
+     * Only what the nav needs crosses the boundary. `SiteSummary` carries a
+     * publication pointer, a style blob and timestamps; the rail wants a name
+     * and an id, and shipping the rest to three client components on every page
+     * would be paying for it in the payload on every navigation.
+     */
+    const navSites = sites.map((site) => ({ id: site.id, name: site.name }));
+
     return (
         <div className="flex min-h-screen">
             {/*
@@ -101,11 +119,12 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             >
                 Skip to content
             </a>
-            <CommandMenu moduleKeys={moduleKeys} />
+            <CommandMenu moduleKeys={moduleKeys} sites={navSites} />
             <AppSidebar
                 unread={unread}
                 moduleKeys={moduleKeys}
                 counts={counts}
+                sites={navSites}
             />
             <div className="flex min-w-0 flex-1 flex-col">
                 <AppHeader
@@ -115,6 +134,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     unread={unread}
                     moduleKeys={moduleKeys}
                     counts={counts}
+                    sites={navSites}
                 />
                 {/*
                  * `tabIndex={-1}` makes this a valid focus target: following the
