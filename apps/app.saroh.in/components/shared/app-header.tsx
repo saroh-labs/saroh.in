@@ -47,8 +47,16 @@ export function AppHeader(props: AppHeaderProps) {
     // completing onboarding as), minus the org-settings link, which has no
     // meaning before an org exists.
     if (props.onboarding) {
+        /*
+         * Sticky, like the rail. The bar carries search, the org switcher and
+         * the account menu — the controls a merchant reaches for mid-page — and
+         * it scrolled away with the page, so on any list longer than a screen
+         * they were gone. `bg-background` because a sticky bar over scrolling
+         * content is otherwise a bar you can read the page through; z-30 sits
+         * above page content and below the command menu and toasts.
+         */
         return (
-            <header className="flex h-14 items-center justify-between border-b px-4 sm:px-6">
+            <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background px-4 sm:px-6">
                 <Link href="/" aria-label="Saroh">
                     <Wordmark />
                 </Link>
@@ -74,7 +82,7 @@ export function AppHeader(props: AppHeaderProps) {
         // nothing could give while the org switcher reserved a flat 16rem.
         // Now the trailing controls hold their size and the switcher absorbs
         // whatever is left, truncating its label to fit any width.
-        <header className="flex h-14 items-center justify-between gap-3 border-b px-4 sm:gap-4 sm:px-6">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b bg-background px-4 sm:gap-4 sm:px-6">
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                 <MobileNav
                     unread={unread}
