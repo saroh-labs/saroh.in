@@ -59,7 +59,18 @@ function errorMessage(code: string | undefined, fallback: string | undefined) {
     );
 }
 
-export function VerifyEmailForm() {
+/**
+ * `returnTo` is where a freshly verified account should land (#222) — the page
+ * they asked for before being bounced to sign in, already vetted by the server
+ * component that renders this form. Null means there was nothing to return to,
+ * and a new account belongs in onboarding rather than at a launcher full of
+ * products that would bounce them straight back.
+ */
+export function VerifyEmailForm({
+    returnTo = null,
+}: {
+    returnTo?: string | null;
+} = {}) {
     const searchParams = useSearchParams();
     const email = searchParams.get("email") ?? "";
 
@@ -111,10 +122,10 @@ export function VerifyEmailForm() {
             setIsVerified(true);
             setTimeout(() => setIsLeaving(true), SUCCESS_EXIT_AT_MS);
             setTimeout(() => {
-                window.location.href = getOnboardingUrl();
+                window.location.href = returnTo ?? getOnboardingUrl();
             }, SUCCESS_HOLD_MS);
         },
-        [email, isVerifying],
+        [email, isVerifying, returnTo],
     );
 
     async function resend() {

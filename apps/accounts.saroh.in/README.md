@@ -43,6 +43,11 @@ validated schema.
 NEXT_PUBLIC_ACCOUNTS_URL=https://accounts.saroh.localhost  # this app's own origin
 NEXT_PUBLIC_BETTER_AUTH_URL=https://api.saroh.localhost    # api origin (the auth server)
 NEXT_PUBLIC_APP_URL=https://app.saroh.localhost            # where a verified user lands
+# Which first-party origins may be RETURNED TO after sign-in (#222), and are
+# trusted for CSRF. Unset falls back to the *.saroh.in list in @saroh/auth —
+# correct in production, wrong in development, where a `?redirect=` to
+# app.saroh.localhost would be refused and the visitor sent to the launcher.
+BETTER_AUTH_TRUSTED_ORIGINS=https://accounts.saroh.localhost,https://admin.saroh.localhost,https://app.saroh.localhost
 ```
 
 `NEXT_PUBLIC_APP_URL` may be omitted — [`lib/app-urls.ts`](lib/app-urls.ts)
