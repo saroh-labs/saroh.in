@@ -16,10 +16,10 @@ import type { PostCategory } from "@/lib/content/service";
  * by the api (owner / EDITOR+).
  */
 export function PostCategoriesManager({
-    storeId,
+    siteId,
     categories,
 }: {
-    storeId: string;
+    siteId: string;
     categories: PostCategory[];
 }) {
     const router = useRouter();
@@ -30,7 +30,7 @@ export function PostCategoriesManager({
     async function onAdd(e: React.FormEvent) {
         e.preventDefault();
         setAdding(true);
-        const res = await createPostCategory(storeId, { name: name.trim() });
+        const res = await createPostCategory(siteId, { name: name.trim() });
         setAdding(false);
         if (!res.ok) {
             toast.error(res.error);
@@ -43,7 +43,7 @@ export function PostCategoriesManager({
 
     async function onDelete(id: string) {
         setBusy(id);
-        const res = await deletePostCategory(storeId, id);
+        const res = await deletePostCategory(siteId, id);
         setBusy(null);
         if (!res.ok) {
             toast.error(res.error);

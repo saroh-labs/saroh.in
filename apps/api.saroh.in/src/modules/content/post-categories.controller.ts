@@ -10,48 +10,53 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
-import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
-import type { AuthUser } from "../../common/types/store-context";
+import { OrganizationGuard } from "../../common/guards/organization.guard";
+import type { OrganizationContext } from "../../common/types/organization-context";
 import { CreatePostCategoryDto, UpdatePostCategoryDto } from "./dto";
 import { PostCategoriesService } from "./post-categories.service";
 
-@Controller("stores/:storeId/post-categories")
-@UseGuards(BetterAuthGuard)
+/** A site's post categories (ADR-004, #209). Guarded like its posts. */
+@Controller("organizations/:organizationId/sites/:siteId/post-categories")
+@UseGuards(BetterAuthGuard, OrganizationGuard)
 export class PostCategoriesController {
     constructor(private readonly categories: PostCategoriesService) {}
 
     @Get()
-    list(@CurrentUser() user: AuthUser, @Param("storeId") storeId: string) {
-        return this.categories.list(storeId, user.id);
+    list(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.categories.list(ctx, siteId);
     }
 
     @Post()
     @HttpCode(201)
     create(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
         @Body() dto: CreatePostCategoryDto,
     ) {
-        return this.categories.create(storeId, user.id, dto);
+        return this.categories.create(ctx, siteId, dto);
     }
 
     @Put(":categoryId")
     update(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
         @Param("categoryId") categoryId: string,
         @Body() dto: UpdatePostCategoryDto,
     ) {
-        return this.categories.update(storeId, categoryId, user.id, dto);
+        return this.categories.update(ctx, siteId, categoryId, dto);
     }
 
     @Delete(":categoryId")
     remove(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
         @Param("categoryId") categoryId: string,
     ) {
-        return this.categories.remove(storeId, categoryId, user.id);
+        return this.categories.remove(ctx, siteId, categoryId);
     }
 }
