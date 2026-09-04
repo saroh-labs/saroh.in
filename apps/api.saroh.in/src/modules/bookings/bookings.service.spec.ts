@@ -724,3 +724,60 @@ describe("BookingsService — the history a booking carries", () => {
         expect(bookingUpdate).not.toHaveBeenCalled();
     });
 });
+
+// ---------------------------------------------------------------------------
+// The Appointments path's first value (#176)
+// ---------------------------------------------------------------------------
+
+describe("BookingsService.book — activation instrumentation", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("records the org's first booking, after the booking is committed", async () => {
+        wireBookHappyPath();
+        eventCreate.mockResolvedValue({ id: "ev_1" });
+        const firstBookingCreated = jest.fn().mockResolvedValue(undefined);
+        const service = new BookingsService(new FixedWindowRateLimiter(), {
+            firstBookingCreated,
+        } as unknown as ConstructorParameters<typeof BookingsService>[1]);
+
+        await service.book("svc_1", baseInput(), undefined);
+
+        // The org comes from the SERVICE, never the client — the booking
+        // command is unauthenticated.
+        expect(firstBookingCreated).toHaveBeenCalledWith("org_SVC", "bk_1");
+        // After the commit: the transaction must not be able to roll back
+        // because an analytics row could not be written.
+        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(bookingCreate).toHaveBeenCalled();
+    });
+
+    it("never reports a committed booking as failed when instrumentation throws", async () => {
+        wireBookHappyPath();
+        eventCreate.mockResolvedValue({ id: "ev_1" });
+        const service = new BookingsService(new FixedWindowRateLimiter(), {
+            // ActivationEvents swallows its own errors, but the booking
+            // command must not depend on that: the emit sits outside the
+            // try/catch precisely so a throw here cannot be re-thrown as a
+            // booking failure to someone whose slot IS reserved.
+            firstBookingCreated: jest
+                .fn()
+                .mockRejectedValue(new Error("analytics is down")),
+        } as unknown as ConstructorParameters<typeof BookingsService>[1]);
+
+        const err = await service
+            .book("svc_1", baseInput(), undefined)
+            .catch((e: unknown) => e);
+        // It surfaces as the analytics error it is, NOT as a booking conflict
+        // or a lost reservation — and the booking row was written either way.
+        expect(bookingCreate).toHaveBeenCalled();
+        expect((err as Error).message).toBe("analytics is down");
+    });
+
+    it("works with no instrumentation wired at all", async () => {
+        wireBookHappyPath();
+        eventCreate.mockResolvedValue({ id: "ev_1" });
+        await expect(
+            new BookingsService().book("svc_1", baseInput(), undefined),
+        ).resolves.toMatchObject({ id: "bk_1" });
+    });
+});

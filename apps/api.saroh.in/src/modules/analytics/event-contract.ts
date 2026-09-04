@@ -180,6 +180,9 @@ const firstCustomerV1: EventValidator = (props) => ({
 const firstOrderV1: EventValidator = (props) => ({
     orderId: requireString(props, "orderId", MAX_ID_LEN),
 });
+const firstBookingV1: EventValidator = (props) => ({
+    bookingId: requireString(props, "bookingId", MAX_ID_LEN),
+});
 
 /**
  * `import.completed` (v1): counts only. Deliberately no file name and no row
@@ -200,6 +203,22 @@ export const MODULE_ENABLED_TYPE = "module.enabled";
 export const FIRST_PRODUCT_CREATED_TYPE = "first.product.created";
 export const FIRST_CUSTOMER_CREATED_TYPE = "first.customer.created";
 export const FIRST_ORDER_CREATED_TYPE = "first.order.created";
+/**
+ * The Appointments path's first value (#176).
+ *
+ * Without this, time-to-first-useful-action was not derivable for an
+ * organization that only takes appointments: its first real outcome is a
+ * booking, and no `first.*` event described one — so the funnel silently
+ * under-counted the entire Appointments path rather than reporting zero.
+ *
+ * Like `first.order.created`, the row is created by a member of the PUBLIC
+ * through the booking form, and like it this remains a MERCHANT event: the
+ * fact recorded is that this business took its first booking. It carries an
+ * opaque id and no visitor, no booker and no consent basis — nothing here
+ * tracks a merchant's own customers, which is the rule this issue exists to
+ * keep.
+ */
+export const FIRST_BOOKING_CREATED_TYPE = "first.booking.created";
 export const IMPORT_COMPLETED_TYPE = "import.completed";
 
 /**
@@ -213,6 +232,7 @@ export const ACTIVATION_TYPES: readonly string[] = [
     FIRST_PRODUCT_CREATED_TYPE,
     FIRST_CUSTOMER_CREATED_TYPE,
     FIRST_ORDER_CREATED_TYPE,
+    FIRST_BOOKING_CREATED_TYPE,
     IMPORT_COMPLETED_TYPE,
 ];
 
@@ -243,6 +263,7 @@ const REGISTRY = new Map<string, EventValidator>([
     [key(FIRST_PRODUCT_CREATED_TYPE, 1), firstProductV1],
     [key(FIRST_CUSTOMER_CREATED_TYPE, 1), firstCustomerV1],
     [key(FIRST_ORDER_CREATED_TYPE, 1), firstOrderV1],
+    [key(FIRST_BOOKING_CREATED_TYPE, 1), firstBookingV1],
     [key(IMPORT_COMPLETED_TYPE, 1), importCompletedV1],
 ]);
 

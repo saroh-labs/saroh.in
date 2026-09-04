@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 
 import { AnalyticsService } from "./analytics.service";
 import {
+    FIRST_BOOKING_CREATED_TYPE,
     FIRST_CUSTOMER_CREATED_TYPE,
     FIRST_ORDER_CREATED_TYPE,
     FIRST_PRODUCT_CREATED_TYPE,
@@ -89,6 +90,20 @@ export class ActivationEvents {
     firstOrderCreated(organizationId: string, orderId: string): Promise<void> {
         return this.emitOnce(organizationId, FIRST_ORDER_CREATED_TYPE, {
             orderId,
+        });
+    }
+
+    /**
+     * The Appointments path's first value. An organization that only takes
+     * appointments produced no first-value event at all before this, so the
+     * funnel under-counted that whole path rather than reporting zero.
+     */
+    firstBookingCreated(
+        organizationId: string,
+        bookingId: string,
+    ): Promise<void> {
+        return this.emitOnce(organizationId, FIRST_BOOKING_CREATED_TYPE, {
+            bookingId,
         });
     }
 
