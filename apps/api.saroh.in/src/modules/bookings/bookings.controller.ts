@@ -23,6 +23,7 @@ import { BookingsService } from "./bookings.service";
 import {
     AddRuleDto,
     CreateServiceDto,
+    RecordOutcomeDto,
     ReplaceRulesDto,
     RescheduleBookingDto,
     UpdateServiceDto,
@@ -170,6 +171,21 @@ export class BookingsController {
         @Body() dto: RescheduleBookingDto,
     ): Promise<Booking> {
         return this.bookings.rescheduleBooking(ctx, bookingId, dto);
+    }
+
+    /**
+     * Record how an appointment went (#241). A separate route from the
+     * reschedule PATCH because it is a separate decision: one changes when the
+     * appointment is, the other says what happened at it.
+     */
+    @Post("bookings/:bookingId/outcome")
+    @HttpCode(200)
+    recordOutcome(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+        @Body() dto: RecordOutcomeDto,
+    ): Promise<Booking> {
+        return this.bookings.recordOutcome(ctx, bookingId, dto.outcome);
     }
 
     @Delete("bookings/:bookingId")

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { BookingDetailView } from "@/components/bookings/booking-detail";
+import { hasEnded } from "@/lib/services/booking-state";
 import { getBooking } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 
@@ -37,5 +38,8 @@ export default async function BookingPage({
     const booking = await getBooking(bookingId);
     if (!booking) notFound();
 
-    return <BookingDetailView booking={booking} />;
+    // Read through the data layer, which is where this codebase keeps clock
+    // reads. A past appointment offers different controls (#241), but nothing
+    // about its OUTCOME is decided by the clock — only a person sets that.
+    return <BookingDetailView booking={booking} past={hasEnded(booking)} />;
 }

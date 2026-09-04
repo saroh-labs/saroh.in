@@ -23,6 +23,7 @@ import type {
 import { availableSlots, isValidSlotStart } from "./availability";
 import type {
     AvailabilityRuleDto,
+    BookingOutcome,
     CreateServiceDto,
     UpdateServiceDto,
 } from "./dto";
@@ -45,7 +46,10 @@ export const BookingEventType = {
     Booked: "BOOKED",
     Rescheduled: "RESCHEDULED",
     Cancelled: "CANCELLED",
+    Attended: "ATTENDED",
+    NoShow: "NO_SHOW",
 } as const;
+
 export type BookingEventType =
     (typeof BookingEventType)[keyof typeof BookingEventType];
 
@@ -429,6 +433,77 @@ export class BookingsService {
                 select: { id: true },
             });
             return cancelled;
+        });
+    }
+
+    /**
+     * Record how an appointment went (#241). `booking:write`.
+     *
+     * Four rules, each of which is a decision rather than a detail:
+     *
+     * **Only a person sets it.** Nothing in this codebase writes an outcome
+     * when a slot elapses. A booking whose time has passed is evidence of
+     * nothing except that the time has passed, and auto-completing would fill
+     * the ledger with attendance nobody witnessed — which is worse than an
+     * empty ledger, because it reads as fact.
+     *
+     * **Only after it has ended.** Marking a future appointment attended is
+     * not a mistake worth supporting.
+     *
+     * **Never on a cancelled booking.** Cancelled-in-advance and did-not-turn-up
+     * are the two most different things a merchant can be told about a
+     * customer, and letting one be relabelled as the other would quietly
+     * destroy that distinction.
+     *
+     * **Correctable.** A merchant who taps the wrong one can change it, and
+     * the change is appended rather than overwritten — so the history shows
+     * both what was said and what it was corrected to.
+     */
+    async recordOutcome(
+        ctx: OrganizationContext,
+        bookingId: string,
+        outcome: BookingOutcome,
+        now: Date = new Date(),
+    ): Promise<Booking> {
+        authorize(ctx, "booking:write");
+        const booking = await this.requireOwnedBooking(ctx, bookingId);
+
+        if (booking.status === "CANCELLED") {
+            throw new ConflictException(
+                "This booking was cancelled, which is already how it went.",
+            );
+        }
+        if (booking.endAt.getTime() > now.getTime()) {
+            throw new ConflictException(
+                "This appointment has not happened yet.",
+            );
+        }
+        if (booking.outcome === outcome) {
+            // Already said. Not an error, and not a second history line.
+            return booking;
+        }
+
+        return prisma.$transaction(async (tx) => {
+            const updated = await tx.booking.update({
+                where: { id: booking.id },
+                data: { outcome },
+            });
+            await tx.bookingEvent.create({
+                data: {
+                    bookingId: booking.id,
+                    organizationId: ctx.organizationId,
+                    type:
+                        outcome === "ATTENDED"
+                            ? BookingEventType.Attended
+                            : BookingEventType.NoShow,
+                    actorUserId: ctx.userId,
+                    // The slot it is about, like CANCELLED — so a history line
+                    // says which appointment, not just what was decided.
+                    fromStartAt: booking.startAt,
+                },
+                select: { id: true },
+            });
+            return updated;
         });
     }
 

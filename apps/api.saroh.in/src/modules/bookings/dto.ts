@@ -18,6 +18,14 @@ import {
 export const SERVICE_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export type ServiceStatus = (typeof SERVICE_STATUSES)[number];
 
+/**
+ * How an appointment went (#241). Declared here beside the other closed sets
+ * so the DTO can validate against it without importing the service, which
+ * imports this file.
+ */
+export const BOOKING_OUTCOMES = ["ATTENDED", "NO_SHOW"] as const;
+export type BookingOutcome = (typeof BOOKING_OUTCOMES)[number];
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -217,4 +225,13 @@ export class RescheduleBookingDto {
     /** ISO-8601 absolute instant of the new slot start. */
     @IsISO8601()
     startAt!: string;
+}
+
+/**
+ * Record how an appointment went (#241). Only a person sets this — nothing
+ * derives it from time passing.
+ */
+export class RecordOutcomeDto {
+    @IsIn(BOOKING_OUTCOMES)
+    outcome!: BookingOutcome;
 }

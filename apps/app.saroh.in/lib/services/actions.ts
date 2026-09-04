@@ -2,6 +2,7 @@
 
 import type {
     AvailabilityRuleInput,
+    BookingOutcome,
     CreateServiceInput,
     Service,
     Slot,
@@ -13,6 +14,7 @@ import {
     createService as createServiceApi,
     listAvailability as listAvailabilityApi,
     listServices as listServicesApi,
+    recordBookingOutcome as recordBookingOutcomeApi,
     replaceRules as replaceRulesApi,
     rescheduleBooking as rescheduleBookingApi,
     updateService as updateServiceApi,
@@ -56,6 +58,14 @@ export async function cancelBooking(bookingId: string) {
 /** Move a booking to another slot (#121). */
 export async function rescheduleBooking(bookingId: string, startAt: string) {
     return rescheduleBookingApi(bookingId, startAt);
+}
+
+/** Record how an appointment went (#241). */
+export async function recordBookingOutcome(
+    bookingId: string,
+    outcome: BookingOutcome,
+) {
+    return recordBookingOutcomeApi(bookingId, outcome);
 }
 
 /**

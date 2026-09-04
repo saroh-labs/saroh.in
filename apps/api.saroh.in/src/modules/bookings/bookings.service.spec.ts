@@ -781,3 +781,152 @@ describe("BookingsService.book — activation instrumentation", () => {
         ).resolves.toMatchObject({ id: "bk_1" });
     });
 });
+
+// ---------------------------------------------------------------------------
+// How the appointment went (#241)
+// ---------------------------------------------------------------------------
+
+const PAST = new Date("2026-07-21T00:00:00.000Z"); // a day after BOOKING's slot
+
+describe("BookingsService.recordOutcome", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        bookingUpdate.mockImplementation(({ data }) =>
+            Promise.resolve({ ...BOOKING, ...data }),
+        );
+        eventCreate.mockResolvedValue({ id: "ev_1" });
+    });
+
+    it("records attendance with who said so, and the slot it is about", async () => {
+        bookingFindUnique.mockResolvedValue(BOOKING);
+        const booking = await new BookingsService().recordOutcome(
+            ctx(),
+            "bk_1",
+            "ATTENDED",
+            PAST,
+        );
+
+        expect(booking.outcome).toBe("ATTENDED");
+        expect(eventCreate.mock.calls[0][0].data).toMatchObject({
+            type: "ATTENDED",
+            actorUserId: "user_1",
+            fromStartAt: new Date(START),
+        });
+    });
+
+    it("records a no-show the same way", async () => {
+        bookingFindUnique.mockResolvedValue(BOOKING);
+        await new BookingsService().recordOutcome(
+            ctx(),
+            "bk_1",
+            "NO_SHOW",
+            PAST,
+        );
+        expect(eventCreate.mock.calls[0][0].data).toMatchObject({
+            type: "NO_SHOW",
+        });
+    });
+
+    it("refuses an appointment that has not happened yet", async () => {
+        bookingFindUnique.mockResolvedValue(BOOKING);
+        // Nothing derives an outcome from time passing, and nothing lets a
+        // merchant assert one before the time has passed either.
+        const beforeItEnds = new Date("2026-07-20T09:30:00.000Z");
+        await expect(
+            new BookingsService().recordOutcome(
+                ctx(),
+                "bk_1",
+                "ATTENDED",
+                beforeItEnds,
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(bookingUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a cancelled booking, which is already how it went", async () => {
+        bookingFindUnique.mockResolvedValue({
+            ...BOOKING,
+            status: "CANCELLED",
+        });
+        // Cancelled-in-advance and did-not-turn-up are the two most different
+        // things a merchant can be told about a customer. Relabelling one as
+        // the other would quietly destroy that distinction.
+        await expect(
+            new BookingsService().recordOutcome(ctx(), "bk_1", "NO_SHOW", PAST),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(bookingUpdate).not.toHaveBeenCalled();
+    });
+
+    it("lets a merchant correct a mistake, and appends rather than overwrites", async () => {
+        bookingFindUnique.mockResolvedValue({
+            ...BOOKING,
+            outcome: "NO_SHOW",
+        });
+        const booking = await new BookingsService().recordOutcome(
+            ctx(),
+            "bk_1",
+            "ATTENDED",
+            PAST,
+        );
+        expect(booking.outcome).toBe("ATTENDED");
+        // The history shows both what was said and what it was corrected to.
+        expect(eventCreate.mock.calls[0][0].data).toMatchObject({
+            type: "ATTENDED",
+        });
+    });
+
+    it("saying the same thing twice changes nothing and records nothing", async () => {
+        bookingFindUnique.mockResolvedValue({
+            ...BOOKING,
+            outcome: "ATTENDED",
+        });
+        await new BookingsService().recordOutcome(
+            ctx(),
+            "bk_1",
+            "ATTENDED",
+            PAST,
+        );
+        expect(bookingUpdate).not.toHaveBeenCalled();
+        expect(eventCreate).not.toHaveBeenCalled();
+    });
+
+    it("404s for another org's booking", async () => {
+        bookingFindUnique.mockResolvedValue({
+            ...BOOKING,
+            organizationId: "org_OTHER",
+        });
+        await expect(
+            new BookingsService().recordOutcome(
+                ctx(),
+                "bk_1",
+                "ATTENDED",
+                PAST,
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("denies a MEMBER (booking:write) before any I/O", async () => {
+        await expect(
+            new BookingsService().recordOutcome(
+                ctx({ role: "MEMBER" }),
+                "bk_1",
+                "ATTENDED",
+                PAST,
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(bookingFindUnique).not.toHaveBeenCalled();
+    });
+
+    it("writes the outcome and its history line in one transaction", async () => {
+        bookingFindUnique.mockResolvedValue(BOOKING);
+        await new BookingsService().recordOutcome(
+            ctx(),
+            "bk_1",
+            "ATTENDED",
+            PAST,
+        );
+        // A booking marked attended with no record of who said so would be
+        // worse than no outcome at all.
+        expect(transaction).toHaveBeenCalledTimes(1);
+    });
+});
