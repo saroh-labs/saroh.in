@@ -16,9 +16,6 @@ export const config = {
     ],
 };
 
-/** This app's own dev port, so `foo.localhost:3009` resolves like a subdomain. */
-const DEV_HOST = "localhost:3009";
-
 /**
  * Hosts that are the renderer itself rather than a tenant site.
  *
@@ -32,7 +29,6 @@ const DEV_HOST = "localhost:3009";
  */
 function isApexHost(hostname: string): boolean {
     return (
-        hostname === DEV_HOST ||
         hostname === env.NEXT_PUBLIC_ROOT_DOMAIN ||
         hostname === `www.${env.NEXT_PUBLIC_ROOT_DOMAIN}` ||
         hostname === "saroh.app" ||
@@ -43,11 +39,13 @@ function isApexHost(hostname: string): boolean {
 export default function middleware(req: NextRequest) {
     const url = req.nextUrl;
 
-    // e.g. demo.saroh.app, or demo.localhost:3009 in development
-    const hostname = (req.headers.get("host") ?? "").replace(
-        `.${DEV_HOST}`,
-        `.${env.NEXT_PUBLIC_ROOT_DOMAIN}`,
-    );
+    // e.g. demo.saroh.app — or demo.saroh.app.localhost in development, where
+    // NEXT_PUBLIC_ROOT_DOMAIN is `saroh.app.localhost` and every app runs at
+    // its production hostname with `.localhost` appended (the `portless` field
+    // in each app's package.json).
+    // Nothing here knows about ports: the host is parsed the same way in both
+    // environments, which is the point of running development that way.
+    const hostname = req.headers.get("host") ?? "";
     const path = url.pathname;
 
     // The legacy scaffold domain still has DNS pointed here.

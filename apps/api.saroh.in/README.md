@@ -37,7 +37,7 @@ Applied globally, in order:
 1. `correlationIdMiddleware` — first, so every request (including the mounted
    Better Auth handler) is traceable through its logs and error envelope
 2. `helmet()`
-3. Credentialed CORS — the `*.saroh.in` trusted origins plus `localhost:3000–3012`
+3. Credentialed CORS — the `*.saroh.in` trusted origins plus every `*.saroh.localhost` app
    in dev, or `CORS_ORIGIN` when set. Never `*` with credentials
 4. `ValidationPipe` — `whitelist`, `forbidNonWhitelisted`, `transform`
 5. `OriginGuard` — app-layer CSRF check on unsafe methods for authenticated
@@ -123,7 +123,7 @@ visible in the filename.
 ```bash
 pnpm install
 pnpm --filter @saroh/database build      # generate the Prisma client first
-pnpm --filter @saroh/api dev             # http://localhost:3333, watch mode
+pnpm --filter @saroh/api dev             # https://api.saroh.localhost, watch mode
 ```
 
 ```bash

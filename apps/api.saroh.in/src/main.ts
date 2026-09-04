@@ -73,6 +73,19 @@ function installProcessGuards(): void {
     });
 }
 
+/** The apps that call this API, by production hostname minus its TLD. */
+const DEV_HOSTNAMES = [
+    "saroh",
+    "app.saroh",
+    "accounts.saroh",
+    "admin.saroh",
+    "docs.saroh",
+    "help.saroh",
+    "templates.saroh",
+    "ui.saroh",
+    "saroh.app",
+];
+
 async function bootstrap() {
     installProcessGuards();
 
@@ -87,10 +100,15 @@ async function bootstrap() {
     app.use(helmet());
 
     // Credentialed CORS for every *.saroh.in frontend (never "*" with creds).
-    const devOrigins = Array.from(
-        { length: 13 },
-        (_, i) => `http://localhost:${3000 + i}`,
-    );
+    //
+    // In development each app runs at its production hostname with
+    // `.localhost` appended (the `portless` field in each app's package.json), so the dev allowlist has the same
+    // shape as production. The bare `localhost:<port>` range stays for anyone
+    // running a `dev:app` script directly, without the proxy.
+    const devOrigins = [
+        ...DEV_HOSTNAMES.map((host) => `https://${host}.localhost`),
+        ...Array.from({ length: 13 }, (_, i) => `http://localhost:${3000 + i}`),
+    ];
     app.enableCors({
         origin: env.CORS_ORIGIN?.split(",").map((o) => o.trim()) ?? [
             ...getTrustedOrigins(),

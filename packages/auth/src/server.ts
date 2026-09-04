@@ -165,6 +165,35 @@ async function assertNotSoleOwner(userId: string): Promise<void> {
 }
 
 /**
+ * The domain the session cookie is shared across, or null for a host-only
+ * cookie.
+ *
+ * The api sets the cookie and every other app reads it, so it has to be scoped
+ * to their common parent: `.saroh.in` in production, `.saroh.localhost` in
+ * development, where each app runs at its production hostname with
+ * `.localhost` appended. It is DERIVED from the api's own URL rather than
+ * written down per environment, so the two cannot drift — the old
+ * production-only `.saroh.in` left development with a cookie that
+ * `app.saroh.localhost` could never see, which plain `localhost` had hidden
+ * because browsers share one cookie jar across ports. A host with no parent
+ * to share with (`localhost`, an IP address, a two-label name) keeps a
+ * host-only cookie.
+ */
+export function sessionCookieDomain(apiUrl: string | undefined): string | null {
+    if (!apiUrl) return null;
+    let hostname: string;
+    try {
+        hostname = new URL(apiUrl).hostname;
+    } catch {
+        return null;
+    }
+    if (/^[\d.]+$/.test(hostname) || hostname.startsWith("[")) return null;
+    const labels = hostname.split(".");
+    if (labels.length < 3) return null;
+    return `.${labels.slice(1).join(".")}`;
+}
+
+/**
  * The single source of truth for the Better Auth server config. api.saroh.in
  * is the auth host — it owns this instance, the DB, and the secret, and both
  * issues and validates sessions. accounts.saroh.in is the SSO login UI only
@@ -188,6 +217,7 @@ async function assertNotSoleOwner(userId: string): Promise<void> {
  */
 export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
     const secret = resolveAuthSecret();
+    const cookieDomain = sessionCookieDomain(process.env.BETTER_AUTH_URL);
 
     const options: BetterAuthOptions = {
         secret,
@@ -283,8 +313,8 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
             },
         },
         advanced: {
-            crossSubDomainCookies: IS_PRODUCTION
-                ? { enabled: true, domain: ".saroh.in" }
+            crossSubDomainCookies: cookieDomain
+                ? { enabled: true, domain: cookieDomain }
                 : { enabled: false },
         },
         plugins: [

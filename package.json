@@ -26,6 +26,7 @@
         "eslint": "^10.8.1",
         "husky": "^9.1.7",
         "madge": "^8.0.0",
+        "portless": "^0.15.6",
         "postcss": "^8.5.26",
         "prettier": "^3.9.6",
         "prettier-plugin-organize-imports": "^4.3.0",

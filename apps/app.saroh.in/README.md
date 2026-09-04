@@ -56,7 +56,7 @@ password, sessions) is deliberately not here; it lives at
 
 ```bash
 pnpm install
-pnpm --filter application dev     # http://localhost:3003
+pnpm --filter application dev     # https://app.saroh.localhost
 ```
 
 `api.saroh.in` and `accounts.saroh.in` must be running as well — this app
@@ -67,11 +67,11 @@ renders nothing useful without a session and an API to read.
 See [`env.ts`](env.ts) for the validated schema.
 
 ```dotenv
-API_URL=http://localhost:3333                      # server-only; used by lib/**/service.ts
-NEXT_PUBLIC_API_URL=http://localhost:3333          # public fallback
-NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
-NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
-NEXT_PUBLIC_ROOT_DOMAIN=saroh.app                  # where merchant subdomains live
+API_URL=https://api.saroh.localhost                # server-only; used by lib/**/service.ts
+NEXT_PUBLIC_API_URL=https://api.saroh.localhost    # public fallback
+NEXT_PUBLIC_ACCOUNTS_URL=https://accounts.saroh.localhost
+NEXT_PUBLIC_BETTER_AUTH_URL=https://api.saroh.localhost
+NEXT_PUBLIC_ROOT_DOMAIN=saroh.app.localhost        # where merchant subdomains live (saroh.app in prod)
 # NGROK_URL=                                       # dev-only tunnel origin
 ```
 
