@@ -174,6 +174,10 @@ export function BookingsView({
             rows={bookings}
             columns={columns}
             rowKey={(b) => b.id}
+            // A row is a destination now (#121): the detail screen is where a
+            // booking is moved, and where the two questions a merchant is
+            // asked on the phone — who is this, can we move it — are answered.
+            rowHref={(b) => `/bookings/${b.id}`}
             modes={["table", "list"]}
             defaultMode="table"
             filters={FILTERS}

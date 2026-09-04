@@ -205,3 +205,16 @@ export class BookServiceDto {
     @MaxLength(128)
     idempotencyKey?: string;
 }
+
+/**
+ * Move an existing booking to a different slot (#121).
+ *
+ * Only the instant. Everything else about the booking — who it is for, what
+ * service, the terms agreed at booking time — is deliberately not reschedulable
+ * here: moving a booking is one decision, and editing its terms is another.
+ */
+export class RescheduleBookingDto {
+    /** ISO-8601 absolute instant of the new slot start. */
+    @IsISO8601()
+    startAt!: string;
+}

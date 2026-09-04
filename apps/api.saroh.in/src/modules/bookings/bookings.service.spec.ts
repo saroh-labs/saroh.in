@@ -28,6 +28,7 @@ jest.mock("@saroh/database", () => {
             count: jest.fn(),
         },
         contact: { upsert: jest.fn() },
+        bookingEvent: { create: jest.fn() },
         job: { create: jest.fn() },
         site: { findUnique: jest.fn() },
     };
@@ -65,6 +66,8 @@ const contactUpsert = prisma.contact.upsert as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 const siteFindUnique = prisma.site.findUnique as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
+const eventCreate = prisma.bookingEvent.create as jest.Mock;
+const ruleFindMany = prisma.availabilityRule.findMany as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -446,6 +449,264 @@ describe("BookingsService — bookings management", () => {
         await expect(
             service.cancelBooking(ctx(), "bk_1"),
         ).rejects.toBeInstanceOf(NotFoundException);
+        expect(bookingUpdate).not.toHaveBeenCalled();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Moving a booking (#121)
+// ---------------------------------------------------------------------------
+
+// Mon 2026-07-20 09:00–12:00 UTC at 60 minutes: slots at 09:00, 10:00, 11:00.
+// Wider than RULES on purpose — a reschedule test needs somewhere to move TO.
+const WIDE_RULES = [{ ...RULES[0], endMinute: 720 }];
+const AT_10 = "2026-07-20T10:00:00.000Z";
+const AT_11 = "2026-07-20T11:00:00.000Z";
+
+const BOOKING = {
+    id: "bk_1",
+    organizationId: "org_SVC",
+    serviceId: "svc_1",
+    contactId: "contact_1",
+    status: "CONFIRMED",
+    startAt: new Date(START),
+    endAt: new Date("2026-07-20T10:00:00.000Z"),
+    // The terms as agreed at booking time. The slot inside is the ORIGINAL.
+    snapshot: { slot: { startAt: START } },
+};
+
+/** An owned, CONFIRMED booking on a service with room to move within. */
+function wireReschedule(over: Partial<typeof BOOKING> = {}) {
+    bookingFindUnique.mockResolvedValue({ ...BOOKING, ...over });
+    serviceFindUnique.mockResolvedValue(SERVICE);
+    ruleFindMany.mockResolvedValue(WIDE_RULES);
+    bookingCount.mockResolvedValue(0);
+    bookingUpdate.mockImplementation(({ data }) =>
+        Promise.resolve({ ...BOOKING, ...over, ...data }),
+    );
+    eventCreate.mockResolvedValue({ id: "ev_1" });
+    jobCreate.mockResolvedValue({ id: "job_1" });
+}
+
+describe("BookingsService.rescheduleBooking", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("moves the slot, records the move, and tells the booker — in one serializable tx", async () => {
+        wireReschedule();
+        const service = new BookingsService();
+        const moved = await service.rescheduleBooking(ctx(), "bk_1", {
+            startAt: AT_10,
+        });
+
+        expect(moved.startAt).toEqual(new Date(AT_10));
+        // End moves with it, by the service's own duration.
+        expect(bookingUpdate.mock.calls[0][0].data.endAt).toEqual(
+            new Date(AT_11),
+        );
+
+        // The history says where it came from AND who moved it — the
+        // difference between "they booked it" and "we moved it".
+        expect(eventCreate.mock.calls[0][0].data).toMatchObject({
+            bookingId: "bk_1",
+            organizationId: "org_SVC",
+            type: "RESCHEDULED",
+            actorUserId: "user_1",
+            fromStartAt: new Date(START),
+            toStartAt: new Date(AT_10),
+        });
+
+        // Transactional outbox, with the reason, so a committed move always
+        // has a pending notification.
+        expect(jobCreate.mock.calls[0][0].data).toMatchObject({
+            type: "booking.notify",
+            payload: { bookingId: "bk_1", reason: "rescheduled" },
+        });
+
+        // All three writes in the ONE serializable transaction.
+        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(transaction.mock.calls[0][1]).toMatchObject({
+            isolationLevel: "Serializable",
+        });
+    });
+
+    it("never rewrites the snapshot — it is the terms that were agreed", async () => {
+        wireReschedule();
+        await new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+            startAt: AT_10,
+        });
+        expect(bookingUpdate.mock.calls[0][0].data).not.toHaveProperty(
+            "snapshot",
+        );
+    });
+
+    it("refuses a time the service is not open for", async () => {
+        wireReschedule();
+        const service = new BookingsService();
+        await expect(
+            // 13:00 is past the rule's 12:00 end.
+            service.rescheduleBooking(ctx(), "bk_1", {
+                startAt: "2026-07-20T13:00:00.000Z",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(bookingUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a time off the duration grid", async () => {
+        wireReschedule();
+        await expect(
+            new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                startAt: "2026-07-20T09:30:00.000Z",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(bookingUpdate).not.toHaveBeenCalled();
+    });
+
+    it("does not count the booking against its own seat", async () => {
+        wireReschedule();
+        await new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+            startAt: AT_10,
+        });
+        // Without this a capacity-one booking could never be nudged into a
+        // slot that overlaps where it already is: it would collide with itself.
+        expect(bookingCount.mock.calls[0][0].where).toMatchObject({
+            id: { not: "bk_1" },
+            status: "CONFIRMED",
+        });
+    });
+
+    it("refuses a slot somebody else already has", async () => {
+        wireReschedule();
+        bookingCount.mockResolvedValue(1); // capacity is 1
+        await expect(
+            new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                startAt: AT_10,
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(bookingUpdate).not.toHaveBeenCalled();
+    });
+
+    it("maps a lost race for the last seat to the same conflict", async () => {
+        wireReschedule();
+        transaction.mockRejectedValueOnce(
+            Object.assign(new Error("serialization failure"), {
+                code: "P2034",
+            }),
+        );
+        await expect(
+            new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                startAt: AT_10,
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("will not move a cancelled booking", async () => {
+        wireReschedule({ status: "CANCELLED" });
+        await expect(
+            new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                startAt: AT_10,
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(bookingUpdate).not.toHaveBeenCalled();
+    });
+
+    it("moving to the time it is already at changes nothing and records nothing", async () => {
+        wireReschedule();
+        const booking = await new BookingsService().rescheduleBooking(
+            ctx(),
+            "bk_1",
+            { startAt: START },
+        );
+        expect(booking.startAt).toEqual(new Date(START));
+        expect(bookingUpdate).not.toHaveBeenCalled();
+        // A history full of "moved to where it already was" is noise.
+        expect(eventCreate).not.toHaveBeenCalled();
+    });
+
+    it("rejects a start that is not an instant at all", async () => {
+        wireReschedule();
+        await expect(
+            new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                startAt: "next tuesday",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("404s for another org's booking, before touching the service", async () => {
+        bookingFindUnique.mockResolvedValue({
+            ...BOOKING,
+            organizationId: "org_OTHER",
+        });
+        await expect(
+            new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                startAt: AT_10,
+            }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(serviceFindUnique).not.toHaveBeenCalled();
+    });
+
+    it("denies a MEMBER (booking:write) before any I/O", async () => {
+        await expect(
+            new BookingsService().rescheduleBooking(
+                ctx({ role: "MEMBER" }),
+                "bk_1",
+                { startAt: AT_10 },
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(bookingFindUnique).not.toHaveBeenCalled();
+    });
+
+    it("still moves a booking on an ARCHIVED service", async () => {
+        wireReschedule();
+        // A merchant who stops taking new bookings must still be able to
+        // manage the ones already on the books.
+        serviceFindUnique.mockResolvedValue({ ...SERVICE, status: "ARCHIVED" });
+        const moved = await new BookingsService().rescheduleBooking(
+            ctx(),
+            "bk_1",
+            { startAt: AT_10 },
+        );
+        expect(moved.startAt).toEqual(new Date(AT_10));
+    });
+});
+
+describe("BookingsService — the history a booking carries", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("books with no actor: the booker did that themselves", async () => {
+        wireBookHappyPath();
+        eventCreate.mockResolvedValue({ id: "ev_1" });
+        bookingCreate.mockResolvedValue({ id: "bk_1", status: "CONFIRMED" });
+        await new BookingsService().book("svc_1", baseInput(), undefined);
+
+        const { data } = eventCreate.mock.calls[0][0];
+        expect(data).toMatchObject({
+            type: "BOOKED",
+            toStartAt: new Date(START),
+        });
+        expect(data.actorUserId).toBeUndefined();
+        expect(data.fromStartAt).toBeUndefined();
+    });
+
+    it("cancelling records the slot it was cancelled out of", async () => {
+        bookingFindUnique.mockResolvedValue(BOOKING);
+        bookingUpdate.mockResolvedValue({ ...BOOKING, status: "CANCELLED" });
+        eventCreate.mockResolvedValue({ id: "ev_2" });
+        await new BookingsService().cancelBooking(ctx(), "bk_1");
+
+        expect(eventCreate.mock.calls[0][0].data).toMatchObject({
+            type: "CANCELLED",
+            actorUserId: "user_1",
+            fromStartAt: new Date(START),
+        });
+    });
+
+    it("cancelling an already-cancelled booking records nothing twice", async () => {
+        bookingFindUnique.mockResolvedValue({
+            ...BOOKING,
+            status: "CANCELLED",
+        });
+        await new BookingsService().cancelBooking(ctx(), "bk_1");
+        expect(eventCreate).not.toHaveBeenCalled();
         expect(bookingUpdate).not.toHaveBeenCalled();
     });
 });
