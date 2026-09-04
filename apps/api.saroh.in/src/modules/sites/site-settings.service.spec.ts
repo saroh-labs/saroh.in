@@ -90,6 +90,37 @@ describe("SitesService.updateSettings — absent vs null", () => {
         expect("seoDescription" in data).toBe(false);
     });
 
+    it("carries the picture's measurements with it, and clears them with it", async () => {
+        // WhatsApp draws its large card only when og:image:width/height are
+        // present (#220), so the facts travel with the address — and go when
+        // the address goes, or the next picture inherits the last one's size.
+        await service.updateSettings(OWNER, SITE, {
+            socialImageUrl: "https://cdn.example.com/share.png",
+            socialImageWidth: 1200,
+            socialImageHeight: 630,
+            socialImageBytes: 180_000,
+        });
+        expect(siteUpdate.mock.calls[0][0].data).toEqual({
+            socialImageUrl: "https://cdn.example.com/share.png",
+            socialImageWidth: 1200,
+            socialImageHeight: 630,
+            socialImageBytes: 180_000,
+        });
+
+        await service.updateSettings(OWNER, SITE, {
+            socialImageUrl: null,
+            socialImageWidth: null,
+            socialImageHeight: null,
+            socialImageBytes: null,
+        });
+        expect(siteUpdate.mock.calls[1][0].data).toEqual({
+            socialImageUrl: null,
+            socialImageWidth: null,
+            socialImageHeight: null,
+            socialImageBytes: null,
+        });
+    });
+
     it("writes nothing when the body is empty", async () => {
         await service.updateSettings(OWNER, SITE, {});
 

@@ -12,6 +12,8 @@ export interface PickedImage {
     src: string;
     width?: number;
     height?: number;
+    /** The file's size on disk, for the share-image limits (#220). */
+    bytes?: number;
 }
 
 /**
@@ -101,7 +103,7 @@ export function MediaPicker({
                 );
                 return;
             }
-            onPick({ src: done.data.url, ...dims });
+            onPick({ src: done.data.url, ...dims, bytes: file.size });
         } catch (e) {
             setError(
                 e instanceof Error && e.message

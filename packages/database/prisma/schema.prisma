@@ -1410,6 +1410,14 @@ model Site {
   seoTitle       String? // <title> / og:title
   seoDescription String? // meta description / og:description
   socialImageUrl String? // og:image — the card shown when the link is shared
+  // Facts about that picture, recorded when it is chosen (#220). WhatsApp draws
+  // its large card only when og:image:width/height are present, and drops it for
+  // files over ~300 KB; Facebook and LinkedIn want at least 1200×630. Stored
+  // rather than measured at publish so the settings screen can warn while the
+  // merchant is still choosing, and so publish stays a pure copy.
+  socialImageWidth  Int?
+  socialImageHeight Int?
+  socialImageBytes  Int?
 
   // The footer a merchant writes for themselves (#202): `{ format, value }`,
   // the same shape richText sections carry, so one authoring surface and one

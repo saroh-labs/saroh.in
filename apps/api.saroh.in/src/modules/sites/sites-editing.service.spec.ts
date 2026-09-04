@@ -363,6 +363,52 @@ describe("SitesService.publishSite", () => {
         expect(data.snapshot.site.footer).toBeNull();
     });
 
+    it("carries the share image with its measurements into the snapshot (#220)", async () => {
+        // WhatsApp draws its large card only when og:image:width/height are
+        // present; the renderer reads them from here and nowhere else.
+        siteFindFirst.mockResolvedValue({
+            ...siteWithRichText("<p>hello</p>"),
+            socialImageUrl: "https://cdn.example.com/share.png",
+            socialImageWidth: 1200,
+            socialImageHeight: 630,
+        });
+
+        await service.publishSite(ctx(), "site_1");
+
+        const data = publicationCreate.mock.calls[0][0].data as {
+            snapshot: {
+                site: {
+                    socialImageUrl: string | null;
+                    socialImage: {
+                        url: string;
+                        width: number | null;
+                        height: number | null;
+                    } | null;
+                };
+            };
+        };
+        expect(data.snapshot.site.socialImage).toEqual({
+            url: "https://cdn.example.com/share.png",
+            width: 1200,
+            height: 630,
+        });
+        // The bare address stays for snapshots an older renderer reads.
+        expect(data.snapshot.site.socialImageUrl).toBe(
+            "https://cdn.example.com/share.png",
+        );
+    });
+
+    it("publishes no share image object when there is no picture", async () => {
+        siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
+
+        await service.publishSite(ctx(), "site_1");
+
+        const data = publicationCreate.mock.calls[0][0].data as {
+            snapshot: { site: { socialImage: unknown } };
+        };
+        expect(data.snapshot.site.socialImage).toBeNull();
+    });
+
     it("asks the database for visible pages only — a hidden page never publishes", async () => {
         siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
 

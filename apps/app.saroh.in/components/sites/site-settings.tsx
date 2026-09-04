@@ -8,10 +8,11 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { ImageIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { MediaPicker } from "@/components/sites/media-picker";
+import { ShareCards } from "@/components/sites/share-cards";
 import dynamic from "next/dynamic";
 
 /* On demand and browser-only, for the same reasons as in the editor. */
@@ -123,6 +124,52 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
     const [socialImageUrl, setSocialImageUrl] = useState(
         site.socialImageUrl ?? "",
     );
+    // Facts about the picture, kept beside its address (#220). A pick from
+    // the library brings them along; a pasted address is measured in the
+    // browser, and its size on disk stays unknown.
+    const [socialImageFacts, setSocialImageFacts] = useState<{
+        width: number | null;
+        height: number | null;
+        bytes: number | null;
+    }>({
+        width: site.socialImageWidth,
+        height: site.socialImageHeight,
+        bytes: site.socialImageBytes,
+    });
+    // The address whose measurement is still in flight, so a slow picture
+    // that finishes after the merchant has moved on cannot stamp its size on
+    // the next one. Touched only from event handlers, never during render.
+    const measuring = useRef<string | null>(null);
+    function chooseShareImage(
+        src: string,
+        facts?: { width?: number; height?: number; bytes?: number },
+    ) {
+        setSocialImageUrl(src);
+        measuring.current = null;
+        if (facts) {
+            setSocialImageFacts({
+                width: facts.width ?? null,
+                height: facts.height ?? null,
+                bytes: facts.bytes ?? null,
+            });
+            return;
+        }
+        setSocialImageFacts({ width: null, height: null, bytes: null });
+        if (!src.trim()) return;
+        // Measure a pasted address. Cross-origin pictures still report their
+        // natural size; a URL that never loads leaves the facts unknown.
+        measuring.current = src;
+        const img = new Image();
+        img.onload = () => {
+            if (measuring.current !== src) return;
+            setSocialImageFacts((f) => ({
+                ...f,
+                width: img.naturalWidth,
+                height: img.naturalHeight,
+            }));
+        };
+        img.src = src;
+    }
     const [footerValue, setFooterValue] = useState(site.footer?.value ?? "");
     const [footerFormat, setFooterFormat] = useState<SiteFooter["format"]>(
         site.footer?.format ?? "html",
@@ -455,10 +502,22 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                                     disabled={pending}
                                     onClick={() =>
                                         save(
-                                            {
-                                                socialImageUrl:
-                                                    socialImageUrl || null,
-                                            },
+                                            socialImageUrl
+                                                ? {
+                                                      socialImageUrl,
+                                                      socialImageWidth:
+                                                          socialImageFacts.width,
+                                                      socialImageHeight:
+                                                          socialImageFacts.height,
+                                                      socialImageBytes:
+                                                          socialImageFacts.bytes,
+                                                  }
+                                                : {
+                                                      socialImageUrl: null,
+                                                      socialImageWidth: null,
+                                                      socialImageHeight: null,
+                                                      socialImageBytes: null,
+                                                  },
                                             "Share image",
                                         )
                                     }
@@ -473,6 +532,12 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                                         setSocialImageUrl(
                                             site.socialImageUrl ?? "",
                                         );
+                                        measuring.current = null;
+                                        setSocialImageFacts({
+                                            width: site.socialImageWidth,
+                                            height: site.socialImageHeight,
+                                            bytes: site.socialImageBytes,
+                                        });
                                         setEditing(null);
                                     }}
                                 >
@@ -522,19 +587,38 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                         {editing === "social" ? (
                             <div className="grid gap-1.5">
                                 <MediaPicker
-                                    onPick={(img) => setSocialImageUrl(img.src)}
+                                    onPick={(img) =>
+                                        chooseShareImage(img.src, img)
+                                    }
                                 />
                                 <Input
                                     value={socialImageUrl}
                                     placeholder="or paste an image address"
                                     onChange={(e) =>
-                                        setSocialImageUrl(e.target.value)
+                                        chooseShareImage(e.target.value)
                                     }
                                     aria-label="Share image address"
                                 />
                             </div>
                         ) : null}
                     </div>
+                </Row>
+
+                {/* The point of the picture: what the link looks like when it
+                    is posted (#220). Drawn from the fields above, live. */}
+                <Row label="When shared">
+                    <ShareCards
+                        title={seoTitle || site.name}
+                        description={seoDescription}
+                        siteName={site.name}
+                        domain={address}
+                        image={
+                            socialImageUrl
+                                ? { url: socialImageUrl, ...socialImageFacts }
+                                : null
+                        }
+                        liveUrl={live && address ? `https://${address}` : null}
+                    />
                 </Row>
             </Section>
 
