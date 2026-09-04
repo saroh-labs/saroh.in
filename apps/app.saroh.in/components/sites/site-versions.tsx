@@ -86,6 +86,21 @@ export function SiteVersions({
                                         Template {p.templateId} v
                                         {p.templateVersion}
                                     </p>
+                                    {p.bypass ? (
+                                        /*
+                                         * The record the epic asked for (#199):
+                                         * this version went live past a
+                                         * reviewer's change request. Said
+                                         * plainly, with who, where the version
+                                         * is listed — never prevented, never
+                                         * hidden.
+                                         */
+                                        <p className="mt-1 text-xs text-warning">
+                                            Published without approval by{" "}
+                                            {p.bypass.by} — a reviewer had asked
+                                            for changes.
+                                        </p>
+                                    ) : null}
                                 </div>
 
                                 {p.isCurrent ? null : confirming === p.id ? (

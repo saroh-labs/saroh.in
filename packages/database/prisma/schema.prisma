@@ -1578,15 +1578,24 @@ model SiteApproval {
   byUserId String
   by       User   @relation(fields: [byUserId], references: [id], onDelete: Cascade)
 
-  // APPROVED | CHANGES_REQUESTED. The two outcomes the design shows, and no
-  // more — the spec's "approved with notes" is this plus the open note count,
-  // not a third state.
+  // APPROVED | CHANGES_REQUESTED | BYPASSED. The first two are what a reviewer
+  // records; the spec's "approved with notes" is APPROVED plus the open note
+  // count, not a third verdict. BYPASSED is written by PUBLISH, never by a
+  // reviewer (#199): when a site goes live while a change request is still
+  // outstanding, the fact is appended here — who, when, and which publication
+  // — because the epic's rule is that bypassing is recorded, not prevented.
   outcome String
+
+  // The publication a BYPASSED row is about, so version history can show
+  // which publish went past an outstanding review. Null on a verdict.
+  publicationId String?
+  publication   Publication? @relation(fields: [publicationId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
   @@index([siteId, createdAt])
   @@index([organizationId])
+  @@index([publicationId])
 }
 
 /**
@@ -1726,6 +1735,8 @@ model Publication {
 
   // Back-relation for Site.currentPublication (the live pointer above).
   currentForSite Site? @relation("SiteCurrentPublication")
+  // Bypass records naming this publication (#199).
+  approvals SiteApproval[]
 
   @@index([siteId, publishedAt])
   @@index([organizationId])

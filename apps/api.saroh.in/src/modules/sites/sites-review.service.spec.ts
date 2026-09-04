@@ -238,6 +238,7 @@ describe("SitesService.getReviewState", () => {
         const state = await service.getReviewState(ctx(), "site_1");
         // One badge carrying both, rather than a third outcome.
         expect(state.latestApproval?.outcome).toBe("APPROVED");
+        expect(state.outstanding).toBe(false);
         expect(state.latestApproval?.by).toBe("Priya Raman");
         expect(state.openNotes).toBe(2);
     });
@@ -247,6 +248,36 @@ describe("SitesService.getReviewState", () => {
         commentCount.mockResolvedValue(0);
         const state = await service.getReviewState(ctx(), "site_1");
         expect(state.latestApproval).toBeNull();
+    });
+});
+
+describe("SitesService.getReviewState — outstanding (#199)", () => {
+    it("is outstanding while the latest verdict asks for changes", async () => {
+        approvalFindFirst.mockResolvedValue({
+            outcome: "CHANGES_REQUESTED",
+            createdAt: new Date("2026-09-03T10:00:00Z"),
+            by: { name: "Priya Raman", email: "priya@example.com" },
+        });
+        commentCount.mockResolvedValue(0);
+        const state = await service.getReviewState(ctx(), "site_1");
+        expect(state.outstanding).toBe(true);
+        expect(state.latestApproval?.outcome).toBe("CHANGES_REQUESTED");
+    });
+
+    it("stays outstanding after a bypass — publish's own record is not the reviewer's approval", async () => {
+        // Latest event of any kind is the bypass; the latest VERDICT is still
+        // the change request.
+        approvalFindFirst
+            .mockResolvedValueOnce({
+                outcome: "BYPASSED",
+                createdAt: new Date("2026-09-04T10:00:00Z"),
+                by: { name: "Demo Owner", email: "demo@saroh.dev" },
+            })
+            .mockResolvedValueOnce({ outcome: "CHANGES_REQUESTED" });
+        commentCount.mockResolvedValue(1);
+        const state = await service.getReviewState(ctx(), "site_1");
+        expect(state.latestApproval?.outcome).toBe("BYPASSED");
+        expect(state.outstanding).toBe(true);
     });
 });
 
