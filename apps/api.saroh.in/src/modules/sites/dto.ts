@@ -290,3 +290,9 @@ export class UpdateSiteSettingsDto {
     @Min(1)
     socialImageBytes?: number | null;
 }
+
+/** Mint a preview link (#198). The choices are the ones the design offers. */
+export class CreatePreviewLinkDto {
+    @IsIn([1, 7, 30], { message: "A preview link lasts 1, 7 or 30 days" })
+    expiresInDays!: 1 | 7 | 30;
+}

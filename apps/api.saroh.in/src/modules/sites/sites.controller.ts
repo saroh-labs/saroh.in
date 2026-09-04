@@ -20,11 +20,13 @@ import {
     CreateApprovalDto,
     CreateCommentDto,
     CreatePageDto,
+    CreatePreviewLinkDto,
     CreateSiteFromTemplateDto,
     UpdateDraftSectionsDto,
     UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
+import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
 
 /**
@@ -40,7 +42,10 @@ import { SitesService } from "./sites.service";
 @Controller("organizations/:organizationId/sites")
 @UseGuards(BetterAuthGuard, OrganizationGuard)
 export class SitesController {
-    constructor(private readonly sites: SitesService) {}
+    constructor(
+        private readonly sites: SitesService,
+        private readonly previewLinks: SitePreviewLinksService,
+    ) {}
 
     /** Create a draft Site (pages + DRAFT versions + sections) from a template. */
     @Post()
@@ -131,6 +136,38 @@ export class SitesController {
         @Body() dto: CreateApprovalDto,
     ) {
         return this.sites.createApproval(ctx, siteId, dto);
+    }
+
+    /**
+     * Share the draft (#198): mint a link that shows it to whoever holds the
+     * link, for 1, 7 or 30 days. Requires `site:update`.
+     */
+    @Post(":siteId/preview-links")
+    createPreviewLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: CreatePreviewLinkDto,
+    ) {
+        return this.previewLinks.create(ctx, siteId, dto);
+    }
+
+    /** Every preview link for the site, with its state. Requires `site:read`. */
+    @Get(":siteId/preview-links")
+    listPreviewLinks(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.previewLinks.list(ctx, siteId);
+    }
+
+    /** Take a preview link back, effective immediately. Requires `site:update`. */
+    @Delete(":siteId/preview-links/:linkId")
+    revokePreviewLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("linkId") linkId: string,
+    ) {
+        return this.previewLinks.revoke(ctx, siteId, linkId);
     }
 
     /** The latest verdict plus the open-note count. Requires `site:read`. */

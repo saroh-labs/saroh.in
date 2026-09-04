@@ -4,6 +4,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { BillingModule } from "../billing/billing.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PublicSitesController } from "./public-sites.controller";
+import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesController } from "./sites.controller";
 import { SitesService } from "./sites.service";
 
@@ -17,7 +18,7 @@ import { SitesService } from "./sites.service";
 @Module({
     imports: [BillingModule, forwardRef(() => OrganizationsModule)],
     controllers: [SitesController, PublicSitesController],
-    providers: [SitesService, OrganizationGuard],
+    providers: [SitesService, SitePreviewLinksService, OrganizationGuard],
     exports: [SitesService],
 })
 export class SitesModule {}

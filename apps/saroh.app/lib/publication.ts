@@ -353,3 +353,67 @@ export function shareImages(site: {
     const { width, height } = site.socialImage ?? {};
     return width && height ? [{ url, width, height }] : [url];
 }
+
+// ---------------------------------------------------------------------------
+// Draft previews (#198)
+// ---------------------------------------------------------------------------
+
+export type PreviewLookup =
+    | {
+          ok: true;
+          snapshot: PublicationSnapshot;
+          siteName: string;
+          /** ISO date-time after which the link stops working. */
+          expiresAt: string;
+      }
+    | { ok: false; reason: "expired" | "revoked" | "missing" };
+
+/**
+ * The draft behind a preview token, or why there is none.
+ *
+ * The api answers 410 with a `reason` once a link has expired or been taken
+ * back, and the page says that in words — a reviewer who opens a dead link
+ * deserves better than a 404. A token that never existed IS a 404, and the
+ * two are kept apart on purpose: naming "revoked" for a guessed token would
+ * confirm it once existed. Uncached, so a revoke is honoured on the very next
+ * request and a fresh save is what the reviewer sees.
+ */
+export async function getPreviewByToken(token: string): Promise<PreviewLookup> {
+    let res: Response;
+    try {
+        res = await fetch(
+            `${API_URL}/public/sites/preview/${encodeURIComponent(token)}`,
+            { cache: "no-store", headers: { accept: "application/json" } },
+        );
+    } catch {
+        return { ok: false, reason: "missing" };
+    }
+    if (res.status === 410) {
+        // The api's error envelope: { error: { message, details: { reason } } }.
+        const body = (await res.json().catch(() => null)) as {
+            error?: { details?: { reason?: string } };
+        } | null;
+        return {
+            ok: false,
+            reason:
+                body?.error?.details?.reason === "revoked"
+                    ? "revoked"
+                    : "expired",
+        };
+    }
+    if (!res.ok) return { ok: false, reason: "missing" };
+    const body = (await res.json().catch(() => null)) as {
+        snapshot?: PublicationSnapshot;
+        site?: { name?: string };
+        expiresAt?: string;
+    } | null;
+    if (!body?.snapshot || !body.expiresAt) {
+        return { ok: false, reason: "missing" };
+    }
+    return {
+        ok: true,
+        snapshot: body.snapshot,
+        siteName: body.site?.name ?? body.snapshot.site.name,
+        expiresAt: body.expiresAt,
+    };
+}

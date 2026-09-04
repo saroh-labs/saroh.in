@@ -2,6 +2,7 @@
 
 import type {
     CreateSiteInput,
+    PreviewLinkDays,
     SectionInput,
     SiteFooter,
     SiteNavigation,
@@ -10,13 +11,16 @@ import type {
 } from "./service";
 import {
     createPage as createPageApi,
+    createPreviewLink as createPreviewLinkApi,
     createSite as createSiteApi,
     deletePage as deletePageApi,
     getReviewState as getReviewStateApi,
     getSiteFlags as getSiteFlagsApi,
     listComments as listCommentsApi,
+    listPreviewLinks as listPreviewLinksApi,
     publishSite as publishSiteApi,
     restorePublication as restorePublicationApi,
+    revokePreviewLink as revokePreviewLinkApi,
     saveDraftSections as saveDraftSectionsApi,
     setCommentResolved as setCommentResolvedApi,
     updatePage as updatePageApi,
@@ -119,4 +123,19 @@ export async function setCommentResolved(
     resolved: boolean,
 ) {
     return setCommentResolvedApi(siteId, commentId, resolved);
+}
+
+export async function listPreviewLinks(siteId: string) {
+    return listPreviewLinksApi(siteId);
+}
+
+export async function createPreviewLink(
+    siteId: string,
+    expiresInDays: PreviewLinkDays,
+) {
+    return createPreviewLinkApi(siteId, expiresInDays);
+}
+
+export async function revokePreviewLink(siteId: string, linkId: string) {
+    return revokePreviewLinkApi(siteId, linkId);
 }
