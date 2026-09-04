@@ -10,9 +10,12 @@ thing you may not do is offer it to other people as a hosted service. See
 A pnpm + Turborepo monorepo: a set of Next.js apps and a single NestJS API, all
 built on one Better Auth identity system and one PostgreSQL database.
 
-> **What's built today:** the implemented product is a store-oriented commerce +
-> content dashboard (catalog, orders, customers, blog, team members). The
-> broader digital-business platform is planned and audited in
+> **What's built today:** an Organization-scoped workspace with Website
+> (pages, posts, publishing, custom domains, draft previews), Appointments
+> (services, availability, bookings, reschedule, outcomes), Commerce (catalog,
+> orders, customers, CSV import), CRM (contacts, leads, pipeline) and a public
+> renderer for merchant sites. Admin, Sales and Social are specified but not
+> built. What remains is tracked in the issues and audited in
 > [`docs/architecture/`](docs/architecture/) — start with
 > [`PRODUCT_ROADMAP.md`](docs/architecture/PRODUCT_ROADMAP.md).
 
@@ -36,28 +39,41 @@ provides the auth **UI** (sign-in, signup, verification, password reset) but is
 not a separate auth server. In production the session cookie is scoped to
 `.saroh.in` so it works across every subdomain.
 
-**Tenancy direction:** the accepted target (DEC-005) makes **Organization** the
-single mandatory tenant boundary, with optional **Projects** grouping resources
-beneath it, and Organization-owned Sites and Stores. Today the effective tenant
-root is still `Store`; the Organization migration is accepted but **not yet
-implemented**. See
+**Tenancy:** **Organization** is the single mandatory tenant boundary
+(DEC-005), with optional **Projects** grouping resources beneath it, and
+Organization-owned Sites and Stores. This is implemented, not planned:
+`organizationId` is carried by 58 models, `OrganizationGuard` resolves a proven
+`OrganizationContext` on every authenticated route, and PostgreSQL row-level
+security enforces `org_isolation` on 66 tables — so a query that forgets to
+scope is refused by the database rather than silently crossing tenants. See
 [`TARGET_ARCHITECTURE.md`](docs/architecture/TARGET_ARCHITECTURE.md) and
 [`DECISIONS.md`](docs/architecture/DECISIONS.md).
 
 ### Apps (`apps/*`) — 10 total
 
-| App                  | Domain                                   | Role                                                                                         |
-| -------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `accounts.saroh.in`  | accounts.saroh.in                        | **Auth UI** — login, signup, verification, password reset, OAuth (auth server runs in `api`) |
-| `api.saroh.in`       | api.saroh.in                             | NestJS backend; **hosts Better Auth** and owns all business logic + DB access                |
-| `app.saroh.in`       | app.saroh.in                             | Main product dashboard (stores, members, catalog, orders, customers, content)                |
-| `admin.saroh.in`     | admin.saroh.in                           | Platform admin (session-gated, allowlisted) — scaffold                                       |
-| `saroh.app`          | saroh.app, `*.saroh.app`, custom domains | Public renderer for user sites — placeholder (fetchers return no data)                       |
-| `templates.saroh.in` | templates.saroh.in                       | Design showcase — scaffold                                                                   |
-| `ui.saroh.in`        | ui.saroh.in                              | Design-system / component showcase                                                           |
-| `docs.saroh.in`      | docs.saroh.in                            | Developer documentation (Nextra)                                                             |
-| `help.saroh.in`      | help.saroh.in                            | End-user help guides (Nextra)                                                                |
-| `saroh.in`           | saroh.in                                 | Marketing site + waitlist                                                                    |
+Every app answers locally at its production hostname with `.localhost`
+appended, served over HTTPS by portless — no ports, and the same shape as
+production, so a cookie scoped to `.saroh.in` behaves the same on
+`.saroh.localhost`. Set it up once (step 4 below); the names come from each
+app's `portless` field in its `package.json`.
+
+| App                  | Production                               | Local (portless)                  | Role                                                                                         |
+| -------------------- | ---------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `accounts.saroh.in`  | accounts.saroh.in                        | https://accounts.saroh.localhost  | **Auth UI** — login, signup, verification, password reset, OAuth (auth server runs in `api`) |
+| `api.saroh.in`       | api.saroh.in                             | https://api.saroh.localhost       | NestJS backend; **hosts Better Auth** and owns all business logic + DB access                |
+| `app.saroh.in`       | app.saroh.in                             | https://app.saroh.localhost       | The merchant workspace — website, schedule, services, sell, contacts, leads, insights        |
+| `admin.saroh.in`     | admin.saroh.in                           | https://admin.saroh.localhost     | Platform admin — staff RBAC, permission guards, platform audit, feature flags (#128)         |
+| `saroh.app`          | saroh.app, `*.saroh.app`, custom domains | https://saroh.app.localhost       | Public renderer for merchant sites — pages, posts, checkout, draft previews                  |
+| `templates.saroh.in` | templates.saroh.in                       | https://templates.saroh.localhost | Design showcase — scaffold                                                                   |
+| `ui.saroh.in`        | ui.saroh.in                              | https://ui.saroh.localhost        | Design-system / component showcase                                                           |
+| `docs.saroh.in`      | docs.saroh.in                            | https://docs.saroh.localhost      | Developer documentation (Nextra)                                                             |
+| `help.saroh.in`      | help.saroh.in                            | https://help.saroh.localhost      | End-user help guides (Nextra)                                                                |
+| `saroh.in`           | saroh.in                                 | https://saroh.localhost           | Marketing site + waitlist                                                                    |
+
+A **tenant site** is reached by its subdomain under the renderer, so the seeded
+`northwind` site is https://northwind.saroh.app.localhost — the wildcard is why
+`portless service install` takes `--wildcard`. A **draft preview** lives on the
+renderer's own apex: `https://saroh.app.localhost/preview/<token>`.
 
 ### Shared packages (`packages/*`)
 
@@ -109,8 +125,8 @@ pnpm --filter @saroh/database db:push
 #    (prompts for sudo once; see docs/architecture/ENVIRONMENT.md)
 npm install -g portless && portless service install --wildcard
 
-# 5. Run apps (examples) — https://app.saroh.localhost, https://api.saroh.localhost, …
-#    (the full table is in docs/architecture/ENVIRONMENT.md)
+# 5. Run apps. Every app answers at its own hostname over HTTPS — the table
+#    above lists them all; details in docs/architecture/ENVIRONMENT.md
 pnpm dev                 # everything
 pnpm dev:api-auth        # api + accounts
 pnpm dev:apps            # accounts + admin + sites
