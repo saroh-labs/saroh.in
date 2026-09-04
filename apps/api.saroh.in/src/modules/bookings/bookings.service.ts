@@ -501,10 +501,20 @@ export class BookingsService {
             return booking;
         }
 
-        // The service is loaded WITHOUT the ACTIVE check the public path
-        // makes: a merchant who archives a service still has to be able to
-        // move the bookings already on it. A soft-deleted one is still a 404.
         const service = await this.requireOwnedService(ctx, booking.serviceId);
+        // An archived service is retired from the menu, and its availability
+        // is retired with it: the windows it still carries describe hours the
+        // merchant has stopped offering, so moving a booking into one would
+        // put a customer in a slot the business no longer keeps. Cancelling
+        // stays available — that is how a retired service's bookings are
+        // wound down. (Archiving through the dashboard also soft-deletes, so
+        // that path is already a 404 above; this covers a service whose status
+        // alone was set.)
+        if (service.status !== "ACTIVE") {
+            throw new ConflictException(
+                "This service is archived, so its bookings cannot be moved. Make it active again first, or cancel the booking.",
+            );
+        }
         const rules = await prisma.availabilityRule.findMany({
             where: { serviceId: service.id },
         });

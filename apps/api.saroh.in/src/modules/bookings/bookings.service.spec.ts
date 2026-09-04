@@ -655,17 +655,31 @@ describe("BookingsService.rescheduleBooking", () => {
         expect(bookingFindUnique).not.toHaveBeenCalled();
     });
 
-    it("still moves a booking on an ARCHIVED service", async () => {
+    it("will not move a booking on an ARCHIVED service", async () => {
         wireReschedule();
-        // A merchant who stops taking new bookings must still be able to
-        // manage the ones already on the books.
         serviceFindUnique.mockResolvedValue({ ...SERVICE, status: "ARCHIVED" });
-        const moved = await new BookingsService().rescheduleBooking(
+        // The availability an archived service still carries describes hours
+        // the merchant has stopped offering. Moving a booking into one would
+        // put a customer in a slot the business no longer keeps.
+        await expect(
+            new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                startAt: AT_10,
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(bookingUpdate).not.toHaveBeenCalled();
+    });
+
+    it("cancelling an archived service's booking still works", async () => {
+        // Refusing the move must not strand the booking: winding it down is
+        // exactly what a merchant does with a retired service's bookings.
+        bookingFindUnique.mockResolvedValue(BOOKING);
+        bookingUpdate.mockResolvedValue({ ...BOOKING, status: "CANCELLED" });
+        eventCreate.mockResolvedValue({ id: "ev_3" });
+        const cancelled = await new BookingsService().cancelBooking(
             ctx(),
             "bk_1",
-            { startAt: AT_10 },
         );
-        expect(moved.startAt).toEqual(new Date(AT_10));
+        expect(cancelled.status).toBe("CANCELLED");
     });
 });
 

@@ -22,6 +22,13 @@ import type { BookingDetail, BookingEvent } from "@/lib/services/service";
 export function BookingDetailView({ booking }: { booking: BookingDetail }) {
     const { service, contact, timezone } = booking;
     const cancelled = booking.status === "CANCELLED";
+    // An archived service is retired from the menu, and its availability is
+    // retired with it — the hours it still carries are hours the merchant has
+    // stopped offering. Moving a booking into one would put a customer in a
+    // slot the business no longer keeps, so the api refuses it and this does
+    // not offer it. Cancelling stays, because winding the booking down is
+    // exactly what a retired service's bookings need.
+    const retired = service.status !== "ACTIVE";
     const moved = booking.events.filter((e) => e.type === "RESCHEDULED");
     // `find`, not `moved[0]`: indexing is typed as always-present here, and
     // this must actually be optional — most bookings have never been moved.
@@ -39,13 +46,15 @@ export function BookingDetailView({ booking }: { booking: BookingDetail }) {
                         </Button>
                         {cancelled ? null : (
                             <>
-                                <RescheduleBooking
-                                    bookingId={booking.id}
-                                    serviceId={service.id}
-                                    timezone={timezone}
-                                    currentStartAt={booking.startAt}
-                                    currentEndAt={booking.endAt}
-                                />
+                                {retired ? null : (
+                                    <RescheduleBooking
+                                        bookingId={booking.id}
+                                        serviceId={service.id}
+                                        timezone={timezone}
+                                        currentStartAt={booking.startAt}
+                                        currentEndAt={booking.endAt}
+                                    />
+                                )}
                                 <CancelBookingControl bookingId={booking.id} />
                             </>
                         )}
@@ -84,6 +93,14 @@ export function BookingDetailView({ booking }: { booking: BookingDetail }) {
                     <div className="mt-4">
                         <StatusBadge status={booking.status} />
                     </div>
+                    {retired && !cancelled ? (
+                        // A missing button with no explanation reads as a bug.
+                        <p className="mt-3 text-sm text-muted-foreground">
+                            {service.name} is archived, so this booking cannot
+                            be moved. Make the service active again to
+                            reschedule, or cancel the booking.
+                        </p>
+                    ) : null}
                 </section>
 
                 <section className="rounded-lg border border-border p-5">
