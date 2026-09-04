@@ -12,6 +12,7 @@ import { Prisma, prisma } from "@saroh/database";
 import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ActivationEvents } from "../analytics/activation-events";
 import { authorize } from "../organizations/organization-policy";
 import type {
     AvailabilityRuleWindow,
@@ -100,6 +101,7 @@ export class BookingsService {
         // trying to inject it so the default (and test overrides) apply.
         @Optional()
         private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(),
+        @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
     // ── Service CRUD ───────────────────────────────────────────────────────
@@ -675,8 +677,9 @@ export class BookingsService {
         const snapshot = this.buildSnapshot(service, input, startAt, endAt);
 
         // 5. Atomic, serializable reservation (see the method doc for WHY).
+        let booked: Booking;
         try {
-            return await prisma.$transaction(
+            booked = await prisma.$transaction(
                 async (tx) => {
                     // Authoritative capacity gate — re-counted INSIDE the tx.
                     const confirmed = await tx.booking.count({
@@ -785,6 +788,18 @@ export class BookingsService {
             }
             throw err;
         }
+
+        // Instrumentation lives OUTSIDE the try, not merely after the commit.
+        // Inside it, a throw from here would fall into the catch above and be
+        // re-thrown as if the booking had failed — a committed booking
+        // reported to the booker as an error. The catch is for database
+        // outcomes only.
+        //
+        // Safe on every booking: the ledger keeps only the first
+        // (deterministic dedupeKey), so there is no "is this their first?"
+        // query and no race between two concurrent bookings.
+        await this.activation?.firstBookingCreated(organizationId, booked.id);
+        return booked;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

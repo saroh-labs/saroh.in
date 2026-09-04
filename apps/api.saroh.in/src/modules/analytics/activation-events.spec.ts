@@ -2,6 +2,7 @@ import { ActivationEvents } from "./activation-events";
 import type { AnalyticsService } from "./analytics.service";
 import {
     ACTIVATION_TYPES,
+    FIRST_BOOKING_CREATED_TYPE,
     FIRST_ORDER_CREATED_TYPE,
     IMPORT_COMPLETED_TYPE,
     MODULE_ENABLED_TYPE,
@@ -72,6 +73,8 @@ describe("activation event contracts", () => {
                 return { customerId: "c_1" };
             case "first.order.created":
                 return { orderId: "o_1" };
+            case "first.booking.created":
+                return { bookingId: "bk_1" };
             case "import.completed":
                 return {
                     entity: "products",
@@ -144,5 +147,44 @@ describe("ActivationEvents", () => {
         await expect(
             events.firstOrderCreated(ORG, "order_1"),
         ).resolves.toBeUndefined();
+    });
+});
+
+describe("first.booking.created (#176)", () => {
+    it("records once per organization, like the other first-value events", async () => {
+        const { events, record } = build();
+        await events.firstBookingCreated(ORG, "bk_1");
+        expect(record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                organizationId: ORG,
+                type: FIRST_BOOKING_CREATED_TYPE,
+                properties: { bookingId: "bk_1" },
+                dedupeKey: `${FIRST_BOOKING_CREATED_TYPE}:${ORG}`,
+                // Server-produced and about the merchant, so there is no
+                // visitor to hash even though a member of the public booked it.
+                visitorHash: null,
+            }),
+        );
+    });
+
+    it("carries an id and nothing about the booker", () => {
+        // The booking form collects a name, an email and a phone number. The
+        // contract must make it impossible to walk any of them into the ledger
+        // by adding a field at the call site.
+        const out = validateEventProperties(FIRST_BOOKING_CREATED_TYPE, 1, {
+            bookingId: "bk_1",
+            bookerEmail: "meera@example.com",
+            bookerPhone: "+919000000000",
+        });
+        expect(out).toEqual({ bookingId: "bk_1" });
+    });
+
+    it("is not ingestable from the public endpoint", () => {
+        // A booking is created through a PUBLIC form, so this matters more
+        // here than for the merchant-side events: anyone could otherwise post
+        // a fake first booking for someone else's organization.
+        expect(PUBLIC_INGESTABLE_TYPES.has(FIRST_BOOKING_CREATED_TYPE)).toBe(
+            false,
+        );
     });
 });
