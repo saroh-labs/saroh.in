@@ -214,14 +214,66 @@ describe("DomainsService.verify", () => {
             siteId: "site_1",
         });
 
+        domainUpdate.mockImplementation(({ data }) =>
+            Promise.resolve({
+                id: "dom_1",
+                organizationId: "org_1",
+                hostname: "shop.acme.com",
+                verificationToken: "tok_abc",
+                status: "PENDING",
+                siteId: "site_1",
+                ...data,
+            }),
+        );
+
         const res = await service.verify(ctx(), "dom_1");
 
+        // Still PENDING, still unlinked — and the attempt is RECORDED (#200):
+        // when it ran and why it failed, so the screen can say so.
         expect(res).toEqual({
-            domain: expect.objectContaining({ status: "PENDING" }),
+            domain: expect.objectContaining({
+                status: "PENDING",
+                lastCheckResult: "NO_RECORD",
+            }),
             verified: false,
+            reason: "NO_RECORD",
         });
-        expect(domainUpdate).not.toHaveBeenCalled();
+        expect(domainUpdate).toHaveBeenCalledWith({
+            where: { id: "dom_1" },
+            data: {
+                lastCheckedAt: expect.any(Date),
+                lastCheckResult: "NO_RECORD",
+            },
+        });
         expect(siteUpdate).not.toHaveBeenCalled();
+    });
+
+    it("names a wrong value and a failed lookup as different failures (#200)", async () => {
+        const verifier = new FakeDomainVerifier(false);
+        const service = new DomainsService(verifier, ent());
+        domainFindUnique.mockResolvedValue({
+            id: "dom_1",
+            organizationId: "org_1",
+            hostname: "shop.acme.com",
+            verificationToken: "tok_abc",
+            status: "PENDING",
+            siteId: null,
+        });
+        domainUpdate.mockImplementation(({ data }) =>
+            Promise.resolve({ id: "dom_1", status: "PENDING", ...data }),
+        );
+
+        verifier.setFailure("WRONG_VALUE");
+        expect((await service.verify(ctx(), "dom_1")).reason).toBe(
+            "WRONG_VALUE",
+        );
+        verifier.setFailure("LOOKUP_FAILED");
+        expect((await service.verify(ctx(), "dom_1")).reason).toBe(
+            "LOOKUP_FAILED",
+        );
+        expect(
+            domainUpdate.mock.calls.map((c) => c[0].data.lastCheckResult),
+        ).toEqual(["WRONG_VALUE", "LOOKUP_FAILED"]);
     });
 
     it("is idempotent: an already-VERIFIED domain is returned without re-checking DNS", async () => {
@@ -275,9 +327,23 @@ describe("DomainsService.list", () => {
 
     it("scopes the query to the ctx org, newest first", async () => {
         const service = new DomainsService(new FakeDomainVerifier(), ent());
-        domainFindMany.mockResolvedValue([]);
+        domainFindMany.mockResolvedValue([
+            {
+                id: "dom_1",
+                hostname: "shop.acme.com",
+                verificationToken: "tok_abc",
+                status: "PENDING",
+            },
+        ]);
 
-        await service.list(ctx());
+        const listed = await service.list(ctx());
+
+        // Each row carries the record to publish (#200), derived once here.
+        expect(listed[0].dnsRecord).toEqual({
+            type: "TXT",
+            name: verificationRecordName("shop.acme.com"),
+            value: "tok_abc",
+        });
 
         expect(domainFindMany).toHaveBeenCalledWith({
             where: { organizationId: "org_1" },

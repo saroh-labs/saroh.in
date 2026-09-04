@@ -11,7 +11,7 @@ import { randomBytes } from "node:crypto";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { authorize } from "../organizations/organization-policy";
-import type { DomainVerifier } from "./domain-verifier";
+import type { DomainVerifier, VerificationFailure } from "./domain-verifier";
 import { DOMAIN_VERIFIER, verificationRecordName } from "./domain-verifier";
 
 /** Input for {@link DomainsService.claim} — the validated {@link ClaimDomainDto}. */
@@ -128,19 +128,38 @@ export class DomainsService {
             return { domain, verified: true };
         }
 
-        const ok = await this.verifier.verify(
+        const checkedAt = new Date();
+        const outcome = await this.verifier.verify(
             domain.hostname,
             domain.verificationToken,
         );
 
-        if (!ok) {
-            // Leave it PENDING so the org can fix DNS and retry.
-            return { domain, verified: false };
+        if (!outcome.ok) {
+            // Leave it PENDING so the org can fix DNS and retry — and RECORD
+            // the attempt (#200): when it ran and why it failed are the two
+            // things the merchant needs while they wait on their registrar.
+            const checked = await prisma.domain.update({
+                where: { id: domain.id },
+                data: {
+                    lastCheckedAt: checkedAt,
+                    lastCheckResult: outcome.reason,
+                },
+            });
+            return {
+                domain: checked,
+                verified: false,
+                reason: outcome.reason satisfies VerificationFailure,
+            };
         }
 
         const verified = await prisma.domain.update({
             where: { id: domain.id },
-            data: { status: "VERIFIED", verifiedAt: new Date() },
+            data: {
+                status: "VERIFIED",
+                verifiedAt: checkedAt,
+                lastCheckedAt: checkedAt,
+                lastCheckResult: null,
+            },
         });
 
         // Routing only happens AFTER verification: link the bound Site to this
@@ -155,13 +174,22 @@ export class DomainsService {
         return { domain: verified, verified: true };
     }
 
-    /** List the org's claimed domains, newest first. Tenant-scoped by ctx. */
+    /**
+     * List the org's claimed domains, newest first, each with the DNS record
+     * it needs (#200) — the screen shows that record as something to copy,
+     * and deriving it here keeps the record name's rule in one place.
+     * Tenant-scoped by ctx.
+     */
     async list(ctx: OrganizationContext) {
         authorize(ctx, "domain:manage");
-        return prisma.domain.findMany({
+        const domains = await prisma.domain.findMany({
             where: { organizationId: ctx.organizationId },
             orderBy: { createdAt: "desc" },
         });
+        return domains.map((domain) => ({
+            ...domain,
+            dnsRecord: this.instructionsFor(domain),
+        }));
     }
 
     /**

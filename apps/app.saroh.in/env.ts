@@ -36,6 +36,11 @@ export const env = createEnv({
          * cannot disagree.
          */
         NEXT_PUBLIC_ROOT_DOMAIN: z.string().optional(),
+        /**
+         * The hostname a merchant's own domain should CNAME to once verified
+         * (#200). Shown as the routing record on the settings screen.
+         */
+        NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET: z.string().optional(),
         NEXT_PUBLIC_VERCEL_ENV: z
             .enum(["development", "preview", "production"])
             .optional(),
@@ -48,6 +53,8 @@ export const env = createEnv({
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
         NEXT_PUBLIC_ROOT_DOMAIN: process.env.NEXT_PUBLIC_ROOT_DOMAIN,
+        NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET:
+            process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
     },
     emptyStringAsUndefined: true,

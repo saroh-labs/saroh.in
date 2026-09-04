@@ -287,9 +287,38 @@ export async function getPublicationBySubdomain(
 export async function getPublicationForHost(
     host: string | null | undefined,
 ): Promise<PublicationSnapshot | null> {
+    const hostname = host?.split(":")[0]?.toLowerCase().trim();
+    if (!hostname) return null;
+    // A host that is not under the platform root is a merchant's own domain
+    // (#200): ask for it by hostname, which resolves only once its claim is
+    // VERIFIED. The subdomain heuristic below stays as the fallback so nothing
+    // that resolved before this stops resolving.
+    const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
+    if (root && hostname !== root && !hostname.endsWith(`.${root}`)) {
+        const byHostname = await getPublicationByHostname(hostname);
+        if (byHostname) return byHostname;
+    }
     const subdomain = subdomainFromHost(host);
     if (!subdomain) return null;
     return getPublicationBySubdomain(subdomain);
+}
+
+/** A VERIFIED custom hostname's current publication, or null. */
+export async function getPublicationByHostname(
+    hostname: string,
+): Promise<PublicationSnapshot | null> {
+    let res: Response;
+    try {
+        res = await fetch(
+            `${API_URL}/public/sites/by-hostname/${encodeURIComponent(hostname)}`,
+            { cache: "no-store", headers: { accept: "application/json" } },
+        );
+    } catch {
+        return null;
+    }
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => null)) as PublicSiteView | null;
+    return body?.snapshot ?? null;
 }
 
 // ---------------------------------------------------------------------------

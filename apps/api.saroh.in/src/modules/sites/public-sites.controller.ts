@@ -40,6 +40,16 @@ export class PublicSitesController {
         return this.previewLinks.resolve(token);
     }
 
+    /**
+     * Current publication snapshot for a VERIFIED custom hostname (#200), e.g.
+     * `shop.acme.com`. A hostname that is unknown, still PENDING, or not bound
+     * to a site is a 404.
+     */
+    @Get("by-hostname/:hostname")
+    byHostname(@Param("hostname") hostname: string) {
+        return this.sites.getPublicationByHostname(hostname);
+    }
+
     /** Current publication snapshot for a site by id. */
     @Get(":siteId/publication")
     bySiteId(@Param("siteId") siteId: string) {
