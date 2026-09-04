@@ -338,18 +338,50 @@ export function DataView<TRow>({
                                     }
                                     className="wk-item border-b border-border transition-colors last:border-b-0 hover:bg-accent/50"
                                 >
-                                    {tableColumns.map((col) => (
-                                        <td
-                                            key={col.id}
-                                            className={cn(
-                                                "px-3 py-2.5 align-middle",
-                                                col.numeric &&
-                                                    "text-right tabular-nums",
-                                            )}
-                                        >
-                                            {col.cell(row)}
-                                        </td>
-                                    ))}
+                                    {tableColumns.map((col, colIndex) => {
+                                        const href = rowHref?.(row);
+                                        return (
+                                            <td
+                                                key={col.id}
+                                                className={cn(
+                                                    "px-3 py-2.5 align-middle",
+                                                    col.numeric &&
+                                                        "text-right tabular-nums",
+                                                )}
+                                            >
+                                                {/*
+                                                 * The FIRST cell carries the
+                                                 * row link, not the row.
+                                                 *
+                                                 * List mode stretches an
+                                                 * overlay anchor across the
+                                                 * row, which a `tr` cannot
+                                                 * hold: `position: relative`
+                                                 * on a table row is not
+                                                 * reliable across browsers, so
+                                                 * the overlay would escape to
+                                                 * the table. Anchoring the
+                                                 * link to one cell keeps a
+                                                 * real, focusable target with
+                                                 * real text, and keeps it out
+                                                 * of the cells where callers
+                                                 * put their own links — a
+                                                 * booking's contact link would
+                                                 * otherwise nest inside it.
+                                                 */}
+                                                {href && colIndex === 0 ? (
+                                                    <Link
+                                                        href={href}
+                                                        className="block rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                                    >
+                                                        {col.cell(row)}
+                                                    </Link>
+                                                ) : (
+                                                    col.cell(row)
+                                                )}
+                                            </td>
+                                        );
+                                    })}
                                     {rowActions ? (
                                         <td className="whitespace-nowrap px-3 py-2.5 text-right align-middle">
                                             {rowActions(row)}

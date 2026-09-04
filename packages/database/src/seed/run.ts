@@ -332,6 +332,24 @@ async function seedAppointments(prisma: Db, orgId: string, now: Date) {
             },
         });
         services.push(service.id);
+
+        // Availability, without which the service has no open slots at all —
+        // the public booking form offers nothing and the reschedule picker
+        // (#121) says "no open times". A seeded service that cannot be booked
+        // is a state the product itself cannot produce.
+        await prisma.availabilityRule.deleteMany({
+            where: { serviceId: service.id },
+        });
+        await prisma.availabilityRule.createMany({
+            // Mon–Fri, 09:00–17:00 in the service's own zone.
+            data: [1, 2, 3, 4, 5].map((dayOfWeek) => ({
+                organizationId: orgId,
+                serviceId: service.id,
+                dayOfWeek,
+                startMinute: 9 * 60,
+                endMinute: 17 * 60,
+            })),
+        });
     }
 
     for (let i = 0; i < BOOKINGS.length; i++) {
@@ -364,6 +382,21 @@ async function seedAppointments(prisma: Db, orgId: string, now: Date) {
                     priceCents: service?.priceCents ?? null,
                     currency: service?.priceCents == null ? null : CURRENCY,
                 },
+            },
+        });
+
+        // Where each booking's history starts (#121). No actor: a seeded
+        // booking was made by the booker, not by staff — the same thing the
+        // public booking command records.
+        await prisma.bookingEvent.deleteMany({
+            where: { bookingId: id("booking", i) },
+        });
+        await prisma.bookingEvent.create({
+            data: {
+                bookingId: id("booking", i),
+                organizationId: orgId,
+                type: "BOOKED",
+                toStartAt: startAt,
             },
         });
     }

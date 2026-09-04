@@ -76,6 +76,38 @@ export interface Booking {
     } | null;
 }
 
+/** What has happened to a booking, in order (#121). */
+export interface BookingEvent {
+    id: string;
+    type: "BOOKED" | "RESCHEDULED" | "CANCELLED";
+    /** Null when the booker did it themselves through the public form. */
+    actor: { name: string | null } | null;
+    fromStartAt: string | null;
+    toStartAt: string | null;
+    createdAt: string;
+}
+
+/**
+ * One booking with everything the detail screen states (#121): the service it
+ * is for, the contact it belongs to, and its history.
+ *
+ * `snapshot` is the terms as they were agreed at booking time, so the slot
+ * inside it is the ORIGINAL one — it is not rewritten when a booking moves.
+ */
+export interface BookingDetail extends Omit<Booking, "contact"> {
+    service: Service;
+    contact:
+        (NonNullable<Booking["contact"]> & { phone: string | null }) | null;
+    events: BookingEvent[];
+    snapshot: unknown;
+}
+
+/** One open slot on a service, as the api's availability preview returns it. */
+export interface Slot {
+    startAt: string;
+    endAt: string;
+}
+
 /** A booking joined with a light snapshot of its owning Service. */
 export interface BookingWithService extends Booking {
     service: { id: string; name: string; timezone: string } | null;
@@ -132,8 +164,7 @@ async function send<T>(
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const data = (await res.json().catch(() => null)) as
-        | (T & { message?: string; error?: string })
-        | null;
+        (T & { message?: string; error?: string }) | null;
     if (res.ok) {
         return { ok: true, data: (data ?? {}) as T };
     }
@@ -182,6 +213,40 @@ export async function listServiceBookings(
     const res = await apiFetch(`${base}/services/${serviceId}/bookings`);
     if (!res.ok) return [];
     return (await res.json()) as Booking[];
+}
+
+/**
+ * One booking with its service, contact and history (#121), or null when it is
+ * missing or not this org's.
+ */
+export async function getBooking(
+    bookingId: string,
+): Promise<BookingDetail | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const res = await apiFetch(`${base}/services/bookings/${bookingId}`);
+    if (!res.ok) return null;
+    return (await res.json()) as BookingDetail;
+}
+
+/**
+ * A service's open slots between two instants — what the reschedule picker
+ * offers. Empty on any failure, which the picker renders as "no open times"
+ * rather than a broken control.
+ */
+export async function listAvailability(
+    serviceId: string,
+    fromISO: string,
+    toISO: string,
+): Promise<Slot[]> {
+    const base = await orgBase();
+    if (!base) return [];
+    const query = new URLSearchParams({ from: fromISO, to: toISO });
+    const res = await apiFetch(
+        `${base}/services/${serviceId}/availability?${query.toString()}`,
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as Slot[];
 }
 
 /**
@@ -272,6 +337,19 @@ export function replaceRules(
 }
 
 /** Cancel a booking, freeing its slot. Idempotent server-side. */
+/** Move a booking to another slot (#121). */
+export function rescheduleBooking(
+    bookingId: string,
+    startAt: string,
+): Promise<CrmResult<Booking>> {
+    return send<Booking>(
+        `/bookings/${bookingId}`,
+        "PATCH",
+        { startAt },
+        "Could not move the booking",
+    );
+}
+
 export function cancelBooking(bookingId: string): Promise<CrmResult<Booking>> {
     return send<Booking>(
         `/bookings/${bookingId}`,

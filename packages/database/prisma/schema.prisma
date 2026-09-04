@@ -45,10 +45,13 @@ model User {
   sessions Session[]
   accounts Account[]
 
-  siteComments  SiteComment[]
-  posts         Post[] // Posts they wrote (ADR-004)
-  siteApprovals SiteApproval[]
+  siteComments     SiteComment[]
+  posts            Post[] // Posts they wrote (ADR-004)
+  siteApprovals    SiteApproval[]
   sitePreviewLinks SitePreviewLink[]
+
+  // Bookings they moved or cancelled on a customer's behalf (#121).
+  bookingEvents BookingEvent[] @relation("BookingEventActor")
 
   @@index([email])
 }
@@ -108,14 +111,14 @@ model Organization {
 
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
-  sites         Site[]
-  pages         Page[]
-  pageVersions  PageVersion[]
-  sections      Section[]
-  siteComments  SiteComment[]
-  siteApprovals SiteApproval[]
+  sites            Site[]
+  pages            Page[]
+  pageVersions     PageVersion[]
+  sections         Section[]
+  siteComments     SiteComment[]
+  siteApprovals    SiteApproval[]
   sitePreviewLinks SitePreviewLink[]
-  publications  Publication[]
+  publications     Publication[]
 
   // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
   // `hostname` is globally unique, so a hostname maps to at most one org.
@@ -146,6 +149,7 @@ model Organization {
   services          Service[]
   availabilityRules AvailabilityRule[]
   bookings          Booking[]
+  bookingEvents     BookingEvent[]
 
   // Commerce attached to the Organization (Stage 5 — S5-001). Store becomes an
   // optional channel; catalog/orders/inventory/customers are org-owned via a
@@ -711,8 +715,8 @@ model Post {
   // post down is repointing to null, which keeps the history. Per POST, so
   // publishing one does not republish the site's pages and restoring an old
   // site publication does not unpublish this week's writing.
-  currentPublicationId String?      @unique
-  currentPublication   Publication? @relation("PostCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
+  currentPublicationId String?       @unique
+  currentPublication   Publication?  @relation("PostCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
   publications         Publication[] @relation("PostPublications")
 
   comments Comment[]
@@ -725,7 +729,9 @@ model Post {
   @@index([authorId])
 }
 
-/** A flat list of categories per SITE (ADR-004), no hierarchy. */
+/**
+ * A flat list of categories per SITE (ADR-004), no hierarchy.
+ */
 model PostCategory {
   id     String @id @default(cuid())
   siteId String
@@ -1434,9 +1440,9 @@ model Site {
   // which reproduce today's appearance exactly.
   style Json?
 
-  seoTitle       String? // <title> / og:title
-  seoDescription String? // meta description / og:description
-  socialImageUrl String? // og:image — the card shown when the link is shared
+  seoTitle          String? // <title> / og:title
+  seoDescription    String? // meta description / og:description
+  socialImageUrl    String? // og:image — the card shown when the link is shared
   // Facts about that picture, recorded when it is chosen (#220). WhatsApp draws
   // its large card only when og:image:width/height are present, and drops it for
   // files over ~300 KB; Facebook and LinkedIn want at least 1200×630. Stored
@@ -1478,14 +1484,14 @@ model Site {
   currentPublicationId String?      @unique
   currentPublication   Publication? @relation("SiteCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
 
-  pages        Page[]
-  comments     SiteComment[]
+  pages          Page[]
+  comments       SiteComment[]
   // The site's writing (ADR-004).
   posts          Post[]
   postCategories PostCategory[]
-  approvals    SiteApproval[]
-  previewLinks SitePreviewLink[]
-  publications Publication[]  @relation("SitePublications")
+  approvals      SiteApproval[]
+  previewLinks   SitePreviewLink[]
+  publications   Publication[]     @relation("SitePublications")
 
   // Verified subdomain / custom-domain claims routed to this Site (S2-007).
   // Nullable on the Domain side (Domain.siteId) — a claim exists before it is
@@ -1628,13 +1634,11 @@ model SiteApproval {
 
 /**
  * A link that shows a site's DRAFT to whoever holds it (#198).
- *
  * The other half of review: notes and approvals shipped, and the Review tab's
  * empty state told the merchant to "share a preview" — an action that did not
  * exist. This is that action. The draft is rendered by the public renderer at
  * /preview/<token>, built by the same snapshot builder publish uses, and
  * NOTHING about it publishes anything.
- *
  * The token is the whole secret: 32 random bytes, unguessable, carried only in
  * the link. Expiry is a fact with a time so the sharer can be told it in words
  * before they send the link; revocation is a fact with a time for the same
@@ -1767,11 +1771,11 @@ model Publication {
   publishedAt       DateTime @default(now()) // immutable; republish == new row
 
   // Back-relation for Site.currentPublication (the live pointer above).
-  currentForSite Site? @relation("SiteCurrentPublication")
+  currentForSite Site?          @relation("SiteCurrentPublication")
   // The same, for a post (#232).
-  currentForPost Post? @relation("PostCurrentPublication")
+  currentForPost Post?          @relation("PostCurrentPublication")
   // Bypass records naming this publication (#199).
-  approvals SiteApproval[]
+  approvals      SiteApproval[]
 
   @@index([siteId, publishedAt])
   @@index([organizationId])
@@ -2238,11 +2242,49 @@ model Booking {
   updatedAt   DateTime  @updatedAt
   cancelledAt DateTime?
 
+  // What has happened to this booking, in order (#121).
+  events BookingEvent[]
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])
   @@index([serviceId, startAt])
   @@index([contactId])
+}
+
+/// What has happened to a Booking, in order (#121).
+///
+/// Append-only. A reschedule must not silently overwrite the time a customer
+/// agreed to: `Booking.startAt` is where it is NOW, and this is how it got
+/// there. Without it the only record of the original slot is the immutable
+/// `snapshot`, which holds the FIRST time and cannot show the ones in between.
+model BookingEvent {
+  id        String  @id @default(cuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type String // BOOKED | RESCHEDULED | CANCELLED
+
+  // Who did it. Null when the booker did it themselves through the public
+  // form, which is exactly the difference between "they booked it" and "we
+  // moved it" — the first question asked when a customer turns up at the
+  // wrong time. SetNull so removing a member keeps the history readable.
+  actorUserId String?
+  actor       User?   @relation("BookingEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  // The slot on either side of the change. `fromStartAt` is null on BOOKED
+  // (there was no before); both are set on RESCHEDULED; CANCELLED carries the
+  // slot it was cancelled out of in `fromStartAt`.
+  fromStartAt DateTime?
+  toStartAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId, createdAt])
+  @@index([organizationId])
 }
 
 // ============================================================================

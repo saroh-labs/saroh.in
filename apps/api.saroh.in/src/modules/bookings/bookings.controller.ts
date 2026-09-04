@@ -18,11 +18,13 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { BookingDetail } from "./bookings.service";
 import { BookingsService } from "./bookings.service";
 import {
     AddRuleDto,
     CreateServiceDto,
     ReplaceRulesDto,
+    RescheduleBookingDto,
     UpdateServiceDto,
 } from "./dto";
 
@@ -141,6 +143,33 @@ export class BookingsController {
         @Param("serviceId") serviceId: string,
     ): Promise<Booking[]> {
         return this.bookings.listBookings(ctx, serviceId);
+    }
+
+    /**
+     * One booking, with its service, its contact and its history (#121).
+     * Declared before the `:serviceId` routes cannot matter — the literal
+     * "bookings" segment is a different shape — but it is grouped here with
+     * the other booking routes rather than the service ones.
+     */
+    @Get("bookings/:bookingId")
+    getBooking(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+    ): Promise<BookingDetail> {
+        return this.bookings.getBooking(ctx, bookingId);
+    }
+
+    /**
+     * Move a booking to another slot (#121). PATCH, not PUT: this changes one
+     * thing about a booking and leaves its terms alone.
+     */
+    @Patch("bookings/:bookingId")
+    rescheduleBooking(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+        @Body() dto: RescheduleBookingDto,
+    ): Promise<Booking> {
+        return this.bookings.rescheduleBooking(ctx, bookingId, dto);
     }
 
     @Delete("bookings/:bookingId")
