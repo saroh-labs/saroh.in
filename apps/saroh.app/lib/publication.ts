@@ -150,6 +150,16 @@ export interface PublicationSite {
     /** The share image a link preview uses (#188). */
     socialImageUrl?: string | null;
     /**
+     * The same picture with its measurements (#220). Present on snapshots
+     * published after this shipped; older ones carry only the URL above, and
+     * the renderer reads whichever it finds.
+     */
+    socialImage?: {
+        url: string;
+        width?: number | null;
+        height?: number | null;
+    } | null;
+    /**
      * The merchant's look, already resolved into `--site-*` custom properties
      * (#189).
      *
@@ -312,4 +322,34 @@ export function findPageByPath(
     const wanted = normalizePath(requestPath);
     if (wanted === "/") return findHomePage(snapshot);
     return snapshot.pages.find((p) => normalizePath(p.path) === wanted) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Share image
+// ---------------------------------------------------------------------------
+
+/** What Next's `openGraph.images` accepts: a bare URL, or one with its size. */
+export type ShareImages = (
+    string | { url: string; width: number; height: number }
+)[];
+
+/**
+ * The share image as the platforms want it: with its width and height when
+ * the snapshot knows them (#220). WhatsApp draws its large card only when
+ * those are present; without them it shows a small square thumbnail, or
+ * nothing. Older snapshots carry only `socialImageUrl`, so both are read.
+ * `metadataBase` resolves a relative address against the site's own host.
+ */
+export function shareImages(site: {
+    socialImageUrl?: string | null;
+    socialImage?: {
+        url: string;
+        width?: number | null;
+        height?: number | null;
+    } | null;
+}): ShareImages | undefined {
+    const url = (site.socialImage?.url ?? site.socialImageUrl)?.trim();
+    if (!url) return undefined;
+    const { width, height } = site.socialImage ?? {};
+    return width && height ? [{ url, width, height }] : [url];
 }

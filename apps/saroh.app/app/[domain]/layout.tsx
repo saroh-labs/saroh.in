@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import type { PublicationSite } from "@/lib/publication";
-import { getPublicationForHost } from "@/lib/publication";
+import { getPublicationForHost, shareImages } from "@/lib/publication";
 
 /**
  * Tenant site layout (S2-006).
@@ -39,17 +39,24 @@ export async function generateMetadata({
      * conditionally in the settings form — an empty search title means "I have
      * not written one", not "publish an empty <title>".
      */
-    const { name, seoTitle, seoDescription, socialImageUrl } = snapshot.site;
+    const { name, seoTitle, seoDescription } = snapshot.site;
     const title = seoTitle?.trim() ? seoTitle : name;
     const description = seoDescription?.trim() ? seoDescription : undefined;
-    // `metadataBase` resolves a relative share image against the site's own
-    // host, so a merchant may store either form.
-    const images = socialImageUrl?.trim() ? [socialImageUrl] : undefined;
+    const images = shareImages(snapshot.site);
 
     return {
         title,
         description,
-        openGraph: { title, description, images },
+        openGraph: {
+            title,
+            description,
+            images,
+            // og:url and og:site_name (#220): the canonical address the
+            // platforms key their cache on, and the name Slack puts above the
+            // card. Resolved against `metadataBase`.
+            url: "/",
+            siteName: name,
+        },
         twitter: {
             // Without an image this degrades to a plain summary card, so the
             // card type follows the picture rather than always claiming one.

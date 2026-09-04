@@ -268,4 +268,25 @@ export class UpdateSiteSettingsDto {
     @IsString()
     @MaxLength(2048)
     socialImageUrl?: string | null;
+
+    // Facts about the picture, measured by the app when it was chosen (#220).
+    // Null clears them along with the picture; a pasted address the browser
+    // could not measure simply leaves them unset.
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsInt()
+    @Min(1)
+    socialImageWidth?: number | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsInt()
+    @Min(1)
+    socialImageHeight?: number | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsInt()
+    @Min(1)
+    socialImageBytes?: number | null;
 }

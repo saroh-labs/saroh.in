@@ -211,6 +211,9 @@ export interface SiteDetailView {
     seoTitle: string | null;
     seoDescription: string | null;
     socialImageUrl: string | null;
+    socialImageWidth: number | null;
+    socialImageHeight: number | null;
+    socialImageBytes: number | null;
     createdAt: Date;
     updatedAt: Date;
     currentPublication: { publishedAt: Date } | null;
@@ -567,6 +570,9 @@ export class SitesService {
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
+                socialImageWidth: true,
+                socialImageHeight: true,
+                socialImageBytes: true,
                 footer: true,
                 navigation: true,
                 createdAt: true,
@@ -639,12 +645,21 @@ export class SitesService {
             seoTitle?: string | null;
             seoDescription?: string | null;
             socialImageUrl?: string | null;
+            socialImageWidth?: number | null;
+            socialImageHeight?: number | null;
+            socialImageBytes?: number | null;
         } = {};
         if (dto.seoTitle !== undefined) data.seoTitle = dto.seoTitle;
         if (dto.seoDescription !== undefined)
             data.seoDescription = dto.seoDescription;
         if (dto.socialImageUrl !== undefined)
             data.socialImageUrl = dto.socialImageUrl;
+        if (dto.socialImageWidth !== undefined)
+            data.socialImageWidth = dto.socialImageWidth;
+        if (dto.socialImageHeight !== undefined)
+            data.socialImageHeight = dto.socialImageHeight;
+        if (dto.socialImageBytes !== undefined)
+            data.socialImageBytes = dto.socialImageBytes;
 
         const site = await prisma.site.update({
             where: { id: siteId },
@@ -654,6 +669,9 @@ export class SitesService {
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
+                socialImageWidth: true,
+                socialImageHeight: true,
+                socialImageBytes: true,
             },
         });
         return site;
@@ -1096,6 +1114,9 @@ export class SitesService {
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
+                socialImageWidth: true,
+                socialImageHeight: true,
+                socialImageBytes: true,
                 footer: true,
                 navigation: true,
                 pages: {
@@ -1207,6 +1228,18 @@ export class SitesService {
                 seoTitle: site.seoTitle,
                 seoDescription: site.seoDescription,
                 socialImageUrl: site.socialImageUrl,
+                // The picture with its measurements (#220). WhatsApp draws the
+                // large card only when og:image:width/height are present, so
+                // a URL alone was a smaller card than the merchant had chosen.
+                // `socialImageUrl` stays beside it for snapshots read by an
+                // older renderer.
+                socialImage: site.socialImageUrl
+                    ? {
+                          url: site.socialImageUrl,
+                          width: site.socialImageWidth,
+                          height: site.socialImageHeight,
+                      }
+                    : null,
                 /*
                  * The look travels with the content (#189). Normalized here so
                  * a snapshot is always complete, never half-styled by whatever
