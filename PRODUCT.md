@@ -87,8 +87,11 @@ separate by design and stays that way.
 - Seeded demo organization "Northwind Supply": 24 contacts, 16 leads, 3
   services, 10 bookings, 12 products, 10 orders (`pnpm --filter @saroh/database
 db:seed`; sign in `demo@saroh.dev` / `demo-password-123`)
-- No product analytics exist. There is **no** usage data, no activation funnel,
-  and no A/B history. Future work must not cite any.
+- The merchant activation path is instrumented (#176): typed, organization-scoped
+  events cover onboarding completion and time-to-first-useful-action. There is
+  still **no** usage history to cite — the events exist, the data does not yet —
+  and there is no A/B history. Nothing tracks a merchant's own customers, and
+  nothing should.
 - No customers, testimonials, or case studies. Do not fabricate them.
 
 ## Product Principles
