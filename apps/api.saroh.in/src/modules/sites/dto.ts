@@ -267,6 +267,14 @@ export class UpdateSiteSettingsDto {
     @Transform(trimOrNull)
     @IsString()
     @MaxLength(2048)
+    // Only a web address. Every sink today is an attribute (<img src>,
+    // og:image), where a javascript: or data: value is inert — but the field
+    // is merchant-controlled and will be read by more code over time, and a
+    // scheme check here is cheaper than remembering one at each future sink.
+    @Matches(/^https?:\/\/\S+$/i, {
+        message:
+            "The share image must be a web address starting with http:// or https://",
+    })
     socialImageUrl?: string | null;
 
     // Facts about the picture, measured by the app when it was chosen (#220).
