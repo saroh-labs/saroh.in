@@ -15,6 +15,7 @@ jest.mock("@saroh/database", () => {
                 findUnique: jest.fn(),
                 update: jest.fn(),
             },
+            post: { findMany: jest.fn(), findFirst: jest.fn() },
         },
     };
 });
@@ -35,6 +36,8 @@ const linkFindMany = prisma.sitePreviewLink.findMany as jest.Mock;
 const linkFindFirst = prisma.sitePreviewLink.findFirst as jest.Mock;
 const linkFindUnique = prisma.sitePreviewLink.findUnique as jest.Mock;
 const linkUpdate = prisma.sitePreviewLink.update as jest.Mock;
+const postFindMany = prisma.post.findMany as jest.Mock;
+const postFindFirst = prisma.post.findFirst as jest.Mock;
 
 const OWNER: OrganizationContext = {
     organizationId: "org_1",
@@ -235,6 +238,133 @@ describe("SitePreviewLinksService.resolve (public)", () => {
         linkFindUnique.mockResolvedValue(null);
         await expect(service.resolve("nope")).rejects.toBeInstanceOf(
             NotFoundException,
+        );
+    });
+});
+
+// ---------------------------------------------------------------------------
+// The writing behind a preview (#236)
+// ---------------------------------------------------------------------------
+
+const ACTIVE = {
+    id: "link_1",
+    siteId: "site_1",
+    organizationId: "org_1",
+    expiresAt: new Date(Date.now() + DAY),
+    revokedAt: null,
+};
+
+const draft = (over: Partial<Record<string, unknown>> = {}) => ({
+    title: "Choosing pallet racking",
+    slug: "choosing-pallet-racking",
+    excerpt: null,
+    content: "<p>Hello</p>",
+    image: null,
+    featured: false,
+    publishedAt: new Date("2026-08-01T00:00:00Z"),
+    updatedAt: new Date("2026-08-01T00:00:00Z"),
+    currentPublicationId: "pub_1",
+    category: null,
+    author: { name: "Demo Owner" },
+    ...over,
+});
+
+describe("SitePreviewLinksService.posts (public)", () => {
+    beforeEach(() => linkFindUnique.mockResolvedValue(ACTIVE));
+
+    it("shows the draft of every post, live or not, and says which", async () => {
+        postFindMany.mockResolvedValue([
+            draft(),
+            draft({
+                title: "Not out yet",
+                slug: "not-out-yet",
+                publishedAt: null,
+                updatedAt: new Date("2026-09-04T00:00:00Z"),
+                currentPublicationId: null,
+            }),
+        ]);
+
+        const { posts } = await service.posts("tok");
+
+        // A post that has never been published is the NEWEST writing, not the
+        // oldest — ordering on publishedAt alone would bury every draft.
+        expect(posts.map((p) => p.slug)).toEqual([
+            "not-out-yet",
+            "choosing-pallet-racking",
+        ]);
+        expect(posts[0]).toMatchObject({ live: false, publishedAt: null });
+        expect(posts[1]).toMatchObject({ live: true });
+
+        // Scoped to the token's own site and org, and reading the DRAFT: the
+        // query must not reach for a publication.
+        const { where, select } = postFindMany.mock.calls[0][0];
+        expect(where).toEqual({
+            siteId: "site_1",
+            site: { organizationId: "org_1", deletedAt: null },
+        });
+        expect(select).not.toHaveProperty("currentPublication");
+    });
+
+    it("sanitizes the draft, because publish has not", async () => {
+        postFindMany.mockResolvedValue([
+            draft({
+                content: "<p>Fine</p><script>alert(1)</script>",
+            }),
+        ]);
+        const { posts } = await service.posts("tok");
+        expect(posts[0]?.content).toBe("<p>Fine</p>");
+    });
+
+    it("serves no writing once the link is taken back", async () => {
+        linkFindUnique.mockResolvedValue({
+            ...ACTIVE,
+            revokedAt: new Date(),
+        });
+        const err = await service.posts("tok").catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(GoneException);
+        expect((err as GoneException).getResponse()).toMatchObject({
+            details: { reason: "revoked" },
+        });
+        expect(postFindMany).not.toHaveBeenCalled();
+    });
+
+    it("is a plain 404 for a token that never existed", async () => {
+        linkFindUnique.mockResolvedValue(null);
+        await expect(service.posts("nope")).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+    });
+});
+
+describe("SitePreviewLinksService.post (public)", () => {
+    beforeEach(() => linkFindUnique.mockResolvedValue(ACTIVE));
+
+    it("reads one post from the draft, scoped to the token's site", async () => {
+        postFindFirst.mockResolvedValue(
+            draft({ publishedAt: null, currentPublicationId: null }),
+        );
+        const post = await service.post("tok", "choosing-pallet-racking");
+
+        expect(post).toMatchObject({ live: false, publishedAt: null });
+        expect(postFindFirst.mock.calls[0][0].where).toEqual({
+            siteId: "site_1",
+            slug: "choosing-pallet-racking",
+            site: { organizationId: "org_1", deletedAt: null },
+        });
+    });
+
+    it("404s for a slug this site does not have", async () => {
+        postFindFirst.mockResolvedValue(null);
+        await expect(service.post("tok", "nope")).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+    });
+
+    it("records that the link was opened", async () => {
+        postFindFirst.mockResolvedValue(draft());
+        await service.post("tok", "choosing-pallet-racking");
+        expect(linkUpdate.mock.calls[0][0].data.lastUsedAt).toBeInstanceOf(
+            Date,
         );
     });
 });
