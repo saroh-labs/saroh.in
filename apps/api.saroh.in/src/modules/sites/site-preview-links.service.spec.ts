@@ -106,9 +106,13 @@ describe("SitePreviewLinksService.create", () => {
         expect(data.createdByUserId).toBe("user_1");
         // 32 bytes, base64url: 43 characters, no padding, path-safe.
         expect(data.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
-        const days = (data.expiresAt.getTime() - before) / DAY;
-        expect(days).toBeGreaterThan(6.99);
-        expect(days).toBeLessThanOrEqual(7);
+        // Seven days from the moment the service read its clock, which is at
+        // or after `before` — so at least 7 days from here, and not more
+        // than a minute over. The first version asserted "<= 7" against a
+        // clock read before the call, and failed on CI by one millisecond.
+        const span = data.expiresAt.getTime() - before;
+        expect(span).toBeGreaterThanOrEqual(7 * DAY);
+        expect(span).toBeLessThan(7 * DAY + 60_000);
         expect(view.state).toBe("active");
     });
 
