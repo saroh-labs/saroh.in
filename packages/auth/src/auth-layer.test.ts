@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getTrustedOrigins, isTrustedOrigin } from "./origins";
+import { getTrustedOrigins, isTrustedOrigin, safeDestination } from "./origins";
 import { sessionCookieDomain } from "./server";
 
 describe("origins", () => {
@@ -201,5 +201,56 @@ describe("sessionCookieDomain", () => {
         expect(sessionCookieDomain("https://saroh.in")).toBeNull();
         expect(sessionCookieDomain(undefined)).toBeNull();
         expect(sessionCookieDomain("not a url")).toBeNull();
+    });
+});
+
+describe("safeDestination — where to land after sign-in (#222)", () => {
+    beforeEach(() => {
+        process.env.BETTER_AUTH_TRUSTED_ORIGINS =
+            "https://app.saroh.in,https://admin.saroh.in";
+    });
+
+    it("follows a full URL on a trusted origin, keeping its path and query", () => {
+        expect(
+            safeDestination("https://app.saroh.in/sites/abc?tab=pages"),
+        ).toBe("https://app.saroh.in/sites/abc?tab=pages");
+    });
+
+    it("refuses an untrusted origin", () => {
+        // The parameter is attacker-controllable: following this would hand an
+        // attacker someone who has just typed their password.
+        expect(safeDestination("https://evil.example/looks-like-saroh")).toBe(
+            null,
+        );
+        expect(safeDestination("https://app.saroh.in.evil.example/")).toBe(
+            null,
+        );
+    });
+
+    it("follows a same-origin path, and refuses a protocol-relative one", () => {
+        expect(safeDestination("/sites/abc")).toBe("/sites/abc");
+        // Browsers read `//host` as protocol-relative and leave the origin —
+        // the one case where a leading slash is not a same-origin path.
+        expect(safeDestination("//evil.example/x")).toBe(null);
+    });
+
+    it("is null when there is nothing to return to", () => {
+        expect(safeDestination(undefined)).toBe(null);
+        expect(safeDestination("")).toBe(null);
+        expect(safeDestination("   ")).toBe(null);
+    });
+
+    it("takes the first of a repeated parameter rather than guessing", () => {
+        expect(
+            safeDestination(["https://app.saroh.in/a", "https://evil.example"]),
+        ).toBe("https://app.saroh.in/a");
+        // And the first still has to be trusted.
+        expect(
+            safeDestination(["https://evil.example", "https://app.saroh.in/a"]),
+        ).toBe(null);
+    });
+
+    it("refuses a javascript: URL", () => {
+        expect(safeDestination("javascript:alert(1)")).toBe(null);
     });
 });

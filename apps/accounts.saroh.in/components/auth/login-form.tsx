@@ -25,7 +25,18 @@ function delay(index: number): React.CSSProperties {
     } as React.CSSProperties;
 }
 
-export function LoginForm() {
+/**
+ * `returnTo` is where this sign-in should land (#222) — the page the visitor
+ * asked for before they were bounced here, already checked against the
+ * trusted origins by the server component that renders this form. It is a
+ * destination, never a claim: this component does not decide whether it is
+ * safe, because it cannot.
+ */
+export function LoginForm({
+    returnTo = "/apps",
+}: {
+    returnTo?: string;
+} = {}) {
     const router = useRouter();
     const { signIn } = authClient;
     const [email, setEmail] = useState("");
@@ -38,7 +49,7 @@ export function LoginForm() {
         setError(null);
         setIsLoading(true);
         const { error: err } = await signIn.email(
-            { email, password, callbackURL: "/apps" },
+            { email, password, callbackURL: returnTo },
             {
                 onError: (ctx) => {
                     // Not a dead end: the server has just mailed a fresh code
@@ -53,11 +64,23 @@ export function LoginForm() {
         setIsLoading(false);
 
         if (err?.code === "EMAIL_NOT_VERIFIED") {
-            router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+            // Carry the destination through the detour: someone who has to
+            // verify first should still land where they were going, not at
+            // the launcher because they took an extra step.
+            router.push(
+                `/verify-email?email=${encodeURIComponent(email)}` +
+                    `&redirect=${encodeURIComponent(returnTo)}`,
+            );
             return;
         }
         if (err) return;
-        router.push("/apps");
+        // An absolute destination is another origin (app.saroh.in), which the
+        // client router cannot reach; a path is this app's own.
+        if (returnTo.startsWith("/")) {
+            router.push(returnTo);
+        } else {
+            window.location.href = returnTo;
+        }
     }
 
     return (
@@ -150,7 +173,7 @@ export function LoginForm() {
                             setError(null);
                             await signIn.social({
                                 provider: "github",
-                                callbackURL: "/apps",
+                                callbackURL: returnTo,
                             });
                         }}
                     >
