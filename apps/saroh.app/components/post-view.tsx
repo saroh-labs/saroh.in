@@ -90,22 +90,38 @@ export function PostIndex({
                         <li key={post.slug}>
                             <Link
                                 href={`${basePath}/${post.slug}`}
-                                className="group block"
+                                className="group flex gap-4"
                             >
-                                <h2 className="text-[calc(1.35rem*var(--site-heading-scale))] font-semibold leading-snug text-site-fg group-hover:text-site-accent">
-                                    {post.title}
-                                </h2>
-                                <p className="mt-1 text-sm text-site-body">
-                                    <time dateTime={post.publishedAt}>
-                                        {postDate(post.publishedAt)}
-                                    </time>
-                                    {post.author ? ` · ${post.author}` : ""}
-                                </p>
-                                {post.excerpt ? (
-                                    <p className="mt-2 text-site-body">
-                                        {post.excerpt}
-                                    </p>
+                                {/* The cover, where a reader is choosing what
+                                    to read — the one place a picture earns its
+                                    space more than in the article. A post
+                                    without one keeps the full width rather
+                                    than leaving a hole where a picture would
+                                    have been. */}
+                                {post.image ? (
+                                    // eslint-disable-next-line @next/next/no-img-element -- a merchant-supplied absolute URL, not a project asset
+                                    <img
+                                        src={post.image}
+                                        alt=""
+                                        className="hidden aspect-[1.91/1] w-40 shrink-0 rounded-[var(--site-radius)] object-cover sm:block"
+                                    />
                                 ) : null}
+                                <div className="min-w-0">
+                                    <h2 className="text-[calc(1.35rem*var(--site-heading-scale))] font-semibold leading-snug text-site-fg group-hover:text-site-accent">
+                                        {post.title}
+                                    </h2>
+                                    <p className="mt-1 text-sm text-site-body">
+                                        <time dateTime={post.publishedAt}>
+                                            {postDate(post.publishedAt)}
+                                        </time>
+                                        {post.author ? ` · ${post.author}` : ""}
+                                    </p>
+                                    {post.excerpt ? (
+                                        <p className="mt-2 text-site-body">
+                                            {post.excerpt}
+                                        </p>
+                                    ) : null}
+                                </div>
                             </Link>
                         </li>
                     ))}
