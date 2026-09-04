@@ -1372,6 +1372,29 @@ export class SitesService {
     }
 
     /**
+     * Public: resolve a VERIFIED custom hostname to its site's CURRENT
+     * publication (#200). Ownership was proven by DNS before the row reached
+     * VERIFIED, and only a VERIFIED row routes — a PENDING claim on someone
+     * else's hostname resolves nothing. Same read guarantees as
+     * {@link getPublicationBySubdomain}.
+     */
+    async getPublicationByHostname(hostname: string): Promise<PublicSiteView> {
+        const domain = await prisma.domain.findUnique({
+            where: { hostname: hostname.trim().toLowerCase() },
+            select: { status: true, siteId: true },
+        });
+        if (domain?.status !== "VERIFIED" || !domain.siteId) {
+            throw new NotFoundException(
+                `No published site found for hostname "${hostname}"`,
+            );
+        }
+        return this.resolveCurrentPublication(
+            { id: domain.siteId, deletedAt: null },
+            `hostname "${hostname}"`,
+        );
+    }
+
+    /**
      * Public: resolve a site by id to its CURRENT publication snapshot. Same
      * guarantees as {@link getPublicationBySubdomain}: only the immutable
      * current Publication is ever exposed; drafts are never reachable here.

@@ -1767,6 +1767,12 @@ model Domain {
   verificationMethod String    @default("DNS_TXT")
   verifiedAt         DateTime?
 
+  // The last verification attempt (#200): when it ran, and why it failed —
+  // NO_RECORD, WRONG_VALUE or LOOKUP_FAILED — because those have different
+  // fixes and the screen must name the one that applies. Null once verified.
+  lastCheckedAt   DateTime?
+  lastCheckResult String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
