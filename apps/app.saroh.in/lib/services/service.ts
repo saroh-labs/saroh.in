@@ -44,7 +44,13 @@ export interface AvailabilityRule {
     endMinute: number;
 }
 
-export type BookingStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
+// The booking state vocabulary and its predicates live in ./booking-state,
+// which imports nothing — the bookings TABLE is a client component and this
+// module reaches next/headers through the CRM HTTP plumbing. Imported for use
+// below AND re-exported, so server callers still have one place to look.
+import type { BookingOutcome, BookingStatus } from "./booking-state";
+
+export type { BookingOutcome, BookingStatus };
 
 /** A reserved slot (mirror of the api's Booking row, JSON-serialized). */
 export interface Booking {
@@ -56,6 +62,8 @@ export interface Booking {
     /** IANA timezone the booker saw the slot in. */
     timezone: string;
     status: BookingStatus;
+    /** Set only by a person; never derived from the slot having passed. */
+    outcome: BookingOutcome | null;
     bookerName: string | null;
     bookerEmail: string | null;
     bookerPhone: string | null;
@@ -79,7 +87,7 @@ export interface Booking {
 /** What has happened to a booking, in order (#121). */
 export interface BookingEvent {
     id: string;
-    type: "BOOKED" | "RESCHEDULED" | "CANCELLED";
+    type: "BOOKED" | "RESCHEDULED" | "CANCELLED" | "ATTENDED" | "NO_SHOW";
     /** Null when the booker did it themselves through the public form. */
     actor: { name: string | null } | null;
     fromStartAt: string | null;
@@ -287,6 +295,25 @@ export async function listUpcomingBookings(): Promise<BookingWithService[]> {
     return all.filter((booking) => new Date(booking.endAt).getTime() >= now);
 }
 
+/**
+ * Every booking, upcoming and past (#241).
+ *
+ * The calendar showed only what was still to come, which was right while a
+ * booking had nothing to say once it was over. Now it does: an outcome is
+ * recorded by a person, so the appointments waiting to be marked have to be
+ * findable. Past bookings were never deleted — they were only filtered out of
+ * every surface.
+ */
+export async function listBookingsWithPast(): Promise<BookingWithService[]> {
+    return listAllBookings();
+}
+
+// The pure state predicates live in ./booking-state so the bookings TABLE (a
+// client component) can import them — this module reaches next/headers and
+// cannot be imported from the client. Re-exported so server callers have one
+// place to look.
+export { hasEnded, needsOutcome } from "./booking-state";
+
 // ---------------------------------------------------------------------------
 // Mutations (wrapped by server actions in ./actions)
 // ---------------------------------------------------------------------------
@@ -337,6 +364,19 @@ export function replaceRules(
 }
 
 /** Cancel a booking, freeing its slot. Idempotent server-side. */
+/** Record how an appointment went (#241). */
+export function recordBookingOutcome(
+    bookingId: string,
+    outcome: BookingOutcome,
+): Promise<CrmResult<Booking>> {
+    return send<Booking>(
+        `/bookings/${bookingId}/outcome`,
+        "POST",
+        { outcome },
+        "Could not record how it went",
+    );
+}
+
 /** Move a booking to another slot (#121). */
 export function rescheduleBooking(
     bookingId: string,

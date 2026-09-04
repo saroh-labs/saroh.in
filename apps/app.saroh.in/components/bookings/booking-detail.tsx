@@ -5,6 +5,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { CancelBookingControl } from "@/components/bookings/cancel-booking-control";
+import { OutcomeControl } from "@/components/bookings/outcome-control";
 import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
 import type { BookingDetail, BookingEvent } from "@/lib/services/service";
@@ -19,7 +20,14 @@ import type { BookingDetail, BookingEvent } from "@/lib/services/service";
  * as the customer booked it. The zone is stated rather than implied, because
  * "9:00 AM" with no zone is a time nobody can act on.
  */
-export function BookingDetailView({ booking }: { booking: BookingDetail }) {
+export function BookingDetailView({
+    booking,
+    past,
+}: {
+    booking: BookingDetail;
+    /** Whether the slot has ended. Read by the page so "now" stays out of render. */
+    past: boolean;
+}) {
     const { service, contact, timezone } = booking;
     const cancelled = booking.status === "CANCELLED";
     // An archived service is retired from the menu, and its availability is
@@ -44,7 +52,15 @@ export function BookingDetailView({ booking }: { booking: BookingDetail }) {
                         <Button asChild variant="ghost" size="sm">
                             <Link href="/bookings">All bookings</Link>
                         </Button>
-                        {cancelled ? null : (
+                        {cancelled ? null : past ? (
+                            // A past appointment cannot be moved and does not
+                            // need cancelling — the only thing left to say
+                            // about it is how it went.
+                            <OutcomeControl
+                                bookingId={booking.id}
+                                outcome={booking.outcome}
+                            />
+                        ) : (
                             <>
                                 {retired ? null : (
                                     <RescheduleBooking
@@ -90,10 +106,20 @@ export function BookingDetailView({ booking }: { booking: BookingDetail }) {
                             .
                         </p>
                     ) : null}
-                    <div className="mt-4">
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
                         <StatusBadge status={booking.status} />
+                        {booking.outcome ? (
+                            <OutcomeBadge outcome={booking.outcome} />
+                        ) : past && !cancelled ? (
+                            // Said plainly rather than left blank: "nobody has
+                            // said" is a real state, and the merchant is the
+                            // only one who can end it.
+                            <span className="text-sm text-muted-foreground">
+                                Nobody has said how this went yet.
+                            </span>
+                        ) : null}
                     </div>
-                    {retired && !cancelled ? (
+                    {retired && !cancelled && !past ? (
                         // A missing button with no explanation reads as a bug.
                         <p className="mt-3 text-sm text-muted-foreground">
                             {service.name} is archived, so this booking cannot
@@ -195,10 +221,27 @@ function StatusBadge({ status }: { status: BookingDetail["status"] }) {
     );
 }
 
+function OutcomeBadge({ outcome }: { outcome: "ATTENDED" | "NO_SHOW" }) {
+    return (
+        <Badge
+            className={cn(
+                "text-[0.625rem] font-medium uppercase tracking-wider",
+                outcome === "ATTENDED"
+                    ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
+                    : "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
+            )}
+        >
+            {outcome === "ATTENDED" ? "Attended" : "No-show"}
+        </Badge>
+    );
+}
+
 /** One history line, in words rather than a state name. */
 function eventTitle(event: BookingEvent, timeZone: string): string {
     if (event.type === "BOOKED") return "Booked";
     if (event.type === "CANCELLED") return "Cancelled";
+    if (event.type === "ATTENDED") return "Marked as attended";
+    if (event.type === "NO_SHOW") return "Marked as a no-show";
     const from = event.fromStartAt
         ? shortTime(event.fromStartAt, timeZone)
         : null;

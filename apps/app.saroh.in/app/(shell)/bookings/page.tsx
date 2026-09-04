@@ -3,14 +3,20 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { BookingsView } from "@/components/bookings/bookings-view";
-import { listUpcomingBookings } from "@/lib/services/service";
+import { listBookingsWithPast } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
 
 /**
- * Owner bookings calendar (S4-003). The org's UPCOMING bookings across every
- * service, each rendered in the booking's own timezone — the zone the booker
- * saw — because an Organization has no single zone to fold them into.
+ * Owner bookings calendar (S4-003). The org's bookings across every service,
+ * each rendered in the booking's own timezone — the zone the booker saw —
+ * because an Organization has no single zone to fold them into.
+ *
+ * PAST bookings are included now (#241). They were always in the database and
+ * filtered out of every surface, which was fine while a finished appointment
+ * had nothing left to say. It has: an outcome is recorded by a person, so the
+ * appointments waiting to be marked have to be somewhere a merchant can find
+ * them. "Upcoming" is still the default view.
  *
  * The page fetches; `BookingsView` decides how to render. Day grouping used to
  * live here as hand-rolled `Intl` helpers; it now lives in `lib/format/datetime`
@@ -27,7 +33,7 @@ export default async function BookingsPage({
     await requireSession();
 
     const [upcoming, params] = await Promise.all([
-        listUpcomingBookings(),
+        listBookingsWithPast(),
         searchParams,
     ]);
 
@@ -35,7 +41,7 @@ export default async function BookingsPage({
         <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">
             <PageHeader
                 title="Bookings"
-                description="Upcoming reservations across your services, in the timezone each was booked in."
+                description="Reservations across your services, in the timezone each was booked in."
                 actions={
                     <Button asChild variant="outline">
                         <Link href="/services">Services</Link>

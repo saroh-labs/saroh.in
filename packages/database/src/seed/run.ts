@@ -364,7 +364,10 @@ async function seedAppointments(prisma: Db, orgId: string, now: Date) {
 
         await prisma.booking.upsert({
             where: { id: id("booking", i) },
-            update: { startAt, endAt, status: b.status },
+            // `outcome: null` is not redundant: without it a re-seed keeps
+            // whatever outcome a previous run recorded, and the seed stops
+            // being a known clean state (#241).
+            update: { startAt, endAt, status: b.status, outcome: null },
             create: {
                 id: id("booking", i),
                 organizationId: orgId,
@@ -388,6 +391,12 @@ async function seedAppointments(prisma: Db, orgId: string, now: Date) {
         // Where each booking's history starts (#121). No actor: a seeded
         // booking was made by the booker, not by staff — the same thing the
         // public booking command records.
+        //
+        // No outcome is seeded (#241). The past bookings here are deliberately
+        // left unanswered, because that is the state the merchant has to act
+        // on and the one the "Needs an outcome" view exists to surface —
+        // seeding them as attended would hide the whole workflow on fresh
+        // data.
         await prisma.bookingEvent.deleteMany({
             where: { bookingId: id("booking", i) },
         });
