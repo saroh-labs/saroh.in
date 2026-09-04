@@ -107,8 +107,14 @@ module.exports = {
         // OrdersService.updateStatus guard spec with a jest-mocked Prisma (never
         // touch a DB). The legacy DB-backed orders.service.spec.ts stays in the
         // integration project; these two named specs run here.
+        // #175 CSV import: the PURE planning core (what an import will do)
+        // and the CSV boundary. Neither touches a DB.
+        "<rootDir>/src/modules/imports/**/*.spec.ts",
         "<rootDir>/src/modules/orders/order-state.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
+        // #173 — organization stamping on create; DB-free so CI catches a
+        // regression without a provisioned Postgres.
+        "<rootDir>/src/modules/orders/orders.service.org-scope.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
         // missing-key) and PaymentsService specs with a jest-mocked Prisma
         // (incl. $transaction) + a fake MerchantProvider — connect stores only

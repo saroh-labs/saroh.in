@@ -22,15 +22,19 @@ export default function RichTextSection({
     content: RichTextContent;
 }) {
     return (
-        <section className="mx-auto w-full max-w-screen-md px-5 py-8 sm:px-8">
+        <section className="mx-auto w-full max-w-screen-md px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             {content.format === "html" ? (
                 <div
-                    className="prose prose-stone max-w-none dark:prose-invert"
+                    /* Typography's own greys are replaced by the merchant's
+                       text colour (#189), and `dark:prose-invert` is gone with
+                       them: once a palette is chosen, a visitor's OS setting
+                       must not repaint a storefront its owner picked. */
+                    className="prose max-w-none prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80"
                     // Sanitized at publish (see the safety note above).
                     dangerouslySetInnerHTML={{ __html: content.value }}
                 />
             ) : (
-                <div className="prose prose-stone max-w-none dark:prose-invert">
+                <div className="prose max-w-none prose-p:text-site-fg/80">
                     <p className="whitespace-pre-wrap">{content.value}</p>
                 </div>
             )}

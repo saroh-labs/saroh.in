@@ -24,7 +24,7 @@ import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 
-import { NAV_GROUPS, filterNavGroups } from "./nav-items";
+import { NAV_GROUPS, filterNavGroups, navGroupsWithSites } from "./nav-items";
 
 const OPEN_EVENT = "saroh:open-command";
 
@@ -150,15 +150,25 @@ const ACTIONS: {
  */
 export function CommandMenu({
     moduleKeys = null,
+    sites = [],
 }: {
     moduleKeys?: string[] | null;
+    /**
+     * The merchant's own sites. They join the nav results, so a site is
+     * reachable by typing its name — which is the payoff for putting the tree
+     * in `NAV_GROUPS` rather than in the sidebar alone.
+     */
+    sites?: { id: string; name: string }[];
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [hits, setHits] = useState<SearchHit[]>([]);
     const [searching, setSearching] = useState(false);
-    const groups = filterNavGroups(NAV_GROUPS, moduleKeys);
+    const groups = filterNavGroups(
+        navGroupsWithSites(NAV_GROUPS, sites),
+        moduleKeys,
+    );
 
     const available = moduleKeys === null ? null : new Set(moduleKeys);
     const actions = ACTIONS.filter(
@@ -355,6 +365,55 @@ export function CommandMenu({
                         </CommandGroup>
                     );
                 })}
+                {/*
+                 * The merchant's own things, flattened out of the tree the
+                 * rail draws (#212). This menu read `group.items` alone, so
+                 * a site was never reachable here by name however it appeared
+                 * in the rail — the claim that it was, made when the tree
+                 * landed, was wrong until this block existed.
+                 */}
+                {(() => {
+                    const leaves: { label: string; href: string }[] = [];
+                    for (const group of groups) {
+                        for (const item of group.items) {
+                            for (const child of item.children ?? []) {
+                                if (child.href) {
+                                    leaves.push({
+                                        label: child.label,
+                                        href: child.href,
+                                    });
+                                    continue;
+                                }
+                                for (const leaf of child.children ?? []) {
+                                    if (!leaf.href) continue;
+                                    leaves.push({
+                                        // "Northwind Supply · Settings": the
+                                        // site is the thing searched for, the
+                                        // screen is where it lands.
+                                        label: `${child.label} · ${leaf.label}`,
+                                        href: leaf.href,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    const hits = leaves.filter((l) => matches(l.label));
+                    if (hits.length === 0) return null;
+                    return (
+                        <CommandGroup heading="Your sites">
+                            {hits.map((leaf) => (
+                                <CommandItem
+                                    key={leaf.href}
+                                    value={leaf.href}
+                                    onSelect={() => go(leaf.href)}
+                                >
+                                    <Globe className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                                    {leaf.label}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    );
+                })()}
                 {visibleHelp.length > 0 ? (
                     <CommandGroup heading="Help">
                         {visibleHelp.map((item) => (

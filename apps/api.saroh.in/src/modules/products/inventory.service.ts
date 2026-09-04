@@ -35,11 +35,16 @@ export class InventoryService {
         userId: string,
         dto: UpdateInventoryDto,
     ) {
-        await this.products.assertProductWritable(storeId, productId, userId);
+        const organizationId = await this.products.assertProductWritable(
+            storeId,
+            productId,
+            userId,
+        );
         const inventory = await prisma.inventory.upsert({
             where: { productId },
             create: {
                 storeId,
+                organizationId,
                 productId,
                 quantity: dto.quantity,
                 lowStockAlert: dto.lowStockAlert ?? 10,

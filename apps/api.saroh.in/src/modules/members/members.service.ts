@@ -178,7 +178,7 @@ export class MembersService {
             where: { id: storeId },
             select: { name: true },
         });
-        const appUrl = env.APP_URL ?? "http://localhost:3003";
+        const appUrl = env.APP_URL ?? "https://app.saroh.localhost";
         await sendStoreInvitationEmail(
             email,
             `${appUrl}/invitations/${token}`,

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getTrustedOrigins, isTrustedOrigin } from "./origins";
+import { sessionCookieDomain } from "./server";
 
 describe("origins", () => {
     it("matches a trusted *.saroh.in origin (with or without path)", () => {
@@ -41,21 +42,34 @@ import { createAuthMiddleware } from "./middleware";
 
 function fakeRequest({
     method = "GET",
-    pathname = "/",
+    pathname,
     href = "https://app.saroh.in/",
     origin,
+    headers: extraHeaders = {},
 }: {
     method?: string;
     pathname?: string;
     href?: string;
     origin?: string;
+    headers?: Record<string, string>;
 }) {
-    const headers = new Map<string, string>();
+    const headers = new Map<string, string>(
+        Object.entries(extraHeaders).map(([k, v]) => [k.toLowerCase(), v]),
+    );
     if (origin) headers.set("origin", origin);
+    // The shape Next gives middleware: `nextUrl` is a URL built from the
+    // server's own address, and the public host lives only in the headers.
+    const url = new URL(href);
     return {
         method,
         headers: { get: (k: string) => headers.get(k.toLowerCase()) ?? null },
-        nextUrl: { pathname, href },
+        nextUrl: {
+            pathname: pathname ?? url.pathname,
+            href: url.href,
+            protocol: url.protocol,
+            host: url.host,
+            search: url.search,
+        },
     } as never;
 }
 
@@ -78,6 +92,67 @@ describe("createAuthMiddleware", () => {
         const location = res.headers.get("location") ?? "";
         expect(location).toContain("accounts.saroh.in/login");
         expect(location).toContain("redirect=");
+    });
+
+    it("builds the back-link from the forwarded host behind a proxy", () => {
+        vi.mocked(getSessionCookie).mockReturnValue(null);
+        // In development Next hands middleware its own bound address; the
+        // proxy (portless locally, the edge in production) forwards the real
+        // one in headers.
+        const res = mw(
+            fakeRequest({
+                href: "http://localhost:4040/sites/abc?tab=pages",
+                headers: {
+                    host: "localhost:4040",
+                    "x-forwarded-host": "app.saroh.localhost",
+                    "x-forwarded-proto": "https",
+                },
+            }),
+        );
+        const location = new URL(res.headers.get("location") ?? "");
+        expect(location.searchParams.get("redirect")).toBe(
+            "https://app.saroh.localhost/sites/abc?tab=pages",
+        );
+    });
+
+    it("falls back to the Host header, then the URL, when nothing is forwarded", () => {
+        vi.mocked(getSessionCookie).mockReturnValue(null);
+        const viaHost = mw(
+            fakeRequest({
+                href: "http://localhost:4040/sites",
+                headers: { host: "app.saroh.in" },
+            }),
+        );
+        expect(
+            new URL(viaHost.headers.get("location") ?? "").searchParams.get(
+                "redirect",
+            ),
+        ).toBe("http://app.saroh.in/sites");
+
+        const viaUrl = mw(fakeRequest({ href: "https://app.saroh.in/sites" }));
+        expect(
+            new URL(viaUrl.headers.get("location") ?? "").searchParams.get(
+                "redirect",
+            ),
+        ).toBe("https://app.saroh.in/sites");
+    });
+
+    it("takes the first hop when a forwarded header lists several", () => {
+        vi.mocked(getSessionCookie).mockReturnValue(null);
+        const res = mw(
+            fakeRequest({
+                href: "http://localhost:4040/sites",
+                headers: {
+                    "x-forwarded-host": "app.saroh.in, edge.internal",
+                    "x-forwarded-proto": "https, http",
+                },
+            }),
+        );
+        expect(
+            new URL(res.headers.get("location") ?? "").searchParams.get(
+                "redirect",
+            ),
+        ).toBe("https://app.saroh.in/sites");
     });
 
     it("allows an authenticated request through", () => {
@@ -109,5 +184,22 @@ describe("createAuthMiddleware", () => {
         });
         const res = mw2(fakeRequest({ pathname: "/public" }));
         expect(res.status).toBe(200);
+    });
+});
+
+describe("sessionCookieDomain", () => {
+    it("shares the cookie across the api's parent domain", () => {
+        expect(sessionCookieDomain("https://api.saroh.in")).toBe(".saroh.in");
+        expect(sessionCookieDomain("https://api.saroh.localhost")).toBe(
+            ".saroh.localhost",
+        );
+    });
+
+    it("keeps a host-only cookie when there is no parent to share with", () => {
+        expect(sessionCookieDomain("http://localhost:3333")).toBeNull();
+        expect(sessionCookieDomain("http://127.0.0.1:3333")).toBeNull();
+        expect(sessionCookieDomain("https://saroh.in")).toBeNull();
+        expect(sessionCookieDomain(undefined)).toBeNull();
+        expect(sessionCookieDomain("not a url")).toBeNull();
     });
 });

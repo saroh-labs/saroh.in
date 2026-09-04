@@ -2,9 +2,11 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import { StoresService } from "../stores/stores.service";
 import type { CreateCustomerDto, UpdateCustomerDto } from "./dto";
 
@@ -15,7 +17,15 @@ import type { CreateCustomerDto, UpdateCustomerDto } from "./dto";
  */
 @Injectable()
 export class CustomersService {
-    constructor(private readonly stores: StoresService) {}
+    constructor(
+        private readonly stores: StoresService,
+        // @Optional for the same reason ModuleLifecycleService's is: this
+        // service is also constructed directly in DB-backed specs, which pass
+        // only what they exercise. Requiring it made every such construction
+        // throw on first write. `app.bootstrap.spec` asserts it IS resolved in
+        // the real graph, so optional here cannot become silently inert (#176).
+        @Optional() private readonly activation?: ActivationEvents,
+    ) {}
 
     async list(storeId: string, userId: string) {
         await this.stores.getForUser(storeId, userId);
@@ -37,11 +47,17 @@ export class CustomersService {
     }
 
     async create(storeId: string, userId: string, dto: CreateCustomerDto) {
-        await this.requireWrite(storeId, userId);
+        const organizationId = await this.requireWrite(storeId, userId);
         try {
             const customer = await prisma.customer.create({
-                data: { storeId, ...this.fields(dto) },
+                data: { storeId, organizationId, ...this.fields(dto) },
             });
+            if (organizationId) {
+                await this.activation?.firstCustomerCreated(
+                    organizationId,
+                    customer.id,
+                );
+            }
             return { id: customer.id };
         } catch {
             throw new ConflictException({
@@ -92,9 +108,23 @@ export class CustomersService {
         };
     }
 
-    private async requireWrite(storeId: string, userId: string): Promise<void> {
-        if (!(await this.stores.canWrite(storeId, userId))) {
+    /**
+     * Assert write access AND return the owning Organization id, so every
+     * create in this service can stamp `organizationId` (#173). Returning it
+     * here rather than looking it up at each call site makes the stamp hard to
+     * forget: the guard you must call already hands you the value.
+     */
+    private async requireWrite(
+        storeId: string,
+        userId: string,
+    ): Promise<string | null> {
+        const writable = await this.stores.writableOrganization(
+            storeId,
+            userId,
+        );
+        if (writable === null) {
             throw new NotFoundException("Store not found");
         }
+        return writable.organizationId;
     }
 }

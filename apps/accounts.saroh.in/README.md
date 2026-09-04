@@ -28,7 +28,7 @@ split and belongs in `app.saroh.in/settings`.
 
 ```bash
 pnpm install
-pnpm --filter auth dev        # http://localhost:3000
+pnpm --filter auth dev        # https://accounts.saroh.localhost
 ```
 
 `api.saroh.in` must be running too — this app has no auth server of its own.
@@ -40,9 +40,9 @@ Every variable is client-exposed and optional; see [`env.ts`](env.ts) for the
 validated schema.
 
 ```dotenv
-NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000     # this app's own origin
-NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333  # api origin (the auth server)
-NEXT_PUBLIC_APP_URL=http://localhost:3003          # where a verified user lands
+NEXT_PUBLIC_ACCOUNTS_URL=https://accounts.saroh.localhost  # this app's own origin
+NEXT_PUBLIC_BETTER_AUTH_URL=https://api.saroh.localhost    # api origin (the auth server)
+NEXT_PUBLIC_APP_URL=https://app.saroh.localhost            # where a verified user lands
 ```
 
 `NEXT_PUBLIC_APP_URL` may be omitted — [`lib/app-urls.ts`](lib/app-urls.ts)

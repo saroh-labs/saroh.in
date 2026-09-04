@@ -121,14 +121,33 @@ jobs:
       # react-email > socket.io in @saroh/emails) with no upstream fix yet;
       # hard-failing on "high" would rot CI. Highs/moderates are triaged in the
       # dependency-refresh pass, not blocked here.
-      - name: Dependency audit (critical only)
-        run: pnpm audit --audit-level critical
-
       - name: Unit tests (api, no database)
         run: pnpm --filter @saroh/api test:unit
 
       - name: Build
         run: pnpm run build
+
+      # Last, and tolerant of the registry being unreachable: the audit endpoint
+      # timed out from the runner on two consecutive runs in one morning, and
+      # because this step used to sit before the tests and the build, a network
+      # blip hid whether the branch even compiled. A CRITICAL FINDING still
+      # fails the job; failing to reach the registry is retried, then reported
+      # as a warning so the next run tries again.
+      - name: Dependency audit (critical only)
+        run: |
+          for attempt in 1 2 3; do
+            if out=$(pnpm audit --audit-level critical 2>&1); then
+              printf '%s\n' "$out"
+              exit 0
+            fi
+            if ! printf '%s' "$out" | grep -qE 'ERR_SOCKET_TIMEOUT|ETIMEDOUT|ECONNRESET|ENOTFOUND|FetchError'; then
+              printf '%s\n' "$out"
+              exit 1
+            fi
+            echo "Registry unreachable (attempt $attempt of 3)."
+            sleep 30
+          done
+          echo "::warning::Dependency audit skipped: registry unreachable after 3 attempts"
 
       # Integration tests need the Postgres service. The globalSetup runs
       # `pnpm exec prisma db push` in packages/database, which relies on the
@@ -139,20 +158,41 @@ jobs:
         run: pnpm --filter @saroh/api test:int
 
   # Secret scanning runs as its own job over the full git history so a secret
-  # committed in an earlier commit is still caught. gitleaks-action is free for
-  # personal/public repos; a GitHub *organization* additionally needs a
-  # GITLEAKS_LICENSE secret (uncomment below) — see gitleaks docs.
+  # committed in an earlier commit is still caught.
+  #
+  # This invokes the gitleaks CLI directly rather than gitleaks-action. The
+  # action refuses to run for a GitHub *organization* without a paid
+  # GITLEAKS_LICENSE — it exits non-zero before scanning anything, so the job
+  # was failing on licensing rather than on any finding. The CLI it wraps is
+  # MIT-licensed with no such gate, and the full-history scan is one flag.
+  #
+  # Version and checksum are pinned: this step is what would catch a leaked
+  # credential, so it must not silently become a different binary, and a new
+  # upstream rule must not turn the pipeline red without a commit that says so.
+  # Reviewed false positives live in .gitleaksignore, keyed by fingerprint.
   secret-scan:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
     steps:
       - name: Checkout (full history)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}"
+          echo "${GITLEAKS_SHA256}  ${tarball}" | sha256sum -c -
+          sudo tar -xzf "$tarball" -C /usr/local/bin gitleaks
+          gitleaks version
+
+      # --redact so a genuine hit is reported as a location to go fix, without
+      # reprinting the secret into a public build log.
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # required only for GitHub organizations
+        run: gitleaks git . --redact --no-banner --exit-code 1

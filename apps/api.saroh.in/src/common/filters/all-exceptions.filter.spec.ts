@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ForbiddenException,
+    GoneException,
     HttpException,
     HttpStatus,
     InternalServerErrorException,
@@ -108,6 +109,24 @@ describe("AllExceptionsFilter", () => {
             "name must not be empty",
             "price must be a number",
         ]);
+    });
+
+    it("carries a reason an exception provides under details (#198)", () => {
+        // A preview link's 410 says WHY — expired or revoked — in a shape the
+        // renderer can branch on, through the same slot validation uses.
+        const res = makeResponse();
+        filter.catch(
+            new GoneException({
+                message: "This preview link was taken back.",
+                details: { reason: "revoked" },
+            }),
+            makeHost(res),
+        );
+
+        const err = envelope(res);
+        expect(err.code).toBe("GONE");
+        expect(err.message).toBe("This preview link was taken back.");
+        expect(err.details).toEqual({ reason: "revoked" });
     });
 
     it("collapses an unknown error into an opaque 500 (no leak)", () => {

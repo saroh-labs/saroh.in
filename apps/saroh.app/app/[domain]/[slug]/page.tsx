@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PageSections } from "@/components/sections/section-renderer";
-import { findPageByPath, getPublicationForHost } from "@/lib/publication";
+import {
+    findPageByPath,
+    getPublicationForHost,
+    shareImages,
+} from "@/lib/publication";
 
 /**
  * Tenant sub-page (S2-006).
@@ -29,11 +33,31 @@ export async function generateMetadata({
         return null;
     }
 
-    const title = page.title ?? snapshot.site.name;
+    // An inner page shared on WhatsApp or Slack used to arrive with a title and
+    // nothing else (#220): the description and picture live on the site, and
+    // this route did not read them. It inherits both, and names its own
+    // address so a share of /about is cached as /about.
+    const { name, seoDescription } = snapshot.site;
+    const title = page.title ?? name;
+    const description = seoDescription?.trim() ? seoDescription : undefined;
+    const images = shareImages(snapshot.site);
     return {
         title,
-        openGraph: { title },
-        twitter: { card: "summary_large_image", title },
+        description,
+        openGraph: {
+            title,
+            description,
+            images,
+            url: `/${slug}`,
+            siteName: name,
+        },
+        twitter: {
+            card: images ? "summary_large_image" : "summary",
+            title,
+            description,
+            images,
+        },
+        metadataBase: new URL(`https://${domain}`),
     };
 }
 

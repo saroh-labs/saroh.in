@@ -44,13 +44,13 @@ without waiting for a cached session to expire.
 
 ```bash
 pnpm install
-pnpm --filter admin dev      # http://localhost:3001
+pnpm --filter admin dev      # https://admin.saroh.localhost
 ```
 
 ```dotenv
-NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:3333
-NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
+NEXT_PUBLIC_ACCOUNTS_URL=https://accounts.saroh.localhost
+NEXT_PUBLIC_API_URL=https://api.saroh.localhost
+NEXT_PUBLIC_BETTER_AUTH_URL=https://api.saroh.localhost
 ```
 
 The API must be running with the same Better Auth configuration and a database

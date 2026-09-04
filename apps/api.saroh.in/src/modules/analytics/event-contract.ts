@@ -127,6 +127,95 @@ const orderPaidV1: EventValidator = (props) => ({
     amountCents: requireNumber(props, "amountCents"),
 });
 
+/* ------------------------------------------------------------------------- *
+ * Activation events (#176 / #119)
+ *
+ * The three contracts above describe things a merchant's CUSTOMER did. Nothing
+ * observed what the MERCHANT did, so `PRODUCT_STRATEGY.md` §23's "How will we
+ * know whether it works?" was unanswerable for onboarding and activation, and
+ * `PRODUCT.md` recorded plainly that no activation funnel exists.
+ *
+ * These describe the merchant's own path through the product. Two rules hold
+ * for all of them:
+ *
+ *  - **Never publicly ingestable.** They are produced server-side only; a
+ *    visitor must not be able to forge an activation milestone.
+ *  - **No personal data.** Properties carry ids, keys and counts — never a
+ *    name, an email, an address or free text a merchant typed. The events say
+ *    THAT something happened, never who it was about.
+ * ------------------------------------------------------------------------- */
+
+/** Identifier-ish property length: a cuid, a module key, a provider name. */
+const MAX_ID_LEN = 128;
+
+/** `organization.created` (v1): the funnel's t0. */
+const organizationCreatedV1: EventValidator = () => ({});
+
+/**
+ * `onboarding.completed` (v1): the merchant finished (or skipped) the goal
+ * picker. `moduleCount` rather than the keys themselves — the count is what
+ * distinguishes "picked something" from "skipped", and a list would grow into a
+ * per-org fingerprint for no analytical gain.
+ */
+const onboardingCompletedV1: EventValidator = (props) => ({
+    moduleCount: requireNumber(props, "moduleCount"),
+});
+
+/** `module.enabled` (v1): a capability switched on. */
+const moduleEnabledV1: EventValidator = (props) => ({
+    moduleKey: requireString(props, "moduleKey", MAX_ID_LEN),
+});
+
+/**
+ * The first-value contracts (v1). Each carries only the created row's id, so
+ * "time to first value" is `occurredAt` minus the org's `organization.created`
+ * — derived at read time rather than stored as a field that could drift.
+ */
+const firstProductV1: EventValidator = (props) => ({
+    productId: requireString(props, "productId", MAX_ID_LEN),
+});
+const firstCustomerV1: EventValidator = (props) => ({
+    customerId: requireString(props, "customerId", MAX_ID_LEN),
+});
+const firstOrderV1: EventValidator = (props) => ({
+    orderId: requireString(props, "orderId", MAX_ID_LEN),
+});
+
+/**
+ * `import.completed` (v1): counts only. Deliberately no file name and no row
+ * contents — an import file is full of customer data and none of it belongs in
+ * an analytics ledger.
+ */
+const importCompletedV1: EventValidator = (props) => ({
+    entity: requireString(props, "entity", MAX_ID_LEN),
+    created: requireNumber(props, "created"),
+    updated: requireNumber(props, "updated"),
+    failed: requireNumber(props, "failed"),
+});
+
+/** Activation event types — server-produced, never publicly ingestable. */
+export const ORGANIZATION_CREATED_TYPE = "organization.created";
+export const ONBOARDING_COMPLETED_TYPE = "onboarding.completed";
+export const MODULE_ENABLED_TYPE = "module.enabled";
+export const FIRST_PRODUCT_CREATED_TYPE = "first.product.created";
+export const FIRST_CUSTOMER_CREATED_TYPE = "first.customer.created";
+export const FIRST_ORDER_CREATED_TYPE = "first.order.created";
+export const IMPORT_COMPLETED_TYPE = "import.completed";
+
+/**
+ * Every activation type, for tests and for the producer helper. Kept beside the
+ * registry so a type added to one and forgotten in the other is visible here.
+ */
+export const ACTIVATION_TYPES: readonly string[] = [
+    ORGANIZATION_CREATED_TYPE,
+    ONBOARDING_COMPLETED_TYPE,
+    MODULE_ENABLED_TYPE,
+    FIRST_PRODUCT_CREATED_TYPE,
+    FIRST_CUSTOMER_CREATED_TYPE,
+    FIRST_ORDER_CREATED_TYPE,
+    IMPORT_COMPLETED_TYPE,
+];
+
 /** The event types accepted from the PUBLIC, unauthenticated intake endpoint. */
 export const SITE_VIEW_TYPE = "site.view";
 export const ENQUIRY_SUBMITTED_TYPE = "enquiry.submitted";
@@ -146,6 +235,15 @@ const REGISTRY = new Map<string, EventValidator>([
     [key(SITE_VIEW_TYPE, 1), siteViewV1],
     [key(ENQUIRY_SUBMITTED_TYPE, 1), enquirySubmittedV1],
     [key(ORDER_PAID_TYPE, 1), orderPaidV1],
+    // Activation (#176) — server-produced only; absent from
+    // PUBLIC_INGESTABLE_TYPES on purpose.
+    [key(ORGANIZATION_CREATED_TYPE, 1), organizationCreatedV1],
+    [key(ONBOARDING_COMPLETED_TYPE, 1), onboardingCompletedV1],
+    [key(MODULE_ENABLED_TYPE, 1), moduleEnabledV1],
+    [key(FIRST_PRODUCT_CREATED_TYPE, 1), firstProductV1],
+    [key(FIRST_CUSTOMER_CREATED_TYPE, 1), firstCustomerV1],
+    [key(FIRST_ORDER_CREATED_TYPE, 1), firstOrderV1],
+    [key(IMPORT_COMPLETED_TYPE, 1), importCompletedV1],
 ]);
 
 /**

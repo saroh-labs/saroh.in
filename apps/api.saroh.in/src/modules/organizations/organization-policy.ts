@@ -90,6 +90,11 @@ export type OrgAction =
     | "media:write"
     | "section:write"
     | "site:publish"
+    // Review (#193). Separate actions because they are separate powers: a
+    // REVIEWER may do both and nothing else, while a MEMBER may do neither —
+    // leaving a note is not a read, and signing a site off is not an edit.
+    | "site:comment"
+    | "site:approve"
     | "domain:manage"
     | "form:read"
     | "form:write"
@@ -151,6 +156,8 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "media:write",
     "section:write",
     "site:publish",
+    "site:comment",
+    "site:approve",
     "domain:manage",
     "form:read",
     "form:write",
@@ -228,6 +235,21 @@ const CAPABILITIES: Record<OrgRole, ReadonlySet<OrgAction>> = {
         ORG_ACTIONS.filter((action) => action !== "org:delete"),
     ),
     MEMBER: new Set<OrgAction>(READ_ONLY_ACTIONS),
+    /*
+     * REVIEWER — website only (#193), and the narrowest role in the system.
+     *
+     * Enumerated explicitly rather than derived from READ_ONLY_ACTIONS. A
+     * reviewer is brought in to look at ONE site, and the read-only floor
+     * includes the org's roster, its stores, its products and its bookings —
+     * everything a small business would not hand to the person checking their
+     * copy. Deriving this set would mean every future addition to the floor
+     * silently widened what a reviewer can see.
+     *
+     * `site:comment` and `site:approve` are what they are here to do.
+     * `section:write` and `site:publish` are absent by design: a reviewer says
+     * what they think, the owner decides.
+     */
+    REVIEWER: new Set<OrgAction>(["site:read", "site:comment", "site:approve"]),
 };
 
 /** Pure predicate: may `role` perform `action`? */

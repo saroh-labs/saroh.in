@@ -5,8 +5,11 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { AuthUser } from "../../common/types/store-context";
+import { OrganizationContextService } from "../organizations/organization-context.service";
 import { ModuleAvailabilityService } from "./module-availability.service";
 import type { ModuleKey } from "./module-registry";
 import { REQUIRE_MODULE_KEY } from "./require-module.decorator";
@@ -25,6 +28,7 @@ export function isModuleEnforcementEnabled(): boolean {
 
 interface GuardedRequest {
     organizationContext?: OrganizationContext;
+    user?: AuthUser;
     params?: Record<string, string | undefined>;
     query?: Record<string, unknown>;
 }
@@ -47,6 +51,7 @@ export class ModuleEnforcementGuard implements CanActivate {
     constructor(
         private readonly reflector: Reflector,
         private readonly availability: ModuleAvailabilityService,
+        private readonly organizations: OrganizationContextService,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -57,7 +62,15 @@ export class ModuleEnforcementGuard implements CanActivate {
         if (!moduleKey || !isModuleEnforcementEnabled()) return true;
 
         const request = context.switchToHttp().getRequest<GuardedRequest>();
-        const orgContext = request.organizationContext;
+        // Store-scoped routes (`stores/:storeId/...`) carry no `:organizationId`
+        // and do not run OrganizationGuard, so resolve the owning Organization
+        // from the Store. Done HERE, after the dark check, rather than by adding
+        // OrganizationGuard to those controllers: that guard is not dark and
+        // 400s a request with no org id, which would change behaviour the moment
+        // the annotation landed instead of when enforcement is switched on.
+        const orgContext =
+            request.organizationContext ??
+            (await this.contextFromStore(request));
         // No resolved Organization (public/webhook) → not enforced here.
         if (!orgContext) return true;
 
@@ -88,5 +101,41 @@ export class ModuleEnforcementGuard implements CanActivate {
             moduleKey,
             blockerCodes: codes,
         });
+    }
+
+    /**
+     * Resolve an Organization context from a `:storeId` route param.
+     *
+     * Returns null — meaning "not enforced" — rather than throwing, in three
+     * cases: no store id or no authenticated user, a store that does not exist,
+     * and a user with no Organization membership for the store's org. That last
+     * one is the important one: a legacy StoreOwner/StoreMembers grant can still
+     * authorize store access without org membership (the dual-read path in
+     * StoresService), and this guard governs capability AVAILABILITY, not
+     * authorization. Turning enforcement on must not silently become an
+     * authorization change for un-migrated staff; the service layer still
+     * decides whether they may read or write.
+     */
+    private async contextFromStore(
+        request: GuardedRequest,
+    ): Promise<OrganizationContext | null> {
+        const storeId = request.params?.storeId;
+        const user = request.user;
+        if (!storeId || !user) return null;
+
+        const store = await prisma.store.findFirst({
+            where: { id: storeId, deletedAt: null },
+            select: { organizationId: true },
+        });
+        if (!store?.organizationId) return null;
+
+        try {
+            return await this.organizations.resolve(
+                user.id,
+                store.organizationId,
+            );
+        } catch {
+            return null;
+        }
     }
 }

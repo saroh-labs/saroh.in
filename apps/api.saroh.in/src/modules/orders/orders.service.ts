@@ -2,9 +2,11 @@ import {
     BadRequestException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import { StoresService } from "../stores/stores.service";
 import type {
     CreateOrderDto,
@@ -33,7 +35,15 @@ const CUSTOMER_SELECT = {
  */
 @Injectable()
 export class OrdersService {
-    constructor(private readonly stores: StoresService) {}
+    constructor(
+        private readonly stores: StoresService,
+        // @Optional for the same reason ModuleLifecycleService's is: this
+        // service is also constructed directly in DB-backed specs, which pass
+        // only what they exercise. Requiring it made every such construction
+        // throw on first write. `app.bootstrap.spec` asserts it IS resolved in
+        // the real graph, so optional here cannot become silently inert (#176).
+        @Optional() private readonly activation?: ActivationEvents,
+    ) {}
 
     async list(storeId: string, userId: string) {
         await this.stores.getForUser(storeId, userId);
@@ -63,7 +73,7 @@ export class OrdersService {
     }
 
     async create(storeId: string, userId: string, dto: CreateOrderDto) {
-        await this.requireWrite(storeId, userId);
+        const organizationId = await this.requireWrite(storeId, userId);
 
         const customer = await prisma.customer.findFirst({
             where: { id: dto.customerId, storeId },
@@ -110,6 +120,7 @@ export class OrdersService {
 
         const data = {
             storeId,
+            organizationId,
             customerId: dto.customerId,
             currency: dto.currency ?? "USD",
             subtotal: fromCents(subtotalCents),
@@ -145,6 +156,15 @@ export class OrdersService {
                     );
                     return order;
                 });
+                if (organizationId) {
+                    // Safe on every order: the ledger keeps only the first
+                    // (deterministic dedupeKey), so no "is this their first?"
+                    // query and no race between concurrent creates.
+                    await this.activation?.firstOrderCreated(
+                        organizationId,
+                        created.id,
+                    );
+                }
                 return { id: created.id };
             } catch (err) {
                 if (this.isUniqueOrderNumber(err) && attempt < 4) continue;
@@ -216,10 +236,24 @@ export class OrdersService {
         return { id: orderId };
     }
 
-    private async requireWrite(storeId: string, userId: string): Promise<void> {
-        if (!(await this.stores.canWrite(storeId, userId))) {
+    /**
+     * Assert write access AND return the owning Organization id, so every
+     * create in this service can stamp `organizationId` (#173). Returning it
+     * here rather than looking it up at each call site makes the stamp hard to
+     * forget: the guard you must call already hands you the value.
+     */
+    private async requireWrite(
+        storeId: string,
+        userId: string,
+    ): Promise<string | null> {
+        const writable = await this.stores.writableOrganization(
+            storeId,
+            userId,
+        );
+        if (writable === null) {
             throw new NotFoundException("Store not found");
         }
+        return writable.organizationId;
     }
 
     private isUniqueOrderNumber(err: unknown): boolean {

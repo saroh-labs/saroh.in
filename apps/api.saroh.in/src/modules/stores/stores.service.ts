@@ -107,24 +107,51 @@ export class StoresService {
 
     /** Owner, or a member with a write-capable role. */
     async canWrite(storeId: string, userId: string): Promise<boolean> {
+        return (await this.writableOrganization(storeId, userId)) !== null;
+    }
+
+    /**
+     * Write access AND the owning Organization, resolved in one pass.
+     *
+     * Returns `null` when the store is missing, deleted, or not writable by
+     * this user. Returns `{ organizationId }` when it IS writable — where
+     * `organizationId` may itself be null for a legacy org-less store, which is
+     * why this is an object rather than a bare `string | null`: "not writable"
+     * and "writable but has no org" are different answers and must not collapse.
+     *
+     * Commerce rows (Order, Customer, Product, Category, Inventory) carry a
+     * NULLABLE `organizationId` that MUST be stamped on write. A NULL there is
+     * invisible both to `WHERE "organizationId" = $1` (SQL three-valued logic)
+     * and to the `org_isolation` RLS policy built on the same predicate, so the
+     * row silently vanishes from the tenant that owns it (#173). Handing the id
+     * back from the write guard makes that stamp hard to forget: the check a
+     * caller must already perform yields the value it must already store.
+     */
+    async writableOrganization(
+        storeId: string,
+        userId: string,
+    ): Promise<{ organizationId: string | null } | null> {
         const store = await prisma.store.findFirst({
             where: { id: storeId, deletedAt: null },
             select: { organizationId: true },
         });
         // A missing/deleted store has no owners or members → not writable.
-        if (!store) return false;
+        if (!store) return null;
+        const writable = { organizationId: store.organizationId };
 
         if (!(await this.useOrgPath(store.organizationId))) {
             // LEGACY path — behavior unchanged from before S1-006.
-            return this.canWriteLegacy(storeId, userId);
+            return (await this.canWriteLegacy(storeId, userId))
+                ? writable
+                : null;
         }
 
         this.assertStoreHasOrg(store.organizationId);
         if (await this.orgAllows(store.organizationId, userId, "store:write")) {
-            return true;
+            return writable;
         }
         // DUAL-READ fallback to the legacy owner/member write check.
-        return this.canWriteLegacy(storeId, userId);
+        return (await this.canWriteLegacy(storeId, userId)) ? writable : null;
     }
 
     // ------------------------------------------------------------------

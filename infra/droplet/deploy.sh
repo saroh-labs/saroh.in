@@ -19,6 +19,24 @@ set -euo pipefail
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Registry credentials scoped to THIS stack, not the host.
+#
+# Docker keeps one credential per registry in a given config, so a plain
+# `docker login ghcr.io` writes to ~/.docker/config.json and OVERWRITES whatever
+# was there. This host already holds a ghcr.io credential for a different
+# account and a different image; clobbering it would leave that image
+# unpullable, and the breakage would not show up until its next deploy — long
+# after the change that caused it.
+#
+# Pointing DOCKER_CONFIG at a directory inside the deploy dir gives this stack
+# its own credential file. Log in once with:
+#
+#   mkdir -p /opt/saroh/.docker && chmod 700 /opt/saroh/.docker
+#   DOCKER_CONFIG=/opt/saroh/.docker docker login ghcr.io -u <github-user>
+#
+# `docker compose pull` honours DOCKER_CONFIG, so exporting it here is enough.
+export DOCKER_CONFIG="${DOCKER_CONFIG:-$PWD/.docker}"
+
 TAG="latest"
 DO_MIGRATE=1
 while [[ $# -gt 0 ]]; do
@@ -52,6 +70,15 @@ done
 docker network inspect edge >/dev/null 2>&1 || {
 	echo "the 'edge' network does not exist — is the infrastructure stack up?" >&2
 	echo "  start it before deploying — see the operator runbook" >&2
+	exit 1
+}
+
+[[ -f "$DOCKER_CONFIG/config.json" ]] || {
+	echo "no registry credentials at $DOCKER_CONFIG/config.json" >&2
+	echo "  mkdir -p $DOCKER_CONFIG && chmod 700 $DOCKER_CONFIG" >&2
+	echo "  DOCKER_CONFIG=$DOCKER_CONFIG docker login ghcr.io -u <github-user>" >&2
+	echo "(a PAT with read:packages; do NOT plain 'docker login' — it would" >&2
+	echo " overwrite the host credential another image depends on)" >&2
 	exit 1
 }
 

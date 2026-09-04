@@ -13,7 +13,10 @@ export default defineConfig((options: Options) => ({
     },
     dts: true,
     target: "es2019",
-    clean: true,
+    // A watcher that wipes dist on start leaves every consumer compiling in that
+    // window — nest --watch in api, for one — resolving `@saroh/*` to nothing,
+    // and it does not re-resolve. Clean only on a one-off build.
+    clean: !options.watch,
     minify: true,
     external: ["react"],
     ...options,

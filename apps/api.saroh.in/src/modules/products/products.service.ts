@@ -3,9 +3,11 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
 import type { CreateProductDto, ProductStatus, UpdateProductDto } from "./dto";
@@ -20,7 +22,15 @@ import { serializeProduct, serializeProductDetail } from "./serialize";
  */
 @Injectable()
 export class ProductsService {
-    constructor(private readonly stores: StoresService) {}
+    constructor(
+        private readonly stores: StoresService,
+        // @Optional for the same reason ModuleLifecycleService's is: this
+        // service is also constructed directly in DB-backed specs, which pass
+        // only what they exercise. Requiring it made every such construction
+        // throw on first write. `app.bootstrap.spec` asserts it IS resolved in
+        // the real graph, so optional here cannot become silently inert (#176).
+        @Optional() private readonly activation?: ActivationEvents,
+    ) {}
 
     /** Catalog for a store the caller can access, optionally filtered by status. */
     async list(storeId: string, userId: string, status?: ProductStatus) {
@@ -51,7 +61,7 @@ export class ProductsService {
     }
 
     async create(storeId: string, userId: string, dto: CreateProductDto) {
-        await this.requireWrite(storeId, userId);
+        const organizationId = await this.requireWrite(storeId, userId);
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({
@@ -66,6 +76,7 @@ export class ProductsService {
             const product = await prisma.product.create({
                 data: {
                     storeId,
+                    organizationId,
                     name: dto.name,
                     slug,
                     description: dto.description ?? null,
@@ -76,6 +87,12 @@ export class ProductsService {
                     status: dto.status ?? "DRAFT",
                 },
             });
+            if (organizationId) {
+                await this.activation?.firstProductCreated(
+                    organizationId,
+                    product.id,
+                );
+            }
             return { id: product.id };
         } catch {
             throw new ConflictException({
@@ -142,10 +159,24 @@ export class ProductsService {
         return { id: productId };
     }
 
-    private async requireWrite(storeId: string, userId: string): Promise<void> {
-        if (!(await this.stores.canWrite(storeId, userId))) {
+    /**
+     * Assert write access AND return the owning Organization id, so every
+     * create in this service can stamp `organizationId` (#173). Returning it
+     * here rather than looking it up at each call site makes the stamp hard to
+     * forget: the guard you must call already hands you the value.
+     */
+    private async requireWrite(
+        storeId: string,
+        userId: string,
+    ): Promise<string | null> {
+        const writable = await this.stores.writableOrganization(
+            storeId,
+            userId,
+        );
+        if (writable === null) {
             throw new NotFoundException("Store not found");
         }
+        return writable.organizationId;
     }
 
     /** Assert the caller can read the store AND the product lives in it. */
@@ -163,9 +194,10 @@ export class ProductsService {
         storeId: string,
         productId: string,
         userId: string,
-    ): Promise<void> {
-        await this.requireWrite(storeId, userId);
+    ): Promise<string | null> {
+        const organizationId = await this.requireWrite(storeId, userId);
         await this.assertProductInStore(storeId, productId);
+        return organizationId;
     }
 
     private async assertProductInStore(

@@ -24,6 +24,7 @@ jest.mock("@saroh/database", () => {
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import type { ActivationEvents } from "../analytics/activation-events";
 import type { StoresService } from "../stores/stores.service";
 import { OrdersService } from "./orders.service";
 
@@ -35,12 +36,20 @@ const txMock = prisma.$transaction as jest.Mock;
 const STORE = "store_1";
 const USER = "user_1";
 const ORDER = "order_1";
+const ORG = "org_1";
 
 function makeService(canWrite = true) {
     const stores = {
-        canWrite: jest.fn().mockResolvedValue(canWrite),
+        // The write guard resolves access AND the owning org in one pass
+        // (#173): null means "not writable", an object means writable.
+        writableOrganization: jest
+            .fn()
+            .mockResolvedValue(canWrite ? { organizationId: ORG } : null),
     } as unknown as StoresService;
-    return new OrdersService(stores);
+    const activation = {
+        firstOrderCreated: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ActivationEvents;
+    return new OrdersService(stores, activation);
 }
 
 beforeEach(() => {

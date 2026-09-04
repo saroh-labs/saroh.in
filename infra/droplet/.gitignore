@@ -4,4 +4,9 @@
 .env
 .env.prod
 
+# Stack-scoped registry credentials written by
+#   DOCKER_CONFIG=./.docker docker login ghcr.io
+# Docker stores the PAT base64-encoded, NOT encrypted.
+.docker/
+
 deploy.log

@@ -1,5 +1,6 @@
 import { Controller, Get, Param } from "@nestjs/common";
 
+import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
 
 /**
@@ -16,12 +17,27 @@ import { SitesService } from "./sites.service";
  */
 @Controller("public/sites")
 export class PublicSitesController {
-    constructor(private readonly sites: SitesService) {}
+    constructor(
+        private readonly sites: SitesService,
+        private readonly previewLinks: SitePreviewLinksService,
+    ) {}
 
     /** Current publication snapshot for the site on `<subdomain>.saroh.app`. */
     @Get("by-subdomain/:subdomain")
     bySubdomain(@Param("subdomain") subdomain: string) {
         return this.sites.getPublicationBySubdomain(subdomain);
+    }
+
+    /**
+     * A site's DRAFT, behind a preview token (#198). The one exception to
+     * "only the current Publication is reachable here", and a narrow one: the
+     * token is 32 random bytes minted by an owner, it expires, and it can be
+     * taken back. 410 with a reason once it has; 404 for a token that never
+     * existed.
+     */
+    @Get("preview/:token")
+    preview(@Param("token") token: string) {
+        return this.previewLinks.resolve(token);
     }
 
     /** Current publication snapshot for a site by id. */

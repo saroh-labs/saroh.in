@@ -766,6 +766,10 @@ async function seedWebsite(
                         contractVersion: 1,
                         order: n,
                         content: normalized,
+                        // Deterministic, like every other seeded id: re-running
+                        // the seed must not re-key the sections, or the notes
+                        // pinned to them would all come back orphaned.
+                        key: id("sectionkey", s, p, n),
                         createdAt,
                     },
                 });

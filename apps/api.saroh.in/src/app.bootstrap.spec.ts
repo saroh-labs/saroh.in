@@ -55,4 +55,53 @@ describe("API bootstrap", () => {
         expect(moduleRef).toBeDefined();
         await moduleRef.close();
     });
+
+    /**
+     * Activation instrumentation is injected with `@Optional()` in the services
+     * that emit it, because those services are also constructed directly in unit
+     * tests. That has a failure mode with no symptoms: if the providing module is
+     * not imported, Nest injects `undefined`, every `this.activation?.…` call
+     * becomes a silent no-op, and the instrumentation looks wired while
+     * recording nothing.
+     *
+     * So assert it is genuinely resolved in the real graph (#176).
+     */
+    it("actually injects ActivationEvents into the services that emit it", async () => {
+        const { AppModule } = await import("./app.module");
+        const { ActivationEvents } =
+            await import("./modules/analytics/activation-events");
+        const { OrdersService } =
+            await import("./modules/orders/orders.service");
+        const { ProductsService } =
+            await import("./modules/products/products.service");
+        const { CustomersService } =
+            await import("./modules/customers/customers.service");
+        const { ImportsService } =
+            await import("./modules/imports/imports.service");
+        const { ModuleLifecycleService } =
+            await import("./modules/capabilities/module-lifecycle.service");
+        const { OrganizationOnboardingService } =
+            await import("./modules/organizations/organization-onboarding.service");
+
+        const moduleRef = await Test.createTestingModule({
+            imports: [AppModule],
+        }).compile();
+
+        for (const type of [
+            OrdersService,
+            ProductsService,
+            CustomersService,
+            ImportsService,
+            ModuleLifecycleService,
+            OrganizationOnboardingService,
+        ]) {
+            const service = moduleRef.get(type, { strict: false }) as Record<
+                string,
+                unknown
+            >;
+            expect(service.activation).toBeInstanceOf(ActivationEvents);
+        }
+
+        await moduleRef.close();
+    });
 });

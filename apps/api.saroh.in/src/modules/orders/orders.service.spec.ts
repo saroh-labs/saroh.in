@@ -134,6 +134,17 @@ describe("Orders & inventory (dev DB)", () => {
         ).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    // PENDING and PROCESSING are both the RESERVED stock phase, so working an
+    // order moves no stock — it only makes the order shippable. The jump
+    // straight from PENDING to SHIPPED this spec used to make predates the
+    // S5-001 lifecycle guard, which rejects it as an illegal transition.
+    it("works the order without moving stock (PENDING → PROCESSING)", async () => {
+        await orders.updateStatus(storeId, orderAId, ownerId, {
+            status: "PROCESSING",
+        });
+        expect(await stock()).toEqual({ quantity: 10, reserved: 3 });
+    });
+
     it("commits stock on SHIPPED (quantity down, reserved released)", async () => {
         await orders.updateStatus(storeId, orderAId, ownerId, {
             status: "SHIPPED",
@@ -151,26 +162,35 @@ describe("Orders & inventory (dev DB)", () => {
         expect(order.paymentStatus).toBe("PAID");
     });
 
-    it("restocks on cancel-after-ship", async () => {
-        await orders.updateStatus(storeId, orderAId, ownerId, {
-            status: "CANCELLED",
-        });
-        expect(await stock()).toEqual({ quantity: 10, reserved: 0 });
+    // Once an order is in the customer's hands it can no longer be cancelled
+    // (order-state.ts: SHIPPED → DELIVERED only). This spec previously asserted
+    // the opposite — that cancelling a shipped order restocked it — which the
+    // S5-001 state machine deliberately outlawed. The guard runs BEFORE the
+    // transaction, so the rejection must leave the committed stock untouched.
+    it("refuses to cancel after shipping, and moves no stock", async () => {
+        await expect(
+            orders.updateStatus(storeId, orderAId, ownerId, {
+                status: "CANCELLED",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(await stock()).toEqual({ quantity: 7, reserved: 0 });
     });
 
     it("releases a reservation when a pending order is cancelled", async () => {
+        // Order A shipped and consumed 3 of the 10, so the shelf is at 7 —
+        // this order reserves against what is actually left, not the original.
         const res = await orders.create(storeId, ownerId, {
             customerId,
             items: [{ productId, quantity: 4 }],
         });
-        expect(await stock()).toEqual({ quantity: 10, reserved: 4 });
+        expect(await stock()).toEqual({ quantity: 7, reserved: 4 });
         expect((await orders.get(storeId, res.id, ownerId)).orderId).toBe(
             "ORD-002",
         );
         await orders.updateStatus(storeId, res.id, ownerId, {
             status: "CANCELLED",
         });
-        expect(await stock()).toEqual({ quantity: 10, reserved: 0 });
+        expect(await stock()).toEqual({ quantity: 7, reserved: 0 });
     });
 
     it("denies a non-member (404, no leak)", async () => {

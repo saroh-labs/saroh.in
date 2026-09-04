@@ -9,11 +9,11 @@ import {
     ANALYTICS_AGGREGATE_TYPE,
     AnalyticsAggregateHandler,
 } from "./analytics-aggregate.handler";
+import { AnalyticsCoreModule } from "./analytics-core.module";
 import {
     AnalyticsController,
     AnalyticsPublicController,
 } from "./analytics.controller";
-import { AnalyticsService } from "./analytics.service";
 
 /**
  * Analytics intake + org-safe aggregates (S7-002).
@@ -33,10 +33,16 @@ import { AnalyticsService } from "./analytics.service";
  * NOTE: this module is registered in `app.module.ts` by the ticket owner.
  */
 @Module({
-    imports: [JobsModule, forwardRef(() => OrganizationsModule)],
+    imports: [
+        AnalyticsCoreModule,
+        JobsModule,
+        forwardRef(() => OrganizationsModule),
+    ],
     controllers: [AnalyticsPublicController, AnalyticsController],
-    providers: [AnalyticsService, AnalyticsAggregateHandler, OrganizationGuard],
-    exports: [AnalyticsService],
+    providers: [AnalyticsAggregateHandler, OrganizationGuard],
+    // Re-exported so existing consumers of AnalyticsModule are unaffected by
+    // the extraction; new consumers should import AnalyticsCoreModule directly.
+    exports: [AnalyticsCoreModule],
 })
 export class AnalyticsModule implements OnModuleInit {
     constructor(

@@ -15,15 +15,15 @@ export default function GallerySection({
 
     if (layout === "carousel") {
         return (
-            <section className="mx-auto w-full max-w-screen-xl px-5 py-12 sm:px-8">
-                <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+            <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+                <div className="flex snap-x snap-mandatory gap-[var(--site-grid-gap)] overflow-x-auto pb-4">
                     {content.images.map((img, i) => (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                             key={i}
                             src={img.src}
                             alt={img.alt ?? ""}
-                            className="h-64 w-auto flex-none snap-start rounded-lg object-cover"
+                            className="h-64 w-auto flex-none snap-start rounded-[var(--site-radius)] object-cover"
                         />
                     ))}
                 </div>
@@ -32,12 +32,12 @@ export default function GallerySection({
     }
 
     return (
-        <section className="mx-auto w-full max-w-screen-xl px-5 py-12 sm:px-8">
+        <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div
                 className={cn(
                     layout === "masonry"
-                        ? "columns-1 gap-4 sm:columns-2 lg:columns-3 [&>*]:mb-4"
-                        : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3",
+                        ? "columns-1 gap-[var(--site-grid-gap)] sm:columns-2 lg:columns-3 [&>*]:mb-[var(--site-grid-gap)]"
+                        : "grid grid-cols-1 gap-[var(--site-grid-gap)] sm:grid-cols-2 lg:grid-cols-3",
                 )}
             >
                 {content.images.map((img, i) => (
@@ -47,7 +47,7 @@ export default function GallerySection({
                         src={img.src}
                         alt={img.alt ?? ""}
                         className={cn(
-                            "w-full rounded-lg object-cover",
+                            "w-full rounded-[var(--site-radius)] object-cover",
                             layout === "masonry"
                                 ? "h-auto"
                                 : "aspect-square h-full",

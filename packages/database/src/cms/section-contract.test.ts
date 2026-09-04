@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    ctaHref,
     getSectionContract,
     listSectionContracts,
     parseSectionContent,
@@ -14,7 +15,15 @@ describe("section-contract registry", () => {
         for (const type of SECTION_TYPES) {
             expect(getSectionContract(type, 1)).toBeDefined();
         }
-        expect(listSectionContracts().length).toBe(SECTION_TYPES.length);
+        // Every registered contract names a known type. The total is no longer
+        // one-per-type: a type may carry more than one version (#207 added
+        // cta@2 and hero@2), and pinning the count to the type count would
+        // make every new version a test change rather than a registry change.
+        for (const contract of listSectionContracts()) {
+            expect(SECTION_TYPES).toContain(contract.type);
+        }
+        expect(getSectionContract("cta", 2)).toBeDefined();
+        expect(getSectionContract("hero", 2)).toBeDefined();
     });
 
     it("rejects an unknown section type", () => {
@@ -262,5 +271,154 @@ describe("parseSectionContentOrThrow", () => {
 
     it("throws on an unknown contract", () => {
         expect(() => parseSectionContentOrThrow("nope", 1, {})).toThrow();
+    });
+});
+
+describe("per-section padding override (#189)", () => {
+    /** A minimal valid content body for each type, so the padding is the variable. */
+    const bodies: Record<string, Record<string, unknown>> = {
+        hero: { heading: "Hi" },
+        richText: { format: "html", value: "<p>Hi</p>" },
+        cta: { label: "Go", href: "/x" },
+        gallery: { images: [{ src: "https://x/a.jpg" }], layout: "grid" },
+        enquiry: {
+            fields: [{ name: "email", label: "Email", type: "email" }],
+        },
+        booking: {},
+    };
+
+    it("is accepted on every section type", () => {
+        for (const type of SECTION_TYPES) {
+            const result = parseSectionContent(type, 1, {
+                ...bodies[type],
+                padding: 40,
+            });
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect((result.data as { padding?: number }).padding).toBe(40);
+            }
+        }
+    });
+
+    it("stays ABSENT when not set, rather than defaulting", () => {
+        // Absent means "follow the site setting". A default would bake the
+        // site's current value into the section and stop it tracking the
+        // slider afterwards.
+        for (const type of SECTION_TYPES) {
+            const result = parseSectionContent(type, 1, bodies[type]);
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(
+                    result.data as Record<string, unknown>,
+                ).not.toHaveProperty("padding");
+            }
+        }
+    });
+
+    it("rejects a padding outside the site slider's own range", () => {
+        // An override must not reach a spacing the site-level setting could
+        // not produce.
+        for (const bad of [8, 200, 52.5]) {
+            const result = parseSectionContent("hero", 1, {
+                heading: "Hi",
+                padding: bad,
+            });
+            expect(result.success).toBe(false);
+        }
+    });
+
+    it("does not break content written before the field existed", () => {
+        // Adding an optional field is why this extends v1 instead of shipping
+        // a v2 — every existing Section and Publication must still validate.
+        const result = parseSectionContent("hero", 1, {
+            heading: "Made before padding existed",
+            subheading: "Still valid",
+        });
+        expect(result.success).toBe(true);
+    });
+});
+
+describe("cta v2 — an action, not a bare href (#207)", () => {
+    it("accepts every kind and applies the style default", () => {
+        for (const action of [
+            { kind: "page", pageId: "p1" },
+            { kind: "url", href: "https://example.com" },
+            { kind: "email", address: "hello@example.in" },
+            { kind: "call", number: "+91 98450 12345" },
+            { kind: "whatsapp", number: "+91 98450 12345", message: "Hi" },
+        ]) {
+            const r = parseSectionContent("cta", 2, { label: "Go", action });
+            expect(r.success, JSON.stringify(action)).toBe(true);
+            if (r.success) expect(r.data).toMatchObject({ style: "primary" });
+        }
+    });
+
+    it("rejects a kind that does not exist, and a phone that is not one", () => {
+        expect(
+            parseSectionContent("cta", 2, {
+                label: "Go",
+                action: { kind: "fax", number: "1" },
+            }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("cta", 2, {
+                label: "Go",
+                action: { kind: "call", number: "call me" },
+            }).success,
+        ).toBe(false);
+    });
+
+    it("keeps v1 sections valid alongside v2 — nothing published breaks", () => {
+        expect(
+            parseSectionContent("cta", 1, { label: "Go", href: "/about" })
+                .success,
+        ).toBe(true);
+        expect(
+            parseSectionContent("hero", 2, {
+                heading: "Hi",
+                cta: { label: "Go", action: { kind: "page", pageId: "p1" } },
+            }).success,
+        ).toBe(true);
+    });
+});
+
+describe("ctaHref", () => {
+    const pages = new Map([["p1", "/about"]]);
+    const resolve = (id: string) => pages.get(id);
+
+    it("resolves a page by id at publish, and to nothing when it is gone", () => {
+        expect(ctaHref({ kind: "page", pageId: "p1" }, resolve)).toBe("/about");
+        // A hidden or deleted page: the flag engine has already said so, and
+        // the button renders as a label rather than a broken link.
+        expect(ctaHref({ kind: "page", pageId: "nope" }, resolve)).toBe("");
+    });
+
+    it("writes the incantations a merchant should never have to know", () => {
+        expect(
+            ctaHref({ kind: "call", number: "+91 98450-12345" }, resolve),
+        ).toBe("tel:+919845012345");
+        expect(
+            ctaHref(
+                {
+                    kind: "whatsapp",
+                    number: "+91 98450 12345",
+                    message: "Hi there",
+                },
+                resolve,
+            ),
+        ).toBe("https://wa.me/919845012345?text=Hi%20there");
+        expect(
+            ctaHref(
+                {
+                    kind: "email",
+                    address: "hello@example.in",
+                    subject: "Order",
+                },
+                resolve,
+            ),
+        ).toBe("mailto:hello@example.in?subject=Order");
+        expect(ctaHref({ kind: "url", href: "/contact" }, resolve)).toBe(
+            "/contact",
+        );
     });
 });

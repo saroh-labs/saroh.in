@@ -35,7 +35,7 @@ an external network.
 
 ```bash
 pnpm install
-pnpm --filter docs dev       # http://localhost:3006
+pnpm --filter docs dev       # https://docs.saroh.localhost
 ```
 
 No environment variables and no backend — it is a static content site.

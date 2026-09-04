@@ -13,11 +13,14 @@ import {
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
+import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
+import { RequireModule } from "../capabilities/require-module.decorator";
 import { CategoriesService } from "./categories.service";
 import { CreateCategoryDto, UpdateCategoryDto } from "./dto";
 
 @Controller("stores/:storeId/categories")
-@UseGuards(BetterAuthGuard)
+@UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
+@RequireModule("COMMERCE")
 export class CategoriesController {
     constructor(private readonly categories: CategoriesService) {}
 

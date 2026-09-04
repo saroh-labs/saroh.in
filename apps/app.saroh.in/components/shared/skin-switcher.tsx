@@ -10,10 +10,16 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { Check, Palette } from "lucide-react";
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 
 import type { SkinId } from "@/lib/skins";
-import { DEFAULT_SKIN, isSkinId, SKIN_STORAGE_KEY, SKINS } from "@/lib/skins";
+import {
+    getSkinServerSnapshot,
+    getSkinSnapshot,
+    SKIN_STORAGE_KEY,
+    SKINS,
+    subscribeToSkin,
+} from "@/lib/skins";
 
 /**
  * Pick the workspace's visual world.
@@ -29,20 +35,31 @@ import { DEFAULT_SKIN, isSkinId, SKIN_STORAGE_KEY, SKINS } from "@/lib/skins";
  */
 export function SkinSwitcher() {
     /*
-     * Initialised from the DOM, not from an effect. The pre-paint script has
-     * already written `data-skin`, so reading it during the lazy initialiser
-     * gets the right value on the first client render — an effect that calls
-     * setState immediately would render once with the default and then again,
-     * which the lint rule correctly flags as a cascading render.
+     * Subscribed to `<html data-skin>` rather than initialised from it.
      *
-     * The `typeof document` guard is for the server pass, where the initialiser
-     * also runs and there is no DOM.
+     * This used to be `useState(() => readTheDOM())`, and it was wrong in a way
+     * that hid itself. The server has no localStorage, so it renders the
+     * default; the pre-paint script then applies the STORED skin before React
+     * hydrates. A lazy initialiser cannot reconcile those two — React keeps the
+     * server's attribute and the label stays frozen at its guess. The previous
+     * code knew a mismatch existed and reached for `suppressHydrationWarning`,
+     * which silences the warning without changing the value: the workspace
+     * painted Panel while the control that sets it said Mono, and the console
+     * was clean because the evidence had been suppressed.
+     *
+     * `useSyncExternalStore` is the fix rather than a patch. It renders the
+     * server snapshot during hydration — so the markup genuinely matches — and
+     * swaps to the live one immediately after, which is the same thing the
+     * editor does for its panel widths and for the same reason.
+     *
+     * It also removes the second source of truth: there is no local state to
+     * keep in step, because the attribute IS the state.
      */
-    const [skin, setSkin] = useState<SkinId>(() => {
-        if (typeof document === "undefined") return DEFAULT_SKIN;
-        const applied = document.documentElement.dataset.skin;
-        return isSkinId(applied) ? applied : DEFAULT_SKIN;
-    });
+    const skin = useSyncExternalStore(
+        subscribeToSkin,
+        getSkinSnapshot,
+        getSkinServerSnapshot,
+    );
 
     const choose = (next: SkinId) => {
         // `setAttribute` rather than assigning to `dataset`: the lint rule
@@ -56,7 +73,9 @@ export function SkinSwitcher() {
             // this session, it just will not survive a reload. Losing a theme
             // preference is not worth failing the interaction over.
         }
-        setSkin(next);
+        // No setState: the MutationObserver behind `subscribeToSkin` sees the
+        // attribute change and re-renders every reader, so the trigger's label
+        // and the menu's tick cannot disagree with what is painted.
     };
 
     const active = SKINS.find((s) => s.id === skin) ?? SKINS[0];
@@ -68,18 +87,14 @@ export function SkinSwitcher() {
                     variant="ghost"
                     size="icon"
                     /*
-                     * The selected skin only exists on the client — the server
-                     * cannot read localStorage, so it renders DEFAULT_SKIN
-                     * while the client renders whatever is stored. React does
-                     * NOT patch up mismatched attributes ("this won't be
-                     * patched up"), so without this the label stayed frozen at
-                     * the server's guess and screen-reader users were told the
-                     * wrong skin was active — an accessibility bug, not just a
-                     * console warning. suppressHydrationWarning exists for
-                     * exactly this: a value that is legitimately
-                     * client-derived.
+                     * No `suppressHydrationWarning` here any more, and its
+                     * absence is the point: with the store above there is no
+                     * mismatch left to suppress. The server renders the default
+                     * and so does the hydration pass; the real skin arrives on
+                     * the commit straight after. Suppressing the warning was
+                     * what let this ship saying the wrong skin out loud to
+                     * screen readers.
                      */
-                    suppressHydrationWarning
                     aria-label={`Theme: ${active.name}. Change theme`}
                 >
                     <Palette className="size-5" />

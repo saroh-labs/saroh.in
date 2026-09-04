@@ -61,16 +61,46 @@ export default function SectionRenderer({ section }: { section: Section }) {
 }
 
 /**
+ * A section's own padding override, if it set one (#189).
+ *
+ * Read defensively: `content` is JSON from a snapshot, so the field may be
+ * absent, of the wrong type, or from an older contract that had no such thing.
+ * The contract bounds it to 24–96px on the way in; re-clamping here means a
+ * value that predates those bounds cannot produce a section a page-length tall.
+ */
+function paddingOverride(content: unknown): React.CSSProperties | undefined {
+    if (content === null || typeof content !== "object") return undefined;
+    const value = (content as { padding?: unknown }).padding;
+    if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+    const px = Math.min(96, Math.max(24, Math.round(value)));
+    // Set one level down from the site variable, so a section that overrides
+    // padding does so for its own subtree and hands the setting back after.
+    return { "--site-section-padding": `${px}px` } as React.CSSProperties;
+}
+
+/**
  * Render an ordered list of sections. Snapshot sections are already in display
  * order, so we key by index (positions are stable within an immutable
  * snapshot).
+ *
+ * The wrapper exists to carry a per-section padding override. It used to be
+ * absent, so a merchant could set a section's padding in the editor, watch the
+ * preview honour it, publish, and see the live site ignore it.
  */
 export function PageSections({ sections }: { sections: Section[] }) {
     return (
         <>
-            {sections.map((section, i) => (
-                <SectionRenderer key={i} section={section} />
-            ))}
+            {sections.map((section, i) => {
+                const style = paddingOverride(section.content);
+                const rendered = <SectionRenderer section={section} />;
+                return style === undefined ? (
+                    <div key={i}>{rendered}</div>
+                ) : (
+                    <div key={i} style={style}>
+                        {rendered}
+                    </div>
+                );
+            })}
         </>
     );
 }

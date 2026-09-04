@@ -45,6 +45,10 @@ model User {
   sessions Session[]
   accounts Account[]
 
+  siteComments  SiteComment[]
+  siteApprovals SiteApproval[]
+  sitePreviewLinks SitePreviewLink[]
+
   @@index([email])
 }
 
@@ -103,11 +107,14 @@ model Organization {
 
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
-  sites        Site[]
-  pages        Page[]
-  pageVersions PageVersion[]
-  sections     Section[]
-  publications Publication[]
+  sites         Site[]
+  pages         Page[]
+  pageVersions  PageVersion[]
+  sections      Section[]
+  siteComments  SiteComment[]
+  siteApprovals SiteApproval[]
+  sitePreviewLinks SitePreviewLink[]
+  publications  Publication[]
 
   // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
   // `hostname` is globally unique, so a hostname maps to at most one org.
@@ -1388,6 +1395,53 @@ model Site {
   // when set (NULLs are distinct, so many sites may have no subdomain).
   subdomain String? @unique
 
+  // Search and social (#188). Site-level rather than per-page: they describe
+  // the site, not any one page of it. Null means "not set" and MUST render as
+  // absent — never as an empty title or a broken image.
+  //
+  // These travel into the Publication snapshot at publish time, because the
+  // public renderer reads only that. Changing one is therefore an unpublished
+  // change like any section edit.
+  // The site's look: six curated colour choices and five spacing scalars
+  // (#189). Validated by `site-style.ts`, stored as CHOICE KEYS rather than raw
+  // hex so a palette can be retuned without rewriting every site, and resolved
+  // into the `--site-*` layer the renderer already defines. Null = the defaults,
+  // which reproduce today's appearance exactly.
+  style Json?
+
+  seoTitle       String? // <title> / og:title
+  seoDescription String? // meta description / og:description
+  socialImageUrl String? // og:image — the card shown when the link is shared
+  // Facts about that picture, recorded when it is chosen (#220). WhatsApp draws
+  // its large card only when og:image:width/height are present, and drops it for
+  // files over ~300 KB; Facebook and LinkedIn want at least 1200×630. Stored
+  // rather than measured at publish so the settings screen can warn while the
+  // merchant is still choosing, and so publish stays a pure copy.
+  socialImageWidth  Int?
+  socialImageHeight Int?
+  socialImageBytes  Int?
+
+  // The footer a merchant writes for themselves (#202): `{ format, value }`,
+  // the same shape richText sections carry, so one authoring surface and one
+  // sanitizer serve both.
+  //
+  // AUTHORED, never derived. BusinessProfile holds a legal name and a contact
+  // email, but a merchant gave those for billing and tax — publishing them to
+  // the open internet would repurpose data collected for something else,
+  // without asking. So this starts empty and stays empty until someone writes
+  // in it, and an empty footer renders NO footer at all.
+  //
+  // `value` is authorable HTML and MUST be sanitized during publish, exactly as
+  // `richText.value` is, before it reaches the immutable snapshot.
+  footer Json?
+
+  // The site's menu (#206): `{ items: [{ pageId, label? }] }`, site-level and
+  // NOT a section. A menu that were a section would have to be added to every
+  // page and kept in step by hand. Items reference pages by ID so a rename
+  // cannot break the menu; the path and the default label are resolved into
+  // the snapshot at publish. Null means no menu has been built.
+  navigation Json?
+
   // Reserved placeholder for the S2-007 custom-domain claim/verification flow.
   // NOT wired to a relation here and NOT the legacy store `CustomDomain`.
   customDomainId String?
@@ -1400,7 +1454,10 @@ model Site {
   currentPublication   Publication? @relation("SiteCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
 
   pages        Page[]
-  publications Publication[] @relation("SitePublications")
+  comments     SiteComment[]
+  approvals    SiteApproval[]
+  previewLinks SitePreviewLink[]
+  publications Publication[]  @relation("SitePublications")
 
   // Verified subdomain / custom-domain claims routed to this Site (S2-007).
   // Nullable on the Domain side (Domain.siteId) — a claim exists before it is
@@ -1437,7 +1494,18 @@ model Page {
   title  String
   isHome Boolean @default(false)
 
+  // Visibility, modelled exactly as `Section.hidden` is: a hidden page keeps
+  // its path, its title, its versions and its sections, and is simply left OUT
+  // of the published snapshot. Two sibling lists in the same editor must not
+  // behave differently — a merchant who learns "hide, don't delete" on sections
+  // and then finds only Delete on pages loses work to our inconsistency.
+  //
+  // The home page can never be hidden: "/" is what the site's own address
+  // serves, and a site whose front door is hidden has nothing to show.
+  hidden Boolean @default(false)
+
   versions PageVersion[]
+  comments SiteComment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1449,6 +1517,117 @@ model Page {
 
 // PageVersion — a DRAFT / working version of a Page. Editing happens here; a
 // version is the source a Publication is snapshotted from at publish time.
+/**
+ * A reviewer's note, pinned to a section.
+ * Scope is deliberately small (#193): notes and one approval. No assignment,
+ * no states, no rounds — an approval workflow is an agency problem, and this
+ * is for two to five people sharing a workspace.
+ * Pinned by `sectionKey`, never by Section.id: ids are regenerated on every
+ * save. If the section a note is about is later deleted, the note does NOT
+ * disappear — nothing matches its key, and the Review tab shows it as being
+ * about a section that is no longer on the page. A note that vanished silently
+ * would lose the one piece of feedback nobody has acted on.
+ */
+model SiteComment {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  pageId String
+  page   Page   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The section this is about. NOT a relation: the row it names is deleted and
+  // recreated on every save, so a foreign key would either block the save or
+  // cascade the note away with it.
+  sectionKey String
+
+  authorUserId String
+  author       User   @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  body String
+
+  // Resolution is a fact with a time, not a boolean: "when was this settled"
+  // is worth being able to answer, and NULL reads unambiguously as open.
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([siteId, resolvedAt])
+  @@index([pageId, sectionKey])
+  @@index([organizationId])
+}
+
+/**
+ * A reviewer signing the site off. One per review, appended not updated, so
+ * "approved, then changes requested, then approved again" is a readable
+ * history rather than a flag that flipped.
+ */
+model SiteApproval {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  byUserId String
+  by       User   @relation(fields: [byUserId], references: [id], onDelete: Cascade)
+
+  // APPROVED | CHANGES_REQUESTED. The two outcomes the design shows, and no
+  // more — the spec's "approved with notes" is this plus the open note count,
+  // not a third state.
+  outcome String
+
+  createdAt DateTime @default(now())
+
+  @@index([siteId, createdAt])
+  @@index([organizationId])
+}
+
+/**
+ * A link that shows a site's DRAFT to whoever holds it (#198).
+ *
+ * The other half of review: notes and approvals shipped, and the Review tab's
+ * empty state told the merchant to "share a preview" — an action that did not
+ * exist. This is that action. The draft is rendered by the public renderer at
+ * /preview/<token>, built by the same snapshot builder publish uses, and
+ * NOTHING about it publishes anything.
+ *
+ * The token is the whole secret: 32 random bytes, unguessable, carried only in
+ * the link. Expiry is a fact with a time so the sharer can be told it in words
+ * before they send the link; revocation is a fact with a time for the same
+ * reason NULL reads as "still valid" on SiteComment.resolvedAt.
+ */
+model SitePreviewLink {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  token String @unique
+
+  createdByUserId String
+  createdBy       User   @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  // When the link was last opened. Tells the sharer whether it was ever used,
+  // which is the first thing they ask when the feedback does not arrive.
+  lastUsedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([siteId, revokedAt])
+  @@index([organizationId])
+}
+
 model PageVersion {
   id     String @id @default(cuid())
   pageId String
@@ -1485,11 +1664,31 @@ model Section {
   type            String // registry key, e.g. "hero", "richText", "cta", "gallery"
   contractVersion Int    @default(1) // contract version validating `content`
   order           Int // ordering within the PageVersion
-  content         Json // validated against the contract for (type, contractVersion)
+
+  // A section's STABLE identity across saves.
+  //
+  // `id` is not that: saving a draft deletes every section on the page and
+  // recreates them (see SitesService.replaceDraftSections — a whole-list
+  // replace is what keeps the write atomic and the order gap-free), so every
+  // row gets a new id each time. Anything that needs to point AT a section and
+  // survive an edit — a reviewer's comment, above all — has to point at this.
+  //
+  // Minted by the editor when a section is first added and carried through
+  // every save afterwards. Unique within a page version, not globally: two
+  // versions of the same page hold the same key for the same section, which is
+  // what lets a note follow its section from one draft to the next.
+  key     String
+  content Json // validated against the contract for (type, contractVersion)
+
+  // Visibility is structural, not content: a hidden section keeps its place and
+  // its copy in the draft, and is simply left OUT of the published snapshot.
+  // That is what lets a merchant park a section without deleting the work.
+  hidden Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([pageVersionId, key])
   @@index([pageVersionId, order])
   @@index([organizationId])
 }

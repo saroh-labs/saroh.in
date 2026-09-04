@@ -24,11 +24,21 @@ const API_URL =
 // Section content shapes — local replica of the v1 section contract.
 // ---------------------------------------------------------------------------
 
-/** A call-to-action button (shared building block + the `cta` section). */
+/**
+ * A call-to-action button (shared building block + the `cta` section).
+ *
+ * `href` is what this app draws, for v1 and v2 alike: a v2 button's `action`
+ * was RESOLVED into it at publish (#207), so this app never turns a page id
+ * into a path or a phone number into a tel: link — the snapshot is the site
+ * as served. `action` travels beside it so a reader can still tell a call
+ * from a link; `href` may be "" when a page the button named was hidden or
+ * removed, and then the button draws as a label rather than a broken link.
+ */
 export interface CtaContent {
     label: string;
     href: string;
     style?: "primary" | "secondary" | "link";
+    action?: { kind: "page" | "url" | "email" | "call" | "whatsapp" };
 }
 
 /** An image reference (shared building block). */
@@ -124,11 +134,69 @@ export interface PublicationPage {
 }
 
 /**
+ * The site-level fields a snapshot carries.
+ *
+ * Everything but `name`/`slug` is optional because publications are immutable
+ * and go back to Stage 2: a row written before #188 and #189 simply has none of
+ * these, and must keep rendering exactly as it does today rather than 404ing or
+ * showing the word "undefined".
+ */
+export interface PublicationSite {
+    name: string;
+    slug: string;
+    /** Search appearance (#188). Absent or null means "not set". */
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    /** The share image a link preview uses (#188). */
+    socialImageUrl?: string | null;
+    /**
+     * The same picture with its measurements (#220). Present on snapshots
+     * published after this shipped; older ones carry only the URL above, and
+     * the renderer reads whichever it finds.
+     */
+    socialImage?: {
+        url: string;
+        width?: number | null;
+        height?: number | null;
+    } | null;
+    /**
+     * The merchant's look, already resolved into `--site-*` custom properties
+     * (#189).
+     *
+     * RESOLVED by the publisher, not by this app. Turning "clay" into an HSL
+     * triple here would mean keeping a second copy of the palette in the
+     * renderer, and a copy that drifts is how a merchant styles one thing and
+     * publishes another. It also keeps the snapshot honest: this is the site as
+     * it was served, so retuning a swatch later does not restyle work that is
+     * already published.
+     */
+    styleVariables?: Record<string, string> | null;
+    /**
+     * What the merchant wrote at the foot of their site (#202).
+     *
+     * Absent or null means they wrote nothing, and nothing renders — the site
+     * simply ends. An empty band in the footer colour would be the interface
+     * claiming a footer that does not exist.
+     *
+     * `value` is already SANITIZED: publish runs it through the same allowlist
+     * as `richText.value` before the immutable write, so this app never sees
+     * raw author input.
+     */
+    footer?: { format: "html" | "markdown"; value: string } | null;
+    /**
+     * The site's menu (#206), already RESOLVED by the publisher to labels and
+     * paths over the pages in this snapshot. Absent or empty means no menu;
+     * the header then shows the site name alone, as it always has.
+     */
+    navigation?: { label: string; href: string }[] | null;
+}
+
+/**
  * The self-contained, immutable publication snapshot — the ONLY thing the
  * renderer draws from. Drafts are never part of this by design.
  */
 export interface PublicationSnapshot {
-    site: { name: string; slug: string };
+    site: PublicationSite;
     pages: PublicationPage[];
     publishedAt: string;
 }
@@ -146,11 +214,11 @@ interface PublicSiteView {
 /**
  * Resolve an incoming host header to a platform subdomain.
  *
- * Middleware has already normalized dev hosts (`*.localhost:3003` →
- * `*.<ROOT_DOMAIN>`), so `demo.saroh.app` → `demo`. We strip the
- * `.<ROOT_DOMAIN>` suffix when present; otherwise (a custom/apex domain, or a
- * bare host) we fall back to the first DNS label. Returns null when there is
- * no meaningful subdomain to look up.
+ * `demo.saroh.app` → `demo`; in development `demo.saroh.app.localhost` →
+ * `demo`, because NEXT_PUBLIC_ROOT_DOMAIN is `saroh.app.localhost` there. We
+ * strip the `.<ROOT_DOMAIN>` suffix when present; otherwise (a custom/apex
+ * domain, or a bare host) we fall back to the first DNS label. Returns null
+ * when there is no meaningful subdomain to look up.
  */
 export function subdomainFromHost(
     host: string | null | undefined,
@@ -254,4 +322,98 @@ export function findPageByPath(
     const wanted = normalizePath(requestPath);
     if (wanted === "/") return findHomePage(snapshot);
     return snapshot.pages.find((p) => normalizePath(p.path) === wanted) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Share image
+// ---------------------------------------------------------------------------
+
+/** What Next's `openGraph.images` accepts: a bare URL, or one with its size. */
+export type ShareImages = (
+    string | { url: string; width: number; height: number }
+)[];
+
+/**
+ * The share image as the platforms want it: with its width and height when
+ * the snapshot knows them (#220). WhatsApp draws its large card only when
+ * those are present; without them it shows a small square thumbnail, or
+ * nothing. Older snapshots carry only `socialImageUrl`, so both are read.
+ * `metadataBase` resolves a relative address against the site's own host.
+ */
+export function shareImages(site: {
+    socialImageUrl?: string | null;
+    socialImage?: {
+        url: string;
+        width?: number | null;
+        height?: number | null;
+    } | null;
+}): ShareImages | undefined {
+    const url = (site.socialImage?.url ?? site.socialImageUrl)?.trim();
+    if (!url) return undefined;
+    const { width, height } = site.socialImage ?? {};
+    return width && height ? [{ url, width, height }] : [url];
+}
+
+// ---------------------------------------------------------------------------
+// Draft previews (#198)
+// ---------------------------------------------------------------------------
+
+export type PreviewLookup =
+    | {
+          ok: true;
+          snapshot: PublicationSnapshot;
+          siteName: string;
+          /** ISO date-time after which the link stops working. */
+          expiresAt: string;
+      }
+    | { ok: false; reason: "expired" | "revoked" | "missing" };
+
+/**
+ * The draft behind a preview token, or why there is none.
+ *
+ * The api answers 410 with a `reason` once a link has expired or been taken
+ * back, and the page says that in words — a reviewer who opens a dead link
+ * deserves better than a 404. A token that never existed IS a 404, and the
+ * two are kept apart on purpose: naming "revoked" for a guessed token would
+ * confirm it once existed. Uncached, so a revoke is honoured on the very next
+ * request and a fresh save is what the reviewer sees.
+ */
+export async function getPreviewByToken(token: string): Promise<PreviewLookup> {
+    let res: Response;
+    try {
+        res = await fetch(
+            `${API_URL}/public/sites/preview/${encodeURIComponent(token)}`,
+            { cache: "no-store", headers: { accept: "application/json" } },
+        );
+    } catch {
+        return { ok: false, reason: "missing" };
+    }
+    if (res.status === 410) {
+        // The api's error envelope: { error: { message, details: { reason } } }.
+        const body = (await res.json().catch(() => null)) as {
+            error?: { details?: { reason?: string } };
+        } | null;
+        return {
+            ok: false,
+            reason:
+                body?.error?.details?.reason === "revoked"
+                    ? "revoked"
+                    : "expired",
+        };
+    }
+    if (!res.ok) return { ok: false, reason: "missing" };
+    const body = (await res.json().catch(() => null)) as {
+        snapshot?: PublicationSnapshot;
+        site?: { name?: string };
+        expiresAt?: string;
+    } | null;
+    if (!body?.snapshot || !body.expiresAt) {
+        return { ok: false, reason: "missing" };
+    }
+    return {
+        ok: true,
+        snapshot: body.snapshot,
+        siteName: body.site?.name ?? body.snapshot.site.name,
+        expiresAt: body.expiresAt,
+    };
 }
