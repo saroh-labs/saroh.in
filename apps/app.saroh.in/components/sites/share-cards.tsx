@@ -47,6 +47,28 @@ export const SHARE_IMAGE_MIN = { width: 1200, height: 630 } as const;
 export const WHATSAPP_MAX_BYTES = 300 * 1024;
 
 /**
+ * The address as something an <img> may be pointed at, or null.
+ *
+ * The api accepts only http(s) for the share image (#227); this is the same
+ * rule on the client, applied before a pasted string that has not been saved
+ * yet reaches a `src`. React escapes the attribute, so nothing here was
+ * exploitable — but a `javascript:` or `data:` value would have drawn a broken
+ * picture and a misleading card, and the rule belongs at every sink, not only
+ * the one that persists.
+ */
+export function webImageUrl(value: string | null | undefined): string | null {
+    if (!value) return null;
+    let url: URL;
+    try {
+        url = new URL(value.trim());
+    } catch {
+        return null;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.href;
+}
+
+/**
  * Everything the merchant should know about the picture before they share,
  * with the limit in the sentence. Exported so the rules can be read in one
  * place; the component draws them.
@@ -106,7 +128,8 @@ function Picture({
     className?: string;
     alt?: string;
 }) {
-    if (!image) {
+    const src = image ? webImageUrl(image.url) : null;
+    if (!src) {
         return (
             <div
                 aria-hidden
@@ -122,7 +145,7 @@ function Picture({
     return (
         // eslint-disable-next-line @next/next/no-img-element -- a merchant-supplied absolute URL, not a project asset
         <img
-            src={image.url}
+            src={src}
             alt={alt}
             className={cn("bg-muted object-cover", className)}
         />
