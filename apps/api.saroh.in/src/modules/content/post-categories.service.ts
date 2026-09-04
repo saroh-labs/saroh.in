@@ -6,23 +6,24 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import type { OrganizationContext } from "../../common/types/organization-context";
+import { authorize } from "../organizations/organization-policy";
 import { slugify } from "../stores/slug";
-import { StoresService } from "../stores/stores.service";
 import type { CreatePostCategoryDto, UpdatePostCategoryDto } from "./dto";
 
 /**
- * Blog post categories — a flat list per store (no hierarchy, unlike product
- * Categories). Authorization delegates to StoresService. Deleting a category
- * detaches its posts (Post.categoryId is optional) rather than blocking.
+ * Post categories — a flat list per SITE (ADR-004, #209), no hierarchy, unlike
+ * product Categories. Authorization is the site's, like the posts they group.
+ * Deleting a category detaches its posts (Post.categoryId is optional) rather
+ * than blocking.
  */
 @Injectable()
 export class PostCategoriesService {
-    constructor(private readonly stores: StoresService) {}
-
-    async list(storeId: string, userId: string) {
-        await this.stores.getForUser(storeId, userId);
+    async list(ctx: OrganizationContext, siteId: string) {
+        authorize(ctx, "site:read");
+        await this.assertSiteInOrg(ctx, siteId);
         return prisma.postCategory.findMany({
-            where: { storeId },
+            where: { siteId },
             orderBy: { name: "asc" },
             select: {
                 id: true,
@@ -33,8 +34,13 @@ export class PostCategoriesService {
         });
     }
 
-    async create(storeId: string, userId: string, dto: CreatePostCategoryDto) {
-        await this.requireWrite(storeId, userId);
+    async create(
+        ctx: OrganizationContext,
+        siteId: string,
+        dto: CreatePostCategoryDto,
+    ) {
+        authorize(ctx, "section:write");
+        await this.assertSiteInOrg(ctx, siteId);
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({
@@ -42,10 +48,10 @@ export class PostCategoriesService {
                 field: "slug",
             });
         }
-        await this.assertSlugFree(storeId, slug);
+        await this.assertSlugFree(siteId, slug);
         try {
             const category = await prisma.postCategory.create({
-                data: { storeId, name: dto.name, slug },
+                data: { siteId, name: dto.name, slug },
             });
             return { id: category.id };
         } catch {
@@ -57,21 +63,22 @@ export class PostCategoriesService {
     }
 
     async update(
-        storeId: string,
+        ctx: OrganizationContext,
+        siteId: string,
         categoryId: string,
-        userId: string,
         dto: UpdatePostCategoryDto,
     ) {
-        await this.requireWrite(storeId, userId);
+        authorize(ctx, "section:write");
+        await this.assertSiteInOrg(ctx, siteId);
         const current = await prisma.postCategory.findFirst({
-            where: { id: categoryId, storeId },
+            where: { id: categoryId, siteId },
             select: { slug: true },
         });
         if (!current) {
             throw new NotFoundException("Category not found");
         }
         const slug = slugify(dto.slug);
-        if (current.slug !== slug) await this.assertSlugFree(storeId, slug);
+        if (current.slug !== slug) await this.assertSlugFree(siteId, slug);
         try {
             await prisma.postCategory.update({
                 where: { id: categoryId },
@@ -87,10 +94,11 @@ export class PostCategoriesService {
     }
 
     /** Delete a category; its posts are detached (categoryId set null). */
-    async remove(storeId: string, categoryId: string, userId: string) {
-        await this.requireWrite(storeId, userId);
+    async remove(ctx: OrganizationContext, siteId: string, categoryId: string) {
+        authorize(ctx, "section:write");
+        await this.assertSiteInOrg(ctx, siteId);
         const category = await prisma.postCategory.findFirst({
-            where: { id: categoryId, storeId },
+            where: { id: categoryId, siteId },
             select: { id: true },
         });
         if (!category) {
@@ -98,7 +106,7 @@ export class PostCategoriesService {
         }
         await prisma.$transaction([
             prisma.post.updateMany({
-                where: { storeId, categoryId },
+                where: { siteId, categoryId },
                 data: { categoryId: null },
             }),
             prisma.postCategory.delete({ where: { id: categoryId } }),
@@ -106,15 +114,27 @@ export class PostCategoriesService {
         return { id: categoryId };
     }
 
-    private async requireWrite(storeId: string, userId: string): Promise<void> {
-        if (!(await this.stores.canWrite(storeId, userId))) {
-            throw new NotFoundException("Store not found");
+    /** Prove the site belongs to the ctx org, or 404. */
+    private async assertSiteInOrg(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<void> {
+        const site = await prisma.site.findFirst({
+            where: {
+                id: siteId,
+                organizationId: ctx.organizationId,
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+        if (!site) {
+            throw new NotFoundException(`Site "${siteId}" not found`);
         }
     }
 
-    private async assertSlugFree(storeId: string, slug: string): Promise<void> {
+    private async assertSlugFree(siteId: string, slug: string): Promise<void> {
         const existing = await prisma.postCategory.findUnique({
-            where: { storeId_slug: { storeId, slug } },
+            where: { siteId_slug: { siteId, slug } },
             select: { id: true },
         });
         if (existing) {

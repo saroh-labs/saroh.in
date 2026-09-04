@@ -41,11 +41,11 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export function PostForm({
-    storeId,
+    siteId,
     categories,
     post,
 }: {
-    storeId: string;
+    siteId: string;
     categories: PostCategory[];
     post?: PostDetail;
 }) {
@@ -80,11 +80,11 @@ export function PostForm({
         };
         const res =
             editing && post
-                ? await updatePost(storeId, post.id, {
+                ? await updatePost(siteId, post.id, {
                       ...input,
                       slug: trimmedOr(values.slug, post.slug),
                   })
-                : await createPost(storeId, {
+                : await createPost(siteId, {
                       ...input,
                       slug: trimmedOr(values.slug, undefined),
                   });
@@ -102,21 +102,21 @@ export function PostForm({
             router.refresh();
         } else {
             const id = res.data.id;
-            router.push(`/stores/${storeId}/content/${id}`);
+            router.push(`/sites/${siteId}/posts/${id}`);
         }
     }
 
     async function onDelete() {
         if (!post) return;
         setDeleting(true);
-        const res = await deletePost(storeId, post.id);
+        const res = await deletePost(siteId, post.id);
         setDeleting(false);
         if (!res.ok) {
             toast.error(res.error);
             return;
         }
         toast.success("Post deleted");
-        router.push(`/stores/${storeId}/content`);
+        router.push(`/sites/${siteId}/posts`);
     }
 
     return (

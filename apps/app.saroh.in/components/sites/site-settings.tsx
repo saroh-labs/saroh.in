@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { CustomDomain } from "@/components/sites/custom-domain";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { ShareCards, webImageUrl } from "@/components/sites/share-cards";
 import dynamic from "next/dynamic";
@@ -330,9 +331,16 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
 
             <Section
                 title="Saroh address"
-                description="Every site gets one of these and keeps it, even after you connect your own domain."
+                description="Every site gets one of these and keeps it. Your own domain, below, is added alongside it."
             >
                 <Row label="Subdomain">{address ?? <Missing />}</Row>
+            </Section>
+
+            <Section
+                title="Your own domain"
+                description="Point a domain you own at this site. You prove you own it with one DNS record; nothing changes for visitors until it is verified."
+            >
+                <CustomDomain siteId={site.id} />
             </Section>
 
             <Section

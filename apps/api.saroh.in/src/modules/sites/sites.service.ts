@@ -93,7 +93,18 @@ export interface CommentView {
 /** The site's review state — the latest verdict plus what is still open. */
 export interface ReviewState {
     openNotes: number;
+    /**
+     * The latest event of any kind — a reviewer's verdict, or a BYPASSED row
+     * publish wrote (#199). What the badge shows.
+     */
     latestApproval: { outcome: string; at: Date; by: string } | null;
+    /**
+     * True while a reviewer's most recent VERDICT is CHANGES_REQUESTED and no
+     * approval has followed it (#199). Publishing then still succeeds, and is
+     * recorded as a bypass. A site nobody asked to review is not outstanding —
+     * it is unreviewed, which is the normal state and must not nag.
+     */
+    outstanding: boolean;
 }
 
 /** A page as returned by the page endpoints and by getSite. */
@@ -152,6 +163,8 @@ export interface PublishResult {
     publicationId: string;
     publishedAt: Date;
     currentPublicationId: string;
+    /** True when this publish went past an outstanding change request (#199). */
+    bypassed: boolean;
 }
 
 /**
@@ -869,11 +882,28 @@ export class SitesService {
                 publishedByUserId: true,
                 templateId: true,
                 templateVersion: true,
+                // Whether this publish went past an outstanding change
+                // request (#199): the bypass row names its publication.
+                approvals: {
+                    where: { outcome: "BYPASSED" },
+                    take: 1,
+                    select: {
+                        createdAt: true,
+                        by: { select: { name: true, email: true } },
+                    },
+                },
             },
         });
 
-        return publications.map((p) => ({
+        return publications.map(({ approvals, ...p }) => ({
             ...p,
+            bypass:
+                approvals.length === 0
+                    ? null
+                    : {
+                          at: approvals[0].createdAt,
+                          by: approvals[0].by.name ?? approvals[0].by.email,
+                      },
             // Which one the public is actually being served. Marked rather than
             // implied by position: after a restore the live version is NOT the
             // newest by content, only by publish time.
@@ -1320,6 +1350,17 @@ export class SitesService {
 
         const publishedAt = new Date();
         const snapshot = this.buildSnapshot(site, publishedAt);
+        /*
+         * Approval gates nothing, and says so (#199). The epic's rule: if a
+         * review was asked for and has not approved, publishing is RECORDED
+         * as a bypass, not prevented. Read before the transaction, written
+         * inside it, so the record and the publication land together or not
+         * at all.
+         */
+        const bypass = await this.reviewOutstanding(
+            site.id,
+            ctx.organizationId,
+        );
 
         // The Site does not track which template produced it; default the
         // Publication's required (non-null) template stamp to the starter
@@ -1344,10 +1385,25 @@ export class SitesService {
                 where: { id: site.id },
                 data: { currentPublicationId: publication.id },
             });
+            if (bypass) {
+                // Appended like every other approval event: "changes
+                // requested, then published anyway" reads as history.
+                await tx.siteApproval.create({
+                    data: {
+                        siteId: site.id,
+                        organizationId: ctx.organizationId,
+                        byUserId: ctx.userId,
+                        outcome: "BYPASSED",
+                        publicationId: publication.id,
+                    },
+                    select: { id: true },
+                });
+            }
             return {
                 publicationId: publication.id,
                 publishedAt: publication.publishedAt,
                 currentPublicationId: publication.id,
+                bypassed: bypass,
             };
         });
     }
@@ -1368,6 +1424,29 @@ export class SitesService {
         return this.resolveCurrentPublication(
             { subdomain, deletedAt: null },
             `subdomain "${subdomain}"`,
+        );
+    }
+
+    /**
+     * Public: resolve a VERIFIED custom hostname to its site's CURRENT
+     * publication (#200). Ownership was proven by DNS before the row reached
+     * VERIFIED, and only a VERIFIED row routes — a PENDING claim on someone
+     * else's hostname resolves nothing. Same read guarantees as
+     * {@link getPublicationBySubdomain}.
+     */
+    async getPublicationByHostname(hostname: string): Promise<PublicSiteView> {
+        const domain = await prisma.domain.findUnique({
+            where: { hostname: hostname.trim().toLowerCase() },
+            select: { status: true, siteId: true },
+        });
+        if (domain?.status !== "VERIFIED" || !domain.siteId) {
+            throw new NotFoundException(
+                `No published site found for hostname "${hostname}"`,
+            );
+        }
+        return this.resolveCurrentPublication(
+            { id: domain.siteId, deletedAt: null },
+            `hostname "${hostname}"`,
         );
     }
 
@@ -1596,7 +1675,7 @@ export class SitesService {
         authorize(ctx, "site:read");
         await this.assertSiteInOrg(ctx, siteId);
 
-        const [latest, openNotes] = await Promise.all([
+        const [latest, outstanding, openNotes] = await Promise.all([
             prisma.siteApproval.findFirst({
                 where: { siteId, organizationId: ctx.organizationId },
                 orderBy: { createdAt: "desc" },
@@ -1606,6 +1685,7 @@ export class SitesService {
                     by: { select: { name: true, email: true } },
                 },
             }),
+            this.reviewOutstanding(siteId, ctx.organizationId),
             prisma.siteComment.count({
                 where: {
                     siteId,
@@ -1617,6 +1697,7 @@ export class SitesService {
 
         return {
             openNotes,
+            outstanding,
             latestApproval:
                 latest === null
                     ? null
@@ -1626,6 +1707,28 @@ export class SitesService {
                           by: latest.by.name ?? latest.by.email,
                       },
         };
+    }
+
+    /**
+     * Is a change request still standing? Reads the latest VERDICT — a
+     * BYPASSED row is publish's own record, not a reviewer changing their
+     * mind, so it does not clear the request. Only an APPROVED after the
+     * CHANGES_REQUESTED does.
+     */
+    private async reviewOutstanding(
+        siteId: string,
+        organizationId: string,
+    ): Promise<boolean> {
+        const verdict = await prisma.siteApproval.findFirst({
+            where: {
+                siteId,
+                organizationId,
+                outcome: { in: ["APPROVED", "CHANGES_REQUESTED"] },
+            },
+            orderBy: { createdAt: "desc" },
+            select: { outcome: true },
+        });
+        return verdict?.outcome === "CHANGES_REQUESTED";
     }
 
     // -----------------------------------------------------------------------

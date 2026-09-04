@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { useEffect } from "react";
 
+import { shortDate } from "@/lib/sites/format-date";
 import type {
     Flag,
     FlagType,
@@ -124,9 +125,11 @@ export function PrePublishCheck({
                     >
                         {publishing
                             ? "Publishing…"
-                            : neverPublished
-                              ? "Publish site"
-                              : "Publish changes"}
+                            : review.outstanding
+                              ? "Publish without approval"
+                              : neverPublished
+                                ? "Publish site"
+                                : "Publish changes"}
                     </Button>
                 </div>
             </header>
@@ -149,10 +152,27 @@ export function PrePublishCheck({
                         >
                             {review.latestApproval.outcome === "APPROVED"
                                 ? `${review.latestApproval.by} approved this site`
-                                : `${review.latestApproval.by} asked for changes`}
+                                : review.latestApproval.outcome === "BYPASSED"
+                                  ? `${review.latestApproval.by} published without approval on ${shortDate(review.latestApproval.at)}`
+                                  : `${review.latestApproval.by} asked for changes`}
                             {review.openNotes > 0
                                 ? `, with ${review.openNotes} ${review.openNotes === 1 ? "note" : "notes"} still open.`
                                 : "."}
+                            {/*
+                             * Which of the two things publishing is about to
+                             * do (#199), said before it does it. The epic's
+                             * rule is recorded, not prevented — so the button
+                             * still works, and this line is the record's
+                             * warning.
+                             */}
+                            {review.outstanding ? (
+                                <span className="mt-1 block">
+                                    A reviewer&apos;s request for changes is
+                                    still open. Publishing now goes ahead
+                                    without approval, and records that it did —
+                                    here and in version history.
+                                </span>
+                            ) : null}
                         </p>
                     )}
 

@@ -290,14 +290,19 @@ export function navGroupsWithSites(
                 children: [
                     ...sites.map((site) => ({
                         // The site row names the site; the rows beneath it are
-                        // where it can be taken. Content is the editor — the
-                        // route that has no rail of its own — and Settings is
-                        // address, search, share card and footer.
+                        // where it can be taken. Pages is the editor — the
+                        // route that has no rail of its own — Posts is its
+                        // writing (ADR-004), and Settings is address, search,
+                        // share card, menu and footer.
                         label: site.name.trim() || "Untitled site",
                         children: [
                             {
                                 href: `${WEBSITE_HREF}/${site.id}`,
-                                label: "Content",
+                                label: "Pages",
+                            },
+                            {
+                                href: `${WEBSITE_HREF}/${site.id}/posts`,
+                                label: "Posts",
                             },
                             {
                                 href: `${WEBSITE_HREF}/${site.id}/settings`,
