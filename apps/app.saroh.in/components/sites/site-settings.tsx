@@ -12,7 +12,7 @@ import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { MediaPicker } from "@/components/sites/media-picker";
-import { ShareCards } from "@/components/sites/share-cards";
+import { ShareCards, webImageUrl } from "@/components/sites/share-cards";
 import dynamic from "next/dynamic";
 
 /* On demand and browser-only, for the same reasons as in the editor. */
@@ -558,10 +558,10 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                     <div className="space-y-2">
                         <div className="flex items-center gap-3">
                             <div className="flex h-14 w-24 shrink-0 items-center justify-center overflow-hidden rounded border bg-muted text-muted-foreground">
-                                {socialImageUrl ? (
+                                {webImageUrl(socialImageUrl) ? (
                                     // eslint-disable-next-line @next/next/no-img-element -- a merchant-supplied absolute URL, not a project asset
                                     <img
-                                        src={socialImageUrl}
+                                        src={webImageUrl(socialImageUrl) ?? ""}
                                         alt=""
                                         className="h-full w-full object-cover"
                                     />
