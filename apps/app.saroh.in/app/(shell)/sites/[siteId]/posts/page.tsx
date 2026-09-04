@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 
 import { listPosts } from "@/lib/content/service";
 import { requireSession } from "@/lib/session";
-import { getStore } from "@/lib/stores/service";
+import { getSite } from "@/lib/sites/service";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
     PUBLISHED: "default",
@@ -23,21 +23,21 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
 export default async function ContentPage({
     params,
 }: {
-    params: Promise<{ storeId: string }>;
+    params: Promise<{ siteId: string }>;
 }) {
-    const { storeId } = await params;
+    const { siteId } = await params;
     await requireSession();
-    const store = await getStore(storeId);
-    if (!store) notFound();
+    const site = await getSite(siteId);
+    if (!site) notFound();
 
-    const posts = await listPosts(storeId);
-    const base = `/stores/${storeId}/content`;
+    const posts = await listPosts(siteId);
+    const base = `/sites/${siteId}/posts`;
 
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Content"
-                description="Blog posts for your storefront."
+                title="Posts"
+                description="Writing published on this site."
                 actions={
                     <>
                         <Button variant="outline" asChild>

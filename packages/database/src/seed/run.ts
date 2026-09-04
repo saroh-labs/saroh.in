@@ -192,13 +192,15 @@ export async function seed(): Promise<void> {
 
     await seedCrm(prisma, org.id, user.id, now);
     await seedAppointments(prisma, org.id, now);
-    const storeId = await seedCommerce(prisma, org.id, user.id, now);
-    await seedContent(prisma, org.id, storeId);
+    await seedCommerce(prisma, org.id, user.id, now);
 
     // Billing first: the sites and the domain claim below are both entitlement-
     // gated, and an org on the FREE default may hold neither.
     await seedBilling(prisma, org.id, now);
     const siteIds = await seedWebsite(prisma, org.id, user.id, now);
+    // Content after the website: a post belongs to the site it is published on
+    // (ADR-004), so there has to be a site first.
+    await seedContent(prisma, siteIds[0] ?? "", user.id);
     await seedProviders(prisma, org.id, siteIds, now);
     await seedAnalytics(prisma, org.id, now);
 
@@ -570,13 +572,14 @@ async function seedCommerce(
 
 // --- Content ------------------------------------------------------------
 
-async function seedContent(prisma: Db, orgId: string, storeId: string) {
+async function seedContent(prisma: Db, siteId: string, userId: string) {
+    if (!siteId) return;
     const category = await prisma.postCategory.upsert({
-        where: { storeId_slug: { storeId, slug: "guides" } },
+        where: { siteId_slug: { siteId, slug: "guides" } },
         update: { name: "Guides" },
         create: {
             id: id("postcategory"),
-            storeId,
+            siteId,
             name: "Guides",
             slug: "guides",
         },
@@ -585,11 +588,12 @@ async function seedContent(prisma: Db, orgId: string, storeId: string) {
     for (let i = 0; i < POSTS.length; i++) {
         const p = POSTS[i];
         await prisma.post.upsert({
-            where: { storeId_slug: { storeId, slug: p.slug } },
+            where: { siteId_slug: { siteId, slug: p.slug } },
             update: { title: p.title, status: p.status },
             create: {
                 id: id("post", i),
-                storeId,
+                siteId,
+                authorId: userId,
                 categoryId: category.id,
                 title: p.title,
                 slug: p.slug,
@@ -1124,6 +1128,7 @@ export async function reset(): Promise<void> {
         () => prisma.product.deleteMany({ where }),
         () => prisma.category.deleteMany({ where }),
         () => prisma.customer.deleteMany({ where }),
+        // Posts hang off a Site (ADR-004), so they clear before the sites do.
         () => prisma.post.deleteMany({ where }),
         () => prisma.postCategory.deleteMany({ where }),
         () => prisma.storeFeatures.deleteMany({ where }),
@@ -1204,7 +1209,7 @@ async function report(prisma: Db, organizationId: string) {
                 status: { in: ["PENDING", "PROCESSING"] },
             },
         }),
-        prisma.post.count({ where: { store: { organizationId } } }),
+        prisma.post.count({ where: { site: { organizationId } } }),
         prisma.site.count({ where: { organizationId, deletedAt: null } }),
         prisma.site.count({
             where: {

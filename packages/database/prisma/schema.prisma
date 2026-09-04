@@ -46,6 +46,7 @@ model User {
   accounts Account[]
 
   siteComments  SiteComment[]
+  posts         Post[] // Posts they wrote (ADR-004)
   siteApprovals SiteApproval[]
   sitePreviewLinks SitePreviewLink[]
 
@@ -284,10 +285,6 @@ model Store {
   customers  Customer[]
   inventory  Inventory[]
 
-  // Blogs
-  posts          Post[]
-  postCategories PostCategory[]
-
   // Payments & Integrations
   paymentConfigs     StorePaymentConfig[]
   transactions       Transaction[]
@@ -341,8 +338,6 @@ model StoreMembers {
 
   role        String // ADMIN, MANAGER, EDITOR, VIEWER
   permissions Int    @default(0) // Bitmask for fine-grained perms
-
-  posts Post[] // Posts they authored
 
   createdAt DateTime @default(now())
 
@@ -674,21 +669,29 @@ model Refund {
 // BLOGS
 // ============================================================================
 
+// A post belongs to the SITE it is published on (ADR-004, #209).
+//
+// It used to belong to a Store, which meant a business with a website and no
+// shop could not write at all — writing is not a commerce capability. It is not
+// owned by the Organization either (the answer #164 gave for Sales): a post is
+// published to an audience AT AN ADDRESS, so "which site does this appear on"
+// is the ownership question, and answering it with the owner leaves nothing to
+// a second column.
 model Post {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
   title   String
   slug    String
   excerpt String?
   content String  @db.Text // Markdown or HTML
 
-  // Optional: a post is authored by a staff member (StoreMembers), but a store
-  // owner is a StoreOwner — not a member — so owner-authored posts have no
-  // author row. See StoresService: owners are deliberately kept out of members.
+  // Who wrote it. Was a StoreMembers row, which carried an oddity: a store
+  // owner is not a member, so owner-written posts had no author at all. Under
+  // site ownership that indirection buys nothing.
   authorId String?
-  author   StoreMembers? @relation(fields: [authorId], references: [id])
+  author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
   categoryId String?
   category   PostCategory? @relation(fields: [categoryId], references: [id])
@@ -704,23 +707,24 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([storeId, slug])
-  @@index([storeId])
+  @@unique([siteId, slug])
+  @@index([siteId])
   @@index([authorId])
 }
 
+/** A flat list of categories per SITE (ADR-004), no hierarchy. */
 model PostCategory {
-  id      String @id @default(cuid())
-  storeId String
-  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
   name String
   slug String
 
   posts Post[]
 
-  @@unique([storeId, slug])
-  @@index([storeId])
+  @@unique([siteId, slug])
+  @@index([siteId])
 }
 
 model Comment {
@@ -1455,6 +1459,9 @@ model Site {
 
   pages        Page[]
   comments     SiteComment[]
+  // The site's writing (ADR-004).
+  posts          Post[]
+  postCategories PostCategory[]
   approvals    SiteApproval[]
   previewLinks SitePreviewLink[]
   publications Publication[]  @relation("SitePublications")
