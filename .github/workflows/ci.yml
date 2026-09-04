@@ -121,14 +121,33 @@ jobs:
       # react-email > socket.io in @saroh/emails) with no upstream fix yet;
       # hard-failing on "high" would rot CI. Highs/moderates are triaged in the
       # dependency-refresh pass, not blocked here.
-      - name: Dependency audit (critical only)
-        run: pnpm audit --audit-level critical
-
       - name: Unit tests (api, no database)
         run: pnpm --filter @saroh/api test:unit
 
       - name: Build
         run: pnpm run build
+
+      # Last, and tolerant of the registry being unreachable: the audit endpoint
+      # timed out from the runner on two consecutive runs in one morning, and
+      # because this step used to sit before the tests and the build, a network
+      # blip hid whether the branch even compiled. A CRITICAL FINDING still
+      # fails the job; failing to reach the registry is retried, then reported
+      # as a warning so the next run tries again.
+      - name: Dependency audit (critical only)
+        run: |
+          for attempt in 1 2 3; do
+            if out=$(pnpm audit --audit-level critical 2>&1); then
+              printf '%s\n' "$out"
+              exit 0
+            fi
+            if ! printf '%s' "$out" | grep -qE 'ERR_SOCKET_TIMEOUT|ETIMEDOUT|ECONNRESET|ENOTFOUND|FetchError'; then
+              printf '%s\n' "$out"
+              exit 1
+            fi
+            echo "Registry unreachable (attempt $attempt of 3)."
+            sleep 30
+          done
+          echo "::warning::Dependency audit skipped: registry unreachable after 3 attempts"
 
       # Integration tests need the Postgres service. The globalSetup runs
       # `pnpm exec prisma db push` in packages/database, which relies on the
