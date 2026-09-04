@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { PostIndex } from "@/components/post-view";
 import { PageSections } from "@/components/sections/section-renderer";
 import {
     findPageByPath,
-    getPublicationForHost,
+    getPublishedPosts,
+    getSiteForHost,
+    postsPrefix,
     shareImages,
 } from "@/lib/publication";
 
@@ -23,9 +26,25 @@ export async function generateMetadata({
     params: Promise<{ domain: string; slug: string }>;
 }): Promise<Metadata | null> {
     const { domain, slug } = await params;
-    const snapshot = await getPublicationForHost(domain);
-    if (!snapshot) {
+    const resolved = await getSiteForHost(domain);
+    if (!resolved) {
         return null;
+    }
+    const { snapshot } = resolved;
+
+    // The posts index owns this path when the merchant's prefix matches it
+    // (#232), and it is not a page, so it needs its own title.
+    if (slug === postsPrefix(snapshot)) {
+        const name = snapshot.site.name;
+        return {
+            title: `Writing · ${name}`,
+            openGraph: {
+                title: `Writing · ${name}`,
+                siteName: name,
+                url: `/${slug}`,
+            },
+            metadataBase: new URL(`https://${domain}`),
+        };
     }
 
     const page = findPageByPath(snapshot, `/${slug}`);
@@ -67,10 +86,25 @@ export default async function SitePostPage({
     params: Promise<{ domain: string; slug: string }>;
 }) {
     const { domain, slug } = await params;
-    const snapshot = await getPublicationForHost(domain);
+    const resolved = await getSiteForHost(domain);
 
-    if (!snapshot) {
+    if (!resolved) {
         notFound();
+    }
+    const { snapshot, siteId } = resolved;
+
+    // The posts index (#232). It answers at the merchant's chosen prefix, and
+    // is checked BEFORE pages because a page could otherwise be created at the
+    // same path and silently win depending on nothing the merchant can see.
+    if (slug === postsPrefix(snapshot)) {
+        const posts = siteId ? await getPublishedPosts(siteId) : [];
+        return (
+            <PostIndex
+                posts={posts}
+                basePath={`/${slug}`}
+                title={`Writing from ${snapshot.site.name}`}
+            />
+        );
     }
 
     const page = findPageByPath(snapshot, `/${slug}`);

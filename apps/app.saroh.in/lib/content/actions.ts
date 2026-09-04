@@ -6,6 +6,8 @@ import {
     createPostCategory as createPostCategoryApi,
     deletePost as deletePostApi,
     deletePostCategory as deletePostCategoryApi,
+    publishPost as publishPostApi,
+    unpublishPost as unpublishPostApi,
     updatePost as updatePostApi,
     updatePostCategory as updatePostCategoryApi,
 } from "./service";
@@ -54,4 +56,14 @@ export async function deletePostCategory(
     categoryId: string,
 ): Promise<Result> {
     return deletePostCategoryApi(storeId, categoryId);
+}
+
+/** Put a post on the site (#232). */
+export async function publishPost(siteId: string, postId: string) {
+    return publishPostApi(siteId, postId);
+}
+
+/** Take it off the site, keeping its history (#232). */
+export async function unpublishPost(siteId: string, postId: string) {
+    return unpublishPostApi(siteId, postId);
 }

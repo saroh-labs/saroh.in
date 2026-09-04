@@ -69,6 +69,27 @@ export class PostsController {
         return this.posts.update(ctx, siteId, postId, dto);
     }
 
+    /** Put this post on the site (#232). Requires `section:write`. */
+    @Post(":postId/publish")
+    @HttpCode(200)
+    publish(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+    ) {
+        return this.posts.publish(ctx, siteId, postId);
+    }
+
+    /** Take it off the site, keeping its history. Requires `section:write`. */
+    @Delete(":postId/publish")
+    unpublish(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+    ) {
+        return this.posts.unpublish(ctx, siteId, postId);
+    }
+
     @Delete(":postId")
     remove(
         @OrgContext() ctx: OrganizationContext,

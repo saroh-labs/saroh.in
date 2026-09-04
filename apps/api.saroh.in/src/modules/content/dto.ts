@@ -13,6 +13,18 @@ const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
 const SLUG_RE = /^[a-z0-9-]+$/;
+
+/**
+ * A cover picture must be a web address (#232, following #227 for the share
+ * image). Every sink today is an escaped attribute, so a `javascript:` value
+ * is inert — but this field is merchant-controlled, it is copied into an
+ * immutable snapshot and re-read by the renderer and by share cards, and a
+ * check at the one place it is written is cheaper than remembering one at
+ * each future sink.
+ */
+const IMAGE_URL_RE = /^https?:\/\/\S+$/i;
+const IMAGE_URL_MSG =
+    "The cover must be a web address starting with http:// or https://";
 const SLUG_MSG =
     "Slug may only contain lowercase letters, numbers, and hyphens";
 
@@ -60,6 +72,7 @@ export class CreatePostDto {
     @Transform(trim)
     @IsString()
     @MaxLength(2000)
+    @Matches(IMAGE_URL_RE, { message: IMAGE_URL_MSG })
     image?: string;
 
     @IsOptional()
@@ -108,6 +121,7 @@ export class UpdatePostDto {
     @Transform(trim)
     @IsString()
     @MaxLength(2000)
+    @Matches(IMAGE_URL_RE, { message: IMAGE_URL_MSG })
     image?: string;
 
     @IsOptional()

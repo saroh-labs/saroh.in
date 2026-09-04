@@ -50,6 +50,21 @@ export class PublicSitesController {
         return this.sites.getPublicationByHostname(hostname);
     }
 
+    /**
+     * A site's live posts, newest first (#232). The renderer resolves a host to
+     * a site once, then asks here by id.
+     */
+    @Get(":siteId/posts")
+    posts(@Param("siteId") siteId: string) {
+        return this.sites.getPublicPosts(siteId);
+    }
+
+    /** One live post by slug (#232). 404 when it is not live. */
+    @Get(":siteId/posts/:slug")
+    post(@Param("siteId") siteId: string, @Param("slug") slug: string) {
+        return this.sites.getPublicPost(siteId, slug);
+    }
+
     /** Current publication snapshot for a site by id. */
     @Get(":siteId/publication")
     bySiteId(@Param("siteId") siteId: string) {

@@ -268,6 +268,8 @@ export interface SiteDetail extends SiteSummary {
     socialImageWidth: number | null;
     socialImageHeight: number | null;
     socialImageBytes: number | null;
+    /** Where this site's posts live (#232); null means the default, "blog". */
+    postsPrefix: string | null;
     /**
      * What the merchant wrote at the foot of their site (#202). Null means they
      * have written nothing, and nothing renders — see `parseSiteFooter`.
@@ -295,6 +297,8 @@ export interface SiteSettingsInput {
     socialImageWidth?: number | null;
     socialImageHeight?: number | null;
     socialImageBytes?: number | null;
+    /** Null restores the default (#232). */
+    postsPrefix?: string | null;
 }
 
 export interface PageDraft {

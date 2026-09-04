@@ -171,6 +171,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
         };
         img.src = src;
     }
+    const [postsPrefix, setPostsPrefix] = useState(site.postsPrefix ?? "");
     const [footerValue, setFooterValue] = useState(site.footer?.value ?? "");
     const [footerFormat, setFooterFormat] = useState<SiteFooter["format"]>(
         site.footer?.format ?? "html",
@@ -341,6 +342,77 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                 description="Point a domain you own at this site. You prove you own it with one DNS record; nothing changes for visitors until it is verified."
             >
                 <CustomDomain siteId={site.id} />
+            </Section>
+
+            <Section
+                title="Writing"
+                description="Where this site's posts live. Yours to name — a practice has updates, a studio has a journal."
+            >
+                <Row
+                    label="Address"
+                    action={
+                        editing === "postsPrefix" ? (
+                            <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    variant="brand"
+                                    disabled={pending}
+                                    onClick={() =>
+                                        save(
+                                            {
+                                                postsPrefix:
+                                                    postsPrefix || null,
+                                            },
+                                            "Writing address",
+                                        )
+                                    }
+                                >
+                                    Save
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={pending}
+                                    onClick={() => {
+                                        setPostsPrefix(site.postsPrefix ?? "");
+                                        setEditing(null);
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        ) : (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditing("postsPrefix")}
+                            >
+                                Edit
+                            </Button>
+                        )
+                    }
+                >
+                    {editing === "postsPrefix" ? (
+                        <div className="space-y-1">
+                            <Input
+                                value={postsPrefix}
+                                autoFocus
+                                placeholder="blog"
+                                onChange={(e) => setPostsPrefix(e.target.value)}
+                                aria-label="Writing address"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                {address
+                                    ? `Posts will live at ${address}/${postsPrefix || "blog"}/…`
+                                    : `Posts will live at /${postsPrefix || "blog"}/…`}
+                            </p>
+                        </div>
+                    ) : (
+                        <span className="text-muted-foreground">
+                            /{site.postsPrefix ?? "blog"}
+                        </span>
+                    )}
+                </Row>
             </Section>
 
             <Section
