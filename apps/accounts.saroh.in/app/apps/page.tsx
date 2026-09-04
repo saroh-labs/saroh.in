@@ -10,45 +10,43 @@ const apps = [
     {
         name: "Application",
         blurb: "Your workspace — stores, sites, orders.",
-        devUrl: "http://localhost:3003",
+        devUrl: "https://app.saroh.localhost",
         prodUrl: "https://app.saroh.in",
     },
     {
         name: "Admin",
         blurb: "Platform control plane.",
-        devUrl: "http://localhost:3001",
+        devUrl: "https://admin.saroh.localhost",
         prodUrl: "https://admin.saroh.in",
     },
     {
         name: "Sites",
         blurb: "Published storefronts and pages.",
-        devUrl: "http://localhost:3009",
+        devUrl: "https://saroh.app.localhost",
         prodUrl: "https://saroh.app",
     },
     {
         name: "Templates",
         blurb: "Storefront templates.",
-        devUrl: "http://localhost:3010/ecommerce",
+        devUrl: "https://templates.saroh.localhost/ecommerce",
         prodUrl: "https://templates.saroh.in",
     },
     {
         name: "Docs",
         blurb: "Guides and API reference.",
-        devUrl: "http://localhost:3006",
+        devUrl: "https://docs.saroh.localhost",
         prodUrl: "https://docs.saroh.in",
     },
     {
         name: "UI",
         blurb: "The design system.",
-        devUrl: "http://localhost:3011",
+        devUrl: "https://ui.saroh.localhost",
         prodUrl: "https://ui.saroh.in",
     },
     {
         name: "Website",
         blurb: "The marketing site.",
-        // The marketing app dev-serves on 3008 (see its package.json `dev`
-        // script); this pointed at 3012, which nothing listens on.
-        devUrl: "http://localhost:3008",
+        devUrl: "https://saroh.localhost",
         prodUrl: "https://saroh.in",
     },
 ];

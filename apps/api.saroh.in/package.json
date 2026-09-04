@@ -5,7 +5,8 @@
   "author": "Saroh Team",
   "license": "MIT",
   "scripts": {
-    "dev": "nest start --watch",
+    "dev": "portless",
+    "dev:app": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
     "lint": "eslint .",
@@ -16,6 +17,10 @@
     "test:int": "jest -c jest.integration.config.js",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage"
+  },
+  "portless": {
+    "name": "api.saroh",
+    "script": "dev:app"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",

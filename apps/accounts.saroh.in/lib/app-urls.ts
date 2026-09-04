@@ -12,7 +12,7 @@ export function getAppUrl(): string {
     if (env.NEXT_PUBLIC_APP_URL) return env.NEXT_PUBLIC_APP_URL;
     return env.NODE_ENV === "production"
         ? "https://app.saroh.in"
-        : "http://localhost:3003";
+        : "https://app.saroh.localhost";
 }
 
 /**

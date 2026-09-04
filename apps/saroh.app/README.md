@@ -8,9 +8,11 @@ Dev port **3009** · package name `sites` (`pnpm --filter sites …`)
 ## How a request resolves
 
 [`middleware.ts`](middleware.ts) rewrites by hostname. Anything that is not this
-service's own apex (`saroh.app`, or `localhost:3009` in dev — so
-`acme.localhost:3009` behaves like a real subdomain) is treated as a tenant
-lookup and rewritten under `app/[domain]/`. The `domain` route param is the full
+service's own apex (`NEXT_PUBLIC_ROOT_DOMAIN`: `saroh.app`, or
+`saroh.app.localhost` in development) is treated as a tenant lookup and
+rewritten under `app/[domain]/`. Nothing in the middleware is
+development-only: locally the app runs at its production hostname with
+`.localhost` appended, so `acme.saroh.app.localhost` is a real subdomain. The `domain` route param is the full
 request hostname.
 
 [`lib/publication.ts`](lib/publication.ts) then resolves that host to a
@@ -47,10 +49,10 @@ contract versions up, add the new shapes here too.
 
 ```bash
 pnpm install
-pnpm --filter sites dev      # http://localhost:3009
+pnpm --filter sites dev      # https://saroh.app.localhost
 ```
 
-Visit a tenant as `http://<subdomain>.localhost:3009`. `api.saroh.in` must be
+Visit a tenant as `https://<subdomain>.saroh.app.localhost`. `api.saroh.in` must be
 running and the site must be **published** — an unpublished site is a 404 here
 by design, not a misconfiguration.
 
@@ -60,8 +62,8 @@ See [`env.ts`](env.ts) for the validated schema.
 
 ```dotenv
 NEXT_PUBLIC_ROOT_DOMAIN=saroh.app        # drives hostname → tenant resolution
-API_URL=http://localhost:3333            # server-only; the public read API
-NEXT_PUBLIC_API_URL=http://localhost:3333
+API_URL=https://api.saroh.localhost      # server-only; the public read API
+NEXT_PUBLIC_API_URL=https://api.saroh.localhost
 # REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS=true   # 302 a tenant to its verified domain
 # NGROK_URL=                                 # dev tunnel origin
 ```

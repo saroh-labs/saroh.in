@@ -48,7 +48,7 @@ against the same `@saroh/ui` build every product app consumes.
 
 ```bash
 pnpm install
-pnpm --filter ui dev         # http://localhost:3011
+pnpm --filter ui dev         # https://ui.saroh.localhost
 ```
 
 No environment variables and no backend.

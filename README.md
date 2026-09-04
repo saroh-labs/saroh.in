@@ -104,7 +104,13 @@ cp .env.example .env
 pnpm --filter @saroh/database build
 pnpm --filter @saroh/database db:push
 
-# 4. Run apps (examples)
+# 4. Once per machine, in a real terminal: the local HTTPS proxy that gives
+#    every app its production hostname with `.localhost` appended
+#    (prompts for sudo once; see docs/architecture/ENVIRONMENT.md)
+npm install -g portless && portless service install --wildcard
+
+# 5. Run apps (examples) — https://app.saroh.localhost, https://api.saroh.localhost, …
+#    (the full table is in docs/architecture/ENVIRONMENT.md)
 pnpm dev                 # everything
 pnpm dev:api-auth        # api + accounts
 pnpm dev:apps            # accounts + admin + sites

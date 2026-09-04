@@ -44,7 +44,7 @@ rule happens to preserve that today; don't rely on it silently.
 
 ```bash
 pnpm install
-pnpm --filter help dev       # http://localhost:3007
+pnpm --filter help dev       # https://help.saroh.localhost
 ```
 
 No environment variables and no backend.

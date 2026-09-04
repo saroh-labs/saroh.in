@@ -204,11 +204,11 @@ interface PublicSiteView {
 /**
  * Resolve an incoming host header to a platform subdomain.
  *
- * Middleware has already normalized dev hosts (`*.localhost:3003` →
- * `*.<ROOT_DOMAIN>`), so `demo.saroh.app` → `demo`. We strip the
- * `.<ROOT_DOMAIN>` suffix when present; otherwise (a custom/apex domain, or a
- * bare host) we fall back to the first DNS label. Returns null when there is
- * no meaningful subdomain to look up.
+ * `demo.saroh.app` → `demo`; in development `demo.saroh.app.localhost` →
+ * `demo`, because NEXT_PUBLIC_ROOT_DOMAIN is `saroh.app.localhost` there. We
+ * strip the `.<ROOT_DOMAIN>` suffix when present; otherwise (a custom/apex
+ * domain, or a bare host) we fall back to the first DNS label. Returns null
+ * when there is no meaningful subdomain to look up.
  */
 export function subdomainFromHost(
     host: string | null | undefined,

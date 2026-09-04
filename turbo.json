@@ -65,6 +65,7 @@
         "db:push": {},
         "db:seed": {},
         "dev": {
+            "dependsOn": ["^build"],
             "cache": false,
             "persistent": true
         },

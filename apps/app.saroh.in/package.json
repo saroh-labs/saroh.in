@@ -3,11 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port=3003",
+    "dev": "portless",
+    "dev:app": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
+  },
+  "portless": {
+    "name": "app.saroh",
+    "script": "dev:app"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",

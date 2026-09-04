@@ -67,6 +67,50 @@ Common optional overrides (point a frontend at a local api instead of prod):
 | `ADMIN_ALLOWLIST`                                                | admin                | No extra admin allowlist applied.        |
 | `NEXT_PUBLIC_ROOT_DOMAIN`, `REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS` | sites                | Sensible built-in defaults.              |
 
+## Local URLs
+
+Every app runs at its production hostname with `.localhost` appended, served
+over HTTPS by [portless](https://github.com/vercel-labs/portless), a root
+devDependency. Each app names itself in the `portless` field of its
+package.json — the one place portless reads whether Turborepo starts the app
+from its own directory or `portless` starts them all from the root. There are
+no port numbers to remember, and host parsing — tenant subdomains, cookies,
+CORS — works the same way as in production.
+
+| Production           | Development                            |
+| -------------------- | -------------------------------------- |
+| saroh.in             | https://saroh.localhost                |
+| app.saroh.in         | https://app.saroh.localhost            |
+| accounts.saroh.in    | https://accounts.saroh.localhost       |
+| api.saroh.in         | https://api.saroh.localhost            |
+| admin.saroh.in       | https://admin.saroh.localhost          |
+| docs.saroh.in        | https://docs.saroh.localhost           |
+| help.saroh.in        | https://help.saroh.localhost           |
+| templates.saroh.in   | https://templates.saroh.localhost      |
+| ui.saroh.in          | https://ui.saroh.localhost             |
+| `<tenant>`.saroh.app | https://`<tenant>`.saroh.app.localhost |
+
+One-time setup on a fresh machine, in a real terminal (the proxy binds port
+443, so it prompts for your password):
+
+```bash
+npm install -g portless                   # the service must run from here, not the repo
+portless service install --wildcard       # generates and trusts a local CA; starts at login
+```
+
+The service runs as root, and macOS does not let a root daemon read your
+Desktop, Documents or Downloads folders — so a service installed from a
+checkout in one of those crash-loops with `EPERM` on `cli.js`. The global
+install lives under your Node prefix, which root can read. `portless doctor`
+reports the proxy's state; `~/.portless/service.log` has the reason if it is
+not running.
+
+`--wildcard` is what lets an unregistered subdomain such as
+`northwind.saroh.app.localhost` reach the renderer. Each app's `dev` script is
+`portless`, which runs its `dev:app` script through the proxy with a `PORT` of
+its own; `pnpm run dev:app` still works on a bare port for anyone without the
+proxy. Adding an app means adding the two scripts and the `portless` field.
+
 ## Local quick start
 
 ```bash
@@ -74,7 +118,7 @@ Common optional overrides (point a frontend at a local api instead of prod):
 echo 'DATABASE_URL="postgres://…"' > packages/database/.env
 
 # 2. (optional) point the app at a local api instead of prod:
-echo 'API_URL="http://localhost:3333"' > apps/app.saroh.in/.env.local
+echo 'API_URL="https://api.saroh.localhost"' > apps/app.saroh.in/.env.local
 
 # 3. run — no auth secret, OAuth, SMTP, storage, or payment keys needed
 pnpm dev

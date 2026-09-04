@@ -33,7 +33,7 @@ Changes here are worth testing end to end against a running API.
 
 ```bash
 pnpm install
-pnpm --filter web dev        # http://localhost:3008
+pnpm --filter web dev        # https://saroh.localhost
 ```
 
 The pages render without a backend; only the waitlist POST needs `api.saroh.in`.
@@ -43,8 +43,8 @@ The pages render without a backend; only the waitlist POST needs `api.saroh.in`.
 See [`env.ts`](env.ts) for the validated schema.
 
 ```dotenv
-API_URL=http://localhost:3333                    # server-only, waitlist route only
-NEXT_PUBLIC_AUTH_APP_URL=http://localhost:3003   # hero CTA → sign-up
+API_URL=https://api.saroh.localhost              # server-only, waitlist route only
+NEXT_PUBLIC_AUTH_APP_URL=https://accounts.saroh.localhost # hero CTA → sign-up
 ```
 
 `API_URL` is server-only on purpose: the route handler is the only thing here

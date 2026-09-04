@@ -33,7 +33,7 @@ a template.
 
 ```bash
 pnpm install
-pnpm --filter ecom-templates dev     # http://localhost:3010
+pnpm --filter ecom-templates dev     # https://templates.saroh.localhost
 ```
 
 ## Verification
