@@ -1,6 +1,24 @@
 import Link from "next/link";
 
-import type { PublishedPost } from "@/lib/publication";
+/**
+ * What this component needs of a post, which is less than either caller has.
+ *
+ * The live routes pass a `PublishedPost`, the preview routes a `PreviewPost`,
+ * and both satisfy this. Two fields carry the difference: `publishedAt` is
+ * null for a post that has never gone live, and `live` is absent on the live
+ * site, where everything shown is live by definition.
+ */
+export interface PostViewModel {
+    title: string;
+    slug: string;
+    excerpt?: string | null;
+    content: string;
+    image?: string | null;
+    category?: { name: string; slug: string } | null;
+    author?: string | null;
+    publishedAt: string | null;
+    live?: boolean;
+}
 
 /**
  * A site's writing, on the site (#232).
@@ -25,19 +43,40 @@ export function postDate(iso: string): string {
     }).format(new Date(iso));
 }
 
-export function PostArticle({ post }: { post: PublishedPost }) {
+/**
+ * "Not published" — said once, in Saroh's own neutral, never the site's
+ * palette. It is Saroh speaking about the post rather than part of the post,
+ * the same distinction the preview bar makes, and it must stay legible on
+ * whatever ground the merchant chose.
+ */
+function DraftChip() {
+    return (
+        <span className="inline-flex items-center rounded-full bg-neutral-900 px-2 py-0.5 text-[11px] font-medium text-neutral-100">
+            Not published
+        </span>
+    );
+}
+
+export function PostArticle({ post }: { post: PostViewModel }) {
     return (
         <article className="mx-auto w-full max-w-[68ch] px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <header className="mb-8">
                 <h1 className="text-[calc(2.25rem*var(--site-heading-scale))] font-bold leading-tight tracking-tight text-site-fg sm:text-[calc(2.75rem*var(--site-heading-scale))]">
                     {post.title}
                 </h1>
-                <p className="mt-3 text-sm text-site-body">
-                    <time dateTime={post.publishedAt}>
-                        {postDate(post.publishedAt)}
-                    </time>
-                    {post.author ? ` · ${post.author}` : ""}
-                    {post.category ? ` · ${post.category.name}` : ""}
+                <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-site-body">
+                    {post.live === false ? <DraftChip /> : null}
+                    <span>
+                        {post.publishedAt ? (
+                            <time dateTime={post.publishedAt}>
+                                {postDate(post.publishedAt)}
+                            </time>
+                        ) : (
+                            "Not dated yet"
+                        )}
+                        {post.author ? ` · ${post.author}` : ""}
+                        {post.category ? ` · ${post.category.name}` : ""}
+                    </span>
                 </p>
             </header>
 
@@ -72,7 +111,7 @@ export function PostIndex({
     basePath,
     title,
 }: {
-    posts: PublishedPost[];
+    posts: PostViewModel[];
     basePath: string;
     title: string;
 }) {
@@ -110,11 +149,24 @@ export function PostIndex({
                                     <h2 className="text-[calc(1.35rem*var(--site-heading-scale))] font-semibold leading-snug text-site-fg group-hover:text-site-accent">
                                         {post.title}
                                     </h2>
-                                    <p className="mt-1 text-sm text-site-body">
-                                        <time dateTime={post.publishedAt}>
-                                            {postDate(post.publishedAt)}
-                                        </time>
-                                        {post.author ? ` · ${post.author}` : ""}
+                                    <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-site-body">
+                                        {post.live === false ? (
+                                            <DraftChip />
+                                        ) : null}
+                                        <span>
+                                            {post.publishedAt ? (
+                                                <time
+                                                    dateTime={post.publishedAt}
+                                                >
+                                                    {postDate(post.publishedAt)}
+                                                </time>
+                                            ) : (
+                                                "Not dated yet"
+                                            )}
+                                            {post.author
+                                                ? ` · ${post.author}`
+                                                : ""}
+                                        </span>
                                     </p>
                                     {post.excerpt ? (
                                         <p className="mt-2 text-site-body">

@@ -461,6 +461,79 @@ export async function getPreviewByToken(token: string): Promise<PreviewLookup> {
     };
 }
 
+/**
+ * One post as a preview shows it (#236).
+ *
+ * A preview shows the DRAFT of every post, including ones never published, so
+ * two fields differ from the live shape: `publishedAt` is null for a post that
+ * has never gone live, and `live` says whether the public is being served it.
+ * `content` is sanitized by the api on the way out, on the same boundary and
+ * through the same allowlist publish uses.
+ */
+export interface PreviewPost {
+    title: string;
+    slug: string;
+    excerpt?: string | null;
+    content: string;
+    image?: string | null;
+    featured?: boolean;
+    category?: { name: string; slug: string } | null;
+    author?: string | null;
+    publishedAt: string | null;
+    updatedAt: string;
+    live: boolean;
+}
+
+/** The draft's posts behind a token, newest first, or an empty list. */
+export async function getPreviewPosts(token: string): Promise<PreviewPost[]> {
+    // Typed as nullable rows on purpose: this is a wire boundary, and a row
+    // without a slug is dropped rather than rendered as a broken link — the
+    // same rule the live index applies.
+    const body = await previewJson<{ posts?: (PreviewPost | null)[] }>(
+        token,
+        "posts",
+    );
+    return (body?.posts ?? []).filter((post): post is PreviewPost =>
+        Boolean(post?.slug),
+    );
+}
+
+/** One post from the draft by slug, or null when this site has no such post. */
+export async function getPreviewPost(
+    token: string,
+    slug: string,
+): Promise<PreviewPost | null> {
+    const post = await previewJson<PreviewPost>(
+        token,
+        `posts/${encodeURIComponent(slug)}`,
+    );
+    return post?.slug ? post : null;
+}
+
+/**
+ * One read under a preview token. Uncached, like every other preview read, so
+ * a revoke is honoured on the very next request and a fresh save is what the
+ * reviewer sees. A dead or unknown token yields null here; the LAYOUT is what
+ * explains an expired or revoked link, and a page under it renders nothing
+ * rather than a second, contradictory message.
+ */
+async function previewJson<T>(
+    token: string,
+    suffix: string,
+): Promise<T | null> {
+    let res: Response;
+    try {
+        res = await fetch(
+            `${API_URL}/public/sites/preview/${encodeURIComponent(token)}/${suffix}`,
+            { cache: "no-store", headers: { accept: "application/json" } },
+        );
+    } catch {
+        return null;
+    }
+    if (!res.ok) return null;
+    return (await res.json().catch(() => null)) as T | null;
+}
+
 // ---------------------------------------------------------------------------
 // Posts (#232)
 // ---------------------------------------------------------------------------

@@ -41,6 +41,23 @@ export class PublicSitesController {
     }
 
     /**
+     * The site's writing behind a preview token (#236), newest first, from the
+     * DRAFT. Declared before `preview/:token` is irrelevant to matching — the
+     * paths differ in length — but it shares that route's token rules exactly,
+     * including the 410 and the "taken back" reason.
+     */
+    @Get("preview/:token/posts")
+    previewPosts(@Param("token") token: string) {
+        return this.previewLinks.posts(token);
+    }
+
+    /** One post from the draft, behind a preview token (#236). */
+    @Get("preview/:token/posts/:slug")
+    previewPost(@Param("token") token: string, @Param("slug") slug: string) {
+        return this.previewLinks.post(token, slug);
+    }
+
+    /**
      * Current publication snapshot for a VERIFIED custom hostname (#200), e.g.
      * `shop.acme.com`. A hostname that is unknown, still PENDING, or not bound
      * to a site is a 404.
