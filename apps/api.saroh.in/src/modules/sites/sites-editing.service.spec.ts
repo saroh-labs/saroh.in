@@ -555,21 +555,30 @@ describe("SitesService public read (drafts never leak)", () => {
     it("returns ONLY the current publication snapshot", async () => {
         const publishedAt = new Date("2026-07-18T00:00:00.000Z");
         siteFindFirst.mockResolvedValue({
+            id: "site_1",
             currentPublication: { snapshot: { pages: [] }, publishedAt },
         });
 
         const result = await service.getPublicationBySubdomain("acme");
 
-        // The query selects nothing but currentPublication — no draft tables.
+        // The query selects nothing but the current publication and the site's
+        // own id — no draft tables. The id is not content: the renderer
+        // resolves a host once and then asks for that site's posts by it
+        // (#232), rather than repeating the host resolution per post route.
         expect(siteFindFirst).toHaveBeenCalledWith({
             where: { subdomain: "acme", deletedAt: null },
             select: {
+                id: true,
                 currentPublication: {
                     select: { snapshot: true, publishedAt: true },
                 },
             },
         });
-        expect(result).toEqual({ snapshot: { pages: [] }, publishedAt });
+        expect(result).toEqual({
+            snapshot: { pages: [] },
+            publishedAt,
+            siteId: "site_1",
+        });
     });
 
     it("404s a site that has never published (currentPublication null)", async () => {

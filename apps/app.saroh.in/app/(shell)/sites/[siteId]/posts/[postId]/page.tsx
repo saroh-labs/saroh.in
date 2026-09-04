@@ -1,11 +1,15 @@
-import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
-import { PostForm } from "@/components/sites/post-form";
+import { PostEditor } from "@/components/sites/post-editor";
 import { getPost, listPostCategories } from "@/lib/content/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
 
+/*
+ * The editor is document-shaped and owns the whole area (#232) — it carries
+ * its own header with the state and the publish control, so a PageHeader above
+ * it would be a second, quieter title saying the same thing.
+ */
 export default async function EditPostPage({
     params,
 }: {
@@ -22,10 +26,5 @@ export default async function EditPostPage({
     ]);
     if (!post) notFound();
 
-    return (
-        <div className="space-y-6">
-            <PageHeader title={post.title} description="Edit this post." />
-            <PostForm siteId={siteId} categories={categories} post={post} />
-        </div>
-    );
+    return <PostEditor siteId={siteId} categories={categories} post={post} />;
 }

@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
+import { parsePostsPrefix } from "../content/posts-prefix";
 import { authorize } from "../organizations/organization-policy";
 import type {
     CreateApprovalDto,
@@ -182,6 +183,12 @@ export type SiteSnapshot = Record<string, unknown> & {
 export interface PublicSiteView {
     snapshot: unknown;
     publishedAt: Date;
+    /**
+     * The site this snapshot belongs to (#232). The renderer resolves a host
+     * once and then asks for that site's posts by id, rather than every post
+     * route repeating the subdomain-or-custom-hostname resolution.
+     */
+    siteId?: string;
 }
 
 /**
@@ -238,6 +245,8 @@ export interface SiteDetailView {
     socialImageWidth: number | null;
     socialImageHeight: number | null;
     socialImageBytes: number | null;
+    /** Where this site's posts live (#232); null means the default. */
+    postsPrefix: string | null;
     createdAt: Date;
     updatedAt: Date;
     currentPublication: { publishedAt: Date } | null;
@@ -291,6 +300,7 @@ const draftSiteSelect = {
     id: true,
     name: true,
     slug: true,
+    postsPrefix: true,
     style: true,
     seoTitle: true,
     seoDescription: true,
@@ -655,6 +665,7 @@ export class SitesService {
                 socialImageWidth: true,
                 socialImageHeight: true,
                 socialImageBytes: true,
+                postsPrefix: true,
                 footer: true,
                 navigation: true,
                 createdAt: true,
@@ -730,6 +741,7 @@ export class SitesService {
             socialImageWidth?: number | null;
             socialImageHeight?: number | null;
             socialImageBytes?: number | null;
+            postsPrefix?: string | null;
         } = {};
         if (dto.seoTitle !== undefined) data.seoTitle = dto.seoTitle;
         if (dto.seoDescription !== undefined)
@@ -742,6 +754,20 @@ export class SitesService {
             data.socialImageHeight = dto.socialImageHeight;
         if (dto.socialImageBytes !== undefined)
             data.socialImageBytes = dto.socialImageBytes;
+        if (dto.postsPrefix !== undefined) {
+            // Checked against this site's own pages: a prefix matching a page
+            // path would make one of the two unreachable, and which one won
+            // would depend on route order rather than on anything the merchant
+            // could see.
+            const pages = await prisma.page.findMany({
+                where: { siteId },
+                select: { path: true },
+            });
+            data.postsPrefix = parsePostsPrefix(
+                dto.postsPrefix,
+                pages.map((p) => p.path),
+            );
+        }
 
         const site = await prisma.site.update({
             where: { id: siteId },
@@ -754,6 +780,7 @@ export class SitesService {
                 socialImageWidth: true,
                 socialImageHeight: true,
                 socialImageBytes: true,
+                postsPrefix: true,
             },
         });
         return site;
@@ -1263,6 +1290,11 @@ export class SitesService {
                 seoTitle: site.seoTitle,
                 seoDescription: site.seoDescription,
                 socialImageUrl: site.socialImageUrl,
+                // Where this site's posts live (#232). In the snapshot because
+                // the renderer routes on it, and a snapshot is the site as it
+                // was served: moving the prefix later must not retarget links
+                // inside pages already published.
+                postsPrefix: site.postsPrefix,
                 // The picture with its measurements (#220). WhatsApp draws the
                 // large card only when og:image:width/height are present, so
                 // a URL alone was a smaller card than the merchant had chosen.
@@ -1451,6 +1483,57 @@ export class SitesService {
     }
 
     /**
+     * PUBLIC: a site's live posts, newest first (#232).
+     *
+     * Reads each post's CURRENT publication and nothing else, so an unpublished
+     * or taken-down post is structurally unreachable — the same guarantee the
+     * page reads give. The snapshot each row carries is what publish wrote.
+     */
+    async getPublicPosts(siteId: string): Promise<{ posts: unknown[] }> {
+        const posts = await prisma.post.findMany({
+            where: {
+                siteId,
+                currentPublicationId: { not: null },
+                site: { deletedAt: null },
+            },
+            orderBy: { publishedAt: "desc" },
+            select: { currentPublication: { select: { snapshot: true } } },
+        });
+        return {
+            posts: posts
+                .map((p) => p.currentPublication?.snapshot)
+                .filter((s) => s !== undefined),
+        };
+    }
+
+    /**
+     * PUBLIC: one live post by its slug (#232). 404 when the post does not
+     * exist, is not live, or belongs to another site.
+     */
+    async getPublicPost(siteId: string, slug: string): Promise<PublicSiteView> {
+        const post = await prisma.post.findFirst({
+            where: {
+                siteId,
+                slug,
+                currentPublicationId: { not: null },
+                site: { deletedAt: null },
+            },
+            select: {
+                currentPublication: {
+                    select: { snapshot: true, publishedAt: true },
+                },
+            },
+        });
+        if (!post?.currentPublication) {
+            throw new NotFoundException(`No published post at "${slug}"`);
+        }
+        return {
+            snapshot: post.currentPublication.snapshot,
+            publishedAt: post.currentPublication.publishedAt,
+        };
+    }
+
+    /**
      * Public: resolve a site by id to its CURRENT publication snapshot. Same
      * guarantees as {@link getPublicationBySubdomain}: only the immutable
      * current Publication is ever exposed; drafts are never reachable here.
@@ -1475,6 +1558,7 @@ export class SitesService {
         const site = await prisma.site.findFirst({
             where,
             select: {
+                id: true,
                 currentPublication: {
                     select: { snapshot: true, publishedAt: true },
                 },
@@ -1486,6 +1570,7 @@ export class SitesService {
         return {
             snapshot: site.currentPublication.snapshot,
             publishedAt: site.currentPublication.publishedAt,
+            siteId: site.id,
         };
     }
 

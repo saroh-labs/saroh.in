@@ -699,8 +699,21 @@ model Post {
   featured Boolean @default(false)
   image    String?
 
+  // The DRAFT-side state the merchant sees. `status` is what they set;
+  // `publishedAt` is stamped the first time it goes PUBLISHED and kept after.
+  // Neither is what the public reads — that is the pointer below.
   status      String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
   publishedAt DateTime?
+
+  // The publication the public is being served for this post, or null when it
+  // is not live (ADR-004 §3, #232). Mirrors Site.currentPublicationId exactly:
+  // publishing appends an immutable Publication and repoints this; taking a
+  // post down is repointing to null, which keeps the history. Per POST, so
+  // publishing one does not republish the site's pages and restoring an old
+  // site publication does not unpublish this week's writing.
+  currentPublicationId String?      @unique
+  currentPublication   Publication? @relation("PostCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
+  publications         Publication[] @relation("PostPublications")
 
   comments Comment[]
 
@@ -1399,6 +1412,14 @@ model Site {
   // when set (NULLs are distinct, so many sites may have no subdomain).
   subdomain String? @unique
 
+  // The path segment this site's posts live under: /<postsPrefix>/<slug>, with
+  // an index at /<postsPrefix> (#232). The merchant chooses it, because "blog"
+  // is not what every business calls its writing — a practice has updates, a
+  // studio has a journal. Null means the default, "blog"; it is not defaulted
+  // in the column so that changing the default later does not silently move
+  // every site's posts.
+  postsPrefix String?
+
   // Search and social (#188). Site-level rather than per-page: they describe
   // the site, not any one page of it. Null means "not set" and MUST render as
   // absent — never as an empty title or a broken image.
@@ -1730,6 +1751,11 @@ model Publication {
   pageId String?
   path   String?
 
+  // A post's publication names its post (#232), so history reads per post and
+  // the live pointer has something to point from. Null on a site publication.
+  postId String?
+  post   Post?   @relation("PostPublications", fields: [postId], references: [id], onDelete: Cascade)
+
   // Fully-resolved, sanitized page(s) + sections at publish time. Self-contained.
   snapshot Json
 
@@ -1742,11 +1768,14 @@ model Publication {
 
   // Back-relation for Site.currentPublication (the live pointer above).
   currentForSite Site? @relation("SiteCurrentPublication")
+  // The same, for a post (#232).
+  currentForPost Post? @relation("PostCurrentPublication")
   // Bypass records naming this publication (#199).
   approvals SiteApproval[]
 
   @@index([siteId, publishedAt])
   @@index([organizationId])
+  @@index([postId])
 }
 
 // ============================================================================

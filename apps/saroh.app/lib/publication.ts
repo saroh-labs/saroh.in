@@ -150,6 +150,12 @@ export interface PublicationSite {
     /** The share image a link preview uses (#188). */
     socialImageUrl?: string | null;
     /**
+     * The path segment this site's posts live under (#232) — `/blog` unless
+     * the merchant chose another word. Absent on snapshots published before
+     * posts could be published at all, which is why the reader below defaults.
+     */
+    postsPrefix?: string | null;
+    /**
      * The same picture with its measurements (#220). Present on snapshots
      * published after this shipped; older ones carry only the URL above, and
      * the renderer reads whichever it finds.
@@ -205,6 +211,14 @@ export interface PublicationSnapshot {
 interface PublicSiteView {
     snapshot: PublicationSnapshot;
     publishedAt: string;
+    /** Present since #232; the post routes ask for posts by it. */
+    siteId?: string;
+}
+
+/** A resolved site: what to render, and the id its posts hang off (#232). */
+export interface ResolvedSite {
+    snapshot: PublicationSnapshot;
+    siteId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -445,4 +459,133 @@ export async function getPreviewByToken(token: string): Promise<PreviewLookup> {
         siteName: body.site?.name ?? body.snapshot.site.name,
         expiresAt: body.expiresAt,
     };
+}
+
+// ---------------------------------------------------------------------------
+// Posts (#232)
+// ---------------------------------------------------------------------------
+
+/** What a post's publication snapshot holds. */
+export interface PublishedPost {
+    title: string;
+    slug: string;
+    excerpt?: string | null;
+    /** Sanitized at publish, like richText and the footer. */
+    content: string;
+    image?: string | null;
+    featured?: boolean;
+    category?: { name: string; slug: string } | null;
+    author?: string | null;
+    publishedAt: string;
+}
+
+interface PostSnapshot {
+    post: PublishedPost;
+    path: string;
+    publishedAt: string;
+}
+
+/** Where a site's posts live. `blog` unless the merchant chose otherwise. */
+export const DEFAULT_POSTS_PREFIX = "blog";
+
+export function postsPrefix(snapshot: PublicationSnapshot): string {
+    const value = snapshot.site.postsPrefix?.trim();
+    // An empty string means "not chosen", same as absent — so this is not a
+    // nullish fallback: "" must fall through to the default too.
+    return value === undefined || value === "" ? DEFAULT_POSTS_PREFIX : value;
+}
+
+/**
+ * A site's live posts, newest first, or an empty list.
+ *
+ * Reads the api's public post index, which serves each post's CURRENT
+ * publication and nothing else — so a draft, an edited-but-unpublished post,
+ * or one taken down is structurally unreachable here, exactly as with pages.
+ */
+export async function getPublishedPosts(
+    siteId: string,
+): Promise<PublishedPost[]> {
+    let res: Response;
+    try {
+        res = await fetch(`${API_URL}/public/sites/${siteId}/posts`, {
+            cache: "no-store",
+            headers: { accept: "application/json" },
+        });
+    } catch {
+        return [];
+    }
+    if (!res.ok) return [];
+    const body = (await res.json().catch(() => null)) as {
+        posts?: PostSnapshot[];
+    } | null;
+    // The api is typed, but this is a wire boundary: a row without a post, or
+    // a post without a slug, is dropped rather than rendered as a broken link.
+    return (body?.posts ?? [])
+        .map((row) => (row as Partial<PostSnapshot> | null)?.post)
+        .filter((post): post is PublishedPost => Boolean(post?.slug));
+}
+
+/** One live post by slug, or null when it is not live. */
+export async function getPublishedPost(
+    siteId: string,
+    slug: string,
+): Promise<PublishedPost | null> {
+    let res: Response;
+    try {
+        res = await fetch(
+            `${API_URL}/public/sites/${siteId}/posts/${encodeURIComponent(slug)}`,
+            { cache: "no-store", headers: { accept: "application/json" } },
+        );
+    } catch {
+        return null;
+    }
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => null)) as {
+        snapshot?: PostSnapshot;
+    } | null;
+    return body?.snapshot?.post ?? null;
+}
+
+/**
+ * A host resolved to its snapshot AND its site id (#232).
+ *
+ * `getPublicationForHost` answers "what do I render", which is all a page
+ * needs. A post route needs one thing more — which site's posts to ask for —
+ * and repeating the subdomain-or-custom-hostname resolution in every post
+ * route to get it would be three copies of the rule that decides what a host
+ * means.
+ */
+export async function getSiteForHost(
+    host: string | null | undefined,
+): Promise<ResolvedSite | null> {
+    const hostname = host?.split(":")[0]?.toLowerCase().trim();
+    if (!hostname) return null;
+
+    const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
+    if (root && hostname !== root && !hostname.endsWith(`.${root}`)) {
+        const view = await fetchSiteView(
+            `by-hostname/${encodeURIComponent(hostname)}`,
+        );
+        if (view) return view;
+    }
+    const subdomain = subdomainFromHost(host);
+    if (!subdomain) return null;
+    return fetchSiteView(`by-subdomain/${encodeURIComponent(subdomain)}`);
+}
+
+/** One public site read, returning the snapshot and the site id together. */
+async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
+    let res: Response;
+    try {
+        res = await fetch(`${API_URL}/public/sites/${suffix}`, {
+            cache: "no-store",
+            headers: { accept: "application/json" },
+        });
+    } catch {
+        return null;
+    }
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => null)) as PublicSiteView | null;
+    if (!body?.snapshot) return null;
+    return { snapshot: body.snapshot, siteId: body.siteId ?? null };
 }

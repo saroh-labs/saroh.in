@@ -200,7 +200,7 @@ export async function seed(): Promise<void> {
     const siteIds = await seedWebsite(prisma, org.id, user.id, now);
     // Content after the website: a post belongs to the site it is published on
     // (ADR-004), so there has to be a site first.
-    await seedContent(prisma, siteIds[0] ?? "", user.id);
+    await seedContent(prisma, org.id, siteIds[0] ?? "", user.id);
     await seedProviders(prisma, org.id, siteIds, now);
     await seedAnalytics(prisma, org.id, now);
 
@@ -572,7 +572,12 @@ async function seedCommerce(
 
 // --- Content ------------------------------------------------------------
 
-async function seedContent(prisma: Db, siteId: string, userId: string) {
+async function seedContent(
+    prisma: Db,
+    orgId: string,
+    siteId: string,
+    userId: string,
+) {
     if (!siteId) return;
     const category = await prisma.postCategory.upsert({
         where: { siteId_slug: { siteId, slug: "guides" } },
@@ -587,7 +592,7 @@ async function seedContent(prisma: Db, siteId: string, userId: string) {
 
     for (let i = 0; i < POSTS.length; i++) {
         const p = POSTS[i];
-        await prisma.post.upsert({
+        const seeded = await prisma.post.upsert({
             where: { siteId_slug: { siteId, slug: p.slug } },
             update: { title: p.title, status: p.status },
             create: {
@@ -602,6 +607,46 @@ async function seedContent(prisma: Db, siteId: string, userId: string) {
                 status: p.status,
             },
         });
+
+        // A post whose status says PUBLISHED must actually be live (#232),
+        // or the dev data shows a state the product itself cannot produce.
+        if (p.status === "PUBLISHED" && !seeded.currentPublicationId) {
+            const publishedAt = seeded.publishedAt ?? new Date();
+            const publication = await prisma.publication.create({
+                data: {
+                    id: id("postpub", i),
+                    siteId,
+                    organizationId: orgId,
+                    postId: seeded.id,
+                    path: `/blog/${seeded.slug}`,
+                    snapshot: {
+                        post: {
+                            title: seeded.title,
+                            slug: seeded.slug,
+                            excerpt: seeded.excerpt,
+                            content: seeded.content,
+                            image: seeded.image,
+                            featured: seeded.featured,
+                            category: null,
+                            author: null,
+                            publishedAt: publishedAt.toISOString(),
+                        },
+                        path: `/blog/${seeded.slug}`,
+                        publishedAt: publishedAt.toISOString(),
+                    },
+                    templateId: "post",
+                    templateVersion: 1,
+                    publishedAt,
+                },
+            });
+            await prisma.post.update({
+                where: { id: seeded.id },
+                data: {
+                    currentPublicationId: publication.id,
+                    publishedAt,
+                },
+            });
+        }
     }
 }
 
@@ -1128,7 +1173,15 @@ export async function reset(): Promise<void> {
         () => prisma.product.deleteMany({ where }),
         () => prisma.category.deleteMany({ where }),
         () => prisma.customer.deleteMany({ where }),
-        // Posts hang off a Site (ADR-004), so they clear before the sites do.
+        // Posts hang off a Site (ADR-004), so they clear before the sites do —
+        // and a post's publications before the post, since the live pointer
+        // and the publication reference each other (#232).
+        () =>
+            prisma.post.updateMany({
+                where,
+                data: { currentPublicationId: null },
+            }),
+        () => prisma.publication.deleteMany({ where }),
         () => prisma.post.deleteMany({ where }),
         () => prisma.postCategory.deleteMany({ where }),
         () => prisma.storeFeatures.deleteMany({ where }),
