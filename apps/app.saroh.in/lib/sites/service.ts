@@ -492,17 +492,24 @@ export async function saveDraftSections(
 /** Publish an immutable snapshot of the site's current drafts. */
 export async function publishSite(
     siteId: string,
-): Promise<SitesResult<{ publicationId?: string }>> {
+): Promise<SitesResult<{ publicationId?: string; bypassed: boolean }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/${siteId}/publish`, { method: "POST" });
     const data = (await res.json().catch(() => null)) as {
         publicationId?: string;
+        bypassed?: boolean;
         message?: string;
         error?: string;
     } | null;
     if (res.ok) {
-        return { ok: true, data: { publicationId: data?.publicationId } };
+        return {
+            ok: true,
+            data: {
+                publicationId: data?.publicationId,
+                bypassed: data?.bypassed === true,
+            },
+        };
     }
     return { ok: false, ...readError(data, "Could not publish the site") };
 }
@@ -545,6 +552,8 @@ export interface SitePublication {
     templateVersion: number;
     /** Whether this is the version the public is being served right now. */
     isCurrent: boolean;
+    /** Set when this publish went past an outstanding change request (#199). */
+    bypass: { at: string; by: string } | null;
 }
 
 /** Every publish of a site, newest first. Empty if it has never been published. */
@@ -602,6 +611,11 @@ export interface SiteCommentView {
 export interface ReviewState {
     openNotes: number;
     latestApproval: { outcome: string; at: string; by: string } | null;
+    /**
+     * A reviewer's latest verdict asked for changes and no approval has
+     * followed (#199). Publishing still works; it is recorded as a bypass.
+     */
+    outstanding: boolean;
 }
 
 /**
@@ -623,7 +637,11 @@ export async function listComments(siteId: string): Promise<SiteCommentView[]> {
 }
 
 export async function getReviewState(siteId: string): Promise<ReviewState> {
-    const empty: ReviewState = { openNotes: 0, latestApproval: null };
+    const empty: ReviewState = {
+        openNotes: 0,
+        latestApproval: null,
+        outstanding: false,
+    };
     const base = await sitesBase();
     if (!base) return empty;
     try {
@@ -633,6 +651,7 @@ export async function getReviewState(siteId: string): Promise<ReviewState> {
         return {
             openNotes: typeof data?.openNotes === "number" ? data.openNotes : 0,
             latestApproval: data?.latestApproval ?? null,
+            outstanding: data?.outstanding === true,
         };
     } catch {
         return empty;

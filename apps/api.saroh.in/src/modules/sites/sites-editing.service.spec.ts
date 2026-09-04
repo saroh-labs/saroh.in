@@ -32,6 +32,10 @@ jest.mock("@saroh/database", () => {
         publication: {
             create: jest.fn(),
         },
+        siteApproval: {
+            findFirst: jest.fn(),
+            create: jest.fn(),
+        },
     };
     return {
         ...actual,
@@ -61,6 +65,8 @@ const sectionFindMany = prisma.section.findMany as jest.Mock;
 const sectionDeleteMany = prisma.section.deleteMany as jest.Mock;
 const sectionCreateMany = prisma.section.createMany as jest.Mock;
 const publicationCreate = prisma.publication.create as jest.Mock;
+const approvalFindFirst = prisma.siteApproval.findFirst as jest.Mock;
+const approvalCreate = prisma.siteApproval.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
@@ -407,6 +413,44 @@ describe("SitesService.publishSite", () => {
             snapshot: { site: { socialImage: unknown } };
         };
         expect(data.snapshot.site.socialImage).toBeNull();
+    });
+
+    it("records a BYPASSED approval when publishing past a change request (#199)", async () => {
+        siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
+        approvalFindFirst.mockResolvedValue({ outcome: "CHANGES_REQUESTED" });
+        approvalCreate.mockResolvedValue({ id: "a_bypass" });
+
+        const result = await service.publishSite(ctx(), "site_1");
+
+        // Never prevented — the publication exists — and recorded: who, when,
+        // and which publication, inside the same transaction.
+        expect(publicationCreate).toHaveBeenCalledTimes(1);
+        expect(result.bypassed).toBe(true);
+        expect(approvalCreate).toHaveBeenCalledTimes(1);
+        expect(approvalCreate.mock.calls[0][0].data).toMatchObject({
+            siteId: "site_1",
+            organizationId: "org_1",
+            byUserId: "user_1",
+            outcome: "BYPASSED",
+            publicationId: "pub_1",
+        });
+        // The outstanding question reads VERDICTS only: a BYPASSED row from an
+        // earlier publish must not count as the reviewer changing their mind.
+        expect(approvalFindFirst.mock.calls[0][0].where.outcome).toEqual({
+            in: ["APPROVED", "CHANGES_REQUESTED"],
+        });
+    });
+
+    it("records nothing when the site is approved, or nobody reviewed it", async () => {
+        siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
+        approvalFindFirst.mockResolvedValueOnce({ outcome: "APPROVED" });
+        const approved = await service.publishSite(ctx(), "site_1");
+        expect(approved.bypassed).toBe(false);
+
+        approvalFindFirst.mockResolvedValueOnce(null);
+        const unreviewed = await service.publishSite(ctx(), "site_1");
+        expect(unreviewed.bypassed).toBe(false);
+        expect(approvalCreate).not.toHaveBeenCalled();
     });
 
     it("asks the database for visible pages only — a hidden page never publishes", async () => {

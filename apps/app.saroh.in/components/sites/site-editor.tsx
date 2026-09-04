@@ -1049,10 +1049,16 @@ export function SiteEditor({
          * "Flour & Ferment is live at flour-and-ferment.saroh.app". A bare
          * "Published" leaves the merchant to go and check what happened.
          */
-        toast.success(
+        const live =
             address === null || address === undefined
                 ? `${siteName} is live.`
-                : `${siteName} is live at ${address}.`,
+                : `${siteName} is live at ${address}.`;
+        toast.success(
+            // Bypassing is recorded, not prevented (#199) — and said, so the
+            // record is never a surprise in version history later.
+            res.data.bypassed
+                ? `${live} Recorded as published without approval.`
+                : live,
         );
         await refreshFlags();
     }
@@ -1222,7 +1228,9 @@ export function SiteEditor({
                     >
                         {review.latestApproval.outcome === "APPROVED"
                             ? `Approved by ${review.latestApproval.by}`
-                            : `${review.latestApproval.by} asked for changes`}
+                            : review.latestApproval.outcome === "BYPASSED"
+                              ? `Published without approval by ${review.latestApproval.by}`
+                              : `${review.latestApproval.by} asked for changes`}
                         {openNotes > 0 ? (
                             <span className="tabular-nums opacity-80">
                                 · {openNotes}{" "}
