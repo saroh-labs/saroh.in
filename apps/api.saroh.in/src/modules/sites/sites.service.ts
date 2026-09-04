@@ -154,6 +154,17 @@ export interface PublishResult {
     currentPublicationId: string;
 }
 
+/**
+ * What a Publication row's `snapshot` holds, and what a draft preview serves
+ * (#198). Loose on purpose at this boundary: the renderer types it on its
+ * side, and the shape is settled by `buildSnapshot`, not by this alias.
+ */
+export type SiteSnapshot = Record<string, unknown> & {
+    site: Record<string, unknown> & { name: string; slug: string };
+    pages: unknown[];
+    publishedAt: string;
+};
+
 /** The public read contract: only the current, immutable Publication snapshot. */
 export interface PublicSiteView {
     snapshot: unknown;
@@ -257,6 +268,64 @@ export interface PublicationDetail {
     templateVersion: number;
     snapshot: unknown;
 }
+
+/**
+ * Everything a snapshot is built from: the site's draft, visible pages and
+ * their visible draft sections. Shared by publish and by draft previews
+ * (#198), so a preview shows exactly what publish would write.
+ */
+const draftSiteSelect = {
+    id: true,
+    name: true,
+    slug: true,
+    style: true,
+    seoTitle: true,
+    seoDescription: true,
+    socialImageUrl: true,
+    socialImageWidth: true,
+    socialImageHeight: true,
+    socialImageBytes: true,
+    footer: true,
+    navigation: true,
+    pages: {
+        // A hidden page does not travel, for the same reason a
+        // hidden section does not: a Publication is immutable once
+        // written, so a page that leaked in could not be taken back
+        // out without republishing.
+        where: { hidden: false },
+        orderBy: { path: "asc" },
+        select: {
+            id: true,
+            path: true,
+            title: true,
+            isHome: true,
+            versions: {
+                where: { status: "DRAFT" },
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: {
+                    // Hidden sections do not travel. The snapshot
+                    // IS the published site, so filtering here —
+                    // rather than in the renderer — means a parked
+                    // section cannot leak through a later reader
+                    // that forgets to check the flag.
+                    sections: {
+                        where: { hidden: false },
+                        orderBy: { order: "asc" },
+                        select: {
+                            type: true,
+                            contractVersion: true,
+                            content: true,
+                        },
+                    },
+                },
+            },
+        },
+    },
+} satisfies Prisma.SiteSelect;
+
+/** A site as {@link draftSiteSelect} loads it. */
+type DraftSite = Prisma.SiteGetPayload<{ select: typeof draftSiteSelect }>;
 
 @Injectable()
 export class SitesService {
@@ -1078,89 +1147,25 @@ export class SitesService {
     // -----------------------------------------------------------------------
 
     /**
-     * Publish the site: build a self-contained, SANITIZED snapshot of every
-     * page from its current DRAFT version, then — in ONE transaction — append a
-     * new immutable {@link Publication} and repoint `Site.currentPublicationId`
-     * at it. Requires `site:publish`. The site must belong to
-     * `ctx.organizationId` (else 404).
-     *
-     * Immutability: a Publication is NEVER updated. Republishing inserts a NEW
-     * row and repoints the live pointer; rollback is simply repointing to an
-     * older row. Rich fields the contract flags (`richText.value`) are sanitized
-     * on the way IN, so the snapshot the public renderer reads is already safe.
-     *
-     * The DRAFT PageVersions are intentionally left DRAFT (not flipped to
-     * PUBLISHED): the draft stays the durable working copy for the next edit,
-     * and the immutable Publication is the published artifact. Republish just
-     * re-snapshots the current drafts.
+     * The draft as a snapshot would see it, or null when the site does not
+     * match `where`. Shared by publish and by draft previews (#198).
      */
-    async publishSite(
-        ctx: OrganizationContext,
-        siteId: string,
-    ): Promise<PublishResult> {
-        authorize(ctx, "site:publish");
+    async loadDraftSite(
+        where: Prisma.SiteWhereInput,
+    ): Promise<DraftSite | null> {
+        return prisma.site.findFirst({ where, select: draftSiteSelect });
+    }
 
-        const site = await prisma.site.findFirst({
-            where: {
-                id: siteId,
-                organizationId: ctx.organizationId,
-                deletedAt: null,
-            },
-            select: {
-                id: true,
-                name: true,
-                slug: true,
-                style: true,
-                seoTitle: true,
-                seoDescription: true,
-                socialImageUrl: true,
-                socialImageWidth: true,
-                socialImageHeight: true,
-                socialImageBytes: true,
-                footer: true,
-                navigation: true,
-                pages: {
-                    // A hidden page does not travel, for the same reason a
-                    // hidden section does not: a Publication is immutable once
-                    // written, so a page that leaked in could not be taken back
-                    // out without republishing.
-                    where: { hidden: false },
-                    orderBy: { path: "asc" },
-                    select: {
-                        id: true,
-                        path: true,
-                        title: true,
-                        isHome: true,
-                        versions: {
-                            where: { status: "DRAFT" },
-                            orderBy: { createdAt: "desc" },
-                            take: 1,
-                            select: {
-                                // Hidden sections do not travel. The snapshot
-                                // IS the published site, so filtering here —
-                                // rather than in the renderer — means a parked
-                                // section cannot leak through a later reader
-                                // that forgets to check the flag.
-                                sections: {
-                                    where: { hidden: false },
-                                    orderBy: { order: "asc" },
-                                    select: {
-                                        type: true,
-                                        contractVersion: true,
-                                        content: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        });
-        if (!site) {
-            throw new NotFoundException(`Site "${siteId}" not found`);
-        }
-
-        const publishedAt = new Date();
+    /**
+     * Build the self-contained, SANITIZED snapshot of a draft. Pure: reads
+     * nothing, writes nothing, throws on a section that fails its contract.
+     *
+     * ONE builder for publish and for preview (#198). A preview built any
+     * other way would eventually show a reviewer something publish does not
+     * write — a resolved menu, a sanitized footer, a hidden section — and
+     * their notes would be about a site that never goes live.
+     */
+    buildSnapshot(site: DraftSite, publishedAt: Date): SiteSnapshot {
         // v2 buttons name a page by id; the snapshot needs its path (#207).
         // Built from the pages this publish will write, so a hidden page
         // resolves to nothing rather than to a path the live site 404s.
@@ -1217,7 +1222,7 @@ export class SitesService {
                   value: sanitizeRichHtml(draftFooter.value),
               }
             : null;
-        const snapshot = {
+        const snapshot: SiteSnapshot = {
             site: {
                 name: site.name,
                 slug: site.slug,
@@ -1278,6 +1283,43 @@ export class SitesService {
             pages,
             publishedAt: publishedAt.toISOString(),
         };
+        return snapshot;
+    }
+
+    /**
+     * Publish the site: build a self-contained, SANITIZED snapshot of every
+     * page from its current DRAFT version, then — in ONE transaction — append a
+     * new immutable {@link Publication} and repoint `Site.currentPublicationId`
+     * at it. Requires `site:publish`. The site must belong to
+     * `ctx.organizationId` (else 404).
+     *
+     * Immutability: a Publication is NEVER updated. Republishing inserts a NEW
+     * row and repoints the live pointer; rollback is simply repointing to an
+     * older row. Rich fields the contract flags (`richText.value`) are sanitized
+     * on the way IN, so the snapshot the public renderer reads is already safe.
+     *
+     * The DRAFT PageVersions are intentionally left DRAFT (not flipped to
+     * PUBLISHED): the draft stays the durable working copy for the next edit,
+     * and the immutable Publication is the published artifact. Republish just
+     * re-snapshots the current drafts.
+     */
+    async publishSite(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<PublishResult> {
+        authorize(ctx, "site:publish");
+
+        const site = await this.loadDraftSite({
+            id: siteId,
+            organizationId: ctx.organizationId,
+            deletedAt: null,
+        });
+        if (!site) {
+            throw new NotFoundException(`Site "${siteId}" not found`);
+        }
+
+        const publishedAt = new Date();
+        const snapshot = this.buildSnapshot(site, publishedAt);
 
         // The Site does not track which template produced it; default the
         // Publication's required (non-null) template stamp to the starter

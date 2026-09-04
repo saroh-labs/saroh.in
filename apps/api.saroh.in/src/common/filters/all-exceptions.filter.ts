@@ -18,7 +18,9 @@ import { structuredLogger } from "../logging/structured-logger";
  * - `statusCode` mirrors the HTTP status. `code` is a stable SCREAMING_SNAKE
  *   symbol (e.g. "NOT_FOUND", "INTERNAL_SERVER_ERROR").
  * - `correlationId` matches the `X-Request-Id` response header for support/trace.
- * - `details` is present only for validation errors (the field-level messages).
+ * - `details` is present for validation errors (the field-level messages) and
+ *   for exceptions that carry a client-readable reason, e.g. a 410's
+ *   `{ reason: "expired" | "revoked" }` (#198).
  * - For any 5xx the message/code are generic ("Internal server error"); the
  *   real error, stack and redacted request headers are logged server-side only,
  *   never sent to the client.
@@ -57,13 +59,18 @@ function extractClientMessage(exception: HttpException): {
     if (typeof response === "string") {
         return { message: response };
     }
-    const body = response as { message?: unknown };
+    const body = response as { message?: unknown; details?: unknown };
     if (Array.isArray(body.message)) {
         // class-validator / ValidationPipe returns an array of field messages.
         return { message: "Validation failed", details: body.message };
     }
     if (typeof body.message === "string") {
-        return { message: body.message };
+        // An exception may say WHY in a shape a client can branch on — a
+        // preview link's 410 names `expired` or `revoked` (#198) — and that
+        // travels as `details`, the same slot validation already uses.
+        return body.details === undefined
+            ? { message: body.message }
+            : { message: body.message, details: body.details };
     }
     return { message: exception.message };
 }

@@ -47,6 +47,7 @@ model User {
 
   siteComments  SiteComment[]
   siteApprovals SiteApproval[]
+  sitePreviewLinks SitePreviewLink[]
 
   @@index([email])
 }
@@ -112,6 +113,7 @@ model Organization {
   sections      Section[]
   siteComments  SiteComment[]
   siteApprovals SiteApproval[]
+  sitePreviewLinks SitePreviewLink[]
   publications  Publication[]
 
   // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
@@ -1454,6 +1456,7 @@ model Site {
   pages        Page[]
   comments     SiteComment[]
   approvals    SiteApproval[]
+  previewLinks SitePreviewLink[]
   publications Publication[]  @relation("SitePublications")
 
   // Verified subdomain / custom-domain claims routed to this Site (S2-007).
@@ -1583,6 +1586,45 @@ model SiteApproval {
   createdAt DateTime @default(now())
 
   @@index([siteId, createdAt])
+  @@index([organizationId])
+}
+
+/**
+ * A link that shows a site's DRAFT to whoever holds it (#198).
+ *
+ * The other half of review: notes and approvals shipped, and the Review tab's
+ * empty state told the merchant to "share a preview" — an action that did not
+ * exist. This is that action. The draft is rendered by the public renderer at
+ * /preview/<token>, built by the same snapshot builder publish uses, and
+ * NOTHING about it publishes anything.
+ *
+ * The token is the whole secret: 32 random bytes, unguessable, carried only in
+ * the link. Expiry is a fact with a time so the sharer can be told it in words
+ * before they send the link; revocation is a fact with a time for the same
+ * reason NULL reads as "still valid" on SiteComment.resolvedAt.
+ */
+model SitePreviewLink {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  token String @unique
+
+  createdByUserId String
+  createdBy       User   @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  // When the link was last opened. Tells the sharer whether it was ever used,
+  // which is the first thing they ask when the feedback does not arrive.
+  lastUsedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([siteId, revokedAt])
   @@index([organizationId])
 }
 

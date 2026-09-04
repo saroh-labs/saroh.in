@@ -844,3 +844,70 @@ export async function updateSiteStyle(
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
     return { ok: false, ...readError(data, "Could not save the style.") };
 }
+
+// ---------------------------------------------------------------------------
+// Preview links (#198)
+// ---------------------------------------------------------------------------
+
+export type PreviewLinkState = "active" | "expired" | "revoked";
+
+export interface SitePreviewLinkView {
+    id: string;
+    token: string;
+    state: PreviewLinkState;
+    createdAt: string;
+    expiresAt: string;
+    revokedAt: string | null;
+    lastUsedAt: string | null;
+    createdBy: { name: string | null };
+}
+
+/** The choices the api accepts, in days. */
+export type PreviewLinkDays = 1 | 7 | 30;
+
+export async function listPreviewLinks(
+    siteId: string,
+): Promise<SitePreviewLinkView[]> {
+    const base = await sitesBase();
+    if (!base) return [];
+    const res = await apiFetch(`${base}/${siteId}/preview-links`);
+    if (!res.ok) return [];
+    return (await res.json()) as SitePreviewLinkView[];
+}
+
+export async function createPreviewLink(
+    siteId: string,
+    expiresInDays: PreviewLinkDays,
+): Promise<SitesResult<SitePreviewLinkView>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/preview-links`, {
+        method: "POST",
+        body: JSON.stringify({ expiresInDays }),
+    });
+    const data = (await res.json().catch(() => null)) as
+        (SitePreviewLinkView & { message?: string; error?: string }) | null;
+    if (res.ok && data?.id) return { ok: true, data };
+    return {
+        ok: false,
+        ...readError(data, "Could not create a preview link."),
+    };
+}
+
+export async function revokePreviewLink(
+    siteId: string,
+    linkId: string,
+): Promise<SitesResult<SitePreviewLinkView>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/preview-links/${linkId}`, {
+        method: "DELETE",
+    });
+    const data = (await res.json().catch(() => null)) as
+        (SitePreviewLinkView & { message?: string; error?: string }) | null;
+    if (res.ok && data?.id) return { ok: true, data };
+    return {
+        ok: false,
+        ...readError(data, "Could not turn this link off."),
+    };
+}

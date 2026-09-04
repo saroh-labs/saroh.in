@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { PreviewLinks } from "@/components/sites/preview-links";
 import { setCommentResolved } from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
 import type { SiteCommentView, SitePage } from "@/lib/sites/service";
@@ -58,16 +59,19 @@ export function ReviewPanel({
 
     if (comments.length === 0) {
         return (
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                <PreviewLinks siteId={siteId} />
                 {/*
                  * The design's empty state, which states the whole feature in
-                 * one sentence — worth keeping verbatim rather than reduced to
-                 * "No notes yet", which tells nobody what notes are or how one
-                 * would ever arrive.
+                 * one sentence. Until #198 it described an action that did
+                 * not exist — "share a preview" had no control anywhere — so
+                 * a merchant would form the plan and then fail to find the
+                 * button. The control now sits directly above this sentence.
                  */}
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                    No notes on this site yet. Share a preview and anyone with
-                    the Reviewer role can pin comments to sections.
+                <p className="p-4 text-xs leading-relaxed text-muted-foreground">
+                    No notes on this site yet. Share a preview above so people
+                    can read the draft; anyone with the Reviewer role can pin
+                    notes to sections from this editor.
                 </p>
             </div>
         );
@@ -88,6 +92,7 @@ export function ReviewPanel({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
+            <PreviewLinks siteId={siteId} />
             <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
                 <span className="text-xs text-muted-foreground">
                     {open.length === 0
