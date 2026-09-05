@@ -29,7 +29,7 @@ saroh.io/
 - `app.saroh.in` - Main product dashboard (stores, members, catalog, orders, customers, content)
 - `admin.saroh.in` - Platform admin (session-gated, allowlisted) — scaffold
 - `saroh.app` - Public renderer for user sites (`*.saroh.app`, custom domains) — placeholder
-- `templates.saroh.in` - Design/template showcase — scaffold
+- `templates.saroh.in` - Public template catalogue, read from `api.saroh.in`
 - `ui.saroh.in` - Design-system / component showcase
 - `docs.saroh.in` - Developer documentation (Nextra)
 - `help.saroh.in` - End-user help guides (Nextra)

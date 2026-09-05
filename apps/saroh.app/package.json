@@ -24,7 +24,6 @@
         "lucide-react": "catalog:",
         "nanoid": "^5.1.16",
         "next": "catalog:next16",
-        "next-mdx-remote": "^6.0.0",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
         "sonner": "^2.0.7",
