@@ -299,7 +299,15 @@ export function DataView<TRow>({
                                                         toggleSort(col)
                                                     }
                                                     className={cn(
-                                                        "inline-flex items-center gap-1 hover:text-foreground",
+                                                        // Sorting a column is a
+                                                        // real action, and on a
+                                                        // touch pointer a 20px
+                                                        // header is not a target
+                                                        // (#178). The browser
+                                                        // harness found these;
+                                                        // reading the filter row
+                                                        // by hand did not.
+                                                        "inline-flex items-center gap-1 hover:text-foreground coarse:min-h-11",
                                                         active &&
                                                             "text-foreground",
                                                     )}

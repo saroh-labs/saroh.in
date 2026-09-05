@@ -83,3 +83,8 @@ dist
 # The durable outputs are DESIGN.md and its sidecar, which ARE committed.
 .impeccable/questions/
 .impeccable/sketches/
+
+# Playwright output (traces, screenshots, HTML report)
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/

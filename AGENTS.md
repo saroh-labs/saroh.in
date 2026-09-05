@@ -95,6 +95,26 @@ broken one.
   `tooling/tailwind-config`. `--accent` is a shadcn neutral, not a brand
   accent — renaming it breaks components.
 
+## Browser tests
+
+The only tests that can answer a cross-origin or a layout question. Everything
+in `e2e/` needs the stack actually running.
+
+```bash
+pnpm dev                                          # in another terminal
+pnpm --filter @saroh/e2e install:browsers         # once
+E2E_IGNORE_HTTPS_ERRORS=1 pnpm --filter @saroh/e2e test:e2e
+```
+
+`E2E_IGNORE_HTTPS_ERRORS` is needed locally because portless serves the
+`.localhost` names with its own CA; CI runs on bare ports and does not set it.
+
+**Set `BETTER_AUTH_TRUSTED_ORIGINS` when running the stack yourself.** Unset, it
+falls back to the `*.saroh.in` production list, so a return-to on a `.localhost`
+origin is correctly refused and sign-in silently lands on the app launcher
+instead of the page you asked for (#222). `.env.example` has the right value;
+an ad-hoc `turbo run dev` with your own env does not inherit it.
+
 ## Before you finish
 
 ```bash
