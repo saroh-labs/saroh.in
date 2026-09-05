@@ -137,9 +137,11 @@ export function CapabilityOffState({
 
 export interface PermissionDeniedStateProps extends Omit<
     StateCardProps,
-    "tone" | "outline" | "icon"
+    "tone" | "outline" | "icon" | "title"
 > {
     icon?: React.ReactNode;
+    /** Optional: this state carries a sensible default. */
+    title?: React.ReactNode;
 }
 
 /**
@@ -169,9 +171,15 @@ export function PermissionDeniedState({
 
 export interface FailedStateProps extends Omit<
     StateCardProps,
-    "tone" | "outline" | "icon"
+    "tone" | "outline" | "icon" | "title"
 > {
     icon?: React.ReactNode;
+    /**
+     * Optional: a failure has a usable default. A caller that knows WHAT
+     * failed should still say so — "Orders could not be loaded" beats "This
+     * could not be loaded" on a screen showing three panels.
+     */
+    title?: React.ReactNode;
     /** A retry control. §30 requires retry to be offered, not just described. */
     action?: React.ReactNode;
 }

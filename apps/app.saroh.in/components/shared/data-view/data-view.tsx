@@ -157,7 +157,7 @@ export function DataView<TRow>({
                                 onChange={(e) => setQuery(e.target.value)}
                                 placeholder="Search…"
                                 aria-label="Search this view"
-                                className="h-9 w-full max-w-xs sm:w-64"
+                                className="h-9 w-full max-w-xs coarse:h-11 sm:w-64"
                             />
                         ) : null}
 
@@ -165,7 +165,7 @@ export function DataView<TRow>({
                             <div
                                 role="group"
                                 aria-label="Filter"
-                                className="flex flex-wrap items-center gap-1"
+                                className="flex flex-wrap items-center gap-1 coarse:gap-2"
                             >
                                 {filters?.map((f) => {
                                     const on = f.id === filterId;
@@ -182,7 +182,14 @@ export function DataView<TRow>({
                                             aria-pressed={on}
                                             onClick={() => chooseFilter(f.id)}
                                             className={cn(
-                                                "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
+                                                // `coarse:` = a touch pointer,
+                                                // i.e. two of the four primary
+                                                // scenes. 32px is a mouse
+                                                // target; a thumb on a shop
+                                                // floor needs 44 (§17, §19).
+                                                // The chip stays 32 on the desk,
+                                                // where density is the point.
+                                                "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors coarse:h-11 coarse:px-3.5 coarse:text-sm",
                                                 on
                                                     ? "border-brand/50 bg-brand/10 text-foreground"
                                                     : "border-border text-muted-foreground hover:bg-accent/50 hover:text-foreground",
@@ -217,7 +224,7 @@ export function DataView<TRow>({
                                         aria-pressed={on}
                                         onClick={() => choose(m)}
                                         className={cn(
-                                            "h-7 gap-1.5 rounded-sm px-2.5 text-xs font-medium",
+                                            "h-7 gap-1.5 rounded-sm px-2.5 text-xs font-medium coarse:h-11 coarse:px-3.5",
                                             on &&
                                                 "bg-accent text-accent-foreground",
                                         )}

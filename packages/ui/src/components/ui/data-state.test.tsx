@@ -124,6 +124,6 @@ describe("product states are distinguishable", () => {
         const { container } = render(element);
 
         expect(container.querySelector("[title]")).toBeNull();
-        expect(container.textContent?.trim().length ?? 0).toBeGreaterThan(0);
+        expect(container.textContent.trim().length).toBeGreaterThan(0);
     });
 });

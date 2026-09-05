@@ -36,6 +36,7 @@ export function MobileNav({
     moduleKeys = null,
     counts,
     sites = [],
+    organizationName,
 }: {
     unread?: number;
     /** `null` = availability unknown; see `filterNavGroups`. */
@@ -44,6 +45,8 @@ export function MobileNav({
     counts?: NavCounts;
     /** The merchant's own sites, hung under Website — same tree as the rail. */
     sites?: { id: string; name: string }[];
+    /** The workspace this nav belongs to; see the header below. */
+    organizationName?: string;
 }) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
@@ -65,8 +68,17 @@ export function MobileNav({
                 </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72">
-                <SheetHeader>
-                    <SheetTitle>Menu</SheetTitle>
+                {/*
+                 * The workspace is named here because on a phone it is named
+                 * NOWHERE else (#178). The header's org switcher truncates to
+                 * its chevron once the controls are sized for a thumb, so a
+                 * merchant who belongs to two organizations had no way to tell
+                 * which one they were looking at without opening a menu that
+                 * then said "Menu". This is the screen they open to orient
+                 * themselves, and it has the room the header does not.
+                 */}
+                <SheetHeader className="text-left">
+                    <SheetTitle>{organizationName ?? "Menu"}</SheetTitle>
                     {/* Radix warns without one, and the warning is right: a
                         dialog announced as "Menu" and nothing else tells a
                         screen-reader user what they have just opened. */}

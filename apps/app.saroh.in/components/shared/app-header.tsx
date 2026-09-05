@@ -89,6 +89,7 @@ export function AppHeader(props: AppHeaderProps) {
                     moduleKeys={moduleKeys}
                     counts={counts}
                     sites={props.sites}
+                    organizationName={activeOrg?.name}
                 />
                 {/*
                  * Hidden below 380px (#178, §18). At 320 the left group
@@ -103,12 +104,17 @@ export function AppHeader(props: AppHeaderProps) {
                  * The wordmark is what gives way because it is the only thing
                  * here that does nothing: the hamburger already opens
                  * navigation and the org switcher already says which workspace
-                 * this is. It returns at 380px.
+                 * this is. It returns at `sm`.
+                 *
+                 * Hidden on every phone width, not just the narrowest. Once the
+                 * controls grew to 44px touch targets (the whole point of #178)
+                 * the header no longer fit at 390 either, and the org switcher
+                 * went back to sitting on top of the search button.
                  */}
                 <Link
                     href="/"
                     aria-label="Saroh"
-                    className="hidden shrink-0 min-[380px]:block lg:hidden"
+                    className="hidden shrink-0 sm:block lg:hidden"
                 >
                     <Wordmark />
                 </Link>
