@@ -95,6 +95,17 @@ broken one.
   `tooling/tailwind-config`. `--accent` is a shadcn neutral, not a brand
   accent — renaming it breaks components.
 
+## `SKIP_ENV_VALIDATION` drops the defaults too
+
+The API's typed env module returns `process.env` untouched when that flag is
+set — so it skips the schema's **defaults** as well as its validation. `PORT`
+has a default of 3333 that never applies, and `app.listen(undefined)` binds a
+random port.
+
+It looks fine locally because `apps/api.saroh.in/.env` sets `PORT`. Anywhere
+without a `.env` — CI, a container — you must pass every value the app needs,
+including the ones that "have a default". This cost a red CI run.
+
 ## Browser tests
 
 The only tests that can answer a cross-origin or a layout question. Everything
