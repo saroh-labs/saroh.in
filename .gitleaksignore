@@ -22,3 +22,10 @@
 # The same placeholder, quoted verbatim in this file's own comment by the commit
 # that introduced it. Same value, same reasoning, new fingerprint.
 a04cd3486ee98ef36c06ce32e7c982cb882ca429:.gitleaksignore:generic-api-key:8
+
+# The same CI placeholder again, in the browser-E2E job's env block. That job
+# builds and starts the apps, so the typed-env validation needs a value of the
+# minimum length exactly as the first job does. Identical value, identical
+# reasoning, identical entropy (3.60) under the same catch-all rule — and a new
+# fingerprint, because a fingerprint is pinned to commit, path and line.
+ad86c5a44e20d53db5a5353bf969a795cc4e8c9d:.github/workflows/ci.yml:generic-api-key:254
