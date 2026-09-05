@@ -1,4 +1,5 @@
 import { Controller, Get, Param } from "@nestjs/common";
+import { listTemplates } from "@saroh/templates";
 
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
@@ -21,6 +22,27 @@ export class PublicSitesController {
         private readonly sites: SitesService,
         private readonly previewLinks: SitePreviewLinksService,
     ) {}
+
+    /**
+     * The template catalogue, for the public showcase on templates.saroh.in
+     * (#107). Unauthenticated on purpose: this is what a site can be built
+     * from, which is a claim about the product rather than about any tenant.
+     *
+     * The org-scoped `GET .../sites/templates` returns the same registry to a
+     * signed-in merchant choosing one. This adds page titles, which a showcase
+     * needs to describe a template and a picker does not, and it carries no
+     * Organization, Site, or Publication data of any kind.
+     */
+    @Get("templates")
+    templates() {
+        return listTemplates().map((template) => ({
+            id: template.id,
+            version: template.version,
+            name: template.name,
+            description: template.description,
+            pages: template.pages.map((page) => page.title),
+        }));
+    }
 
     /** Current publication snapshot for the site on `<subdomain>.saroh.app`. */
     @Get("by-subdomain/:subdomain")

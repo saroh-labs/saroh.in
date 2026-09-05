@@ -64,7 +64,7 @@ app's `portless` field in its `package.json`.
 | `app.saroh.in`       | app.saroh.in                             | https://app.saroh.localhost       | The merchant workspace — website, schedule, services, sell, contacts, leads, insights        |
 | `admin.saroh.in`     | admin.saroh.in                           | https://admin.saroh.localhost     | Platform admin — staff RBAC, permission guards, platform audit, feature flags (#128)         |
 | `saroh.app`          | saroh.app, `*.saroh.app`, custom domains | https://saroh.app.localhost       | Public renderer for merchant sites — pages, posts, checkout, draft previews                  |
-| `templates.saroh.in` | templates.saroh.in                       | https://templates.saroh.localhost | Design showcase — scaffold                                                                   |
+| `templates.saroh.in` | templates.saroh.in                       | https://templates.saroh.localhost | Public template catalogue, read from the API                                                 |
 | `ui.saroh.in`        | ui.saroh.in                              | https://ui.saroh.localhost        | Design-system / component showcase                                                           |
 | `docs.saroh.in`      | docs.saroh.in                            | https://docs.saroh.localhost      | Developer documentation (Nextra)                                                             |
 | `help.saroh.in`      | help.saroh.in                            | https://help.saroh.localhost      | End-user help guides (Nextra)                                                                |
