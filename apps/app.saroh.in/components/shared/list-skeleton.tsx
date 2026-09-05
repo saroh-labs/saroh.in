@@ -1,3 +1,4 @@
+import { LoadingState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 
@@ -21,20 +22,18 @@ export function ListSkeleton({
     maxWidth?: string;
 }) {
     return (
-        <main
-            className={cn("mx-auto w-full p-6 sm:p-8", maxWidth)}
-            aria-busy="true"
-            aria-label="Loading"
-        >
-            <div className="mb-6 space-y-2">
+        <main className={cn("mx-auto w-full p-6 sm:p-8", maxWidth)}>
+            {/* The page heading, which is a shape this component knows and the
+                shared primitive does not. */}
+            <div className="mb-6 space-y-2" aria-hidden>
                 <Skeleton className="h-8 w-48" />
                 <Skeleton className="h-4 w-72" />
             </div>
-            <div className="space-y-3">
-                {Array.from({ length: rows }).map((_, i) => (
-                    <Skeleton key={i} className="h-20 w-full rounded-lg" />
-                ))}
-            </div>
+            {/* The rows come from the shared `LoadingState` (#177) so there is
+                ONE loading treatment rather than two that drift: it carries the
+                `aria-busy` and the announced label, so a screen reader is told
+                this is arriving instead of being read a wall of empty boxes. */}
+            <LoadingState rows={rows} className="gap-3 [&>*]:h-20" />
         </main>
     );
 }
