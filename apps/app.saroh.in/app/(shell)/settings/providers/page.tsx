@@ -1,4 +1,4 @@
-import { EmptyState } from "@saroh/ui/empty-state";
+import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { ProviderHealthCard } from "@/components/providers/provider-health-card";
@@ -15,7 +15,7 @@ export const metadata = { title: "Providers" };
 
 export default async function ProvidersSettingsPage() {
     await requireSession();
-    const health = await listProviderHealth();
+    const result = await listProviderHealth();
 
     return (
         <main className="mx-auto max-w-3xl p-8">
@@ -23,14 +23,22 @@ export default async function ProvidersSettingsPage() {
                 title="Providers & health"
                 description="The external services your modules depend on, and whether each is ready."
             />
-            {health.length === 0 ? (
+            {/* Three outcomes, three states. "Nothing to show" was previously
+                rendered for both a denial and an empty list, which are
+                different facts about the same screen (#177, §30). */}
+            {result.status === "denied" ? (
+                <PermissionDeniedState
+                    title="Provider health is limited to owners and admins"
+                    description="It can name the credentials an organization depends on, so it is kept to the roles that manage them. An owner or admin can tell you whether anything needs attention."
+                />
+            ) : result.health.length === 0 ? (
                 <EmptyState
-                    title="Nothing to show"
-                    description="Provider health is available to owners and admins."
+                    title="No providers connected yet"
+                    description="Payments, messaging and domains appear here once a module that needs them is set up."
                 />
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
-                    {health.map((h) => (
+                    {result.health.map((h) => (
                         <ProviderHealthCard key={h.key} health={h} />
                     ))}
                 </div>
