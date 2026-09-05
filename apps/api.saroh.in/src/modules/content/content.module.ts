@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PostCategoriesController } from "./post-categories.controller";
 import { PostCategoriesService } from "./post-categories.service";
@@ -16,7 +17,7 @@ import { PostsService } from "./posts.service";
  * shop can write.
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule)],
+    imports: [forwardRef(() => OrganizationsModule), CapabilitiesModule],
     controllers: [PostsController, PostCategoriesController],
     providers: [PostsService, PostCategoriesService, OrganizationGuard],
     exports: [PostsService, PostCategoriesService],

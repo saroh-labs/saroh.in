@@ -2,6 +2,7 @@ import type { OnModuleInit } from "@nestjs/common";
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
@@ -27,7 +28,11 @@ import { commsProviderFactoryProvider } from "./providers/provider.factory";
  *    (real email/WhatsApp adapters in prod) backs it via `COMMS_PROVIDER_FACTORY`.
  */
 @Module({
-    imports: [JobsModule, forwardRef(() => OrganizationsModule)],
+    imports: [
+        JobsModule,
+        forwardRef(() => OrganizationsModule),
+        CapabilitiesModule,
+    ],
     controllers: [CommunicationsController],
     providers: [
         CommunicationsService,

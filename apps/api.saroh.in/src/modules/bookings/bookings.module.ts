@@ -2,6 +2,7 @@ import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
+import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { BookingsController } from "./bookings.controller";
 import { BookingsService } from "./bookings.service";
@@ -18,7 +19,11 @@ import { PublicBookingsController } from "./public-bookings.controller";
  * single {@link BookingsService}.
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule), AnalyticsCoreModule],
+    imports: [
+        forwardRef(() => OrganizationsModule),
+        AnalyticsCoreModule,
+        CapabilitiesModule,
+    ],
     controllers: [BookingsController, PublicBookingsController],
     providers: [BookingsService, OrganizationGuard],
     exports: [BookingsService],

@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { FormsController } from "./forms.controller";
 import { FormsService } from "./forms.service";
@@ -12,7 +13,7 @@ import { FormsService } from "./forms.service";
  * {@link FormsService} for reuse (e.g. future CRM tickets).
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule)],
+    imports: [forwardRef(() => OrganizationsModule), CapabilitiesModule],
     controllers: [FormsController],
     providers: [FormsService, OrganizationGuard],
     exports: [FormsService],

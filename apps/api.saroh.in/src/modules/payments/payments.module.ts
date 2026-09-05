@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
@@ -15,7 +16,7 @@ import { PublicPaymentsController } from "./public-payments.controller";
  * `PROVIDER_FACTORY` token.
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule)],
+    imports: [forwardRef(() => OrganizationsModule), CapabilitiesModule],
     controllers: [PaymentsController, PublicPaymentsController],
     providers: [PaymentsService, providerFactoryProvider, OrganizationGuard],
     exports: [PaymentsService],
