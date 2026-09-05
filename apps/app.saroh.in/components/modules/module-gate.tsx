@@ -1,6 +1,5 @@
 import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/empty-state";
-import { Blocks } from "lucide-react";
+import { CapabilityOffState } from "@saroh/ui/data-state";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -18,8 +17,7 @@ import type { ModuleView } from "@/lib/modules/schema";
 function Unavailable({ capability }: { capability: ModuleView }) {
     const archived = capability.lifecycle === "ARCHIVED";
     return (
-        <EmptyState
-            icon={<Blocks />}
+        <CapabilityOffState
             title={`${capability.label} is turned off`}
             description={
                 archived

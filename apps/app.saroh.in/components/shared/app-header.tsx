@@ -82,31 +82,49 @@ export function AppHeader(props: AppHeaderProps) {
         // nothing could give while the org switcher reserved a flat 16rem.
         // Now the trailing controls hold their size and the switcher absorbs
         // whatever is left, truncating its label to fit any width.
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b bg-background px-4 sm:gap-4 sm:px-6">
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b bg-background px-2 min-[380px]:gap-3 min-[380px]:px-4 sm:gap-4 sm:px-6">
+            <div className="flex shrink-0 items-center gap-1 min-[380px]:gap-2 sm:gap-3">
                 <MobileNav
                     unread={unread}
                     moduleKeys={moduleKeys}
                     counts={counts}
                     sites={props.sites}
                 />
+                {/*
+                 * Hidden below 380px (#178, §18). At 320 the left group
+                 * (menu + wordmark + search) and the right group (org switcher
+                 * + four controls) together exceed the viewport, and because
+                 * the right group is `justify-end` its children were laid out
+                 * OVER the left group's — the org switcher sat on top of the
+                 * search button. Nothing was unreachable, but two controls
+                 * occupied the same pixels, which on a phone means tapping one
+                 * and getting the other.
+                 *
+                 * The wordmark is what gives way because it is the only thing
+                 * here that does nothing: the hamburger already opens
+                 * navigation and the org switcher already says which workspace
+                 * this is. It returns at 380px.
+                 */}
                 <Link
                     href="/"
                     aria-label="Saroh"
-                    className="shrink-0 lg:hidden"
+                    className="hidden shrink-0 min-[380px]:block lg:hidden"
                 >
                     <Wordmark />
                 </Link>
                 <CommandTrigger />
             </div>
-            <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-4">
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-1 min-[380px]:gap-2 sm:gap-4">
                 {activeOrg && (
                     <OrganizationSwitcher
                         organizations={organizations}
                         activeOrgId={activeOrg.id}
                     />
                 )}
-                <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                {/* Gaps, not controls, give way below 380px. Every one of
+                    these stays reachable on a phone — the skin picker has no
+                    other home, so hiding it would strand it. */}
+                <div className="flex shrink-0 items-center gap-0 min-[380px]:gap-1 sm:gap-2">
                     <HelpLink />
                     <SkinSwitcher />
                     <ThemeToggle />

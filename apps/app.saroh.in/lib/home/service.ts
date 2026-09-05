@@ -57,12 +57,26 @@ export interface HomeNumber {
     moduleKey?: string;
 }
 
+/**
+ * A part of Home that could not be read (#177, §30).
+ *
+ * The API distinguishes "you have no open orders" from "we could not find out",
+ * and Home has to render that difference — a screen that silently drops a
+ * failed source reports "nothing to do" when the truth is "we do not know".
+ */
+export interface HomeUnavailable {
+    moduleKey: string;
+    label: string;
+}
+
 export interface HomeModel {
     actions: HomeAction[];
     primaryAction: HomeAction | null;
     hasAnyModule: boolean;
     upcoming: HomeBooking[];
     numbers: HomeNumber[];
+    /** Empty on a healthy read; non-empty means what is shown is incomplete. */
+    unavailable: HomeUnavailable[];
 }
 
 const EMPTY: HomeModel = {
@@ -71,6 +85,7 @@ const EMPTY: HomeModel = {
     hasAnyModule: false,
     upcoming: [],
     numbers: [],
+    unavailable: [],
 };
 
 export async function getHome(projectId?: string): Promise<HomeModel> {

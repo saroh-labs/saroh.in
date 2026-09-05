@@ -128,6 +128,99 @@ const OPEN_ORDER = {
     },
 };
 
+/**
+ * Home aggregates several independent reads. Before #177 they were awaited
+ * unguarded, so one failing source threw out of `build()` and the merchant got
+ * the segment error boundary: no actions, no schedule, no numbers — including
+ * every part that had answered fine. Home is where the decision about what to
+ * do next is made, and "everything is broken" was both untrue and the least
+ * useful thing to say.
+ */
+describe("HomeService degrades one source at a time (#177, §30)", () => {
+    const ACTIVE_ALL: View[] = [
+        { key: "COMMERCE", label: "Sell", readiness: "ACTIVE" },
+        { key: "APPOINTMENTS", label: "Appointments", readiness: "ACTIVE" },
+    ];
+
+    function buildWithFailure(
+        failing: "order" | "booking",
+        views: View[] = ACTIVE_ALL,
+    ) {
+        const service = build(views, {
+            bookings: [
+                {
+                    id: "bk_1",
+                    startAt: new Date("2026-08-01T09:00:00.000Z"),
+                    endAt: new Date("2026-08-01T10:00:00.000Z"),
+                    timezone: "Asia/Kolkata",
+                    status: "CONFIRMED",
+                    bookerName: "Priya",
+                    bookerEmail: null,
+                    service: { name: "Consultation" },
+                    contact: null,
+                },
+            ],
+            orders: [OPEN_ORDER],
+        });
+
+        // Reach the mocked client the service was constructed with.
+        const db = (
+            service as unknown as {
+                db: Record<
+                    string,
+                    {
+                        count: jest.Mock;
+                        findMany: jest.Mock;
+                    }
+                >;
+            }
+        ).db;
+        const boom = new Error("relation is being migrated");
+        db[failing].count.mockRejectedValue(boom);
+        db[failing].findMany.mockRejectedValue(boom);
+        return service;
+    }
+
+    it("still returns the parts that answered when open orders fail", async () => {
+        const home = await buildWithFailure("order").build(INPUT);
+
+        expect(home.unavailable).toEqual([
+            { moduleKey: "COMMERCE", label: "Open orders" },
+        ]);
+        // The schedule survived, which is the whole point.
+        expect(home.upcoming).toHaveLength(1);
+    });
+
+    it("names the schedule when it is the part that failed", async () => {
+        const home = await buildWithFailure("booking").build(INPUT);
+
+        expect(home.unavailable).toEqual([
+            { moduleKey: "APPOINTMENTS", label: "Schedule" },
+        ]);
+        expect(home.upcoming).toEqual([]);
+    });
+
+    // The distinction §30 exists for: a failed source must never be reported
+    // as an absence. "No open orders" and "we could not find out" are
+    // different facts and the merchant acts on the difference.
+    it("does not emit a SUGGESTION that assumes an empty catalog when the read failed", async () => {
+        const home = await buildWithFailure("order").build(INPUT);
+
+        expect(home.actions.map((action) => action.code)).not.toContain(
+            "COMMERCE_OPEN_ORDERS",
+        );
+        expect(home.unavailable).not.toHaveLength(0);
+    });
+
+    it("reports nothing unavailable on a healthy read", async () => {
+        const home = await build(ACTIVE_ALL, { orders: [OPEN_ORDER] }).build(
+            INPUT,
+        );
+
+        expect(home.unavailable).toEqual([]);
+    });
+});
+
 describe("HomeService ranking", () => {
     it("puts an attention action before a suggestion", async () => {
         const svc = build([

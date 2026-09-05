@@ -166,8 +166,21 @@ function ActionBlock({
                 className={cn("absolute inset-y-0 left-0 w-0.5", severity.rail)}
             />
 
-            <header className="flex items-center justify-between gap-3 px-4 py-3">
-                <div className="flex min-w-0 items-center gap-2.5">
+            {/*
+             * `flex-wrap` is load-bearing, not cosmetic (#178, §18). The title
+             * group and a `whitespace-nowrap` button gave this header a
+             * min-content width of 396px, and because a grid item defaults to
+             * `min-width: auto` that floor propagated all the way up: at a
+             * 320px viewport the whole of Home scrolled sideways by ~100px.
+             * The shop floor and the phone are primary scenes, and horizontal
+             * scrolling on an action list is how a merchant misses the action.
+             *
+             * Wrapping rather than shrinking on purpose: §17 says avoid tiny
+             * controls, so the button drops to its own line at full size and
+             * stays thumb-reachable instead of being squeezed.
+             */}
+            <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
+                <div className="flex min-w-0 flex-1 basis-40 items-center gap-2.5">
                     <Badge className={cn("shrink-0", severity.badge)}>
                         {severity.label}
                     </Badge>
