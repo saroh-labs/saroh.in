@@ -62,8 +62,20 @@ test.describe("cross-origin session", () => {
         await page.getByRole("button", { name: "Log in" }).click();
 
         await page.waitForURL(/\/bookings/, { timeout: 30_000 });
+
+        /*
+         * The claim is about the DESTINATION, so that is what is asserted.
+         *
+         * This used to check for the "Bookings" heading, which passed locally
+         * and failed in CI — because a freshly seeded database has no
+         * `MODULE_*` rollout flags, so Appointments is unavailable and
+         * `/bookings` correctly renders "Appointments is turned off". That is
+         * still the page the visitor asked for, which is the whole of #222;
+         * tying the test to one module's content made it a test of the seed.
+         */
+        expect(new URL(page.url()).pathname).toBe("/bookings");
         await expect(
-            page.getByRole("heading", { name: "Bookings", level: 1 }),
+            page.getByRole("button", { name: "Your account" }),
         ).toBeVisible();
     });
 
