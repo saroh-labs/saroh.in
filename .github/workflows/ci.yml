@@ -251,6 +251,12 @@ jobs:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_e2e_test
       DATABASE_TARGET_CONFIRM: saroh_e2e_test
+      # Explicit, and load-bearing. `SKIP_ENV_VALIDATION` makes the API's typed
+      # env module return `process.env` untouched, which bypasses the SCHEMA
+      # DEFAULTS as well as the validation — so `env.PORT` is undefined here and
+      # Nest binds a random port. It only looks fine locally because
+      # `apps/api.saroh.in/.env` sets PORT and a runner has no .env at all.
+      PORT: 3333
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters
       BETTER_AUTH_URL: http://localhost:3333
       # The redirect-after-sign-in check (#222) fails without this: the trusted
@@ -310,22 +316,33 @@ jobs:
           pnpm --filter auth exec next start -p 3000 > /tmp/accounts.log 2>&1 &
           pnpm --filter application exec next start -p 3003 > /tmp/app.log 2>&1 &
 
-          for name in "api:3333/health" "accounts:3000/login" "app:3003"; do
-            url="http://localhost:${name#*:}"
+          wait_for() {
+            name="$1"
+            url="$2"
             for attempt in $(seq 1 60); do
-              if curl -sf -o /dev/null "$url" || \
-                 [ "$(curl -s -o /dev/null -w '%{http_code}' "$url")" = "307" ]; then
-                echo "${name%%:*} is up"
-                break
-              fi
-              if [ "$attempt" = "60" ]; then
-                echo "::error::${name%%:*} never came up"
-                tail -50 /tmp/api.log /tmp/accounts.log /tmp/app.log || true
-                exit 1
-              fi
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo 000)
+              # 307 is the workspace bouncing an anonymous visitor to sign in,
+              # which means it is serving.
+              case "$code" in
+                200|307) echo "$name is up ($code)"; return 0 ;;
+              esac
               sleep 2
             done
-          done
+            echo "::error::$name never came up (last status ${code})"
+            return 1
+          }
+
+          # `tail -n 50`, not `tail -50`: the obsolete form is rejected in this
+          # context, so the first version of this dump failed silently and a
+          # failed run reported nothing about WHY the stack did not start.
+          if ! wait_for api http://localhost:3333/health \
+            || ! wait_for accounts http://localhost:3000/login \
+            || ! wait_for app http://localhost:3003/; then
+            echo "----- api -----";      tail -n 50 /tmp/api.log      || true
+            echo "----- accounts -----"; tail -n 50 /tmp/accounts.log || true
+            echo "----- app -----";      tail -n 50 /tmp/app.log      || true
+            exit 1
+          fi
 
       - name: Run browser tests
         run: pnpm --filter @saroh/e2e test:e2e
