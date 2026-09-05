@@ -14,6 +14,8 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
+import { RequireModule } from "../capabilities/require-module.decorator";
 import { CreatePostDto, UpdatePostDto } from "./dto";
 import { PostsService } from "./posts.service";
 
@@ -28,7 +30,8 @@ import { PostsService } from "./posts.service";
  * enforces the site policy on top and proves the site belongs to the org.
  */
 @Controller("organizations/:organizationId/sites/:siteId/posts")
-@UseGuards(BetterAuthGuard, OrganizationGuard)
+@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+@RequireModule("WEBSITE")
 export class PostsController {
     constructor(private readonly posts: PostsService) {}
 

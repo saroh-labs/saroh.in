@@ -14,6 +14,8 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
+import { RequireModule } from "../capabilities/require-module.decorator";
 import { CreatePipelineDto, CreateStageDto, UpdateStageDto } from "./dto";
 import { PipelinesService } from "./pipelines.service";
 
@@ -27,7 +29,8 @@ import { PipelinesService } from "./pipelines.service";
  * service.
  */
 @Controller("organizations/:organizationId/pipelines")
-@UseGuards(BetterAuthGuard, OrganizationGuard)
+@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+@RequireModule("CRM")
 export class PipelinesController {
     constructor(private readonly pipelines: PipelinesService) {}
 

@@ -14,6 +14,8 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
+import { RequireModule } from "../capabilities/require-module.decorator";
 import {
     CreateActivityDto,
     CreateLeadDto,
@@ -32,7 +34,8 @@ import { LeadsService } from "./leads.service";
  * `lead:read`, writes `lead:write` — enforced in the service.
  */
 @Controller("organizations/:organizationId/leads")
-@UseGuards(BetterAuthGuard, OrganizationGuard)
+@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+@RequireModule("CRM")
 export class LeadsController {
     constructor(private readonly leads: LeadsService) {}
 
@@ -122,7 +125,8 @@ export class LeadsController {
  * as {@link LeadsController}; reads require `activity:read`.
  */
 @Controller("organizations/:organizationId/tasks")
-@UseGuards(BetterAuthGuard, OrganizationGuard)
+@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+@RequireModule("CRM")
 export class TasksController {
     constructor(private readonly leads: LeadsService) {}
 
