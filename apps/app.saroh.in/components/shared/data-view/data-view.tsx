@@ -157,7 +157,7 @@ export function DataView<TRow>({
                                 onChange={(e) => setQuery(e.target.value)}
                                 placeholder="Search…"
                                 aria-label="Search this view"
-                                className="h-9 w-full max-w-xs sm:w-64"
+                                className="h-9 w-full max-w-xs coarse:h-11 sm:w-64"
                             />
                         ) : null}
 
@@ -165,7 +165,7 @@ export function DataView<TRow>({
                             <div
                                 role="group"
                                 aria-label="Filter"
-                                className="flex flex-wrap items-center gap-1"
+                                className="flex flex-wrap items-center gap-1 coarse:gap-2"
                             >
                                 {filters?.map((f) => {
                                     const on = f.id === filterId;
@@ -182,7 +182,14 @@ export function DataView<TRow>({
                                             aria-pressed={on}
                                             onClick={() => chooseFilter(f.id)}
                                             className={cn(
-                                                "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
+                                                // `coarse:` = a touch pointer,
+                                                // i.e. two of the four primary
+                                                // scenes. 32px is a mouse
+                                                // target; a thumb on a shop
+                                                // floor needs 44 (§17, §19).
+                                                // The chip stays 32 on the desk,
+                                                // where density is the point.
+                                                "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors coarse:h-11 coarse:px-3.5 coarse:text-sm",
                                                 on
                                                     ? "border-brand/50 bg-brand/10 text-foreground"
                                                     : "border-border text-muted-foreground hover:bg-accent/50 hover:text-foreground",
@@ -217,7 +224,7 @@ export function DataView<TRow>({
                                         aria-pressed={on}
                                         onClick={() => choose(m)}
                                         className={cn(
-                                            "h-7 gap-1.5 rounded-sm px-2.5 text-xs font-medium",
+                                            "h-7 gap-1.5 rounded-sm px-2.5 text-xs font-medium coarse:h-11 coarse:px-3.5",
                                             on &&
                                                 "bg-accent text-accent-foreground",
                                         )}
@@ -292,7 +299,15 @@ export function DataView<TRow>({
                                                         toggleSort(col)
                                                     }
                                                     className={cn(
-                                                        "inline-flex items-center gap-1 hover:text-foreground",
+                                                        // Sorting a column is a
+                                                        // real action, and on a
+                                                        // touch pointer a 20px
+                                                        // header is not a target
+                                                        // (#178). The browser
+                                                        // harness found these;
+                                                        // reading the filter row
+                                                        // by hand did not.
+                                                        "inline-flex items-center gap-1 hover:text-foreground coarse:min-h-11",
                                                         active &&
                                                             "text-foreground",
                                                     )}
@@ -338,18 +353,50 @@ export function DataView<TRow>({
                                     }
                                     className="wk-item border-b border-border transition-colors last:border-b-0 hover:bg-accent/50"
                                 >
-                                    {tableColumns.map((col) => (
-                                        <td
-                                            key={col.id}
-                                            className={cn(
-                                                "px-3 py-2.5 align-middle",
-                                                col.numeric &&
-                                                    "text-right tabular-nums",
-                                            )}
-                                        >
-                                            {col.cell(row)}
-                                        </td>
-                                    ))}
+                                    {tableColumns.map((col, colIndex) => {
+                                        const href = rowHref?.(row);
+                                        return (
+                                            <td
+                                                key={col.id}
+                                                className={cn(
+                                                    "px-3 py-2.5 align-middle",
+                                                    col.numeric &&
+                                                        "text-right tabular-nums",
+                                                )}
+                                            >
+                                                {/*
+                                                 * The FIRST cell carries the
+                                                 * row link, not the row.
+                                                 *
+                                                 * List mode stretches an
+                                                 * overlay anchor across the
+                                                 * row, which a `tr` cannot
+                                                 * hold: `position: relative`
+                                                 * on a table row is not
+                                                 * reliable across browsers, so
+                                                 * the overlay would escape to
+                                                 * the table. Anchoring the
+                                                 * link to one cell keeps a
+                                                 * real, focusable target with
+                                                 * real text, and keeps it out
+                                                 * of the cells where callers
+                                                 * put their own links — a
+                                                 * booking's contact link would
+                                                 * otherwise nest inside it.
+                                                 */}
+                                                {href && colIndex === 0 ? (
+                                                    <Link
+                                                        href={href}
+                                                        className="block rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                                    >
+                                                        {col.cell(row)}
+                                                    </Link>
+                                                ) : (
+                                                    col.cell(row)
+                                                )}
+                                            </td>
+                                        );
+                                    })}
                                     {rowActions ? (
                                         <td className="whitespace-nowrap px-3 py-2.5 text-right align-middle">
                                             {rowActions(row)}

@@ -29,6 +29,12 @@ export interface Post {
     createdAt: string;
     category: { id: string; name: string } | null;
     author: string | null;
+    /**
+     * Whether the PUBLIC is being served this post (#232) — which `status`
+     * alone cannot say, because a post edited since it went live is still
+     * PUBLISHED and the live copy is the older one.
+     */
+    live: boolean;
 }
 
 export interface PostDetail {
@@ -44,6 +50,10 @@ export interface PostDetail {
     publishedAt: string | null;
     createdAt: string;
     author: string | null;
+    /** Whether the public is being served this post (#232). */
+    live: boolean;
+    /** When the live copy was published, or null. */
+    liveAt: string | null;
 }
 
 export interface PostInput {
@@ -171,4 +181,21 @@ export async function deletePostCategory(siteId: string, categoryId: string) {
     const base = await siteBase(siteId);
     if (!base) return noOrg();
     return mutate(`${base}/post-categories/${categoryId}`, "DELETE");
+}
+
+/** Put this post on the site (#232). */
+export async function publishPost(
+    siteId: string,
+    postId: string,
+): Promise<Result<{ path: string }>> {
+    const base = await siteBase(siteId);
+    if (!base) return noOrg();
+    return mutate<{ path: string }>(`${base}/posts/${postId}/publish`, "POST");
+}
+
+/** Take it off the site, keeping its history (#232). */
+export async function unpublishPost(siteId: string, postId: string) {
+    const base = await siteBase(siteId);
+    if (!base) return noOrg();
+    return mutate(`${base}/posts/${postId}/publish`, "DELETE");
 }

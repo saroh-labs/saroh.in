@@ -15,6 +15,9 @@ import {
     formatDayHeading,
     formatTimeRange,
 } from "@/lib/format/datetime";
+// From ./booking-state, NOT ./service: this is a client component, and the
+// service module reaches next/headers through the CRM HTTP plumbing.
+import { hasEnded, needsOutcome } from "@/lib/services/booking-state";
 import type { BookingWithService } from "@/lib/services/service";
 
 /**
@@ -34,6 +37,16 @@ import type { BookingWithService } from "@/lib/services/service";
 const WITHIN_A_WEEK = 7;
 
 const FILTERS: DataFilter<BookingWithService>[] = [
+    // Upcoming leads, because the schedule is mostly read forwards. "Needs an
+    // outcome" is the one that earns its place beside it: those appointments
+    // are finished, invisible to every other view, and only a person can
+    // resolve them (#241).
+    { id: "upcoming", label: "Upcoming", predicate: (b) => !hasEnded(b) },
+    {
+        id: "outcome",
+        label: "Needs an outcome",
+        predicate: (b) => needsOutcome(b),
+    },
     { id: "all", label: "All" },
     {
         id: "today",
@@ -147,6 +160,29 @@ export function BookingsView({
             ),
         },
         {
+            id: "outcome",
+            header: "How it went",
+            priority: "secondary",
+            sortValue: (b) => b.outcome ?? "",
+            // Only meaningful once an appointment is over, and deliberately
+            // blank rather than "—" for a future one: there is nothing to
+            // report yet, which is different from nobody having said.
+            cell: (b) =>
+                b.outcome ? (
+                    <span
+                        className={cn(
+                            b.outcome === "NO_SHOW"
+                                ? "text-warning-subtle-foreground"
+                                : "text-muted-foreground",
+                        )}
+                    >
+                        {b.outcome === "ATTENDED" ? "Attended" : "No-show"}
+                    </span>
+                ) : needsOutcome(b) ? (
+                    <span className="text-muted-foreground">Not said yet</span>
+                ) : null,
+        },
+        {
             id: "status",
             header: "Status",
             priority: "secondary",
@@ -174,14 +210,22 @@ export function BookingsView({
             rows={bookings}
             columns={columns}
             rowKey={(b) => b.id}
+            // A row is a destination now (#121): the detail screen is where a
+            // booking is moved, and where the two questions a merchant is
+            // asked on the phone — who is this, can we move it — are answered.
+            rowHref={(b) => `/bookings/${b.id}`}
             modes={["table", "list"]}
             defaultMode="table"
             filters={FILTERS}
-            initialFilterId={initialView}
+            initialFilterId={initialView ?? "upcoming"}
             searchableColumnIds={["service", "booker"]}
             empty="Bookings appear here as visitors reserve slots on your services."
             rowActions={(b) =>
-                b.status === "CONFIRMED" ? (
+                // Not for an appointment that already happened: cancelling one
+                // is meaningless, and the detail screen offers an outcome
+                // instead (#241). A row must not offer what the screen behind
+                // it refuses.
+                b.status === "CONFIRMED" && !hasEnded(b) ? (
                     <CancelBookingControl bookingId={b.id} />
                 ) : null
             }

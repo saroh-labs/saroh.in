@@ -1,4 +1,5 @@
 import { Controller, Get, Param } from "@nestjs/common";
+import { listTemplates } from "@saroh/templates";
 
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
@@ -22,6 +23,27 @@ export class PublicSitesController {
         private readonly previewLinks: SitePreviewLinksService,
     ) {}
 
+    /**
+     * The template catalogue, for the public showcase on templates.saroh.in
+     * (#107). Unauthenticated on purpose: this is what a site can be built
+     * from, which is a claim about the product rather than about any tenant.
+     *
+     * The org-scoped `GET .../sites/templates` returns the same registry to a
+     * signed-in merchant choosing one. This adds page titles, which a showcase
+     * needs to describe a template and a picker does not, and it carries no
+     * Organization, Site, or Publication data of any kind.
+     */
+    @Get("templates")
+    templates() {
+        return listTemplates().map((template) => ({
+            id: template.id,
+            version: template.version,
+            name: template.name,
+            description: template.description,
+            pages: template.pages.map((page) => page.title),
+        }));
+    }
+
     /** Current publication snapshot for the site on `<subdomain>.saroh.app`. */
     @Get("by-subdomain/:subdomain")
     bySubdomain(@Param("subdomain") subdomain: string) {
@@ -41,6 +63,23 @@ export class PublicSitesController {
     }
 
     /**
+     * The site's writing behind a preview token (#236), newest first, from the
+     * DRAFT. Declared before `preview/:token` is irrelevant to matching — the
+     * paths differ in length — but it shares that route's token rules exactly,
+     * including the 410 and the "taken back" reason.
+     */
+    @Get("preview/:token/posts")
+    previewPosts(@Param("token") token: string) {
+        return this.previewLinks.posts(token);
+    }
+
+    /** One post from the draft, behind a preview token (#236). */
+    @Get("preview/:token/posts/:slug")
+    previewPost(@Param("token") token: string, @Param("slug") slug: string) {
+        return this.previewLinks.post(token, slug);
+    }
+
+    /**
      * Current publication snapshot for a VERIFIED custom hostname (#200), e.g.
      * `shop.acme.com`. A hostname that is unknown, still PENDING, or not bound
      * to a site is a 404.
@@ -48,6 +87,21 @@ export class PublicSitesController {
     @Get("by-hostname/:hostname")
     byHostname(@Param("hostname") hostname: string) {
         return this.sites.getPublicationByHostname(hostname);
+    }
+
+    /**
+     * A site's live posts, newest first (#232). The renderer resolves a host to
+     * a site once, then asks here by id.
+     */
+    @Get(":siteId/posts")
+    posts(@Param("siteId") siteId: string) {
+        return this.sites.getPublicPosts(siteId);
+    }
+
+    /** One live post by slug (#232). 404 when it is not live. */
+    @Get(":siteId/posts/:slug")
+    post(@Param("siteId") siteId: string, @Param("slug") slug: string) {
+        return this.sites.getPublicPost(siteId, slug);
     }
 
     /** Current publication snapshot for a site by id. */

@@ -1,4 +1,4 @@
-import { Injectable, Optional } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrgRole } from "../../common/types/organization-context";
@@ -120,6 +120,20 @@ export interface HomeNumber {
     moduleKey?: string;
 }
 
+/**
+ * A part of Home that could not be read.
+ *
+ * The difference between "you have no open orders" and "we could not find out
+ * whether you have open orders" is the whole of PRODUCT_STRATEGY §30, and the
+ * client cannot render a difference the API does not express.
+ */
+export interface HomeUnavailable {
+    /** Module key the failed source belongs to, e.g. `COMMERCE`. */
+    moduleKey: string;
+    /** What the merchant would call it, e.g. "Open orders". */
+    label: string;
+}
+
 export interface HomeModel {
     actions: HomeAction[];
     primaryAction: HomeAction | null;
@@ -127,6 +141,12 @@ export interface HomeModel {
     /** Confirmed bookings from now forward; the client groups them by day. */
     upcoming: HomeBooking[];
     numbers: HomeNumber[];
+    /**
+     * Sources that failed. Empty on a healthy read. Non-empty means what is
+     * shown is INCOMPLETE, and Home must say so rather than presenting the
+     * subset as the whole picture (§30).
+     */
+    unavailable: HomeUnavailable[];
 }
 
 export interface HomeInput {
@@ -155,14 +175,56 @@ function personName(person: {
 
 @Injectable()
 export class HomeService {
+    private readonly logger = new Logger(HomeService.name);
+
     constructor(
         private readonly availability: ModuleAvailabilityService,
         @Optional() private readonly db: typeof prisma = prisma,
     ) {}
 
+    /**
+     * Read one source, and treat its failure as a missing part rather than a
+     * dead page.
+     *
+     * Home aggregates several independent reads. Awaiting them unguarded meant
+     * a single failing source — one slow count, one module whose table was
+     * mid-migration — threw out of `build()` and took the whole of Home with
+     * it. The merchant then saw the segment error boundary: no ranked actions,
+     * no schedule, no numbers, including every part that had answered fine.
+     *
+     * That is the §30 failure in its worst form. Home is where a merchant
+     * decides what to do next, and "everything is broken" is both untrue and
+     * the least useful thing to tell them. Now the part that failed is named
+     * and the rest still renders.
+     */
+    private async attempt<T>(
+        source: HomeUnavailable,
+        read: () => Promise<T>,
+        fallback: T,
+        unavailable: HomeUnavailable[],
+    ): Promise<T> {
+        try {
+            return await read();
+        } catch (error) {
+            // Logged, not swallowed: the merchant is told a part is missing,
+            // and the operator is told which query failed and why.
+            this.logger.error(
+                `Home source "${source.label}" (${source.moduleKey}) failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            unavailable.push(source);
+            return fallback;
+        }
+    }
+
     async build(input: HomeInput): Promise<HomeModel> {
+        // NOT guarded. Availability decides what Home is even allowed to show;
+        // without it there is no page to degrade, and guessing would risk
+        // emitting an action for a module the actor cannot see.
         const views = await this.availability.listViews(input);
         const actions: HomeAction[] = [];
+        const unavailable: HomeUnavailable[] = [];
 
         // Setup / attention actions straight from module readiness.
         for (const view of views) {
@@ -216,13 +278,22 @@ export class HomeService {
         let upcoming: HomeBooking[] = [];
 
         if (available.has("CRM")) {
-            numbers.push(...(await this.crmNumbers(input.organizationId)));
+            numbers.push(
+                ...(await this.attempt(
+                    { moduleKey: "CRM", label: "Customer numbers" },
+                    () => this.crmNumbers(input.organizationId),
+                    [],
+                    unavailable,
+                )),
+            );
         }
 
         if (active.has("CRM")) {
-            const overdue = await this.overdueFollowUps(
-                input.organizationId,
-                now,
+            const overdue = await this.attempt(
+                { moduleKey: "CRM", label: "Overdue follow-ups" },
+                () => this.overdueFollowUps(input.organizationId, now),
+                { count: 0, evidence: [] },
+                unavailable,
             );
             if (overdue.count > 0) {
                 actions.push({
@@ -238,7 +309,12 @@ export class HomeService {
         }
 
         if (available.has("COMMERCE")) {
-            const open = await this.openOrders(input.organizationId);
+            const open = await this.attempt(
+                { moduleKey: "COMMERCE", label: "Open orders" },
+                () => this.openOrders(input.organizationId),
+                { count: 0, evidence: [] },
+                unavailable,
+            );
 
             if (open.count > 0) {
                 numbers.push({
@@ -277,14 +353,26 @@ export class HomeService {
         }
 
         if (available.has("APPOINTMENTS")) {
-            upcoming = await this.upcomingBookings(input.organizationId, now);
-            const total = await this.db.booking.count({
-                where: {
-                    organizationId: input.organizationId,
-                    status: "CONFIRMED",
-                    startAt: { gte: now },
-                },
-            });
+            const schedule = await this.attempt(
+                { moduleKey: "APPOINTMENTS", label: "Schedule" },
+                async () => ({
+                    upcoming: await this.upcomingBookings(
+                        input.organizationId,
+                        now,
+                    ),
+                    total: await this.db.booking.count({
+                        where: {
+                            organizationId: input.organizationId,
+                            status: "CONFIRMED",
+                            startAt: { gte: now },
+                        },
+                    }),
+                }),
+                { upcoming: [], total: 0 },
+                unavailable,
+            );
+            upcoming = schedule.upcoming;
+            const total = schedule.total;
             if (total > 0) {
                 numbers.push({
                     key: "UPCOMING_BOOKINGS",
@@ -316,6 +404,7 @@ export class HomeService {
             hasAnyModule: views.some((v) => v.readiness !== "DISABLED"),
             upcoming,
             numbers,
+            unavailable,
         };
     }
 

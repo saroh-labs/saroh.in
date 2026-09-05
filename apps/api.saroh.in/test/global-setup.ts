@@ -11,13 +11,21 @@ import { assertTestDatabase } from "./db-guard";
  * 2. Materializes the current schema into the test DB.
  *
  * We use `prisma db push --force-reset` rather than `migrate deploy` on
- * purpose: the single committed migration
- * (20260214131612_init_multi_tenant_schema) is known to be DRIFTED from
- * schema.prisma — later feature work used `db push`, not new migrations — so
- * deploying migrations would materialize a stale schema and the DB-backed
- * specs would fail against columns/tables that no longer match. `db push`
- * reflects schema.prisma exactly, and `--force-reset` drops and recreates the
- * public schema for a pristine, deterministic starting point every run.
+ * purpose: it reflects schema.prisma exactly and resets to a pristine,
+ * deterministic starting point every run, without replaying 51 migrations
+ * before each suite.
+ *
+ * The original reason given here — that the one committed migration had
+ * DRIFTED from schema.prisma — has not been true since the chain was repaired
+ * (`eb6ce65`). It is now checked rather than assumed: the `migration-replay`
+ * CI job (`pnpm --filter @saroh/database db:verify:replay`) builds a database
+ * from the migrations alone and fails if the result differs from
+ * schema.prisma. Keep that job green and the schema this pushes is the same
+ * schema the migrations produce.
+ *
+ * That division matters: `db push` means NO spec here executes a migration
+ * file, so this suite cannot tell you whether a migration works. Only the
+ * replay job can.
  */
 export default async function globalSetup(): Promise<void> {
     const testDatabaseUrl = assertTestDatabase();

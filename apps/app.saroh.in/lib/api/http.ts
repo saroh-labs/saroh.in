@@ -1,6 +1,8 @@
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
 
+import { ApiError } from "@/lib/api/errors";
+
 import { env } from "@/env";
 
 /**
@@ -46,8 +48,7 @@ const memberOrgIds = cache(async (): Promise<string[] | null> => {
     });
     if (!res.ok) return null;
     const orgs = (await res.json().catch(() => null)) as
-        | { id: string }[]
-        | null;
+        { id: string }[] | null;
     return Array.isArray(orgs) ? orgs.map((o) => o.id) : null;
 });
 
@@ -131,7 +132,10 @@ export async function getJson<T>(path: string): Promise<T | null> {
     const res = await apiFetch(path);
     if (res.status === 404) return null;
     if (!res.ok) {
-        throw new Error(`GET ${path} failed: ${res.status}`);
+        // An ApiError, not a bare Error: the segment boundary has to tell a
+        // 403 (explain it — §30) from a 500 (offer a retry), and it can only
+        // do that if the status survives the throw. See lib/api/errors.ts.
+        throw new ApiError(res.status, `GET ${path}`);
     }
     return (await res.json()) as T;
 }
@@ -163,8 +167,7 @@ export async function mutate<T>(
         body: JSON.stringify(body),
     });
     const data = (await res.json().catch(() => null)) as
-        | (T & { message?: string; error?: string })
-        | null;
+        (T & { message?: string; error?: string }) | null;
     if (res.ok) {
         return { ok: true, data: (data ?? {}) as T };
     }

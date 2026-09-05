@@ -83,6 +83,12 @@ export function SiteTheme({
                 --site-bg: 0 0% 100%;
                 --site-surface: 0 0% 100%;
                 --site-fg: 24 10% 10%;
+                /* Body text: quieter than a heading, still readable. The
+                   Tailwind config has mapped site-body since S2-006 and
+                   nothing ever defined the variable, so every user of it —
+                   the layout root, the 404 page, checkout — fell back to
+                   near-black, which is invisible on a dark ground. */
+                --site-body: 24 6% 34%;
                 --site-accent: 24 10% 10%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 0 0% 100%;
@@ -114,6 +120,7 @@ ${
                     --site-bg: 0 0% 0%;
                     --site-surface: 24 6% 10%;
                     --site-fg: 0 0% 100%;
+                    --site-body: 0 0% 78%;
                     --site-accent: 0 0% 100%;
                     --site-accent-fg: 24 10% 10%;
                     --site-hero-bg: 24 6% 10%;

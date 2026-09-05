@@ -157,6 +157,207 @@ jobs:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_test
         run: pnpm --filter @saroh/api test:int
 
+  # The migration history is not exercised anywhere else in this workflow: the
+  # integration suite builds its database with `prisma db push`, which reads
+  # schema.prisma directly and never executes a migration file. So a migration
+  # that cannot replay, or that disagrees with the datamodel, passes every other
+  # gate here. Both have shipped (#146, and the booking-outcome index) — the
+  # first made it impossible to provision a new environment at all.
+  #
+  # This job builds a database the way a new environment does: empty, then the
+  # whole chain in order, then a diff against schema.prisma that must be empty.
+  migration-replay:
+    name: Migration replay from empty
+    runs-on: ubuntu-latest
+
+    # Its own throwaway database, created empty by the image. The name is not in
+    # the S0-003 guard's allow-list on purpose, so the step names it explicitly
+    # via DATABASE_TARGET_CONFIRM rather than the guard being bypassed.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saroh_migrate_check
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.9.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Replay migrations and check for drift
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_migrate_check
+          DATABASE_TARGET_CONFIRM: saroh_migrate_check
+        run: pnpm --filter @saroh/database db:verify:replay
+  # Browser tests against a running, seeded stack.
+  #
+  # This is the harness the cross-product UX epic kept deferring to. Browser
+  # verification is the recurring remaining step on #121, #122 and #125; #50
+  # asks for cross-subdomain cookie, redirect, logout and CSRF coverage; and
+  # B6 records the Playwright auth E2E as "manual-verified only". None of it
+  # could move because nothing here ever started the apps together.
+  #
+  # Everything it asserts needs a real browser: whether a cookie set by one
+  # origin is sent by another, whether a layout overflows at 320px, whether two
+  # controls occupy the same pixels, whether a touch pointer gets a 44px
+  # target. A test without a layout engine can answer none of those.
+  #
+  # Bare ports here, not the `.localhost` hostnames a developer uses: there is
+  # no portless proxy on a runner, so the URLs are passed in explicitly and the
+  # trusted-origin list is set to match. That list is exactly why the local
+  # names exist — see the root AGENTS.md.
+  browser-e2e:
+    name: Browser E2E (seeded stack)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saroh_e2e_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SKIP_ENV_VALIDATION: "1"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_e2e_test
+      DATABASE_TARGET_CONFIRM: saroh_e2e_test
+      # Explicit, and load-bearing. `SKIP_ENV_VALIDATION` makes the API's typed
+      # env module return `process.env` untouched, which bypasses the SCHEMA
+      # DEFAULTS as well as the validation — so `env.PORT` is undefined here and
+      # Nest binds a random port. It only looks fine locally because
+      # `apps/api.saroh.in/.env` sets PORT and a runner has no .env at all.
+      PORT: 3333
+      BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters
+      BETTER_AUTH_URL: http://localhost:3333
+      # The redirect-after-sign-in check (#222) fails without this: the trusted
+      # list defaults to the *.saroh.in production origins, so a return-to on
+      # localhost is correctly refused and the visitor lands on the launcher.
+      BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://localhost:3003,http://localhost:3333
+      APP_URL: http://localhost:3003
+      NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3333
+      NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
+      NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
+      NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
+      EMAIL_FROM: Saroh <noreply@saroh.in>
+      E2E_APP_URL: http://localhost:3003
+      E2E_ACCOUNTS_URL: http://localhost:3000
+      E2E_API_URL: http://localhost:3333
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.9.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Migrations, not `db push`: this stack is the one place CI exercises the
+      # app end to end, so it is built the way a real environment is.
+      - name: Apply migrations
+        run: pnpm --filter @saroh/database db:migrate:deploy
+
+      - name: Seed the demo Organization
+        run: pnpm --filter @saroh/database db:seed
+
+      - name: Build the apps under test
+        run: pnpm turbo run build --filter=@saroh/api --filter=auth --filter=application
+
+      - name: Install Playwright browser
+        run: pnpm --filter @saroh/e2e install:browsers
+
+      # Started detached and polled, rather than trusting a fixed sleep: a cold
+      # Next server on a runner is not reliably up in any particular number of
+      # seconds, and a flaky harness gets ignored, which is worse than none.
+      - name: Start the stack
+        run: |
+          set -euo pipefail
+          pnpm --filter @saroh/api start > /tmp/api.log 2>&1 &
+          pnpm --filter auth exec next start -p 3000 > /tmp/accounts.log 2>&1 &
+          pnpm --filter application exec next start -p 3003 > /tmp/app.log 2>&1 &
+
+          wait_for() {
+            name="$1"
+            url="$2"
+            for attempt in $(seq 1 60); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo 000)
+              # 307 is the workspace bouncing an anonymous visitor to sign in,
+              # which means it is serving.
+              case "$code" in
+                200|307) echo "$name is up ($code)"; return 0 ;;
+              esac
+              sleep 2
+            done
+            echo "::error::$name never came up (last status ${code})"
+            return 1
+          }
+
+          # `tail -n 50`, not `tail -50`: the obsolete form is rejected in this
+          # context, so the first version of this dump failed silently and a
+          # failed run reported nothing about WHY the stack did not start.
+          if ! wait_for api http://localhost:3333/health \
+            || ! wait_for accounts http://localhost:3000/login \
+            || ! wait_for app http://localhost:3003/; then
+            echo "----- api -----";      tail -n 50 /tmp/api.log      || true
+            echo "----- accounts -----"; tail -n 50 /tmp/accounts.log || true
+            echo "----- app -----";      tail -n 50 /tmp/app.log      || true
+            exit 1
+          fi
+
+      - name: Run browser tests
+        run: pnpm --filter @saroh/e2e test:e2e
+
+      # The trace and screenshots are the whole point of a failed browser run:
+      # without them a red build says "something looked wrong" and nothing else.
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          retention-days: 7
   # Secret scanning runs as its own job over the full git history so a secret
   # committed in an earlier commit is still caught.
   #

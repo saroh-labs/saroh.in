@@ -52,6 +52,7 @@ docs/plans/*
 !docs/plans/2026-07-22-modular-product-ux-design.md
 !docs/plans/2026-07-22-modular-capabilities-implementation-plan.md
 !docs/plans/2026-07-22-cross-product-ux-implementation-plan.md
+!docs/plans/2026-09-05-remaining-work-plan.md
 !docs/product-transformation/
 !docs/design/
 !docs/design/**
@@ -82,3 +83,8 @@ dist
 # The durable outputs are DESIGN.md and its sidecar, which ARE committed.
 .impeccable/questions/
 .impeccable/sketches/
+
+# Playwright output (traces, screenshots, HTML report)
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/

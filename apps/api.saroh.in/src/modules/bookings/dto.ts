@@ -18,6 +18,14 @@ import {
 export const SERVICE_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export type ServiceStatus = (typeof SERVICE_STATUSES)[number];
 
+/**
+ * How an appointment went (#241). Declared here beside the other closed sets
+ * so the DTO can validate against it without importing the service, which
+ * imports this file.
+ */
+export const BOOKING_OUTCOMES = ["ATTENDED", "NO_SHOW"] as const;
+export type BookingOutcome = (typeof BOOKING_OUTCOMES)[number];
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -204,4 +212,26 @@ export class BookServiceDto {
     @IsString()
     @MaxLength(128)
     idempotencyKey?: string;
+}
+
+/**
+ * Move an existing booking to a different slot (#121).
+ *
+ * Only the instant. Everything else about the booking — who it is for, what
+ * service, the terms agreed at booking time — is deliberately not reschedulable
+ * here: moving a booking is one decision, and editing its terms is another.
+ */
+export class RescheduleBookingDto {
+    /** ISO-8601 absolute instant of the new slot start. */
+    @IsISO8601()
+    startAt!: string;
+}
+
+/**
+ * Record how an appointment went (#241). Only a person sets this — nothing
+ * derives it from time passing.
+ */
+export class RecordOutcomeDto {
+    @IsIn(BOOKING_OUTCOMES)
+    outcome!: BookingOutcome;
 }

@@ -1,5 +1,5 @@
 import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/empty-state";
+import { EmptyState, PartialNotice } from "@saroh/ui/data-state";
 import Link from "next/link";
 
 import type { HomeModel } from "@/lib/home/service";
@@ -27,6 +27,12 @@ import { Schedule } from "./schedule";
  * ("3 days overdue", "Today") is measured from the same instant. Letting each
  * component call `new Date()` would let a slow render disagree with itself.
  */
+/** "Open orders", "Open orders and Schedule", "A, B and C". */
+function formatList(labels: string[]): string {
+    if (labels.length <= 1) return labels[0] ?? "";
+    return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+}
+
 export function HomeDashboard({ home }: { home: HomeModel }) {
     // Brand-new / no modules enabled → guide to need-based setup, not an empty
     // dashboard whose every band says "nothing yet".
@@ -54,6 +60,18 @@ export function HomeDashboard({ home }: { home: HomeModel }) {
 
     return (
         <div className="space-y-6">
+            {/* Say what is missing BEFORE the bands, not after: a merchant who
+                scans the top of Home and leaves must not carry away a picture
+                they think is complete (§30). Naming the parts is the point —
+                "something went wrong" would not tell them whether the thing
+                they came to check is the thing that is missing. */}
+            {home.unavailable.length > 0 ? (
+                <PartialNotice>
+                    {formatList(home.unavailable.map((part) => part.label))}{" "}
+                    could not be loaded, so this is not the whole picture.
+                </PartialNotice>
+            ) : null}
+
             <div
                 className={
                     showSchedule
@@ -61,7 +79,11 @@ export function HomeDashboard({ home }: { home: HomeModel }) {
                         : ""
                 }
             >
-                <div className="space-y-3">
+                {/* `min-w-0` is required, not tidiness: a grid item defaults
+                    to `min-width: auto`, so this column refused to shrink below
+                    its content's min-content width and pushed the whole page
+                    into a horizontal scroll at 320px (#178, §18). */}
+                <div className="min-w-0 space-y-3">
                     <h2 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                         Needs you
                     </h2>
@@ -69,7 +91,7 @@ export function HomeDashboard({ home }: { home: HomeModel }) {
                 </div>
 
                 {showSchedule ? (
-                    <div className="space-y-3">
+                    <div className="min-w-0 space-y-3">
                         <h2 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                             Schedule
                         </h2>

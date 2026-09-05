@@ -12,7 +12,8 @@
   "scripts": {
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "react": "^19.0.0",
@@ -27,10 +28,14 @@
     "@types/node": "catalog:",
     "@types/react": "19.2.15",
     "@types/react-dom": "catalog:react19",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "jsdom": "^25.0.1",
     "react": "catalog:react19",
     "react-dom": "catalog:react19",
     "react-hook-form": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^3.2.7"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",

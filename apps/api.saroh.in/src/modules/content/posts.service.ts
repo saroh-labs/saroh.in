@@ -8,8 +8,10 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
+import { sanitizeRichHtml } from "../sites/sanitize";
 import { slugify } from "../stores/slug";
 import type { CreatePostDto, PostStatus, UpdatePostDto } from "./dto";
+import { postPath } from "./posts-prefix";
 
 /**
  * A site's writing (ADR-004, #209).
@@ -43,13 +45,18 @@ export class PostsService {
                 image: true,
                 publishedAt: true,
                 createdAt: true,
+                currentPublicationId: true,
                 category: { select: { id: true, name: true } },
                 author: { select: { name: true } },
             },
         });
-        return posts.map(({ author, ...p }) => ({
+        return posts.map(({ author, currentPublicationId, ...p }) => ({
             ...p,
             author: author?.name ?? null,
+            // What the PUBLIC is being served, which `status` alone cannot say:
+            // a post edited since it went live is PUBLISHED and live, and the
+            // live copy is the older one.
+            live: currentPublicationId !== null,
         }));
     }
 
@@ -70,14 +77,22 @@ export class PostsService {
                 status: true,
                 publishedAt: true,
                 createdAt: true,
+                currentPublicationId: true,
+                currentPublication: { select: { publishedAt: true } },
                 author: { select: { name: true } },
             },
         });
         if (!post) {
             throw new NotFoundException("Post not found");
         }
-        const { author, ...rest } = post;
-        return { ...rest, author: author?.name ?? null };
+        const { author, currentPublicationId, currentPublication, ...rest } =
+            post;
+        return {
+            ...rest,
+            author: author?.name ?? null,
+            live: currentPublicationId !== null,
+            liveAt: currentPublication?.publishedAt ?? null,
+        };
     }
 
     async create(ctx: OrganizationContext, siteId: string, dto: CreatePostDto) {
@@ -187,6 +202,139 @@ export class PostsService {
         // Comments cascade-delete via Comment.post onDelete: Cascade.
         await prisma.post.delete({ where: { id: postId } });
         return { id: postId };
+    }
+
+    /**
+     * Publish a post: append an immutable, path-scoped {@link Publication} and
+     * repoint the post at it (#232, ADR-004 §3).
+     *
+     * PER POST, and that is the whole point. A site-wide snapshot would mean
+     * publishing one post republishes every page, and restoring last week's
+     * site publication would silently unpublish this week's writing. A post's
+     * history is its own.
+     *
+     * The body is SANITIZED here, on the same boundary as `richText.value` and
+     * the footer — before the immutable write — so the renderer only ever reads
+     * markup that is already safe and never sanitizes at read time.
+     *
+     * Requires `section:write`. Publishing an already-live post appends a new
+     * row and repoints: republishing is how an edit reaches the public, and the
+     * old row stays as history.
+     */
+    async publish(ctx: OrganizationContext, siteId: string, postId: string) {
+        authorize(ctx, "section:write");
+        const site = await this.requireSite(ctx, siteId);
+
+        const post = await prisma.post.findFirst({
+            where: { id: postId, siteId },
+            select: {
+                id: true,
+                title: true,
+                slug: true,
+                excerpt: true,
+                content: true,
+                image: true,
+                featured: true,
+                publishedAt: true,
+                category: { select: { name: true, slug: true } },
+                author: { select: { name: true } },
+            },
+        });
+        if (!post) {
+            throw new NotFoundException("Post not found");
+        }
+
+        const publishedAt = new Date();
+        const path = postPath(site.postsPrefix, post.slug);
+        const snapshot = {
+            post: {
+                title: post.title,
+                slug: post.slug,
+                excerpt: post.excerpt,
+                // Sanitized on the way IN — see the note above.
+                content: sanitizeRichHtml(post.content),
+                image: post.image,
+                featured: post.featured,
+                category: post.category,
+                author: post.author?.name ?? null,
+                // The date the writing claims, not the date this row was
+                // written: republishing a correction must not make a post look
+                // new to a reader or a feed.
+                publishedAt: (post.publishedAt ?? publishedAt).toISOString(),
+            },
+            path,
+            publishedAt: publishedAt.toISOString(),
+        };
+
+        return prisma.$transaction(async (tx) => {
+            const publication = await tx.publication.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    postId: post.id,
+                    path,
+                    snapshot,
+                    templateId: "post",
+                    templateVersion: 1,
+                    publishedByUserId: ctx.userId,
+                    publishedAt,
+                },
+                select: { id: true, publishedAt: true },
+            });
+            await tx.post.update({
+                where: { id: post.id },
+                data: {
+                    currentPublicationId: publication.id,
+                    status: "PUBLISHED",
+                    publishedAt: post.publishedAt ?? publishedAt,
+                },
+            });
+            return {
+                publicationId: publication.id,
+                publishedAt: publication.publishedAt,
+                path,
+            };
+        });
+    }
+
+    /**
+     * Take a post off the site. Repoints the live pointer at null and leaves
+     * every publication in place — the same shape as everything else here:
+     * unpublishing is not deleting, and the history stays readable.
+     *
+     * Requires `section:write`.
+     */
+    async unpublish(ctx: OrganizationContext, siteId: string, postId: string) {
+        authorize(ctx, "section:write");
+        await this.assertSiteInOrg(ctx, siteId);
+        const post = await prisma.post.findFirst({
+            where: { id: postId, siteId },
+            select: { id: true },
+        });
+        if (!post) {
+            throw new NotFoundException("Post not found");
+        }
+        await prisma.post.update({
+            where: { id: post.id },
+            data: { currentPublicationId: null, status: "DRAFT" },
+        });
+        return { id: post.id, live: false };
+    }
+
+    /** The site, with the prefix its posts live under. 404 when not this org's. */
+    private async requireSite(ctx: OrganizationContext, siteId: string) {
+        const site = await prisma.site.findFirst({
+            where: {
+                id: siteId,
+                organizationId: ctx.organizationId,
+                deletedAt: null,
+            },
+            select: { id: true, postsPrefix: true },
+        });
+        if (!site) {
+            throw new NotFoundException(`Site "${siteId}" not found`);
+        }
+        return site;
     }
 
     /**

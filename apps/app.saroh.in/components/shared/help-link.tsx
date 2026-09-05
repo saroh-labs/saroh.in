@@ -25,7 +25,7 @@ export function HelpLink({ topic }: { topic?: HelpTopic }) {
             rel="noreferrer"
             aria-label="Help centre (opens in a new tab)"
             title="Help"
-            className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background coarse:size-11"
         >
             <CircleHelp className="size-5" />
         </a>

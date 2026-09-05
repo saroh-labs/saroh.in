@@ -2,6 +2,7 @@ import forms from "@tailwindcss/forms";
 import typography from "@tailwindcss/typography";
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
+import plugin from "tailwindcss/plugin";
 
 /**
  * Tailwind's own default stacks, inlined.
@@ -238,7 +239,31 @@ const config = {
             },
         },
     },
-    plugins: [tailwindcssAnimate, forms, typography],
+    plugins: [
+        tailwindcssAnimate,
+        forms,
+        typography,
+        /**
+         * `coarse:` — a touch pointer, i.e. the phone and the shop floor.
+         *
+         * Two of the four primary scenes are touch (PRODUCT.md), and §17 asks
+         * for critical workflows to be DESIGNED for the phone rather than
+         * compressed from the desk. A control sized for a mouse is a control
+         * sized for a pointer that lands within a pixel; a thumb — possibly
+         * gloved, in a hurry, on a warehouse floor — is not that.
+         *
+         * This is a media query rather than a breakpoint on purpose. Width says
+         * how much room there is; it does not say what is doing the pointing. A
+         * narrow desktop window is still a mouse and should keep the dense
+         * layout, while a tablet at 1024px is a thumb and should not.
+         *
+         * Use it to enlarge a target (`coarse:min-h-11`), never to hide one.
+         */
+        plugin(({ addVariant }) => {
+            addVariant("coarse", "@media (pointer: coarse)");
+            addVariant("fine", "@media (pointer: fine)");
+        }),
+    ],
 } satisfies Config;
 
 export default config;

@@ -297,6 +297,18 @@ export class UpdateSiteSettingsDto {
     @IsInt()
     @Min(1)
     socialImageBytes?: number | null;
+
+    /**
+     * Where this site's posts live: `/<postsPrefix>/<slug>` (#232). Null
+     * restores the default. Shape and collisions are checked in the service,
+     * which is the only place that knows the site's page paths.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(64)
+    postsPrefix?: string | null;
 }
 
 /** Mint a preview link (#198). The choices are the ones the design offers. */

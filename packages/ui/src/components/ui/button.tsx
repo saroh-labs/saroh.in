@@ -64,11 +64,24 @@ const buttonVariants = cva(
             // 32 / 40 / 48 — the Geist control heights. `sm` was 36px and `lg`
             // 44px, which put every button between two steps and made dense
             // toolbars sit oddly against 40px inputs.
+            /*
+             * `coarse:` is a touch pointer — the phone and the shop floor, two
+             * of the four primary scenes (§18). Every size grows to at least
+             * 44px there and keeps its desk height under a mouse, because §17
+             * asks for phone workflows to be designed rather than compressed
+             * and §19 asks for large touch targets. `default` and `icon` are
+             * already 40 and gain 4; `sm` is 32 on a desk, which is a mouse
+             * target, and becomes 44.
+             *
+             * A media query, not a breakpoint: width says how much room there
+             * is, not what is doing the pointing. A narrow desktop window is
+             * still a mouse; a tablet at 1024px is a thumb.
+             */
             size: {
-                default: "h-10 px-4 py-2",
-                sm: "h-8 rounded-md px-3 text-[0.8125rem]",
+                default: "h-10 px-4 py-2 coarse:h-11",
+                sm: "h-8 rounded-md px-3 text-[0.8125rem] coarse:h-11 coarse:px-4 coarse:text-sm",
                 lg: "h-12 rounded-md px-6",
-                icon: "h-10 w-10",
+                icon: "h-10 w-10 coarse:h-11 coarse:w-11",
             },
         },
         defaultVariants: {

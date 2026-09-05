@@ -12,6 +12,7 @@ import { Prisma, prisma } from "@saroh/database";
 import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ActivationEvents } from "../analytics/activation-events";
 import { authorize } from "../organizations/organization-policy";
 import type {
     AvailabilityRuleWindow,
@@ -22,6 +23,7 @@ import type {
 import { availableSlots, isValidSlotStart } from "./availability";
 import type {
     AvailabilityRuleDto,
+    BookingOutcome,
     CreateServiceDto,
     UpdateServiceDto,
 } from "./dto";
@@ -35,6 +37,44 @@ export interface BookInput {
     bookerPhone?: string;
     idempotencyKey?: string;
 }
+
+/**
+ * What can happen to a booking. A closed set so call sites never pass a raw,
+ * typo-prone string, and so the screen can render each kind deliberately.
+ */
+export const BookingEventType = {
+    Booked: "BOOKED",
+    Rescheduled: "RESCHEDULED",
+    Cancelled: "CANCELLED",
+    Attended: "ATTENDED",
+    NoShow: "NO_SHOW",
+} as const;
+
+export type BookingEventType =
+    (typeof BookingEventType)[keyof typeof BookingEventType];
+
+/** Exactly what {@link BookingsService.getBooking} reads, named so the
+ *  controller's inferred return type stays portable. */
+const bookingDetailInclude = {
+    service: true,
+    contact: {
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+        },
+    },
+    events: {
+        orderBy: { createdAt: "asc" },
+        include: { actor: { select: { name: true } } },
+    },
+} satisfies Prisma.BookingInclude;
+
+export type BookingDetail = Prisma.BookingGetPayload<{
+    include: typeof bookingDetailInclude;
+}>;
 
 /**
  * Bookable Services, availability and the transactional public booking command
@@ -65,6 +105,7 @@ export class BookingsService {
         // trying to inject it so the default (and test overrides) apply.
         @Optional()
         private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(),
+        @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
     // ── Service CRUD ───────────────────────────────────────────────────────
@@ -374,10 +415,260 @@ export class BookingsService {
         if (booking.status === "CANCELLED") {
             return booking;
         }
-        return prisma.booking.update({
-            where: { id: booking.id },
-            data: { status: "CANCELLED", cancelledAt: new Date() },
+        return prisma.$transaction(async (tx) => {
+            const cancelled = await tx.booking.update({
+                where: { id: booking.id },
+                data: { status: "CANCELLED", cancelledAt: new Date() },
+            });
+            // The slot it was cancelled OUT of, so the history reads as a
+            // sequence rather than a list of states with the times missing.
+            await tx.bookingEvent.create({
+                data: {
+                    bookingId: booking.id,
+                    organizationId: ctx.organizationId,
+                    type: BookingEventType.Cancelled,
+                    actorUserId: ctx.userId,
+                    fromStartAt: booking.startAt,
+                },
+                select: { id: true },
+            });
+            return cancelled;
         });
+    }
+
+    /**
+     * Record how an appointment went (#241). `booking:write`.
+     *
+     * Four rules, each of which is a decision rather than a detail:
+     *
+     * **Only a person sets it.** Nothing in this codebase writes an outcome
+     * when a slot elapses. A booking whose time has passed is evidence of
+     * nothing except that the time has passed, and auto-completing would fill
+     * the ledger with attendance nobody witnessed — which is worse than an
+     * empty ledger, because it reads as fact.
+     *
+     * **Only after it has ended.** Marking a future appointment attended is
+     * not a mistake worth supporting.
+     *
+     * **Never on a cancelled booking.** Cancelled-in-advance and did-not-turn-up
+     * are the two most different things a merchant can be told about a
+     * customer, and letting one be relabelled as the other would quietly
+     * destroy that distinction.
+     *
+     * **Correctable.** A merchant who taps the wrong one can change it, and
+     * the change is appended rather than overwritten — so the history shows
+     * both what was said and what it was corrected to.
+     */
+    async recordOutcome(
+        ctx: OrganizationContext,
+        bookingId: string,
+        outcome: BookingOutcome,
+        now: Date = new Date(),
+    ): Promise<Booking> {
+        authorize(ctx, "booking:write");
+        const booking = await this.requireOwnedBooking(ctx, bookingId);
+
+        if (booking.status === "CANCELLED") {
+            throw new ConflictException(
+                "This booking was cancelled, which is already how it went.",
+            );
+        }
+        if (booking.endAt.getTime() > now.getTime()) {
+            throw new ConflictException(
+                "This appointment has not happened yet.",
+            );
+        }
+        if (booking.outcome === outcome) {
+            // Already said. Not an error, and not a second history line.
+            return booking;
+        }
+
+        return prisma.$transaction(async (tx) => {
+            const updated = await tx.booking.update({
+                where: { id: booking.id },
+                data: { outcome },
+            });
+            await tx.bookingEvent.create({
+                data: {
+                    bookingId: booking.id,
+                    organizationId: ctx.organizationId,
+                    type:
+                        outcome === "ATTENDED"
+                            ? BookingEventType.Attended
+                            : BookingEventType.NoShow,
+                    actorUserId: ctx.userId,
+                    // The slot it is about, like CANCELLED — so a history line
+                    // says which appointment, not just what was decided.
+                    fromStartAt: booking.startAt,
+                },
+                select: { id: true },
+            });
+            return updated;
+        });
+    }
+
+    /**
+     * One booking, with everything the detail screen states (#121): the service
+     * it is for, the contact it belongs to, and what has happened to it.
+     *
+     * `booking:read`. Cross-tenant or missing is a 404, like everywhere else.
+     * The contact carries only name and email — a booking screen has no
+     * business showing a contact's company, and `booking:read` is not
+     * `contact:read`.
+     */
+    async getBooking(
+        ctx: OrganizationContext,
+        bookingId: string,
+    ): Promise<BookingDetail> {
+        authorize(ctx, "booking:read");
+        await this.requireOwnedBooking(ctx, bookingId);
+        return prisma.booking.findUniqueOrThrow({
+            where: { id: bookingId },
+            include: bookingDetailInclude,
+        });
+    }
+
+    /**
+     * Move a booking to a different slot (#121).
+     *
+     * Cancelling was the only thing a merchant could do to a booking, so the
+     * commonest request a customer makes — "can we move it?" — had no answer
+     * in the product but to cancel and ask them to book again, losing the
+     * booking and its history.
+     *
+     * THE NEW TIME MUST BE A REAL OPEN SLOT. It is checked with
+     * `isValidSlotStart` — the same function the public form passes — so a
+     * merchant cannot put a booking somewhere the service is closed, or
+     * off the duration grid, and land a customer at a time nothing else in
+     * the product believes in.
+     *
+     * Capacity is re-counted INSIDE a serializable transaction, exactly as
+     * {@link book} does and for the same reason: a reschedule and a public
+     * booking racing for the last seat must not both win. The count EXCLUDES
+     * this booking, otherwise a capacity-one booking could never be nudged to
+     * an overlapping slot — it would collide with itself.
+     *
+     * `Booking.snapshot` is deliberately NOT rewritten. It is the terms as they
+     * were agreed at booking time; the slot inside it is the ORIGINAL one, and
+     * the move is recorded as a `BookingEvent` instead.
+     */
+    async rescheduleBooking(
+        ctx: OrganizationContext,
+        bookingId: string,
+        input: { startAt: string },
+    ): Promise<Booking> {
+        authorize(ctx, "booking:write");
+        const booking = await this.requireOwnedBooking(ctx, bookingId);
+
+        if (booking.status === "CANCELLED") {
+            // Nothing to move. Reinstating a cancelled booking is a different
+            // decision (the slot may be gone) and is not this.
+            throw new ConflictException(
+                "This booking was cancelled. Book a new time instead of moving it.",
+            );
+        }
+
+        const startAt = new Date(input.startAt);
+        if (Number.isNaN(startAt.getTime())) {
+            throw new BadRequestException("startAt is not a valid instant");
+        }
+        if (startAt.getTime() === booking.startAt.getTime()) {
+            // Already there. Not an error, and not an event either — a history
+            // full of "moved to the time it was already at" is noise.
+            return booking;
+        }
+
+        const service = await this.requireOwnedService(ctx, booking.serviceId);
+        // An archived service is retired from the menu, and its availability
+        // is retired with it: the windows it still carries describe hours the
+        // merchant has stopped offering, so moving a booking into one would
+        // put a customer in a slot the business no longer keeps. Cancelling
+        // stays available — that is how a retired service's bookings are
+        // wound down. (Archiving through the dashboard also soft-deletes, so
+        // that path is already a 404 above; this covers a service whose status
+        // alone was set.)
+        if (service.status !== "ACTIVE") {
+            throw new ConflictException(
+                "This service is archived, so its bookings cannot be moved. Make it active again first, or cancel the booking.",
+            );
+        }
+        const rules = await prisma.availabilityRule.findMany({
+            where: { serviceId: service.id },
+        });
+        const availService = this.toAvailabilityService(service);
+        if (!isValidSlotStart(availService, rules, startAt)) {
+            throw new BadRequestException(
+                "That is not a bookable slot for this service",
+            );
+        }
+        const endAt = new Date(
+            startAt.getTime() + service.durationMinutes * 60_000,
+        );
+
+        try {
+            return await prisma.$transaction(
+                async (tx) => {
+                    const taken = await tx.booking.count({
+                        where: {
+                            serviceId: service.id,
+                            status: "CONFIRMED",
+                            startAt: { lt: endAt },
+                            endAt: { gt: startAt },
+                            // Itself is not a competitor for its own seat.
+                            id: { not: booking.id },
+                        },
+                    });
+                    if (taken >= service.capacity) {
+                        throw new ConflictException(
+                            "That slot is fully booked",
+                        );
+                    }
+
+                    const moved = await tx.booking.update({
+                        where: { id: booking.id },
+                        data: { startAt, endAt },
+                    });
+                    await tx.bookingEvent.create({
+                        data: {
+                            bookingId: booking.id,
+                            organizationId: ctx.organizationId,
+                            type: BookingEventType.Rescheduled,
+                            actorUserId: ctx.userId,
+                            fromStartAt: booking.startAt,
+                            toStartAt: startAt,
+                        },
+                        select: { id: true },
+                    });
+                    // Same transactional outbox as booking: a committed move
+                    // ALWAYS has a pending notification, so the booker cannot
+                    // be left standing at the old time because a send failed.
+                    await tx.job.create({
+                        data: {
+                            organizationId: ctx.organizationId,
+                            type: "booking.notify",
+                            payload: {
+                                bookingId: booking.id,
+                                serviceId: service.id,
+                                contactId: booking.contactId,
+                                reason: "rescheduled",
+                            },
+                        },
+                        select: { id: true },
+                    });
+                    return moved;
+                },
+                {
+                    isolationLevel:
+                        Prisma.TransactionIsolationLevel.Serializable,
+                },
+            );
+        } catch (err) {
+            // Lost the race with a concurrent booking for the same seat.
+            if ((err as { code?: string }).code === "P2034") {
+                throw new ConflictException("That slot is fully booked");
+            }
+            throw err;
+        }
     }
 
     // ── PUBLIC booking command ─────────────────────────────────────────────
@@ -461,8 +752,9 @@ export class BookingsService {
         const snapshot = this.buildSnapshot(service, input, startAt, endAt);
 
         // 5. Atomic, serializable reservation (see the method doc for WHY).
+        let booked: Booking;
         try {
-            return await prisma.$transaction(
+            booked = await prisma.$transaction(
                 async (tx) => {
                     // Authoritative capacity gate — re-counted INSIDE the tx.
                     const confirmed = await tx.booking.count({
@@ -513,6 +805,19 @@ export class BookingsService {
                         },
                     });
 
+                    // Where the history starts. No `fromStartAt`: there was
+                    // no before, and no actor either — the booker did this
+                    // themselves, which is what distinguishes it from a move.
+                    await tx.bookingEvent.create({
+                        data: {
+                            bookingId: booking.id,
+                            organizationId,
+                            type: BookingEventType.Booked,
+                            toStartAt: startAt,
+                        },
+                        select: { id: true },
+                    });
+
                     // Transactional outbox: a committed booking ALWAYS has a
                     // pending notification (the worker/handler is a later ticket).
                     await tx.job.create({
@@ -558,6 +863,18 @@ export class BookingsService {
             }
             throw err;
         }
+
+        // Instrumentation lives OUTSIDE the try, not merely after the commit.
+        // Inside it, a throw from here would fall into the catch above and be
+        // re-thrown as if the booking had failed — a committed booking
+        // reported to the booker as an error. The catch is for database
+        // outcomes only.
+        //
+        // Safe on every booking: the ledger keeps only the first
+        // (deterministic dedupeKey), so there is no "is this their first?"
+        // query and no race between two concurrent bookings.
+        await this.activation?.firstBookingCreated(organizationId, booked.id);
+        return booked;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

@@ -2,16 +2,21 @@
 
 import type {
     AvailabilityRuleInput,
+    BookingOutcome,
     CreateServiceInput,
     Service,
+    Slot,
     UpdateServiceInput,
 } from "./service";
 import {
     archiveService as archiveServiceApi,
     cancelBooking as cancelBookingApi,
     createService as createServiceApi,
+    listAvailability as listAvailabilityApi,
     listServices as listServicesApi,
+    recordBookingOutcome as recordBookingOutcomeApi,
     replaceRules as replaceRulesApi,
+    rescheduleBooking as rescheduleBookingApi,
     updateService as updateServiceApi,
 } from "./service";
 
@@ -48,6 +53,32 @@ export async function replaceRules(
 
 export async function cancelBooking(bookingId: string) {
     return cancelBookingApi(bookingId);
+}
+
+/** Move a booking to another slot (#121). */
+export async function rescheduleBooking(bookingId: string, startAt: string) {
+    return rescheduleBookingApi(bookingId, startAt);
+}
+
+/** Record how an appointment went (#241). */
+export async function recordBookingOutcome(
+    bookingId: string,
+    outcome: BookingOutcome,
+) {
+    return recordBookingOutcomeApi(bookingId, outcome);
+}
+
+/**
+ * The open slots the reschedule picker offers. Read through an action because
+ * the picker widens its own window as the merchant looks further ahead, and
+ * a server component cannot re-read on a click.
+ */
+export async function listAvailability(
+    serviceId: string,
+    fromISO: string,
+    toISO: string,
+): Promise<Slot[]> {
+    return listAvailabilityApi(serviceId, fromISO, toISO);
 }
 
 /**

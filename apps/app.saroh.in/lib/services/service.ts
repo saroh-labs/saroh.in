@@ -44,7 +44,13 @@ export interface AvailabilityRule {
     endMinute: number;
 }
 
-export type BookingStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
+// The booking state vocabulary and its predicates live in ./booking-state,
+// which imports nothing — the bookings TABLE is a client component and this
+// module reaches next/headers through the CRM HTTP plumbing. Imported for use
+// below AND re-exported, so server callers still have one place to look.
+import type { BookingOutcome, BookingStatus } from "./booking-state";
+
+export type { BookingOutcome, BookingStatus };
 
 /** A reserved slot (mirror of the api's Booking row, JSON-serialized). */
 export interface Booking {
@@ -56,6 +62,8 @@ export interface Booking {
     /** IANA timezone the booker saw the slot in. */
     timezone: string;
     status: BookingStatus;
+    /** Set only by a person; never derived from the slot having passed. */
+    outcome: BookingOutcome | null;
     bookerName: string | null;
     bookerEmail: string | null;
     bookerPhone: string | null;
@@ -74,6 +82,38 @@ export interface Booking {
         lastName: string | null;
         email: string;
     } | null;
+}
+
+/** What has happened to a booking, in order (#121). */
+export interface BookingEvent {
+    id: string;
+    type: "BOOKED" | "RESCHEDULED" | "CANCELLED" | "ATTENDED" | "NO_SHOW";
+    /** Null when the booker did it themselves through the public form. */
+    actor: { name: string | null } | null;
+    fromStartAt: string | null;
+    toStartAt: string | null;
+    createdAt: string;
+}
+
+/**
+ * One booking with everything the detail screen states (#121): the service it
+ * is for, the contact it belongs to, and its history.
+ *
+ * `snapshot` is the terms as they were agreed at booking time, so the slot
+ * inside it is the ORIGINAL one — it is not rewritten when a booking moves.
+ */
+export interface BookingDetail extends Omit<Booking, "contact"> {
+    service: Service;
+    contact:
+        (NonNullable<Booking["contact"]> & { phone: string | null }) | null;
+    events: BookingEvent[];
+    snapshot: unknown;
+}
+
+/** One open slot on a service, as the api's availability preview returns it. */
+export interface Slot {
+    startAt: string;
+    endAt: string;
 }
 
 /** A booking joined with a light snapshot of its owning Service. */
@@ -132,8 +172,7 @@ async function send<T>(
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const data = (await res.json().catch(() => null)) as
-        | (T & { message?: string; error?: string })
-        | null;
+        (T & { message?: string; error?: string }) | null;
     if (res.ok) {
         return { ok: true, data: (data ?? {}) as T };
     }
@@ -185,6 +224,40 @@ export async function listServiceBookings(
 }
 
 /**
+ * One booking with its service, contact and history (#121), or null when it is
+ * missing or not this org's.
+ */
+export async function getBooking(
+    bookingId: string,
+): Promise<BookingDetail | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const res = await apiFetch(`${base}/services/bookings/${bookingId}`);
+    if (!res.ok) return null;
+    return (await res.json()) as BookingDetail;
+}
+
+/**
+ * A service's open slots between two instants — what the reschedule picker
+ * offers. Empty on any failure, which the picker renders as "no open times"
+ * rather than a broken control.
+ */
+export async function listAvailability(
+    serviceId: string,
+    fromISO: string,
+    toISO: string,
+): Promise<Slot[]> {
+    const base = await orgBase();
+    if (!base) return [];
+    const query = new URLSearchParams({ from: fromISO, to: toISO });
+    const res = await apiFetch(
+        `${base}/services/${serviceId}/availability?${query.toString()}`,
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as Slot[];
+}
+
+/**
  * Every booking across the org's services, each joined with its owning
  * Service (name + timezone), sorted by slot ascending — the shape the owner
  * calendar renders. The api exposes bookings per-service, so this fans out over
@@ -221,6 +294,25 @@ export async function listUpcomingBookings(): Promise<BookingWithService[]> {
     const now = Date.now();
     return all.filter((booking) => new Date(booking.endAt).getTime() >= now);
 }
+
+/**
+ * Every booking, upcoming and past (#241).
+ *
+ * The calendar showed only what was still to come, which was right while a
+ * booking had nothing to say once it was over. Now it does: an outcome is
+ * recorded by a person, so the appointments waiting to be marked have to be
+ * findable. Past bookings were never deleted — they were only filtered out of
+ * every surface.
+ */
+export async function listBookingsWithPast(): Promise<BookingWithService[]> {
+    return listAllBookings();
+}
+
+// The pure state predicates live in ./booking-state so the bookings TABLE (a
+// client component) can import them — this module reaches next/headers and
+// cannot be imported from the client. Re-exported so server callers have one
+// place to look.
+export { hasEnded, needsOutcome } from "./booking-state";
 
 // ---------------------------------------------------------------------------
 // Mutations (wrapped by server actions in ./actions)
@@ -272,6 +364,32 @@ export function replaceRules(
 }
 
 /** Cancel a booking, freeing its slot. Idempotent server-side. */
+/** Record how an appointment went (#241). */
+export function recordBookingOutcome(
+    bookingId: string,
+    outcome: BookingOutcome,
+): Promise<CrmResult<Booking>> {
+    return send<Booking>(
+        `/bookings/${bookingId}/outcome`,
+        "POST",
+        { outcome },
+        "Could not record how it went",
+    );
+}
+
+/** Move a booking to another slot (#121). */
+export function rescheduleBooking(
+    bookingId: string,
+    startAt: string,
+): Promise<CrmResult<Booking>> {
+    return send<Booking>(
+        `/bookings/${bookingId}`,
+        "PATCH",
+        { startAt },
+        "Could not move the booking",
+    );
+}
+
 export function cancelBooking(bookingId: string): Promise<CrmResult<Booking>> {
     return send<Booking>(
         `/bookings/${bookingId}`,

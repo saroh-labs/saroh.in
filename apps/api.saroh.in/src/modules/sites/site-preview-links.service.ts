@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
+import { sanitizeRichHtml } from "./sanitize";
 import type { SiteSnapshot } from "./sites.service";
 import { SitesService } from "./sites.service";
 
@@ -47,6 +48,30 @@ export interface PreviewView {
     expiresAt: Date;
 }
 
+/**
+ * One post as a preview shows it (#236): the DRAFT, plus whether it is live.
+ *
+ * Shaped like the `post` half of what publish writes, so the renderer draws a
+ * previewed post and a live one with the same component and cannot end up with
+ * two versions of what a post looks like. Two fields are additional and both
+ * are about the draft rather than the writing: `publishedAt` is null for a post
+ * that has never gone live, and `live` says whether the public is being served
+ * this post right now.
+ */
+export interface PreviewPostView {
+    title: string;
+    slug: string;
+    excerpt: string | null;
+    content: string;
+    image: string | null;
+    featured: boolean;
+    category: { name: string; slug: string } | null;
+    author: string | null;
+    publishedAt: string | null;
+    updatedAt: string;
+    live: boolean;
+}
+
 /** Why a token no longer works — the page says this in words, not a 404. */
 export type PreviewGoneReason = "expired" | "revoked";
 
@@ -82,6 +107,59 @@ function toView(
     now = new Date(),
 ): PreviewLinkView {
     return { ...link, state: previewLinkState(link, now) };
+}
+
+/** The draft columns a preview post needs — never a Publication. */
+const draftPostSelect = {
+    title: true,
+    slug: true,
+    excerpt: true,
+    content: true,
+    image: true,
+    featured: true,
+    publishedAt: true,
+    updatedAt: true,
+    currentPublicationId: true,
+    category: { select: { name: true, slug: true } },
+    author: { select: { name: true } },
+} as const;
+
+interface DraftPostRow {
+    title: string;
+    slug: string;
+    excerpt: string | null;
+    content: string;
+    image: string | null;
+    featured: boolean;
+    publishedAt: Date | null;
+    updatedAt: Date;
+    currentPublicationId: string | null;
+    category: { name: string; slug: string } | null;
+    author: { name: string | null } | null;
+}
+
+function toPreviewPost(row: DraftPostRow): PreviewPostView {
+    return {
+        title: row.title,
+        slug: row.slug,
+        excerpt: row.excerpt,
+        // The draft has not been through publish, so it is sanitized here.
+        content: sanitizeRichHtml(row.content),
+        image: row.image,
+        featured: row.featured,
+        category: row.category,
+        author: row.author?.name ?? null,
+        publishedAt: row.publishedAt?.toISOString() ?? null,
+        updatedAt: row.updatedAt.toISOString(),
+        // Exactly the pointer the public read follows, so "live" in a preview
+        // means the same thing it means to a visitor.
+        live: row.currentPublicationId !== null,
+    };
+}
+
+/** The date a post sorts by: what it claims, else when it was last touched. */
+function sortKey(post: PreviewPostView): number {
+    return Date.parse(post.publishedAt ?? post.updatedAt);
 }
 
 @Injectable()
@@ -176,6 +254,93 @@ export class SitePreviewLinksService {
      * would confirm it once existed.
      */
     async resolve(token: string): Promise<PreviewView> {
+        const link = await this.requireActiveLink(token);
+
+        const site = await this.sites.loadDraftSite({
+            id: link.siteId,
+            organizationId: link.organizationId,
+            deletedAt: null,
+        });
+        if (!site) {
+            throw new NotFoundException("No preview at this address");
+        }
+
+        return {
+            snapshot: this.sites.buildSnapshot(site, new Date()),
+            site: { name: site.name },
+            expiresAt: link.expiresAt,
+        };
+    }
+
+    /**
+     * PUBLIC: the site's writing behind a token, newest first (#236).
+     *
+     * A preview shows EVERY post from its draft, including ones that have
+     * never been published, and says which is which. That is the deliberate
+     * answer to the question #236 raised, and it follows from what a preview
+     * is: the pages it already shows are unpublished too, so showing only live
+     * posts beside them would be incoherent — and a reviewer asked to read the
+     * writing before it goes out cannot do that if the preview hides exactly
+     * the posts that have not gone out.
+     *
+     * `content` is sanitized HERE, on the same boundary and through the same
+     * allowlist publish uses, because a draft has not been through publish yet.
+     * The renderer's rule is unchanged by this route: it only ever receives
+     * markup that is already safe, and never sanitizes at read time.
+     */
+    async posts(token: string): Promise<{ posts: PreviewPostView[] }> {
+        const link = await this.requireActiveLink(token);
+        const rows = await prisma.post.findMany({
+            where: {
+                siteId: link.siteId,
+                site: { organizationId: link.organizationId, deletedAt: null },
+            },
+            select: draftPostSelect,
+        });
+        // Sorted here rather than in the query: a post that has never been
+        // published has no `publishedAt`, and it is the NEWEST writing, not the
+        // oldest. Ordering on the column alone would bury every draft.
+        return {
+            posts: rows
+                .map(toPreviewPost)
+                .sort((a, b) => sortKey(b) - sortKey(a)),
+        };
+    }
+
+    /**
+     * PUBLIC: one post from the draft, by slug (#236). 404 when no post on
+     * this site has that slug — published or not.
+     */
+    async post(token: string, slug: string): Promise<PreviewPostView> {
+        const link = await this.requireActiveLink(token);
+        const row = await prisma.post.findFirst({
+            where: {
+                siteId: link.siteId,
+                slug,
+                site: { organizationId: link.organizationId, deletedAt: null },
+            },
+            select: draftPostSelect,
+        });
+        if (!row) {
+            throw new NotFoundException(`No post at "${slug}"`);
+        }
+        return toPreviewPost(row);
+    }
+
+    /**
+     * The token check every public preview read shares: 404 for a token that
+     * never existed, 410 naming why for one that has stopped working.
+     *
+     * Shared on purpose. A revoked link must stop serving the draft AND the
+     * writing at the same instant, and the only way to be sure of that is for
+     * both to ask the same question in the same place.
+     */
+    private async requireActiveLink(token: string): Promise<{
+        id: string;
+        siteId: string;
+        organizationId: string;
+        expiresAt: Date;
+    }> {
         const link = await prisma.sitePreviewLink.findUnique({
             where: { token },
             select: {
@@ -202,15 +367,6 @@ export class SitePreviewLinksService {
             });
         }
 
-        const site = await this.sites.loadDraftSite({
-            id: link.siteId,
-            organizationId: link.organizationId,
-            deletedAt: null,
-        });
-        if (!site) {
-            throw new NotFoundException("No preview at this address");
-        }
-
         // Recorded, not awaited: a reviewer's page must not wait on, or fail
         // for, a bookkeeping write.
         void prisma.sitePreviewLink
@@ -221,11 +377,7 @@ export class SitePreviewLinksService {
             })
             .catch(() => undefined);
 
-        return {
-            snapshot: this.sites.buildSnapshot(site, new Date()),
-            site: { name: site.name },
-            expiresAt: link.expiresAt,
-        };
+        return link;
     }
 
     private async assertSiteInOrg(
