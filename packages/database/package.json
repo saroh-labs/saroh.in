@@ -26,7 +26,8 @@
         "test": "vitest run",
         "typecheck": "tsc --noEmit",
         "db:guard": "tsx src/database-target.cli.ts",
-        "db:seed:reset": "tsx src/seed.ts --reset"
+        "db:seed:reset": "tsx src/seed.ts --reset",
+        "db:verify:replay": "tsx src/verify-migration-replay.cli.ts"
     },
     "dependencies": {
         "@prisma/adapter-pg": "7.4.0",

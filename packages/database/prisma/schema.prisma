@@ -2259,6 +2259,12 @@ model Booking {
   @@index([organizationId])
   @@index([serviceId, startAt])
   @@index([contactId])
+  // Finding the appointments that still need an answer — past, not cancelled,
+  // no outcome yet — is the whole workflow (#241), so it is indexed rather
+  // than scanned. Declared here as well as in the migration that created it:
+  // an index that exists in the database but not in the datamodel reads to
+  // `migrate dev` as drift, and the migration it generates DROPS it.
+  @@index([organizationId, outcome, endAt])
 }
 
 /// What has happened to a Booking, in order (#121).
