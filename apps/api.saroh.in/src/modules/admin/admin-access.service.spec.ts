@@ -309,6 +309,36 @@ describe("AdminAccessService", () => {
         ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
+    // SEC-007's other half. Revocation is the control an incident depends on,
+    // and it only means anything if the NEXT request stops being authorized —
+    // with no background job in between, since a session revoked by a colleague
+    // during an incident cannot wait for a sweep to notice.
+    it("stops authorizing as soon as the session is revoked, whoever revoked it", async () => {
+        sessionFindUnique.mockResolvedValue({
+            ...activeSession,
+            revokedAt: new Date("2026-07-30T10:00:00.000Z"),
+            revokedByUserId: "staff_2",
+            platformAdmin: { revokedAt: null },
+        });
+
+        await expect(
+            service.authorize({
+                sessionId: "access_1",
+                organizationId: "org_1",
+                staff,
+                intent: "READ",
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(audit.write).toHaveBeenCalledWith(
+            prisma,
+            expect.objectContaining({
+                outcome: "DENIED",
+                metadata: expect.objectContaining({ reasonCode: "REVOKED" }),
+            }),
+        );
+    });
+
     it("revokes the matching session and records who closed it", async () => {
         await service.revoke({
             sessionId: "access_1",

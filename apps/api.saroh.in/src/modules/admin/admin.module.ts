@@ -8,7 +8,9 @@ import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminMetricsService } from "./admin-metrics.service";
+import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminController } from "./admin.controller";
+import { OrganizationAccessSessionGuard } from "./organization-access-session.guard";
 
 /**
  * The Saroh control plane (S1-012) — the API behind admin.saroh.in. Closes the
@@ -24,8 +26,10 @@ import { AdminController } from "./admin.controller";
         AdminAccessService,
         AdminAuditService,
         AdminMetricsService,
+        AdminOrganizationViewService,
         PlatformAdminGuard,
         PlatformPermissionGuard,
+        OrganizationAccessSessionGuard,
     ],
 })
 export class AdminModule {}

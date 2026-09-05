@@ -28,6 +28,7 @@ import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminMetricsService } from "./admin-metrics.service";
+import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminPermission } from "./admin-permissions";
 import {
     ClearFlagOverrideDto,
@@ -36,6 +37,10 @@ import {
     RevokeAdminAccessSessionDto,
     SetFlagDto,
 } from "./dto";
+import {
+    OrganizationAccessSessionGuard,
+    RequireOrganizationAccessSession,
+} from "./organization-access-session.guard";
 
 /**
  * The Saroh control plane (S1-012) — the API behind admin.saroh.in.
@@ -47,7 +52,16 @@ import {
  * and aggregate metrics, no tenant records.
  */
 @Controller("admin")
-@UseGuards(BetterAuthGuard, PlatformAdminGuard, PlatformPermissionGuard)
+@UseGuards(
+    BetterAuthGuard,
+    PlatformAdminGuard,
+    PlatformPermissionGuard,
+    // Last: it only acts on routes marked with
+    // `@RequireOrganizationAccessSession`, and those must already have
+    // passed staff authentication and the permission check before a
+    // support-access session is consulted.
+    OrganizationAccessSessionGuard,
+)
 export class AdminController {
     constructor(
         private readonly flags: FeatureFlagService,
@@ -55,6 +69,7 @@ export class AdminController {
         private readonly metrics: AdminMetricsService,
         private readonly adminAudit: AdminAuditService,
         private readonly adminAccess: AdminAccessService,
+        private readonly organizationView: AdminOrganizationViewService,
         private readonly idempotency: IdempotencyService,
     ) {}
 
@@ -150,6 +165,47 @@ export class AdminController {
             scope: session.scope,
             expiresAt: session.expiresAt,
         };
+    }
+
+    /**
+     * Read one Organization under an open support-access session (#139).
+     *
+     * This is the route that makes the access ledger true. Every other admin
+     * route is platform-level; this one reads a single tenant's workspace, and
+     * reaching it requires a session that `authorize()` has just checked —
+     * right Organization, right staff member, not revoked, not expired, not a
+     * write. Before this existed, a session could be opened and revoked and
+     * nothing in between ever consulted one, so the recorded authorization
+     * described a control with no code behind it.
+     *
+     * Counts and lifecycle only. See `AdminOrganizationViewService`.
+     */
+    @Get("organizations/:organizationId")
+    @RequireAdminPermission(AdminPermission.OrganizationViewAs)
+    @RequireOrganizationAccessSession("READ")
+    async viewOrganization(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+    ) {
+        const view = await this.organizationView.view(organizationId);
+
+        // A successful read goes through `recordRead`, which reports an audit
+        // outage without failing the response. Denials take the opposite path
+        // inside `authorize()` and fail the request (SEC-008): losing the
+        // record of a refusal leaves an incident with no evidence, while
+        // losing the record of a read that already succeeded does not change
+        // what the caller saw.
+        await this.adminAudit.recordRead({
+            actorUserId: staff.userId,
+            permission: AdminPermission.OrganizationViewAs,
+            action: "organization.access.read",
+            targetType: "organization",
+            targetId: organizationId,
+            organizationId,
+            outcome: AdminAuditOutcome.Success,
+        });
+
+        return view;
     }
 
     @Delete("organizations/:organizationId/access-sessions/:accessSessionId")
