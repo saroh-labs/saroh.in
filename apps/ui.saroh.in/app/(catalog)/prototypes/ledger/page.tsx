@@ -111,7 +111,7 @@ function money(row: Row) {
         // says the words. This is the one place the prototype spends extra
         // vertical space on a phone rather than saving it.
         return (
-            <span className="text-muted-foreground text-xs italic">
+            <span className="text-xs italic text-muted-foreground">
                 No price set
             </span>
         );
@@ -137,7 +137,7 @@ function money(row: Row) {
  */
 function LedgerRow({ row, resembles }: { row: Row; resembles?: Row }) {
     return (
-        <li className="border-border border-b last:border-b-0">
+        <li className="border-b border-border last:border-b-0">
             <div className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4">
                 {/* WHO + WHAT — never drops. If a row cannot say who it is
                     about and what it is, it is not a row. */}
@@ -151,7 +151,7 @@ function LedgerRow({ row, resembles }: { row: Row; resembles?: Row }) {
                             {row.kind === "order" ? "Sale" : "Appointment"}
                         </Badge>
                     </div>
-                    <p className="text-muted-foreground mt-0.5 truncate text-sm">
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">
                         {row.what}{" "}
                         <span className="text-foreground/70">
                             · {row.detail}
@@ -164,7 +164,7 @@ function LedgerRow({ row, resembles }: { row: Row; resembles?: Row }) {
                         same person, and §"Say what is true" means it may not
                         imply it. The merchant is the one who knows. */}
                     {resembles ? (
-                        <p className="text-muted-foreground mt-1 text-xs">
+                        <p className="mt-1 text-xs text-muted-foreground">
                             Also a row for{" "}
                             <span className="text-foreground">
                                 {resembles.who}
@@ -176,7 +176,7 @@ function LedgerRow({ row, resembles }: { row: Row; resembles?: Row }) {
                                 broke the rule the prototype is about. */}
                             <button
                                 type="button"
-                                className="text-foreground coarse:min-h-11 coarse:px-2 inline-flex items-center rounded-md underline underline-offset-2"
+                                className="inline-flex items-center rounded-md text-foreground underline underline-offset-2 coarse:min-h-11 coarse:px-2"
                             >
                                 Link them
                             </button>
@@ -188,7 +188,7 @@ function LedgerRow({ row, resembles }: { row: Row; resembles?: Row }) {
                     than disappearing: on the shop floor "how long has this
                     waited" is the reason the merchant opened the list. */}
                 <div className="flex items-center justify-between gap-3 sm:justify-end">
-                    <span className="text-muted-foreground shrink-0 text-xs tabular-nums sm:w-28 sm:text-right">
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:w-28 sm:text-right">
                         {row.when}
                     </span>
                     <span
@@ -227,11 +227,11 @@ function Answer({
     children: React.ReactNode;
 }) {
     return (
-        <div className="border-border border-t py-4">
+        <div className="border-t border-border py-4">
             <h3 className="text-sm font-semibold">
                 {n}. {question}
             </h3>
-            <p className="text-muted-foreground mt-1 max-w-prose text-sm">
+            <p className="mt-1 max-w-prose text-sm text-muted-foreground">
                 {children}
             </p>
         </div>
@@ -246,13 +246,13 @@ export default function LedgerPrototype() {
             <h1 className="font-display text-2xl font-semibold">
                 The ledger across four scenes
             </h1>
-            <p className="text-muted-foreground mt-2 max-w-prose text-sm">
+            <p className="mt-2 max-w-prose text-sm text-muted-foreground">
                 A prototype for #172 — rough on purpose, so the choices in it
                 can be argued with. Look at it at 320, 390 and 1440, in light
                 and dark, with a mouse and with a thumb.
             </p>
 
-            <ul className="border-border mt-8 rounded-lg border">
+            <ul className="mt-8 rounded-lg border border-border">
                 {ROWS.map((row) => (
                     <LedgerRow
                         key={row.id}

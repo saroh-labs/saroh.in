@@ -16,7 +16,7 @@ function Swatch({ name, className }: { name: string; className: string }) {
     return (
         <div className="flex flex-col gap-1.5">
             <div className={`h-14 rounded-md border ${className}`} />
-            <span className="text-muted-foreground text-xs">{name}</span>
+            <span className="text-xs text-muted-foreground">{name}</span>
         </div>
     );
 }
@@ -33,7 +33,7 @@ function Section({
     return (
         <section className="border-t py-10">
             <h2 className="text-lg font-semibold">{title}</h2>
-            <p className="text-muted-foreground mt-1 text-sm">{description}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
             <div className="mt-6">{children}</div>
         </section>
     );
@@ -49,7 +49,7 @@ export default function Home() {
         <main className="mx-auto max-w-5xl px-6 py-16">
             <header className="flex flex-col items-start gap-4">
                 <Wordmark suffix="UI" style={{ fontSize: "2rem" }} />
-                <p className="text-muted-foreground max-w-xl text-balance">
+                <p className="max-w-xl text-balance text-muted-foreground">
                     The Saroh design system — the tokens and components every
                     app shares, from one source. This page renders them live.
                 </p>
@@ -78,7 +78,7 @@ export default function Home() {
                     <Swatch name="info" className="bg-info" />
                     <Swatch name="destructive" className="bg-destructive" />
                 </div>
-                <p className="text-muted-foreground mb-3 text-sm">
+                <p className="mb-3 text-sm text-muted-foreground">
                     <strong className="text-foreground">accent</strong> is
                     shadcn&rsquo;s neutral hover/selected surface (button ghost
                     hover, menu focus, calendar selection) — not a brand colour.
@@ -150,7 +150,7 @@ export default function Home() {
                         Sans · body and dense UI. The quick brown fox jumps over
                         the lazy dog — 0123456789 ₹4.2L
                     </p>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-sm text-muted-foreground">
                         Muted · secondary and descriptive copy.
                     </p>
                 </div>
@@ -163,19 +163,19 @@ export default function Home() {
                 {/* Written out, not interpolated: Tailwind scans source
                     statically, so `shadow-${s}` would be purged. */}
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-                    <div className="bg-card shadow-xs rounded-lg p-4 text-center text-sm">
+                    <div className="rounded-lg bg-card p-4 text-center text-sm shadow-xs">
                         shadow-xs
                     </div>
-                    <div className="bg-card rounded-lg p-4 text-center text-sm shadow-sm">
+                    <div className="rounded-lg bg-card p-4 text-center text-sm shadow-sm">
                         shadow-sm
                     </div>
-                    <div className="bg-card rounded-lg p-4 text-center text-sm shadow-md">
+                    <div className="rounded-lg bg-card p-4 text-center text-sm shadow-md">
                         shadow-md
                     </div>
-                    <div className="bg-card rounded-lg p-4 text-center text-sm shadow-lg">
+                    <div className="rounded-lg bg-card p-4 text-center text-sm shadow-lg">
                         shadow-lg
                     </div>
-                    <div className="bg-card rounded-lg p-4 text-center text-sm shadow-xl">
+                    <div className="rounded-lg bg-card p-4 text-center text-sm shadow-xl">
                         shadow-xl
                     </div>
                 </div>
