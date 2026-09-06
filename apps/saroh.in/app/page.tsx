@@ -56,12 +56,18 @@ export default function HomePage() {
                         without losing anything behind it.
                     </p>
 
+                    {/* The waitlist is the ask (#261). "Start free" pointed at
+                        a signup PRODUCT.md calls gated, and the waitlist was the
+                        footnote under it — the primary action was the one that
+                        could not be completed. The footnote is gone with it: an
+                        escape hatch only reads as one when there is something to
+                        escape from. */}
                     <div className="mt-7 flex flex-wrap items-center gap-2.5">
                         <Link
-                            href="https://accounts.saroh.in/signup"
+                            href="#waitlist"
                             className="inline-flex h-[38px] items-center rounded-md bg-primary px-[18px] text-[13.5px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
                         >
-                            Start free
+                            Join the waitlist
                         </Link>
                         <Link
                             href="/modules"
@@ -71,14 +77,8 @@ export default function HomePage() {
                         </Link>
                     </div>
                     <p className="mt-3.5 text-[12.5px] text-muted-foreground/70">
-                        Not ready?{" "}
-                        <Link
-                            href="#waitlist"
-                            className="text-muted-foreground underline decoration-border underline-offset-4 hover:decoration-current"
-                        >
-                            Join the waitlist
-                        </Link>{" "}
-                        instead.
+                        Saroh is invite-only while we finish the onboarding
+                        work.
                     </p>
 
                     <ProductShot
@@ -177,33 +177,21 @@ export default function HomePage() {
                             Start with what you need today.
                         </h2>
                         <p className="mt-4 text-[16px] leading-relaxed text-muted-foreground">
-                            Free to start. Source-available under the Elastic
-                            License 2.0 — you can read the code.
+                            Free to start when your invite lands.
+                            Source-available under the Elastic License 2.0 — you
+                            can read the code today.
                         </p>
-                        {/* Both asks, together. The hero pairs "Start free"
-                            with an escape hatch; this one did not, so a visitor
-                            who read the whole page and clicked the final CTA had
-                            no fallback at the exact moment of decision — and
-                            open signup is still gated (PRODUCT.md). */}
-                        <div className="mt-7 flex flex-wrap justify-center gap-2.5">
-                            <Link
-                                href="https://accounts.saroh.in/signup"
-                                className="inline-flex h-[38px] items-center rounded-md bg-primary px-[18px] text-[13.5px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
-                            >
-                                Start free
-                            </Link>
-                            <Link
-                                href="#waitlist-form"
-                                className="inline-flex h-[38px] items-center rounded-md border border-border px-[18px] text-[13.5px] font-medium transition-colors hover:bg-accent"
-                            >
-                                Join the waitlist
-                            </Link>
-                        </div>
+                        {/* One ask (#261). This section used to pair "Start
+                            free" with the waitlist so the final CTA had a
+                            fallback; with signup gated there is nothing to fall
+                            back from, and the form is already directly below —
+                            a button that scrolls the reader a few hundred pixels
+                            to a form they can see is friction, not a choice. */}
                     </div>
 
-                    {/* The waitlist stays as the fallback ask, below the
-                        primary one, for visitors who are not ready to sign up. */}
-                    <div className="mx-auto mt-14 max-w-xl">
+                    {/* The waitlist is now the only ask on the page, so the
+                        form is the section rather than a fallback under it. */}
+                    <div className="mx-auto mt-10 max-w-xl">
                         <JoinWaitlist />
                     </div>
                 </div>
