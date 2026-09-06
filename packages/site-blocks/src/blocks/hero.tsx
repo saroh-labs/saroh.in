@@ -1,4 +1,4 @@
-import type { HeroContent } from "@/lib/publication";
+import type { RenderedHero } from "@saroh/block-contract";
 
 import { CtaButton } from "./cta";
 
@@ -16,10 +16,10 @@ import { CtaButton } from "./cta";
  * phone a co-primary scene, so the mobile gutter stays fixed and the merchant's
  * margin governs the widths it was chosen for.
  */
-export default function HeroSection({ content }: { content: HeroContent }) {
+export default function HeroSection({ content }: { content: RenderedHero }) {
     const hasImage = Boolean(content.image?.src);
     return (
-        <section className="mx-auto w-full max-w-screen-xl bg-site-hero-bg px-5 py-[var(--site-section-padding)] text-site-hero-fg sm:px-[var(--site-page-margin)]">
+        <section className="bg-site-hero-bg text-site-hero-fg mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div
                 className={
                     hasImage
@@ -47,7 +47,7 @@ export default function HeroSection({ content }: { content: HeroContent }) {
                 {content.image?.src ? (
                     // Remote publication images from arbitrary tenant origins —
                     // a plain <img> avoids next/image's per-domain allowlist.
-                    // eslint-disable-next-line @next/next/no-img-element
+
                     <img
                         src={content.image.src}
                         alt={content.image.alt ?? ""}

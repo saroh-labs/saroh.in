@@ -2,11 +2,11 @@
 
 import { useId, useState } from "react";
 
-import { env } from "@/env";
-import type { EnquiryContent } from "@/lib/publication";
-import { cn } from "@/lib/utils";
+import type { RenderedEnquiry } from "@saroh/block-contract";
+import { cn } from "../lib/utils";
 
 import { destructiveAlertClasses } from "../alert";
+import { DEFAULT_API_URL } from "../api-url";
 import { ctaClasses } from "./cta";
 
 /**
@@ -27,9 +27,6 @@ import { ctaClasses } from "./cta";
  * can't create two leads.
  */
 
-const API_URL =
-    env.NEXT_PUBLIC_API_URL ?? env.API_URL ?? "https://api.saroh.in";
-
 type SubmitState =
     | { kind: "idle" }
     | { kind: "submitting" }
@@ -37,7 +34,7 @@ type SubmitState =
     | { kind: "error"; message: string };
 
 /** Map an enquiry field type to the native input type / control. */
-function inputTypeFor(type: EnquiryContent["fields"][number]["type"]): string {
+function inputTypeFor(type: RenderedEnquiry["fields"][number]["type"]): string {
     switch (type) {
         case "email":
             return "email";
@@ -50,8 +47,11 @@ function inputTypeFor(type: EnquiryContent["fields"][number]["type"]): string {
 
 export default function EnquirySection({
     content,
+    apiUrl = DEFAULT_API_URL,
 }: {
-    content: EnquiryContent;
+    content: RenderedEnquiry;
+    /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
+    apiUrl?: string;
 }) {
     // A stable id per mount for accessible label ids.
     const baseId = useId();
@@ -77,7 +77,7 @@ export default function EnquirySection({
         setState({ kind: "submitting" });
         try {
             const res = await fetch(
-                `${API_URL}/public/forms/${encodeURIComponent(formId)}/submit`,
+                `${apiUrl}/public/forms/${encodeURIComponent(formId)}/submit`,
                 {
                     method: "POST",
                     headers: { "content-type": "application/json" },
@@ -120,8 +120,8 @@ export default function EnquirySection({
     if (state.kind === "success") {
         return (
             <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-                <div className="rounded-[var(--site-radius)] border border-site-border bg-site-surface p-8 text-center">
-                    <p className="text-lg font-medium text-site-fg">
+                <div className="border-site-border bg-site-surface rounded-[var(--site-radius)] border p-8 text-center">
+                    <p className="text-site-fg text-lg font-medium">
                         {content.successMessage ??
                             "Thanks — we'll be in touch soon."}
                     </p>
@@ -133,12 +133,12 @@ export default function EnquirySection({
     return (
         <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             {content.title ? (
-                <h2 className="text-3xl font-bold tracking-tight text-site-fg">
+                <h2 className="text-site-fg text-3xl font-bold tracking-tight">
                     {content.title}
                 </h2>
             ) : null}
             {content.description ? (
-                <p className="mt-3 text-site-body">{content.description}</p>
+                <p className="text-site-body mt-3">{content.description}</p>
             ) : null}
 
             <form
@@ -171,7 +171,7 @@ export default function EnquirySection({
                         <div key={i} className="grid gap-1.5">
                             <label
                                 htmlFor={fieldId}
-                                className="text-sm font-medium text-site-fg"
+                                className="text-site-fg text-sm font-medium"
                             >
                                 {label}
                                 {field.required ? (

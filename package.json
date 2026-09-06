@@ -2,19 +2,20 @@
     "private": true,
     "license": "Elastic-2.0",
     "scripts": {
-        "prepare": "husky install",
         "build": "turbo run build",
+        "check:blocks": "node scripts/check-blocks.mjs",
+        "check:cycles": "madge --circular --extensions ts,tsx --exclude 'node_modules|\\.next|dist|\\.turbo' apps packages",
+        "check:routes": "node scripts/check-app-routes.mjs",
         "db:migrate:deploy": "turbo run db:migrate:deploy",
         "db:push": "turbo run db:push",
         "db:seed": "turbo run db:seed",
         "dev": "turbo run dev --concurrency 100",
         "dev:api-auth": "turbo run dev --filter=@saroh/api --filter=auth",
         "dev:apps": "turbo run dev --filter=auth --filter=admin --filter=sites",
+        "format": "prettier --write \"**/*.{js,jsx,ts,tsx,md}\"",
         "lint": "turbo run lint",
-        "typecheck": "turbo run typecheck",
-        "check:cycles": "madge --circular --extensions ts,tsx --exclude 'node_modules|\\.next|dist|\\.turbo' apps packages",
-        "check:routes": "node scripts/check-app-routes.mjs",
-        "format": "prettier --write \"**/*.{js,jsx,ts,tsx,md}\""
+        "prepare": "husky install",
+        "typecheck": "turbo run typecheck"
     },
     "prisma": {
         "schema": "./packages/database/prisma/schema.prisma",

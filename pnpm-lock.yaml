@@ -728,6 +728,9 @@ importers:
 
   apps/saroh.app:
     dependencies:
+      '@saroh/site-blocks':
+        specifier: workspace:*
+        version: link:../../packages/site-blocks
       '@saroh/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -1233,6 +1236,61 @@ importers:
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(@swc/core@1.15.40(@swc/helpers@0.5.23))(jiti@2.7.0)(postcss@8.5.26)(tsx@4.23.11)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@20.19.33)(jiti@2.7.0)(jsdom@25.0.1)(terser@5.49.2)(tsx@4.23.11)(yaml@2.9.0)
+
+  packages/site-blocks:
+    dependencies:
+      '@saroh/block-contract':
+        specifier: workspace:*
+        version: link:../block-contract
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      tailwind-merge:
+        specifier: ^3.6.0
+        version: 3.6.0
+    devDependencies:
+      '@saroh/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint-config-custom
+      '@saroh/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/tsconfig
+      '@testing-library/jest-dom':
+        specifier: ^6.6.3
+        version: 6.10.0(@testing-library/dom@10.4.1)
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/node':
+        specifier: 'catalog:'
+        version: 20.19.33
+      '@types/react':
+        specifier: 19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: catalog:react19
+        version: 19.2.4(@types/react@19.2.18)
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
+      next:
+        specifier: catalog:next16
+        version: 16.3.0(@playwright/test@1.63.0)(@types/node@20.19.33)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: catalog:react19
+        version: 19.2.8
+      react-dom:
+        specifier: catalog:react19
+        version: 19.2.8(react@19.2.8)
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 3.4.19(tsx@4.23.11)(yaml@2.9.0)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

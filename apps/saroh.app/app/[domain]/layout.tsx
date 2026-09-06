@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { SiteFooter, SiteHeader, SiteTheme } from "@/components/site-chrome";
+import { SiteTheme } from "@saroh/site-blocks";
+
+import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { getPublicationForHost, shareImages } from "@/lib/publication";
 
 /**

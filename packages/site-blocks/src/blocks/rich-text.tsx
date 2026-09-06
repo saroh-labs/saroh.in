@@ -1,4 +1,4 @@
-import type { RichTextContent } from "@/lib/publication";
+import type { RenderedRichText } from "@saroh/block-contract";
 
 /**
  * `richText` v1 — authored rich content.
@@ -19,7 +19,7 @@ import type { RichTextContent } from "@/lib/publication";
 export default function RichTextSection({
     content,
 }: {
-    content: RichTextContent;
+    content: RenderedRichText;
 }) {
     return (
         <section className="mx-auto w-full max-w-screen-md px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
@@ -29,12 +29,12 @@ export default function RichTextSection({
                        text colour (#189), and `dark:prose-invert` is gone with
                        them: once a palette is chosen, a visitor's OS setting
                        must not repaint a storefront its owner picked. */
-                    className="prose max-w-none prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80"
+                    className="prose prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-none"
                     // Sanitized at publish (see the safety note above).
                     dangerouslySetInnerHTML={{ __html: content.value }}
                 />
             ) : (
-                <div className="prose max-w-none prose-p:text-site-fg/80">
+                <div className="prose prose-p:text-site-fg/80 max-w-none">
                     <p className="whitespace-pre-wrap">{content.value}</p>
                 </div>
             )}

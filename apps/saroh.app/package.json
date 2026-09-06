@@ -15,6 +15,7 @@
         "script": "dev:app"
     },
     "dependencies": {
+        "@saroh/site-blocks": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "class-variance-authority": "^0.7.1",

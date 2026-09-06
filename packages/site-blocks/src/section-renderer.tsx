@@ -1,19 +1,29 @@
 import type {
-    BookingContent,
-    CtaContent,
-    EnquiryContent,
-    GalleryContent,
-    HeroContent,
-    RichTextContent,
-    Section,
-} from "@/lib/publication";
+    RenderedBooking,
+    RenderedCtaSection,
+    RenderedEnquiry,
+    RenderedGallery,
+    RenderedHero,
+    RenderedRichText,
+} from "@saroh/block-contract";
 
-import BookingSection from "./booking";
-import CtaSection from "./cta";
-import EnquirySection from "./enquiry";
-import GallerySection from "./gallery";
-import HeroSection from "./hero";
-import RichTextSection from "./rich-text";
+import BookingSection from "./blocks/booking";
+import CtaSection from "./blocks/cta";
+import EnquirySection from "./blocks/enquiry";
+import GallerySection from "./blocks/gallery";
+import HeroSection from "./blocks/hero";
+import RichTextSection from "./blocks/rich-text";
+
+/**
+ * One section of a published page, as the snapshot carries it.
+ *
+ * `content` is `unknown` because it arrives as JSON. It is narrowed per `type`
+ * at the point of use — see the note on {@link SectionRenderer}.
+ */
+export interface Section {
+    type: string;
+    content: unknown;
+}
 
 /**
  * Maps a publication {@link Section} to its presentational component by
@@ -31,27 +41,48 @@ import RichTextSection from "./rich-text";
  * section type this build does not know) degrades gracefully instead of
  * crashing the whole page.
  */
-export default function SectionRenderer({ section }: { section: Section }) {
+export default function SectionRenderer({
+    section,
+    apiUrl,
+}: {
+    section: Section;
+    /**
+     * Base URL of the public API, for the two blocks that talk to it. Optional:
+     * each defaults to production, which is what the app-level env fallback did
+     * before these components moved into a package (#252).
+     */
+    apiUrl?: string;
+}) {
     switch (section.type) {
         case "hero":
-            return <HeroSection content={section.content as HeroContent} />;
+            return <HeroSection content={section.content as RenderedHero} />;
         case "richText":
             return (
-                <RichTextSection content={section.content as RichTextContent} />
+                <RichTextSection
+                    content={section.content as RenderedRichText}
+                />
             );
         case "cta":
-            return <CtaSection content={section.content as CtaContent} />;
+            return (
+                <CtaSection content={section.content as RenderedCtaSection} />
+            );
         case "gallery":
             return (
-                <GallerySection content={section.content as GalleryContent} />
+                <GallerySection content={section.content as RenderedGallery} />
             );
         case "enquiry":
             return (
-                <EnquirySection content={section.content as EnquiryContent} />
+                <EnquirySection
+                    content={section.content as RenderedEnquiry}
+                    apiUrl={apiUrl}
+                />
             );
         case "booking":
             return (
-                <BookingSection content={section.content as BookingContent} />
+                <BookingSection
+                    content={section.content as RenderedBooking}
+                    apiUrl={apiUrl}
+                />
             );
         default:
             // Unknown section type (e.g. from a newer contract version) —
@@ -87,12 +118,21 @@ function paddingOverride(content: unknown): React.CSSProperties | undefined {
  * absent, so a merchant could set a section's padding in the editor, watch the
  * preview honour it, publish, and see the live site ignore it.
  */
-export function PageSections({ sections }: { sections: Section[] }) {
+export function PageSections({
+    sections,
+    apiUrl,
+}: {
+    sections: Section[];
+    /** Passed through to the blocks that talk to the public API. */
+    apiUrl?: string;
+}) {
     return (
         <>
             {sections.map((section, i) => {
                 const style = paddingOverride(section.content);
-                const rendered = <SectionRenderer section={section} />;
+                const rendered = (
+                    <SectionRenderer section={section} apiUrl={apiUrl} />
+                );
                 return style === undefined ? (
                     <div key={i}>{rendered}</div>
                 ) : (
