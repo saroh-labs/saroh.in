@@ -1055,6 +1055,34 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/debug@4.1.13)(@types/node@20.19.33)(jiti@2.7.0)(jsdom@25.0.1)(terser@5.49.2)(tsx@4.23.11)(yaml@2.9.0)
 
+  packages/block-contract:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@saroh/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint-config-custom
+      '@saroh/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/tsconfig
+      '@types/node':
+        specifier: 'catalog:'
+        version: 20.19.33
+      rimraf:
+        specifier: ^6.0.1
+        version: 6.1.3
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.1(@swc/core@1.15.40(@swc/helpers@0.5.23))(jiti@2.7.0)(postcss@8.5.26)(tsx@4.23.11)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@20.19.33)(jiti@2.7.0)(jsdom@25.0.1)(terser@5.49.2)(tsx@4.23.11)(yaml@2.9.0)
+
   packages/charts:
     dependencies:
       '@saroh/ui':
@@ -1106,6 +1134,9 @@ importers:
       '@prisma/client':
         specifier: catalog:prisma
         version: 7.9.1(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(typescript@5.9.3)
+      '@saroh/block-contract':
+        specifier: workspace:*
+        version: link:../block-contract
       '@types/node':
         specifier: 'catalog:'
         version: 20.19.33
@@ -1211,9 +1242,9 @@ importers:
 
   packages/templates:
     dependencies:
-      '@saroh/database':
+      '@saroh/block-contract':
         specifier: workspace:*
-        version: link:../database
+        version: link:../block-contract
     devDependencies:
       '@saroh/tsconfig':
         specifier: workspace:*

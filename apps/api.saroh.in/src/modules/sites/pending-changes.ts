@@ -1,5 +1,4 @@
-import type { CtaAction } from "@saroh/database";
-import { ctaHref, parseSectionContent } from "@saroh/database";
+import { parseSectionContent, toRendered } from "@saroh/database";
 
 import { sanitizeSectionContent } from "./sanitize";
 
@@ -66,48 +65,21 @@ export function toPublishableSection(
         section: {
             type: section.type,
             contractVersion: section.contractVersion,
-            content: resolveCtaHrefs(
+            // The block declares how its own draft becomes what a component
+            // draws (#252). This used to be a local function that found buttons
+            // by sniffing for an `action` or a `cta` key, which was right for
+            // the two shapes that existed and silently published a dead button
+            // for any block nesting one elsewhere.
+            content: toRendered(
+                section.type,
                 sanitizeSectionContent(
                     parsed.data,
                     parsed.contract.sanitizedFields,
                 ),
-                resolvePage,
+                { resolvePage },
             ),
         },
     };
-}
-
-/**
- * A v2 button carries an ACTION; the renderer draws an HREF (#207).
- *
- * Resolved here, on the way into the snapshot, for the same reason style is
- * resolved into `--site-*` properties: the snapshot is the site as served, and
- * the renderer must never need the draft tables to draw it. Both publish and
- * the pending count go through this function, so the count is a diff over the
- * same bytes publish writes — a button whose page was renamed counts as
- * changed, because on the live site it did.
- *
- * The action stays in the content beside the resolved href, so a later reader
- * can still tell a call from a link.
- */
-function resolveCtaHrefs(
-    content: unknown,
-    resolvePage: (pageId: string) => string | undefined,
-): unknown {
-    if (content === null || typeof content !== "object") return content;
-    const c = content as Record<string, unknown>;
-    const withHref = (cta: unknown): unknown => {
-        if (cta === null || typeof cta !== "object") return cta;
-        const action = (cta as { action?: unknown }).action;
-        if (!action || typeof action !== "object") return cta;
-        return {
-            ...(cta as Record<string, unknown>),
-            href: ctaHref(action as CtaAction, resolvePage),
-        };
-    };
-    if ("action" in c) return withHref(c);
-    if ("cta" in c) return { ...c, cta: withHref(c.cta) };
-    return content;
 }
 
 /**
