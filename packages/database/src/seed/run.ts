@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { hashPassword as hashPasswordUntyped } from "better-auth/crypto";
 
-import { parseSectionContentOrThrow } from "../cms/section-contract";
+import { parseSectionContentOrThrow } from "@saroh/block-contract";
 import { assertDatabaseTarget } from "../database-target";
 import type { SeedSection } from "./data";
 import {

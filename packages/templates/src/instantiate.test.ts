@@ -1,4 +1,4 @@
-import { parseSectionContent } from "@saroh/database";
+import { parseSectionContent } from "@saroh/block-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantiateTemplate, TemplateInstantiationError } from "./instantiate";

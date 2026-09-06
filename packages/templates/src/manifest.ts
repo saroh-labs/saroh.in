@@ -1,4 +1,4 @@
-import type { ContractVersion, SectionType } from "@saroh/database";
+import type { ContractVersion, SectionType } from "@saroh/block-contract";
 
 /**
  * Site templates (Stage 2 — S2-002).
@@ -8,7 +8,7 @@ import type { ContractVersion, SectionType } from "@saroh/database";
  * lay down. Manifests are pure data — they never touch Prisma. Turning a
  * manifest into concrete Pages+Sections is the job of `instantiateTemplate`
  * (see `./instantiate.ts`), which resolves it against a {@link TemplateContext}
- * and validates every produced section through the `@saroh/database` section
+ * and validates every produced section through the `@saroh/block-contract` section
  * contract. A manifest can therefore never produce an invalid page.
  *
  * BUSINESS-PROFILE DEFAULTS. A template needs to weave the merchant's own
@@ -75,7 +75,7 @@ export function resolveContent<T>(
 
 /** One CMS section within a template page. */
 export interface TemplateSection {
-    /** The section type — must have a registered contract in `@saroh/database`. */
+    /** The section type — must have a registered contract in `@saroh/block-contract`. */
     type: SectionType;
     /** The contract version this section's content targets (starts at 1). */
     contractVersion: ContractVersion;

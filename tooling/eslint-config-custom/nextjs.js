@@ -19,7 +19,12 @@ const AUTH_ROOT_BAN_MESSAGE =
 const DB_IMPORT_BAN_PATTERNS = [
     "@saroh/database",
     "@saroh/database/*",
-    "@saroh/templates",
+    // @saroh/templates came OFF this list in #252. It was here only because
+    // `manifest.ts` imported two types from @saroh/database, which dragged
+    // Prisma into anything that touched it. Those types now come from
+    // @saroh/block-contract — zod and nothing else — so the package a template
+    // gallery needs to display is finally importable by the app that displays
+    // it. Put it back the moment it grows a database dependency again.
     "@prisma/client",
     "@prisma/*",
     "prisma",

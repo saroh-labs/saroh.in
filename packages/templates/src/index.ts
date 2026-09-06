@@ -4,7 +4,7 @@
  * A template is a pure, versioned description of a site (pages + ordered CMS
  * sections). `instantiateTemplate` resolves a manifest against a business
  * profile ({@link TemplateContext}) and validates every section through the
- * `@saroh/database` section contract, yielding a plain, ready-to-persist
+ * `@saroh/block-contract` section contract, yielding a plain, ready-to-persist
  * structure of Pages + Sections. This package never touches Prisma.
  */
 

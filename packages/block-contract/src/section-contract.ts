@@ -4,13 +4,26 @@ import { z } from "zod";
  * Versioned section contract (Stage 2 — S2-001).
  *
  * The SINGLE SOURCE OF TRUTH for what a `Section.content` (see schema.prisma)
- * may contain, keyed by `(sectionType, contractVersion)`. Every part of the
- * CMS validates through this module:
+ * may contain, keyed by `(sectionType, contractVersion)`. This is the AUTHORING
+ * shape — what an author may write. What a component finally draws is the
+ * RENDERED shape, in `./rendered.ts`, and `./to-rendered.ts` maps between them.
  *
- *   - the section editor (S2-004) validates on save,
+ * Two places validate through this module:
+ *
+ *   - the section editor (S2-004) validates on save, and
  *   - publish (S2-005) validates before snapshotting into an immutable
- *     Publication, and
- *   - the public renderer (S2-006) validates what it reads back.
+ *     Publication.
+ *
+ * The public renderer does NOT, and should not. This header used to claim it
+ * did; it never has (`section-renderer.tsx` casts). The claim was also wrong on
+ * the merits, which is why the comment was corrected rather than the code
+ * (#252): a Publication is immutable and was validated on the way in, so its
+ * content cannot be invalid, and `apps/saroh.app/lib/publication.ts` fetches
+ * `no-store` — so re-checking would cost every visitor to catch a condition
+ * that cannot occur. Worse, a strict re-check would turn today's graceful
+ * degradation of a field from a newer contract into a blank section. Rendered
+ * content is instead validated where it is hand-authored and genuinely can be
+ * wrong: in tests and in the ui.saroh.in catalog's fixtures.
  *
  * SANITIZATION BOUNDARY. This module validates the *shape* of content only; it
  * NEVER sanitizes. Section types that carry rich/authorable HTML declare their
