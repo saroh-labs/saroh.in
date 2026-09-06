@@ -1,37 +1,39 @@
 {
-  "name": "ui",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "portless",
-    "dev:app": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
-  },
-  "portless": {
-    "name": "ui.saroh",
-    "script": "dev:app"
-  },
-  "dependencies": {
-    "@saroh/auth": "workspace:*",
-    "@saroh/charts": "workspace:*",
-    "@saroh/ui": "workspace:*",
-    "next": "catalog:next16",
-    "react": "catalog:react19",
-    "react-dom": "catalog:react19",
-    "react-icons": "catalog:"
-  },
-  "devDependencies": {
-    "@saroh/eslint-config": "workspace:*",
-    "@types/node": "catalog:",
-    "@types/react": "19.2.15",
-    "@types/react-dom": "catalog:react19",
-    "eslint": "catalog:",
-    "eslint-config-next": "catalog:",
-    "postcss": "catalog:",
-    "tailwindcss": "catalog:",
-    "typescript": "catalog:"
-  }
+    "name": "ui",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "portless",
+        "dev:app": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "eslint .",
+        "typecheck": "tsc --noEmit"
+    },
+    "portless": {
+        "name": "ui.saroh",
+        "script": "dev:app"
+    },
+    "dependencies": {
+        "@saroh/auth": "workspace:*",
+        "@saroh/block-contract": "workspace:*",
+        "@saroh/charts": "workspace:*",
+        "@saroh/site-blocks": "workspace:*",
+        "@saroh/ui": "workspace:*",
+        "next": "catalog:next16",
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19",
+        "react-icons": "catalog:"
+    },
+    "devDependencies": {
+        "@saroh/eslint-config": "workspace:*",
+        "@types/node": "catalog:",
+        "@types/react": "19.2.15",
+        "@types/react-dom": "catalog:react19",
+        "eslint": "catalog:",
+        "eslint-config-next": "catalog:",
+        "postcss": "catalog:",
+        "tailwindcss": "catalog:",
+        "typescript": "catalog:"
+    }
 }

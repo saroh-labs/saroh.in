@@ -1,4 +1,3 @@
-import BaseLayout from "@/components/layouts/base-layout";
 import "@saroh/ui/globals.css";
 import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
@@ -37,7 +36,7 @@ export default function RootLayout({
                     enableSystem
                     disableTransitionOnChange
                 >
-                    <BaseLayout>{children}</BaseLayout>
+                    {children}
                 </ThemeProvider>
             </body>
         </html>
