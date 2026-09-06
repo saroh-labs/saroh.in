@@ -73,18 +73,23 @@ export default async function ModulePage({
                         </p>
                     ) : null}
 
+                    {/* Signup is gated (PRODUCT.md), so the waitlist takes the
+                        primary slot here as it does everywhere else (#261).
+                        "See every module" replaces the demoted second button —
+                        a reader on one module's page has an obvious next step
+                        that is not the same button twice. */}
                     <div className="mt-8 flex flex-wrap items-center gap-2.5">
                         <Link
-                            href="https://accounts.saroh.in/signup"
+                            href="/#waitlist"
                             className="inline-flex h-[38px] items-center rounded-md bg-primary px-[18px] text-[13.5px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
                         >
-                            Start free
+                            Join the waitlist
                         </Link>
                         <Link
-                            href="/#waitlist"
+                            href="/modules"
                             className="inline-flex h-[38px] items-center rounded-md border border-border px-[18px] text-[13.5px] font-medium transition-colors hover:bg-accent"
                         >
-                            Join the waitlist
+                            See every module
                         </Link>
                     </div>
 
