@@ -179,6 +179,13 @@ export const BLOCK_META = {
         fixtures: {
             default: {
                 variant: "default",
+                // Present because the block renders NOTHING without one — a
+                // section with no backing Form was never synced, and drawing a
+                // form that would POST to a broken URL is worse than drawing
+                // none. The catalog's copy is inert: this id belongs to no
+                // Form, so a submit from the catalog fails visibly rather than
+                // writing somewhere unexpected.
+                formId: "fixture-enquiry-form",
                 title: "Ask us anything",
                 submitLabel: "Send",
                 successMessage: "Thanks — we will reply within a day.",
@@ -203,6 +210,11 @@ export const BLOCK_META = {
         fixtures: {
             default: {
                 variant: "default",
+                // No `serviceId` on purpose. With one, the block fetches
+                // availability on mount — which a catalog has no business
+                // doing, and a test would have to stub. This is the state a
+                // merchant sees before they pick a Service, and it is a real
+                // state worth showing.
                 title: "Book a table",
                 description: "Lunch and dinner, seven days a week.",
                 submitLabel: "Confirm booking",

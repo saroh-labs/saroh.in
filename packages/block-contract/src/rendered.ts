@@ -35,6 +35,24 @@ import { SECTION_TYPES } from "./section-contract";
  */
 
 /**
+ * NO DEFAULTS IN THIS MODULE.
+ *
+ * The authoring schemas in `section-contract.ts` default `style` to "primary",
+ * `format` to "html", `layout` to "grid" and `alt` to "" — correctly, because
+ * they describe what an author may write and publish normalises it on the way
+ * in.
+ *
+ * These schemas describe JSON that ALREADY EXISTS, and a Publication is
+ * immutable and goes back to Stage 2. A default here would type a field as
+ * always-present, which would in turn make the `?? "grid"` guards the
+ * components have carried since they were written look redundant — and
+ * deleting them would break exactly the oldest published sites, the ones whose
+ * owners can no longer re-publish to fix them. Optional is the honest shape.
+ * `apps/saroh.app/lib/publication.ts` declared every one of these optional, and
+ * it was written by people looking at the rows.
+ */
+
+/**
  * A block's chosen look (#252, #254).
  *
  * Design is not otherwise merchant-editable: a merchant picks a variant and
@@ -73,7 +91,7 @@ const padding = z.number().int().min(24).max(96).optional();
 export const renderedCtaSchema = z.object({
     label: z.string().min(1),
     href: z.string(),
-    style: z.enum(["primary", "secondary", "link"]).default("primary"),
+    style: z.enum(["primary", "secondary", "link"]).optional(),
     action: z
         .object({
             kind: z.enum(["page", "url", "email", "call", "whatsapp"]),
@@ -82,10 +100,19 @@ export const renderedCtaSchema = z.object({
 });
 export type RenderedCta = z.infer<typeof renderedCtaSchema>;
 
-/** An image, as published. Identical to the authoring shape — nothing resolves. */
+/**
+ * An image, as published. Nothing about an image resolves at publish.
+ *
+ * `alt` is OPTIONAL here although the authoring schema defaults it to `""`.
+ * That is not an oversight and not a mismatch: publications are immutable and
+ * go back to Stage 2, so a row written before that default existed carries no
+ * `alt` at all, and a type claiming otherwise would delete the `?? ""` guards
+ * the components have always had. The type describes the JSON that exists, not
+ * the JSON we would write today.
+ */
 export const renderedImageSchema = z.object({
     src: z.string().min(1),
-    alt: z.string().default(""),
+    alt: z.string().optional(),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
 });
@@ -108,7 +135,7 @@ const renderedHero = z.object({
 const renderedRichText = z.object({
     variant,
     padding,
-    format: z.enum(["html", "markdown"]).default("html"),
+    format: z.enum(["html", "markdown"]).optional(),
     value: z.string(),
 });
 
@@ -118,7 +145,7 @@ const renderedGallery = z.object({
     variant,
     padding,
     images: z.array(renderedImageSchema).min(1),
-    layout: z.enum(["grid", "carousel", "masonry"]).default("grid"),
+    layout: z.enum(["grid", "carousel", "masonry"]).optional(),
 });
 
 const renderedEnquiryField = z.object({

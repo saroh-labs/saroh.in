@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 
-import { PageSections } from "@/components/sections/section-renderer";
+import { PageSections } from "@saroh/site-blocks";
+
+import { publicApiUrl } from "@/lib/api-url";
 import { findHomePage, getPublicationForHost } from "@/lib/publication";
 
 /**
@@ -28,5 +30,5 @@ export default async function SiteHomePage({
         notFound();
     }
 
-    return <PageSections sections={home.sections} />;
+    return <PageSections sections={home.sections} apiUrl={publicApiUrl()} />;
 }

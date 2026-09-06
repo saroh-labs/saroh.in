@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import type { CtaContent } from "@/lib/publication";
-import { cn } from "@/lib/utils";
+import type { RenderedCta, RenderedCtaSection } from "@saroh/block-contract";
+import { cn } from "../lib/utils";
 
 /**
  * Which surface a CTA sits on, because that decides what it may be coloured
@@ -31,7 +31,7 @@ export type CtaSurface = "page" | "band";
  * band, is a white halo on terracotta.
  */
 export function ctaClasses(
-    style: CtaContent["style"],
+    style: RenderedCta["style"],
     surface: CtaSurface = "page",
 ): string {
     const base =
@@ -103,7 +103,7 @@ export function CtaButton({
     content,
     surface = "page",
 }: {
-    content: CtaContent;
+    content: RenderedCta;
     surface?: CtaSurface;
 }) {
     const className = ctaClasses(content.style, surface);
@@ -138,9 +138,13 @@ export function CtaButton({
  * a button floating on the page ground. That colour is one of the six they
  * choose, and until now nothing read it.
  */
-export default function CtaSection({ content }: { content: CtaContent }) {
+export default function CtaSection({
+    content,
+}: {
+    content: RenderedCtaSection;
+}) {
     return (
-        <section className="w-full bg-site-cta-bg px-5 py-[var(--site-section-padding)] text-center text-site-cta-fg sm:px-[var(--site-page-margin)]">
+        <section className="bg-site-cta-bg text-site-cta-fg w-full px-5 py-[var(--site-section-padding)] text-center sm:px-[var(--site-page-margin)]">
             <CtaButton content={content} surface="band" />
         </section>
     );

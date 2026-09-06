@@ -1,5 +1,5 @@
-import type { GalleryContent } from "@/lib/publication";
-import { cn } from "@/lib/utils";
+import type { RenderedGallery } from "@saroh/block-contract";
+import { cn } from "../lib/utils";
 
 /**
  * `gallery` v1 — an ordered set of images. `carousel` degrades to a horizontal
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export default function GallerySection({
     content,
 }: {
-    content: GalleryContent;
+    content: RenderedGallery;
 }) {
     const layout = content.layout ?? "grid";
 
@@ -18,7 +18,6 @@ export default function GallerySection({
             <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
                 <div className="flex snap-x snap-mandatory gap-[var(--site-grid-gap)] overflow-x-auto pb-4">
                     {content.images.map((img, i) => (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                             key={i}
                             src={img.src}
@@ -41,7 +40,6 @@ export default function GallerySection({
                 )}
             >
                 {content.images.map((img, i) => (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                         key={i}
                         src={img.src}

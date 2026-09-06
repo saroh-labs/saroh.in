@@ -10,8 +10,7 @@ import type {
 import { createPaymentIntent, fetchReceipt } from "@/lib/checkout";
 import { cn } from "@/lib/utils";
 
-import { destructiveAlertClasses } from "./alert";
-import { ctaClasses } from "./sections/cta";
+import { ctaClasses, destructiveAlertClasses } from "@saroh/site-blocks";
 
 /**
  * `Checkout` (S5-004) — the PUBLIC buyer checkout + receipt view behind

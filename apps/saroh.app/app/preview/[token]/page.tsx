@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 
-import { PageSections } from "@/components/sections/section-renderer";
+import { PageSections } from "@saroh/site-blocks";
+
+import { publicApiUrl } from "@/lib/api-url";
 import { findHomePage, getPreviewByToken } from "@/lib/publication";
 
 /** The draft's home page, behind a preview token (#198). */
@@ -18,5 +20,5 @@ export default async function PreviewHomePage({
     const home = findHomePage(preview.snapshot);
     if (!home) notFound();
 
-    return <PageSections sections={home.sections} />;
+    return <PageSections sections={home.sections} apiUrl={publicApiUrl()} />;
 }

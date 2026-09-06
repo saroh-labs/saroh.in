@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useId, useState } from "react";
 
-import { env } from "@/env";
-import type { BookingContent } from "@/lib/publication";
-import { cn } from "@/lib/utils";
+import type { RenderedBooking } from "@saroh/block-contract";
+import { cn } from "../lib/utils";
 
 import { destructiveAlertClasses } from "../alert";
+import { DEFAULT_API_URL } from "../api-url";
 import { ctaClasses } from "./cta";
 
 /**
@@ -33,9 +33,6 @@ import { ctaClasses } from "./cta";
  * two bookings. On a 409 ("slot just taken") the slots refresh so the visitor
  * can pick another; a 429 asks them to slow down.
  */
-
-const API_URL =
-    env.NEXT_PUBLIC_API_URL ?? env.API_URL ?? "https://api.saroh.in";
 
 /** How far ahead to offer slots. */
 const WINDOW_DAYS = 14;
@@ -122,8 +119,11 @@ function groupByDay(slots: Slot[]): DayGroup[] {
 
 export default function BookingSection({
     content,
+    apiUrl = DEFAULT_API_URL,
 }: {
-    content: BookingContent;
+    content: RenderedBooking;
+    /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
+    apiUrl?: string;
 }) {
     const baseId = useId();
     // A stable idempotency key per mount so a double-click / retry can't create
@@ -154,7 +154,7 @@ export default function BookingSection({
         const to = new Date(from.getTime() + WINDOW_DAYS * 24 * 60 * 60 * 1000);
         try {
             const res = await fetch(
-                `${API_URL}/public/services/${encodeURIComponent(serviceId)}/availability` +
+                `${apiUrl}/public/services/${encodeURIComponent(serviceId)}/availability` +
                     `?from=${encodeURIComponent(from.toISOString())}` +
                     `&to=${encodeURIComponent(to.toISOString())}`,
                 { headers: { accept: "application/json" } },
@@ -175,7 +175,7 @@ export default function BookingSection({
                     "We couldn't reach the server — please check your connection and try again.",
             };
         }
-    }, [serviceId]);
+    }, [serviceId, apiUrl]);
 
     // Apply a fetched result: set the slots state and drop a selection that's no
     // longer on offer.
@@ -227,7 +227,7 @@ export default function BookingSection({
         setSubmit({ kind: "submitting" });
         try {
             const res = await fetch(
-                `${API_URL}/public/services/${encodeURIComponent(serviceId)}/book`,
+                `${apiUrl}/public/services/${encodeURIComponent(serviceId)}/book`,
                 {
                     method: "POST",
                     headers: { "content-type": "application/json" },
@@ -288,8 +288,8 @@ export default function BookingSection({
     if (submit.kind === "success") {
         return (
             <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-                <div className="rounded-[var(--site-radius)] border border-site-border bg-site-surface p-8 text-center">
-                    <p className="text-lg font-medium text-site-fg">
+                <div className="border-site-border bg-site-surface rounded-[var(--site-radius)] border p-8 text-center">
+                    <p className="text-site-fg text-lg font-medium">
                         {content.successMessage ?? "You're booked!"}
                     </p>
                 </div>
@@ -303,27 +303,27 @@ export default function BookingSection({
     return (
         <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             {content.title ? (
-                <h2 className="text-3xl font-bold tracking-tight text-site-fg">
+                <h2 className="text-site-fg text-3xl font-bold tracking-tight">
                     {content.title}
                 </h2>
             ) : null}
             {content.description ? (
-                <p className="mt-3 text-site-body">{content.description}</p>
+                <p className="text-site-body mt-3">{content.description}</p>
             ) : null}
 
             {/* Slot picker */}
             <div className="mt-8">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-site-fg">
+                    <h3 className="text-site-fg text-sm font-semibold">
                         Choose a time
                     </h3>
-                    <p className="text-xs text-site-muted">
+                    <p className="text-site-muted text-xs">
                         Times shown in {timezone}
                     </p>
                 </div>
 
                 {slotsState.kind === "loading" ? (
-                    <p className="mt-4 text-sm text-site-muted">
+                    <p className="text-site-muted mt-4 text-sm">
                         Loading available times…
                     </p>
                 ) : slotsState.kind === "error" ? (
@@ -340,7 +340,7 @@ export default function BookingSection({
                         </button>
                     </div>
                 ) : groups.length === 0 ? (
-                    <p className="mt-4 text-sm text-site-muted">
+                    <p className="text-site-muted mt-4 text-sm">
                         No open times in the next {WINDOW_DAYS} days — please
                         check back soon.
                     </p>
@@ -352,7 +352,7 @@ export default function BookingSection({
                     >
                         {groups.map((group) => (
                             <div key={group.key}>
-                                <p className="text-xs font-medium uppercase tracking-wide text-site-muted">
+                                <p className="text-site-muted text-xs font-medium uppercase tracking-wide">
                                     {group.label}
                                 </p>
                                 <div className="mt-2 flex flex-wrap gap-2">
@@ -370,7 +370,7 @@ export default function BookingSection({
                                                     setSelected(slot.startAt)
                                                 }
                                                 className={cn(
-                                                    "rounded-[var(--site-radius)] border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent disabled:opacity-60",
+                                                    "focus-visible:ring-site-accent rounded-[var(--site-radius)] border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:opacity-60",
                                                     active
                                                         ? "border-site-accent bg-site-accent text-site-accent-fg"
                                                         : "border-site-border text-site-fg hover:bg-site-surface",
@@ -396,7 +396,7 @@ export default function BookingSection({
                 <div className="grid gap-1.5">
                     <label
                         htmlFor={`${baseId}-name`}
-                        className="text-sm font-medium text-site-fg"
+                        className="text-site-fg text-sm font-medium"
                     >
                         Name
                     </label>
@@ -407,13 +407,13 @@ export default function BookingSection({
                         value={name}
                         disabled={submitting}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
+                        className="border-site-border bg-site-surface text-site-fg focus:border-site-border focus:ring-site-border w-full max-w-full rounded-[var(--site-radius)] border px-3 py-2 outline-none focus:ring-2"
                     />
                 </div>
                 <div className="grid gap-1.5">
                     <label
                         htmlFor={`${baseId}-email`}
-                        className="text-sm font-medium text-site-fg"
+                        className="text-site-fg text-sm font-medium"
                     >
                         Email
                         {/* Decorative and aria-hidden — the field's own
@@ -432,13 +432,13 @@ export default function BookingSection({
                         value={email}
                         disabled={submitting}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
+                        className="border-site-border bg-site-surface text-site-fg focus:border-site-border focus:ring-site-border w-full max-w-full rounded-[var(--site-radius)] border px-3 py-2 outline-none focus:ring-2"
                     />
                 </div>
                 <div className="grid gap-1.5">
                     <label
                         htmlFor={`${baseId}-phone`}
-                        className="text-sm font-medium text-site-fg"
+                        className="text-site-fg text-sm font-medium"
                     >
                         Phone
                     </label>
@@ -449,7 +449,7 @@ export default function BookingSection({
                         value={phone}
                         disabled={submitting}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border"
+                        className="border-site-border bg-site-surface text-site-fg focus:border-site-border focus:ring-site-border w-full max-w-full rounded-[var(--site-radius)] border px-3 py-2 outline-none focus:ring-2"
                     />
                 </div>
 

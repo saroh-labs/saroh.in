@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
-import { PageSections } from "@/components/sections/section-renderer";
+import { PageSections } from "@saroh/site-blocks";
+
+import { publicApiUrl } from "@/lib/api-url";
 import {
     findPageByPath,
     getPublishedPosts,
@@ -112,5 +114,5 @@ export default async function SitePostPage({
         notFound();
     }
 
-    return <PageSections sections={page.sections} />;
+    return <PageSections sections={page.sections} apiUrl={publicApiUrl()} />;
 }
