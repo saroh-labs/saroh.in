@@ -297,8 +297,13 @@ jobs:
       - name: Apply migrations
         run: pnpm --filter @saroh/database db:migrate:deploy
 
+      # Through turbo, not `pnpm --filter`, so the seed's own build dependency
+      # is honoured. The seed validates every section it writes through the
+      # block contract, which lives in a built package (#252) — and this job
+      # builds the apps two steps LATER, so a direct `pnpm --filter` call
+      # resolved @saroh/block-contract to a dist nobody had made yet.
       - name: Seed the demo Organization
-        run: pnpm --filter @saroh/database db:seed
+        run: pnpm turbo run db:seed --filter=@saroh/database
 
       - name: Build the apps under test
         run: pnpm turbo run build --filter=@saroh/api --filter=auth --filter=application
