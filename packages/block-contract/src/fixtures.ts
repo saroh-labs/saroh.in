@@ -234,3 +234,24 @@ export function listBlockMeta(): {
         meta: BLOCK_META[type],
     }));
 }
+
+/**
+ * One block's example content for a variant, or `undefined`.
+ *
+ * `BLOCK_META` is declared with `satisfies`, which keeps each block's fixture
+ * keys as literals — good for authoring (a typo in a variant id does not
+ * compile) and useless for lookup by a string from a URL. This narrows once,
+ * here, so consumers do not each reach for a cast.
+ *
+ * Returns `unknown`, which already includes "absent": an unrecognised variant
+ * id comes back as `undefined`, and a caller has to narrow either way.
+ */
+export function blockFixture(type: SectionType, variantId: string): unknown {
+    const fixtures = BLOCK_META[type].fixtures as Record<string, unknown>;
+    return fixtures[variantId];
+}
+
+/** A block's variant ids, in the order the catalog should offer them. */
+export function blockVariantIds(type: SectionType): string[] {
+    return BLOCK_META[type].variants.map((v) => v.id);
+}

@@ -166,6 +166,11 @@ const SITE_LAYER_ALLOWED = new Set([
     "apps/saroh.app/app/[domain]/[slug]/not-found.tsx",
     "apps/saroh.app/app/[domain]/layout.tsx",
     "apps/saroh.app/app/preview/[token]/layout.tsx",
+    // The catalog's preview document. Same category as the layouts above: it
+    // supplies the merchant's page GROUND so a block has one to sit on, and
+    // without it every palette would look identical behind the section. It
+    // draws no block of its own — it renders SectionRenderer from the package.
+    "apps/ui.saroh.in/app/preview/[type]/page.tsx",
 ]);
 
 /**

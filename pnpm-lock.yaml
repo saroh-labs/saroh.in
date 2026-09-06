@@ -944,9 +944,15 @@ importers:
       '@saroh/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@saroh/block-contract':
+        specifier: workspace:*
+        version: link:../../packages/block-contract
       '@saroh/charts':
         specifier: workspace:*
         version: link:../../packages/charts
+      '@saroh/site-blocks':
+        specifier: workspace:*
+        version: link:../../packages/site-blocks
       '@saroh/ui':
         specifier: workspace:*
         version: link:../../packages/ui
