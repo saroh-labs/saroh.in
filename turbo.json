@@ -5,6 +5,12 @@
         "NODE_ENV",
         "SKIP_ENV_VALIDATION",
         "DATABASE_URL",
+        // The database-target guard's escape hatch. Turbo passes NOTHING to a
+        // task that is not declared here, so running db:seed through turbo
+        // (which is how the seed gets its ^build) silently dropped this and the
+        // guard refused the e2e database — correctly, since from its point of
+        // view nobody had named it.
+        "DATABASE_TARGET_CONFIRM",
         "RLS_ENFORCEMENT",
         "MODULE_ENFORCEMENT",
         "BETTER_AUTH_SECRET",
