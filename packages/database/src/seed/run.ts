@@ -165,6 +165,68 @@ export async function seed(): Promise<void> {
         });
     }
 
+    /*
+     * Each module's ROLLOUT flag, and an override turning it on for this
+     * organization (#266).
+     *
+     * A module is available only when its rollout flag is on AND the
+     * organization has enabled it AND entitlement AND authorization pass. The
+     * seed used to write only the `OrganizationModule` rows above, and the flag
+     * resolver fails closed on a flag that is registered in code but absent
+     * from the database — so a freshly seeded workspace had seven modules
+     * ENABLED and every one of them reporting ROLLOUT_DISABLED. Every screen
+     * read "Website is turned off", which is the opposite of what AGENTS.md
+     * promises this seed produces.
+     *
+     * TWO ROWS, DELIBERATELY, rather than one global flag flipped on. The
+     * rollout gate is Saroh's kill switch and is meant to default false so
+     * modules dark-roll out; a seed that flipped it globally would be seeding
+     * away the mechanism. Registering the flag dark and granting THIS
+     * organization an override is what the override mechanism is for, and it
+     * leaves a second org in the same database seeing the production default.
+     *
+     * The key is derived from the module key, so a module added to
+     * `MODULE_STATES` seeds its own flag and cannot be forgotten.
+     *
+     * The flag row itself is registry rather than demo data — it makes the
+     * database match the code — so it is NOT seed-prefixed and the reset leaves
+     * it alone. Deleting it would cascade to overrides belonging to
+     * organizations this seed never created.
+     *
+     * `ORG_AUTHORIZATION` is deliberately untouched: it selects an
+     * authorization path for Stores rather than gating a surface, and turning
+     * it on here would change behaviour under test rather than reveal it.
+     */
+    for (const m of MODULE_STATES) {
+        const flagKey = `MODULE_${m.key}`;
+        await prisma.featureFlag.upsert({
+            where: { key: flagKey },
+            // Never re-dark a flag someone has deliberately turned on.
+            update: {},
+            create: {
+                id: `flag_${flagKey}`,
+                key: flagKey,
+                description: `Saroh-side rollout switch for the ${m.key} module.`,
+                enabledByDefault: false,
+            },
+        });
+        await prisma.featureFlagOverride.upsert({
+            where: {
+                flagKey_organizationId: {
+                    flagKey,
+                    organizationId: org.id,
+                },
+            },
+            update: { enabled: true },
+            create: {
+                id: id("flagoverride", m.key.toLowerCase()),
+                flagKey,
+                organizationId: org.id,
+                enabled: true,
+            },
+        });
+    }
+
     // A connected-but-disabled provider: a merchant who set Razorpay up and
     // then turned it off. Kept alongside the live Cashfree connection below so
     // `/settings/providers` has a provider set that is genuinely mixed rather
@@ -1253,6 +1315,7 @@ export async function reset(): Promise<void> {
         () => prisma.plan.deleteMany({ where }),
         () => prisma.communicationProvider.deleteMany({ where }),
         () => prisma.merchantPaymentProvider.deleteMany({ where }),
+        () => prisma.featureFlagOverride.deleteMany({ where }),
         () => prisma.organizationModule.deleteMany({ where }),
         () => prisma.membership.deleteMany({ where }),
         () => prisma.organization.deleteMany({ where }),
