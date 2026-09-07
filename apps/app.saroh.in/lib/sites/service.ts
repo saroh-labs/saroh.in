@@ -28,9 +28,21 @@ export type {
 // Section content types — mirror of the section contract (v1)
 // ---------------------------------------------------------------------------
 
-/** The section types the editor supports. */
-export type SectionType =
-    "hero" | "richText" | "cta" | "gallery" | "enquiry" | "booking";
+/**
+ * The section types the editor supports.
+ *
+ * RE-EXPORTED, not redeclared. This was a hand-written union listing the six
+ * types, which is a fourth place the set of blocks lived — and it went stale the
+ * first time a block was added (#255): the compiler rejected `features`
+ * everywhere while `SECTION_TYPES` already had it.
+ *
+ * Taking it from the contract means a block added there is a block this app
+ * knows about, and the exhaustive `Record<SectionType, …>` maps in the editor
+ * start demanding their entries instead of silently accepting six.
+ */
+import type { SectionType } from "@saroh/block-contract";
+
+export type { SectionType };
 
 /** Button style shared by hero CTA and the standalone cta section. */
 export type CtaStyle = "primary" | "secondary" | "link";
@@ -85,6 +97,19 @@ export interface GalleryContent {
     layout?: GalleryLayout;
 }
 
+/** One point in a features section (mirror of the section contract). */
+export interface FeatureItem {
+    title: string;
+    body?: string;
+}
+
+/** `features` — a heading over a set of short, titled points. */
+export interface FeaturesContent {
+    heading?: string;
+    intro?: string;
+    items: FeatureItem[];
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -134,6 +159,7 @@ export interface SectionContentByType {
     gallery: GalleryContent;
     enquiry: EnquiryContent;
     booking: BookingContent;
+    features: FeaturesContent;
 }
 
 /**

@@ -276,6 +276,39 @@ const galleryV2 = z.object({
     images: z.array(imageSchema).min(1),
 });
 
+/**
+ * features v1 — a heading over a set of short, titled points.
+ *
+ * The first block added after the library's machinery was built (#255), and
+ * deliberately pure content: no module data, so nothing here is gated on a
+ * capability and nothing renders differently when Commerce is off. What a
+ * merchant types is what a visitor reads.
+ *
+ * `items` IS BOUNDED AT BOTH ENDS. #257 found every comparable product declares
+ * a cap on repeated content — Shopify's is "up to 50 blocks" per section — and
+ * `gallery` shipping with `.min(1)` and no upper bound is the gap this does not
+ * repeat. Twelve is a judgement about what a page can carry, not a technical
+ * limit: past it the block stops being a summary and the merchant wants a page.
+ *
+ * No icon, and no per-item image, in v1. Both are real wants and both drag in a
+ * picker; leaving them out keeps this block honest about what it draws and
+ * keeps the first measurement of "what does adding a block cost" free of a
+ * media dependency. An added optional field is not a breaking change, so either
+ * can arrive without a v2.
+ */
+const featureItemSchema = z.object({
+    title: z.string().min(1).max(120),
+    body: z.string().max(600).optional(),
+});
+
+const featuresV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    heading: z.string().max(160).optional(),
+    intro: z.string().max(600).optional(),
+    items: z.array(featureItemSchema).min(1).max(12),
+});
+
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
 const enquiryFieldTypes = ["text", "email", "tel", "textarea"] as const;
 
@@ -368,6 +401,7 @@ export const SECTION_TYPES = [
     "gallery",
     "enquiry",
     "booking",
+    "features",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -442,6 +476,13 @@ const REGISTRY: Record<string, SectionContract> = {
         version: 1,
         schema: enquiryV1,
         // All values are plain text — nothing here is authored HTML.
+        sanitizedFields: [],
+    },
+    [key("features", 1)]: {
+        type: "features",
+        version: 1,
+        // Plain text throughout — nothing here is authored HTML.
+        schema: featuresV1,
         sanitizedFields: [],
     },
     [key("booking", 1)]: {

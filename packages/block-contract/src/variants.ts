@@ -1,11 +1,6 @@
 import { BLOCK_META } from "./fixtures";
 import type { SectionType } from "./section-contract";
 
-export {
-    variantRequirements,
-    type VariantRequirement,
-} from "./section-contract";
-
 /**
  * Which look a block wears, and how content that predates looks resolves (#254).
  *
@@ -106,6 +101,12 @@ const LEGACY_RESOLVERS = {
     cta: () => defaultVariant("cta"),
     enquiry: () => defaultVariant("enquiry"),
     booking: () => defaultVariant("booking"),
+    /*
+     * Nothing to read: `features` never existed without variants, so no content
+     * can reach this that predates them. It returns the default because the
+     * signature demands an answer, not because a section will ever need one.
+     */
+    features: () => defaultVariant("features"),
 } satisfies Record<SectionType, LegacyResolver>;
 
 /**

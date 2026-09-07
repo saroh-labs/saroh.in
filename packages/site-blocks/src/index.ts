@@ -19,6 +19,7 @@ export { default as BookingSection } from "./blocks/booking";
 export { CtaButton, default as CtaSection, ctaClasses } from "./blocks/cta";
 export type { CtaSurface } from "./blocks/cta";
 export { default as EnquirySection } from "./blocks/enquiry";
+export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";
 export { default as HeroSection } from "./blocks/hero";
 export { default as RichTextSection } from "./blocks/rich-text";

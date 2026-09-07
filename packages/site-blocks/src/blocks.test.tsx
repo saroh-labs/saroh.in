@@ -2,6 +2,7 @@ import type {
     RenderedBooking,
     RenderedCtaSection,
     RenderedEnquiry,
+    RenderedFeatures,
     RenderedGallery,
     RenderedHero,
     RenderedRichText,
@@ -13,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import BookingSection from "./blocks/booking";
 import CtaSection from "./blocks/cta";
 import EnquirySection from "./blocks/enquiry";
+import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import RichTextSection from "./blocks/rich-text";
@@ -169,6 +171,35 @@ describe("block rendering", () => {
             await Promise.resolve();
         });
         expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    it.each(["grid", "list"])("features/%s", (look) => {
+        const { container } = render(
+            <FeaturesSection
+                content={blockFixture("features", look) as RenderedFeatures}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    /*
+     * The two looks must actually differ. A variant system whose variants draw
+     * the same markup is a field nobody needs — and the catalog would be
+     * showing two pictures of one thing.
+     */
+    it("draws the two features looks differently", () => {
+        const grid = render(
+            <FeaturesSection
+                content={blockFixture("features", "grid") as RenderedFeatures}
+            />,
+        ).container.innerHTML;
+        const list = render(
+            <FeaturesSection
+                content={blockFixture("features", "list") as RenderedFeatures}
+            />,
+        ).container.innerHTML;
+        expect(grid).toContain("lg:grid-cols-3");
+        expect(list).not.toContain("lg:grid-cols-3");
     });
 
     /**

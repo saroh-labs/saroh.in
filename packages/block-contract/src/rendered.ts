@@ -185,6 +185,28 @@ const renderedBooking = z.object({
 });
 
 /**
+ * `features`, as published. Nothing resolves — it is text all the way down.
+ *
+ * The bounds are looser than the authoring schema's on purpose: an immutable
+ * snapshot may hold content written against a future contract that allowed
+ * more, and refusing to describe it would not make it go away.
+ */
+const renderedFeatures = z.object({
+    variant,
+    padding,
+    heading: z.string().optional(),
+    intro: z.string().optional(),
+    items: z
+        .array(
+            z.object({
+                title: z.string(),
+                body: z.string().optional(),
+            }),
+        )
+        .min(1),
+});
+
+/**
  * The rendered schema for every block type.
  *
  * `Record<SectionType, …>` on purpose: a block type added to `SECTION_TYPES`
@@ -205,6 +227,7 @@ export const RENDERED_SCHEMAS = {
     gallery: renderedGallery,
     enquiry: renderedEnquiry,
     booking: renderedBooking,
+    features: renderedFeatures,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -217,6 +240,7 @@ export type RenderedCtaSection = RenderedContent<"cta">;
 export type RenderedGallery = RenderedContent<"gallery">;
 export type RenderedEnquiry = RenderedContent<"enquiry">;
 export type RenderedBooking = RenderedContent<"booking">;
+export type RenderedFeatures = RenderedContent<"features">;
 
 /**
  * Validate rendered content for a block type.
