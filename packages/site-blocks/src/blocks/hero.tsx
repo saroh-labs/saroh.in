@@ -1,4 +1,5 @@
 import type { RenderedHero } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 
 import { CtaButton } from "./cta";
 
@@ -17,7 +18,19 @@ import { CtaButton } from "./cta";
  * margin governs the widths it was chosen for.
  */
 export default function HeroSection({ content }: { content: RenderedHero }) {
-    const hasImage = Boolean(content.image?.src);
+    /*
+     * The look is declared now (#254). `resolveVariant` keeps this identical for
+     * content of any age: a hero with no variant resolves through hero's own
+     * legacy rule, which IS `Boolean(content.image?.src)` — so every already
+     * published hero renders exactly as it did.
+     *
+     * Naming it is the point. That switch was a real choice, invisible in the
+     * editor, unnameable in a template and unshowable in a catalog.
+     */
+    const variant = resolveVariant("hero", content);
+    const split = variant === "split";
+    // A split hero still needs something to put beside the copy.
+    const hasImage = split && Boolean(content.image?.src);
     return (
         <section className="bg-site-hero-bg text-site-hero-fg mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div

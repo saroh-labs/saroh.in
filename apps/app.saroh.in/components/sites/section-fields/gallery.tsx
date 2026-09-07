@@ -4,17 +4,9 @@ import { MediaPicker } from "@/components/sites/media-picker";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@saroh/ui/select";
 
-import type { GalleryLayout, ImageValue } from "@/lib/sites/service";
+import type { ImageValue } from "@/lib/sites/service";
 import { FIELD_LABEL } from "./constants";
-import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
 /**
@@ -37,29 +29,12 @@ export function GalleryFields({
         onChange({ ...section, content: { ...c, images } });
     return (
         <div className="grid gap-3">
-            <Field label="Layout">
-                <Select
-                    value={c.layout ?? "grid"}
-                    onValueChange={(v) =>
-                        onChange({
-                            ...section,
-                            content: {
-                                ...c,
-                                layout: v as GalleryLayout,
-                            },
-                        })
-                    }
-                >
-                    <SelectTrigger>
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="grid">Grid</SelectItem>
-                        <SelectItem value="carousel">Carousel</SelectItem>
-                        <SelectItem value="masonry">Masonry</SelectItem>
-                    </SelectContent>
-                </Select>
-            </Field>
+            {/*
+                The Layout select lived here until #254 folded it into the
+                block's look. The dispatcher renders that picker above these
+                fields now, from the same list the catalog browses — one place a
+                look is chosen, not two.
+            */}
             <div className="grid gap-2">
                 <Label className={FIELD_LABEL}>Images</Label>
                 {c.images.map((img, i) => (

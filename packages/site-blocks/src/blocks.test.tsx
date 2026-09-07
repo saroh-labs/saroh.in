@@ -6,7 +6,7 @@ import type {
     RenderedHero,
     RenderedRichText,
 } from "@saroh/block-contract";
-import { BLOCK_META } from "@saroh/block-contract";
+import { BLOCK_META, blockFixture } from "@saroh/block-contract";
 import { act, render } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -101,13 +101,50 @@ describe("block rendering", () => {
         expect(container.innerHTML).toMatchSnapshot();
     });
 
-    it("gallery", () => {
+    // `blockFixture` narrows the literal-keyed fixture map, so a look id
+    // coming from an array does not need a cast at every call site.
+    // One per look: what changes between them is the arrangement, not the
+    // content, so a snapshot each is what proves the variant does anything.
+    it.each(["grid", "carousel", "masonry"])("gallery/%s", (look) => {
         const { container } = render(
             <GallerySection
-                content={BLOCK_META.gallery.fixtures.default as RenderedGallery}
+                content={blockFixture("gallery", look) as RenderedGallery}
             />,
         );
         expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    /*
+     * The #254 guarantee that matters most: a gallery@1 section carries
+     * `layout` and no `variant`, and must keep the look it was published with.
+     * Defaulting it to `grid` would silently restyle every published carousel.
+     */
+    it("renders a gallery@1 section on its old `layout` field", () => {
+        const legacy = {
+            layout: "carousel",
+            images: [...BLOCK_META.gallery.fixtures.grid.images],
+        };
+        const { container } = render(
+            <GallerySection content={legacy as unknown as RenderedGallery} />,
+        );
+        expect(container.innerHTML).toContain("snap-x");
+    });
+
+    /*
+     * And the hero equivalent: a hero with an image and no variant was
+     * two-column before #254 and must stay so. `centered` is hero's FIRST
+     * declared variant, so a naive default would have flipped every published
+     * hero carrying an image.
+     */
+    it("renders a variant-less hero with an image as split", () => {
+        const legacy = {
+            heading: "Fresh bread",
+            image: { src: "data:image/svg+xml;utf8,%3Csvg/%3E", alt: "" },
+        };
+        const { container } = render(
+            <HeroSection content={legacy as unknown as RenderedHero} />,
+        );
+        expect(container.innerHTML).toContain("lg:grid-cols-2");
     });
 
     it("enquiry", () => {

@@ -1,4 +1,5 @@
 import type { RenderedGallery } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 import { cn } from "../lib/utils";
 
 /**
@@ -11,7 +12,13 @@ export default function GallerySection({
 }: {
     content: RenderedGallery;
 }) {
-    const layout = content.layout ?? "grid";
+    /*
+     * The look comes from `variant` now (#254). `resolveVariant` is what makes
+     * that safe for content of any age: a `gallery@1` section carries `layout`
+     * and no variant, and the rule reads that old field rather than defaulting
+     * — so a published carousel stays a carousel.
+     */
+    const layout = resolveVariant("gallery", content);
 
     if (layout === "carousel") {
         return (

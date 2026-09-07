@@ -76,6 +76,24 @@ function soleVariant(description: string): readonly [BlockVariant] {
 }
 
 /**
+ * The gallery fixture's images, shared by all three of its looks.
+ *
+ * One list, three variants: what changes between grid, carousel and masonry is
+ * the arrangement, never the content. A catalog showing different pictures per
+ * look would be demonstrating the wrong thing.
+ */
+const GALLERY_IMAGES = [
+    {
+        src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23d9cbb5'/%3E%3Crect x='80' y='330' width='640' height='150' fill='%23a8794c'/%3E%3Ccircle cx='250' cy='250' r='70' fill='%23c9a878'/%3E%3C/svg%3E",
+        alt: "The counter at opening time",
+    },
+    {
+        src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%232f2a26'/%3E%3Crect x='140' y='170' width='520' height='270' rx='16' fill='%23120f0d'/%3E%3Crect x='190' y='220' width='420' height='170' fill='%23e0913a'/%3E%3C/svg%3E",
+        alt: "The deck oven mid-bake",
+    },
+] as const;
+
+/**
  * Every block's catalog entry.
  *
  * Typed per key so each block's fixtures are checked against ITS OWN rendered
@@ -151,24 +169,35 @@ export const BLOCK_META = {
     gallery: {
         label: "Gallery",
         description: "A set of images.",
-        variants: soleVariant(
-            "Layout is chosen by the block's own `layout` field — grid, carousel or masonry.",
-        ),
-        fixtures: {
-            default: {
-                variant: "default",
-                layout: "grid",
-                images: [
-                    {
-                        src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23d9cbb5'/%3E%3Crect x='80' y='330' width='640' height='150' fill='%23a8794c'/%3E%3Ccircle cx='250' cy='250' r='70' fill='%23c9a878'/%3E%3C/svg%3E",
-                        alt: "The counter at opening time",
-                    },
-                    {
-                        src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%232f2a26'/%3E%3Crect x='140' y='170' width='520' height='270' rx='16' fill='%23120f0d'/%3E%3Crect x='190' y='220' width='420' height='170' fill='%23e0913a'/%3E%3C/svg%3E",
-                        alt: "The deck oven mid-bake",
-                    },
-                ],
+        /*
+         * These were the `layout` field until #254 folded it into `variant`.
+         * `grid` is FIRST because it is the least demanding look, and the first
+         * entry is what an unrecognised variant falls back to.
+         */
+        variants: [
+            {
+                id: "grid",
+                label: "Grid",
+                description:
+                    "Even rows and columns. The safe choice for a mixed set of shapes.",
             },
+            {
+                id: "carousel",
+                label: "Carousel",
+                description:
+                    "One horizontal row that scrolls and snaps. Keeps a long set to one screen.",
+            },
+            {
+                id: "masonry",
+                label: "Masonry",
+                description:
+                    "Columns that keep each image's own proportions rather than cropping to a grid.",
+            },
+        ] as const,
+        fixtures: {
+            grid: { variant: "grid", images: [...GALLERY_IMAGES] },
+            carousel: { variant: "carousel", images: [...GALLERY_IMAGES] },
+            masonry: { variant: "masonry", images: [...GALLERY_IMAGES] },
         },
     },
     enquiry: {
