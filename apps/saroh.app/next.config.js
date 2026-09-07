@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // @saroh/ui ships its entries as source, so Next must compile it.
-    transpilePackages: ["@saroh/ui"],
+    transpilePackages: ["@saroh/ui", "@saroh/site-blocks"],
 
     // No database here — saroh.app renders via api.saroh.in (single backend).
     reactStrictMode: false,

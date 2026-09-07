@@ -171,23 +171,25 @@ const SITE_LAYER_ALLOWED = new Set([
     // without it every palette would look identical behind the section. It
     // draws no block of its own — it renders SectionRenderer from the package.
     "apps/ui.saroh.in/app/preview/[type]/page.tsx",
+    // The site editor's preview frame. Same category: it supplies the
+    // merchant's page ground and the selection outlines around each block, and
+    // delegates every block to @saroh/site-blocks rather than drawing one.
+    "apps/app.saroh.in/components/sites/section-preview.tsx",
 ]);
 
 /**
- * The second renderer, still standing.
+ * Files that once held a second implementation of the blocks.
  *
- * `section-preview.tsx` is 362 lines drawing the same six blocks the package
- * draws, and it is the reason this whole effort exists — #189 is the two of
- * them disagreeing in production. Step 4 of the plan deletes it, once the
- * editor previews with the shared components.
+ * `apps/app.saroh.in/components/sites/section-preview.tsx` was 362 lines, of
+ * which 240 drew the same six designs `saroh.app` drew, in different code. #189
+ * is the two of them disagreeing in production. #252 Step 4 deleted that half:
+ * the editor previews with `@saroh/site-blocks` now, and what is left in the
+ * file is the editing chrome that was never duplicated.
  *
- * Listed separately from the allowlist above so it reads as what it is: a known
- * violation with a date on it, not a surface that belongs here. Delete this
- * entry and the gate starts enforcing what it was written to enforce.
+ * Empty, and it should stay empty. A new entry here means someone has started
+ * drawing blocks a second time.
  */
-const PENDING_REMOVAL = new Set([
-    "apps/app.saroh.in/components/sites/section-preview.tsx",
-]);
+const PENDING_REMOVAL = new Set([]);
 
 const SEARCH_ROOTS = ["apps", "packages"];
 for (const root of SEARCH_ROOTS) {

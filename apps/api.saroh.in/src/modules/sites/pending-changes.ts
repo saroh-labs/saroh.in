@@ -1,4 +1,8 @@
-import { parseSectionContent, toRendered } from "@saroh/database";
+import {
+    pagePathResolver,
+    parseSectionContent,
+    toRendered,
+} from "@saroh/database";
 
 import { sanitizeSectionContent } from "./sanitize";
 
@@ -239,16 +243,9 @@ export function toPendingPages(pages: DraftPageRow[]): PublishablePage[] {
     }));
 }
 
-/**
- * Page id → path, over the pages that will be in the snapshot.
- *
- * The caller passes the pages it is about to publish — already filtered to the
- * visible ones — so a button pointing at a hidden page resolves to nothing
- * rather than to a path the live site 404s.
+/*
+ * `pagePathResolver` moved to @saroh/block-contract (#252): the site editor
+ * needs the same map to build a preview that draws what publish will write.
+ * Re-exported so this module's existing importers are untouched.
  */
-export function pagePathResolver(
-    pages: readonly { id: string; path: string }[],
-): (pageId: string) => string | undefined {
-    const byId = new Map(pages.map((p) => [p.id, p.path]));
-    return (pageId) => byId.get(pageId);
-}
+export { pagePathResolver } from "@saroh/database";

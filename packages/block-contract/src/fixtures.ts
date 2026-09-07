@@ -113,7 +113,7 @@ export const BLOCK_META = {
                     action: { kind: "call" },
                 },
                 image: {
-                    src: "https://images.example.com/loaves.jpg",
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'%3E%3Crect width='1200' height='800' fill='%23e7dcc9'/%3E%3Cellipse cx='600' cy='430' rx='300' ry='150' fill='%23c8a06a'/%3E%3Cellipse cx='330' cy='470' rx='190' ry='105' fill='%23b88c58'/%3E%3Cellipse cx='880' cy='470' rx='190' ry='105' fill='%23b88c58'/%3E%3C/svg%3E",
                     alt: "Three loaves cooling on a wire rack",
                     width: 1200,
                     height: 800,
@@ -160,11 +160,11 @@ export const BLOCK_META = {
                 layout: "grid",
                 images: [
                     {
-                        src: "https://images.example.com/counter.jpg",
+                        src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23d9cbb5'/%3E%3Crect x='80' y='330' width='640' height='150' fill='%23a8794c'/%3E%3Ccircle cx='250' cy='250' r='70' fill='%23c9a878'/%3E%3C/svg%3E",
                         alt: "The counter at opening time",
                     },
                     {
-                        src: "https://images.example.com/oven.jpg",
+                        src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%232f2a26'/%3E%3Crect x='140' y='170' width='520' height='270' rx='16' fill='%23120f0d'/%3E%3Crect x='190' y='220' width='420' height='170' fill='%23e0913a'/%3E%3C/svg%3E",
                         alt: "The deck oven mid-bake",
                     },
                 ],
@@ -210,11 +210,17 @@ export const BLOCK_META = {
         fixtures: {
             default: {
                 variant: "default",
-                // No `serviceId` on purpose. With one, the block fetches
-                // availability on mount — which a catalog has no business
-                // doing, and a test would have to stub. This is the state a
-                // merchant sees before they pick a Service, and it is a real
-                // state worth showing.
+                // A booking block with no `serviceId` renders NOTHING at all
+                // (`if (!serviceId) return null`), so the first version of this
+                // fixture gave the catalog an empty box and gave the G5
+                // snapshot the empty string — a test that asserted nothing.
+                // Caught by looking at the page, which is the argument for
+                // having one.
+                //
+                // The id belongs to no Service, so availability 404s and the
+                // widget shows its "no times" state. That is a real state a
+                // visitor sees, and an honest thing to put in a catalog.
+                serviceId: "fixture-service",
                 title: "Book a table",
                 description: "Lunch and dinner, seven days a week.",
                 submitLabel: "Confirm booking",
