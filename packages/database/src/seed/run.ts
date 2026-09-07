@@ -26,6 +26,8 @@ import {
     POSTS,
     PRODUCTS,
     SEED_PREFIX,
+    SEEDED_FOOTER,
+    SEEDED_STYLE_VARIABLES,
     SERVICES,
     SITES,
     STORE_SLUG,
@@ -962,7 +964,44 @@ async function seedWebsite(
                 siteId: site.id,
                 organizationId: orgId,
                 snapshot: {
-                    site: { name: fixture.name, slug: fixture.slug },
+                    /*
+                     * SHAPED LIKE A REAL PUBLISH (#265).
+                     *
+                     * This used to carry `name` and `slug` and nothing else,
+                     * which is a snapshot `buildSnapshot` would never write. A
+                     * publication is self-contained by design — the renderer
+                     * reads it and resolves nothing — so the missing fields did
+                     * not degrade, they fell through to a different set of
+                     * defaults inside the renderer. The seeded site rendered on
+                     * SiteTheme's hardcoded stone palette, or a black ground on
+                     * a machine whose OS prefers dark, while the editor showed
+                     * the resolved defaults. Anyone comparing the two locally
+                     * was comparing against something publish could not produce.
+                     */
+                    site: {
+                        name: fixture.name,
+                        slug: fixture.slug,
+                        styleVariables: { ...SEEDED_STYLE_VARIABLES },
+                        footer: { ...SEEDED_FOOTER },
+                        /*
+                         * A menu over this site's own published pages, in the
+                         * order the fixture lists them. Publish resolves page
+                         * ids to paths and drops hidden pages; the fixture has
+                         * the paths already, so it writes the resolved shape.
+                         *
+                         * A single-page site gets no menu, which is what
+                         * `resolveSiteNavigation` produces for a merchant who
+                         * has not built one — and what `SiteHeader` is designed
+                         * around: with no menu it centres the site name.
+                         */
+                        navigation:
+                            snapshotPages.length > 1
+                                ? snapshotPages.map((page) => ({
+                                      label: page.title,
+                                      href: page.path,
+                                  }))
+                                : [],
+                    },
                     pages: [...snapshotPages].sort((a, b) =>
                         a.path.localeCompare(b.path),
                     ),

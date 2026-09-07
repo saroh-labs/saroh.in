@@ -1020,3 +1020,65 @@ export const ANALYTICS_PATHS: readonly { path: string; weight: number }[] = [
     { path: "/book", weight: 0.05 },
     { path: "/blog/choosing-the-right-mailer", weight: 0.04 },
 ];
+
+/**
+ * The `--site-*` custom properties a publish writes for a site whose merchant
+ * has not opened the Style panel (#265).
+ *
+ * NOT invented here. This is the exact output of
+ * `siteStyleVariables(defaultSiteStyle())` in
+ * `apps/api.saroh.in/src/modules/sites/site-style.ts`, captured by running it —
+ * `parseSiteStyle(null)` returns the defaults, so this is what publish resolves
+ * for every site in this fixture. `--site-body`, `--site-muted` and
+ * `--site-border` are DERIVED by mixing the ground and text rather than chosen,
+ * which is why they are captured rather than hand-written.
+ *
+ * WHY THE SEED HAS TO WRITE THEM. A snapshot is self-contained: the renderer
+ * reads `styleVariables` and never resolves a palette itself. The seed used to
+ * write a snapshot carrying only `name` and `slug`, so `SiteTheme` fell through
+ * to its hardcoded stone defaults — and, on a machine whose OS prefers dark, to
+ * a black ground. The editor meanwhile resolved the real defaults. The two
+ * disagreed for every seeded site, and not for any reason a merchant would ever
+ * hit: publish always writes these.
+ *
+ * To regenerate after a palette change:
+ *
+ *   pnpm exec tsx -e "import {defaultSiteStyle,siteStyleVariables} from \
+ *     './apps/api.saroh.in/src/modules/sites/site-style'; \
+ *     console.log(JSON.stringify(siteStyleVariables(defaultSiteStyle()),null,4))"
+ */
+export const SEEDED_STYLE_VARIABLES: Readonly<Record<string, string>> = {
+    "--site-bg": "0 0% 100%",
+    "--site-surface": "0 0% 100%",
+    "--site-fg": "24 10% 10%",
+    "--site-body": "24 6.1% 45.1%",
+    "--site-muted": "24 4.9% 55.9%",
+    "--site-border": "24 1.1% 90.1%",
+    "--site-accent": "18 45% 45%",
+    "--site-accent-fg": "0 0% 98%",
+    "--site-hero-bg": "0 0% 100%",
+    "--site-cta-bg": "18 45% 45%",
+    "--site-cta-fg": "0 0% 98%",
+    "--site-footer-bg": "18 30% 30%",
+    "--site-footer-fg": "0 0% 98%",
+    "--site-hero-fg": "24 10% 10%",
+    "--site-page-margin": "38px",
+    "--site-section-padding": "52px",
+    "--site-grid-gap": "14px",
+    "--site-radius": "2px",
+    "--site-heading-scale": "1",
+};
+
+/**
+ * The footer a seeded site publishes.
+ *
+ * Text rather than HTML: publish sanitizes an HTML footer on the way into the
+ * snapshot, and a fixture that shipped pre-sanitized markup would be asserting
+ * the sanitizer's output rather than exercising it. `SiteFooter` renders
+ * nothing at all when a site has none, which is why every seeded site had a
+ * page that simply stopped.
+ */
+export const SEEDED_FOOTER = {
+    format: "text" as const,
+    value: "Northwind Supply · Peenya, Bengaluru · Mon–Sat, 9am–7pm",
+};
