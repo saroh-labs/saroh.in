@@ -119,3 +119,26 @@ export function toRendered(
     const map = (TO_RENDERED as Record<string, ToRendered | undefined>)[type];
     return map ? map(draft, ctx) : draft;
 }
+
+/**
+ * Page id → path, over the pages that will actually be published.
+ *
+ * Lives here rather than in the API because BOTH sides of the resolution now
+ * need it: publish builds the snapshot with it, and the site editor builds its
+ * preview with it so the preview draws what publish will write (#252). Two
+ * implementations of this map is how a preview starts lying.
+ *
+ * PASS ONLY THE PAGES THAT WILL BE IN THE SNAPSHOT. A hidden page is left out
+ * of a publish, so a button naming one must resolve to nothing — the flag
+ * engine has already told the merchant, and the button renders as a label
+ * rather than a link to a path the live site would 404 on. A caller that hands
+ * in its full page list, hidden ones included, gets a preview showing a working
+ * link where the live site will show dead text: the #189 failure exactly, in a
+ * new place.
+ */
+export function pagePathResolver(
+    pages: readonly { id: string; path: string }[],
+): (pageId: string) => string | undefined {
+    const byId = new Map(pages.map((p) => [p.id, p.path]));
+    return (pageId) => byId.get(pageId);
+}

@@ -1463,6 +1463,7 @@ export function SiteEditor({
                     >
                         <DraftPreview
                             sections={sections}
+                            pages={pages}
                             style={style}
                             styleOptions={styleOptions}
                             selectedIndex={selectedIndex}
@@ -1502,6 +1503,7 @@ export function SiteEditor({
                     >
                         <DraftPreview
                             sections={sections}
+                            pages={pages}
                             style={style}
                             styleOptions={styleOptions}
                         />
