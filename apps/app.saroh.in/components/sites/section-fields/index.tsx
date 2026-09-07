@@ -9,6 +9,7 @@ import { GalleryFields } from "./gallery";
 import { HeroFields } from "./hero";
 import { RichTextFields } from "./rich-text";
 import type { ServiceOption } from "./types";
+import { VariantField } from "./variant-field";
 
 /**
  * The per-type editor for one section.
@@ -37,6 +38,31 @@ export function SectionFields({
     section: Section;
     services: ServiceOption[];
     /** The site's pages, so a button can pick one rather than type a path. */
+    pages: SitePage[];
+    onChange: (next: Section) => void;
+}) {
+    return (
+        <div className="grid gap-3">
+            <VariantField section={section} onChange={onChange} />
+            {perTypeFields({ section, services, pages, onChange })}
+        </div>
+    );
+}
+
+/**
+ * The block's own fields, below the look picker the dispatcher renders.
+ *
+ * The switch stays rather than becoming a lookup table because it is what
+ * NARROWS `section` to the exact variant — see the note above.
+ */
+function perTypeFields({
+    section,
+    services,
+    pages,
+    onChange,
+}: {
+    section: Section;
+    services: ServiceOption[];
     pages: SitePage[];
     onChange: (next: Section) => void;
 }) {

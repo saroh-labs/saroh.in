@@ -141,11 +141,19 @@ const renderedRichText = z.object({
 
 const renderedCta = renderedCtaSchema.extend({ variant, padding });
 
+/**
+ * `layout` is gone: it WAS this block's variant under another name (#254), and
+ * carrying both was two mechanisms answering one question.
+ *
+ * A `gallery@1` snapshot still carries `layout` and no `variant`. It is not
+ * described here and does not need to be — unknown keys are stripped, and
+ * `resolveVariant` reads the old field to work out which look such a section was
+ * already wearing.
+ */
 const renderedGallery = z.object({
     variant,
     padding,
     images: z.array(renderedImageSchema).min(1),
-    layout: z.enum(["grid", "carousel", "masonry"]).optional(),
 });
 
 const renderedEnquiryField = z.object({

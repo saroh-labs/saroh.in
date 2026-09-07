@@ -65,6 +65,32 @@ import { z } from "zod";
  */
 const paddingOverride = z.number().int().min(24).max(96).optional();
 
+/**
+ * Which of the block's looks this section wears (#254).
+ *
+ * ON THE AUTHORING SHAPE, not only the rendered one. #252 Step 1 reserved
+ * `variant` in `rendered.ts` and stopped there — and because a zod object
+ * strips unknown keys by default, `parseSectionContent` would have SILENTLY
+ * DISCARDED a merchant's choice on save. The reserved field could never have
+ * survived a round trip. Nothing caught it because nothing wrote a variant yet.
+ *
+ * Optional, so adding it extends v1 rather than versioning every block —
+ * the same reasoning `paddingOverride` records: an added optional field is not
+ * a breaking change, existing Sections and Publications still validate.
+ *
+ * ABSENT does not mean "the default". It means the content predates variants,
+ * and each block DECLARES how to resolve that (see `resolveVariant` in
+ * `./variants.ts`) — hero's answer is its old `hasImage` rule, because
+ * defaulting it to the first declared look would have flipped every published
+ * hero carrying an image from two-column to centred.
+ *
+ * Not an enum here on purpose. The set of looks is per block and lives in
+ * `BLOCK_META`; encoding it in each schema would put the same list in two
+ * places, and a snapshot published against a newer contract may legitimately
+ * name a look this build has never heard of.
+ */
+const variant = z.string().min(1).optional();
+
 const ctaSchema = z.object({
     label: z.string().min(1),
     href: z.string().min(1),
@@ -174,6 +200,7 @@ const imageSchema = z.object({
 
 /** hero v1 — a headline block with optional CTA + image. */
 const heroV1 = z.object({
+    variant,
     padding: paddingOverride,
     heading: z.string().min(1),
     subheading: z.string().optional(),
@@ -187,6 +214,7 @@ const heroV1 = z.object({
  * before it reaches the immutable snapshot (see `sanitizedFields` below).
  */
 const richTextV1 = z.object({
+    variant,
     padding: paddingOverride,
     format: z.enum(["html", "markdown"]).default("html"),
     value: z.string(),
@@ -194,6 +222,7 @@ const richTextV1 = z.object({
 
 /** cta v1 — a standalone call-to-action button. */
 const ctaV1 = z.object({
+    variant,
     padding: paddingOverride,
     label: z.string().min(1),
     href: z.string().min(1),
@@ -206,14 +235,45 @@ const ctaV1 = z.object({
  * every v1 Section and Publication keeps validating, and a v1 `href` lifts to
  * `{ kind: "url", href }` the first time the editor touches it.
  */
-const ctaV2 = ctaSchemaV2.extend({ padding: paddingOverride });
+const ctaV2 = ctaSchemaV2.extend({ variant, padding: paddingOverride });
 const heroV2 = heroV1.extend({ cta: ctaSchemaV2.optional() });
 
-/** gallery v1 — an ordered set of images. */
+/**
+ * gallery v1 — an ordered set of images.
+ *
+ * DELIBERATELY UNTOUCHED, `layout` and all. Its look mechanism IS `layout`, and
+ * adding `variant` here would recreate in v1 exactly the two-mechanisms-for-one-
+ * question problem v2 exists to remove. Every gallery section and publication
+ * written before #254 validates against this and must keep doing so.
+ */
 const galleryV1 = z.object({
     padding: paddingOverride,
     images: z.array(imageSchema).min(1),
     layout: z.enum(["grid", "carousel", "masonry"]).default("grid"),
+});
+
+/**
+ * gallery v2 — the same block, with `layout` folded into `variant` (#254).
+ *
+ * `renderedGallery` carried BOTH `variant` and `layout`, which is two
+ * mechanisms answering one question. For most blocks a setting and a preset are
+ * different things — Shopify has both, and Dawn's `layout: image_first` is a
+ * setting the merchant flips freely while presets are the catalog entry. For
+ * gallery they collapse: the only thing distinguishing one gallery preset from
+ * another IS the layout.
+ *
+ * A NEW VERSION rather than an in-place edit, per the module rule. This is the
+ * first breaking change the contract has actually had to absorb, and spending
+ * it on one block now is cheaper than discovering at twelve that "which look"
+ * has three different field names.
+ *
+ * `grid` is first because it is the least demanding look and therefore the
+ * default an unrecognised variant falls back to (#254).
+ */
+const galleryV2 = z.object({
+    variant,
+    padding: paddingOverride,
+    images: z.array(imageSchema).min(1),
 });
 
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
@@ -245,6 +305,7 @@ const enquiryFieldSchema = z.object({
  */
 const enquiryV1 = z
     .object({
+        variant,
         padding: paddingOverride,
         formId: z.string().min(1).optional(),
         title: z.string().optional(),
@@ -286,6 +347,7 @@ const enquiryV1 = z
  * inline. All values are plain text, so NOTHING here requires sanitization.
  */
 const bookingV1 = z.object({
+    variant,
     padding: paddingOverride,
     serviceId: z.string().min(1).optional(),
     title: z.string().optional(),
@@ -363,6 +425,12 @@ const REGISTRY: Record<string, SectionContract> = {
         schema: heroV2,
         sanitizedFields: [],
     },
+    [key("gallery", 2)]: {
+        type: "gallery",
+        version: 2,
+        schema: galleryV2,
+        sanitizedFields: [],
+    },
     [key("gallery", 1)]: {
         type: "gallery",
         version: 1,
@@ -388,6 +456,50 @@ const REGISTRY: Record<string, SectionContract> = {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+/**
+ * What a variant additionally REQUIRES, beyond its block's base schema.
+ *
+ * Requiredness only — never a different field set. Declared here rather than in
+ * the schemas because it is keyed on a value inside the content, and because a
+ * block's looks live in `BLOCK_META` beside their labels and fixtures.
+ *
+ * A variant with no entry requires nothing extra, which is the common case.
+ */
+export interface VariantRequirement {
+    /** Dot-free key on the section's own content. */
+    field: string;
+    /** Shown to the author, so it must name the look and the field. */
+    message: string;
+}
+
+const VARIANT_REQUIREMENTS: Partial<
+    Record<SectionType, Record<string, VariantRequirement[]>>
+> = {
+    hero: {
+        /*
+         * The split look is copy beside an image; without one it is a column of
+         * text next to a hole. Required at AUTHORING only — a published snapshot
+         * predating this rule may well be a split hero with no image, and it
+         * must keep rendering rather than fail validation it never had to pass.
+         */
+        split: [
+            {
+                field: "image",
+                message:
+                    'The "Split" hero shows an image beside the copy — add one, or choose the "Centered" look.',
+            },
+        ],
+    },
+};
+
+/** The extra requirements a given look imposes. Empty for most. */
+export function variantRequirements(
+    type: SectionType,
+    variantId: string,
+): VariantRequirement[] {
+    return VARIANT_REQUIREMENTS[type]?.[variantId] ?? [];
+}
 
 /** Typed error returned by `parseSectionContent`. */
 export type SectionContractError =
@@ -416,6 +528,21 @@ export function getSectionContract(
     version: number,
 ): SectionContract | undefined {
     return REGISTRY[key(type, version)];
+}
+
+/**
+ * The newest version registered for a block type.
+ *
+ * What the editor should write when it touches a section: the contract evolves
+ * by adding a version beside the old one, and a section only moves forward when
+ * someone edits it. `gallery@1` sections keep rendering untouched; the first
+ * edit that sets a look makes them `gallery@2`.
+ */
+export function latestContractVersion(type: string): number {
+    const versions = Object.values(REGISTRY)
+        .filter((c) => c.type === type)
+        .map((c) => c.version);
+    return versions.length > 0 ? Math.max(...versions) : 1;
 }
 
 /** Every registered contract (e.g. for editor palettes / introspection). */
@@ -470,6 +597,52 @@ export function parseSectionContent(
                 message: `Invalid content for section "${type}" v${version}`,
             },
         };
+    }
+
+    /*
+     * A look may REQUIRE a field the block itself leaves optional — `hero/split`
+     * shows an image beside the copy, and without one it is a column of text
+     * next to a hole (#254).
+     *
+     * Checked here rather than inside the schema because the requirement is
+     * keyed on a value INSIDE the content, and only after the base parse has
+     * confirmed the content is a section at all.
+     *
+     * READ FROM THE RAW `variant`, and skip when it is absent. Content written
+     * before #254 names no look, and must not start failing validation it never
+     * had to pass — every existing draft would become unsaveable. An unknown
+     * look is skipped for the same reason: a build that does not know a variant
+     * cannot know what it demands.
+     */
+    const named = (result.data as { variant?: unknown }).variant;
+    if (typeof named === "string" && named.trim() !== "") {
+        // `type` is a plain string here — parseSectionContent accepts anything
+        // and reports UNKNOWN_CONTRACT — but a contract was found above, so it
+        // is a registered type by construction.
+        const unmet = variantRequirements(contract.type, named).filter(
+            (req) => {
+                const value = (result.data as Record<string, unknown>)[
+                    req.field
+                ];
+                return value === undefined || value === null || value === "";
+            },
+        );
+        if (unmet.length > 0) {
+            return {
+                success: false,
+                error: {
+                    code: "INVALID_CONTENT",
+                    type,
+                    version,
+                    issues: unmet.map((req) => ({
+                        code: z.ZodIssueCode.custom,
+                        path: [req.field],
+                        message: req.message,
+                    })),
+                    message: unmet[0].message,
+                },
+            };
+        }
     }
 
     return { success: true, data: result.data, contract };

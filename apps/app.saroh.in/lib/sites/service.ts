@@ -149,6 +149,20 @@ export interface SectionContentByType {
  */
 export interface SectionLayout {
     padding?: number;
+    /**
+     * Which of the block's looks this section wears (#254).
+     *
+     * Here rather than on each of the six content types for the same reason
+     * `padding` is: it applies to every block. A plain string, not a union —
+     * the set of looks is per block and lives in `BLOCK_META`, and duplicating
+     * it here would put the same list in two places.
+     *
+     * ABSENT means the section predates variants, NOT that it wears the
+     * default: `resolveVariant` reads the old shape instead, so a published
+     * hero with an image stays two-column and a `gallery@1` carousel stays a
+     * carousel.
+     */
+    variant?: string;
 }
 
 /**
