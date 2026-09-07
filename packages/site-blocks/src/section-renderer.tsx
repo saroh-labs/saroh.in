@@ -2,6 +2,7 @@ import type {
     RenderedBooking,
     RenderedCtaSection,
     RenderedEnquiry,
+    RenderedFeatures,
     RenderedGallery,
     RenderedHero,
     RenderedRichText,
@@ -10,6 +11,7 @@ import type {
 import BookingSection from "./blocks/booking";
 import CtaSection from "./blocks/cta";
 import EnquirySection from "./blocks/enquiry";
+import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import RichTextSection from "./blocks/rich-text";
@@ -75,6 +77,12 @@ export default function SectionRenderer({
                 <EnquirySection
                     content={section.content as RenderedEnquiry}
                     apiUrl={apiUrl}
+                />
+            );
+        case "features":
+            return (
+                <FeaturesSection
+                    content={section.content as RenderedFeatures}
                 />
             );
         case "booking":

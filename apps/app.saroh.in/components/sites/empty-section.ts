@@ -50,6 +50,20 @@ export function emptySection(type: SectionType): Section {
                     ],
                 },
             };
+        case "features":
+            /*
+             * One empty point, not zero: the contract requires at least one
+             * (#255), and a merchant who adds the block should see the shape
+             * they are filling in rather than an empty box with an Add button.
+             */
+            return {
+                type,
+                contractVersion: 1,
+                content: {
+                    heading: "",
+                    items: [{ title: "", body: "" }],
+                },
+            };
         case "booking":
             return {
                 type,

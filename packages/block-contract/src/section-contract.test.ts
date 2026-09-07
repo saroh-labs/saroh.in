@@ -285,6 +285,7 @@ describe("per-section padding override (#189)", () => {
             fields: [{ name: "email", label: "Email", type: "email" }],
         },
         booking: {},
+        features: { items: [{ title: "Stocked, not ordered in" }] },
     };
 
     it("is accepted on every section type", () => {

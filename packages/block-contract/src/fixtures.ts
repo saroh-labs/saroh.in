@@ -231,6 +231,70 @@ export const BLOCK_META = {
             },
         },
     },
+    features: {
+        label: "Features",
+        description:
+            "A heading over a set of short, titled points — what you do, or what a visitor gets.",
+        /*
+         * `grid` is first because it is the least demanding look, and the first
+         * entry is what an unrecognised variant falls back to (#254). Both
+         * looks draw the same content; neither needs anything the other does
+         * not, which is what makes them variants rather than separate blocks.
+         */
+        variants: [
+            {
+                id: "grid",
+                label: "Grid",
+                description:
+                    "Points side by side in columns. Reads as a summary — best for three to six short ones.",
+            },
+            {
+                id: "list",
+                label: "List",
+                description:
+                    "Points stacked in one column, each with room to explain itself. Better when the copy is longer than a line.",
+            },
+        ] as const,
+        fixtures: {
+            grid: {
+                variant: "grid",
+                heading: "Why buy from us",
+                items: [
+                    {
+                        title: "Stocked, not ordered in",
+                        body: "Around nine hundred lines sit in our own warehouse, so a same-day order is a real thing rather than a promise.",
+                    },
+                    {
+                        title: "Trade accounts",
+                        body: "Order monthly and open a 30-day account. Tiered pricing applies from the second order.",
+                    },
+                    {
+                        title: "Cut to size",
+                        body: "Bulk and custom runs quoted within one working day.",
+                    },
+                ],
+            },
+            list: {
+                variant: "list",
+                heading: "How ordering works",
+                intro: "Three steps, and the second one is us.",
+                items: [
+                    {
+                        title: "Tell us what you need",
+                        body: "By phone, or through the form on this site. A part number helps; a photograph does too.",
+                    },
+                    {
+                        title: "We quote within a working day",
+                        body: "Including whether it is in stock, and what it costs to get it to you.",
+                    },
+                    {
+                        title: "Order by 2pm, it goes the same day",
+                        body: "Anything stocked. Custom runs get their own date, agreed before you commit.",
+                    },
+                ],
+            },
+        },
+    },
     booking: {
         label: "Booking",
         description:

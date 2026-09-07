@@ -102,6 +102,8 @@ export const TO_RENDERED = {
     gallery: identity,
     enquiry: identity,
     booking: identity,
+    // Text only: nothing to resolve. Stated, not assumed.
+    features: identity,
 } satisfies Record<SectionType, ToRendered>;
 
 /**

@@ -159,3 +159,41 @@ describe("every block declares its looks", () => {
         expect(BLOCK_META[type].variants.length).toBeGreaterThan(0);
     });
 });
+
+/**
+ * #255 — the first block added after the library's machinery was built.
+ *
+ * These assert the two rules the survey said a repeated-item contract needs and
+ * `gallery` shipped without: a documented minimum AND a declared cap.
+ */
+describe("features", () => {
+    const point = { title: "Stocked, not ordered in" };
+
+    it("requires at least one point", () => {
+        expect(parseSectionContent("features", 1, { items: [] }).success).toBe(
+            false,
+        );
+    });
+
+    it("caps the list, rather than letting a page become a list", () => {
+        const twelve = Array.from({ length: 12 }, () => point);
+        expect(
+            parseSectionContent("features", 1, { items: twelve }).success,
+        ).toBe(true);
+        expect(
+            parseSectionContent("features", 1, { items: [...twelve, point] })
+                .success,
+        ).toBe(false);
+    });
+
+    it("needs no heading — a bare set of points is a legitimate block", () => {
+        expect(
+            parseSectionContent("features", 1, { items: [point] }).success,
+        ).toBe(true);
+    });
+
+    it("takes a look like every other block", () => {
+        expect(resolveVariant("features", { variant: "list" })).toBe("list");
+        expect(resolveVariant("features", {})).toBe("grid");
+    });
+});
