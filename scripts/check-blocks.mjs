@@ -166,6 +166,22 @@ const SITE_LAYER_ALLOWED = new Set([
     "apps/saroh.app/app/[domain]/[slug]/not-found.tsx",
     "apps/saroh.app/app/[domain]/layout.tsx",
     "apps/saroh.app/app/preview/[token]/layout.tsx",
+    // The error and loading boundaries, same category as the 404 above: a
+    // Saroh surface on a merchant's page, which should wear the merchant's
+    // palette rather than ours. They draw no block — a heading, a line of
+    // copy, and a CTA from ctaClasses() — so there is still one implementation
+    // of every block.
+    //
+    // The root boundary is in this app but not under [domain], because a throw
+    // inside [domain]/layout.tsx belongs to the parent segment. That is also
+    // the case where SiteTheme has not mounted, so it mounts SiteTheme itself
+    // on the neutral defaults: a visitor on a merchant's domain must not be
+    // shown Saroh's brand just because we could not load the merchant's.
+    "apps/saroh.app/app/error.tsx",
+    "apps/saroh.app/app/[domain]/error.tsx",
+    "apps/saroh.app/app/[domain]/loading.tsx",
+    "apps/saroh.app/app/preview/[token]/error.tsx",
+    "apps/saroh.app/app/preview/[token]/loading.tsx",
     // The catalog's preview document. Same category as the layouts above: it
     // supplies the merchant's page GROUND so a block has one to sit on, and
     // without it every palette would look identical behind the section. It
