@@ -8,7 +8,7 @@ import type {
     ReceiptPaymentStatus,
 } from "@/lib/checkout";
 import { createPaymentIntent, fetchReceipt } from "@/lib/checkout";
-import { cn } from "@/lib/utils";
+import { cn } from "@saroh/ui/lib/utils";
 
 import { ctaClasses, destructiveAlertClasses } from "@saroh/site-blocks";
 

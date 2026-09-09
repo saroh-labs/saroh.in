@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
 export default function MaxWidthWrapper({
