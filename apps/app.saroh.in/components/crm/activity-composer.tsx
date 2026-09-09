@@ -2,9 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { Textarea } from "@saroh/ui/textarea";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { logActivity } from "@/lib/leads/actions";
 
@@ -27,11 +27,11 @@ export function ActivityComposer({ leadId }: { leadId: string }) {
         const res = await logActivity(leadId, text);
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setBody("");
-        toast.success("Note added");
+        showSuccess("Note added");
         router.refresh();
     }
 

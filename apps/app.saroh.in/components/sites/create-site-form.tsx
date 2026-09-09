@@ -18,9 +18,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@saroh/ui/select";
+import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { trimmedOr } from "@/lib/forms/values";
@@ -77,7 +77,7 @@ export function CreateSiteForm({ templates }: { templates: Template[] }) {
             if (res.field === "subdomain" || res.field === "name") {
                 form.setError(res.field, { message: res.error });
             } else {
-                toast.error(res.error);
+                showError(res.error);
             }
             return;
         }

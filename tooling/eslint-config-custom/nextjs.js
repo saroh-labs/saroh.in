@@ -49,12 +49,20 @@ const DB_IMPORT_BAN_PATTERNS = [
  */
 const AUTH_ROOT_BAN_PATHS = ["@saroh/auth", "@saroh/auth/server"];
 
+const TOAST_BAN_MESSAGE =
+    "Import { showSuccess, showError, showWarning, showInfo } from '@saroh/ui/toast' instead of sonner's `toast`. One seam keeps theming, error-tracker routing and a future library swap to a single file — see packages/ui/src/components/ui/toast.tsx.";
+
 /** Shared option object for both the TypeScript and JSX rule blocks. */
 const restrictedImportOptions = {
-    paths: AUTH_ROOT_BAN_PATHS.map((name) => ({
-        name,
-        message: AUTH_ROOT_BAN_MESSAGE,
-    })),
+    paths: [
+        ...AUTH_ROOT_BAN_PATHS.map((name) => ({
+            name,
+            message: AUTH_ROOT_BAN_MESSAGE,
+        })),
+        // `importNames`, not the whole module: `Toaster` is the mount point and
+        // an app has to import it. Only the imperative `toast` is off-limits.
+        { name: "sonner", importNames: ["toast"], message: TOAST_BAN_MESSAGE },
+    ],
     patterns: [
         { group: DB_IMPORT_BAN_PATTERNS, message: DB_IMPORT_BAN_MESSAGE },
     ],

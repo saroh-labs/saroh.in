@@ -11,11 +11,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { showError } from "@saroh/ui/toast";
 import { ChevronsUpDown, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
 
 import { setActiveOrganization } from "@/lib/organizations/actions";
 import type { Organization } from "@/lib/organizations/service";
@@ -49,7 +49,7 @@ export function OrganizationSwitcher({
         startTransition(async () => {
             const res = await setActiveOrganization(organizationId);
             if (!res.ok) {
-                toast.error(res.error);
+                showError(res.error);
                 return;
             }
             setOpen(false);

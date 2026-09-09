@@ -3,9 +3,9 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { createPage, deletePage, updatePage } from "@/lib/sites/actions";
 import type { SitePage } from "@/lib/sites/service";
@@ -52,7 +52,7 @@ export function PagesPanel({
          * merchant would have no way to know it happened.
          */
         if (dirty) {
-            toast.error("Save this page before opening another.");
+            showError("Save this page before opening another.");
             return;
         }
         router.push(`/sites/${siteId}?page=${pageId}`);
@@ -66,13 +66,13 @@ export function PagesPanel({
         const res = await createPage(siteId, { title: t, path: p });
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setAdding(false);
         setTitle("");
         setPath("");
-        toast.success(`Added ${res.data.title}.`);
+        showSuccess(`Added ${res.data.title}.`);
         router.push(`/sites/${siteId}?page=${res.data.id}`);
         router.refresh();
     }
@@ -84,7 +84,7 @@ export function PagesPanel({
         const res = await updatePage(siteId, pageId, { title: t });
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setRenaming(null);
@@ -101,10 +101,10 @@ export function PagesPanel({
         const res = await updatePage(siteId, page.id, { hidden });
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success(
+        showSuccess(
             hidden
                 ? `${page.title} is hidden. It stays here and comes off the site when you publish.`
                 : `${page.title} is visible again. It goes back on the site when you publish.`,
@@ -124,10 +124,10 @@ export function PagesPanel({
         const res = await deletePage(siteId, page.id);
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success(`Deleted ${page.title}.`);
+        showSuccess(`Deleted ${page.title}.`);
         if (page.id === activePageId) router.push(`/sites/${siteId}`);
         router.refresh();
     }

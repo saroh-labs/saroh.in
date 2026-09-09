@@ -9,8 +9,8 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 const formSchema = z.object({
     email: z.string().email({
@@ -52,7 +52,7 @@ export default function JoinWaitlist() {
                 // either way, which is what the visitor wanted. Saying so is
                 // friendlier than the previous destructive "Email already
                 // exists" toast.
-                toast.success(
+                showSuccess(
                     json.created === false
                         ? "You're already on the list — we'll be in touch."
                         : "You're on the list. We'll email you when we open your batch.",
@@ -61,16 +61,17 @@ export default function JoinWaitlist() {
                 return;
             }
 
-            toast.error(
+            showError(
                 json.reason?.code === "RATE_LIMITED"
                     ? "Too many attempts. Try again in a minute."
                     : "Something went wrong. Please try again.",
             );
             console.error("[waitlist]", json.reason);
         } catch (error: unknown) {
-            toast.error("Something went wrong. Please try again.", {
-                description: error instanceof Error ? error.message : undefined,
-            });
+            showError(
+                "Something went wrong. Please try again.",
+                error instanceof Error ? error.message : undefined,
+            );
         }
     }
 

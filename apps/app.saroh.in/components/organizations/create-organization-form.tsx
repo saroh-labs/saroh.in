@@ -11,9 +11,9 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { createOrganization } from "@/lib/organizations/actions";
@@ -90,7 +90,7 @@ export function CreateOrganizationForm() {
             if (res.field === "name") {
                 form.setError("name", { message: res.error });
             } else {
-                toast.error(res.error);
+                showError(res.error);
             }
             return;
         }

@@ -2,8 +2,8 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 import { env } from "@/env";
 import {
@@ -82,12 +82,12 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
         const res = await createPreviewLink(siteId, days);
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setLinks((prev) => [res.data, ...(prev ?? [])]);
         const copied = await copy(previewUrl(res.data.token));
-        toast.success(
+        showSuccess(
             copied
                 ? `Link copied. It stops working on ${dayOf(res.data.expiresAt)}.`
                 : `Link ready. It stops working on ${dayOf(res.data.expiresAt)}.`,
@@ -99,13 +99,13 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
         const res = await revokePreviewLink(siteId, link.id);
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setLinks((prev) =>
             (prev ?? []).map((l) => (l.id === link.id ? res.data : l)),
         );
-        toast.success("Link turned off. Anyone opening it now is told so.");
+        showSuccess("Link turned off. Anyone opening it now is told so.");
     }
 
     return (
@@ -138,10 +138,10 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                         void copy(previewUrl(link.token)).then(
                                             (ok) =>
                                                 ok
-                                                    ? toast.success(
+                                                    ? showSuccess(
                                                           "Link copied.",
                                                       )
-                                                    : toast.error(
+                                                    : showError(
                                                           "Could not copy. Select the link and copy it yourself.",
                                                       ),
                                         )

@@ -5,11 +5,11 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 
 import { MediaPicker } from "@/components/sites/media-picker";
 import {
@@ -99,7 +99,7 @@ export function PostEditor({
         async (opts: { silent?: boolean } = {}) => {
             const v = latest.current;
             if (!v.title.trim()) {
-                if (!opts.silent) toast.error("A post needs a title.");
+                if (!opts.silent) showError("A post needs a title.");
                 return null;
             }
             setSaving(true);
@@ -119,7 +119,7 @@ export function PostEditor({
                 : await createPost(siteId, body);
             setSaving(false);
             if (!res.ok) {
-                toast.error(res.error);
+                showError(res.error);
                 return null;
             }
             setDirty(false);
@@ -130,7 +130,7 @@ export function PostEditor({
                 setPostId(res.data.id);
                 router.replace(`/sites/${siteId}/posts/${res.data.id}`);
             }
-            if (!opts.silent) toast.success("Draft saved.");
+            if (!opts.silent) showSuccess("Draft saved.");
             return res.data.id;
         },
         [postId, router, siteId],
@@ -171,12 +171,12 @@ export function PostEditor({
         const res = await publishPost(siteId, id);
         setPublishing(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setLive(true);
         setLiveAt(new Date().toISOString());
-        toast.success(`Published. It is live at ${res.data.path}.`);
+        showSuccess(`Published. It is live at ${res.data.path}.`);
         router.refresh();
     }
 
@@ -186,12 +186,12 @@ export function PostEditor({
         const res = await unpublishPost(siteId, postId);
         setPublishing(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setLive(false);
         setLiveAt(null);
-        toast.success("Taken off the site. The writing is still here.");
+        showSuccess("Taken off the site. The writing is still here.");
         router.refresh();
     }
 
@@ -199,10 +199,10 @@ export function PostEditor({
         if (!postId) return;
         const res = await deletePost(siteId, postId);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Post deleted.");
+        showSuccess("Post deleted.");
         router.push(`/sites/${siteId}/posts`);
     }
 

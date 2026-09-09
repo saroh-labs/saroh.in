@@ -20,9 +20,9 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useTransition } from "react";
-import { toast } from "sonner";
 
 import { setModuleStatusAction } from "@/lib/modules/actions";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -68,10 +68,10 @@ export function ModuleCard({ module }: { module: ModuleView }) {
         startTransition(async () => {
             const result = await setModuleStatusAction(module.key, status);
             if (result.ok) {
-                toast.success(successMessage);
+                showSuccess(successMessage);
             } else {
                 const detail = result.blockers?.[0]?.message ?? result.error;
-                toast.error(detail);
+                showError(detail);
             }
         });
     };

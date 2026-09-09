@@ -1,8 +1,8 @@
 "use client";
 
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { moveLead } from "@/lib/leads/actions";
 import type { LeadStage } from "@/lib/leads/service";
@@ -36,10 +36,10 @@ export function MoveStageControl({
         const res = await moveLead(leadId, stageId);
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Lead moved");
+        showSuccess("Lead moved");
         router.refresh();
     }
 

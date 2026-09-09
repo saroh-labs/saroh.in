@@ -10,9 +10,9 @@ import {
     DialogTrigger,
 } from "@saroh/ui/dialog";
 import { cn } from "@saroh/ui/lib/utils";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { toast } from "sonner";
 
 import { formatTimeRange } from "@/lib/format/datetime";
 import { listAvailability, rescheduleBooking } from "@/lib/services/actions";
@@ -84,10 +84,10 @@ export function RescheduleBooking({
             if (!res.ok) {
                 // The api refuses a slot taken between this list loading and
                 // the click. Saying so plainly beats a generic failure.
-                toast.error(res.error);
+                showError(res.error);
                 return;
             }
-            toast.success("Booking moved");
+            showSuccess("Booking moved");
             setOpen(false);
             router.refresh();
         });
