@@ -1,6 +1,6 @@
 import { GoneException, Injectable, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
@@ -33,13 +33,29 @@ export type PreviewLinkState = "active" | "expired" | "revoked";
 
 export interface PreviewLinkView {
     id: string;
-    token: string;
     state: PreviewLinkState;
     createdAt: Date;
     expiresAt: Date;
     revokedAt: Date | null;
     lastUsedAt: Date | null;
     createdBy: { name: string | null };
+}
+
+/**
+ * A link as its creator receives it, once (#284).
+ *
+ * The raw `token` exists only in this response. The database holds its hash,
+ * so no list, revoke or later read can return it to anyone, whatever their
+ * role. Before this, `list` handed every token to anyone with `site:read`, so
+ * a MEMBER who cannot load the draft could open it through any share link.
+ */
+export interface CreatedPreviewLinkView extends PreviewLinkView {
+    token: string;
+}
+
+/** Hash a preview token the way it is stored (#284): SHA-256, hex. */
+export function hashPreviewToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
 }
 
 /** What the renderer gets for a valid token. */
@@ -78,7 +94,6 @@ export type PreviewGoneReason = "expired" | "revoked";
 
 const linkSelect = {
     id: true,
-    token: true,
     createdAt: true,
     expiresAt: true,
     revokedAt: true,
@@ -98,7 +113,6 @@ export function previewLinkState(
 function toView(
     link: {
         id: string;
-        token: string;
         createdAt: Date;
         expiresAt: Date;
         revokedAt: Date | null;
@@ -175,7 +189,7 @@ export class SitePreviewLinksService {
         ctx: OrganizationContext,
         siteId: string,
         input: { expiresInDays: PreviewLinkDays },
-    ): Promise<PreviewLinkView> {
+    ): Promise<CreatedPreviewLinkView> {
         authorize(ctx, "site:update");
         await assertSiteInOrg(ctx, siteId);
 
@@ -183,25 +197,32 @@ export class SitePreviewLinksService {
         const expiresAt = new Date(
             now.getTime() + input.expiresInDays * 24 * 60 * 60 * 1000,
         );
+        // 32 random bytes is the whole secret. base64url keeps it short enough
+        // to read aloud and safe in a path segment.
+        const token = randomBytes(32).toString("base64url");
         const link = await prisma.sitePreviewLink.create({
             data: {
                 siteId,
                 organizationId: ctx.organizationId,
                 createdByUserId: ctx.userId,
-                // 32 random bytes is the whole secret. base64url keeps it
-                // short enough to read aloud and safe in a path segment.
-                token: randomBytes(32).toString("base64url"),
+                // Only the hash is stored (#284).
+                tokenHash: hashPreviewToken(token),
                 expiresAt,
             },
             select: linkSelect,
         });
-        return toView(link, now);
+        // The one time the raw token leaves the API.
+        return { ...toView(link, now), token };
     }
 
     /**
      * Every link for the site, newest first, each with its state. Expired and
      * revoked ones are returned too: "did I already share this, and with what
      * expiry" is a question the list answers. Requires `site:read`.
+     *
+     * No link's address is returned (#284). Only its hash is stored, so every
+     * role, OWNER included, sees a link's state and dates here, never a token
+     * that opens the draft.
      */
     async list(
         ctx: OrganizationContext,
@@ -343,7 +364,8 @@ export class SitePreviewLinksService {
         expiresAt: Date;
     }> {
         const link = await prisma.sitePreviewLink.findUnique({
-            where: { token },
+            // By hash (#284): the database never holds the token itself.
+            where: { tokenHash: hashPreviewToken(token) },
             select: {
                 id: true,
                 siteId: true,

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
+import { PreviewGone } from "@/components/preview-gone";
 import { PageSections } from "@saroh/site-blocks";
 
 import { publicApiUrl } from "@/lib/api-url";
@@ -19,7 +20,11 @@ export default async function PreviewPage({
 }) {
     const { token, slug } = await params;
     const preview = await getPreviewByToken(token);
-    if (!preview.ok) return null;
+    // Explained here too, not left blank: see the home page's note (#284).
+    if (!preview.ok) {
+        if (preview.reason === "missing") notFound();
+        return <PreviewGone reason={preview.reason} />;
+    }
 
     // The posts index (#236). Checked BEFORE pages, for the same reason the
     // live route checks it first: a page could otherwise be created at the

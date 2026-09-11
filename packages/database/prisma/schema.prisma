@@ -1652,7 +1652,9 @@ model SitePreviewLink {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  token String @unique
+  // SHA-256 (hex) of the link's secret, never the secret itself (#284). The raw
+  // token is returned once, when the link is created.
+  tokenHash String @unique
 
   createdByUserId String
   createdBy       User   @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
