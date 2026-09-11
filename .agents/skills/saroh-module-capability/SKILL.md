@@ -67,9 +67,14 @@ controller in a gated domain gets the decorator and an entry in that spec.
 
 `ModuleGate` at a section's `layout.tsx`, so a deep link to a detail page is
 covered by one check rather than each page remembering. It renders
-`CapabilityOffState` — visibly distinct from an empty list, because "Commerce
+`CapabilityOffState`, visibly distinct from an empty list, because "Commerce
 is turned off" and "you have no orders" are different facts
 ([[saroh-product-states]]).
+
+The exception is an `UNAUTHORIZED` blocker, which renders `AccessDenied`.
+Readiness is `DISABLED` whenever any gate is closed, permission included, and
+"turned off" is only true of the other gates. Before #274, a MEMBER was told
+Website was switched off for the whole organization.
 
 **Fail open, not closed.** `moduleAccess` renders the section when availability
 is UNKNOWN. Claiming a capability is off because a lookup failed would be worse
@@ -77,6 +82,11 @@ than showing a section the server will refuse anyway once enforcement is on.
 
 ## Rules
 
+- `requiredAction` is who may REACH the module: make it the read action a
+  read-only role holds, and let `authorize()` refuse writes per route. WEBSITE
+  was gated on `site:update`, which hid it from MEMBER and REVIEWER and would
+  have 404'd every review route under enforcement (#274).
+  `module-enforcement.roles.spec.ts` checks every role against every module.
 - Never hard-code a module key in a component; read the registry.
 - Never emit an action for a module the actor cannot see — that is a leak.
 - Deactivation runs a policy; it does not delete rows.

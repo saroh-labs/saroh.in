@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { parsePostsPrefix } from "../content/posts-prefix";
-import { authorize } from "../organizations/organization-policy";
+import { authorize, can } from "../organizations/organization-policy";
 import type {
     CreateApprovalDto,
     CreateCommentDto,
@@ -240,6 +240,8 @@ function slugify(input: string): string {
  */
 /** One site as the editor and settings screens read it. */
 export interface SiteDetailView {
+    /** Whether this caller may load and write editable drafts. */
+    canEdit: boolean;
     id: string;
     name: string;
     slug: string;
@@ -706,6 +708,7 @@ export class SitesService {
         const pending = await this.pendingSectionChanges([site.id]);
         return {
             ...rest,
+            canEdit: can(ctx.role, "section:write"),
             /*
              * What publishing would change (#190). The editor's top bar and the
              * settings screen both render this, so neither computes its own —

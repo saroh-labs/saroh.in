@@ -132,3 +132,51 @@ no-op that resolved, so the worker completed each job.
 type to a registered handler and lists the gaps still open. The handler itself
 is still unwritten.
 **Category**: jobs
+
+## App — a role denial reads "turned off" in the gate, and "try again" in production (#274)
+
+**Problem**: A MEMBER opening a website page was told "Website is not switched
+on for this organization", which was false. Where a 403 did reach an error
+boundary, `next dev` showed "You do not have access to this" while a
+production build showed "Couldn't load this — try again".
+**Root cause**: Two separate causes.
+
+- `ModuleGate` rendered `CapabilityOffState` for every `DISABLED` readiness, and
+  a failed authorization gate also makes a module `DISABLED`. WEBSITE's
+  `requiredAction` was `site:update`, so every read-only role failed it; under
+  `MODULE_ENFORCEMENT` the same gate 404s every sites route for them.
+- `SectionError` found the status by parsing the thrown `ApiError`'s message,
+  which Next replaces with a digest for server errors in production. The parse
+  returned null, and the denial rendered as a failure.
+
+**Fix**:
+
+- WEBSITE gates on `site:read`.
+- `ModuleGate` renders `AccessDenied` for an `UNAUTHORIZED` blocker.
+- `getJson` calls `forbidden()` on a 403 (`experimental.authInterrupts`), caught
+  by `forbidden.tsx` in `(shell)`, `(editor)` and the app root.
+- Required Settings reads propagate permission interrupts and server failures.
+- Site detail reports `canEdit` from server policy. Read-only roles get a site
+  overview and review notes without requesting a draft, which requires write access.
+- `module-enforcement.roles.spec.ts` runs the guard per role with the real
+  availability service, which the stubbed guard spec never could.
+
+Check a denial in `next build && next start`, not only in dev.
+**Category**: auth · rules in `docs/patterns/frontend-error-feedback.md` and
+`.agents/skills/saroh-module-capability`
+
+## Local dev — an OWNER sees the read-only site view after a test run
+
+**Problem**: With `pnpm dev` running, the site editor showed an OWNER "You can
+view this site. Editing and publishing are limited to owners and admins."
+`tsc` was clean, and the service returned `canEdit: true` in its spec.
+**Root cause**: `pnpm --filter @saroh/e2e test:permissions` runs
+`turbo run build`, which rebuilds `@saroh/database`'s `dist`. The API's dev
+watcher recompiled mid-rebuild, reported missing exports from
+`@saroh/database`, and kept serving its previous build, from before `canEdit`
+existed. The field came back `undefined`, which the editor page treats as
+read-only. Touching a source file did not trigger a recompile.
+**Fix**: Restart `pnpm dev` after anything that rebuilds a workspace package's
+`dist`. If the watcher's last line is "Found N errors" while `tsc --noEmit`
+passes, the API is running an old build.
+**Category**: local dev · note in `docs/patterns/frontend-error-feedback.md`

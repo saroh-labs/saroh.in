@@ -47,10 +47,14 @@ export class ApiError extends Error {
  * Recover an {@link ApiError} from whatever reached an error boundary.
  *
  * Next.js does not hand a client `error.tsx` the original object: it serializes
- * the error and replaces the message in production with a digest. So the
- * boundary cannot use `instanceof`, and reading a status off the message is the
- * only thing left — which is why {@link ApiError} keeps the status IN the
- * message rather than only on the instance.
+ * the error, so the boundary cannot use `instanceof`, and reading a status off
+ * the message is the only thing left — which is why {@link ApiError} keeps the
+ * status IN the message rather than only on the instance.
+ *
+ * That only works where the message survives. In a production build Next
+ * replaces a SERVER error's message with a digest, so this returns null for
+ * every server-thrown ApiError there. That is why a 403 from `getJson` no
+ * longer throws at all: it calls `forbidden()` instead (lib/api/http.ts, #274).
  */
 export function statusFromError(error: unknown): number | null {
     if (error instanceof ApiError) return error.status;

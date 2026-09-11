@@ -12,15 +12,14 @@ import { requireSession } from "@/lib/session";
  * published sites.
  *
  * OWNER/ADMIN only, enforced by the API (`org:settings:read` / `org:update`). A
- * MEMBER gets a 403 that surfaces as the explanatory empty state rather than an
- * error page: not being allowed is a legitimate answer, not a failure.
+ * role denial reaches forbidden.tsx; an unavailable API reaches error.tsx.
  */
 export const metadata = { title: "Organization" };
 
 export default async function OrganizationSettingsPage() {
     await requireSession();
 
-    const settings = await getOrganizationSettings().catch(() => null);
+    const settings = await getOrganizationSettings();
 
     return (
         <main className="mx-auto max-w-3xl p-8">
@@ -33,7 +32,7 @@ export default async function OrganizationSettingsPage() {
             ) : (
                 <EmptyState
                     title="Not available"
-                    description="Organization settings are available to owners and admins."
+                    description="Choose an organization to view its settings."
                 />
             )}
         </main>

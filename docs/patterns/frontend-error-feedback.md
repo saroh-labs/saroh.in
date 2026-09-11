@@ -51,6 +51,16 @@ Before the split, one API restart signed out every user.
   can give support — and log the error (`TODO(#103)`: forward it to a tracker
   once one exists). Current in the accounts, admin and saroh.app boundaries; gap:
   `app.saroh.in/app/error.tsx` does not show it.
+- **Current** — **A 403 from a server read calls `forbidden()` instead of throwing
+  an ordinary error.**
+    - `getJson` does it (`lib/api/http.ts`).
+    - `forbidden.tsx` in `(shell)`, `(editor)` and the `app.saroh.in` root renders
+      `AccessDenied`.
+    - Production replaces a thrown server error's message with a digest, so an
+      `error.tsx` cannot tell a 403 from a 500 there (`DEV_LEARNINGS.md`, #274).
+    - Required page reads must let `forbidden()` propagate. A catch that returns
+      `null` swallows the interrupt and hides failures as missing data. Optional
+      navigation reads may deliberately fall back without blocking the page.
 - **Current** — **Calm, recoverable copy**: it is usually temporary, and **Try
   again** calls `reset`. In accounts it never hints at whether an account or a
   password was right.
@@ -84,3 +94,21 @@ Before the split, one API restart signed out every user.
   `{ error: { code, message, statusCode, correlationId, details? } }`, 5xx
   messages are generic, and `readError` in `lib/api/http.ts` maps them. Never
   render a raw body or an HTTP code ("Calm under errors", 07 §1).
+
+### Production permission regression tests
+
+Run `pnpm --filter @saroh/e2e test:permissions` with the Portless proxy running.
+This builds the workspace app and tests its real production routes against an
+isolated API fixture on desktop and phone. It covers permission boundaries,
+server failures, disabled modules, and read-only site access without a database.
+Backend guard/service tests separately verify role authorization; the fixture
+is not a substitute for the seeded-stack authentication suite.
+
+Before running it, know what its build touches (`DEV_LEARNINGS.md`, #274):
+
+- **`@saroh/database`'s `dist` is rebuilt.** A `pnpm dev` API watching at the
+  same time compiles against the half-built package, then keeps serving its last
+  good build. Stop `pnpm dev` first, or restart it afterwards.
+- **`apps/app.saroh.in/.next` is overwritten** with the fixture's API URLs
+  inlined. Rebuild before any other `next start`.
+- **CI does not run it yet.** The `browser-e2e` job runs `test:e2e` only.
