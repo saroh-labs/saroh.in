@@ -32,6 +32,7 @@
     "dependencies": {
         "@prisma/adapter-pg": "7.4.0",
         "@prisma/client": "catalog:prisma",
+        "@saroh/block-contract": "workspace:*",
         "@types/node": "catalog:",
         "pg": "^8.22.0",
         "zod": "catalog:"
@@ -47,6 +48,6 @@
         "tsup": "^8.5.1",
         "tsx": "^4.23.11",
         "typescript": "catalog:",
-        "vitest": "^3.2.7"
+        "vitest": "^4.1.11"
     }
 }

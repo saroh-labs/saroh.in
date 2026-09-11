@@ -6,7 +6,6 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import { parseSectionContent, Prisma, prisma } from "@saroh/database";
-import type { TemplateContext } from "@saroh/templates";
 import {
     getTemplate,
     instantiateTemplate,
@@ -36,6 +35,13 @@ import {
     toPublishableSection,
 } from "./pending-changes";
 import { sanitizeRichHtml } from "./sanitize";
+import {
+    assertPageInSite,
+    assertPathIsFree,
+    assertSiteInOrg,
+    buildTemplateContext,
+    getOrCreateDraftVersion,
+} from "./site-access";
 import type { Flag, FlagType } from "./site-flags";
 import { checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
 import type { SiteFooter } from "./site-footer";
@@ -394,7 +400,7 @@ export class SitesService {
             );
         }
 
-        const context = await this.buildTemplateContext(ctx.organizationId);
+        const context = await buildTemplateContext(ctx.organizationId);
 
         let pages;
         try {
@@ -732,7 +738,7 @@ export class SitesService {
         dto: UpdateSiteSettingsDto,
     ) {
         authorize(ctx, "site:update");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         const data: {
             seoTitle?: string | null;
@@ -802,7 +808,7 @@ export class SitesService {
         input: unknown,
     ): Promise<{ id: string; style: SiteStyle }> {
         authorize(ctx, "site:update");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         // Validate BEFORE writing: an unknown colour key or a non-numeric
         // slider must be a 400, not a site that renders wrong later.
@@ -836,7 +842,7 @@ export class SitesService {
         input: unknown,
     ): Promise<{ id: string; footer: SiteFooter | null }> {
         authorize(ctx, "site:update");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         // Validate BEFORE writing, for the same reason style does: a malformed
         // body is a 400 now rather than a footer that fails to render later.
@@ -866,7 +872,7 @@ export class SitesService {
         input: unknown,
     ): Promise<{ id: string; navigation: SiteNavigation | null }> {
         authorize(ctx, "site:update");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
         const navigation = parseSiteNavigation(input);
         await prisma.site.update({
             where: { id: siteId },
@@ -898,7 +904,7 @@ export class SitesService {
      */
     async listPublications(ctx: OrganizationContext, siteId: string) {
         authorize(ctx, "site:read");
-        const site = await this.assertSiteInOrg(ctx, siteId);
+        const site = await assertSiteInOrg(ctx, siteId);
 
         const publications = await prisma.publication.findMany({
             where: { siteId, organizationId: ctx.organizationId },
@@ -945,7 +951,7 @@ export class SitesService {
         publicationId: string,
     ): Promise<PublicationDetail> {
         authorize(ctx, "site:read");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         const publication = await prisma.publication.findFirst({
             where: {
@@ -991,7 +997,7 @@ export class SitesService {
         publicationId: string,
     ) {
         authorize(ctx, "site:publish");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         const source = await prisma.publication.findFirst({
             where: {
@@ -1054,10 +1060,10 @@ export class SitesService {
         pageId: string,
     ): Promise<PageDraftView> {
         authorize(ctx, "section:write");
-        await this.assertSiteInOrg(ctx, siteId);
-        await this.assertPageInSite(ctx, siteId, pageId);
+        await assertSiteInOrg(ctx, siteId);
+        await assertPageInSite(ctx, siteId, pageId);
 
-        const version = await this.getOrCreateDraftVersion(prisma, ctx, pageId);
+        const version = await getOrCreateDraftVersion(prisma, ctx, pageId);
         const sections = await prisma.section.findMany({
             where: { pageVersionId: version.id },
             orderBy: { order: "asc" },
@@ -1101,8 +1107,8 @@ export class SitesService {
         dto: UpdateDraftSectionsDto,
     ): Promise<PageDraftView> {
         authorize(ctx, "section:write");
-        await this.assertSiteInOrg(ctx, siteId);
-        await this.assertPageInSite(ctx, siteId, pageId);
+        await assertSiteInOrg(ctx, siteId);
+        await assertPageInSite(ctx, siteId, pageId);
 
         // Validate the entire list up front — reject before touching the DB.
         const seenKeys = new Set<string>();
@@ -1147,7 +1153,7 @@ export class SitesService {
         });
 
         const draft = await prisma.$transaction(async (tx) => {
-            const version = await this.getOrCreateDraftVersion(tx, ctx, pageId);
+            const version = await getOrCreateDraftVersion(tx, ctx, pageId);
             await tx.section.deleteMany({
                 where: { pageVersionId: version.id },
             });
@@ -1597,7 +1603,7 @@ export class SitesService {
         siteId: string,
     ): Promise<CommentView[]> {
         authorize(ctx, "site:read");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         const [comments, pages] = await Promise.all([
             prisma.siteComment.findMany({
@@ -1666,8 +1672,8 @@ export class SitesService {
         dto: CreateCommentDto,
     ): Promise<{ id: string }> {
         authorize(ctx, "site:comment");
-        await this.assertSiteInOrg(ctx, siteId);
-        await this.assertPageInSite(ctx, siteId, dto.pageId);
+        await assertSiteInOrg(ctx, siteId);
+        await assertPageInSite(ctx, siteId, dto.pageId);
 
         const comment = await prisma.siteComment.create({
             data: {
@@ -1698,7 +1704,7 @@ export class SitesService {
         resolved: boolean,
     ): Promise<{ id: string; resolvedAt: Date | null }> {
         authorize(ctx, "section:write");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         const existing = await prisma.siteComment.findFirst({
             where: {
@@ -1735,7 +1741,7 @@ export class SitesService {
         dto: CreateApprovalDto,
     ): Promise<{ id: string }> {
         authorize(ctx, "site:approve");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         return prisma.siteApproval.create({
             data: {
@@ -1758,7 +1764,7 @@ export class SitesService {
         siteId: string,
     ): Promise<ReviewState> {
         authorize(ctx, "site:read");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         const [latest, outstanding, openNotes] = await Promise.all([
             prisma.siteApproval.findFirst({
@@ -1941,7 +1947,7 @@ export class SitesService {
         dto: CreatePageDto,
     ): Promise<PageView> {
         authorize(ctx, "site:update");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         // "/" is the home page's path and the home page already exists. Caught
         // here so the merchant is told what is wrong rather than being handed
@@ -1951,7 +1957,7 @@ export class SitesService {
                 "The path / already belongs to this site's home page. Choose another, for example /about.",
             );
         }
-        await this.assertPathIsFree(siteId, dto.path);
+        await assertPathIsFree(siteId, dto.path);
 
         const page = await prisma.page.create({
             data: {
@@ -1985,7 +1991,7 @@ export class SitesService {
         dto: UpdatePageDto,
     ): Promise<PageView> {
         authorize(ctx, "site:update");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         const page = await prisma.page.findFirst({
             where: { id: pageId, siteId, organizationId: ctx.organizationId },
@@ -2006,7 +2012,7 @@ export class SitesService {
                     "The path / already belongs to this site's home page.",
                 );
             }
-            await this.assertPathIsFree(siteId, dto.path);
+            await assertPathIsFree(siteId, dto.path);
         }
 
         if (dto.hidden === true && page.isHome) {
@@ -2051,7 +2057,7 @@ export class SitesService {
         pageId: string,
     ): Promise<{ deleted: true }> {
         authorize(ctx, "site:update");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         const page = await prisma.page.findFirst({
             where: { id: pageId, siteId, organizationId: ctx.organizationId },
@@ -2068,131 +2074,5 @@ export class SitesService {
 
         await prisma.page.delete({ where: { id: pageId } });
         return { deleted: true };
-    }
-
-    /** Refuse a path another page on this site already holds. */
-    private async assertPathIsFree(siteId: string, path: string) {
-        const clash = await prisma.page.findFirst({
-            where: { siteId, path },
-            select: { title: true },
-        });
-        if (clash) {
-            throw new BadRequestException(
-                `The path ${path} is already used by "${clash.title}".`,
-            );
-        }
-    }
-
-    private async assertSiteInOrg(
-        ctx: OrganizationContext,
-        siteId: string,
-    ): Promise<{ id: string; currentPublicationId: string | null }> {
-        const site = await prisma.site.findFirst({
-            where: {
-                id: siteId,
-                organizationId: ctx.organizationId,
-                deletedAt: null,
-            },
-            // Returns the row it already had to fetch. Callers that only need
-            // the guard ignore it; version history needs to know which
-            // publication is live, and a second query for a column this one
-            // already read would be waste.
-            select: { id: true, currentPublicationId: true },
-        });
-        if (!site) {
-            throw new NotFoundException(`Site "${siteId}" not found`);
-        }
-        return site;
-    }
-
-    /** Prove `pageId` belongs to `siteId` in the ctx org, or 404. */
-    private async assertPageInSite(
-        ctx: OrganizationContext,
-        siteId: string,
-        pageId: string,
-    ): Promise<void> {
-        const page = await prisma.page.findFirst({
-            where: {
-                id: pageId,
-                siteId,
-                organizationId: ctx.organizationId,
-            },
-            select: { id: true },
-        });
-        if (!page) {
-            throw new NotFoundException(`Page "${pageId}" not found`);
-        }
-    }
-
-    /**
-     * Get the page's latest DRAFT PageVersion, creating an empty one if none
-     * exists. Takes a Prisma client/transaction so callers can run it inside a
-     * write transaction. The caller must already have proven the page belongs
-     * to the ctx org.
-     */
-    private async getOrCreateDraftVersion(
-        client: Prisma.TransactionClient,
-        ctx: OrganizationContext,
-        pageId: string,
-    ): Promise<{ id: string }> {
-        const existing = await client.pageVersion.findFirst({
-            where: {
-                pageId,
-                organizationId: ctx.organizationId,
-                status: "DRAFT",
-            },
-            orderBy: { createdAt: "desc" },
-            select: { id: true },
-        });
-        if (existing) {
-            return existing;
-        }
-        return client.pageVersion.create({
-            data: {
-                pageId,
-                organizationId: ctx.organizationId,
-                status: "DRAFT",
-                createdByUserId: ctx.userId,
-            },
-            select: { id: true },
-        });
-    }
-
-    /**
-     * Build the {@link TemplateContext} from the org's name + optional business
-     * profile (S1-004). Only fields the profile actually carries are mapped;
-     * `tagline`/`description` have no profile column yet, so builders fall back
-     * to name-derived defaults.
-     */
-    private async buildTemplateContext(
-        organizationId: string,
-    ): Promise<TemplateContext> {
-        const org = await prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: {
-                name: true,
-                businessProfile: {
-                    select: {
-                        legalName: true,
-                        contactEmail: true,
-                        website: true,
-                    },
-                },
-            },
-        });
-        if (!org) {
-            // The guard proved membership in this org, so it must exist; a miss
-            // here is a real integrity fault, not a client error.
-            throw new NotFoundException(
-                `Organization "${organizationId}" not found`,
-            );
-        }
-        const profile = org.businessProfile;
-        return {
-            organizationName: org.name,
-            legalName: profile?.legalName ?? undefined,
-            contactEmail: profile?.contactEmail ?? undefined,
-            websiteUrl: profile?.website ?? undefined,
-        };
     }
 }

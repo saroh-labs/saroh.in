@@ -1,9 +1,9 @@
 "use client";
 
 import { Switch } from "@saroh/ui/switch";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useTransition } from "react";
-import { toast } from "sonner";
 
 import {
     deselectProjectModuleAction,
@@ -58,13 +58,13 @@ function ProjectModuleRow({
                 ? await selectProjectModuleAction(projectId, module.key)
                 : await deselectProjectModuleAction(projectId, module.key);
             if (result.ok) {
-                toast.success(
+                showSuccess(
                     next
                         ? `${module.label} added to this project`
                         : `${module.label} removed from this project`,
                 );
             } else {
-                toast.error(result.error);
+                showError(result.error);
             }
         });
     };

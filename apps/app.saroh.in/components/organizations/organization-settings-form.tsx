@@ -12,9 +12,9 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
@@ -88,11 +88,11 @@ export function OrganizationSettingsForm({
         });
 
         if (!result.ok) {
-            toast.error(result.error);
+            showError(result.error);
             return;
         }
 
-        toast.success("Organization saved");
+        showSuccess("Organization saved");
         form.reset({
             name: result.data.name,
             legalName: result.data.profile?.legalName ?? "",

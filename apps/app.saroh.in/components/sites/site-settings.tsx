@@ -6,10 +6,10 @@ import { Card, CardContent } from "@saroh/ui/card";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { ImageIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { toast } from "sonner";
 
 import { CustomDomain } from "@/components/sites/custom-domain";
 import { MediaPicker } from "@/components/sites/media-picker";
@@ -187,14 +187,14 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
         startTransition(async () => {
             const res = await updateSiteSettings(site.id, input);
             if (!res.ok) {
-                toast.error(res.error);
+                showError(res.error);
                 return;
             }
             setEditing(null);
             // Local state already shows the new value; refresh so the server
             // props agree with it and a reload does not appear to lose the edit.
             router.refresh();
-            toast.success(`${label} saved. Publish to make it public.`);
+            showSuccess(`${label} saved. Publish to make it public.`);
         });
     }
 
@@ -211,12 +211,12 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                 menu.length ? { items: menu } : null,
             );
             if (!res.ok) {
-                toast.error(res.error);
+                showError(res.error);
                 return;
             }
             setEditing(null);
             router.refresh();
-            toast.success(
+            showSuccess(
                 menu.length
                     ? "Menu saved. Publish to make it public."
                     : "Menu removed. Publish to take it off the site.",
@@ -243,12 +243,12 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                     : { format: footerFormat, value: footerValue };
             const res = await updateSiteFooter(site.id, next);
             if (!res.ok) {
-                toast.error(res.error);
+                showError(res.error);
                 return;
             }
             setEditing(null);
             router.refresh();
-            toast.success(
+            showSuccess(
                 next === null
                     ? "Footer removed. Publish to take it off the site."
                     : "Footer saved. Publish to make it public.",

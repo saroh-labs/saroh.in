@@ -2,8 +2,8 @@ import type {
     ContractVersion,
     SectionContractError,
     SectionType,
-} from "@saroh/database";
-import { parseSectionContent } from "@saroh/database";
+} from "@saroh/block-contract";
+import { parseSectionContent } from "@saroh/block-contract";
 
 import type { TemplateContext, TemplateManifest } from "./manifest";
 import { resolveContent } from "./manifest";
@@ -38,7 +38,7 @@ export interface InstantiatedTemplate {
 }
 
 /**
- * Thrown when a template produces a section that fails its `@saroh/database`
+ * Thrown when a template produces a section that fails its `@saroh/block-contract`
  * contract. Carries enough locating info (page path + section index) plus the
  * underlying typed {@link SectionContractError} to make the offending manifest
  * obvious. This is the guarantee that a template can never emit an invalid page.

@@ -13,6 +13,8 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
+import { RequireModule } from "../capabilities/require-module.decorator";
 import { ConnectProviderDto, CreateIntentDto, RefundOrderDto } from "./dto";
 import { PaymentsService } from "./payments.service";
 
@@ -27,11 +29,19 @@ import { PaymentsService } from "./payments.service";
  * top. Provider secrets are inbound-only and never echoed back.
  */
 @Controller("organizations/:organizationId")
-@UseGuards(BetterAuthGuard, OrganizationGuard)
+@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
 export class PaymentsController {
     constructor(private readonly payments: PaymentsService) {}
 
+    /*
+     * Annotated per METHOD, not on the controller. The runbook forbids gating
+     * refunds and payment status on a module: money already taken must stay
+     * refundable and reconcilable after Payments is switched off. Connecting
+     * and disconnecting a provider are new commands, which is exactly what the
+     * rollout says to annotate first.
+     */
     @Post("payment-providers")
+    @RequireModule("PAYMENTS")
     @HttpCode(201)
     connect(
         @OrgContext() ctx: OrganizationContext,
@@ -46,6 +56,7 @@ export class PaymentsController {
     }
 
     @Delete("payment-providers/:provider")
+    @RequireModule("PAYMENTS")
     disconnect(
         @OrgContext() ctx: OrganizationContext,
         @Param("provider") provider: string,

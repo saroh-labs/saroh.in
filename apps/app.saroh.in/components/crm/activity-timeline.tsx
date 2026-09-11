@@ -2,9 +2,9 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { completeTask } from "@/lib/leads/actions";
 import type { LeadActivity } from "@/lib/leads/service";
@@ -65,10 +65,10 @@ function CompleteTaskButton({
         const res = await completeTask(leadId, activityId);
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Task completed");
+        showSuccess("Task completed");
         router.refresh();
     }
 

@@ -3,18 +3,16 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "portless",
+        "dev": "portless saroh.app next dev",
         "dev:app": "next dev",
         "build": "next build",
         "start": "next start",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit"
     },
-    "portless": {
-        "name": "saroh.app",
-        "script": "dev:app"
-    },
+    "portless": "saroh.app",
     "dependencies": {
+        "@saroh/site-blocks": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "class-variance-authority": "^0.7.1",

@@ -17,6 +17,11 @@ Grounded in: `tooling/tailwind-config/tailwind.config.ts` (keyframes/animation),
 
 ## 1. Motion tokens
 
+> **Update 2026-09-11:** tokens now exist in `globals.css` — `--duration-fast`
+> 120ms, `--duration-base` 200ms, `--duration-slow` 320ms, `--ease-out` and
+> `--ease-in-out`. `--duration-slow` is above the 300ms cap proposed below;
+> settle it with `06_DESIGN_TOKENS.md` §8.
+
 The codebase has **implicit** durations scattered across primitives; this
 formalizes them into named tokens. Current real values found in code:
 
@@ -77,6 +82,12 @@ still canvas is the point.
 
 ## 3. What already exists (verified)
 
+> **Update 2026-09-11:** two apps now define their own keyframes, against the
+> rule in this section: `apps/accounts.saroh.in/app/auth.css` (8, some on a curve
+> named `--sa-spring`) and `apps/app.saroh.in/app/workspace.css` (3, one on
+> `--wk-spring`). Either sanction them here or move them to the shared config;
+> don't add a third.
+
 The animation system is **`tailwindcss-animate` + Radix `data-[state]`
 attributes**, wired in `tailwind.config.ts` (plugin, l.88) and consumed by the
 primitives:
@@ -99,6 +110,9 @@ per-app.
 ---
 
 ## 4. Reduced motion (required — this is the one gap)
+
+> **Update 2026-09-11:** closed — the override below is in
+> `packages/ui/src/globals.css`.
 
 **WCAG 2.3.3** and basic vestibular safety: honor `prefers-reduced-motion`.
 

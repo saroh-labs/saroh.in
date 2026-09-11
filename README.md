@@ -129,8 +129,22 @@ npm install -g portless && portless service install --wildcard
 #    above lists them all; details in docs/architecture/ENVIRONMENT.md
 pnpm dev                 # everything
 pnpm dev:api-auth        # api + accounts
-pnpm dev:apps            # accounts + admin + sites
+pnpm dev:apps            # api + accounts + workspace + admin + sites
+pnpm dev:app             # api + accounts + workspace
+pnpm dev:admin           # api + accounts + admin
+pnpm dev:sites           # api + merchant site renderer
+pnpm dev:emails          # email preview at https://emails.saroh.localhost
+pnpm portless:status     # check the shared HTTPS proxy
+pnpm portless:doctor     # diagnose routing, DNS, and certificate issues
 ```
+
+Other focused shortcuts: `dev:api`, `dev:accounts`, `dev:web`, `dev:docs`,
+`dev:help`, `dev:templates`, and `dev:ui`. You can also run `pnpm dev` inside
+any app. Each app declares its hostname in `portless` and invokes
+`portless <name> <server command>` directly, matching the Virashi setup.
+Shared package `tsup --watch` scripts remain build watchers; only HTTP servers
+need Portless. Set `BETTER_AUTH_TRUSTED_ORIGINS` to the local origins in
+`.env.example` when starting the API.
 
 ## Environment & secrets
 

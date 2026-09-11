@@ -13,9 +13,9 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { trimmedOr } from "@/lib/forms/values";
@@ -110,10 +110,10 @@ export function CreateServiceForm() {
         });
 
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Service created");
+        showSuccess("Service created");
         router.push(`/services/${res.data.id}`);
     }
 

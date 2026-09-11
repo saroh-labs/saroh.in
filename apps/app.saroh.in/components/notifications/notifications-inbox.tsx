@@ -2,11 +2,11 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { BellOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
 
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import {
@@ -57,7 +57,7 @@ export function NotificationsInbox({
         const res = await markNotificationRead(id);
         setBusyId(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         startTransition(() => router.refresh());
@@ -66,10 +66,10 @@ export function NotificationsInbox({
     async function markAll() {
         const res = await markAllNotificationsRead();
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("All notifications marked read");
+        showSuccess("All notifications marked read");
         startTransition(() => router.refresh());
     }
 

@@ -11,108 +11,21 @@ import { env } from "@/env";
  * there is simply no draft data reachable from this app to render instead.
  *
  * Prisma / `@saroh/database` is intentionally NOT imported here (ESLint forbids
- * it in frontends). The snapshot + section-content types below are a LOCAL
- * replica of `packages/database/src/cms/section-contract.ts` (v1). If the
- * server contract gains a new version, add it here — unknown section types are
- * rendered as nothing (forward-compatible), never crash.
+ * it in frontends).
+ *
+ * The section-content types USED to be a hand-typed local replica of the
+ * contract, under a note asking the next person to remember to update it when
+ * the server contract changed. They live in `@saroh/block-contract` now (#252),
+ * which is neither Prisma nor forbidden — so the shapes a component draws have
+ * one definition instead of three. #189 is what having three cost: a
+ * per-section padding the editor honoured and this app ignored.
+ *
+ * What remains here is what this file was always actually about — fetching a
+ * snapshot from the public read API.
  */
 
 const API_URL =
     env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
-
-// ---------------------------------------------------------------------------
-// Section content shapes — local replica of the v1 section contract.
-// ---------------------------------------------------------------------------
-
-/**
- * A call-to-action button (shared building block + the `cta` section).
- *
- * `href` is what this app draws, for v1 and v2 alike: a v2 button's `action`
- * was RESOLVED into it at publish (#207), so this app never turns a page id
- * into a path or a phone number into a tel: link — the snapshot is the site
- * as served. `action` travels beside it so a reader can still tell a call
- * from a link; `href` may be "" when a page the button named was hidden or
- * removed, and then the button draws as a label rather than a broken link.
- */
-export interface CtaContent {
-    label: string;
-    href: string;
-    style?: "primary" | "secondary" | "link";
-    action?: { kind: "page" | "url" | "email" | "call" | "whatsapp" };
-}
-
-/** An image reference (shared building block). */
-export interface ImageContent {
-    src: string;
-    alt?: string;
-    width?: number;
-    height?: number;
-}
-
-/** `hero` v1 — a headline block with optional CTA + image. */
-export interface HeroContent {
-    heading: string;
-    subheading?: string;
-    cta?: CtaContent;
-    image?: ImageContent;
-}
-
-/**
- * `richText` v1 — authorable rich content. `value` is HTML or markdown that
- * was ALREADY SANITIZED server-side at publish (the publish step runs the
- * contract's `sanitizedFields` through an HTML sanitizer before writing the
- * immutable snapshot). The renderer therefore treats it as trusted, controlled
- * content — see the safety note in `components/sections/rich-text.tsx`.
- */
-export interface RichTextContent {
-    format: "html" | "markdown";
-    value: string;
-}
-
-/** `gallery` v1 — an ordered set of images. */
-export interface GalleryContent {
-    images: ImageContent[];
-    layout?: "grid" | "carousel" | "masonry";
-}
-
-/** One field descriptor snapshotted into an `enquiry` section. */
-export interface EnquiryField {
-    name: string;
-    label: string;
-    type: "text" | "email" | "tel" | "textarea";
-    required?: boolean;
-}
-
-/**
- * `enquiry` v1 — a public enquiry form. `formId` names the backing Form the
- * PUBLIC submit endpoint validates against and derives the owning org from (so
- * the visitor's POST can only ever create a lead in that Form's org). `fields`
- * is the snapshot the renderer draws the inputs from. All values are plain
- * text — nothing here was authored HTML, so no sanitization is involved.
- */
-export interface EnquiryContent {
-    formId?: string;
-    title?: string;
-    description?: string;
-    submitLabel?: string;
-    successMessage?: string;
-    fields: EnquiryField[];
-}
-
-/**
- * `booking` v1 — a public booking widget. `serviceId` names the bookable
- * Service the PUBLIC availability + book endpoints resolve the owning org from
- * (so the visitor's POST can only ever create a Booking in that Service's org).
- * A section with no `serviceId` (never picked in the editor) renders nothing.
- * All values are plain text — nothing here was authored HTML.
- */
-export interface BookingContent {
-    serviceId?: string;
-    title?: string;
-    description?: string;
-    submitLabel?: string;
-    successMessage?: string;
-}
 
 /**
  * A single section as it appears in a publication snapshot. `content` is

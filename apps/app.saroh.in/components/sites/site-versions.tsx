@@ -4,10 +4,10 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { EmptyState } from "@saroh/ui/empty-state";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { History } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
 
 import { restorePublication } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
@@ -51,12 +51,12 @@ export function SiteVersions({
         startTransition(async () => {
             const res = await restorePublication(siteId, publicationId);
             if (!res.ok) {
-                toast.error(res.error);
+                showError(res.error);
                 return;
             }
             setConfirming(null);
             router.refresh();
-            toast.success("That version is live again.");
+            showSuccess("That version is live again.");
         });
     }
 

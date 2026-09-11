@@ -3,23 +3,20 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-        "dev": "portless",
+        "dev": "portless saroh next dev",
         "dev:app": "next dev",
         "build": " next build",
         "start": "next start",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit"
     },
-    "portless": {
-        "name": "saroh",
-        "script": "dev:app"
-    },
+    "portless": "saroh",
     "dependencies": {
         "@hookform/resolvers": "catalog:",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "lucide-react": "catalog:",
-        "next": "^16.3.0",
+        "next": "^16.3.4",
         "next-themes": "^0.4.6",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
@@ -28,7 +25,7 @@
         "zod": "catalog:"
     },
     "devDependencies": {
-        "@next/eslint-plugin-next": "^16.3.0",
+        "@next/eslint-plugin-next": "^16.3.4",
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
         "@saroh/tsconfig": "workspace:*",

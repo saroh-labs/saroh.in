@@ -2,11 +2,11 @@
 
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
+import { showError } from "@saroh/ui/toast";
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { toast } from "sonner";
 
 import { setModuleStatusAction } from "@/lib/modules/actions";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -202,7 +202,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                     // Stop at the first failure rather than pressing on — a
                     // partially-enabled set is worse than a clear error, and the
                     // merchant's remaining selection is still on screen to retry.
-                    toast.error(result.error);
+                    showError(result.error);
                     return;
                 }
             }

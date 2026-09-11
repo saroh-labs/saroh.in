@@ -19,7 +19,12 @@ const AUTH_ROOT_BAN_MESSAGE =
 const DB_IMPORT_BAN_PATTERNS = [
     "@saroh/database",
     "@saroh/database/*",
-    "@saroh/templates",
+    // @saroh/templates came OFF this list in #252. It was here only because
+    // `manifest.ts` imported two types from @saroh/database, which dragged
+    // Prisma into anything that touched it. Those types now come from
+    // @saroh/block-contract — zod and nothing else — so the package a template
+    // gallery needs to display is finally importable by the app that displays
+    // it. Put it back the moment it grows a database dependency again.
     "@prisma/client",
     "@prisma/*",
     "prisma",
@@ -44,12 +49,20 @@ const DB_IMPORT_BAN_PATTERNS = [
  */
 const AUTH_ROOT_BAN_PATHS = ["@saroh/auth", "@saroh/auth/server"];
 
+const TOAST_BAN_MESSAGE =
+    "Import { showSuccess, showError, showWarning, showInfo } from '@saroh/ui/toast' instead of sonner's `toast`. One seam keeps theming, error-tracker routing and a future library swap to a single file — see packages/ui/src/components/ui/toast.tsx.";
+
 /** Shared option object for both the TypeScript and JSX rule blocks. */
 const restrictedImportOptions = {
-    paths: AUTH_ROOT_BAN_PATHS.map((name) => ({
-        name,
-        message: AUTH_ROOT_BAN_MESSAGE,
-    })),
+    paths: [
+        ...AUTH_ROOT_BAN_PATHS.map((name) => ({
+            name,
+            message: AUTH_ROOT_BAN_MESSAGE,
+        })),
+        // `importNames`, not the whole module: `Toaster` is the mount point and
+        // an app has to import it. Only the imperative `toast` is off-limits.
+        { name: "sonner", importNames: ["toast"], message: TOAST_BAN_MESSAGE },
+    ],
     patterns: [
         { group: DB_IMPORT_BAN_PATTERNS, message: DB_IMPORT_BAN_MESSAGE },
     ],

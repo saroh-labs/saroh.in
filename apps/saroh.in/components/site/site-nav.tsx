@@ -64,17 +64,18 @@ export function SiteNav() {
                         <Sun className="hidden size-4 dark:block" />
                     </button>
 
+                    {/* One ask, not two (#261). Signup is gated — PRODUCT.md
+                        says the product is waitlist-only until the work #250
+                        names is done — so the nav offered a primary button to a
+                        door that is shut, with the waitlist beside it as the
+                        lesser option. The waitlist takes the primary slot until
+                        signup opens, at which point this becomes two buttons
+                        again. */}
                     <Link
                         href="/#waitlist"
-                        className="hidden h-8 items-center rounded-md border border-border px-3 text-[13px] font-medium transition-colors hover:bg-accent sm:inline-flex"
-                    >
-                        Waitlist
-                    </Link>
-                    <Link
-                        href="https://accounts.saroh.in/signup"
                         className="inline-flex h-8 items-center rounded-md bg-primary px-3.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
                     >
-                        Start free
+                        Join the waitlist
                     </Link>
                 </div>
             </nav>

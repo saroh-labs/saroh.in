@@ -60,6 +60,11 @@ component handles the logo treatment).
 
 ## 3. Iconography
 
+> **Update 2026-09-11:** `react-icons` is now imported in two files —
+> `apps/accounts.saroh.in/components/auth/login-form.tsx` and
+> `apps/ui.saroh.in/components/shared/header/index.tsx`. The rule below stands;
+> those two are the gap.
+
 **Verified library usage:**
 
 - **`lucide-react` is the standard** — it's a dependency of both the app
@@ -137,6 +142,9 @@ them — one place to fix, consistent everywhere ([01 P6](./01_PRODUCT_DESIGN_PH
 
 ## 6. Status & badges
 
+> **Update 2026-09-11:** the status tokens exist; the `Badge` variants do not
+> yet (`badge.tsx` has `default`, `secondary`, `destructive`, `outline`).
+
 Statuses (order paid/pending, lead stage, booking confirmed) must use the **semantic
 status tokens** and `Badge` variants defined in [06 §2](./06_DESIGN_TOKENS.md) — not
 ad-hoc coloured text.
@@ -156,6 +164,11 @@ app. **Don't:** invent a new colour per module (today's `activity-timeline.tsx` 
 ---
 
 ## 7. Feedback: toasts, loading, errors
+
+> **Update 2026-09-11:** call `showSuccess` / `showError` / `showWarning` /
+> `showInfo` from `@saroh/ui/toast`, not `toast.success` / `toast.error` —
+> ESLint rejects sonner's `toast` in the apps. Examples below that call
+> `toast.*` predate the wrapper.
 
 | Situation               | Pattern                                                                                                                                    | Why                                                                                                        |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |

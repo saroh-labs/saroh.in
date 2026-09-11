@@ -4,11 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FieldErrors } from "react-hook-form";
 import { useFieldArray, useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { createOrder } from "@/lib/orders/actions";
@@ -121,10 +121,10 @@ export function OrderForm({
             discount: values.discount,
         });
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Order created");
+        showSuccess("Order created");
         router.push(`/stores/${storeId}/orders/${res.data.id}`);
     }
 
@@ -135,7 +135,7 @@ export function OrderForm({
             errors.lines?.message ??
             errors.lines?.root?.message ??
             "Please fix the highlighted fields";
-        toast.error(String(message));
+        showError(String(message));
     }
 
     if (products.length === 0 || customers.length === 0) {

@@ -276,12 +276,16 @@ export default function AboutPage() {
                             Whichever one your business does today. The other
                             four are waiting, switched off, costing you nothing.
                         </p>
+                        {/* This page names "Open signup" as a gap a few
+                            hundred pixels above, then offered a Start free
+                            button — the page contradicted itself (#261). The
+                            waitlist is the ask until #250 lands. */}
                         <div className="mt-7 flex flex-wrap justify-center gap-2.5">
                             <Link
-                                href="https://accounts.saroh.in/signup"
+                                href="/#waitlist"
                                 className="inline-flex h-[38px] items-center rounded-md bg-primary px-[18px] text-[13.5px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
                             >
-                                Start free
+                                Join the waitlist
                             </Link>
                             <Link
                                 href="/modules"
@@ -290,18 +294,6 @@ export default function AboutPage() {
                                 See the modules
                             </Link>
                         </div>
-                        {/* Open signup is gated (PRODUCT.md), so the escape
-                            hatch travels with every primary ask on this site. */}
-                        <p className="mt-3.5 text-[12.5px] text-muted-foreground/70">
-                            Not ready?{" "}
-                            <Link
-                                href="/#waitlist"
-                                className="text-muted-foreground underline decoration-border underline-offset-4 hover:decoration-current"
-                            >
-                                Join the waitlist
-                            </Link>{" "}
-                            instead.
-                        </p>
                     </div>
                 </div>
             </section>

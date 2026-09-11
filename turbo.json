@@ -5,6 +5,12 @@
         "NODE_ENV",
         "SKIP_ENV_VALIDATION",
         "DATABASE_URL",
+        // The database-target guard's escape hatch. Turbo passes NOTHING to a
+        // task that is not declared here, so running db:seed through turbo
+        // (which is how the seed gets its ^build) silently dropped this and the
+        // guard refused the e2e database — correctly, since from its point of
+        // view nobody had named it.
+        "DATABASE_TARGET_CONFIRM",
         "RLS_ENFORCEMENT",
         "MODULE_ENFORCEMENT",
         "BETTER_AUTH_SECRET",
@@ -21,7 +27,6 @@
         "NEXT_PUBLIC_ACCOUNTS_URL",
         "NEXT_PUBLIC_API_URL",
         "NEXT_PUBLIC_BETTER_AUTH_URL",
-        "NEXT_PUBLIC_AUTH_APP_URL",
         "NEXT_PUBLIC_ROOT_DOMAIN",
         "NEXT_PUBLIC_APP_DOMAIN",
         "NEXT_PUBLIC_VERCEL_ENV",
@@ -63,7 +68,16 @@
         },
         "db:migrate:deploy": {},
         "db:push": {},
-        "db:seed": {},
+        // Seeding validates every section it lays down through the block
+        // contract, which lives in a BUILT package (#252). Without ^build the
+        // seed resolves @saroh/block-contract to a dist nobody made — which is
+        // exactly how it broke CI: the e2e job seeds two steps before it builds
+        // anything, and the failure reads as a missing module rather than a
+        // missing step.
+        "db:seed": {
+            "dependsOn": ["^build"],
+            "cache": false
+        },
         "dev": {
             "dependsOn": ["^build"],
             "cache": false,

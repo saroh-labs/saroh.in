@@ -3,9 +3,9 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { replaceRules } from "@/lib/services/actions";
 import type { AvailabilityRule } from "@/lib/services/service";
@@ -97,11 +97,11 @@ export function AvailabilityRulesEditor({
             const startMinute = timeToMinutes(row.start);
             const endMinute = timeToMinutes(row.end);
             if (startMinute === null || endMinute === null) {
-                toast.error(`Row ${i + 1}: enter valid start and end times`);
+                showError(`Row ${i + 1}: enter valid start and end times`);
                 return;
             }
             if (startMinute >= endMinute) {
-                toast.error(`Row ${i + 1}: the end must be after the start`);
+                showError(`Row ${i + 1}: the end must be after the start`);
                 return;
             }
             rules.push({ dayOfWeek: row.dayOfWeek, startMinute, endMinute });
@@ -111,10 +111,10 @@ export function AvailabilityRulesEditor({
         const res = await replaceRules(serviceId, rules);
         setSaving(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Availability saved");
+        showSuccess("Availability saved");
         router.refresh();
     }
 

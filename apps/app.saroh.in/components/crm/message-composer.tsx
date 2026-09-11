@@ -3,9 +3,9 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
+import { showError, showSuccess, showWarning } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { sendMessage } from "@/lib/messages/actions";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
@@ -59,15 +59,15 @@ export function MessageComposer({
         });
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setSubject("");
         setBody("");
         if (res.data.status === "SUPPRESSED") {
-            toast.warning("Message suppressed — consent is revoked");
+            showWarning("Message suppressed — consent is revoked");
         } else {
-            toast.success("Message queued");
+            showSuccess("Message queued");
         }
         router.refresh();
     }

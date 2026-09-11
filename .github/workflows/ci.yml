@@ -113,6 +113,13 @@ jobs:
       - name: Route destination check
         run: pnpm run check:routes
 
+      # Merchant sites render off the --site-* layer only, and there is exactly
+      # one renderer — gates G2 and G6 (#252). The script existed and no job ran
+      # it, so a block painted in Saroh's palette, or a second renderer drifting
+      # from the first the way #189 did, would have merged green.
+      - name: Site blocks gate
+        run: pnpm run check:blocks
+
       - name: Typecheck
         run: pnpm run typecheck
 
@@ -297,8 +304,13 @@ jobs:
       - name: Apply migrations
         run: pnpm --filter @saroh/database db:migrate:deploy
 
+      # Through turbo, not `pnpm --filter`, so the seed's own build dependency
+      # is honoured. The seed validates every section it writes through the
+      # block contract, which lives in a built package (#252) — and this job
+      # builds the apps two steps LATER, so a direct `pnpm --filter` call
+      # resolved @saroh/block-contract to a dist nobody had made yet.
       - name: Seed the demo Organization
-        run: pnpm --filter @saroh/database db:seed
+        run: pnpm turbo run db:seed --filter=@saroh/database
 
       - name: Build the apps under test
         run: pnpm turbo run build --filter=@saroh/api --filter=auth --filter=application

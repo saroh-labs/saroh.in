@@ -4,9 +4,9 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import {
     inviteMember,
@@ -41,12 +41,12 @@ export function MembersManager({
         const res = await inviteMember(storeId, email.trim(), role);
         setInviting(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setEmail("");
         setRole("VIEWER");
-        toast.success("Invitation sent");
+        showSuccess("Invitation sent");
         router.refresh();
     }
 
@@ -55,10 +55,10 @@ export function MembersManager({
         const res = await updateMemberRole(storeId, userId, next);
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Role updated");
+        showSuccess("Role updated");
         router.refresh();
     }
 
@@ -67,10 +67,10 @@ export function MembersManager({
         const res = await removeMember(storeId, userId);
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Member removed");
+        showSuccess("Member removed");
         router.refresh();
     }
 
@@ -79,10 +79,10 @@ export function MembersManager({
         const res = await revokeInvitation(storeId, invitationId);
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Invitation revoked");
+        showSuccess("Invitation revoked");
         router.refresh();
     }
 

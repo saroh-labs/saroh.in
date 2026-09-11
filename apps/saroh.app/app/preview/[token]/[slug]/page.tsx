@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
-import { PageSections } from "@/components/sections/section-renderer";
+import { PageSections } from "@saroh/site-blocks";
+
+import { publicApiUrl } from "@/lib/api-url";
 import {
     findPageByPath,
     getPreviewByToken,
@@ -37,5 +39,5 @@ export default async function PreviewPage({
     const page = findPageByPath(preview.snapshot, `/${slug}`);
     if (!page) notFound();
 
-    return <PageSections sections={page.sections} />;
+    return <PageSections sections={page.sections} apiUrl={publicApiUrl()} />;
 }

@@ -1,0 +1,47 @@
+{
+    "name": "@saroh/site-blocks",
+    "version": "0.0.0",
+    "description": "The blocks a merchant's website is built from.",
+    "license": "MIT",
+    "sideEffects": false,
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "files": [
+        "src/**"
+    ],
+    "exports": {
+        ".": "./src/index.ts",
+        "./tailwind-preset": "./src/tailwind-preset.ts"
+    },
+    "scripts": {
+        "lint": "eslint src/",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@saroh/block-contract": "workspace:*",
+        "clsx": "^2.1.1",
+        "tailwind-merge": "^3.6.0"
+    },
+    "peerDependencies": {
+        "next": "catalog:next16",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
+    },
+    "devDependencies": {
+        "@saroh/eslint-config": "workspace:*",
+        "@saroh/tsconfig": "workspace:*",
+        "@testing-library/jest-dom": "^6.6.3",
+        "@testing-library/react": "^16.1.0",
+        "@types/node": "catalog:",
+        "@types/react": "19.2.15",
+        "@types/react-dom": "catalog:react19",
+        "jsdom": "^25.0.1",
+        "next": "catalog:next16",
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19",
+        "tailwindcss": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "^4.1.11"
+    }
+}

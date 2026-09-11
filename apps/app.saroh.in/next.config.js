@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    transpilePackages: ["@saroh/auth", "@saroh/ui"],
+    transpilePackages: ["@saroh/auth", "@saroh/ui", "@saroh/site-blocks"],
     // No Prisma externalization here: this app has no @prisma/* dependency and
     // imports no database code — every read and write goes to api.saroh.in over
     // HTTP (enforced by the DB-import ban in @saroh/eslint-config/nextjs).

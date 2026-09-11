@@ -56,6 +56,12 @@ accent is used sparingly, exactly per [01 P1](./01_PRODUCT_DESIGN_PHILOSOPHY.md)
 
 ## 2. Semantic status tokens (the GAP — define these)
 
+> **Update 2026-09-11:** closed. `--success`, `--warning` and `--info` (with
+> foregrounds, plus `--warning-subtle`) exist in `packages/ui/src/globals.css`,
+> and `Button` has a `success` variant. Still open: `Badge` has no `success`,
+> `warning` or `info` variant. Current rules with status:
+> `docs/patterns/frontend-design-system.md`.
+
 There is **no** success / warning / info token today. Components improvise with raw
 Tailwind palette colours — `border-amber-400`, `border-blue-400`, `border-emerald-400`
 in `components/crm/activity-timeline.tsx` and `text-amber-700 dark:text-amber-400` in
@@ -187,6 +193,11 @@ coloured/glow shadows, no layered shadows.
 
 ## 8. Motion / duration / easing
 
+> **Update 2026-09-11:** the tokens in `globals.css` are `--duration-fast`
+> 120ms, `--duration-base` 200ms and `--duration-slow` 320ms — above both the
+> 200ms cap below and the 300ms cap in `15_MOTION_GUIDELINES.md`. The three
+> disagree; settle them in one change.
+
 | Token           | Value                           | Use                                                                                              |
 | --------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
 | Duration — fast | 120ms                           | Hover/focus colour transitions (`transition-colors` on `Button`, `StoreNav`)                     |
@@ -256,6 +267,14 @@ keyboard or screen-reader user gets.
 ---
 
 ## 12. Current violations to fix
+
+> **Update 2026-09-11:** three rows below are fixed — the raw status colours are
+> gone from `activity-timeline.tsx` and `order-payments.tsx`,
+> `apps/app.saroh.in/components/ui/` no longer exists, and toasts go through
+> `@saroh/ui/toast` (sonner) with an ESLint rule against calling sonner
+> directly. `@radix-ui/react-toast` is still declared in
+> `apps/app.saroh.in/package.json` and imported nowhere. The arbitrary-value
+> rows were not re-checked.
 
 Grounded, from source (excluding vendored shadcn primitives, where Radix-derived
 arbitrary values like `min-w-[8rem]` are acceptable):

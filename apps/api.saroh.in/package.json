@@ -5,7 +5,7 @@
   "author": "Saroh Team",
   "license": "MIT",
   "scripts": {
-    "dev": "portless",
+    "dev": "portless api.saroh nest start --watch",
     "dev:app": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
@@ -18,10 +18,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage"
   },
-  "portless": {
-    "name": "api.saroh",
-    "script": "dev:app"
-  },
+  "portless": "api.saroh",
   "dependencies": {
     "@nestjs/common": "^11.1.28",
     "@nestjs/config": "^4.0.4",
@@ -41,10 +38,10 @@
     "dotenv": "^17.4.2",
     "helmet": "^8.3.0",
     "luxon": "^3.7.2",
-    "nodemailer": "^9.0.5",
+    "nodemailer": "^9.1.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "sanitize-html": "2.17.5",
+    "sanitize-html": "2.17.7",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -1,8 +1,8 @@
 "use client";
 
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { refundOrder } from "@/lib/payments/actions";
 
@@ -28,10 +28,10 @@ export function RefundButton({ orderId }: { orderId: string }) {
         const res = await refundOrder(orderId);
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Refund initiated — it will settle once confirmed.");
+        showSuccess("Refund initiated — it will settle once confirmed.");
         router.refresh();
     }
 

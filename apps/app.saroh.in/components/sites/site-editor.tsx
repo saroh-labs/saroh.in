@@ -1,17 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@saroh/ui/select";
-import { Textarea } from "@saroh/ui/textarea";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,28 +12,22 @@ import {
     useState,
     useSyncExternalStore,
 } from "react";
-import { toast } from "sonner";
 
-import { MediaPicker } from "@/components/sites/media-picker";
-import dynamic from "next/dynamic";
-
-/*
- * Loaded on demand. Tiptap is the largest dependency this app takes on, and
- * only the editor route needs it — the sites list and settings must not pay
- * for it. `ssr: false` because the editor exists only in the browser.
- */
-const RichTextEditor = dynamic(
-    () =>
-        import("@/components/sites/rich-text-editor").then(
-            (m) => m.RichTextEditor,
-        ),
-    {
-        ssr: false,
-        loading: () => (
-            <div className="min-h-40 animate-pulse rounded-md border bg-muted" />
-        ),
-    },
-);
+import { PanelDivider, RailTabs } from "@/components/sites/editor-chrome";
+import type { Device, Zoom } from "@/components/sites/editor-constants";
+import {
+    DEVICE_PX,
+    DEVICE_WIDTH,
+    DEVICES,
+    SECTION_LABELS,
+    SECTION_ORDER,
+    sectionTitle,
+    ZOOMS,
+} from "@/components/sites/editor-constants";
+import { emptySection } from "@/components/sites/empty-section";
+import type { ServiceOption } from "@/components/sites/section-fields";
+import { SectionFields } from "@/components/sites/section-fields";
+import { SectionPadding } from "@/components/sites/section-fields/padding";
 
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
@@ -76,20 +61,8 @@ import {
 } from "@/lib/sites/editor-prefs";
 import { exactDate } from "@/lib/sites/format-date";
 import type {
-    BookingContent,
-    CtaAction,
-    CtaKind,
-    CtaStyle,
-    CtaValue,
-    EnquiryContent,
-    EnquiryField,
-    EnquiryFieldType,
     Flag,
-    GalleryLayout,
-    HeroContent,
-    ImageValue,
     ReviewState,
-    RichTextContent,
     Section,
     SectionType,
     SiteCommentView,
@@ -98,13 +71,6 @@ import type {
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
-/** A service as offered in the booking-section picker. */
-interface ServiceOption {
-    id: string;
-    name: string;
-    status: "ACTIVE" | "ARCHIVED";
-}
-
 /**
  * SiteEditor (S2-004) — the ticket's core deliverable. A client-side editable
  * list of sections rendered next to a LIVE `DraftPreview` that reflects local
@@ -112,470 +78,6 @@ interface ServiceOption {
  * requirement). "Save draft" and "Publish" are the only API calls, via the
  * server actions. A dirty flag (local state vs. last-saved) gates publishing.
  */
-
-const SECTION_LABELS: Record<SectionType, string> = {
-    hero: "Hero",
-    richText: "Rich text",
-    cta: "Call to action",
-    gallery: "Gallery",
-    enquiry: "Enquiry form",
-    booking: "Booking",
-};
-
-/**
- * The rail's tabs. One definition, used by both panels it switches between —
- * two copies of a tablist is two chances for the selected state to disagree
- * with what is actually showing.
- *
- * All three tabs lead somewhere. Review was absent while it was unbuilt — a tab
- * leading nowhere is worse than one that is not there — and it earned its place
- * when the notes and the approval landed behind it.
- */
-function RailTabs({
-    rail,
-    onSelect,
-    openNotes,
-}: {
-    rail: "sections" | "pages" | "review" | "style";
-    onSelect: (tab: "sections" | "pages" | "review") => void;
-    /** Shown on the Review tab when notes are open. */
-    openNotes: number;
-}) {
-    return (
-        <div
-            role="tablist"
-            aria-label="Editor panels"
-            className="flex items-center gap-1 border-b px-2 py-1.5"
-        >
-            {(["sections", "pages", "review"] as const).map((tab) => (
-                <button
-                    key={tab}
-                    type="button"
-                    role="tab"
-                    aria-selected={rail === tab}
-                    onClick={() => onSelect(tab)}
-                    className={cn(
-                        "rounded px-2 py-1 text-xs font-medium capitalize transition-colors",
-                        rail === tab
-                            ? "bg-secondary text-secondary-foreground"
-                            : // Pressing shows the surface the tab is about to
-                              // settle on. This is feedback on the PRESS, not an
-                              // animation of the switch — the switch itself stays
-                              // instant, because it happens dozens of times a
-                              // session and anything staged would make the rail
-                              // feel slower than it is.
-                              "text-muted-foreground hover:text-foreground active:bg-secondary/60 active:text-secondary-foreground",
-                    )}
-                >
-                    {tab}
-                    {/*
-                     * The count rides the tab rather than a separate badge:
-                     * the number only means anything next to the word it
-                     * counts, and the rail has no room for both.
-                     */}
-                    {tab === "review" && openNotes > 0 ? (
-                        <span className="ml-1 tabular-nums text-[#c99f6f]">
-                            {openNotes}
-                        </span>
-                    ) : null}
-                </button>
-            ))}
-        </div>
-    );
-}
-
-/**
- * A draggable hairline between two panels.
- *
- * Pointer events rather than mouse events, so a trackpad, a pen and a touch
- * screen all work, and pointer CAPTURE so a fast drag that outruns the 1px
- * line keeps resizing instead of stopping dead. Double-click resets, which the
- * spec asks for and which is the only cheap way back from a width that turned
- * out to be wrong.
- *
- * It is also a real control for the keyboard: a separator that can only be
- * dragged is a separator half the people using it cannot move at all.
- */
-function PanelDivider({
-    label,
-    width,
-    min,
-    max,
-    reset,
-    onResize,
-    onNudge,
-}: {
-    label: string;
-    width: number;
-    min: number;
-    max: number;
-    reset: number;
-    /** Absolute target width, for the drag. */
-    onResize: (px: number) => void;
-    /**
-     * A RELATIVE step, for the keyboard. Deliberately not `onResize(width + n)`:
-     * `width` is this render's prop, so a burst of key events arriving before
-     * React re-renders would each compute from the same stale number and only
-     * the last would count. A delta is applied against whatever the store
-     * currently holds, so every press lands.
-     */
-    onNudge: (delta: number) => void;
-}) {
-    const start = useRef<{ x: number; width: number } | null>(null);
-
-    return (
-        <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label={label}
-            aria-valuenow={width}
-            aria-valuemin={min}
-            aria-valuemax={max}
-            tabIndex={0}
-            onPointerDown={(e) => {
-                start.current = { x: e.clientX, width };
-                e.currentTarget.setPointerCapture(e.pointerId);
-            }}
-            onPointerMove={(e) => {
-                const from = start.current;
-                if (from === null) return;
-                onResize(from.width + (e.clientX - from.x));
-            }}
-            onPointerUp={(e) => {
-                start.current = null;
-                e.currentTarget.releasePointerCapture(e.pointerId);
-            }}
-            onDoubleClick={() => onResize(reset)}
-            onKeyDown={(e) => {
-                // 16px a press is roughly a visible step without being so
-                // coarse that the useful widths fall between two presses.
-                if (e.key === "ArrowLeft") onNudge(-16);
-                else if (e.key === "ArrowRight") onNudge(16);
-                else if (e.key === "Home") onResize(reset);
-                else return;
-                e.preventDefault();
-            }}
-            /*
-             * 1px of line, 9px of target. `after` widens what the pointer can
-             * hit without widening what the eye sees — a hairline you have to
-             * hit exactly is a hairline nobody moves twice.
-             */
-            className="relative hidden cursor-col-resize bg-border after:absolute after:inset-y-0 after:-left-1 after:w-[9px] after:content-[''] hover:bg-ring focus-visible:bg-ring focus-visible:outline-none lg:block"
-        />
-    );
-}
-
-/** Preview widths. The phone value is a real handset, not a breakpoint. */
-const DEVICES = [
-    { key: "desktop", label: "Desktop" },
-    { key: "tablet", label: "Tablet" },
-    { key: "phone", label: "Phone" },
-] as const;
-type Device = (typeof DEVICES)[number]["key"];
-/** Zoom steps. "fit" is computed; the rest are literal percentages (spec §2). */
-type Zoom = 50 | 75 | 100 | "fit";
-const ZOOMS: Zoom[] = [50, 75, 100, "fit"];
-
-/**
- * The same widths in pixels, for the Fit calculation. Desktop is null because
- * it has no fixed width — it already takes whatever the canvas gives it, so
- * there is nothing to scale down to make it fit.
- */
-const DEVICE_PX: Record<Device, number | null> = {
-    desktop: null,
-    tablet: 768,
-    phone: 375,
-};
-
-const DEVICE_WIDTH: Record<Device, string> = {
-    desktop: "100%",
-    tablet: "48rem",
-    phone: "23.4375rem",
-};
-
-/**
- * A section's own words in the rail, falling back to its type.
- *
- * "Hero" five times is a list of types, not a page. The merchant recognises
- * their own heading, which is what makes the rail navigable.
- */
-function sectionTitle(section: Section): string {
-    const c = section.content as Record<string, unknown>;
-    const candidate =
-        (typeof c.heading === "string" && c.heading) ||
-        (typeof c.title === "string" && c.title) ||
-        (typeof c.label === "string" && c.label) ||
-        "";
-    return candidate.trim() || SECTION_LABELS[section.type];
-}
-
-/*
- * Field labels, as the design draws them: small, uppercase, letter-spaced and
- * muted, so a column of them reads as a quiet index rather than competing with
- * the values a merchant is actually editing.
- */
-const FIELD_LABEL =
-    "text-[0.625rem] font-medium uppercase tracking-[0.08em] text-muted-foreground";
-
-const SECTION_ORDER: SectionType[] = [
-    "hero",
-    "richText",
-    "cta",
-    "gallery",
-    "enquiry",
-    "booking",
-];
-
-/** The field types an enquiry field may take, with author-facing labels. */
-const ENQUIRY_FIELD_TYPES: { value: EnquiryFieldType; label: string }[] = [
-    { value: "text", label: "Text" },
-    { value: "email", label: "Email" },
-    { value: "tel", label: "Phone" },
-    { value: "textarea", label: "Long text" },
-];
-
-/** A sensible empty section for the chosen type (contract v1). */
-function emptySection(type: SectionType): Section {
-    switch (type) {
-        case "hero":
-            return {
-                type,
-                contractVersion: 1,
-                content: { heading: "", subheading: "" },
-            };
-        case "richText":
-            return {
-                type,
-                contractVersion: 1,
-                content: { format: "html", value: "" },
-            };
-        case "cta":
-            return {
-                type,
-                contractVersion: 2,
-                content: {
-                    label: "",
-                    action: { kind: "url", href: "" },
-                    style: "primary",
-                },
-            };
-        case "gallery":
-            return {
-                type,
-                contractVersion: 1,
-                content: { images: [], layout: "grid" },
-            };
-        case "enquiry":
-            return {
-                type,
-                contractVersion: 1,
-                content: {
-                    title: "Get in touch",
-                    submitLabel: "Send",
-                    successMessage: "Thanks — we'll be in touch soon.",
-                    // Seed with an email field: the contract + the backing Form
-                    // both require one, so the section is valid out of the box.
-                    fields: [
-                        {
-                            name: "email",
-                            label: "Email",
-                            type: "email",
-                            required: true,
-                        },
-                    ],
-                },
-            };
-        case "booking":
-            return {
-                type,
-                contractVersion: 1,
-                content: {
-                    title: "Book a time",
-                    submitLabel: "Confirm booking",
-                    successMessage:
-                        "You're booked — we've sent a confirmation to your email.",
-                },
-            };
-    }
-}
-
-/**
- * Read a button's action, lifting a v1 `href` on the way (#207).
- *
- * A v1 button had only an address. Read as `{ kind: "url", href }` it is the
- * same button with its intent named, and saving it back writes v2 — which is
- * why the callers below bump `contractVersion` when they write an action. A
- * button is never rewritten just by being looked at: the lift is applied on
- * the first EDIT, so an untouched v1 section stays exactly as it was.
- */
-function actionOf(cta: CtaValue | undefined): CtaAction {
-    if (cta?.action) return cta.action;
-    return { kind: "url", href: cta?.href ?? "" };
-}
-
-const CTA_KINDS: { value: CtaKind; label: string }[] = [
-    { value: "page", label: "Open a page on this site" },
-    { value: "url", label: "Open a web address" },
-    { value: "call", label: "Call a phone number" },
-    { value: "whatsapp", label: "Message on WhatsApp" },
-    { value: "email", label: "Send an email" },
-];
-
-/** A blank action of the given kind, for when the merchant switches kinds. */
-function blankAction(kind: CtaKind, homePageId: string | undefined): CtaAction {
-    switch (kind) {
-        case "page":
-            return { kind, pageId: homePageId ?? "" };
-        case "url":
-            return { kind, href: "" };
-        case "call":
-            return { kind, number: "" };
-        case "whatsapp":
-            return { kind, number: "" };
-        case "email":
-            return { kind, address: "" };
-    }
-}
-
-/**
- * What a button does, and the one thing that kind needs (#207).
- *
- * Choosing the action changes what is asked for. A page is PICKED from the
- * site's pages rather than typed as a path — that is what turns "points at a
- * page that is not on this site" from a warning into something that cannot
- * be authored. A phone number is typed as people type them; the publisher
- * normalises it.
- */
-function CtaActionFields({
-    action,
-    pages,
-    onChange,
-}: {
-    action: CtaAction;
-    pages: SitePage[];
-    onChange: (next: CtaAction) => void;
-}) {
-    const home = pages.find((p) => p.isHome)?.id;
-    return (
-        <>
-            <Field label="When pressed">
-                <Select
-                    value={action.kind}
-                    onValueChange={(v) =>
-                        onChange(blankAction(v as CtaKind, home))
-                    }
-                >
-                    <SelectTrigger>
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {CTA_KINDS.map((k) => (
-                            <SelectItem key={k.value} value={k.value}>
-                                {k.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </Field>
-            {action.kind === "page" ? (
-                <Field label="Page">
-                    <Select
-                        value={action.pageId}
-                        onValueChange={(v) =>
-                            onChange({ kind: "page", pageId: v })
-                        }
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Choose a page" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {pages
-                                .filter((p) => !p.hidden)
-                                .map((p) => (
-                                    <SelectItem key={p.id} value={p.id}>
-                                        {p.title}
-                                        <span className="ml-2 font-mono text-[0.6875rem] text-muted-foreground">
-                                            {p.path}
-                                        </span>
-                                    </SelectItem>
-                                ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            ) : null}
-            {action.kind === "url" ? (
-                <Field label="Address">
-                    <Input
-                        value={action.href}
-                        onChange={(e) =>
-                            onChange({ kind: "url", href: e.target.value })
-                        }
-                        placeholder="https://…"
-                        inputMode="url"
-                    />
-                </Field>
-            ) : null}
-            {action.kind === "call" || action.kind === "whatsapp" ? (
-                <Field label="Phone number">
-                    <Input
-                        value={action.number}
-                        onChange={(e) =>
-                            onChange({ ...action, number: e.target.value })
-                        }
-                        placeholder="+91 98450 12345"
-                        inputMode="tel"
-                    />
-                </Field>
-            ) : null}
-            {action.kind === "whatsapp" ? (
-                <Field label="Message to start with">
-                    <Input
-                        value={action.message ?? ""}
-                        onChange={(e) =>
-                            onChange({
-                                ...action,
-                                message: e.target.value || undefined,
-                            })
-                        }
-                        placeholder="Hi, I'd like to ask about…"
-                    />
-                </Field>
-            ) : null}
-            {action.kind === "email" ? (
-                <>
-                    <Field label="Email address">
-                        <Input
-                            value={action.address}
-                            onChange={(e) =>
-                                onChange({ ...action, address: e.target.value })
-                            }
-                            placeholder="hello@example.in"
-                            inputMode="email"
-                        />
-                    </Field>
-                    <Field label="Subject">
-                        <Input
-                            value={action.subject ?? ""}
-                            onChange={(e) =>
-                                onChange({
-                                    ...action,
-                                    subject: e.target.value || undefined,
-                                })
-                            }
-                            placeholder="Optional"
-                        />
-                    </Field>
-                </>
-            ) : null}
-        </>
-    );
-}
-
-/** Build a hero image, or undefined when there is no source. */
-function buildImage(src: string, alt: string): ImageValue | undefined {
-    if (!src.trim()) return undefined;
-    return { src, alt: alt.trim() || undefined };
-}
 
 export function SiteEditor({
     siteId,
@@ -901,7 +403,7 @@ export function SiteEditor({
             setSaving(false);
             setErrorIndex(synced.index);
             setErrorMessage(synced.error);
-            toast.error(synced.error);
+            showError(synced.error);
             return;
         }
         if (JSON.stringify(synced.sections) !== JSON.stringify(sections)) {
@@ -937,7 +439,7 @@ export function SiteEditor({
             setPendingChanges(res.data.pendingSectionChanges ?? null);
             // An autosave that announces itself every few seconds is noise; the
             // bar already states when it last saved.
-            if (!auto) toast.success("Draft saved.");
+            if (!auto) showSuccess("Draft saved.");
             /*
              * The flags settle here — after the save, not on every keystroke.
              * Deliberately not awaited: the dots catching up a moment later is
@@ -952,7 +454,7 @@ export function SiteEditor({
             setErrorIndex(res.index);
             setErrorMessage(res.error);
         }
-        toast.error(res.error);
+        showError(res.error);
     }
 
     /*
@@ -997,7 +499,7 @@ export function SiteEditor({
                 if (res.ok) {
                     setSavedStyleJson(JSON.stringify(payload));
                 } else {
-                    toast.error(res.error);
+                    showError(res.error);
                 }
             });
         }, 700);
@@ -1026,7 +528,7 @@ export function SiteEditor({
      */
     async function openCheck() {
         if (dirty) {
-            toast.error("You have unsaved changes — save the draft first.");
+            showError("You have unsaved changes — save the draft first.");
             return;
         }
         setChecking(true);
@@ -1040,7 +542,7 @@ export function SiteEditor({
         const res = await publishSite(siteId);
         setPublishing(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setChecking(false);
@@ -1053,7 +555,7 @@ export function SiteEditor({
             address === null || address === undefined
                 ? `${siteName} is live.`
                 : `${siteName} is live at ${address}.`;
-        toast.success(
+        showSuccess(
             // Bypassing is recorded, not prevented (#199) — and said, so the
             // record is never a surprise in version history later.
             res.data.bypassed
@@ -1794,7 +1296,7 @@ export function SiteEditor({
                                             if (!ok) return;
                                             removeAt(active.index);
                                             setSelectedIndex(null);
-                                            toast.success(`Removed ${title}.`);
+                                            showSuccess(`Removed ${title}.`);
                                         }}
                                     >
                                         Remove
@@ -1961,6 +1463,7 @@ export function SiteEditor({
                     >
                         <DraftPreview
                             sections={sections}
+                            pages={pages}
                             style={style}
                             styleOptions={styleOptions}
                             selectedIndex={selectedIndex}
@@ -2000,6 +1503,7 @@ export function SiteEditor({
                     >
                         <DraftPreview
                             sections={sections}
+                            pages={pages}
                             style={style}
                             styleOptions={styleOptions}
                         />
@@ -2042,718 +1546,3 @@ export function SiteEditor({
 }
 
 /** Per-type field editor. Narrowing on `section.type` gives the exact shape. */
-/**
- * A section's own padding, overriding the site setting (#189).
- *
- * Lives at the bottom of every section's field panel, as the design has it,
- * because it belongs to this section rather than to the site — the site-wide
- * value is in the Style panel, and putting both in one place would make it
- * unclear which one a merchant was changing.
- *
- * The default state is "Following the site setting", showing the value it is
- * following. That matters: a slider sitting at 52 with no other information
- * looks like a decision someone made about THIS section, when in fact nothing
- * has been decided and moving the site slider will still move it.
- */
-function SectionPadding({
-    section,
-    siteDefault,
-    bounds,
-    onChange,
-}: {
-    section: Section;
-    siteDefault: number;
-    bounds:
-        { min: number; max: number; step: number; default: number } | undefined;
-    onChange: (next: Section) => void;
-}) {
-    // Bounds come from the same served options as the site slider, so an
-    // override can never reach a spacing the site setting could not.
-    const min = bounds?.min ?? 24;
-    const max = bounds?.max ?? 96;
-    const step = bounds?.step ?? 1;
-
-    const override = section.content.padding;
-    const following = override === undefined;
-    const shown = override ?? siteDefault;
-
-    function set(padding: number | undefined) {
-        // Deleting the key rather than storing null: the contract treats ABSENT
-        // as "follow the site", and a null would have to be special-cased in
-        // every reader.
-        const content = { ...section.content } as Record<string, unknown>;
-        if (padding === undefined) delete content.padding;
-        else content.padding = padding;
-        onChange({ ...section, content } as Section);
-    }
-
-    return (
-        <div className="space-y-1 border-t pt-4">
-            <Label htmlFor="section-padding" className={FIELD_LABEL}>
-                Padding
-            </Label>
-            {/*
-             * The state on its own line under the label, as the design has it:
-             * "Following the site setting" is a sentence, and squeezing it
-             * beside the label pushed the number that actually matters out to
-             * the far edge.
-             */}
-            <div className="flex items-baseline justify-between gap-2">
-                <span className="text-xs text-muted-foreground">
-                    {following ? "Following the site setting" : "This section"}
-                </span>
-                <span className="text-xs tabular-nums">{shown}px</span>
-            </div>
-            <input
-                id="section-padding"
-                type="range"
-                min={min}
-                max={max}
-                step={step}
-                value={shown}
-                onChange={(e) => set(Number(e.target.value))}
-                className="w-full accent-foreground"
-            />
-            {!following && (
-                <button
-                    type="button"
-                    onClick={() => set(undefined)}
-                    className="rounded text-left text-xs text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                    Follow the site setting
-                </button>
-            )}
-        </div>
-    );
-}
-
-function SectionFields({
-    section,
-    services,
-    pages,
-    onChange,
-}: {
-    section: Section;
-    services: ServiceOption[];
-    /** The site's pages, so a button can pick one rather than type a path. */
-    pages: SitePage[];
-    onChange: (next: Section) => void;
-}) {
-    switch (section.type) {
-        case "hero": {
-            const c = section.content;
-            const patch = (next: Partial<HeroContent>) =>
-                onChange({ ...section, content: { ...c, ...next } });
-            return (
-                <div className="grid gap-3">
-                    <Field label="Heading">
-                        <Input
-                            value={c.heading}
-                            onChange={(e) => patch({ heading: e.target.value })}
-                            placeholder="Welcome"
-                        />
-                    </Field>
-                    <Field label="Subheading">
-                        <Input
-                            value={c.subheading ?? ""}
-                            onChange={(e) =>
-                                patch({ subheading: e.target.value })
-                            }
-                            placeholder="A short tagline"
-                        />
-                    </Field>
-                    <Field label="Button label">
-                        <Input
-                            value={c.cta?.label ?? ""}
-                            onChange={(e) => {
-                                // Writing the button writes it as v2, lifting
-                                // a v1 href into an action on the way.
-                                const label = e.target.value;
-                                const action = actionOf(c.cta);
-                                const blank =
-                                    !label.trim() &&
-                                    action.kind === "url" &&
-                                    !action.href.trim();
-                                onChange({
-                                    ...section,
-                                    contractVersion: 2,
-                                    content: {
-                                        ...c,
-                                        cta: blank
-                                            ? undefined
-                                            : {
-                                                  label,
-                                                  action,
-                                                  style:
-                                                      c.cta?.style ?? "primary",
-                                              },
-                                    },
-                                });
-                            }}
-                            placeholder="Get started"
-                        />
-                    </Field>
-                    {c.cta?.label.trim() ? (
-                        <CtaActionFields
-                            action={actionOf(c.cta)}
-                            pages={pages}
-                            onChange={(action) =>
-                                onChange({
-                                    ...section,
-                                    contractVersion: 2,
-                                    content: {
-                                        ...c,
-                                        cta: {
-                                            label: c.cta?.label ?? "",
-                                            action,
-                                            style: c.cta?.style ?? "primary",
-                                        },
-                                    },
-                                })
-                            }
-                        />
-                    ) : null}
-                    <Field label="Image">
-                        {/*
-                         * The picture first, the address second. A merchant
-                         * has the photo on their phone; the URL field stays
-                         * for the one who genuinely has an address, but it is
-                         * no longer the only door.
-                         */}
-                        <MediaPicker
-                            onPick={(img) =>
-                                patch({
-                                    image: {
-                                        src: img.src,
-                                        alt: c.image?.alt,
-                                        width: img.width,
-                                        height: img.height,
-                                    },
-                                })
-                            }
-                        />
-                        <Input
-                            value={c.image?.src ?? ""}
-                            onChange={(e) =>
-                                patch({
-                                    image: buildImage(
-                                        e.target.value,
-                                        c.image?.alt ?? "",
-                                    ),
-                                })
-                            }
-                            placeholder="or paste an image address"
-                            aria-label="Image address"
-                            className="mt-1.5"
-                        />
-                    </Field>
-                    {c.image?.src ? (
-                        <Field label="Describe the image">
-                            {/*
-                             * Alt text is asked where the image is chosen, not
-                             * in a settings screen later. It is only shown once
-                             * there is an image to describe.
-                             */}
-                            <Input
-                                value={c.image.alt ?? ""}
-                                onChange={(e) => {
-                                    // Narrowing from the surrounding `c.image?.src`
-                                    // does not reach into this closure.
-                                    if (!c.image) return;
-                                    patch({
-                                        image: {
-                                            ...c.image,
-                                            alt: e.target.value,
-                                        },
-                                    });
-                                }}
-                                placeholder="What is in the picture, for someone who cannot see it"
-                            />
-                        </Field>
-                    ) : null}
-                </div>
-            );
-        }
-        case "richText": {
-            const c = section.content;
-            const patch = (next: Partial<RichTextContent>) =>
-                onChange({ ...section, content: { ...c, ...next } });
-            return (
-                <div className="grid gap-3">
-                    <Field label="Format">
-                        <Select
-                            value={c.format}
-                            onValueChange={(v) =>
-                                patch({
-                                    format: v as RichTextContent["format"],
-                                })
-                            }
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="html">HTML</SelectItem>
-                                <SelectItem value="markdown">
-                                    Markdown
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </Field>
-                    <Field label="Content">
-                        {c.format === "html" ? (
-                            <RichTextEditor
-                                value={c.value}
-                                onChange={(value) => patch({ value })}
-                                placeholder="Write about your business…"
-                            />
-                        ) : (
-                            <Textarea
-                                value={c.value}
-                                onChange={(e) =>
-                                    patch({ value: e.target.value })
-                                }
-                                rows={6}
-                                placeholder="# Hello world"
-                            />
-                        )}
-                    </Field>
-                </div>
-            );
-        }
-        case "cta": {
-            const c = section.content;
-            const patch = (next: Partial<CtaValue>) =>
-                onChange({ ...section, content: { ...c, ...next } });
-            return (
-                <div className="grid gap-3">
-                    <Field label="Label">
-                        <Input
-                            value={c.label}
-                            onChange={(e) => patch({ label: e.target.value })}
-                            placeholder="Start now"
-                        />
-                    </Field>
-                    <CtaActionFields
-                        action={actionOf(c)}
-                        pages={pages}
-                        onChange={(action) =>
-                            onChange({
-                                ...section,
-                                contractVersion: 2,
-                                content: { ...c, href: undefined, action },
-                            })
-                        }
-                    />
-                    <Field label="Style">
-                        <Select
-                            value={c.style ?? "primary"}
-                            onValueChange={(v) =>
-                                patch({ style: v as CtaStyle })
-                            }
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="primary">Primary</SelectItem>
-                                <SelectItem value="secondary">
-                                    Secondary
-                                </SelectItem>
-                                <SelectItem value="link">Link</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </Field>
-                </div>
-            );
-        }
-        case "gallery": {
-            const c = section.content;
-            const setImages = (images: ImageValue[]) =>
-                onChange({ ...section, content: { ...c, images } });
-            return (
-                <div className="grid gap-3">
-                    <Field label="Layout">
-                        <Select
-                            value={c.layout ?? "grid"}
-                            onValueChange={(v) =>
-                                onChange({
-                                    ...section,
-                                    content: {
-                                        ...c,
-                                        layout: v as GalleryLayout,
-                                    },
-                                })
-                            }
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="grid">Grid</SelectItem>
-                                <SelectItem value="carousel">
-                                    Carousel
-                                </SelectItem>
-                                <SelectItem value="masonry">Masonry</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </Field>
-                    <div className="grid gap-2">
-                        <Label className={FIELD_LABEL}>Images</Label>
-                        {c.images.map((img, i) => (
-                            <div key={i} className="flex items-start gap-2">
-                                <Input
-                                    value={img.src}
-                                    onChange={(e) =>
-                                        setImages(
-                                            c.images.map((im, idx) =>
-                                                idx === i
-                                                    ? {
-                                                          ...im,
-                                                          src: e.target.value,
-                                                      }
-                                                    : im,
-                                            ),
-                                        )
-                                    }
-                                    placeholder="Image source"
-                                />
-                                <Input
-                                    value={img.alt ?? ""}
-                                    onChange={(e) =>
-                                        setImages(
-                                            c.images.map((im, idx) =>
-                                                idx === i
-                                                    ? {
-                                                          ...im,
-                                                          alt: e.target.value,
-                                                      }
-                                                    : im,
-                                            ),
-                                        )
-                                    }
-                                    placeholder="Alt text"
-                                />
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    aria-label="Remove image"
-                                    onClick={() =>
-                                        setImages(
-                                            c.images.filter(
-                                                (_, idx) => idx !== i,
-                                            ),
-                                        )
-                                    }
-                                >
-                                    ✕
-                                </Button>
-                            </div>
-                        ))}
-                        {/*
-                          The picker appends; the rows below stay editable by address,
-                          so a merchant can mix uploaded photographs with pictures they
-                          already host somewhere.
-                        */}
-                        <MediaPicker
-                            label="Add a photo"
-                            onPick={(img) =>
-                                setImages([
-                                    ...c.images,
-                                    {
-                                        src: img.src,
-                                        alt: "",
-                                        width: img.width,
-                                        height: img.height,
-                                    },
-                                ])
-                            }
-                        />
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="justify-self-start"
-                            onClick={() =>
-                                setImages([...c.images, { src: "", alt: "" }])
-                            }
-                        >
-                            + Image
-                        </Button>
-                    </div>
-                </div>
-            );
-        }
-        case "enquiry": {
-            const c = section.content;
-            const patch = (next: Partial<EnquiryContent>) =>
-                onChange({ ...section, content: { ...c, ...next } });
-            const setFields = (fields: EnquiryField[]) =>
-                onChange({ ...section, content: { ...c, fields } });
-            const patchField = (i: number, next: Partial<EnquiryField>) =>
-                setFields(
-                    c.fields.map((f, idx) =>
-                        idx === i ? { ...f, ...next } : f,
-                    ),
-                );
-            return (
-                <div className="grid gap-3">
-                    <Field label="Title">
-                        <Input
-                            value={c.title ?? ""}
-                            onChange={(e) => patch({ title: e.target.value })}
-                            placeholder="Get in touch"
-                        />
-                    </Field>
-                    <Field label="Description">
-                        <Textarea
-                            value={c.description ?? ""}
-                            onChange={(e) =>
-                                patch({ description: e.target.value })
-                            }
-                            rows={2}
-                            placeholder="Tell us what you need and we'll reply."
-                        />
-                    </Field>
-                    <Field label="Submit button label">
-                        <Input
-                            value={c.submitLabel ?? ""}
-                            onChange={(e) =>
-                                patch({ submitLabel: e.target.value })
-                            }
-                            placeholder="Send"
-                        />
-                    </Field>
-                    <Field label="Success message">
-                        <Input
-                            value={c.successMessage ?? ""}
-                            onChange={(e) =>
-                                patch({ successMessage: e.target.value })
-                            }
-                            placeholder="Thanks — we'll be in touch soon."
-                        />
-                    </Field>
-                    <div className="grid gap-2">
-                        <Label className={FIELD_LABEL}>Fields</Label>
-                        <p className="text-xs text-muted-foreground">
-                            Include at least one email field — it identifies the
-                            person who enquired.
-                        </p>
-                        {c.fields.map((field, i) => (
-                            <div
-                                key={i}
-                                className="grid gap-2 rounded-md border p-2"
-                            >
-                                <div className="flex items-start gap-2">
-                                    <Input
-                                        value={field.name}
-                                        onChange={(e) =>
-                                            patchField(i, {
-                                                name: e.target.value,
-                                            })
-                                        }
-                                        placeholder="Field name (email)"
-                                        aria-label="Field name"
-                                    />
-                                    <Input
-                                        value={field.label}
-                                        onChange={(e) =>
-                                            patchField(i, {
-                                                label: e.target.value,
-                                            })
-                                        }
-                                        placeholder="Label (Email)"
-                                        aria-label="Field label"
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        aria-label="Remove field"
-                                        onClick={() =>
-                                            setFields(
-                                                c.fields.filter(
-                                                    (_, idx) => idx !== i,
-                                                ),
-                                            )
-                                        }
-                                    >
-                                        ✕
-                                    </Button>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="w-40">
-                                        <Select
-                                            value={field.type}
-                                            onValueChange={(v) =>
-                                                patchField(i, {
-                                                    type: v as EnquiryFieldType,
-                                                })
-                                            }
-                                        >
-                                            <SelectTrigger aria-label="Field type">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {ENQUIRY_FIELD_TYPES.map(
-                                                    (t) => (
-                                                        <SelectItem
-                                                            key={t.value}
-                                                            value={t.value}
-                                                        >
-                                                            {t.label}
-                                                        </SelectItem>
-                                                    ),
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <label className="flex items-center gap-2 text-sm">
-                                        <input
-                                            type="checkbox"
-                                            checked={field.required ?? false}
-                                            onChange={(e) =>
-                                                patchField(i, {
-                                                    required: e.target.checked,
-                                                })
-                                            }
-                                        />
-                                        Required
-                                    </label>
-                                </div>
-                            </div>
-                        ))}
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="justify-self-start"
-                            onClick={() =>
-                                setFields([
-                                    ...c.fields,
-                                    {
-                                        name: "",
-                                        label: "",
-                                        type: "text",
-                                    },
-                                ])
-                            }
-                        >
-                            + Field
-                        </Button>
-                    </div>
-                </div>
-            );
-        }
-        case "booking": {
-            const c = section.content;
-            const patch = (next: Partial<BookingContent>) =>
-                onChange({ ...section, content: { ...c, ...next } });
-            // Prefer active services, but keep a currently-selected archived one
-            // visible so the author sees what's set.
-            const options = services.filter(
-                (s) => s.status === "ACTIVE" || s.id === c.serviceId,
-            );
-            const selectedMissing =
-                c.serviceId !== undefined &&
-                !services.some((s) => s.id === c.serviceId);
-            return (
-                <div className="grid gap-3">
-                    <Field label="Service">
-                        {services.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                No services yet.{" "}
-                                <Link
-                                    href="/services/new"
-                                    className="underline hover:text-foreground"
-                                >
-                                    Create a service
-                                </Link>{" "}
-                                first, then pick it here.
-                            </p>
-                        ) : (
-                            <Select
-                                value={c.serviceId ?? ""}
-                                onValueChange={(v) => patch({ serviceId: v })}
-                            >
-                                <SelectTrigger aria-label="Service">
-                                    <SelectValue placeholder="Choose a service" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {options.map((s) => (
-                                        <SelectItem key={s.id} value={s.id}>
-                                            {s.name}
-                                            {s.status === "ARCHIVED"
-                                                ? " (archived)"
-                                                : ""}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-                        {selectedMissing && (
-                            <p className="text-xs text-muted-foreground">
-                                The selected service is no longer available —
-                                choose another.
-                            </p>
-                        )}
-                    </Field>
-                    <Field label="Title">
-                        <Input
-                            value={c.title ?? ""}
-                            onChange={(e) => patch({ title: e.target.value })}
-                            placeholder="Book a time"
-                        />
-                    </Field>
-                    <Field label="Description">
-                        <Textarea
-                            value={c.description ?? ""}
-                            onChange={(e) =>
-                                patch({ description: e.target.value })
-                            }
-                            rows={2}
-                            placeholder="Pick a slot that suits you and we'll confirm by email."
-                        />
-                    </Field>
-                    <Field label="Submit button label">
-                        <Input
-                            value={c.submitLabel ?? ""}
-                            onChange={(e) =>
-                                patch({ submitLabel: e.target.value })
-                            }
-                            placeholder="Confirm booking"
-                        />
-                    </Field>
-                    <Field label="Success message">
-                        <Input
-                            value={c.successMessage ?? ""}
-                            onChange={(e) =>
-                                patch({ successMessage: e.target.value })
-                            }
-                            placeholder="You're booked — check your email."
-                        />
-                    </Field>
-                </div>
-            );
-        }
-        default:
-            return null;
-    }
-}
-
-/** Small labelled field wrapper to keep the per-type editors terse. */
-function Field({
-    label,
-    children,
-}: {
-    label: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="grid gap-1.5">
-            <Label className={FIELD_LABEL}>{label}</Label>
-            {children}
-        </div>
-    );
-}

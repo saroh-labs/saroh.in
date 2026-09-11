@@ -9,8 +9,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@saroh/ui/dialog";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
 
 import { linkCustomerAction } from "@/lib/customer-workspace/actions";
 import type { IdentitySuggestion } from "@/lib/customer-workspace/service";
@@ -35,10 +35,10 @@ export function IdentityLinkDialog({
         startTransition(async () => {
             const result = await linkCustomerAction(contactId, customerId);
             if (result.ok) {
-                toast.success("Customer linked");
+                showSuccess("Customer linked");
                 setOpen(false);
             } else {
-                toast.error(result.error);
+                showError(result.error);
             }
         });
     };

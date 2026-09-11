@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PipelinesModule } from "../pipelines/pipelines.module";
 import { LeadsController, TasksController } from "./leads.controller";
@@ -13,7 +14,11 @@ import { LeadsService } from "./leads.service";
  * used when a manual lead omits its pipeline.
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule), PipelinesModule],
+    imports: [
+        forwardRef(() => OrganizationsModule),
+        PipelinesModule,
+        CapabilitiesModule,
+    ],
     controllers: [LeadsController, TasksController],
     providers: [LeadsService, OrganizationGuard],
     exports: [LeadsService],

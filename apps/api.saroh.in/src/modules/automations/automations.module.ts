@@ -2,6 +2,7 @@ import type { OnModuleInit } from "@nestjs/common";
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { CommunicationsModule } from "../communications/communications.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
@@ -34,6 +35,7 @@ import { AutomationsService } from "./automations.service";
         JobsModule,
         CommunicationsModule,
         forwardRef(() => OrganizationsModule),
+        CapabilitiesModule,
     ],
     controllers: [AutomationsController],
     providers: [AutomationsService, AutomationRunHandler, OrganizationGuard],

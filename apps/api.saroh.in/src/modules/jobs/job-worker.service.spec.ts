@@ -77,15 +77,81 @@ describe("JobWorkerService.runOnce", () => {
         expect(queue.jobs[0].processedAt).toBeInstanceOf(Date);
     });
 
-    it("routes an unknown type to the no-op fallback and completes it (queue not wedged)", async () => {
+    it("does not record DONE when its lease was reclaimed while the handler ran", async () => {
+        const queue = new FakeJobQueue();
+        const registry = new JobHandlerRegistry();
+        // A handler that outlives JOB_VISIBILITY_MS: by the time it returns,
+        // another worker has reclaimed the row and owns its outcome.
+        registry.register("enquiry.notify", () => {
+            queue.jobs[0].lockedBy = "worker_b";
+            return Promise.resolve();
+        });
+        await queue.enqueue({ type: "enquiry.notify", payload: {} });
+
+        await makeWorker(queue, registry).runOnce();
+
+        expect(queue.jobs[0].status).toBe("PROCESSING");
+        expect(queue.jobs[0].lockedBy).toBe("worker_b");
+        expect(queue.jobs[0].processedAt).toBeNull();
+    });
+
+    it("does not reschedule a job another worker finished while this one was failing", async () => {
+        const queue = new FakeJobQueue();
+        const registry = new JobHandlerRegistry();
+        // The reclaiming worker completes the row, then this stale run throws.
+        // Rescheduling a DONE job would send its notification a second time.
+        registry.register("enquiry.notify", () => {
+            Object.assign(queue.jobs[0], {
+                status: "DONE",
+                lockedBy: null,
+                processedAt: new Date(),
+            });
+            return Promise.reject(new Error("smtp timeout"));
+        });
+        await queue.enqueue({ type: "enquiry.notify", payload: {} });
+
+        await makeWorker(queue, registry).runOnce();
+
+        expect(queue.jobs[0].status).toBe("DONE");
+        expect(queue.jobs[0].attempts).toBe(0);
+        expect(queue.jobs[0].lastError).toBeNull();
+    });
+
+    it("dead-letters a job with no registered handler instead of recording it as done", async () => {
+        const queue = new FakeJobQueue();
+        const registry = new JobHandlerRegistry();
+        await queue.enqueue({ type: "booking.notify", payload: {} });
+        await queue.enqueue({ type: "enquiry.notify", payload: {} });
+        const handler = jest.fn().mockResolvedValue(undefined);
+        registry.register("enquiry.notify", handler);
+
+        const processed = await makeWorker(queue, registry).runOnce();
+
+        // Not wedged: the handled job behind it still ran.
+        expect(processed).toBe(2);
+        expect(handler).toHaveBeenCalledTimes(1);
+        expect(queue.jobs[1].status).toBe("DONE");
+
+        const unhandled = queue.jobs[0];
+        expect(unhandled.status).toBe("FAILED"); // never DONE
+        expect(unhandled.attempts).toBe(0); // nothing was attempted
+        expect(unhandled.lastError).toMatch(
+            /No handler registered.*booking\.notify/,
+        );
+        expect(unhandled.processedAt).toBeInstanceOf(Date);
+    });
+
+    it("does not retry a job with no registered handler", async () => {
         const queue = new FakeJobQueue();
         const registry = new JobHandlerRegistry();
         await queue.enqueue({ type: "mystery.type", payload: {} });
 
-        const processed = await makeWorker(queue, registry).runOnce();
+        const worker = makeWorker(queue, registry);
+        await worker.runOnce();
+        const second = await worker.runOnce();
 
-        expect(processed).toBe(1);
-        expect(queue.jobs[0].status).toBe("DONE");
+        expect(second).toBe(0);
+        expect(queue.jobs[0].status).toBe("FAILED");
     });
 
     it("does not hand the same claimed job to a second tick (visibility)", async () => {

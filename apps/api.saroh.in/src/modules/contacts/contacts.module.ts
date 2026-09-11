@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { ContactsController } from "./contacts.controller";
 import { ContactsService } from "./contacts.service";
@@ -11,7 +12,7 @@ import { ContactsService } from "./contacts.service";
  * needs, and provides the guard so the controller's `@UseGuards` can resolve it.
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule)],
+    imports: [forwardRef(() => OrganizationsModule), CapabilitiesModule],
     controllers: [ContactsController],
     providers: [ContactsService, OrganizationGuard],
     exports: [ContactsService],

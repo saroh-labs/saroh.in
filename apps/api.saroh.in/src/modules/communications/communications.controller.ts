@@ -14,6 +14,8 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
+import { RequireModule } from "../capabilities/require-module.decorator";
 import { CommunicationsService } from "./communications.service";
 import { ConnectCommsProviderDto, SendMessageDto, SetConsentDto } from "./dto";
 
@@ -28,12 +30,19 @@ import { ConnectCommsProviderDto, SendMessageDto, SetConsentDto } from "./dto";
  * `consent:*` on top. Provider credentials are inbound-only and never echoed.
  */
 @Controller("organizations/:organizationId")
-@UseGuards(BetterAuthGuard, OrganizationGuard)
+@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
 export class CommunicationsController {
     constructor(private readonly comms: CommunicationsService) {}
 
     // ---- Providers ----
+    /*
+     * Per METHOD. Consent is deliberately NOT gated: withdrawing consent is a
+     * legal obligation and must keep working after Communications is switched
+     * off, as must reading the delivery ledger for messages already sent.
+     * What is gated is connecting a provider and sending something new.
+     */
     @Post("comms-providers")
+    @RequireModule("COMMUNICATIONS")
     @HttpCode(201)
     connect(
         @OrgContext() ctx: OrganizationContext,
@@ -48,6 +57,7 @@ export class CommunicationsController {
     }
 
     @Delete("comms-providers/:channel")
+    @RequireModule("COMMUNICATIONS")
     disconnect(
         @OrgContext() ctx: OrganizationContext,
         @Param("channel") channel: string,
@@ -84,6 +94,7 @@ export class CommunicationsController {
 
     // ---- Messages ----
     @Post("messages")
+    @RequireModule("COMMUNICATIONS")
     @HttpCode(201)
     send(@OrgContext() ctx: OrganizationContext, @Body() dto: SendMessageDto) {
         return this.comms.sendMessage(ctx, dto);

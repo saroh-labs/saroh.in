@@ -2,9 +2,9 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { setConsent } from "@/lib/messages/actions";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
@@ -34,10 +34,10 @@ export function ConsentToggle({
         const res = await setConsent({ contactId, channel, status: next });
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success(
+        showSuccess(
             next === "GRANTED"
                 ? `${channel} consent granted`
                 : `${channel} consent revoked`,

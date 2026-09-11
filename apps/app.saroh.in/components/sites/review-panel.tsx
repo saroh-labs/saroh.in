@@ -2,8 +2,8 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { PreviewLinks } from "@/components/sites/preview-links";
 import { setCommentResolved } from "@/lib/sites/actions";
@@ -51,7 +51,7 @@ export function ReviewPanel({
         );
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         onChanged();

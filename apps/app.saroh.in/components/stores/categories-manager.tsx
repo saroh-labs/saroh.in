@@ -3,9 +3,9 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { createCategory, deleteCategory } from "@/lib/products/actions";
 import type { Category } from "@/lib/products/service";
@@ -39,12 +39,12 @@ export function CategoriesManager({
         });
         setAdding(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setName("");
         setParentId("");
-        toast.success("Category created");
+        showSuccess("Category created");
         router.refresh();
     }
 
@@ -53,10 +53,10 @@ export function CategoriesManager({
         const res = await deleteCategory(storeId, id);
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Category deleted");
+        showSuccess("Category deleted");
         router.refresh();
     }
 

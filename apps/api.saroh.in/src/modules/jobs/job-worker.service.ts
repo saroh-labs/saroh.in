@@ -92,16 +92,64 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
 
     private async dispatch(job: Job): Promise<void> {
         const handler = this.registry.get(job.type);
+        if (!handler) {
+            await this.unhandled(job);
+            return;
+        }
         try {
             await handler(job);
-            await this.queue.complete(job.id);
+            if (!(await this.queue.complete(job.id, this.workerId))) {
+                this.lostLease(job, "succeeded");
+            }
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             this.logger.warn(
                 `Job ${job.id} (${job.type}) failed attempt ` +
                     `${job.attempts + 1}/${job.maxAttempts}: ${message}`,
             );
-            await this.queue.fail(job.id, message);
+            if (!(await this.queue.fail(job.id, this.workerId, message))) {
+                this.lostLease(job, "failed");
+            }
         }
+    }
+
+    /**
+     * A job whose `type` has no registered handler. It is dead-lettered — not
+     * completed, and not retried. No amount of retrying registers a handler,
+     * and completing it records as delivered something that never ran, which
+     * is what every `booking.notify` got before this existed.
+     *
+     * ERROR, because each one is a producer and a consumer that disagree. The
+     * row keeps the reason in `lastError`, so when the handler ships those jobs
+     * can be re-queued rather than lost — check first that sending them late is
+     * still what the recipient should get.
+     */
+    private async unhandled(job: Job): Promise<void> {
+        const reason = `No handler registered for job type "${job.type}"`;
+        this.logger.error(
+            `Job ${job.id}: ${reason}; dead-lettered. ` +
+                `Register a handler for this type or stop enqueuing it.`,
+        );
+        if (!(await this.queue.deadLetter(job.id, this.workerId, reason))) {
+            this.lostLease(job, "failed");
+        }
+    }
+
+    /**
+     * The handler returned after this worker's lease on the job was gone: it
+     * ran past JOB_VISIBILITY_MS, another worker reclaimed the row, and that
+     * worker owns the outcome. Nothing was written.
+     *
+     * It also means the side effect ran twice. Occasional is survivable —
+     * handlers are idempotent by contract, which is what absorbs it. A steady
+     * stream means some handler routinely outlives the visibility timeout:
+     * raise JOB_VISIBILITY_MS or make the handler faster, because every one of
+     * these is a duplicate the idempotency guard had to catch.
+     */
+    private lostLease(job: Job, outcome: "succeeded" | "failed"): void {
+        this.logger.warn(
+            `Job ${job.id} (${job.type}) ${outcome} after its lease was ` +
+                `reclaimed; outcome not recorded — the reclaiming worker owns it.`,
+        );
     }
 }

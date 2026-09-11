@@ -35,7 +35,7 @@
     "react-dom": "catalog:react19",
     "react-hook-form": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.11"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",

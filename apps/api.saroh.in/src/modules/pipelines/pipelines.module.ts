@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PipelinesController } from "./pipelines.controller";
 import { PipelinesService } from "./pipelines.service";
@@ -12,7 +13,7 @@ import { PipelinesService } from "./pipelines.service";
  * `ensureDefault` helper when creating a lead without an explicit pipeline.
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule)],
+    imports: [forwardRef(() => OrganizationsModule), CapabilitiesModule],
     controllers: [PipelinesController],
     providers: [PipelinesService, OrganizationGuard],
     exports: [PipelinesService],

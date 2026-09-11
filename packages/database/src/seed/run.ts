@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { hashPassword as hashPasswordUntyped } from "better-auth/crypto";
 
-import { parseSectionContentOrThrow } from "../cms/section-contract";
+import { parseSectionContentOrThrow } from "@saroh/block-contract";
 import { assertDatabaseTarget } from "../database-target";
 import type { SeedSection } from "./data";
 import {
@@ -26,6 +26,8 @@ import {
     POSTS,
     PRODUCTS,
     SEED_PREFIX,
+    SEEDED_FOOTER,
+    SEEDED_STYLE_VARIABLES,
     SERVICES,
     SITES,
     STORE_SLUG,
@@ -161,6 +163,68 @@ export async function seed(): Promise<void> {
                 status: m.status,
                 enabledAt: m.status === "ENABLED" ? now : null,
                 enabledByUserId: m.status === "ENABLED" ? user.id : null,
+            },
+        });
+    }
+
+    /*
+     * Each module's ROLLOUT flag, and an override turning it on for this
+     * organization (#266).
+     *
+     * A module is available only when its rollout flag is on AND the
+     * organization has enabled it AND entitlement AND authorization pass. The
+     * seed used to write only the `OrganizationModule` rows above, and the flag
+     * resolver fails closed on a flag that is registered in code but absent
+     * from the database — so a freshly seeded workspace had seven modules
+     * ENABLED and every one of them reporting ROLLOUT_DISABLED. Every screen
+     * read "Website is turned off", which is the opposite of what AGENTS.md
+     * promises this seed produces.
+     *
+     * TWO ROWS, DELIBERATELY, rather than one global flag flipped on. The
+     * rollout gate is Saroh's kill switch and is meant to default false so
+     * modules dark-roll out; a seed that flipped it globally would be seeding
+     * away the mechanism. Registering the flag dark and granting THIS
+     * organization an override is what the override mechanism is for, and it
+     * leaves a second org in the same database seeing the production default.
+     *
+     * The key is derived from the module key, so a module added to
+     * `MODULE_STATES` seeds its own flag and cannot be forgotten.
+     *
+     * The flag row itself is registry rather than demo data — it makes the
+     * database match the code — so it is NOT seed-prefixed and the reset leaves
+     * it alone. Deleting it would cascade to overrides belonging to
+     * organizations this seed never created.
+     *
+     * `ORG_AUTHORIZATION` is deliberately untouched: it selects an
+     * authorization path for Stores rather than gating a surface, and turning
+     * it on here would change behaviour under test rather than reveal it.
+     */
+    for (const m of MODULE_STATES) {
+        const flagKey = `MODULE_${m.key}`;
+        await prisma.featureFlag.upsert({
+            where: { key: flagKey },
+            // Never re-dark a flag someone has deliberately turned on.
+            update: {},
+            create: {
+                id: `flag_${flagKey}`,
+                key: flagKey,
+                description: `Saroh-side rollout switch for the ${m.key} module.`,
+                enabledByDefault: false,
+            },
+        });
+        await prisma.featureFlagOverride.upsert({
+            where: {
+                flagKey_organizationId: {
+                    flagKey,
+                    organizationId: org.id,
+                },
+            },
+            update: { enabled: true },
+            create: {
+                id: id("flagoverride", m.key.toLowerCase()),
+                flagKey,
+                organizationId: org.id,
+                enabled: true,
             },
         });
     }
@@ -900,7 +964,44 @@ async function seedWebsite(
                 siteId: site.id,
                 organizationId: orgId,
                 snapshot: {
-                    site: { name: fixture.name, slug: fixture.slug },
+                    /*
+                     * SHAPED LIKE A REAL PUBLISH (#265).
+                     *
+                     * This used to carry `name` and `slug` and nothing else,
+                     * which is a snapshot `buildSnapshot` would never write. A
+                     * publication is self-contained by design — the renderer
+                     * reads it and resolves nothing — so the missing fields did
+                     * not degrade, they fell through to a different set of
+                     * defaults inside the renderer. The seeded site rendered on
+                     * SiteTheme's hardcoded stone palette, or a black ground on
+                     * a machine whose OS prefers dark, while the editor showed
+                     * the resolved defaults. Anyone comparing the two locally
+                     * was comparing against something publish could not produce.
+                     */
+                    site: {
+                        name: fixture.name,
+                        slug: fixture.slug,
+                        styleVariables: { ...SEEDED_STYLE_VARIABLES },
+                        footer: { ...SEEDED_FOOTER },
+                        /*
+                         * A menu over this site's own published pages, in the
+                         * order the fixture lists them. Publish resolves page
+                         * ids to paths and drops hidden pages; the fixture has
+                         * the paths already, so it writes the resolved shape.
+                         *
+                         * A single-page site gets no menu, which is what
+                         * `resolveSiteNavigation` produces for a merchant who
+                         * has not built one — and what `SiteHeader` is designed
+                         * around: with no menu it centres the site name.
+                         */
+                        navigation:
+                            snapshotPages.length > 1
+                                ? snapshotPages.map((page) => ({
+                                      label: page.title,
+                                      href: page.path,
+                                  }))
+                                : [],
+                    },
                     pages: [...snapshotPages].sort((a, b) =>
                         a.path.localeCompare(b.path),
                     ),
@@ -1253,6 +1354,7 @@ export async function reset(): Promise<void> {
         () => prisma.plan.deleteMany({ where }),
         () => prisma.communicationProvider.deleteMany({ where }),
         () => prisma.merchantPaymentProvider.deleteMany({ where }),
+        () => prisma.featureFlagOverride.deleteMany({ where }),
         () => prisma.organizationModule.deleteMany({ where }),
         () => prisma.membership.deleteMany({ where }),
         () => prisma.organization.deleteMany({ where }),

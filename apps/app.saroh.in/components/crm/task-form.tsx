@@ -3,9 +3,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { Form, FormControl, FormField, FormItem } from "@saroh/ui/form";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { createTask } from "@/lib/leads/actions";
@@ -45,7 +45,7 @@ export function TaskForm({ leadId }: { leadId: string }) {
     async function onSubmit(values: FormValues) {
         const parsed = new Date(values.due);
         if (Number.isNaN(parsed.getTime())) {
-            toast.error("Enter a valid due date");
+            showError("Enter a valid due date");
             return;
         }
         const res = await createTask(leadId, {
@@ -53,11 +53,11 @@ export function TaskForm({ leadId }: { leadId: string }) {
             dueAt: parsed.toISOString(),
         });
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         form.reset({ body: "", due: "" });
-        toast.success("Follow-up scheduled");
+        showSuccess("Follow-up scheduled");
         router.refresh();
     }
 

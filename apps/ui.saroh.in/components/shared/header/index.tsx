@@ -14,7 +14,7 @@ export default function Header() {
                         <Link
                             href={link.href}
                             key={link.title}
-                            className="text-md text-muted-foreground hover:text-primary font-medium transition-colors hover:underline"
+                            className="text-md font-medium text-muted-foreground transition-colors hover:text-primary hover:underline"
                         >
                             {link.title}
                         </Link>
@@ -39,6 +39,13 @@ const links = [
     {
         title: "Docs",
         href: "/docs",
+    },
+    {
+        // The merchant token layer, kept separate from "Components" on purpose:
+        // those are Saroh's own primitives in Saroh's palette, these are what a
+        // merchant's website is built from and never wear Saroh's brand (#252).
+        title: "Blocks",
+        href: "/blocks",
     },
     {
         title: "Components",

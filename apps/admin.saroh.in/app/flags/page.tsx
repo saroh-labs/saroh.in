@@ -1,16 +1,12 @@
-import { getServerSession } from "@saroh/auth/next";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-
 import { AdminShell } from "@/components/admin-shell";
 import { FlagCard } from "@/components/flag-card";
 import { NotAuthorized } from "@/components/not-authorized";
-import { accountsLoginUrl } from "@/lib/admin-access";
 import {
     getStaffIdentity,
     listFlags,
     listOrganizations,
 } from "@/lib/control-plane";
+import { requireSession } from "@/lib/session";
 
 /**
  * Feature flags — the rollout control surface (S1-012, DEC feature-flags).
@@ -24,8 +20,7 @@ import {
 export const metadata = { title: "Releases" };
 
 export default async function FlagsPage() {
-    const session = await getServerSession(await headers());
-    if (!session) redirect(accountsLoginUrl);
+    const session = await requireSession();
 
     const staff = await getStaffIdentity();
     if (!staff) return <NotAuthorized email={session.user.email} />;

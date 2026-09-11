@@ -3,9 +3,9 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import {
     createVariant,
@@ -54,13 +54,13 @@ export function ProductVariants({
         });
         setAddingVariant(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setSku("");
         setTitle("");
         setVprice("");
-        toast.success("Variant added");
+        showSuccess("Variant added");
         router.refresh();
     }
 
@@ -69,10 +69,10 @@ export function ProductVariants({
         const res = await deleteVariant(storeId, productId, variantId);
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Variant removed");
+        showSuccess("Variant removed");
         router.refresh();
     }
 
@@ -85,10 +85,10 @@ export function ProductVariants({
         });
         setSavingStock(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Stock updated");
+        showSuccess("Stock updated");
         router.refresh();
     }
 

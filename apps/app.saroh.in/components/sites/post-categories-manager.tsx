@@ -3,9 +3,9 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { createPostCategory, deletePostCategory } from "@/lib/content/actions";
 import type { PostCategory } from "@/lib/content/service";
@@ -33,11 +33,11 @@ export function PostCategoriesManager({
         const res = await createPostCategory(siteId, { name: name.trim() });
         setAdding(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setName("");
-        toast.success("Category created");
+        showSuccess("Category created");
         router.refresh();
     }
 
@@ -46,10 +46,10 @@ export function PostCategoriesManager({
         const res = await deletePostCategory(siteId, id);
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Category deleted");
+        showSuccess("Category deleted");
         router.refresh();
     }
 

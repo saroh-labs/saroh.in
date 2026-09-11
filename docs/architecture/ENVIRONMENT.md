@@ -106,10 +106,13 @@ reports the proxy's state; `~/.portless/service.log` has the reason if it is
 not running.
 
 `--wildcard` is what lets an unregistered subdomain such as
-`northwind.saroh.app.localhost` reach the renderer. Each app's `dev` script is
-`portless`, which runs its `dev:app` script through the proxy with a `PORT` of
-its own; `pnpm run dev:app` still works on a bare port for anyone without the
-proxy. Adding an app means adding the two scripts and the `portless` field.
+`northwind.saroh.app.localhost` reach the renderer. Each app's `dev` script invokes
+`portless <name> <server command>` directly, and its `portless` field stores
+the same name. Portless assigns the server a free `PORT`. Existing `dev:app`
+scripts remain available for tooling, but local development uses `pnpm dev`
+so cross-app authentication uses the shared HTTPS hostnames. The email
+preview also uses Portless at `https://emails.saroh.localhost`; shared package
+build watchers do not need proxy routes.
 
 ## Local quick start
 

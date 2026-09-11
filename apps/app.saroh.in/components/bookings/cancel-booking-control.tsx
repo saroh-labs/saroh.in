@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { cancelBooking } from "@/lib/services/actions";
 
@@ -22,10 +22,10 @@ export function CancelBookingControl({ bookingId }: { bookingId: string }) {
         const res = await cancelBooking(bookingId);
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Booking cancelled");
+        showSuccess("Booking cancelled");
         router.refresh();
     }
 
