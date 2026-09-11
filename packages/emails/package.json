@@ -4,7 +4,7 @@
   "description": "Email templates for saroh",
   "main": "index.js",
   "scripts": {
-    "dev": "email dev -p 3010",
+    "dev": "portless emails.saroh sh -c 'email dev --port \"$PORT\"'",
     "export": "email export",
     "typecheck": "tsc --noEmit"
   },
@@ -25,5 +25,6 @@
     "@saroh/tsconfig": "workspace:*",
     "@types/react": "19.2.15",
     "typescript": "catalog:"
-  }
+  },
+  "portless": "emails.saroh"
 }
