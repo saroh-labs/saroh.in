@@ -11,8 +11,8 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { trimmedOr } from "@/lib/forms/values";
@@ -62,11 +62,11 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
             ) {
                 form.setError(res.field, { message: res.error });
             } else {
-                toast.error(res.error);
+                showError(res.error);
             }
             return;
         }
-        toast.success("Store settings saved");
+        showSuccess("Store settings saved");
     }
 
     return (

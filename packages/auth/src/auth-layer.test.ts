@@ -254,3 +254,115 @@ describe("safeDestination — where to land after sign-in (#222)", () => {
         expect(safeDestination("javascript:alert(1)")).toBe(null);
     });
 });
+
+import {
+    getServerSession,
+    resolveServerSession,
+    SessionUnavailableError,
+} from "./next";
+
+/**
+ * The distinction this suite protects: a request whose session the api
+ * declined is signed out; a request the api never answered is unknown. They
+ * used to be the same `null`, which made one api restart a sign-out for every
+ * user on their next server render.
+ */
+describe("resolveServerSession — signed out vs. could not tell", () => {
+    const withCookie = new Headers({ cookie: "saroh.session_token=abc" });
+    const session = {
+        session: { id: "s1", userId: "u1", expiresAt: "2099-01-01T00:00:00Z" },
+        user: { id: "u1", email: "demo@saroh.dev", emailVerified: true },
+    };
+
+    const respondWith = (body: unknown, init?: ResponseInit) =>
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockResolvedValue(
+                new Response(body === null ? "" : JSON.stringify(body), {
+                    status: 200,
+                    ...init,
+                }),
+            ),
+        );
+
+    beforeEach(() => {
+        vi.unstubAllGlobals();
+        process.env.NEXT_PUBLIC_BETTER_AUTH_URL = "https://api.saroh.in";
+    });
+
+    it("returns the session when the api validates the cookie", async () => {
+        respondWith(session);
+        const result = await resolveServerSession(withCookie);
+        expect(result).toEqual({ status: "authenticated", session });
+    });
+
+    it("is anonymous with no cookie, without calling the api", async () => {
+        const fetchSpy = vi.fn();
+        vi.stubGlobal("fetch", fetchSpy);
+        expect(await resolveServerSession(new Headers())).toEqual({
+            status: "anonymous",
+        });
+        expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("is anonymous when the api rejects the session (401/403)", async () => {
+        for (const status of [401, 403]) {
+            respondWith(null, { status });
+            expect(await resolveServerSession(withCookie)).toEqual({
+                status: "anonymous",
+            });
+        }
+    });
+
+    it("is anonymous when the api answers 200 with no session", async () => {
+        // Better Auth's shape for a stale cookie: a well-formed "nobody here".
+        respondWith(null);
+        expect(await resolveServerSession(withCookie)).toEqual({
+            status: "anonymous",
+        });
+    });
+
+    it("is unavailable — NOT anonymous — when the api never answers", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+        );
+        expect(await resolveServerSession(withCookie)).toEqual({
+            status: "unavailable",
+            reason: "network",
+        });
+    });
+
+    it("is unavailable — NOT anonymous — on 5xx, 429 and 404", async () => {
+        // A restarting container, a rate limit, and a deploy swapping routes.
+        // None of the three is the api saying the session is invalid.
+        for (const statusCode of [500, 502, 503, 429, 404]) {
+            respondWith(null, { status: statusCode });
+            expect(await resolveServerSession(withCookie)).toEqual({
+                status: "unavailable",
+                reason: "http",
+                statusCode,
+            });
+        }
+    });
+
+    it("keeps getServerSession's null contract for callers that can't act on it", async () => {
+        respondWith(session);
+        expect(await getServerSession(withCookie)).toEqual(session);
+
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+        expect(await getServerSession(withCookie)).toBeNull();
+    });
+
+    it("carries the reason on the error a gate throws", () => {
+        const err = new SessionUnavailableError({
+            status: "unavailable",
+            reason: "http",
+            statusCode: 502,
+        });
+        expect(err).toBeInstanceOf(Error);
+        expect(err.name).toBe("SessionUnavailableError");
+        expect(err.reason).toBe("http");
+        expect(err.statusCode).toBe(502);
+    });
+});

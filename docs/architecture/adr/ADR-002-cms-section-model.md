@@ -42,6 +42,10 @@ The `snapshot` is self-contained and already sanitized, so the public renderer (
 
 ## 3. Versioned section contract
 
+> **Update 2026-09-11:** the contract now lives in
+> `packages/block-contract/src/section-contract.ts`, moved in #252 so frontends
+> can import it without Prisma.
+
 `packages/database/src/cms/section-contract.ts` is the **single source of truth** for what a `Section.content` may hold, keyed by `(sectionType, contractVersion)`. A Zod schema per (type, version) validates and normalizes content. The editor (S2-004), publish (S2-005), and renderer (S2-006) all validate through `parseSectionContent(type, version, content)`, which returns normalized data or a typed error (`UNKNOWN_CONTRACT` for an unregistered pair, `INVALID_CONTENT` for a schema failure).
 
 **Starter registry (all at version 1):** `hero` (heading, optional subheading/cta/image), `richText` (format + value), `cta` (label, href, style), `gallery` (images[], layout).

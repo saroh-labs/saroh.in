@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -11,7 +12,6 @@ import {
     useState,
     useSyncExternalStore,
 } from "react";
-import { toast } from "sonner";
 
 import { PanelDivider, RailTabs } from "@/components/sites/editor-chrome";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
@@ -403,7 +403,7 @@ export function SiteEditor({
             setSaving(false);
             setErrorIndex(synced.index);
             setErrorMessage(synced.error);
-            toast.error(synced.error);
+            showError(synced.error);
             return;
         }
         if (JSON.stringify(synced.sections) !== JSON.stringify(sections)) {
@@ -439,7 +439,7 @@ export function SiteEditor({
             setPendingChanges(res.data.pendingSectionChanges ?? null);
             // An autosave that announces itself every few seconds is noise; the
             // bar already states when it last saved.
-            if (!auto) toast.success("Draft saved.");
+            if (!auto) showSuccess("Draft saved.");
             /*
              * The flags settle here — after the save, not on every keystroke.
              * Deliberately not awaited: the dots catching up a moment later is
@@ -454,7 +454,7 @@ export function SiteEditor({
             setErrorIndex(res.index);
             setErrorMessage(res.error);
         }
-        toast.error(res.error);
+        showError(res.error);
     }
 
     /*
@@ -499,7 +499,7 @@ export function SiteEditor({
                 if (res.ok) {
                     setSavedStyleJson(JSON.stringify(payload));
                 } else {
-                    toast.error(res.error);
+                    showError(res.error);
                 }
             });
         }, 700);
@@ -528,7 +528,7 @@ export function SiteEditor({
      */
     async function openCheck() {
         if (dirty) {
-            toast.error("You have unsaved changes — save the draft first.");
+            showError("You have unsaved changes — save the draft first.");
             return;
         }
         setChecking(true);
@@ -542,7 +542,7 @@ export function SiteEditor({
         const res = await publishSite(siteId);
         setPublishing(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setChecking(false);
@@ -555,7 +555,7 @@ export function SiteEditor({
             address === null || address === undefined
                 ? `${siteName} is live.`
                 : `${siteName} is live at ${address}.`;
-        toast.success(
+        showSuccess(
             // Bypassing is recorded, not prevented (#199) — and said, so the
             // record is never a surprise in version history later.
             res.data.bypassed
@@ -1296,7 +1296,7 @@ export function SiteEditor({
                                             if (!ok) return;
                                             removeAt(active.index);
                                             setSelectedIndex(null);
-                                            toast.success(`Removed ${title}.`);
+                                            showSuccess(`Removed ${title}.`);
                                         }}
                                     >
                                         Remove

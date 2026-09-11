@@ -144,6 +144,9 @@ should happen at each tier; **⚠️ = current gap**, ✅ = already correct.
 
 ## 5. Touch ergonomics (cross-ref doc 13 §7)
 
+> **Update 2026-09-11:** `Button` now reaches 44px on touch through `coarse:`
+> (see `13_ACCESSIBILITY_GUIDE.md` §7).
+
 | Guideline                 | Value                             | Why                                                                                                                                   |
 | ------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Min target                | **44 × 44px**                     | default `Button h-10` = 40px; promote to `size="lg"` (h-11=44px) on touch                                                             |

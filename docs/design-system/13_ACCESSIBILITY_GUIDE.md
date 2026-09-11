@@ -254,6 +254,9 @@ _never_ hand-roll a field; always use `FormField` → `FormItem` → `FormLabel`
 
 ## 6. Reduced motion
 
+> **Update 2026-09-11:** the global `prefers-reduced-motion` override now exists
+> in `packages/ui/src/globals.css`.
+
 Fully specified in `15_MOTION_GUIDELINES.md`; the a11y requirement (WCAG 2.3.3,
 AAA but we adopt it): honor `prefers-reduced-motion`. **Current gap:** the
 system relies on `tailwindcss-animate` + Radix `data-[state]` animations
@@ -265,6 +268,11 @@ can be made physically ill by the sheet's `slide-in-from-*` and the dialog's
 ---
 
 ## 7. Touch targets ≥ 44px
+
+> **Update 2026-09-11:** addressed for `Button`. Every size grows to at least
+> 44px on a touch pointer through the `coarse:` variant (`default` and `icon`
+> 40→44px, `sm` 32→44px) and keeps its desk height under a mouse. The audit
+> table below records the earlier state; `Input` was not re-checked.
 
 ### Audit of the real size tokens (`button.tsx` l.23–28, `input.tsx` l.12)
 

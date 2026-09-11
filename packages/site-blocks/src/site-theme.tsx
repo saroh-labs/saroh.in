@@ -63,6 +63,25 @@ export function SiteTheme({
                    the layout root, the 404 page, checkout — fell back to
                    near-black, which is invisible on a dark ground. */
                 --site-body: 24 6% 34%;
+                /* Declared in the site.* namespace since #252 and never
+                   given a default here, so text-site-muted and
+                   border-site-border resolved to hsl() of nothing — an invalid
+                   declaration the browser drops, leaving the text at its
+                   inherited colour and the border invisible. The publisher
+                   DERIVES both per publication (app.saroh.in/lib/sites/style.ts),
+                   so live sites were fine and only this fallback was not: the
+                   tenant 404, the root error boundary, checkout, and every
+                   publication older than #189 — exactly the paths that render
+                   when something has already gone wrong.
+
+                   The values are the ones siteStyleVariables() derives for the
+                   default style, asserted in api's site-style.spec.ts, so a
+                   publication carrying no variables renders identically to one
+                   published today having chosen nothing. Picking a fresh pair
+                   here would have made "never styled" and "styled by default"
+                   two different-looking things. */
+                --site-muted: 24 4.9% 55.9%;
+                --site-border: 24 1.1% 90.1%;
                 --site-accent: 24 10% 10%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 0 0% 100%;

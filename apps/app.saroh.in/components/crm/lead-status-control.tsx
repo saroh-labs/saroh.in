@@ -1,8 +1,8 @@
 "use client";
 
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { updateLead } from "@/lib/leads/actions";
 import type { LeadStatus } from "@/lib/leads/service";
@@ -30,10 +30,10 @@ export function LeadStatusControl({
         const res = await updateLead(leadId, { status: next });
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Lead updated");
+        showSuccess("Lead updated");
         router.refresh();
     }
 

@@ -3,8 +3,8 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
+import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 import { env } from "@/env";
 import {
@@ -88,8 +88,8 @@ function CopyField({ label, value }: { label: string; value: string }) {
                 onClick={() =>
                     void copy(value).then((ok) =>
                         ok
-                            ? toast.success(`${label} copied.`)
-                            : toast.error(
+                            ? showSuccess(`${label} copied.`)
+                            : showError(
                                   "Could not copy. Select the text and copy it yourself.",
                               ),
                     )
@@ -166,7 +166,7 @@ export function CustomDomain({ siteId }: { siteId: string }) {
         }
         setDomains((prev) => [res.data, ...(prev ?? [])]);
         setHostname("");
-        toast.success(
+        showSuccess(
             `${res.data.hostname} added. Now add the record below at your registrar.`,
         );
     }
@@ -176,7 +176,7 @@ export function CustomDomain({ siteId }: { siteId: string }) {
         const res = await verifyDomain(domain.id);
         setBusy(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setDomains((prev) =>
@@ -185,14 +185,12 @@ export function CustomDomain({ siteId }: { siteId: string }) {
             ),
         );
         if (res.data.verified) {
-            toast.success(`${domain.hostname} is verified.`);
+            showSuccess(`${domain.hostname} is verified.`);
         } else {
-            toast.message("Not verified yet.", {
-                description: lastCheckLine({
-                    ...domain,
-                    ...res.data.domain,
-                }),
-            });
+            showInfo(
+                "Not verified yet.",
+                lastCheckLine({ ...domain, ...res.data.domain }),
+            );
         }
     }
 
@@ -202,11 +200,11 @@ export function CustomDomain({ siteId }: { siteId: string }) {
         setBusy(null);
         setConfirmRemove(null);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
         setDomains((prev) => (prev ?? []).filter((d) => d.id !== domain.id));
-        toast.success(`${domain.hostname} removed.`);
+        showSuccess(`${domain.hostname} removed.`);
     }
 
     if (domains === null) {

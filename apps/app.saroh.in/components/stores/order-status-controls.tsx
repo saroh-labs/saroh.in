@@ -1,8 +1,8 @@
 "use client";
 
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { updateOrder } from "@/lib/orders/actions";
 import type { OrderStatus, PaymentStatus } from "@/lib/orders/service";
@@ -48,10 +48,10 @@ export function OrderStatusControls({
         const res = await updateOrder(storeId, orderId, input);
         setBusy(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Order updated");
+        showSuccess("Order updated");
         router.refresh();
     }
 

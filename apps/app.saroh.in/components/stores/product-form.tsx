@@ -11,10 +11,10 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { trimmedOr } from "@/lib/forms/values";
@@ -96,11 +96,11 @@ export function ProductForm({
             ) {
                 form.setError(res.field, { message: res.error });
             } else {
-                toast.error(res.error);
+                showError(res.error);
             }
             return;
         }
-        toast.success(editing ? "Product saved" : "Product created");
+        showSuccess(editing ? "Product saved" : "Product created");
         if (editing) {
             router.refresh();
         } else {
@@ -115,10 +115,10 @@ export function ProductForm({
         const res = await deleteProduct(storeId, product.id);
         setDeleting(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Product deleted");
+        showSuccess("Product deleted");
         router.push(`/stores/${storeId}/products`);
     }
 

@@ -1,4 +1,3 @@
-import { getServerSession } from "@saroh/auth/next";
 import {
     Card,
     CardContent,
@@ -8,13 +7,11 @@ import {
 } from "@saroh/ui/card";
 import { PageHeader } from "@saroh/ui/page-header";
 import { StatCard } from "@saroh/ui/stat-card";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 
 import { AdminShell } from "@/components/admin-shell";
 import { NotAuthorized } from "@/components/not-authorized";
-import { accountsLoginUrl } from "@/lib/admin-access";
 import { getMetrics, getStaffIdentity } from "@/lib/control-plane";
+import { requireSession } from "@/lib/session";
 
 /**
  * Platform dashboard — how Saroh itself is doing.
@@ -24,8 +21,7 @@ import { getMetrics, getStaffIdentity } from "@/lib/control-plane";
  * explicitly-audited surface rather than something this quietly grows into.
  */
 export default async function DashboardPage() {
-    const session = await getServerSession(await headers());
-    if (!session) redirect(accountsLoginUrl);
+    const session = await requireSession();
 
     // The API is the authority on who is staff, not this app's env — see
     // lib/control-plane.ts.

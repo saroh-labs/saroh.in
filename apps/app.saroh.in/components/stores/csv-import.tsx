@@ -11,10 +11,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@saroh/ui/select";
+import { showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState, useTransition } from "react";
-import { toast } from "sonner";
 
 import { applyImport, previewImport } from "@/lib/imports/actions";
 import type {
@@ -189,7 +189,7 @@ export function CsvImport({
             setError(null);
             setResult(res.data);
             setPhase("done");
-            toast.success(
+            showSuccess(
                 `Imported ${res.data.created + res.data.updated} ${descriptor.entity}`,
             );
             router.refresh();

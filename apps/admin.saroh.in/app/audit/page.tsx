@@ -1,16 +1,13 @@
-import { getServerSession } from "@saroh/auth/next";
 import { Button, buttonVariants } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import { headers } from "next/headers";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { AdminAuditTable } from "@/components/admin-audit-table";
 import { AdminShell } from "@/components/admin-shell";
 import { NotAuthorized } from "@/components/not-authorized";
-import { accountsLoginUrl } from "@/lib/admin-access";
 import { getStaffIdentity, listAudit } from "@/lib/control-plane";
+import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Platform audit" };
 
@@ -26,8 +23,7 @@ export default async function AuditPage({
 }: {
     searchParams?: Promise<AuditSearchParams>;
 }) {
-    const session = await getServerSession(await headers());
-    if (!session) redirect(accountsLoginUrl);
+    const session = await requireSession();
 
     const staff = await getStaffIdentity();
     if (!staff?.permissions.includes("audit:read")) {

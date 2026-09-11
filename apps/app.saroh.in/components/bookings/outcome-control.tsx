@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { toast } from "sonner";
 
 import { recordBookingOutcome } from "@/lib/services/actions";
 import type { BookingOutcome } from "@/lib/services/service";
@@ -34,10 +34,10 @@ export function OutcomeControl({
         startTransition(async () => {
             const res = await recordBookingOutcome(bookingId, next);
             if (!res.ok) {
-                toast.error(res.error);
+                showError(res.error);
                 return;
             }
-            toast.success(
+            showSuccess(
                 next === "ATTENDED"
                     ? "Marked as attended"
                     : "Marked as a no-show",

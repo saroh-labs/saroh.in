@@ -11,9 +11,9 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { createCustomer, updateCustomer } from "@/lib/customers/actions";
@@ -76,10 +76,10 @@ export function CustomerForm({
         if (!res.ok) {
             if (res.field === "email")
                 form.setError("email", { message: res.error });
-            else toast.error(res.error);
+            else showError(res.error);
             return;
         }
-        toast.success(editing ? "Customer saved" : "Customer created");
+        showSuccess(editing ? "Customer saved" : "Customer created");
         router.push(`/stores/${storeId}/customers`);
     }
 

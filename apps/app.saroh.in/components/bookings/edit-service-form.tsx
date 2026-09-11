@@ -12,10 +12,10 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { archiveService, updateService } from "@/lib/services/actions";
@@ -80,10 +80,10 @@ export function EditServiceForm({ service }: { service: Service }) {
             timezone: values.timezone.trim(),
         });
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Service updated");
+        showSuccess("Service updated");
         router.refresh();
     }
 
@@ -92,10 +92,10 @@ export function EditServiceForm({ service }: { service: Service }) {
         const res = await archiveService(service.id);
         setArchiving(false);
         if (!res.ok) {
-            toast.error(res.error);
+            showError(res.error);
             return;
         }
-        toast.success("Service archived");
+        showSuccess("Service archived");
         router.push("/services");
     }
 
