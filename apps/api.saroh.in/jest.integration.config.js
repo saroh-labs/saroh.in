@@ -13,6 +13,14 @@
  */
 module.exports = {
     preset: "ts-jest",
+    // sanitize-html 2.17.7 uses ESM-only HTML parser packages. Node 24 loads
+    // them natively; Jest's CommonJS runtime needs them transformed too.
+    transform: {
+        "^.+\\.[tj]s$": ["ts-jest", { tsconfig: { allowJs: true } }],
+    },
+    transformIgnorePatterns: [
+        "node_modules/(?!(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities)(?:@|/))",
+    ],
     testEnvironment: "node",
     rootDir: ".",
     testMatch: ["<rootDir>/src/modules/**/*.spec.ts"],
