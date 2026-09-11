@@ -35,7 +35,7 @@
         "eslint": "catalog:",
         "tsup": "^8.5.1",
         "typescript": "catalog:",
-        "vitest": "^3.2.7"
+        "vitest": "^4.1.11"
     },
     "author": "Mohit Kumar <himohitmehta>",
     "homepage": "https://saroh.in",
