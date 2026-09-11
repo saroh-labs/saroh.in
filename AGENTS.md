@@ -128,28 +128,33 @@ an ad-hoc `turbo run dev` with your own env does not inherit it.
 
 ## Triggers — read before you change
 
-Not every agent loads `.agents/skills/` on its own — Claude Code in this repo
-does not — so this table is how a rule reaches you. Find what you are about to
-do and follow the right-hand column **before** writing code. Product and
-architecture decisions are in `docs/architecture/DECISIONS.md`; these sit below
-them.
+How this codebase is built is written down in `docs/patterns/` (index:
+`docs/patterns/README.md`), with deeper procedures in `.agents/skills/`. Not
+every agent loads skills on its own — Claude Code in this repo does not — so
+this table is how a pattern reaches you. Find what you are about to do and read
+the right-hand files **before** writing code.
 
-| When you are about to…                                                                                         | First                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Debug anything non-obvious                                                                                     | Search `docs/architecture/DEV_LEARNINGS.md`; the cause may already be written down. Add an entry once you have fixed it.                                                                                                                                                                                                                               |
-| Add a module, route or data-access path, or cross an app or package boundary                                   | Read `.agents/skills/saroh-architecture/SKILL.md`. Frontends read through Server Components and `lib/<domain>/service.ts` → `lib/api/http.ts`, and write through Server Actions (DEC-004); there is no client-side server-state library. An org-scoped Site write starts with the guards in `apps/api.saroh.in/src/modules/sites/site-access.ts`.      |
-| Build a screen that reads data — empty, loading, failed, partial, denied or gated                              | Read `.agents/skills/saroh-product-states/SKILL.md`. A failed read is never an empty one.                                                                                                                                                                                                                                                              |
-| Touch session handling, `packages/auth`, or anything that redirects to sign-in                                 | Use `resolveServerSession()` / `requireSession()`. Only a 401/403 means signed out; an unreachable api throws to `error.tsx`. Never collapse the two into one `null`.                                                                                                                                                                                  |
-| Add or change a capability module, or a gated route or nav entry                                               | Read `.agents/skills/saroh-module-capability/SKILL.md`.                                                                                                                                                                                                                                                                                                |
-| Change `schema.prisma` or a migration                                                                          | Read `.agents/skills/saroh-migrations/SKILL.md` and run the replay check under Databases.                                                                                                                                                                                                                                                              |
-| Build or change merchant-facing UI in `app.saroh.in`                                                           | Read `.agents/skills/saroh-four-scenes/SKILL.md`.                                                                                                                                                                                                                                                                                                      |
-| Change layout, cross-origin auth or touch targets                                                              | Read `.agents/skills/saroh-browser-tests/SKILL.md`; only a real browser answers these.                                                                                                                                                                                                                                                                 |
-| Draw anything on a merchant's page — `apps/saroh.app`, `packages/site-blocks`, `SiteTheme`, the editor preview | `--site-*` tokens only, never Saroh's. A surface that draws no block (404, error boundary, checkout) goes on the G6 allowlist in `scripts/check-blocks.mjs` with its reason; a block goes in the package. A new `siteColors` key needs a `SiteTheme` default. Tailwind is 3.4: `rounded-[var(--x)]`, not `rounded-[--x]`. Run `pnpm run check:blocks`. |
-| Enqueue a background job, or write or register a handler                                                       | Register the handler in the same change that first enqueues the type; `modules/jobs/job-consumers.spec.ts` fails otherwise. Handlers must be idempotent — delivery is at-least-once (DEC-008). A new terminal write on `Job` is fenced on `(id, status: PROCESSING, lockedBy)`.                                                                        |
-| Show a toast                                                                                                   | `showSuccess` / `showError` / `showWarning` / `showInfo` from `@saroh/ui/toast`; ESLint rejects sonner's `toast`. Toast your own copy, never `error.message`.                                                                                                                                                                                          |
-| Add a helper, hook or component                                                                                | Search for an existing one first. `cn()` comes from `@saroh/ui/lib/utils`; `packages/site-blocks` keeps its own on purpose.                                                                                                                                                                                                                            |
-| Add a Next app or route group                                                                                  | Give it `app/error.tsx` and `loading.tsx`.                                                                                                                                                                                                                                                                                                             |
-| Add a dependency                                                                                               | Check it is not already installed under another name, and was not removed on purpose — React Query was, because nothing here fetches server state client-side.                                                                                                                                                                                         |
+| When you are about to…                                                            | Read first                                                                                     |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Make any change                                                                   | `docs/patterns/00-universal.md`                                                                |
+| Debug anything non-obvious                                                        | `docs/architecture/DEV_LEARNINGS.md`                                                           |
+| Add a route, page, layout, component or `lib/` module in a Next app               | `docs/patterns/frontend-app-structure.md` · `.agents/skills/saroh-architecture/SKILL.md`       |
+| Read or write API data from a Next app, or add client or URL state                | `docs/patterns/frontend-data-and-state.md`                                                     |
+| Build or change a form                                                            | `docs/patterns/frontend-forms.md`                                                              |
+| Show a toast, an error, or an empty, loading or failed state                      | `docs/patterns/frontend-error-feedback.md` · `.agents/skills/saroh-product-states/SKILL.md`    |
+| Touch session handling, `packages/auth`, or anything that redirects to sign-in    | `docs/patterns/frontend-error-feedback.md` · `docs/patterns/backend-auth-and-access.md`        |
+| Style anything, add a token, icon or animation, or draw on a merchant's page      | `docs/patterns/frontend-design-system.md`                                                      |
+| Build or change merchant-facing UI in `app.saroh.in`                              | `.agents/skills/saroh-four-scenes/SKILL.md`                                                    |
+| Call a UI change done                                                             | `docs/patterns/frontend-verification.md` · `.agents/skills/saroh-browser-tests/SKILL.md`       |
+| Add or change an API module, controller, service, DTO or guard                    | `docs/patterns/backend-nestjs.md` · `.agents/skills/saroh-architecture/SKILL.md`               |
+| Change `schema.prisma`, add a model, or store money                               | `docs/patterns/backend-data-and-money.md` · `.agents/skills/saroh-migrations/SKILL.md`         |
+| Touch roles, organization context, capability gates, entitlements or staff access | `docs/patterns/backend-auth-and-access.md` · `.agents/skills/saroh-module-capability/SKILL.md` |
+| Enqueue a background job, or write or register a handler                          | `docs/patterns/backend-jobs.md`                                                                |
+| Call a payment, billing, messaging or storage provider, or receive a webhook      | `docs/patterns/backend-integrations.md`                                                        |
+| Add an environment variable, an environment check or a feature flag               | `docs/patterns/devops-environments-and-flags.md`                                               |
+| Handle a credential, or find one where it should not be                           | `docs/patterns/devops-secrets.md`                                                              |
+| Add logging, a degraded path, a health check or error tracking                    | `docs/patterns/devops-observability.md`                                                        |
+| Change lint, TypeScript, CI, tests or dependencies, or ship the API               | `docs/patterns/devops-tooling-and-deploy.md`                                                   |
 
 ## Before you finish
 
@@ -160,6 +165,7 @@ TEST_DATABASE_URL=... pnpm --filter @saroh/api test:int
 pnpm run check:routes && pnpm run check:blocks && pnpm run check:cycles
 ```
 
-Repo-specific agent skills live in `.agents/skills/`. When you add one, add its
-row to Triggers above — an agent that does not load skills will never find it
-otherwise.
+Patterns live in `docs/patterns/` and skills in `.agents/skills/`. When you add
+either, add its row to Triggers above (and a pattern to
+`docs/patterns/README.md`) — an agent that does not load them on its own will
+never find it otherwise.
