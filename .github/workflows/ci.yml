@@ -113,6 +113,13 @@ jobs:
       - name: Route destination check
         run: pnpm run check:routes
 
+      # Merchant sites render off the --site-* layer only, and there is exactly
+      # one renderer — gates G2 and G6 (#252). The script existed and no job ran
+      # it, so a block painted in Saroh's palette, or a second renderer drifting
+      # from the first the way #189 did, would have merged green.
+      - name: Site blocks gate
+        run: pnpm run check:blocks
+
       - name: Typecheck
         run: pnpm run typecheck
 

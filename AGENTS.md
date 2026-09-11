@@ -132,7 +132,7 @@ an ad-hoc `turbo run dev` with your own env does not inherit it.
 pnpm run lint && pnpm run typecheck
 pnpm --filter @saroh/api test:unit
 TEST_DATABASE_URL=... pnpm --filter @saroh/api test:int
-pnpm run check:routes && pnpm run check:cycles
+pnpm run check:routes && pnpm run check:blocks && pnpm run check:cycles
 ```
 
 Repo-specific agent skills live in `.agents/skills/`.
