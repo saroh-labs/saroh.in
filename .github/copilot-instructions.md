@@ -500,7 +500,7 @@ Each app pins its own port in its `package.json` `dev` script (e.g. `admin` on
 ```bash
 pnpm dev                    # Run everything (turbo, high concurrency)
 pnpm dev:api-auth           # api + accounts
-pnpm dev:apps               # accounts + admin + sites
+pnpm dev:apps               # api + accounts + workspace + admin + sites
 pnpm build                  # Build all apps
 pnpm lint                   # Lint all workspaces
 pnpm typecheck              # Typecheck all workspaces

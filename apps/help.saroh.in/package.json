@@ -3,17 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "portless",
+    "dev": "portless help.saroh next dev",
     "dev:app": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit"
   },
-  "portless": {
-    "name": "help.saroh",
-    "script": "dev:app"
-  },
+  "portless": "help.saroh",
   "dependencies": {
     "@saroh/ui": "workspace:*",
     "next": "^16.3.0",

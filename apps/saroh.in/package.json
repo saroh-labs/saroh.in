@@ -3,17 +3,14 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-        "dev": "portless",
+        "dev": "portless saroh next dev",
         "dev:app": "next dev",
         "build": " next build",
         "start": "next start",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit"
     },
-    "portless": {
-        "name": "saroh",
-        "script": "dev:app"
-    },
+    "portless": "saroh",
     "dependencies": {
         "@hookform/resolvers": "catalog:",
         "@saroh/ui": "workspace:*",
