@@ -1895,7 +1895,12 @@ model Form {
   site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
 
   name   String
-  fields Json // ordered field descriptors: [{ name, label, type, required }]
+  // Ordered field descriptors: [{ name, label, type, required }]. The site
+  // editor rewrites these on every autosave, so they are the DRAFT's fields. A
+  // live submission is validated against the current publication's copy
+  // instead, and falls back to these only when no publication carries the form
+  // (#281).
+  fields Json
 
   // The Pipeline new leads from this form land in. Null → the org's default.
   pipelineId String?

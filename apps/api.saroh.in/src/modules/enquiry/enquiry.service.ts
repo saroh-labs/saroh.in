@@ -9,6 +9,7 @@ import {
 import { Prisma, prisma } from "@saroh/database";
 
 import type { FieldType, FormField } from "../forms/dto";
+import { fieldsFromSnapshot } from "./live-form-fields";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 
 /** The result of a successful (or idempotently-replayed) submission. */
@@ -83,7 +84,8 @@ export class EnquiryService {
     /**
      * Submit an enquiry against a public Form. Steps (in order):
      *  1. Load the Form; 404 if missing/soft-deleted, 410 if not ACTIVE.
-     *  2. Validate `data` against `form.fields` (required present, email valid) — 400 otherwise.
+     *  2. Validate `data` against the live form's fields (required present, email valid) — 400 otherwise.
+     *     "Live" means the current publication's, falling back to `form.fields` (#281).
      *  3. Idempotency: an existing Submission for `(formId, idempotencyKey)` is replayed, no new lead.
      *  4. Rate-limit by `${formId}:${ipHash}`; 429 on exceed.
      *  5. In ONE transaction: upsert Contact, ensure Pipeline+Stage, create Lead,
@@ -111,7 +113,8 @@ export class EnquiryService {
             );
         }
 
-        const fields = this.readFields(form.fields);
+        // The fields the visitor was actually shown, not the draft's (#281).
+        const fields = await this.liveFields(form);
 
         // 2. Validate the submitted data against the form definition.
         const contactFields = this.validate(fields, data);
@@ -243,6 +246,51 @@ export class EnquiryService {
     /** Narrow the persisted `Form.fields` JSON to a typed descriptor array. */
     private readFields(raw: Prisma.JsonValue): FormField[] {
         return (Array.isArray(raw) ? raw : []) as unknown as FormField[];
+    }
+
+    /**
+     * The fields a submission is validated against (#281).
+     *
+     * The live site draws an enquiry form from its PUBLICATION snapshot, but the
+     * site editor rewrites `Form.fields` on every autosave. Validating against
+     * the Form row meant a draft edit changed what the live site accepted before
+     * anything was published. Add a required field in a draft, and every visitor
+     * submitting the form they could actually see was refused, with no record on
+     * the merchant's side.
+     *
+     * So a form that a live publication carries is validated against that
+     * snapshot's fields. Publishing switches them, and restoring an older
+     * version switches them back. `Form.fields` is the fallback for a form no
+     * live publication carries: a site not yet published, or a form used outside
+     * a site.
+     *
+     * Scoped to the form's own organization, and to its site when it records
+     * one. Forms the editor creates do not record one, so the organization's
+     * live sites are searched; an organization has a handful.
+     */
+    private async liveFields(form: {
+        id: string;
+        organizationId: string;
+        siteId: string | null;
+        fields: Prisma.JsonValue;
+    }): Promise<FormField[]> {
+        const sites = await prisma.site.findMany({
+            where: {
+                organizationId: form.organizationId,
+                deletedAt: null,
+                currentPublicationId: { not: null },
+                ...(form.siteId ? { id: form.siteId } : {}),
+            },
+            select: { currentPublication: { select: { snapshot: true } } },
+        });
+        for (const site of sites) {
+            const published = fieldsFromSnapshot(
+                site.currentPublication?.snapshot,
+                form.id,
+            );
+            if (published) return published;
+        }
+        return this.readFields(form.fields);
     }
 
     /**
