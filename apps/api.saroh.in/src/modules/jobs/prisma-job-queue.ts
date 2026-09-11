@@ -12,8 +12,15 @@ import { nextBackoff } from "./job-queue.port";
  * `FOR UPDATE SKIP LOCKED` so any number of concurrent workers can poll the
  * same table and never claim the same row. That SQL can't run against a mocked
  * Prisma, which is why the worker + the retry logic are unit-tested against the
- * in-memory `FakeJobQueue` instead, and only {@link fail}'s branch selection is
- * unit-tested here with a mocked `prisma.job`.
+ * in-memory `FakeJobQueue` instead. What IS unit-tested here, with a mocked
+ * `prisma.job`, is the two terminal writes: {@link fail}'s branch selection, and
+ * the lease fence on both {@link complete} and {@link fail}.
+ *
+ * The fence is what makes the visibility timeout safe. Reclaiming a job whose
+ * worker went quiet means two workers can both believe they own it; `claimDue`
+ * decides which one does by stamping `lockedBy`, and every terminal write
+ * matches on that stamp, so the one that lost the row cannot write its outcome
+ * over the one that has it.
  */
 export class PrismaJobQueue implements JobQueue {
     /**
@@ -71,9 +78,9 @@ export class PrismaJobQueue implements JobQueue {
         );
     }
 
-    async complete(id: string): Promise<void> {
-        await prisma.job.update({
-            where: { id },
+    async complete(id: string, workerId: string): Promise<boolean> {
+        const { count } = await prisma.job.updateMany({
+            where: { id, status: "PROCESSING", lockedBy: workerId },
             data: {
                 status: "DONE",
                 processedAt: new Date(),
@@ -81,6 +88,7 @@ export class PrismaJobQueue implements JobQueue {
                 lockedBy: null,
             },
         });
+        return count === 1;
     }
 
     /**
@@ -88,16 +96,24 @@ export class PrismaJobQueue implements JobQueue {
      * dead-letters (FAILED, terminal) once `attempts+1 >= maxAttempts`, or
      * reschedules PENDING at `now + nextBackoff(attempts)`. The lock is always
      * released so a reclaim/retry can proceed.
+     *
+     * Both the read and the write are fenced on the lease. The read is only a
+     * cheap early exit; the lease can still expire and be reclaimed between it
+     * and the UPDATE, and `attempts` would then be computed from a row this
+     * worker no longer owns — so the WHERE clause checks again.
      */
-    async fail(id: string, error: string): Promise<void> {
+    async fail(id: string, workerId: string, error: string): Promise<boolean> {
         const job = await prisma.job.findUnique({ where: { id } });
-        if (!job) return;
+        // Gone, finished by someone else, or reclaimed: not ours to record.
+        if (job?.status !== "PROCESSING" || job.lockedBy !== workerId) {
+            return false;
+        }
 
         const attempts = job.attempts + 1;
         const deadLetter = attempts >= job.maxAttempts;
 
-        await prisma.job.update({
-            where: { id },
+        const { count } = await prisma.job.updateMany({
+            where: { id, status: "PROCESSING", lockedBy: workerId },
             data: deadLetter
                 ? {
                       status: "FAILED",
@@ -116,5 +132,6 @@ export class PrismaJobQueue implements JobQueue {
                       lockedBy: null,
                   },
         });
+        return count === 1;
     }
 }

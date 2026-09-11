@@ -32,15 +32,28 @@ export interface JobQueue {
      */
     claimDue(workerId: string, limit: number): Promise<Job[]>;
 
-    /** Mark a job DONE (terminal, success). */
-    complete(id: string): Promise<void>;
+    /**
+     * Mark a job DONE — but only while `workerId` still holds its lease.
+     *
+     * Returns `false`, writing nothing, when it does not. A handler that runs
+     * past the visibility timeout has had its row reclaimed by another worker,
+     * and that worker owns the outcome now; letting the slower of two runs
+     * write last would overwrite the faster one's result.
+     */
+    complete(id: string, workerId: string): Promise<boolean>;
 
     /**
-     * Record a failed attempt. If this was the last allowed attempt the job is
+     * Record a failed attempt, fenced on the lease exactly like
+     * {@link complete}. If this was the last allowed attempt the job is
      * dead-lettered (FAILED, terminal); otherwise it is rescheduled PENDING
      * with an exponential backoff via {@link nextBackoff}.
+     *
+     * Returns `false` without writing when `workerId` no longer holds the
+     * lease. The case that matters: a stale worker's failure arriving after the
+     * reclaiming worker already finished the job. Rescheduling that DONE row to
+     * PENDING runs its side effect — a notification, a message — again.
      */
-    fail(id: string, error: string): Promise<void>;
+    fail(id: string, workerId: string, error: string): Promise<boolean>;
 }
 
 /** Input for {@link JobQueue.enqueue}. */
@@ -103,7 +116,8 @@ export function nextBackoff(attempts: number): number {
  * network, no timers. `claimDue` mirrors the real visibility semantics (a
  * claimed job flips to PROCESSING and is not handed out again) so worker tests
  * can assert a job isn't dispatched twice; `fail` mirrors the real
- * backoff/dead-letter decision.
+ * backoff/dead-letter decision; and both terminal writes carry the same lease
+ * fence as the Postgres queue.
  */
 export class FakeJobQueue implements JobQueue {
     /** Every job ever enqueued, in insertion order (inspect in assertions). */
@@ -146,37 +160,43 @@ export class FakeJobQueue implements JobQueue {
         return Promise.resolve(claimed);
     }
 
-    complete(id: string): Promise<void> {
-        const job = this.find(id);
-        if (job) {
-            job.status = "DONE";
+    complete(id: string, workerId: string): Promise<boolean> {
+        const job = this.held(id, workerId);
+        if (!job) return Promise.resolve(false);
+        job.status = "DONE";
+        job.processedAt = new Date();
+        job.lockedAt = null;
+        job.lockedBy = null;
+        return Promise.resolve(true);
+    }
+
+    fail(id: string, workerId: string, error: string): Promise<boolean> {
+        const job = this.held(id, workerId);
+        if (!job) return Promise.resolve(false);
+        const attempts = job.attempts + 1;
+        job.attempts = attempts;
+        job.lastError = error;
+        job.lockedAt = null;
+        job.lockedBy = null;
+        if (attempts >= job.maxAttempts) {
+            job.status = "FAILED";
             job.processedAt = new Date();
-            job.lockedAt = null;
-            job.lockedBy = null;
+        } else {
+            job.status = "PENDING";
+            job.runAt = new Date(Date.now() + nextBackoff(attempts));
         }
-        return Promise.resolve();
+        return Promise.resolve(true);
     }
 
-    fail(id: string, error: string): Promise<void> {
-        const job = this.find(id);
-        if (job) {
-            const attempts = job.attempts + 1;
-            job.attempts = attempts;
-            job.lastError = error;
-            job.lockedAt = null;
-            job.lockedBy = null;
-            if (attempts >= job.maxAttempts) {
-                job.status = "FAILED";
-                job.processedAt = new Date();
-            } else {
-                job.status = "PENDING";
-                job.runAt = new Date(Date.now() + nextBackoff(attempts));
-            }
-        }
-        return Promise.resolve();
-    }
-
-    private find(id: string): Job | undefined {
-        return this.jobs.find((j) => j.id === id);
+    /**
+     * The job, if `workerId` still holds its lease — the same fence the
+     * Postgres queue writes into its WHERE clause, so worker tests exercise the
+     * real rule rather than a looser one.
+     */
+    private held(id: string, workerId: string): Job | undefined {
+        const job = this.jobs.find((j) => j.id === id);
+        return job?.status === "PROCESSING" && job.lockedBy === workerId
+            ? job
+            : undefined;
     }
 }

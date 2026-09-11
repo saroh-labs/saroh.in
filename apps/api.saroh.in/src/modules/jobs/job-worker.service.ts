@@ -94,14 +94,36 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
         const handler = this.registry.get(job.type);
         try {
             await handler(job);
-            await this.queue.complete(job.id);
+            if (!(await this.queue.complete(job.id, this.workerId))) {
+                this.lostLease(job, "succeeded");
+            }
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             this.logger.warn(
                 `Job ${job.id} (${job.type}) failed attempt ` +
                     `${job.attempts + 1}/${job.maxAttempts}: ${message}`,
             );
-            await this.queue.fail(job.id, message);
+            if (!(await this.queue.fail(job.id, this.workerId, message))) {
+                this.lostLease(job, "failed");
+            }
         }
+    }
+
+    /**
+     * The handler returned after this worker's lease on the job was gone: it
+     * ran past JOB_VISIBILITY_MS, another worker reclaimed the row, and that
+     * worker owns the outcome. Nothing was written.
+     *
+     * It also means the side effect ran twice. Occasional is survivable —
+     * handlers are idempotent by contract, which is what absorbs it. A steady
+     * stream means some handler routinely outlives the visibility timeout:
+     * raise JOB_VISIBILITY_MS or make the handler faster, because every one of
+     * these is a duplicate the idempotency guard had to catch.
+     */
+    private lostLease(job: Job, outcome: "succeeded" | "failed"): void {
+        this.logger.warn(
+            `Job ${job.id} (${job.type}) ${outcome} after its lease was ` +
+                `reclaimed; outcome not recorded — the reclaiming worker owns it.`,
+        );
     }
 }
