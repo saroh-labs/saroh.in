@@ -97,6 +97,7 @@ export default async function SiteEditorPage({
              * after any write this request may have followed.
              */
             initialPendingChanges={draft?.pendingSectionChanges ?? null}
+            initialPendingSiteChanges={draft?.pendingSiteChanges ?? null}
             initialSections={initialSections}
             siteName={site.name}
             initialStyle={site.style}

@@ -60,6 +60,8 @@ import {
     subscribe,
 } from "@/lib/sites/editor-prefs";
 import { exactDate } from "@/lib/sites/format-date";
+import type { SiteChangeKind } from "@/lib/sites/pending";
+import { describePendingChanges } from "@/lib/sites/pending";
 import type {
     ApprovalOutcome,
     Flag,
@@ -110,6 +112,7 @@ export function SiteEditor({
     initialReview,
     neverPublished,
     initialPendingChanges,
+    initialPendingSiteChanges,
     initialSections,
     siteName,
     address,
@@ -132,6 +135,8 @@ export function SiteEditor({
      * load (#190). Null before the first publish. Refreshed by every autosave.
      */
     initialPendingChanges: number | null;
+    /** Site-level settings publishing would change (#282). Null before the first publish. */
+    initialPendingSiteChanges: SiteChangeKind[] | null;
     initialSections: Section[];
     siteName: string;
     initialStyle: SiteStyle;
@@ -168,6 +173,9 @@ export function SiteEditor({
     const [pendingChanges, setPendingChanges] = useState<number | null>(
         initialPendingChanges,
     );
+    const [pendingSiteChanges, setPendingSiteChanges] = useState<
+        SiteChangeKind[] | null
+    >(initialPendingSiteChanges);
     const [checking, setChecking] = useState(false);
     const [comments, setComments] =
         useState<SiteCommentView[]>(initialComments);
@@ -347,6 +355,16 @@ export function SiteEditor({
     }, []);
 
     const dirty = JSON.stringify(sections) !== lastSavedJson;
+    /*
+     * A style change that is unsaved or still saving counts as unpublished
+     * work too (#282). Publish only waited on the sections, so publishing inside
+     * the style debounce snapshotted the previous look.
+     */
+    const styleDirty = styleSaving || JSON.stringify(style) !== savedStyleJson;
+    const pendingSummary = describePendingChanges(
+        pendingChanges,
+        pendingSiteChanges,
+    );
 
     function replaceAt(index: number, next: Section) {
         setSections((prev) => prev.map((s, i) => (i === index ? next : s)));
@@ -529,6 +547,7 @@ export function SiteEditor({
             // The save recounted what publishing would change; take its answer
             // rather than guessing at one from what was just sent.
             setPendingChanges(res.data.pendingSectionChanges ?? null);
+            setPendingSiteChanges(res.data.pendingSiteChanges ?? null);
             // An autosave that announces itself every few seconds is noise; the
             // bar already states when it last saved.
             if (!auto) showSuccess("Draft saved.");
@@ -587,22 +606,45 @@ export function SiteEditor({
      * palette. Debounced longer, because dragging a slider produces a value on
      * every pixel and none of the intermediate ones is worth a request.
      */
+    /*
+     * One style save at a time (#282). Without that, an older PUT could land
+     * after a newer one and leave the older palette saved. The effect waits
+     * while a save is in flight, then runs again for the newest style.
+     *
+     * A style that failed to save is not retried until it changes, or a 400
+     * would retry every 700ms with a toast each time. A request that never
+     * reached the API resolves to a failure too, instead of leaving
+     * `styleSaving` stuck on and every later style unsaved.
+     */
+    const failedStyleJson = useRef<string | null>(null);
     useEffect(() => {
-        if (JSON.stringify(style) === savedStyleJson) return;
+        const json = JSON.stringify(style);
+        if (json === savedStyleJson || styleSaving) return;
+        if (failedStyleJson.current === json) return;
         const id = setTimeout(() => {
             const payload = style;
+            const payloadJson = JSON.stringify(payload);
             setStyleSaving(true);
-            void updateSiteStyle(siteId, payload).then((res) => {
-                setStyleSaving(false);
-                if (res.ok) {
-                    setSavedStyleJson(JSON.stringify(payload));
-                } else {
-                    showError(res.error);
-                }
-            });
+            updateSiteStyle(siteId, payload)
+                .then((res) => {
+                    if (res.ok) {
+                        failedStyleJson.current = null;
+                        setSavedStyleJson(payloadJson);
+                    } else {
+                        failedStyleJson.current = payloadJson;
+                        showError(res.error);
+                    }
+                })
+                .catch(() => {
+                    failedStyleJson.current = payloadJson;
+                    showError(
+                        "Could not reach Saroh. Your style is still here and will save with your next change.",
+                    );
+                })
+                .finally(() => setStyleSaving(false));
         }, 700);
         return () => clearTimeout(id);
-    }, [style, savedStyleJson, siteId]);
+    }, [style, savedStyleJson, siteId, styleSaving]);
 
     function resetStyle() {
         // Back to the business's own defaults — which is what the site looked
@@ -810,11 +852,9 @@ export function SiteEditor({
                  * left, and the two together say the whole truth: your work is
                  * safe, and this much of it is not live yet.
                  */}
-                {pendingChanges !== null && pendingChanges > 0 ? (
+                {pendingSummary ? (
                     <span className="text-xs text-muted-foreground">
-                        {pendingChanges === 1
-                            ? "1 section changed"
-                            : `${pendingChanges} sections changed`}
+                        {pendingSummary} changed
                     </span>
                 ) : null}
 
@@ -944,7 +984,7 @@ export function SiteEditor({
                     <Button
                         className="wk-press h-7 rounded bg-[#8a5a3c] px-3 text-xs font-medium text-white hover:bg-[#794e34]"
                         onClick={() => void openCheck()}
-                        disabled={publishing || dirty || saving}
+                        disabled={publishing || dirty || saving || styleDirty}
                     >
                         {publishing
                             ? "Publishing…"

@@ -33,9 +33,11 @@ import type {
     UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
+import type { SiteChangeKind } from "./pending-changes";
 import {
     countPendingSectionChanges,
     pagePathResolver,
+    pendingSiteChanges,
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
@@ -168,6 +170,11 @@ export interface PageDraftView {
      * against, and the button says "Publish site" rather than a count.
      */
     pendingSectionChanges: number | null;
+    /**
+     * Which site-level settings publishing would change (#282): search, share
+     * image, style, menu, footer, page list. Null before the first publish.
+     */
+    pendingSiteChanges: SiteChangeKind[] | null;
 }
 
 /** What a publish returns: the new immutable Publication + the live pointer. */
@@ -277,6 +284,11 @@ export interface SiteDetailView {
      * that shows this number reads this one computation.
      */
     pendingSectionChanges: number | null;
+    /**
+     * Which site-level settings publishing would change (#282): search, share
+     * image, style, menu, footer, page list. Null before the first publish.
+     */
+    pendingSiteChanges: SiteChangeKind[] | null;
     /** Always complete — absent choices are filled from the defaults. */
     style: SiteStyle;
     /**
@@ -362,6 +374,14 @@ const draftSiteSelect = {
 
 /** A site as {@link draftSiteSelect} loads it. */
 type DraftSite = Prisma.SiteGetPayload<{ select: typeof draftSiteSelect }>;
+
+/** What publishing a site would change (#190, #282). */
+interface PendingChanges {
+    /** How many sections would be added, removed or changed. */
+    sections: number;
+    /** Which site-level settings differ from what is live. */
+    site: SiteChangeKind[];
+}
 
 @Injectable()
 export class SitesService {
@@ -554,10 +574,13 @@ export class SitesService {
              * something once there is something to compare against, and until
              * then the site's state is "never published", which says more.
              */
-            const pendingSectionChanges = pending.get(site.id) ?? null;
+            const changes = pending.get(site.id) ?? null;
+            const pendingSectionChanges = changes?.sections ?? null;
+            const pendingSiteChanges = changes?.site ?? null;
             return {
                 ...site,
                 pendingSectionChanges,
+                pendingSiteChanges,
                 /*
                  * Derived from the diff, not from a timestamp.
                  *
@@ -569,7 +592,9 @@ export class SitesService {
                  * work saw a list that said "Live" — the exact over-claim #191
                  * exists to remove.
                  */
-                hasUnpublishedChanges: (pendingSectionChanges ?? 0) > 0,
+                hasUnpublishedChanges:
+                    (pendingSectionChanges ?? 0) > 0 ||
+                    (pendingSiteChanges?.length ?? 0) > 0,
                 pendingDomain:
                     claimedDomains.find((d) => d.status !== "VERIFIED")
                         ?.hostname ?? null,
@@ -578,7 +603,8 @@ export class SitesService {
     }
 
     /**
-     * How many sections publishing would change, per site (#190, #191).
+     * What publishing would change, per site (#190, #191, #282): how many
+     * sections, and which site-level settings.
      *
      * `null` for a site that has never published: there is no baseline to diff
      * against, and "never published" is a stronger thing to say than any number
@@ -591,59 +617,39 @@ export class SitesService {
      */
     private async pendingSectionChanges(
         siteIds: string[],
-    ): Promise<Map<string, number | null>> {
-        const byId = new Map<string, number | null>();
+    ): Promise<Map<string, PendingChanges | null>> {
+        const byId = new Map<string, PendingChanges | null>();
         if (siteIds.length === 0) return byId;
 
         const sites = await prisma.site.findMany({
             where: { id: { in: siteIds } },
+            /*
+             * Exactly what publish loads (#282). The site block is then built by
+             * the same code publish runs, so this diff compares the bytes
+             * publishing would actually write, sections and settings alike.
+             */
             select: {
-                id: true,
+                ...draftSiteSelect,
                 currentPublication: { select: { snapshot: true } },
-                pages: {
-                    // Hidden pages do not travel, on exactly the reasoning that
-                    // keeps hidden sections out below: the snapshot IS the
-                    // published site, and a Publication is immutable once
-                    // written, so a page that leaked in could not be taken back
-                    // out without republishing.
-                    where: { hidden: false },
-                    orderBy: { path: "asc" },
-                    select: {
-                        id: true,
-                        path: true,
-                        title: true,
-                        isHome: true,
-                        versions: {
-                            where: { status: "DRAFT" },
-                            orderBy: { createdAt: "desc" },
-                            take: 1,
-                            select: {
-                                sections: {
-                                    where: { hidden: false },
-                                    orderBy: { order: "asc" },
-                                    select: {
-                                        type: true,
-                                        contractVersion: true,
-                                        content: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
             },
         });
 
         for (const site of sites) {
-            byId.set(
-                site.id,
-                site.currentPublication === null
-                    ? null
-                    : countPendingSectionChanges(
-                          toPendingPages(site.pages),
-                          site.currentPublication.snapshot,
-                      ),
-            );
+            if (site.currentPublication === null) {
+                byId.set(site.id, null);
+                continue;
+            }
+            const live = site.currentPublication.snapshot;
+            const pages = toPendingPages(site.pages);
+            // Lenient: counting is a read, and one stale section must not
+            // make the sites list throw.
+            const draft = this.buildSnapshot(site, new Date(0), {
+                lenient: true,
+            });
+            byId.set(site.id, {
+                sections: countPendingSectionChanges(pages, live),
+                site: pendingSiteChanges(draft.site, pages, live),
+            });
         }
         return byId;
     }
@@ -720,7 +726,9 @@ export class SitesService {
              * the whole point of the number is that a merchant can read it in
              * two places and get the same answer.
              */
-            pendingSectionChanges: pending.get(site.id) ?? null,
+            pendingSectionChanges: pending.get(site.id)?.sections ?? null,
+            // The settings that travel into the snapshot too (#282).
+            pendingSiteChanges: pending.get(site.id)?.site ?? null,
             style: parseSiteStyle(style),
             styleOptions: siteStyleOptions(),
             footer: parseSiteFooter(footer),
@@ -1139,7 +1147,8 @@ export class SitesService {
                 ) as typeof section.content,
             })),
             // The editor's first read of the count, before any autosave.
-            pendingSectionChanges: pending.get(siteId) ?? null,
+            pendingSectionChanges: pending.get(siteId)?.sections ?? null,
+            pendingSiteChanges: pending.get(siteId)?.site ?? null,
         };
     }
 
@@ -1260,7 +1269,8 @@ export class SitesService {
         const pending = await this.pendingSectionChanges([siteId]);
         return {
             ...draft,
-            pendingSectionChanges: pending.get(siteId) ?? null,
+            pendingSectionChanges: pending.get(siteId)?.sections ?? null,
+            pendingSiteChanges: pending.get(siteId)?.site ?? null,
         };
     }
 
@@ -1287,7 +1297,16 @@ export class SitesService {
      * write — a resolved menu, a sanitized footer, a hidden section — and
      * their notes would be about a site that never goes live.
      */
-    buildSnapshot(site: DraftSite, publishedAt: Date): SiteSnapshot {
+    buildSnapshot(
+        site: DraftSite,
+        publishedAt: Date,
+        /**
+         * `lenient` keeps a section that fails its contract instead of
+         * throwing (#282). The pending-change count is a read and must not
+         * fail; publish is not lenient.
+         */
+        options: { lenient?: boolean } = {},
+    ): SiteSnapshot {
         // v2 buttons name a page by id; the snapshot needs its path (#207).
         // Built from the pages this publish will write, so a hidden page
         // resolves to nothing rather than to a path the live site 404s.
@@ -1311,6 +1330,13 @@ export class SitesService {
                      * this writes, not over the raw draft.
                      */
                     const result = toPublishableSection(section, resolvePage);
+                    if (!result.ok && options.lenient) {
+                        return {
+                            type: section.type,
+                            contractVersion: section.contractVersion,
+                            content: section.content,
+                        };
+                    }
                     if (!result.ok) {
                         throw new BadRequestException(
                             `Cannot publish: page "${page.path}" has an invalid "${section.type}" section (${result.error})`,
@@ -1943,31 +1969,32 @@ export class SitesService {
 
         const publishedAt = site.currentPublication?.publishedAt ?? null;
         /*
-         * Two places a change can land, and each needs its own test.
+         * From the same diff the editor bar, settings and the sites list read
+         * (#282), not from timestamps.
          *
-         * The page's OWN timestamp catches what lives on the Page row rather
-         * than inside a draft: hiding a page (#197), renaming one, moving one.
-         * All three alter the snapshot publishing would write — title and path
-         * travel in it, and a hidden page does not travel at all.
+         * Timestamps missed two whole categories. Everything that lives on the
+         * Site row — search, share image, style, menu, footer — has no page to
+         * date. And a section edit leaves no timestamp to compare at all:
+         * saving a draft deletes and recreates the page's Section rows without
+         * touching `PageVersion.updatedAt`, so that comparison sat at whenever
+         * the version was created and never fired for the edit merchants make
+         * most (#191).
          *
-         * Section edits leave no timestamp to compare. Saving a draft deletes
-         * and recreates the page's Section rows and never updates the
-         * PageVersion row, so the `PageVersion.updatedAt` comparison this used
-         * to make sat at whenever the version was created and never fired for
-         * the edit merchants make most — the same over-claim `listSites` had
-         * (#191). Those are counted by the diff in `pending-changes.ts`
-         * instead, the one the editor's "N sections changed" line shows, so
-         * this flag cannot say "nothing waiting" beside a non-zero count.
-         * Skipped before the first publish, where there is nothing to diff.
+         * The diff also covers what the page's own timestamp used to catch —
+         * hiding a page (#197), renaming one, moving one — because a page's
+         * title, path and presence all travel in the snapshot, and `pages` is
+         * one of the kinds it compares.
+         *
+         * Skipped before the first publish: there is nothing to diff against.
          */
         const pending =
             publishedAt === null
-                ? null
-                : await this.pendingSectionChanges([siteId]);
+                ? undefined
+                : (await this.pendingSectionChanges([siteId])).get(siteId);
         const hasUnpublishedChanges =
             publishedAt !== null &&
-            (site.pages.some((page) => page.updatedAt > publishedAt) ||
-                (pending?.get(siteId) ?? 0) > 0);
+            !!pending &&
+            (pending.sections > 0 || pending.site.length > 0);
 
         const flags = checkSite({
             navigation: parseSiteNavigation(site.navigation),

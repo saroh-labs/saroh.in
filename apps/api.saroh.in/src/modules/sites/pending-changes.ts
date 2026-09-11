@@ -7,7 +7,7 @@ import {
 import { sanitizeSectionContent } from "./sanitize";
 
 /**
- * How much publishing would actually change (#190, #191).
+ * How much publishing would actually change (#190, #191, #282).
  *
  * Three surfaces ask this question — the editor's top bar, the settings screen
  * and the sites list — and the epic is explicit that three places showing three
@@ -241,6 +241,119 @@ export function toPendingPages(pages: DraftPageRow[]): PublishablePage[] {
             }),
         ),
     }));
+}
+
+/**
+ * The site-level things publishing would change (#282).
+ *
+ * Sections were the only thing counted, but the snapshot carries far more: the
+ * site name, search title and description, share image, blog address, style,
+ * footer, menu and the page list. A merchant who changed only their search
+ * title was told "Nothing — the live site matches your draft" and then
+ * wondered why Google never updated. #188 named that failure.
+ *
+ * Closed on purpose, so every surface can name each kind in words. A new
+ * snapshot field that a merchant can change needs a kind here, or it goes
+ * uncounted exactly as these did.
+ */
+export const SITE_CHANGE_KINDS = [
+    "name",
+    "search",
+    "shareImage",
+    "posts",
+    "style",
+    "footer",
+    "menu",
+    "pages",
+] as const;
+export type SiteChangeKind = (typeof SITE_CHANGE_KINDS)[number];
+
+/**
+ * Which snapshot `site` fields make up each kind.
+ *
+ * `styleVariables` is deliberately absent. It is derived from `style`, and
+ * counting it would report "the style changed" on every site the moment a
+ * swatch was retuned in code, a change no merchant made.
+ */
+const SITE_CHANGE_FIELDS: Record<
+    Exclude<SiteChangeKind, "pages">,
+    readonly string[]
+> = {
+    name: ["name", "slug"],
+    search: ["seoTitle", "seoDescription"],
+    shareImage: ["socialImageUrl", "socialImage"],
+    posts: ["postsPrefix"],
+    style: ["style"],
+    footer: ["footer"],
+    menu: ["navigation"],
+};
+
+/** The named fields of an object, with absent normalised to null. */
+function pick(
+    source: Record<string, unknown>,
+    fields: readonly string[],
+): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const field of fields) out[field] = source[field] ?? null;
+    return out;
+}
+
+/** A page list reduced to what the site shows about each page, by path. */
+function pageList(pages: readonly unknown[]): unknown[] {
+    return pages
+        .filter(
+            (p): p is Record<string, unknown> =>
+                p !== null && typeof p === "object",
+        )
+        .map((p) => ({
+            path: typeof p.path === "string" ? p.path : null,
+            title: typeof p.title === "string" ? p.title : null,
+            isHome: p.isHome === true,
+        }))
+        .sort((a, b) => String(a.path).localeCompare(String(b.path)));
+}
+
+/**
+ * Diff the site block publish would write against the live snapshot's.
+ *
+ * `draftSite` must be built by the same code publish runs
+ * (`SitesService.buildSnapshot`), so both sides describe the same bytes. The
+ * live side is read forgivingly: a setting an older snapshot never carried
+ * reads as unset, so a draft that has not set it either is not a change.
+ */
+export function pendingSiteChanges(
+    draftSite: Record<string, unknown>,
+    draftPages: readonly Pick<PublishablePage, "path" | "title" | "isHome">[],
+    snapshot: unknown,
+): SiteChangeKind[] {
+    const shape = (
+        snapshot !== null && typeof snapshot === "object" ? snapshot : {}
+    ) as { site?: unknown; pages?: unknown };
+    const liveSite = (
+        shape.site !== null && typeof shape.site === "object" ? shape.site : {}
+    ) as Record<string, unknown>;
+
+    const changed: SiteChangeKind[] = [];
+    for (const kind of SITE_CHANGE_KINDS) {
+        if (kind === "pages") {
+            const livePages = Array.isArray(shape.pages) ? shape.pages : [];
+            if (
+                canonical(pageList(draftPages)) !==
+                canonical(pageList(livePages))
+            ) {
+                changed.push(kind);
+            }
+            continue;
+        }
+        const fields = SITE_CHANGE_FIELDS[kind];
+        if (
+            canonical(pick(draftSite, fields)) !==
+            canonical(pick(liveSite, fields))
+        ) {
+            changed.push(kind);
+        }
+    }
+    return changed;
 }
 
 /*
