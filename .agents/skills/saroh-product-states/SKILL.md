@@ -86,6 +86,12 @@ Check all four scenes ([[saroh-four-scenes]]), including dark.
 
 - **Never `catch {}` a user-facing read.** Either it degrades into a named
   state, or it throws to the segment boundary. Silence is the bug.
+- **An api that could not be asked is not a signed-out user.** The session is
+  a read like any other, and "no session" and "could not find out" are
+  different states. `resolveServerSession()` keeps them apart; only a 401/403
+  may send someone to sign-in, and anything else throws to the segment
+  boundary so it offers a retry. One restart used to sign everyone out
+  (`packages/auth/src/next.ts`).
 - **A failed read is not an empty read.** `getList` throws rather than
   returning `[]` for exactly this reason (`lib/api/http.ts`).
 - **A capability being off is not a failure.** It is not alarming, and it must
