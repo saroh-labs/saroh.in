@@ -103,6 +103,9 @@ export class DraftSectionInputDto {
     // so an older client that never sends the field cannot hide anything by
     // omission.
     @IsOptional()
+    // Raw value, not implicit conversion's truthiness: "false" must be
+    // refused, never read as true, which would HIDE the section (#286).
+    @Transform(({ obj }: { obj: Record<string, unknown> }) => obj.hidden)
     @IsBoolean({ message: "hidden must be a boolean" })
     hidden?: boolean;
 
@@ -198,6 +201,9 @@ export class UpdatePageDto {
      * parked page back on a live site simply by not mentioning it.
      */
     @IsOptional()
+    // Raw value, not implicit conversion's truthiness: "false" must be
+    // refused, never read as true, which would HIDE the section (#286).
+    @Transform(({ obj }: { obj: Record<string, unknown> }) => obj.hidden)
     @IsBoolean({ message: "hidden must be a boolean" })
     hidden?: boolean;
 }
@@ -223,6 +229,25 @@ export class CreateCommentDto {
     @MinLength(1, { message: "sectionKey is required" })
     @MaxLength(64)
     sectionKey!: string;
+}
+
+/**
+ * Mark a note settled, or reopen it (#286).
+ *
+ * This body used to be an inline `{ resolved?: boolean }`. An inline type
+ * reflects as `Object`, and the ValidationPipe validates nothing for `Object`:
+ * no whitelist, no type check. `{"resolved": "true"}` silently reopened the
+ * note.
+ *
+ * `resolved` is read RAW, before class-transformer's implicit conversion. That
+ * conversion runs first and turns any string into a boolean by truthiness, so
+ * `"false"` would settle a note. A real boolean is required, and anything else
+ * is a 400.
+ */
+export class SetCommentResolvedDto {
+    @Transform(({ obj }: { obj: Record<string, unknown> }) => obj.resolved)
+    @IsBoolean({ message: "resolved must be true or false" })
+    resolved!: boolean;
 }
 
 /**

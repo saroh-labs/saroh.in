@@ -285,3 +285,23 @@ what the visitor presents. `PreviewGone` is shared and rendered by every
 preview page. The share-link UI keeps this session's addresses and says older
 ones were shown once.
 **Category**: security · tests in `site-preview-links.service.spec.ts`
+
+## API — "false" settles a note: implicit conversion and inline body types (#286)
+
+**Problem**: `PATCH …/comments/:id` with `{"resolved": "true"}` reopened a note
+instead of being refused. The obvious fix, a DTO with `@IsBoolean()`, would
+have made `{"resolved": "false"}` settle it.
+**Root cause**: Two layers.
+
+- The handler took `@Body() dto: { resolved?: boolean }`. An inline type
+  reflects as `Object`, and `ValidationPipe` skips validation for `Object`.
+- The pipe's `enableImplicitConversion` converts a value to the declared
+  property type BEFORE validators run, and a boolean conversion is truthiness.
+  Any string, `"false"` included, becomes `true` and then passes
+  `@IsBoolean()`.
+
+**Fix**: `SetCommentResolvedDto` reads the raw value with
+`@Transform(({ obj }) => obj.resolved)` ahead of `@IsBoolean()`. The pipe's
+options moved to `common/validation.ts` so `dto.validation.spec.ts` validates
+through exactly what `main.ts` applies.
+**Category**: api · rule in `docs/patterns/backend-nestjs.md`
