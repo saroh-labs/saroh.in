@@ -640,8 +640,11 @@ export class BookingsService {
                         select: { id: true },
                     });
                     // Same transactional outbox as booking: a committed move
-                    // ALWAYS has a pending notification, so the booker cannot
-                    // be left standing at the old time because a send failed.
+                    // always has a queued notification job, so a failed send
+                    // cannot drop it. It is NOT delivered yet: no handler is
+                    // registered for booking.notify, so the worker dead-letters
+                    // these jobs (see jobs/job-consumers.spec.ts), and until one
+                    // is, nothing tells the booker their time moved.
                     await tx.job.create({
                         data: {
                             organizationId: ctx.organizationId,
@@ -818,8 +821,10 @@ export class BookingsService {
                         select: { id: true },
                     });
 
-                    // Transactional outbox: a committed booking ALWAYS has a
-                    // pending notification (the worker/handler is a later ticket).
+                    // Transactional outbox: a committed booking always has a
+                    // queued notification job. The handler never landed: the
+                    // worker dead-letters booking.notify until one is
+                    // registered (see jobs/job-consumers.spec.ts).
                     await tx.job.create({
                         data: {
                             organizationId,

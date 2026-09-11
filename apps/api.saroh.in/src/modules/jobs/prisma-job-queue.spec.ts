@@ -168,3 +168,36 @@ describe("PrismaJobQueue.fail", () => {
         expect(updateMany.mock.calls[0][0].where).toEqual(FENCE);
     });
 });
+
+describe("PrismaJobQueue.deadLetter", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        updateMany.mockResolvedValue({ count: 1 });
+    });
+
+    it("marks FAILED at once, keeps attempts, and records why — fenced on the lease", async () => {
+        await expect(
+            new PrismaJobQueue().deadLetter(
+                "job_1",
+                "worker_1",
+                "No handler registered",
+            ),
+        ).resolves.toBe(true);
+
+        const { where, data } = updateMany.mock.calls[0][0];
+        expect(where).toEqual(FENCE);
+        expect(data.status).toBe("FAILED");
+        expect(data.lastError).toBe("No handler registered");
+        expect(data.processedAt).toBeInstanceOf(Date);
+        expect(data.attempts).toBeUndefined(); // nothing was attempted
+        expect(data.runAt).toBeUndefined(); // never rescheduled
+    });
+
+    it("reports a lost lease rather than writing", async () => {
+        updateMany.mockResolvedValue({ count: 0 });
+
+        await expect(
+            new PrismaJobQueue().deadLetter("job_1", "worker_1", "x"),
+        ).resolves.toBe(false);
+    });
+});

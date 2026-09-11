@@ -1,10 +1,4 @@
-import type { Job } from "@saroh/database";
-
 import { JobHandlerRegistry } from "./job-handler.registry";
-
-function job(over: Partial<Job> = {}): Job {
-    return { id: "job_1", type: "enquiry.notify", ...over } as Job;
-}
 
 describe("JobHandlerRegistry", () => {
     it("registers and looks up a handler by type", () => {
@@ -24,14 +18,11 @@ describe("JobHandlerRegistry", () => {
         );
     });
 
-    it("returns a loud no-op fallback for an unknown type (resolves, doesn't throw)", async () => {
+    it("has no fallback for an unknown type — the worker dead-letters it", () => {
         const reg = new JobHandlerRegistry();
         expect(reg.has("nope.unknown")).toBe(false);
-        const fallback = reg.get("nope.unknown");
-        // Must resolve so the worker COMPLETEs an unknown-type job rather than
-        // retrying it forever.
-        await expect(
-            fallback(job({ type: "nope.unknown" })),
-        ).resolves.toBeUndefined();
+        // Not a resolving no-op: that is what let the worker record an
+        // unhandled job as DONE.
+        expect(reg.get("nope.unknown")).toBeUndefined();
     });
 });

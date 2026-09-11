@@ -54,6 +54,16 @@ export interface JobQueue {
      * PENDING runs its side effect — a notification, a message — again.
      */
     fail(id: string, workerId: string, error: string): Promise<boolean>;
+
+    /**
+     * Dead-letter a job at once — FAILED, terminal, never retried — fenced on
+     * the lease like {@link complete}. For a job that cannot succeed however
+     * often it runs, such as one whose `type` has no registered handler:
+     * retrying only spends attempts, and completing it records work as done
+     * that never happened. `attempts` is left alone because nothing was
+     * attempted.
+     */
+    deadLetter(id: string, workerId: string, reason: string): Promise<boolean>;
 }
 
 /** Input for {@link JobQueue.enqueue}. */
@@ -88,7 +98,7 @@ export type JobHandler = (job: Job) => Promise<void>;
  */
 export interface JobHandlerRegistryPort {
     register(type: string, handler: JobHandler): void;
-    get(type: string): JobHandler;
+    get(type: string): JobHandler | undefined;
 }
 
 /** Base retry delay (ms) — the first retry waits roughly this long. */
@@ -185,6 +195,17 @@ export class FakeJobQueue implements JobQueue {
             job.status = "PENDING";
             job.runAt = new Date(Date.now() + nextBackoff(attempts));
         }
+        return Promise.resolve(true);
+    }
+
+    deadLetter(id: string, workerId: string, reason: string): Promise<boolean> {
+        const job = this.held(id, workerId);
+        if (!job) return Promise.resolve(false);
+        job.status = "FAILED";
+        job.lastError = reason;
+        job.processedAt = new Date();
+        job.lockedAt = null;
+        job.lockedBy = null;
         return Promise.resolve(true);
     }
 

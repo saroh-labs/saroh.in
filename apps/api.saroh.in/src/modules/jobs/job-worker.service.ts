@@ -92,6 +92,10 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
 
     private async dispatch(job: Job): Promise<void> {
         const handler = this.registry.get(job.type);
+        if (!handler) {
+            await this.unhandled(job);
+            return;
+        }
         try {
             await handler(job);
             if (!(await this.queue.complete(job.id, this.workerId))) {
@@ -106,6 +110,28 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
             if (!(await this.queue.fail(job.id, this.workerId, message))) {
                 this.lostLease(job, "failed");
             }
+        }
+    }
+
+    /**
+     * A job whose `type` has no registered handler. It is dead-lettered — not
+     * completed, and not retried. No amount of retrying registers a handler,
+     * and completing it records as delivered something that never ran, which
+     * is what every `booking.notify` got before this existed.
+     *
+     * ERROR, because each one is a producer and a consumer that disagree. The
+     * row keeps the reason in `lastError`, so when the handler ships those jobs
+     * can be re-queued rather than lost — check first that sending them late is
+     * still what the recipient should get.
+     */
+    private async unhandled(job: Job): Promise<void> {
+        const reason = `No handler registered for job type "${job.type}"`;
+        this.logger.error(
+            `Job ${job.id}: ${reason}; dead-lettered. ` +
+                `Register a handler for this type or stop enqueuing it.`,
+        );
+        if (!(await this.queue.deadLetter(job.id, this.workerId, reason))) {
+            this.lostLease(job, "failed");
         }
     }
 

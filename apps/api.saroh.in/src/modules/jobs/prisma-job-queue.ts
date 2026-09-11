@@ -91,6 +91,24 @@ export class PrismaJobQueue implements JobQueue {
         return count === 1;
     }
 
+    async deadLetter(
+        id: string,
+        workerId: string,
+        reason: string,
+    ): Promise<boolean> {
+        const { count } = await prisma.job.updateMany({
+            where: { id, status: "PROCESSING", lockedBy: workerId },
+            data: {
+                status: "FAILED",
+                lastError: reason,
+                processedAt: new Date(),
+                lockedAt: null,
+                lockedBy: null,
+            },
+        });
+        return count === 1;
+    }
+
     /**
      * Record a failure. Reads the job to know its attempt count, then either
      * dead-letters (FAILED, terminal) once `attempts+1 >= maxAttempts`, or
