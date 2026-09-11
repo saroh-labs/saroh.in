@@ -5,7 +5,12 @@ import {
     InternalServerErrorException,
     NotFoundException,
 } from "@nestjs/common";
-import { parseSectionContent, Prisma, prisma } from "@saroh/database";
+import {
+    getSectionContract,
+    parseSectionContent,
+    Prisma,
+    prisma,
+} from "@saroh/database";
 import {
     getTemplate,
     instantiateTemplate,
@@ -34,7 +39,7 @@ import {
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
-import { sanitizeRichHtml } from "./sanitize";
+import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
 import {
     assertPageInSite,
     assertPathIsFree,
@@ -849,7 +854,13 @@ export class SitesService {
 
         // Validate BEFORE writing, for the same reason style does: a malformed
         // body is a 400 now rather than a footer that fails to render later.
-        const footer = parseSiteFooter(input);
+        const parsed = parseSiteFooter(input);
+        // Sanitized on the way IN as well as at publish (#280). Publish is not
+        // the only reader of what is stored here, and "safe because publish
+        // cleans it" left every other reader trusting HTML nobody had cleaned.
+        const footer: SiteFooter | null = parsed
+            ? { format: parsed.format, value: sanitizeRichHtml(parsed.value) }
+            : null;
 
         await prisma.site.update({
             where: { id: siteId },
@@ -1085,7 +1096,21 @@ export class SitesService {
             pageId,
             pageVersionId: version.id,
             status: "DRAFT",
-            sections,
+            /*
+             * Sanitized on the way OUT as well (#280). The editor's preview
+             * renders rich fields as HTML, and a row saved before sanitize-on-
+             * write existed, or written by any other path, must not reach it
+             * raw. It also cleans the row for good: the editor saves back what
+             * it was given.
+             */
+            sections: sections.map((section) => ({
+                ...section,
+                content: sanitizeSectionContent(
+                    section.content,
+                    getSectionContract(section.type, section.contractVersion)
+                        ?.sanitizedFields ?? [],
+                ) as typeof section.content,
+            })),
             // The editor's first read of the count, before any autosave.
             pendingSectionChanges: pending.get(siteId) ?? null,
         };
@@ -1100,8 +1125,9 @@ export class SitesService {
      * existing Section rows are deleted and replaced with new rows whose
      * `order = array index` (a whole-list replace keeps ordering gap-free and
      * the write atomic). The persisted `content` is the contract-NORMALIZED
-     * value (defaults applied). Sanitization is deferred to publish, per the
-     * contract's sanitization boundary.
+     * value (defaults applied), with the contract's rich fields SANITIZED. Publish
+     * sanitizes again, but the editor preview renders what is stored here, so
+     * cleaning only at publish left it rendering raw HTML (#280).
      */
     async replaceDraftSections(
         ctx: OrganizationContext,
@@ -1136,7 +1162,10 @@ export class SitesService {
                 type: section.type,
                 contractVersion: section.contractVersion,
                 order: index,
-                content: result.data,
+                content: sanitizeSectionContent(
+                    result.data,
+                    result.contract.sanitizedFields,
+                ),
                 // Absent means visible — see DraftSectionInputDto.hidden.
                 hidden: section.hidden ?? false,
                 /*

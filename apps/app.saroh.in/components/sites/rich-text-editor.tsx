@@ -63,18 +63,21 @@ import { MediaPicker } from "@/components/sites/media-picker";
  * the editor that replaces that — Tiptap underneath, the workspace's own
  * shadcn primitives on top, modelled on Echo Editor's toolbar.
  *
- * THE ALLOWLIST IS THE SPEC. Publish runs `richText.value` and the footer
- * through `sanitize.ts`, an allowlist applied before the immutable snapshot is
- * written. Anything this editor can produce that the allowlist strips is
- * formatting the merchant applies, sees, and then loses at publish — the worst
- * failure, because it is silent and only visible on the live site. So every
+ * THE ALLOWLIST IS THE SPEC. The API runs `richText.value` and the footer
+ * through `sanitize.ts`, an allowlist, when a draft is saved and again at
+ * publish (#280). Anything this editor can produce that the allowlist strips is
+ * formatting the merchant applies, sees, and then loses on the next save — the
+ * worst failure, because it is silent. So every
  * extension loaded here maps onto something the allowlist keeps, and the ones
  * that do not — task lists render an <input>, embeds an <iframe> — are not
  * loaded, however good they look in the reference.
  *
- * Colour, highlight, font family and size are included on a product call.
- * They survive publish (the sanitizer keeps `style` on every tag), and they
- * are the one place a merchant can step outside the site's curated palette.
+ * Colour, highlight, font family, size and alignment are included on a product
+ * call, and they are the one place a merchant can step outside the site's
+ * curated palette. They survive because the sanitizer keeps exactly the CSS
+ * properties these extensions write, plus `<mark>` for highlight, and no other
+ * CSS. An extension that writes a new property needs it added to
+ * `allowedStyles` in `sanitize.ts` first, or its formatting vanishes on save.
  *
  * PASTE IS WHERE THIS EARNS ITS KEEP. ProseMirror parses pasted Word,
  * Google-Docs and web HTML INTO the schema, so whatever is not one of these
@@ -150,8 +153,9 @@ export function RichTextEditor({
                 link: {
                     openOnClick: false,
                     autolink: true,
-                    // The sanitizer sets rel/target itself; the editor
-                    // stating them keeps the two in agreement.
+                    // The sanitizer forces target=_blank and
+                    // rel=noopener noreferrer on any link with a target; the
+                    // editor stating them keeps the two in agreement.
                     HTMLAttributes: {
                         rel: "noopener noreferrer",
                         target: "_blank",

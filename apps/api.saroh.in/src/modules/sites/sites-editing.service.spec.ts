@@ -269,6 +269,135 @@ describe("SitesService.getPageDraft", () => {
             service.getPageDraft(ctx({ role: "MEMBER" }), "site_1", "page_1"),
         ).rejects.toThrow(/MEMBER.*section:write/);
     });
+
+    it("SANITIZES a stored draft on the way out, so the editor preview never renders it raw (#280)", async () => {
+        siteFindFirst.mockResolvedValue({ id: "site_1" });
+        pageFindFirst.mockResolvedValue({ id: "page_1" });
+        versionFindFirst.mockResolvedValue({ id: "ver_1" });
+        // Rows as they could exist from before sanitize-on-write: a rich
+        // field carrying a handler, and a text field that merely looks like
+        // HTML.
+        sectionFindMany.mockResolvedValue([
+            {
+                id: "sec_1",
+                type: "richText",
+                contractVersion: 1,
+                order: 0,
+                hidden: false,
+                key: "key_1",
+                content: {
+                    format: "html",
+                    value: '<p>Hi</p><img src="https://img.test/a.png" onerror="alert(1)">',
+                },
+            },
+            {
+                id: "sec_2",
+                type: "hero",
+                contractVersion: 1,
+                order: 1,
+                hidden: false,
+                key: "key_2",
+                content: { heading: "<b onclick=x>Not HTML</b>" },
+            },
+        ]);
+
+        const draft = await service.getPageDraft(ctx(), "site_1", "page_1");
+        const [rich, hero] = draft.sections as unknown as Array<{
+            content: Record<string, string>;
+        }>;
+
+        expect(rich.content.value).toContain("<p>Hi</p>");
+        expect(rich.content.value).not.toMatch(/onerror|alert/);
+        // Only the contract's flagged fields are cleaned. A heading is text,
+        // and React escapes it wherever it is drawn.
+        expect(hero.content.heading).toBe("<b onclick=x>Not HTML</b>");
+    });
+});
+
+describe("SitesService.replaceDraftSections sanitizes on the way in (#280)", () => {
+    beforeEach(() => {
+        siteFindFirst.mockResolvedValue({ id: "site_1" });
+        pageFindFirst.mockResolvedValue({ id: "page_1" });
+        versionFindFirst.mockResolvedValue({ id: "ver_1" });
+        sectionFindMany.mockResolvedValue([]);
+        sectionDeleteMany.mockResolvedValue({ count: 0 });
+        sectionCreateMany.mockResolvedValue({ count: 0 });
+    });
+
+    it("stores rich text already cleaned, not only at publish", async () => {
+        await service.replaceDraftSections(ctx(), "site_1", "page_1", {
+            sections: [
+                {
+                    type: "richText",
+                    contractVersion: 1,
+                    content: {
+                        format: "html",
+                        value: '<p style="position: fixed; color: #b91c1c">ok</p><img src="https://img.test/a.png" onerror="alert(1)"><script>alert(2)</script>',
+                    },
+                },
+            ],
+        });
+
+        const created = sectionCreateMany.mock.calls[0][0].data as Array<{
+            content: { value: string };
+        }>;
+        expect(created[0].content.value).not.toMatch(
+            /onerror|alert|script|position/,
+        );
+        expect(created[0].content.value).toMatch(/color:\s*#b91c1c/);
+    });
+
+    it("refuses a button whose link would run script", async () => {
+        await expect(
+            service.replaceDraftSections(ctx(), "site_1", "page_1", {
+                sections: [
+                    {
+                        type: "cta",
+                        contractVersion: 2,
+                        content: {
+                            label: "Order now",
+                            action: {
+                                kind: "url",
+                                href: "javascript:alert(1)",
+                            },
+                        },
+                    },
+                ],
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(sectionCreateMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("SitesService.updateFooter (#280)", () => {
+    beforeEach(() => {
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            currentPublicationId: null,
+        });
+        siteUpdate.mockResolvedValue({ id: "site_1" });
+    });
+
+    it("stores the footer SANITIZED, not only at publish", async () => {
+        const result = await service.updateFooter(ctx(), "site_1", {
+            format: "html",
+            value: '<p onclick="steal()">Northwind Supply</p><script>alert(1)</script>',
+        });
+
+        const stored = siteUpdate.mock.calls[0][0].data.footer as {
+            value: string;
+        };
+        expect(stored.value).toBe("<p>Northwind Supply</p>");
+        expect(result.footer?.value).toBe("<p>Northwind Supply</p>");
+    });
+
+    it("still treats an emptied footer as no footer", async () => {
+        const result = await service.updateFooter(ctx(), "site_1", {
+            format: "html",
+            value: "   ",
+        });
+        expect(result.footer).toBeNull();
+    });
 });
 
 describe("SitesService.publishSite", () => {
