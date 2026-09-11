@@ -389,4 +389,15 @@ describe("DomainsService.remove", () => {
         );
         expect(domainDelete).not.toHaveBeenCalled();
     });
+
+    it("denies a MEMBER (domain:manage is OWNER/ADMIN-only) before any I/O", async () => {
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
+
+        await expect(
+            service.remove(ctx({ role: "MEMBER" }), "dom_1"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(domainFindUnique).not.toHaveBeenCalled();
+        expect(siteUpdateMany).not.toHaveBeenCalled();
+        expect(domainDelete).not.toHaveBeenCalled();
+    });
 });

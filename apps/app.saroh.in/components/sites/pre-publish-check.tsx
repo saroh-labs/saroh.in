@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { shortDate } from "@/lib/sites/format-date";
 import type {
+    ApprovalOutcome,
     Flag,
     FlagType,
     ReviewState,
@@ -36,6 +37,30 @@ const TYPE_LABEL: Record<FlagType, string> = {
     missingSeoDescription: "No search description",
     brokenLink: "Link goes nowhere",
     phoneWidth: "Breaks at phone width",
+};
+
+/**
+ * The approval line, worded per outcome. Keyed by the union so a new outcome
+ * is a type error here rather than a line that falls through to "asked for
+ * changes". Only an approval takes the accent: it is the one good-news verdict.
+ */
+const APPROVAL_LINE: Record<
+    ApprovalOutcome,
+    {
+        approved: boolean;
+        text: (approval: NonNullable<ReviewState["latestApproval"]>) => string;
+    }
+> = {
+    APPROVED: { approved: true, text: ({ by }) => `${by} approved this site` },
+    CHANGES_REQUESTED: {
+        approved: false,
+        text: ({ by }) => `${by} asked for changes`,
+    },
+    BYPASSED: {
+        approved: false,
+        text: ({ by, at }) =>
+            `${by} published without approval on ${shortDate(at)}`,
+    },
 };
 
 export function PrePublishCheck({
@@ -145,16 +170,15 @@ export function PrePublishCheck({
                     {review.latestApproval === null ? null : (
                         <p
                             className={
-                                review.latestApproval.outcome === "APPROVED"
+                                APPROVAL_LINE[review.latestApproval.outcome]
+                                    .approved
                                     ? "mb-6 rounded-md border border-[#3d3020] bg-[#241d14] px-3 py-2 text-sm text-[#c99f6f]"
                                     : "mb-6 rounded-md border px-3 py-2 text-sm text-muted-foreground"
                             }
                         >
-                            {review.latestApproval.outcome === "APPROVED"
-                                ? `${review.latestApproval.by} approved this site`
-                                : review.latestApproval.outcome === "BYPASSED"
-                                  ? `${review.latestApproval.by} published without approval on ${shortDate(review.latestApproval.at)}`
-                                  : `${review.latestApproval.by} asked for changes`}
+                            {APPROVAL_LINE[review.latestApproval.outcome].text(
+                                review.latestApproval,
+                            )}
                             {review.openNotes > 0
                                 ? `, with ${review.openNotes} ${review.openNotes === 1 ? "note" : "notes"} still open.`
                                 : "."}

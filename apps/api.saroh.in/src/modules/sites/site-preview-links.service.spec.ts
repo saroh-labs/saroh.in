@@ -172,6 +172,15 @@ describe("SitePreviewLinksService.revoke", () => {
             service.revoke(OWNER, "site_1", "link_x"),
         ).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it("is the owner's call: a MEMBER is refused before any I/O", async () => {
+        await expect(
+            service.revoke(MEMBER, "site_1", "link_1"),
+        ).rejects.toThrow();
+        expect(siteFindFirst).not.toHaveBeenCalled();
+        expect(linkFindFirst).not.toHaveBeenCalled();
+        expect(linkUpdate).not.toHaveBeenCalled();
+    });
 });
 
 describe("SitePreviewLinksService.resolve (public)", () => {

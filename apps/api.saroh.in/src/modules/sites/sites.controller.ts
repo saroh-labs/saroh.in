@@ -263,11 +263,6 @@ export class SitesController {
     }
 
     /**
-     * Publish the site: snapshot its pages' current drafts into a new immutable
-     * Publication (sanitizing rich fields) and repoint the live pointer.
-     * Requires `site:publish`.
-     */
-    /**
      * Update a site's search and social settings (#188).
      *
      * PATCH, not PUT: a settings form sends what changed. An omitted field is
@@ -282,15 +277,6 @@ export class SitesController {
         return this.sites.updateSettings(ctx, siteId, dto);
     }
 
-    /**
-     * Set the site's look (#189). Replaces rather than merges — the Style panel
-     * always sends a whole look, and merging would let two tabs produce a
-     * palette neither person chose.
-     */
-    /**
-     * Set the site's footer (#202). Replaces rather than merges, and an empty
-     * value clears it — see `SitesService.updateFooter`.
-     */
     /** Set the site's menu (#206). Replaces; an empty list clears it. */
     @Put(":siteId/navigation")
     updateNavigation(
@@ -301,6 +287,10 @@ export class SitesController {
         return this.sites.updateNavigation(ctx, siteId, body);
     }
 
+    /**
+     * Set the site's footer (#202). Replaces rather than merges, and an empty
+     * value clears it — see `SitesService.updateFooter`.
+     */
     @Put(":siteId/footer")
     updateFooter(
         @OrgContext() ctx: OrganizationContext,
@@ -310,6 +300,11 @@ export class SitesController {
         return this.sites.updateFooter(ctx, siteId, body);
     }
 
+    /**
+     * Set the site's look (#189). Replaces rather than merges — the Style panel
+     * always sends a whole look, and merging would let two tabs produce a
+     * palette neither person chose.
+     */
     @Put(":siteId/style")
     updateStyle(
         @OrgContext() ctx: OrganizationContext,
@@ -356,6 +351,11 @@ export class SitesController {
         return this.sites.restorePublication(ctx, siteId, publicationId);
     }
 
+    /**
+     * Publish the site: snapshot its pages' current drafts into a new immutable
+     * Publication (sanitizing rich fields) and repoint the live pointer.
+     * Requires `site:publish`.
+     */
     @Post(":siteId/publish")
     @HttpCode(200)
     publish(

@@ -61,6 +61,7 @@ import {
 } from "@/lib/sites/editor-prefs";
 import { exactDate } from "@/lib/sites/format-date";
 import type {
+    ApprovalOutcome,
     Flag,
     ReviewState,
     Section,
@@ -70,6 +71,27 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+
+/**
+ * The bar's verdict badge, worded per outcome. Keyed by the union so a new
+ * outcome is a type error here rather than a badge that falls through to
+ * "asked for changes". Only an approval takes the accent: it is the one
+ * good-news verdict.
+ */
+const APPROVAL_BADGE: Record<
+    ApprovalOutcome,
+    { approved: boolean; text: (by: string) => string }
+> = {
+    APPROVED: { approved: true, text: (by) => `Approved by ${by}` },
+    CHANGES_REQUESTED: {
+        approved: false,
+        text: (by) => `${by} asked for changes`,
+    },
+    BYPASSED: {
+        approved: false,
+        text: (by) => `Published without approval by ${by}`,
+    },
+};
 
 /**
  * SiteEditor (S2-004) — the ticket's core deliverable. A client-side editable
@@ -152,19 +174,35 @@ export function SiteEditor({
     const [review, setReview] = useState<ReviewState>(initialReview);
     const openNotes = review.openNotes;
 
+    /*
+     * One counter per re-read below. Both fire from several places — every
+     * autosave, opening the check, publishing, a note changing — and nothing
+     * orders their responses, so a slow early read landing after a fast later
+     * one would put back the state from before. Each call takes the next
+     * number and only the newest may write; the same rule `measuring` keeps
+     * for the share image in site settings.
+     */
+    const reviewRequest = useRef(0);
+    const flagsRequest = useRef(0);
+
     /** Re-read notes and the verdict together — they move together. */
     async function refreshReview() {
+        const request = ++reviewRequest.current;
         const [next, state] = await Promise.all([
             listComments(siteId),
             getReviewState(siteId),
         ]);
+        if (request !== reviewRequest.current) return;
         setComments(next);
         setReview(state);
     }
 
     /** Re-read flags from the server. They settle after a save, not per key. */
     async function refreshFlags() {
-        setSiteFlags(await getSiteFlags(siteId));
+        const request = ++flagsRequest.current;
+        const next = await getSiteFlags(siteId);
+        if (request !== flagsRequest.current) return;
+        setSiteFlags(next);
     }
 
     const [errorIndex, setErrorIndex] = useState<number | null>(null);
@@ -391,6 +429,15 @@ export function SiteEditor({
         return { ok: true, sections: next };
     }
 
+    /*
+     * The draft the last save failed on, as JSON. Without it a failure re-arms
+     * the autosave below — still dirty, no longer saving — and the same draft
+     * goes out again every 1.5s, each attempt with a fresh error toast, for as
+     * long as the failure lasts. A ref rather than state: it only gates the
+     * timer, and nothing on screen reads it.
+     */
+    const failedJson = useRef<string | null>(null);
+
     async function onSave(auto = false) {
         setSaving(true);
         setErrorIndex(null);
@@ -431,6 +478,7 @@ export function SiteEditor({
         }));
         setSaving(false);
         if (res.ok) {
+            failedJson.current = null;
             setLastSavedJson(JSON.stringify(synced.sections));
             setLastSavedAt(new Date());
             setSaveError(false);
@@ -449,6 +497,7 @@ export function SiteEditor({
             void refreshFlags();
             return;
         }
+        failedJson.current = JSON.stringify(synced.sections);
         setSaveError(true);
         if ("index" in res && typeof res.index === "number") {
             setErrorIndex(res.index);
@@ -471,6 +520,11 @@ export function SiteEditor({
      */
     useEffect(() => {
         if (!dirty || saving || publishing) return;
+        // Not the draft that just failed, again: see `failedJson`. Any edit
+        // changes the JSON, so the next edit is still the retry.
+        if (saveError && JSON.stringify(sections) === failedJson.current) {
+            return;
+        }
         const id = setTimeout(() => {
             void onSave(true);
         }, 1500);
@@ -478,7 +532,7 @@ export function SiteEditor({
         // `onSave` is redefined each render; depending on it would restart the
         // timer on every keystroke and never fire.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dirty, saving, publishing, sections]);
+    }, [dirty, saving, publishing, saveError, sections]);
 
     /*
      * Style autosave.
@@ -562,7 +616,16 @@ export function SiteEditor({
                 ? `${live} Recorded as published without approval.`
                 : live,
         );
-        await refreshFlags();
+        /*
+         * Everything the bar counted just went live, so the count is zero —
+         * set here rather than left for the next autosave to recount, which
+         * never comes if the merchant only opened the editor to publish. The
+         * review state moves too: publishing over a request for changes writes
+         * a bypass record, and the approval line should say so now rather
+         * than after a reload. Flags are re-read for the same reason.
+         */
+        setPendingChanges(0);
+        await Promise.all([refreshFlags(), refreshReview()]);
     }
 
     /*
@@ -722,17 +785,16 @@ export function SiteEditor({
                     <span
                         className={cn(
                             "flex h-[22px] items-center gap-1.5 rounded-[3px] border px-2 text-xs",
-                            review.latestApproval.outcome === "APPROVED"
+                            APPROVAL_BADGE[review.latestApproval.outcome]
+                                .approved
                                 ? "border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
                                 : "border-border text-muted-foreground",
                         )}
                         title={exactDate(review.latestApproval.at)}
                     >
-                        {review.latestApproval.outcome === "APPROVED"
-                            ? `Approved by ${review.latestApproval.by}`
-                            : review.latestApproval.outcome === "BYPASSED"
-                              ? `Published without approval by ${review.latestApproval.by}`
-                              : `${review.latestApproval.by} asked for changes`}
+                        {APPROVAL_BADGE[review.latestApproval.outcome].text(
+                            review.latestApproval.by,
+                        )}
                         {openNotes > 0 ? (
                             <span className="tabular-nums opacity-80">
                                 · {openNotes}{" "}
@@ -929,6 +991,19 @@ export function SiteEditor({
                                      * first and a selection after it.
                                      */
                                     if (jumpPageId !== pageId) {
+                                        /*
+                                         * The same guard the Pages tab puts on
+                                         * opening a page, in its words: leaving
+                                         * mid-flight loses whatever autosave
+                                         * has not sent yet, and a note is no
+                                         * reason to lose work.
+                                         */
+                                        if (dirty) {
+                                            showError(
+                                                "Save this page before opening another.",
+                                            );
+                                            return;
+                                        }
                                         router.push(
                                             `/sites/${siteId}?page=${jumpPageId}`,
                                         );

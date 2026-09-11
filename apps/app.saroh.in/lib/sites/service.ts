@@ -652,9 +652,22 @@ export interface SiteCommentView {
     orphaned: boolean;
 }
 
+/**
+ * What the latest verdict on a site was. `BYPASSED` is not a reviewer's word:
+ * it is the record that someone published over a request for changes (#199).
+ * A union rather than a string so every place that words a verdict has to
+ * word all three — a new outcome is a type error, not a line that quietly
+ * renders as "asked for changes".
+ */
+export type ApprovalOutcome = "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED";
+
 export interface ReviewState {
     openNotes: number;
-    latestApproval: { outcome: string; at: string; by: string } | null;
+    latestApproval: {
+        outcome: ApprovalOutcome;
+        at: string;
+        by: string;
+    } | null;
     /**
      * A reviewer's latest verdict asked for changes and no approval has
      * followed (#199). Publishing still works; it is recorded as a bypass.

@@ -222,7 +222,7 @@ model Membership {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  role String @default("MEMBER") // OWNER, ADMIN, MEMBER
+  role String @default("MEMBER") // OWNER, ADMIN, MEMBER, REVIEWER
 
   @@unique([organizationId, userId])
   @@index([organizationId])
