@@ -56,12 +56,12 @@ Modules ship behind `MODULE_*` rollout flags that default off, with
 
 ## Gating an endpoint
 
-`@RequireModule` + `ModuleEnforcementGuard`. **The annotation rollout is
-incomplete**: as of 2026-09-05 it covers Commerce alone — categories,
-customers, orders, products, product-details, imports. Bookings, sites,
-contacts, leads, communications and analytics carry none. If you are adding an
-endpoint in one of those domains, you are probably the person who should
-annotate it (#117).
+`@RequireModule` + `ModuleEnforcementGuard`. The annotation rollout is complete
+(#117, `c3d09f9`): 19 controllers across all eight modules carry it, some per
+handler where routes must survive the module being switched off.
+`apps/api.saroh.in/src/modules/capabilities/module-annotations.spec.ts` is the
+source of truth for which routes are gated and which must never be — a new
+controller in a gated domain gets the decorator and an entry in that spec.
 
 ## Gating a surface
 

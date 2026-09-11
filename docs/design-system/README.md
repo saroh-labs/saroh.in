@@ -12,6 +12,12 @@ disclosure; every screen answers _Where am I / What can I do / What next_.
 
 ## Start here
 
+> **Read with care (2026-09-11):** these documents are a July 2026 audit and
+> specification. Where one says something is missing, check the code first —
+> several gaps have closed, and dated update notes mark the ones known. The
+> rules to follow today, each labelled Current or Adopted, are in
+> `docs/patterns/frontend-design-system.md`.
+
 - **[00_FINAL_REPORT.md](./00_FINAL_REPORT.md)** — capstone: 5 headline scores,
   Top-100 UI / Top-50 UX / Top-30 inconsistencies / Top-20 components, effort per
   milestone, file-impact map. **Overall UX 5.3/10.**

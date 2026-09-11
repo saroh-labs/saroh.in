@@ -8,6 +8,11 @@
 
 ## 1. Findings re-audit (old audit → now)
 
+> **Update 2026-09-11:** some ✗ rows below predate later work — Home now renders
+> the ranked action list (`lib/home/service.ts` → `HomeDashboard`), and
+> `lib/customer-workspace` and `lib/provider-health` exist. Re-audit a row before
+> citing it as current.
+
 | Audit finding (July 20)                                   | Status                  | Evidence                                                                                                                               |
 | --------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Flat horizontal nav overflows at 8+ items (D-05)          | ✅ Resolved             | Persistent left `AppSidebar` + `MobileNav` drawer — `components/shared/app-sidebar.tsx`, `mobile-nav.tsx`                              |
