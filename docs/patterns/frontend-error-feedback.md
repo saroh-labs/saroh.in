@@ -2,10 +2,11 @@
 
 > **Read when:** showing a toast, an error, or an empty, loading or failed state;
 > adding an error boundary; or touching anything that redirects to sign-in.
-> Adapted from claude-patterns `frontend/05-error-feedback.md`. For the named
-> product states, also read `.agents/skills/saroh-product-states/SKILL.md`.
+> Adapted from claude-patterns `frontend/05-error-feedback.md`. Also read
+> `.agents/skills/saroh-product-states/SKILL.md`; copy rules are in
+> `docs/design-system/07_STYLE_GUIDE.md` §1 and §7.
 
-## One layer presents each failure
+## One layer presents each failure — **Current**
 
 1. **Segment boundaries** (`error.tsx`): a read that threw.
 2. **Named states** from `@saroh/ui/data-state`: `EmptyState`,
@@ -17,15 +18,19 @@
 
 ## Rules
 
-### Toasts go through one seam
+### Toasts
 
-`showSuccess`, `showError`, `showWarning` and `showInfo` from
-`@saroh/ui/toast`, all `(message, description?)`. ESLint rejects sonner's
-`toast` in the apps. `description` is product copy — never `error.message`, an
-API `detail` or a response body. (`saroh.in`'s `join-waitlist.tsx` still
-forwards `error.message`; known, awaiting copy.)
+- **Current** — **One seam.** `showSuccess`, `showError`, `showWarning` and
+  `showInfo` from `@saroh/ui/toast`, all `(message, description?)`. ESLint
+  rejects sonner's `toast` in the apps.
+- **Adopted** — **Toast copy is product copy.** Show the API's guarded message
+  (`res.error`) or your own sentence — never an exception's `error.message`, an
+  API `detail` or a response body. Gap: `saroh.in`'s `join-waitlist.tsx`
+  forwards `error.message`.
+- **Adopted** — **Never put the only way to do something in a toast,** and keep
+  error toasts on screen long enough to read (15 §5).
 
-### An unreachable API is not a signed-out user
+### An unreachable API is not a signed-out user — **Current**
 
 Use `requireSession()`, built on `resolveServerSession()` in
 `packages/auth/src/next.ts`:
@@ -36,36 +41,46 @@ Use `requireSession()`, built on `resolveServerSession()` in
 
 `getServerSession()` returns `null` for both, and is only for code that renders
 the same either way (`AppShell`, the onboarding layout, the accounts proxy).
-Before this split, one API restart signed out every user.
+Before the split, one API restart signed out every user.
 
 ### Boundaries
 
-- Every app root has `error.tsx` and `loading.tsx`. Show `error.digest` as a
-  reference — it is the only handle a user can give support — and log the
-  error (`TODO(#103)`: forward it to a tracker once one exists).
-- Copy says it is usually temporary and offers **Try again** (`reset`). In
-  accounts it never hints at whether an account or password was right.
-- **Merchant pages** (`apps/saroh.app`) draw boundaries from `--site-*`, never
-  Saroh's brand. A throw inside `[domain]/layout.tsx` lands in the _root_
-  boundary, where the merchant's palette never loaded, so the root boundary
-  mounts `SiteTheme` on its neutral defaults. New files there go on the G6
-  allowlist (`frontend-design-system.md`).
-- A loading state has the shape of the real layout, not a spinner.
+- **Adopted** — **Every app root has `error.tsx` and `loading.tsx`.** Gap:
+  templates, saroh.in and ui have neither.
+- **Adopted** — **Show `error.digest` as a reference** — the only handle a user
+  can give support — and log the error (`TODO(#103)`: forward it to a tracker
+  once one exists). Current in the accounts, admin and saroh.app boundaries; gap:
+  `app.saroh.in/app/error.tsx` does not show it.
+- **Current** — **Calm, recoverable copy**: it is usually temporary, and **Try
+  again** calls `reset`. In accounts it never hints at whether an account or a
+  password was right.
+- **Current** — **Merchant pages** (`apps/saroh.app`) draw boundaries from
+  `--site-*`, never Saroh's brand. A throw inside `[domain]/layout.tsx` lands in
+  the _root_ boundary, where the merchant's palette never loaded, so that
+  boundary mounts `SiteTheme` on its neutral defaults. New files there go on the
+  G6 allowlist (`frontend-design-system.md`).
+- **Current** — **A loading state has the shape of the page.** 49 of 51
+  `loading.tsx` files use `Skeleton` or `LoadingState`; none use a spinner.
 
-### A failed read is never an empty read
+### States are part of the product
 
-Throw, or render `FailedState`; never show "No X yet" because a fetch failed.
-The Insights dashboard currently says "No views recorded in this range yet" to
-organizations whose rollups have never been computed — exactly the sentence
-this rule exists to stop (`backend-jobs.md`, known gaps).
+- **Current** — **A failed read is never an empty read**: `getList` throws, and
+  `FailedState` exists for the case you catch.
+- **Adopted** — **Never say "No X yet" when the data was never computed or never
+  loaded.** Gap: Insights shows "No views recorded in this range yet" to
+  organizations whose rollups have never been built (`backend-jobs.md`).
+- **Adopted** — **Every important workflow handles** loading, empty, partial,
+  error, permission denial, capability off, provider disconnected, provider
+  error, stale information and retry (PRODUCT_STRATEGY §30), and the activation
+  gate adds setup, attention and forbidden (`docs/design-system/18_ACTIVATION_RELEASE_GATE.md`).
+  `@saroh/ui/data-state` has no named state yet for provider-disconnected or
+  stale data.
 
-### Silent catches
+### Silent catches and API errors
 
-Only for genuinely background work nobody asked for, such as analytics pings.
-Everything a user triggered surfaces its failure.
-
-### API errors
-
-Error responses are `{ error: { code, message, statusCode, correlationId, details? } }`,
-and 5xx messages are generic. `readError` in `lib/api/http.ts` maps them. Never
-render a raw body.
+- **Current** — Silent `catch {}` only for genuinely background work nobody asked
+  for; the one in the repo is the pre-paint theme script.
+- **Current** — Error responses are
+  `{ error: { code, message, statusCode, correlationId, details? } }`, 5xx
+  messages are generic, and `readError` in `lib/api/http.ts` maps them. Never
+  render a raw body or an HTTP code ("Calm under errors", 07 §1).
