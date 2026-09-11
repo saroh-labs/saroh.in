@@ -133,8 +133,22 @@ function PreviewGone({ reason }: { reason: "expired" | "revoked" }) {
  * covers buttons and links inside sections and rich text, whose targets are
  * the live site's paths. Without scripts those links leave the preview, and
  * the bar has already said the preview is not the live site.
+ *
+ * The script body is a constant, and the base path reaches it through a
+ * `data-` attribute, which React escapes. It used to be spliced into the
+ * script with `JSON.stringify`, which escapes quotes but not `<`, so a base
+ * containing `</script>` would have closed the element and let the rest run
+ * as markup (CodeQL js/bad-code-sanitization). That could not happen here —
+ * `base` is `encodeURIComponent`-ed and only exists for a token the API
+ * accepted — but a script built from strings is one refactor away from it.
  */
 function KeepLinksInside({ base }: { base: string }) {
-    const code = `document.addEventListener("click",function(e){var t=e.target;var a=t&&t.closest?t.closest("a[href]"):null;if(!a)return;var h=a.getAttribute("href");if(!h||h.charAt(0)!=="/"||h.indexOf("//")===0||h.indexOf(${JSON.stringify(base)})===0)return;a.setAttribute("href",${JSON.stringify(base)}+h);},true);`;
-    return <script dangerouslySetInnerHTML={{ __html: code }} />;
+    return (
+        <script
+            data-preview-base={base}
+            dangerouslySetInnerHTML={{ __html: KEEP_LINKS_INSIDE }}
+        />
+    );
 }
+
+const KEEP_LINKS_INSIDE = `(function(s){var base=s&&s.getAttribute("data-preview-base");if(!base)return;document.addEventListener("click",function(e){var t=e.target;var a=t&&t.closest?t.closest("a[href]"):null;if(!a)return;var h=a.getAttribute("href");if(!h||h.charAt(0)!=="/"||h.indexOf("//")===0||h.indexOf(base)===0)return;a.setAttribute("href",base+h);},true);})(document.currentScript);`;
