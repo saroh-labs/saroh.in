@@ -230,3 +230,20 @@ Publishing switches the fields, and restoring switches them back. The editor
 now stamps only new formIds onto current state, instead of overwriting typing
 done during the sync.
 **Category**: enquiry · rule in `docs/patterns/backend-data-and-money.md`
+
+## Sites — restoring a version went live past a change request unrecorded (#279)
+
+**Problem**: A reviewer asked for changes. The merchant restored last week's
+version from version history instead of publishing, and nothing, neither
+version history nor the approval record, said the site had gone live past the
+request.
+**Root cause**: #199 added the bypass record to `publishSite` only.
+`restorePublication` also appends a Publication and repoints the site, which is
+a publish by effect, but it never called `reviewOutstanding`.
+**Fix**: `restorePublication` reads `reviewOutstanding` and appends a
+`BYPASSED` approval linked to the restored publication, inside the same
+transaction. Version history already marks bypass rows by `publicationId`, and
+the restore confirm now says a change request is outstanding before it
+happens. Any new path that repoints `Site.currentPublicationId` must do the
+same.
+**Category**: sites · tests in `sites-editing.service.spec.ts`

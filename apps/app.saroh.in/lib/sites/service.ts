@@ -618,7 +618,7 @@ export async function listPublications(
 export async function restorePublication(
     siteId: string,
     publicationId: string,
-): Promise<SitesResult<{ publicationId: string }>> {
+): Promise<SitesResult<{ publicationId: string; bypassed: boolean }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(
@@ -627,11 +627,19 @@ export async function restorePublication(
     );
     const data = (await res.json().catch(() => null)) as {
         publicationId?: string;
+        bypassed?: boolean;
         message?: string;
         error?: string;
     } | null;
     if (res.ok && data?.publicationId) {
-        return { ok: true, data: { publicationId: data.publicationId } };
+        return {
+            ok: true,
+            data: {
+                publicationId: data.publicationId,
+                // Whether this restore went live past a change request (#279).
+                bypassed: data.bypassed === true,
+            },
+        };
     }
     return { ok: false, ...readError(data, "Could not restore that version.") };
 }
