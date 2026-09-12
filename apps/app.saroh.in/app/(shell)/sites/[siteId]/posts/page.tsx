@@ -17,9 +17,17 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
 };
 
 /**
- * Content (blog) list. Store-access gated (members can read). Each row links to
- * the post editor; "New post" is shown to everyone with access — the api
- * rejects writes from VIEWER members.
+ * Content (blog) list.
+ *
+ * Reading a site's writing is `site:read`, so everyone who can reach the site
+ * can read its posts — a reviewer included, and deliberately: the writing is
+ * part of what they were asked to look at.
+ *
+ * Writing it is `section:write`. "New post" and "Categories" used to be shown
+ * to everyone anyway, on the reasoning that the API would reject the write —
+ * which it does, after the person has chosen a category, written a title and
+ * pressed the button (#313). `can.edit` is the server's own answer about this
+ * caller and this site, so the page asks that rather than guessing.
  */
 export default async function ContentPage({
     params,
@@ -40,25 +48,35 @@ export default async function ContentPage({
                 title="Posts"
                 description="Writing published on this site."
                 actions={
-                    <>
-                        <Button variant="outline" asChild>
-                            <Link href={`${base}/categories`}>Categories</Link>
-                        </Button>
-                        <Button variant="brand" asChild>
-                            <Link href={`${base}/new`}>New post</Link>
-                        </Button>
-                    </>
+                    site.can.edit ? (
+                        <>
+                            <Button variant="outline" asChild>
+                                <Link href={`${base}/categories`}>
+                                    Categories
+                                </Link>
+                            </Button>
+                            <Button variant="brand" asChild>
+                                <Link href={`${base}/new`}>New post</Link>
+                            </Button>
+                        </>
+                    ) : undefined
                 }
             />
 
             {posts.length === 0 ? (
                 <EmptyState
                     title="No posts yet"
-                    description="Write your first post to start your blog."
+                    description={
+                        site.can.edit
+                            ? "Write your first post to start your blog."
+                            : "Nothing has been written on this site yet."
+                    }
                     action={
-                        <Button variant="brand" asChild>
-                            <Link href={`${base}/new`}>New post</Link>
-                        </Button>
+                        site.can.edit ? (
+                            <Button variant="brand" asChild>
+                                <Link href={`${base}/new`}>New post</Link>
+                            </Button>
+                        ) : undefined
                     }
                 />
             ) : (
