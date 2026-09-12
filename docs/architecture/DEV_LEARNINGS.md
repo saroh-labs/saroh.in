@@ -267,3 +267,21 @@ against the live snapshot into `SITE_CHANGE_KINDS`. It is returned as
 unsaved style, and style saves run one at a time. A new snapshot field a
 merchant can change needs a kind, or it goes uncounted.
 **Category**: sites · tests in `pending-site-changes.spec.ts`
+
+## Sites — anyone who could list share links could open the draft (#284)
+
+**Problem**: A MEMBER cannot load a site's draft, but opening Review, listing
+the share links and following one showed it to them anyway. A revoked link that
+a reviewer already had open went blank on their next click.
+**Root cause**: `SitePreviewLinksService.list` returned the raw `token` to any
+`site:read` role, and tokens were stored in plaintext, so every row was a
+working link. Separately, the three preview pages returned `null` when the link
+was gone. Only the layout explained why, and Next keeps a layout mounted
+across navigation inside it.
+**Fix**: Only `tokenHash` (SHA-256 hex) is stored; migration
+`20260911120000_preview_link_token_hash` hashes existing rows in place with the
+same function. The raw token is returned once, from `create`, and lookups hash
+what the visitor presents. `PreviewGone` is shared and rendered by every
+preview page. The share-link UI keeps this session's addresses and says older
+ones were shown once.
+**Category**: security · tests in `site-preview-links.service.spec.ts`

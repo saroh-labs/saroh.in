@@ -950,7 +950,11 @@ export type PreviewLinkState = "active" | "expired" | "revoked";
 
 export interface SitePreviewLinkView {
     id: string;
-    token: string;
+    /**
+     * The link's secret. Present ONLY on the response that created the link
+     * (#284): the API stores its hash, so a list or a revoke never carries it.
+     */
+    token?: string;
     state: PreviewLinkState;
     createdAt: string;
     expiresAt: string;
@@ -975,7 +979,7 @@ export async function listPreviewLinks(
 export async function createPreviewLink(
     siteId: string,
     expiresInDays: PreviewLinkDays,
-): Promise<SitesResult<SitePreviewLinkView>> {
+): Promise<SitesResult<SitePreviewLinkView & { token: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/${siteId}/preview-links`, {
@@ -984,7 +988,9 @@ export async function createPreviewLink(
     });
     const data = (await res.json().catch(() => null)) as
         (SitePreviewLinkView & { message?: string; error?: string }) | null;
-    if (res.ok && data?.id) return { ok: true, data };
+    if (res.ok && data?.id && data.token) {
+        return { ok: true, data: { ...data, token: data.token } };
+    }
     return {
         ok: false,
         ...readError(data, "Could not create a preview link."),
