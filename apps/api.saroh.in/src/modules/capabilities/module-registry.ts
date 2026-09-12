@@ -46,10 +46,7 @@ export type ModuleLifecycle = "DISABLED" | "ENABLED" | "ARCHIVED";
 
 /** Derived operational readiness — computed, never persisted. */
 export type ModuleReadiness =
-    | "DISABLED"
-    | "SETUP_REQUIRED"
-    | "ACTIVE"
-    | "ATTENTION_REQUIRED";
+    "DISABLED" | "SETUP_REQUIRED" | "ACTIVE" | "ATTENTION_REQUIRED";
 
 /**
  * One module's server-owned descriptor.
@@ -105,7 +102,16 @@ export const MODULES: readonly ModuleDescriptor[] = [
         description:
             "Sites, pages, templates, forms, and domains — the Organization's public presence.",
         rootRoutes: ["/website"],
-        requiredAction: "site:update",
+        /*
+         * `site:read`, not `site:update` (#274). This gate answers "may this
+         * person reach the Website module at all". A REVIEWER exists to read a
+         * site and leave notes on it, and a MEMBER may read every site. Gated on
+         * a write action, both were told Website was switched off, and with
+         * MODULE_ENFORCEMENT on every sites route, review included, returned 404
+         * for them. Writes are still refused per route: every sites service
+         * method authorizes its own action before touching a row.
+         */
+        requiredAction: "site:read",
         dependencies: [],
         projectSelectable: true,
         rolloutFlag: FlagKey.MODULE_WEBSITE,

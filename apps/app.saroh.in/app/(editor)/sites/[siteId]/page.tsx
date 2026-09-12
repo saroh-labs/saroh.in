@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { SiteEditor } from "@/components/sites/site-editor";
+import { SiteReadView } from "@/components/sites/site-read-view";
 import { env } from "@/env";
 import { requireSession } from "@/lib/session";
 import type { Section } from "@/lib/sites/service";
@@ -34,6 +35,12 @@ export default async function SiteEditorPage({
 
     const site = await getSite(siteId);
     if (!site) notFound();
+
+    // Reading a site does not grant access to the write-protected draft loader.
+    if (!site.canEdit) {
+        const comments = await listComments(siteId);
+        return <SiteReadView site={site} comments={comments} />;
+    }
 
     if (site.pages.length === 0) notFound();
     /*

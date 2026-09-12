@@ -294,6 +294,8 @@ export interface SitePage {
 }
 
 export interface SiteDetail extends SiteSummary {
+    /** Server-owned permission for the draft editor. */
+    canEdit: boolean;
     pages: SitePage[];
     /** Always present on a detail read; null only before the first publish. */
     pendingSectionChanges: number | null;

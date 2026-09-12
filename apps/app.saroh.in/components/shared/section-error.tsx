@@ -1,10 +1,11 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { FailedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 import { useEffect } from "react";
 
+import { AccessDenied } from "@/components/shared/access-denied";
 import { isDenial, statusFromError } from "@/lib/api/errors";
 
 /**
@@ -25,10 +26,19 @@ import { isDenial, statusFromError } from "@/lib/api/errors";
  * broken, and trying again will do exactly the same thing forever. §30 asks
  * for permission denial to be explained rather than presented as a breakage.
  *
- * So a 401/403 renders {@link PermissionDeniedState} — no retry, because there
- * is nothing to retry — and everything else renders {@link FailedState}, which
- * keeps the retry as its primary action. The two are distinguishable by shape,
- * icon, wording and ARIA, not by colour.
+ * So a 401/403 renders {@link AccessDenied}, with no retry because there is
+ * nothing to retry. Everything else renders {@link FailedState}, which keeps
+ * the retry as its primary action. The two are distinguishable by shape, icon,
+ * wording and ARIA, not by colour.
+ *
+ * ## Where a denial usually does NOT arrive from (#274)
+ *
+ * In a production build, a server component's thrown error reaches this
+ * boundary with its message replaced by a digest, so `isDenial` cannot see a
+ * 403 there. Server reads therefore don't throw a 403 at all: `getJson` calls
+ * `forbidden()`, and the segment's `forbidden.tsx` renders the denial. This
+ * branch still catches a denial whose message survived: in development, or
+ * thrown on the client.
  */
 export function SectionError({
     error,
@@ -67,26 +77,15 @@ export function SectionError({
         ) : null;
 
     if (denied) {
-        return (
-            <main className="mx-auto w-full max-w-md p-6 sm:p-12">
-                <PermissionDeniedState
-                    title={
-                        status === 401
-                            ? "Your session has ended"
-                            : "You do not have access to this"
-                    }
-                    description={
-                        status === 401
-                            ? "Sign in again to pick up where you left off."
-                            : "This section is limited to certain roles in this organization. An owner or admin can change what you can reach."
-                    }
-                    action={
-                        <Button asChild variant="outline" className="wk-press">
-                            <Link href={backHref}>{backLabel}</Link>
-                        </Button>
-                    }
-                />
-            </main>
+        return status === 401 ? (
+            <AccessDenied
+                title="Your session has ended"
+                description="Sign in again to pick up where you left off."
+                backHref={backHref}
+                backLabel={backLabel}
+            />
+        ) : (
+            <AccessDenied backHref={backHref} backLabel={backLabel} />
         );
     }
 
