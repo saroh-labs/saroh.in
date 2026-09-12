@@ -1003,7 +1003,9 @@ export class SitesService {
      * lost publish for another.
      *
      * Requires `site:publish`: this changes what the public sees, which is the
-     * same act as publishing.
+     * same act as publishing. For the same reason, going live past an
+     * outstanding change request is recorded as a bypass, exactly as
+     * `publishSite` records it (#279).
      */
     async restorePublication(
         ctx: OrganizationContext,
@@ -1033,6 +1035,16 @@ export class SitesService {
             );
         }
 
+        /*
+         * A restore puts a version live, so it is a publish. A publish past an
+         * outstanding change request is RECORDED, not prevented (#199). This
+         * path used to skip the check, so rolling back while a reviewer had
+         * asked for changes went live with nothing anywhere saying so (#279).
+         * Read before the transaction and written inside it, as publishSite
+         * does, so the record and the publication land together or not at all.
+         */
+        const bypass = await this.reviewOutstanding(siteId, ctx.organizationId);
+
         return prisma.$transaction(async (tx) => {
             const restored = await tx.publication.create({
                 data: {
@@ -1051,9 +1063,24 @@ export class SitesService {
                 where: { id: siteId },
                 data: { currentPublicationId: restored.id },
             });
+            if (bypass) {
+                // Linked to the restored publication, so version history marks
+                // this entry the way it marks a bypassed publish.
+                await tx.siteApproval.create({
+                    data: {
+                        siteId,
+                        organizationId: ctx.organizationId,
+                        byUserId: ctx.userId,
+                        outcome: "BYPASSED",
+                        publicationId: restored.id,
+                    },
+                    select: { id: true },
+                });
+            }
             return {
                 publicationId: restored.id,
                 publishedAt: restored.publishedAt,
+                bypassed: bypass,
             };
         });
     }

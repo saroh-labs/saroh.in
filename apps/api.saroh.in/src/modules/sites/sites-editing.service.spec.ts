@@ -30,6 +30,7 @@ jest.mock("@saroh/database", () => {
             createMany: jest.fn(),
         },
         publication: {
+            findFirst: jest.fn(),
             create: jest.fn(),
         },
         siteApproval: {
@@ -65,6 +66,7 @@ const sectionFindMany = prisma.section.findMany as jest.Mock;
 const sectionDeleteMany = prisma.section.deleteMany as jest.Mock;
 const sectionCreateMany = prisma.section.createMany as jest.Mock;
 const publicationCreate = prisma.publication.create as jest.Mock;
+const publicationFindFirst = prisma.publication.findFirst as jest.Mock;
 const approvalFindFirst = prisma.siteApproval.findFirst as jest.Mock;
 const approvalCreate = prisma.siteApproval.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
@@ -397,6 +399,101 @@ describe("SitesService.updateFooter (#280)", () => {
             value: "   ",
         });
         expect(result.footer).toBeNull();
+    });
+});
+
+describe("SitesService.restorePublication (#279)", () => {
+    beforeEach(() => {
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            currentPublicationId: "pub_live",
+        });
+        publicationFindFirst.mockResolvedValue({
+            snapshot: { pages: [] },
+            templateId: "starter",
+            templateVersion: 1,
+            pageId: null,
+            path: null,
+        });
+        publicationCreate.mockResolvedValue({
+            id: "pub_restored",
+            publishedAt: new Date("2026-09-11T10:00:00Z"),
+        });
+        siteUpdate.mockResolvedValue({ id: "site_1" });
+        approvalCreate.mockResolvedValue({ id: "approval_1" });
+    });
+
+    it("records a BYPASSED approval for the restored version when a change request is outstanding", async () => {
+        approvalFindFirst.mockResolvedValue({ outcome: "CHANGES_REQUESTED" });
+
+        const result = await service.restorePublication(
+            ctx(),
+            "site_1",
+            "pub_old",
+        );
+
+        expect(result).toMatchObject({
+            publicationId: "pub_restored",
+            bypassed: true,
+        });
+        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(approvalCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: {
+                    siteId: "site_1",
+                    organizationId: "org_1",
+                    byUserId: "user_1",
+                    outcome: "BYPASSED",
+                    publicationId: "pub_restored",
+                },
+            }),
+        );
+    });
+
+    it.each([
+        ["nobody has reviewed the site", null],
+        ["the latest verdict approved it", { outcome: "APPROVED" }],
+    ])("records nothing when %s", async (_label, verdict) => {
+        approvalFindFirst.mockResolvedValue(verdict);
+
+        const result = await service.restorePublication(
+            ctx(),
+            "site_1",
+            "pub_old",
+        );
+
+        expect(result).toMatchObject({ bypassed: false });
+        expect(approvalCreate).not.toHaveBeenCalled();
+    });
+
+    it("404s a version from another site or organization, and writes nothing", async () => {
+        publicationFindFirst.mockResolvedValue(null);
+
+        await expect(
+            service.restorePublication(ctx(), "site_1", "pub_elsewhere"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(publicationFindFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    id: "pub_elsewhere",
+                    siteId: "site_1",
+                    organizationId: "org_1",
+                },
+            }),
+        );
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("refuses a MEMBER before any database work", async () => {
+        await expect(
+            service.restorePublication(
+                ctx({ role: "MEMBER" }),
+                "site_1",
+                "pub_old",
+            ),
+        ).rejects.toThrow(/MEMBER.*site:publish/);
+        expect(siteFindFirst).not.toHaveBeenCalled();
+        expect(transaction).not.toHaveBeenCalled();
     });
 });
 

@@ -27,9 +27,16 @@ import type { SitePublication } from "@/lib/sites/service";
 export function SiteVersions({
     siteId,
     publications,
+    changesRequested,
 }: {
     siteId: string;
     publications: SitePublication[];
+    /**
+     * A reviewer's change request is outstanding (#279). Restoring still works,
+     * because the rule is recorded, not prevented. But the confirm says so
+     * before it happens, as the pre-publish check does for a publish.
+     */
+    changesRequested: boolean;
 }) {
     const router = useRouter();
     const [confirming, setConfirming] = useState<string | null>(null);
@@ -56,7 +63,11 @@ export function SiteVersions({
             }
             setConfirming(null);
             router.refresh();
-            showSuccess("That version is live again.");
+            showSuccess(
+                res.data.bypassed
+                    ? "That version is live again. Going live without approval is recorded in this list."
+                    : "That version is live again.",
+            );
         });
     }
 
@@ -113,7 +124,9 @@ export function SiteVersions({
                                         >
                                             {pending
                                                 ? "Restoring…"
-                                                : "Yes, restore"}
+                                                : changesRequested
+                                                  ? "Restore without approval"
+                                                  : "Yes, restore"}
                                         </Button>
                                         <Button
                                             size="sm"
@@ -145,6 +158,9 @@ export function SiteVersions({
                                     published again as a new entry, so you can
                                     undo it from this same list. Your
                                     unpublished draft is left alone.
+                                    {changesRequested
+                                        ? " A reviewer has asked for changes, so this goes live without their approval, and this list will record that it did."
+                                        : null}
                                 </p>
                             ) : null}
                         </CardContent>

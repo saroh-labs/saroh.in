@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 
 import { SiteVersions } from "@/components/sites/site-versions";
 import { requireSession } from "@/lib/session";
-import { getSite, listPublications } from "@/lib/sites/service";
+import { getReviewState, getSite, listPublications } from "@/lib/sites/service";
 
 /**
  * Version history (#194).
@@ -24,9 +24,12 @@ export default async function SiteVersionsPage({
     const { siteId } = await params;
     await requireSession();
 
-    const [site, publications] = await Promise.all([
+    const [site, publications, review] = await Promise.all([
         getSite(siteId),
         listPublications(siteId),
+        // So the restore confirm can say a change request is outstanding
+        // before a restore goes live past it (#279).
+        getReviewState(siteId),
     ]);
     if (!site) notFound();
 
@@ -41,7 +44,11 @@ export default async function SiteVersionsPage({
                     </Button>
                 }
             />
-            <SiteVersions siteId={siteId} publications={publications} />
+            <SiteVersions
+                siteId={siteId}
+                publications={publications}
+                changesRequested={review.outstanding}
+            />
         </div>
     );
 }
