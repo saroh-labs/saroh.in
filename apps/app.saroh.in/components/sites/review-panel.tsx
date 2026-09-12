@@ -42,15 +42,16 @@ export function ReviewPanel({
     siteId: string;
     pages: SitePage[];
     comments: SiteCommentView[];
-    /** Re-read after a note or a verdict changes, so the badge follows. */
+    /** The site's standing with its reviewers: pending, stale, latest verdict. */
     review: ReviewState;
-    /** Re-read after a note or a request changes, so the bar follows. */
+    /** Re-read after a note, a verdict or a request, so the bar follows. */
     onChanged: () => void;
     onJump: (pageId: string, sectionKey: string) => void;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [showResolved, setShowResolved] = useState(false);
     const [recording, setRecording] = useState(false);
+    const [asking, setAsking] = useState(false);
 
     /**
      * Say what you think (#277). The api gates both on `site:approve`, which
@@ -64,7 +65,17 @@ export function ReviewPanel({
         setRecording(true);
         const res = await createApproval(siteId, outcome);
         setRecording(false);
-    const [asking, setAsking] = useState(false);
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        showSuccess(
+            outcome === "APPROVED"
+                ? "Marked as approved."
+                : "Recorded that you asked for changes.",
+        );
+        onChanged();
+    }
 
     /**
      * Ask for a review (#278).
@@ -82,11 +93,7 @@ export function ReviewPanel({
             showError(res.error);
             return;
         }
-        showSuccess(
-            outcome === "APPROVED"
-                ? "Marked as approved."
-                : "Recorded that you asked for changes.",
-        );
+        showSuccess("Asked for a review. Share a preview so they can read it.");
         onChanged();
     }
 
@@ -112,9 +119,8 @@ export function ReviewPanel({
             >
                 Ask for changes
             </Button>
-        showSuccess("Asked for a review. Share a preview so they can read it.");
-        onChanged();
-    }
+        </div>
+    );
 
     const askForReview = (
         <div className="border-b px-3 py-2">

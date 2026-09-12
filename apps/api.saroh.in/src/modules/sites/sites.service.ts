@@ -1128,15 +1128,26 @@ export class SitesService {
 
         /*
          * A restore puts a version live, so it is a publish. A publish past an
-         * outstanding change request is RECORDED, not prevented (#199). This
+         * outstanding review is RECORDED, not prevented (#199, #278). This
          * path used to skip the check, so rolling back while a reviewer had
          * asked for changes went live with nothing anywhere saying so (#279).
-         * Read before the transaction and written inside it, as publishSite
-         * does, so the record and the publication land together or not at all.
+         *
+         * The fingerprint is of the version being restored, because that is
+         * what goes live: an approval counts only if a reviewer approved this
+         * exact content, which a draft approval almost never is.
          */
-        const bypass = await this.reviewOutstanding(siteId, ctx.organizationId);
+        const fingerprint = draftFingerprint(source.snapshot);
 
         return prisma.$transaction(async (tx) => {
+            const standing = await this.reviewStandingFor(
+                tx,
+                siteId,
+                ctx.organizationId,
+                fingerprint,
+                ctx.userId,
+            );
+            const bypass = standing.outstanding;
+
             const restored = await tx.publication.create({
                 data: {
                     siteId,
@@ -1147,6 +1158,9 @@ export class SitesService {
                     templateId: source.templateId,
                     templateVersion: source.templateVersion,
                     publishedByUserId: ctx.userId,
+                    // A restore is a publish, and says which route it took
+                    // (#278) like any other.
+                    reviewRoute: standing.route satisfies ReviewRoute,
                 },
                 select: { id: true, publishedAt: true },
             });

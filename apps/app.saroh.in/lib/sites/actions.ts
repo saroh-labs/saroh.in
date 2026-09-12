@@ -64,6 +64,8 @@ export async function createComment(
 /** Record a verdict on the site (#277). */
 export async function createApproval(siteId: string, outcome: ReviewerVerdict) {
     return createApprovalApi(siteId, outcome);
+}
+
 /** Ask for a review (#278). */
 export async function requestReview(siteId: string) {
     return requestReviewApi(siteId);

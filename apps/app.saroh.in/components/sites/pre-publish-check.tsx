@@ -51,6 +51,12 @@ const APPROVAL_LINE: Record<
         text: (approval: NonNullable<ReviewState["latestApproval"]>) => string;
     }
 > = {
+    // Asked for and not yet answered (#278). Publishing is still allowed from
+    // this panel — it says so, and the publish records as a bypass.
+    REQUESTED: {
+        approved: false,
+        text: ({ by }) => `${by} asked for a review, and nobody has replied`,
+    },
     APPROVED: { approved: true, text: ({ by }) => `${by} approved this site` },
     CHANGES_REQUESTED: {
         approved: false,

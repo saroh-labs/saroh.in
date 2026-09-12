@@ -88,7 +88,10 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
  */
 const APPROVAL_BADGE: Record<
     ApprovalOutcome,
-    { approved: (stale: boolean) => boolean; text: (by: string, stale: boolean) => string }
+    {
+        approved: (stale: boolean) => boolean;
+        text: (by: string, stale: boolean) => string;
+    }
 > = {
     REQUESTED: {
         approved: () => false,

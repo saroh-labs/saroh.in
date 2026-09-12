@@ -440,14 +440,19 @@ describe("SitesService.updateFooter (#280)", () => {
     });
 });
 
+/** The version being restored — what actually goes live (#278). */
+const RESTORED_SNAPSHOT = { pages: [] };
+
 describe("SitesService.restorePublication (#279)", () => {
     beforeEach(() => {
+        // Nobody asked for a review, unless a test says otherwise.
+        approvalFindMany.mockResolvedValue([]);
         siteFindFirst.mockResolvedValue({
             id: "site_1",
             currentPublicationId: "pub_live",
         });
         publicationFindFirst.mockResolvedValue({
-            snapshot: { pages: [] },
+            snapshot: RESTORED_SNAPSHOT,
             templateId: "starter",
             templateVersion: 1,
             pageId: null,
@@ -462,7 +467,9 @@ describe("SitesService.restorePublication (#279)", () => {
     });
 
     it("records a BYPASSED approval for the restored version when a change request is outstanding", async () => {
-        approvalFindFirst.mockResolvedValue({ outcome: "CHANGES_REQUESTED" });
+        approvalFindMany.mockResolvedValue(
+            verdicts({ outcome: "CHANGES_REQUESTED" }),
+        );
 
         const result = await service.restorePublication(
             ctx(),
@@ -488,11 +495,8 @@ describe("SitesService.restorePublication (#279)", () => {
         );
     });
 
-    it.each([
-        ["nobody has reviewed the site", null],
-        ["the latest verdict approved it", { outcome: "APPROVED" }],
-    ])("records nothing when %s", async (_label, verdict) => {
-        approvalFindFirst.mockResolvedValue(verdict);
+    it("records nothing when nobody has reviewed the site", async () => {
+        approvalFindMany.mockResolvedValue([]);
 
         const result = await service.restorePublication(
             ctx(),
@@ -502,6 +506,65 @@ describe("SitesService.restorePublication (#279)", () => {
 
         expect(result).toMatchObject({ bypassed: false });
         expect(approvalCreate).not.toHaveBeenCalled();
+        // Nobody was asked, so the route says so rather than claiming an
+        // approval this restore never had (#278).
+        expect(publicationCreate.mock.calls[0][0].data.reviewRoute).toBe(
+            "NONE",
+        );
+    });
+
+    it("counts an approval only when it approved THIS version (#278)", async () => {
+        // The restored snapshot is what goes live, so that is what an approval
+        // has to have covered. A draft approval does not carry over to a
+        // rollback, which is content nobody signed off.
+        const fingerprint = draftFingerprint(RESTORED_SNAPSHOT);
+        approvalFindMany.mockResolvedValue(
+            verdicts(
+                { outcome: "REQUESTED", byUserId: "user_1", fingerprint },
+                { outcome: "APPROVED", byUserId: "reviewer", fingerprint },
+            ),
+        );
+
+        const result = await service.restorePublication(
+            ctx(),
+            "site_1",
+            "pub_old",
+        );
+
+        expect(result).toMatchObject({ bypassed: false });
+        expect(approvalCreate).not.toHaveBeenCalled();
+        expect(publicationCreate.mock.calls[0][0].data.reviewRoute).toBe(
+            "APPROVED",
+        );
+    });
+
+    it("records a bypass when the approval was of a different draft (#278)", async () => {
+        approvalCreate.mockResolvedValue({ id: "a_bypass" });
+        approvalFindMany.mockResolvedValue(
+            verdicts(
+                {
+                    outcome: "REQUESTED",
+                    byUserId: "user_1",
+                    fingerprint: "a-draft",
+                },
+                {
+                    outcome: "APPROVED",
+                    byUserId: "reviewer",
+                    fingerprint: "a-draft",
+                },
+            ),
+        );
+
+        const result = await service.restorePublication(
+            ctx(),
+            "site_1",
+            "pub_old",
+        );
+
+        expect(result).toMatchObject({ bypassed: true });
+        expect(publicationCreate.mock.calls[0][0].data.reviewRoute).toBe(
+            "BYPASSED",
+        );
     });
 
     it("404s a version from another site or organization, and writes nothing", async () => {

@@ -737,10 +737,7 @@ export interface SiteCommentView {
  * renders as "asked for changes".
  */
 export type ApprovalOutcome =
-    | "REQUESTED"
-    | "APPROVED"
-    | "CHANGES_REQUESTED"
-    | "BYPASSED";
+    "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED";
 
 export interface ReviewState {
     openNotes: number;
@@ -863,6 +860,9 @@ export async function createApproval(
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
     return { ok: false, ...readError(data, "Could not record that.") };
+}
+
+/**
  * Ask for a review (#278). Requires `site:update` — the person whose work it
  * is saying they are ready for eyes. It blocks nothing.
  */
