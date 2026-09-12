@@ -24,6 +24,7 @@ import {
     CreatePageDto,
     CreatePreviewLinkDto,
     CreateSiteFromTemplateDto,
+    SetCommentResolvedDto,
     UpdateDraftSectionsDto,
     UpdatePageDto,
     UpdateSiteSettingsDto,
@@ -121,13 +122,15 @@ export class SitesController {
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
         @Param("commentId") commentId: string,
-        @Body() dto: { resolved?: boolean },
+        // A DTO, not an inline type: the pipe validates nothing for an inline
+        // type (#286).
+        @Body() dto: SetCommentResolvedDto,
     ) {
         return this.sites.setCommentResolved(
             ctx,
             siteId,
             commentId,
-            dto.resolved === true,
+            dto.resolved,
         );
     }
 

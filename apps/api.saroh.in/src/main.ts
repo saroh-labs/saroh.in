@@ -29,6 +29,7 @@ import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
+import { validationPipeOptions } from "./common/validation";
 import { env } from "./env";
 
 /**
@@ -118,12 +119,9 @@ async function bootstrap() {
     });
 
     app.useGlobalPipes(
-        new ValidationPipe({
-            whitelist: true,
-            forbidNonWhitelisted: true,
-            transform: true,
-            transformOptions: { enableImplicitConversion: true },
-        }),
+        // Shared with DTO specs, so what a test accepts is what the API accepts
+        // (#286). Read common/validation.ts on implicit boolean conversion.
+        new ValidationPipe(validationPipeOptions),
     );
 
     // App-layer CSRF origin check (B3): reject a present-but-untrusted Origin/
