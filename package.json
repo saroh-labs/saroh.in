@@ -29,6 +29,7 @@
         "portless:list": "portless list",
         "portless:status": "portless service status",
         "prepare": "husky install",
+        "test": "turbo run test --filter=!@saroh/api",
         "typecheck": "turbo run typecheck"
     },
     "prisma": {
