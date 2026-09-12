@@ -49,6 +49,7 @@ export default async function SiteVersionsPage({
                 siteId={siteId}
                 publications={publications}
                 changesRequested={review.outstanding}
+                canRestore={site.can.publish}
             />
         </PageContainer>
     );

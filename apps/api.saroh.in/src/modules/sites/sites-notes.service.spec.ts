@@ -1,6 +1,9 @@
 // #277: a note names a section that exists, says where it was when the page is
 // gone, and a reviewer can learn the keys without the editor's write role.
 jest.mock("@saroh/database", () => ({
+    // The real contract helpers: the service sanitizes what it hands a reviewer
+    // (#275), and a bare mock would leave getSectionContract undefined.
+    ...jest.requireActual("@saroh/database"),
     prisma: {
         site: { findFirst: jest.fn() },
         page: { findFirst: jest.fn(), findMany: jest.fn() },
@@ -17,6 +20,9 @@ import type {
 } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
 import { SitesService } from "./sites.service";
+
+const siteFindFirst = (prisma as unknown as { site: { findFirst: jest.Mock } })
+    .site.findFirst;
 
 const db = prisma as unknown as {
     site: { findFirst: jest.Mock };
@@ -157,46 +163,74 @@ describe("a note outlives its page (#277)", () => {
     });
 });
 
-describe("getPageOutline gives a reviewer the keys (#277)", () => {
+describe("getPageForReview is what a reviewer reads (#275, #277)", () => {
     beforeEach(() => {
         db.pageVersion.findFirst.mockResolvedValue({
             sections: [
                 {
                     key: "sec_1",
                     type: "hero",
+                    contractVersion: 1,
+                    hidden: false,
                     content: { heading: "Northwind" },
                 },
                 {
                     key: "sec_2",
                     type: "richText",
-                    content: { value: "<p>…</p>" },
+                    contractVersion: 1,
+                    hidden: true,
+                    content: {
+                        format: "html",
+                        value: '<p onclick="steal()">Racking</p>',
+                    },
                 },
-                { key: "sec_3", type: "cta", content: { label: "Call us" } },
             ],
         });
     });
 
-    it("returns key, type and a label, and no content", async () => {
-        const outline = await service.getPageOutline(
+    it("returns the sections with their keys, so a note has something to pin to", async () => {
+        const page = await service.getPageForReview(
             ctx("REVIEWER"),
             "site_1",
             "page_1",
         );
 
-        expect(outline).toEqual([
-            { key: "sec_1", type: "hero", label: "Northwind" },
-            // Nothing this block calls a heading: named by its type in the UI.
-            { key: "sec_2", type: "richText", label: null },
-            { key: "sec_3", type: "cta", label: "Call us" },
+        expect(page.sections.map((s) => [s.key, s.type, s.label])).toEqual([
+            ["sec_1", "hero", "Northwind"],
+            // Nothing this block calls a heading: the UI names it by type.
+            ["sec_2", "richText", null],
         ]);
-        expect(JSON.stringify(outline)).not.toContain("<p>");
     });
 
-    it("is empty for a page with no draft sections", async () => {
+    it("sanitizes the content it hands over, as the draft load does", async () => {
+        const page = await service.getPageForReview(ctx(), "site_1", "page_1");
+
+        expect(JSON.stringify(page.sections)).not.toContain("onclick");
+        expect(JSON.stringify(page.sections)).toContain("Racking");
+    });
+
+    it("shows a hidden section, marked — it is part of the draft", async () => {
+        const page = await service.getPageForReview(ctx(), "site_1", "page_1");
+
+        expect(page.sections.map((s) => s.hidden)).toEqual([false, true]);
+    });
+
+    it("reads without writing: no draft is created for a page that has none", async () => {
         db.pageVersion.findFirst.mockResolvedValue(null);
 
         await expect(
-            service.getPageOutline(ctx(), "site_1", "page_1"),
-        ).resolves.toEqual([]);
+            service.getPageForReview(ctx(), "site_1", "page_1"),
+        ).resolves.toEqual({ sections: [] });
+    });
+
+    it("is closed to someone outside the organization's roles", async () => {
+        // Every role in ORG_ROLES may read a site they can reach; the per-site
+        // grant (#276) is what narrows a REVIEWER, and it is applied by
+        // assertSiteInOrg rather than here.
+        siteFindFirst.mockResolvedValue(null);
+
+        await expect(
+            service.getPageForReview(ctx("REVIEWER"), "site_other", "page_1"),
+        ).rejects.toThrow(/not found/);
     });
 });

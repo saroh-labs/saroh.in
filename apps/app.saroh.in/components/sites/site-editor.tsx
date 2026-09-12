@@ -128,6 +128,7 @@ export function SiteEditor({
     initialComments,
     initialReview,
     neverPublished,
+    unreadableSections,
     initialPendingChanges,
     initialPendingSiteChanges,
     initialSections,
@@ -147,6 +148,12 @@ export function SiteEditor({
     initialReview: ReviewState;
     /** Never-published sites say "Publish site", not "Publish changes". */
     neverPublished: boolean;
+    /**
+     * Keys of sections whose stored content no longer matches their contract
+     * (#275). Shown, not hidden: it is the merchant's work, and a section
+     * quietly missing from the list would be deleted by the next save.
+     */
+    unreadableSections: string[];
     /**
      * How many sections publishing would change, as the server counted it on
      * load (#190). Null before the first publish. Refreshed by every autosave.
@@ -1516,6 +1523,24 @@ export function SiteEditor({
                              * a advisory note would cost more than it is worth
                              * until the notes need to sit on the input itself.
                              */}
+                            {active.section.key !== undefined &&
+                            unreadableSections.includes(active.section.key) ? (
+                                /*
+                                 * Said, not hidden (#275). This section's
+                                 * stored content does not match the shape its
+                                 * block promises, so the fields below may show
+                                 * blanks that are not what was written. The
+                                 * work is still here; saving over it is what
+                                 * would lose it.
+                                 */
+                                <p className="rounded-md border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
+                                    Saroh cannot read this section&apos;s saved
+                                    content. The fields may look empty even
+                                    though something is stored. Editing and
+                                    saving will replace whatever is there.
+                                </p>
+                            ) : null}
+
                             {activeFlags.length > 0 ? (
                                 <ul className="grid gap-1.5 border-t pt-3">
                                     {activeFlags.map((flag, i) => (

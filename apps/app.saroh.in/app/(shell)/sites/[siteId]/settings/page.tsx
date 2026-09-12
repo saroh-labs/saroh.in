@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page-container";
 import { SiteSettings } from "@/components/sites/site-settings";
+import { SiteSettingsRead } from "@/components/sites/site-settings-read";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
 
@@ -44,11 +45,19 @@ export default async function SiteSettingsPage({
                 description={site.name}
                 actions={
                     <Button variant="brand" asChild>
-                        <Link href={`/sites/${siteId}`}>Open editor</Link>
+                        <Link href={`/sites/${siteId}`}>
+                            {site.can.edit ? "Open editor" : "Read the site"}
+                        </Link>
                     </Button>
                 }
             />
-            <SiteSettings site={site} />
+            {site.can.manageSettings ? (
+                <SiteSettings site={site} />
+            ) : (
+                // The values, and none of the controls the API would refuse
+                // (#275).
+                <SiteSettingsRead site={site} />
+            )}
         </PageContainer>
     );
 }
