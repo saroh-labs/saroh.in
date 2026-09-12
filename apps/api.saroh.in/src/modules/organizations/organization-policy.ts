@@ -127,6 +127,11 @@ export type OrgAction =
     | "analytics:read"
     | "billing:read"
     | "billing:manage"
+    // The health of the external services the org depends on — payments,
+    // messaging, domains (#123). Named rather than derived: the surface can
+    // say WHICH provider an organization pays through, so it belongs to the
+    // roles that manage those relationships, not to everyone who may read.
+    | "provider:read"
     // Modular capabilities (ADR-003). `module:read` is the read floor — every
     // role may see effective module availability for the Projects it can access.
     // `module:manage` (OWNER/ADMIN) enables/disables Organization modules and
@@ -195,6 +200,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "analytics:read",
     "billing:read",
     "billing:manage",
+    "provider:read",
     // Modular capabilities (ADR-003).
     "module:read",
     "module:manage",

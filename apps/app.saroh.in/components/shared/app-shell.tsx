@@ -119,10 +119,22 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             >
                 Skip to content
             </a>
-            <CommandMenu moduleKeys={moduleKeys} sites={navSites} />
+            {/*
+             * The role, alongside module availability, decides what the chrome
+             * offers. Two different questions — does this business have the
+             * capability, and may this person use it — and a merchant meets
+             * both (#313). It comes off the resolved active organization, so
+             * switching workspaces changes it with everything else.
+             */}
+            <CommandMenu
+                moduleKeys={moduleKeys}
+                role={activeOrg?.role ?? null}
+                sites={navSites}
+            />
             <AppSidebar
                 unread={unread}
                 moduleKeys={moduleKeys}
+                role={activeOrg?.role ?? null}
                 counts={counts}
                 sites={navSites}
             />

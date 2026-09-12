@@ -8,7 +8,9 @@ const OWNER: OrganizationContext = {
     userId: "u",
     role: "OWNER",
 };
+const ADMIN: OrganizationContext = { ...OWNER, role: "ADMIN" };
 const MEMBER: OrganizationContext = { ...OWNER, role: "MEMBER" };
+const REVIEWER: OrganizationContext = { ...OWNER, role: "REVIEWER" };
 
 function make(data: {
     payments?: { status: string }[];
@@ -31,11 +33,40 @@ const byKey = (list: { key: string; status: string }[], key: string) =>
     list.find((h) => h.key === key);
 
 describe("ProviderHealthService", () => {
-    it("denies a MEMBER", async () => {
+    /*
+     * Every role, not only the one that was thought of first.
+     *
+     * The check used to be `role === "MEMBER"`, and this test was `denies a
+     * MEMBER`, so the pair agreed with each other and with nothing else:
+     * REVIEWER, added later (#276), read straight through and saw which payment
+     * and messaging providers the business runs on (#313). A table over all
+     * four roles is what makes the next role a decision rather than an
+     * oversight.
+     */
+    it.each([
+        ["OWNER", OWNER, true],
+        ["ADMIN", ADMIN, true],
+        ["MEMBER", MEMBER, false],
+        ["REVIEWER", REVIEWER, false],
+    ] as const)("%s may read provider health: %s", async (_name, ctx, may) => {
         const { svc } = make({});
-        await expect(svc.list(MEMBER)).rejects.toBeInstanceOf(
+        if (may) {
+            await expect(svc.list(ctx)).resolves.toBeInstanceOf(Array);
+        } else {
+            await expect(svc.list(ctx)).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+        }
+    });
+
+    it("does not touch a row for a role that may not read", async () => {
+        // The refusal comes before the query, so a denied read is not also a
+        // database round trip.
+        const { svc, db } = make({});
+        await expect(svc.list(REVIEWER)).rejects.toBeInstanceOf(
             ForbiddenException,
         );
+        expect(db.merchantPaymentProvider.findMany).not.toHaveBeenCalled();
     });
 
     it("reports NOT_CONFIGURED with nothing connected", async () => {

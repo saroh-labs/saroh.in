@@ -63,6 +63,59 @@ test.describe("a reviewer", () => {
         await expect(cards).toHaveCount(1);
     });
 
+    test("is offered nothing in the rail that they cannot open", async ({
+        page,
+    }) => {
+        await page.goto(`${urls.APP_URL}/sites`);
+
+        /*
+         * The rail is not a permission boundary — every destination refuses on
+         * its own, and it still does. It is a description of the workspace
+         * someone has, and it was describing one they do not: Notifications,
+         * Organization and People answer "you do not have access to this",
+         * Providers named the payment and messaging providers the business runs
+         * on, and "New site" leads to a form that fails on submit (#313).
+         */
+        /*
+         * Below `lg` the rail is a drawer, so it has to be opened before it can
+         * be read. Both draw the same groups from the same projection — that is
+         * the point of one `navFor` — and this suite runs at both widths, so
+         * the assertions below cover the phone as well as the desk.
+         */
+        const opener = page.getByRole("button", {
+            name: "Open navigation menu",
+        });
+        if (await opener.isVisible()) {
+            // The drawer is a client component, so the press only lands once
+            // it has hydrated. `toBeVisible` on the panel is what waits for it;
+            // clicking and reading straight away raced the hydration and read
+            // the hidden desktop rail instead.
+            await expect(opener).toBeEnabled();
+            await opener.click();
+            await expect(
+                page.getByRole("dialog").getByRole("navigation"),
+            ).toBeVisible();
+        }
+
+        const rail = page
+            .getByRole("navigation", { name: "Primary" })
+            .filter({ visible: true });
+        for (const gone of [
+            "/notifications",
+            "/settings/organization",
+            "/settings/people",
+            "/settings/modules",
+            "/settings/providers",
+            "/sites/new",
+        ]) {
+            await expect(rail.locator(`a[href="${gone}"]`)).toHaveCount(0);
+        }
+
+        // What is left is their site, by the name they were invited to.
+        await expect(rail.getByRole("link", { name: "Website" })).toBeVisible();
+        await expect(rail.getByRole("link", { name: "Review" })).toBeVisible();
+    });
+
     test("is taken to Review, not to the editor, and is told why", async ({
         page,
     }) => {
