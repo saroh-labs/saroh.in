@@ -117,6 +117,9 @@ export default async function SiteEditorPage({
             initialComments={comments}
             initialReview={review}
             neverPublished={site.currentPublicationId === null}
+            // Which edit of the draft these sections are (#285); the editor
+            // sends it back on every save.
+            initialRevision={draft?.revision ?? 0}
             // Sections whose stored content no longer matches their contract
             // (#275). Named so the editor can say which, rather than letting a
             // field component meet a shape it was promised it would not.

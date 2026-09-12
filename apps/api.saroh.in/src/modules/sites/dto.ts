@@ -134,6 +134,19 @@ export class DraftSectionInputDto {
  * An empty array is allowed and clears the draft's sections.
  */
 export class UpdateDraftSectionsDto {
+    /**
+     * The revision the editor was handed when it loaded this draft (#285).
+     *
+     * Optional, and checked when present: a save that carries one the server
+     * has moved past is refused with 409 rather than deleting whatever the
+     * other editor wrote. A caller that sends none never read the draft, so it
+     * cannot be overwriting an edit it saw.
+     */
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    revision?: number;
+
     @IsArray()
     @ArrayMaxSize(200)
     @ValidateNested({ each: true })

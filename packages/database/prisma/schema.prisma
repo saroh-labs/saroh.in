@@ -1791,6 +1791,17 @@ model PageVersion {
 
   status PageVersionStatus @default(DRAFT)
 
+  // Which edit of this draft the sections are (#285). Incremented inside the
+  // replace transaction, and checked against the revision the editor was given
+  // when it loaded.
+  //
+  // Saving a draft DELETES every section and recreates the list the client
+  // sent, so without this two tabs on one page silently undo each other: each
+  // one saves its whole list, the last write wins, and the loser's work is gone
+  // with no conflict, error or trace. A counter is enough — there is exactly
+  // one writer path, and it holds a transaction.
+  revision Int @default(0)
+
   createdByUserId String? // authoring user, when known
 
   sections Section[] // ordered content blocks (see Section.order)

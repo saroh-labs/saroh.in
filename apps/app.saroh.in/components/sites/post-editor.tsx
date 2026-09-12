@@ -95,43 +95,85 @@ export function PostEditor({
         latest.current = { title, content, slug, excerpt, categoryId, image };
     }, [title, content, slug, excerpt, categoryId, image]);
 
+    /*
+     * The save in flight, if any (#285).
+     *
+     * Autosave, the Save button and Publish each call `save()` on their own.
+     * Before a NEW post's first save returns, `postId` is still null — so two
+     * overlapping saves each took the create branch and the merchant ended up
+     * with a duplicate draft they never asked for.
+     *
+     * A second caller now waits for the first rather than starting its own.
+     * Publish in particular: it wants an id, and the one being minted is the
+     * one it should use.
+     */
+    const inFlight = useRef<Promise<string | null> | null>(null);
+
     const save = useCallback(
         async (opts: { silent?: boolean } = {}) => {
-            const v = latest.current;
-            if (!v.title.trim()) {
-                if (!opts.silent) showError("A post needs a title.");
-                return null;
+            if (inFlight.current) return inFlight.current;
+
+            const run = (async () => {
+                const v = latest.current;
+                if (!v.title.trim()) {
+                    if (!opts.silent) showError("A post needs a title.");
+                    return null;
+                }
+                setSaving(true);
+                const body = {
+                    title: v.title,
+                    slug: v.slug.trim() || undefined,
+                    excerpt: v.excerpt.trim() || undefined,
+                    content: v.content,
+                    categoryId: v.categoryId || undefined,
+                    image: v.image.trim() || undefined,
+                };
+                // What is being sent, so edits made WHILE it is in flight are
+                // not marked saved when it returns.
+                const sent = JSON.stringify(body);
+                const res = postId
+                    ? await updatePost(siteId, postId, {
+                          ...body,
+                          slug: v.slug.trim() || slugFrom(v.title),
+                      })
+                    : await createPost(siteId, body);
+                setSaving(false);
+                if (!res.ok) {
+                    showError(res.error);
+                    return null;
+                }
+                const now = latest.current;
+                const unchanged =
+                    sent ===
+                    JSON.stringify({
+                        title: now.title,
+                        slug: now.slug.trim() || undefined,
+                        excerpt: now.excerpt.trim() || undefined,
+                        content: now.content,
+                        categoryId: now.categoryId || undefined,
+                        image: now.image.trim() || undefined,
+                    });
+                // Still dirty when the merchant kept typing: autosave fires
+                // again for what they wrote, instead of the editor claiming
+                // their newest words are saved.
+                if (unchanged) setDirty(false);
+                setSavedAt(new Date());
+                if (!postId && res.data.id) {
+                    // A new post becomes a real one on its first save, and the
+                    // address should say so — otherwise a reload loses the work.
+                    setPostId(res.data.id);
+                    router.replace(`/sites/${siteId}/posts/${res.data.id}`);
+                }
+                if (!opts.silent) showSuccess("Draft saved.");
+                return res.data.id;
+            })();
+
+            inFlight.current = run;
+            try {
+                return await run;
+            } finally {
+                inFlight.current = null;
             }
-            setSaving(true);
-            const body = {
-                title: v.title,
-                slug: v.slug.trim() || undefined,
-                excerpt: v.excerpt.trim() || undefined,
-                content: v.content,
-                categoryId: v.categoryId || undefined,
-                image: v.image.trim() || undefined,
-            };
-            const res = postId
-                ? await updatePost(siteId, postId, {
-                      ...body,
-                      slug: v.slug.trim() || slugFrom(v.title),
-                  })
-                : await createPost(siteId, body);
-            setSaving(false);
-            if (!res.ok) {
-                showError(res.error);
-                return null;
-            }
-            setDirty(false);
-            setSavedAt(new Date());
-            if (!postId && res.data.id) {
-                // A new post becomes a real one on its first save, and the
-                // address should say so — otherwise a reload loses the work.
-                setPostId(res.data.id);
-                router.replace(`/sites/${siteId}/posts/${res.data.id}`);
-            }
-            if (!opts.silent) showSuccess("Draft saved.");
-            return res.data.id;
         },
         [postId, router, siteId],
     );
@@ -139,10 +181,12 @@ export function PostEditor({
     // Autosave, and only when there is something to save. An editor that loses
     // an hour of writing to a closed tab is not worth the simplicity.
     useEffect(() => {
-        if (!dirty || !title.trim()) return;
+        // Never while one is already running (#285): the timer would otherwise
+        // queue a second save against a post whose id does not exist yet.
+        if (!dirty || saving || !title.trim()) return;
         const t = setTimeout(() => void save({ silent: true }), AUTOSAVE_MS);
         return () => clearTimeout(t);
-    }, [dirty, title, content, slug, excerpt, categoryId, image, save]);
+    }, [dirty, saving, title, content, slug, excerpt, categoryId, image, save]);
 
     // The browser's own guard, for the case the timer has not yet fired.
     useEffect(() => {
