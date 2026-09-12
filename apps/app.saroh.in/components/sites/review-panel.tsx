@@ -215,12 +215,25 @@ export function ReviewPanel({
         (c) => c.pageId === null || !pageIds.has(c.pageId),
     );
 
+    /*
+     * ONE scroller for the whole panel, which is what the empty state above
+     * already does.
+     *
+     * This column held four fixed blocks — the share links, the verdict, the
+     * ask-for-review prompt, the counts row — above a notes list that was the
+     * only thing allowed to scroll. Flex children shrink; their CONTENT does
+     * not, so once the four were taller than the pane the panel overflowed it
+     * and painted over the fields panel below. On a phone, where the rail gets
+     * a third of the screen, "Create link" ended up drawn on top of another
+     * pane and could not be clicked at all — the browser flow in
+     * `e2e/tests/site-review.spec.ts` failed on exactly that.
+     */
     return (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <PreviewLinks siteId={siteId} />
             {verdict}
             {askForReview}
-            <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
                 <span className="text-xs text-muted-foreground">
                     {open.length === 0
                         ? "Nothing open"
@@ -239,7 +252,7 @@ export function ReviewPanel({
                 ) : null}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            <div className="min-h-0 flex-1 p-2">
                 {groups.map(({ page, notes }) => (
                     <section key={page.id} className="mb-4">
                         <h3 className="px-1 pb-1 text-[0.625rem] uppercase tracking-[0.08em] text-muted-foreground">

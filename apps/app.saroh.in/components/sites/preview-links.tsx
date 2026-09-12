@@ -118,7 +118,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
     }
 
     return (
-        <section className="border-b p-3">
+        <section className="shrink-0 border-b p-3">
             <h3 className="text-[0.625rem] uppercase tracking-[0.08em] text-muted-foreground">
                 Share a preview
             </h3>
