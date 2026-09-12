@@ -15,7 +15,12 @@ jest.mock("@saroh/database", () => {
                 update: jest.fn(),
                 count: jest.fn(),
             },
-            siteApproval: { create: jest.fn(), findFirst: jest.fn() },
+            siteApproval: {
+                create: jest.fn(),
+                findFirst: jest.fn(),
+                // #278 reads every verdict, not just the latest one.
+                findMany: jest.fn(),
+            },
         },
     };
 });
@@ -37,6 +42,20 @@ const commentUpdate = prisma.siteComment.update as jest.Mock;
 const commentCount = prisma.siteComment.count as jest.Mock;
 const approvalCreate = prisma.siteApproval.create as jest.Mock;
 const approvalFindFirst = prisma.siteApproval.findFirst as jest.Mock;
+const approvalFindMany = prisma.siteApproval.findMany as jest.Mock;
+
+/** The verdict rows #278 reasons over, newest first. */
+function verdicts(
+    ...rows: { outcome: string; byUserId?: string; fingerprint?: string }[]
+) {
+    let tick = 0;
+    return rows.map((r) => ({
+        outcome: r.outcome,
+        byUserId: r.byUserId ?? "reviewer",
+        draftFingerprint: r.fingerprint ?? null,
+        createdAt: new Date(Date.UTC(2026, 8, 12, 0, 0, rows.length - tick++)),
+    }));
+}
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -241,6 +260,8 @@ describe("SitesService.getReviewState", () => {
             createdAt: new Date("2026-09-01"),
             by: { name: "Priya Raman", email: "p@example.test" },
         });
+        // Nothing was asked for and nobody objected: not outstanding.
+        approvalFindMany.mockResolvedValue([]);
         commentCount.mockResolvedValue(2);
 
         const state = await service.getReviewState(ctx(), "site_1");
@@ -253,6 +274,7 @@ describe("SitesService.getReviewState", () => {
 
     it("has no approval before anyone has given one", async () => {
         approvalFindFirst.mockResolvedValue(null);
+        approvalFindMany.mockResolvedValue([]);
         commentCount.mockResolvedValue(0);
         const state = await service.getReviewState(ctx(), "site_1");
         expect(state.latestApproval).toBeNull();
@@ -266,6 +288,9 @@ describe("SitesService.getReviewState — outstanding (#199)", () => {
             createdAt: new Date("2026-09-03T10:00:00Z"),
             by: { name: "Priya Raman", email: "priya@example.com" },
         });
+        approvalFindMany.mockResolvedValue(
+            verdicts({ outcome: "CHANGES_REQUESTED" }),
+        );
         commentCount.mockResolvedValue(0);
         const state = await service.getReviewState(ctx(), "site_1");
         expect(state.outstanding).toBe(true);
@@ -275,13 +300,16 @@ describe("SitesService.getReviewState — outstanding (#199)", () => {
     it("stays outstanding after a bypass — publish's own record is not the reviewer's approval", async () => {
         // Latest event of any kind is the bypass; the latest VERDICT is still
         // the change request.
-        approvalFindFirst
-            .mockResolvedValueOnce({
-                outcome: "BYPASSED",
-                createdAt: new Date("2026-09-04T10:00:00Z"),
-                by: { name: "Demo Owner", email: "demo@saroh.dev" },
-            })
-            .mockResolvedValueOnce({ outcome: "CHANGES_REQUESTED" });
+        approvalFindFirst.mockResolvedValue({
+            outcome: "BYPASSED",
+            createdAt: new Date("2026-09-04T10:00:00Z"),
+            by: { name: "Demo Owner", email: "demo@saroh.dev" },
+        });
+        // The service does not select BYPASSED rows at all (#278): publish's
+        // own record must not settle the request it was written about.
+        approvalFindMany.mockResolvedValue(
+            verdicts({ outcome: "CHANGES_REQUESTED" }),
+        );
         commentCount.mockResolvedValue(1);
         const state = await service.getReviewState(ctx(), "site_1");
         expect(state.latestApproval?.outcome).toBe("BYPASSED");

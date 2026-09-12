@@ -43,6 +43,8 @@ import {
 } from "./pending-changes";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
+import type { ApprovalRow, ReviewRoute } from "./review-route";
+import { draftFingerprint, reviewStanding } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
 import {
     assertPageInSite,
@@ -111,6 +113,13 @@ export interface CommentView {
 /** The site's review state — the latest verdict plus what is still open. */
 export interface ReviewState {
     openNotes: number;
+    /** A review has been asked for and nobody has answered it yet (#278). */
+    pending: boolean;
+    /**
+     * The newest approval was of a different draft than the one that would go
+     * live now — someone approved, then the work carried on (#278).
+     */
+    approvalIsStale: boolean;
     /**
      * The latest event of any kind — a reviewer's verdict, or a BYPASSED row
      * publish wrote (#199). What the badge shows.
@@ -970,6 +979,9 @@ export class SitesService {
                 publishedByUserId: true,
                 templateId: true,
                 templateVersion: true,
+                // Which of the three routes this publish took (#278). Null on
+                // rows published before it was recorded.
+                reviewRoute: true,
                 // Whether this publish went past an outstanding change
                 // request (#199): the bypass row names its publication.
                 approvals: {
@@ -1116,15 +1128,26 @@ export class SitesService {
 
         /*
          * A restore puts a version live, so it is a publish. A publish past an
-         * outstanding change request is RECORDED, not prevented (#199). This
+         * outstanding review is RECORDED, not prevented (#199, #278). This
          * path used to skip the check, so rolling back while a reviewer had
          * asked for changes went live with nothing anywhere saying so (#279).
-         * Read before the transaction and written inside it, as publishSite
-         * does, so the record and the publication land together or not at all.
+         *
+         * The fingerprint is of the version being restored, because that is
+         * what goes live: an approval counts only if a reviewer approved this
+         * exact content, which a draft approval almost never is.
          */
-        const bypass = await this.reviewOutstanding(siteId, ctx.organizationId);
+        const fingerprint = draftFingerprint(source.snapshot);
 
         return prisma.$transaction(async (tx) => {
+            const standing = await this.reviewStandingFor(
+                tx,
+                siteId,
+                ctx.organizationId,
+                fingerprint,
+                ctx.userId,
+            );
+            const bypass = standing.outstanding;
+
             const restored = await tx.publication.create({
                 data: {
                     siteId,
@@ -1135,6 +1158,9 @@ export class SitesService {
                     templateId: source.templateId,
                     templateVersion: source.templateVersion,
                     publishedByUserId: ctx.userId,
+                    // A restore is a publish, and says which route it took
+                    // (#278) like any other.
+                    reviewRoute: standing.route satisfies ReviewRoute,
                 },
                 select: { id: true, publishedAt: true },
             });
@@ -1545,25 +1571,43 @@ export class SitesService {
         const publishedAt = new Date();
         const snapshot = this.buildSnapshot(site, publishedAt);
         /*
-         * Approval gates nothing, and says so (#199). The epic's rule: if a
-         * review was asked for and has not approved, publishing is RECORDED
-         * as a bypass, not prevented. Read before the transaction, written
-         * inside it, so the record and the publication land together or not
-         * at all.
+         * Approval gates nothing, and says so (#199, #278). The epic's rule: if
+         * a review was asked for and has not been answered for THIS draft,
+         * publishing is RECORDED as a bypass, not prevented.
+         *
+         * The fingerprint is of the snapshot about to be written, so an
+         * approval of an earlier draft does not cover this one.
          */
-        const bypass = await this.reviewOutstanding(
-            site.id,
-            ctx.organizationId,
-        );
+        const fingerprint = draftFingerprint(snapshot);
 
         // The Site does not track which template produced it; default the
         // Publication's required (non-null) template stamp to the starter
         // template's identity/version.
         return prisma.$transaction(async (tx) => {
+            /*
+             * Asked INSIDE the transaction (#278). It used to be read before
+             * one, so a verdict posted while a publish was in flight was
+             * missed — the narrow window in which the record would have been
+             * wrong is exactly the window a reviewer racing a publisher falls
+             * into.
+             */
+            const standing = await this.reviewStandingFor(
+                tx,
+                site.id,
+                ctx.organizationId,
+                fingerprint,
+                ctx.userId,
+            );
+            const bypass = standing.outstanding;
+
             const publication = await tx.publication.create({
                 data: {
                     siteId: site.id,
                     organizationId: ctx.organizationId,
+                    // Which of the three routes this took, so version history
+                    // can tell "a reviewer approved it" from "nobody was
+                    // asked" (#193).
+                    reviewRoute: standing.route satisfies ReviewRoute,
                     // Through `unknown`: SiteStyle is a precise interface, and
                     // Prisma's InputJsonValue index signature does not accept
                     // one directly even though the value is plain JSON.
@@ -1992,6 +2036,13 @@ export class SitesService {
                 organizationId: ctx.organizationId,
                 byUserId: ctx.userId,
                 outcome: dto.outcome,
+                // An approval names the draft it approved (#278), so later
+                // edits do not inherit it. A change request does not: it is
+                // about the work as a whole and stands until it is answered.
+                draftFingerprint:
+                    dto.outcome === "APPROVED"
+                        ? await this.currentDraftFingerprint(ctx, siteId)
+                        : null,
             },
             select: { id: true },
         });
@@ -2009,7 +2060,7 @@ export class SitesService {
         authorize(ctx, "site:read");
         await assertSiteInOrg(ctx, siteId);
 
-        const [latest, outstanding, openNotes] = await Promise.all([
+        const [latest, standing, openNotes] = await Promise.all([
             prisma.siteApproval.findFirst({
                 where: { siteId, organizationId: ctx.organizationId },
                 orderBy: { createdAt: "desc" },
@@ -2019,7 +2070,17 @@ export class SitesService {
                     by: { select: { name: true, email: true } },
                 },
             }),
-            this.reviewOutstanding(siteId, ctx.organizationId),
+            // Asked as "what would happen if THIS caller published now",
+            // because that is the question the editor's bar is answering.
+            this.currentDraftFingerprint(ctx, siteId).then((fingerprint) =>
+                this.reviewStandingFor(
+                    prisma,
+                    siteId,
+                    ctx.organizationId,
+                    fingerprint,
+                    ctx.userId,
+                ),
+            ),
             prisma.siteComment.count({
                 where: {
                     siteId,
@@ -2031,7 +2092,12 @@ export class SitesService {
 
         return {
             openNotes,
-            outstanding,
+            outstanding: standing.outstanding,
+            // "In review" is the state a REQUESTED row creates and only a
+            // verdict clears (#278).
+            pending:
+                standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED",
+            approvalIsStale: standing.approvalIsStale,
             latestApproval:
                 latest === null
                     ? null
@@ -2044,25 +2110,106 @@ export class SitesService {
     }
 
     /**
-     * Is a change request still standing? Reads the latest VERDICT — a
-     * BYPASSED row is publish's own record, not a reviewer changing their
-     * mind, so it does not clear the request. Only an APPROVED after the
-     * CHANGES_REQUESTED does.
+     * Ask for a review (#278, #193).
+     *
+     * The act the model was missing. "Outstanding" used to mean only "the
+     * latest verdict is CHANGES_REQUESTED", so a review nobody had answered
+     * yet could not exist: asking someone to look and their not having looked
+     * was indistinguishable from never having asked.
+     *
+     * Requires `site:update` — this is the person whose work it is saying they
+     * are ready for eyes, not a reviewer's action. It blocks nothing:
+     * publishing while it stands still succeeds, and records a bypass.
      */
-    private async reviewOutstanding(
+    async requestReview(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<{ id: string }> {
+        authorize(ctx, "site:update");
+        await assertSiteInOrg(ctx, siteId);
+
+        return prisma.siteApproval.create({
+            data: {
+                siteId,
+                organizationId: ctx.organizationId,
+                byUserId: ctx.userId,
+                outcome: "REQUESTED",
+                // Which draft is being put up for review, so "approved" can
+                // later be checked against the same work.
+                draftFingerprint: await this.currentDraftFingerprint(
+                    ctx,
+                    siteId,
+                ),
+            },
+            select: { id: true },
+        });
+    }
+
+    /**
+     * A hash of the draft as publishing would write it, for binding an
+     * approval to the work it approved (#278).
+     */
+    private async currentDraftFingerprint(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<string> {
+        const site = await this.loadDraftSite({
+            id: siteId,
+            organizationId: ctx.organizationId,
+            deletedAt: null,
+        });
+        if (!site) {
+            throw new NotFoundException(`Site "${siteId}" not found`);
+        }
+        /*
+         * The canonical snapshot, which is what an approval is really about:
+         * the thing that would go live. The date passed is arbitrary because
+         * the fingerprint excludes it.
+         *
+         * A draft mid-edit can hold a section that fails its contract, and
+         * `buildSnapshot` throws on one — correct for publishing, wrong here,
+         * where the question is only "is this the same draft as before". The
+         * fallback hashes the draft rows instead: a different answer for the
+         * same work, but a stable one, and a draft that cannot build cannot be
+         * published either, so no approval can be carried across the switch.
+         */
+        try {
+            return draftFingerprint(this.buildSnapshot(site, new Date(0)));
+        } catch {
+            return draftFingerprint({ unbuildableDraft: site });
+        }
+    }
+
+    /**
+     * Where the site stands with its reviewers, as {@link reviewStanding}
+     * decides it. The query lives here; the rule lives in `review-route.ts`,
+     * where publish can apply it to its own transaction's rows.
+     */
+    private async reviewStandingFor(
+        client: Pick<typeof prisma, "siteApproval">,
         siteId: string,
         organizationId: string,
-    ): Promise<boolean> {
-        const verdict = await prisma.siteApproval.findFirst({
+        currentFingerprint: string,
+        publisherUserId: string | null,
+    ) {
+        const verdicts = (await client.siteApproval.findMany({
             where: {
                 siteId,
                 organizationId,
-                outcome: { in: ["APPROVED", "CHANGES_REQUESTED"] },
+                // BYPASSED is publish's own record, not a verdict: it must not
+                // settle the request it was written about.
+                outcome: { in: ["REQUESTED", "APPROVED", "CHANGES_REQUESTED"] },
             },
             orderBy: { createdAt: "desc" },
-            select: { outcome: true },
-        });
-        return verdict?.outcome === "CHANGES_REQUESTED";
+            select: {
+                outcome: true,
+                byUserId: true,
+                draftFingerprint: true,
+                createdAt: true,
+            },
+        })) as ApprovalRow[];
+
+        return reviewStanding(verdicts, currentFingerprint, publisherUserId);
     }
 
     // -----------------------------------------------------------------------

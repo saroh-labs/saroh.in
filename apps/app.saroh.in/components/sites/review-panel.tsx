@@ -6,10 +6,15 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
 import { PreviewLinks } from "@/components/sites/preview-links";
-import { createApproval, setCommentResolved } from "@/lib/sites/actions";
+import {
+    createApproval,
+    requestReview,
+    setCommentResolved,
+} from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
 import type {
     ReviewerVerdict,
+    ReviewState,
     SiteCommentView,
     SitePage,
 } from "@/lib/sites/service";
@@ -30,19 +35,23 @@ export function ReviewPanel({
     siteId,
     pages,
     comments,
+    review,
     onChanged,
     onJump,
 }: {
     siteId: string;
     pages: SitePage[];
     comments: SiteCommentView[];
-    /** Re-read after a note or a verdict changes, so the badge follows. */
+    /** The site's standing with its reviewers: pending, stale, latest verdict. */
+    review: ReviewState;
+    /** Re-read after a note, a verdict or a request, so the bar follows. */
     onChanged: () => void;
     onJump: (pageId: string, sectionKey: string) => void;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [showResolved, setShowResolved] = useState(false);
     const [recording, setRecording] = useState(false);
+    const [asking, setAsking] = useState(false);
 
     /**
      * Say what you think (#277). The api gates both on `site:approve`, which
@@ -65,6 +74,26 @@ export function ReviewPanel({
                 ? "Marked as approved."
                 : "Recorded that you asked for changes.",
         );
+        onChanged();
+    }
+
+    /**
+     * Ask for a review (#278).
+     *
+     * The act the model was missing: until this existed, a review nobody had
+     * answered could not be expressed, so "waiting on someone" and "nobody was
+     * asked" looked identical. It blocks nothing — publishing while it stands
+     * still works, and is recorded as a bypass.
+     */
+    async function ask() {
+        setAsking(true);
+        const res = await requestReview(siteId);
+        setAsking(false);
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        showSuccess("Asked for a review. Share a preview so they can read it.");
         onChanged();
     }
 
@@ -93,6 +122,36 @@ export function ReviewPanel({
         </div>
     );
 
+    const askForReview = (
+        <div className="border-b px-3 py-2">
+            {review.pending ? (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                    In review. Publishing still works — it is recorded as going
+                    ahead without approval.
+                </p>
+            ) : (
+                <>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        disabled={asking}
+                        onClick={() => void ask()}
+                    >
+                        {asking ? "Asking…" : "Ask for a review"}
+                    </Button>
+                    {review.approvalIsStale ? (
+                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                            This site was approved, and has been edited since.
+                            The approval does not cover the changes.
+                        </p>
+                    ) : null}
+                </>
+            )}
+        </div>
+    );
+
     const open = comments.filter((c) => c.resolvedAt === null);
     const shown = showResolved ? comments : open;
 
@@ -116,6 +175,7 @@ export function ReviewPanel({
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
                 <PreviewLinks siteId={siteId} />
                 {verdict}
+                {askForReview}
                 {/*
                  * The design's empty state, which states the whole feature in
                  * one sentence. Until #198 it described an action that did
@@ -159,6 +219,7 @@ export function ReviewPanel({
         <div className="flex min-h-0 flex-1 flex-col">
             <PreviewLinks siteId={siteId} />
             {verdict}
+            {askForReview}
             <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
                 <span className="text-xs text-muted-foreground">
                     {open.length === 0

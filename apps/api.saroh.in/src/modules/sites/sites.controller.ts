@@ -134,6 +134,18 @@ export class SitesController {
         );
     }
 
+    /**
+     * Ask for a review (#278). Requires `site:update` — the person whose work
+     * it is saying they are ready for eyes. It blocks nothing.
+     */
+    @Post(":siteId/review/request")
+    requestReview(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.requestReview(ctx, siteId);
+    }
+
     /** Record a reviewer's verdict. Requires `site:approve`. */
     @Post(":siteId/approvals")
     createApproval(

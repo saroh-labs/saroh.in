@@ -613,6 +613,11 @@ export interface SitePublication {
     isCurrent: boolean;
     /** Set when this publish went past an outstanding change request (#199). */
     bypass: { at: string; by: string } | null;
+    /**
+     * Which route this publish took: APPROVED, BYPASSED or NONE (#278). Null on
+     * versions published before it was recorded.
+     */
+    reviewRoute: string | null;
 }
 
 /** Every publish of a site, newest first. Empty if it has never been published. */
@@ -731,7 +736,8 @@ export interface SiteCommentView {
  * word all three — a new outcome is a type error, not a line that quietly
  * renders as "asked for changes".
  */
-export type ApprovalOutcome = "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED";
+export type ApprovalOutcome =
+    "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED";
 
 export interface ReviewState {
     openNotes: number;
@@ -741,10 +747,18 @@ export interface ReviewState {
         by: string;
     } | null;
     /**
-     * A reviewer's latest verdict asked for changes and no approval has
-     * followed (#199). Publishing still works; it is recorded as a bypass.
+     * A review was asked for, or changes were, and neither has been settled
+     * for the draft as it stands (#199, #278). Publishing still works; it is
+     * recorded as a bypass.
      */
     outstanding: boolean;
+    /** Asked for and not yet answered — the "In review" state (#278). */
+    pending: boolean;
+    /**
+     * The newest approval was of a different draft than the one that would go
+     * live now: approved, then the work carried on (#278).
+     */
+    approvalIsStale: boolean;
 }
 
 /**
@@ -768,6 +782,8 @@ export async function listComments(siteId: string): Promise<SiteCommentView[]> {
 export async function getReviewState(siteId: string): Promise<ReviewState> {
     const empty: ReviewState = {
         openNotes: 0,
+        pending: false,
+        approvalIsStale: false,
         latestApproval: null,
         outstanding: false,
     };
@@ -781,6 +797,8 @@ export async function getReviewState(siteId: string): Promise<ReviewState> {
             openNotes: typeof data?.openNotes === "number" ? data.openNotes : 0,
             latestApproval: data?.latestApproval ?? null,
             outstanding: data?.outstanding === true,
+            pending: data?.pending === true,
+            approvalIsStale: data?.approvalIsStale === true,
         };
     } catch {
         return empty;
@@ -811,11 +829,17 @@ export async function createComment(
 }
 
 /**
- * The verdicts a REVIEWER can record (#277) — every outcome except the one
- * publish writes for itself. Derived from {@link ApprovalOutcome} rather than
- * repeated, so a fourth outcome cannot be added to one list and not the other.
+ * The verdicts a REVIEWER can record (#277): an answer to the work, and
+ * nothing else. REQUESTED is the merchant asking (#278) and BYPASSED is what
+ * publish writes for itself, so neither is a reviewer's to record.
+ *
+ * Derived from {@link ApprovalOutcome} rather than repeated, so an outcome
+ * cannot be added to one list and forgotten in the other.
  */
-export type ReviewerVerdict = Exclude<ApprovalOutcome, "BYPASSED">;
+export type ReviewerVerdict = Exclude<
+    ApprovalOutcome,
+    "REQUESTED" | "BYPASSED"
+>;
 
 /**
  * Record a verdict on the site. Requires `site:approve`.
@@ -836,6 +860,23 @@ export async function createApproval(
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
     return { ok: false, ...readError(data, "Could not record that.") };
+}
+
+/**
+ * Ask for a review (#278). Requires `site:update` — the person whose work it
+ * is saying they are ready for eyes. It blocks nothing.
+ */
+export async function requestReview(
+    siteId: string,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/review/request`, {
+        method: "POST",
+    });
+    const data = (await res.json().catch(() => null)) as { id?: string } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not ask for a review.") };
 }
 
 /** Mark a note settled, or reopen it. Requires `section:write` on the api. */

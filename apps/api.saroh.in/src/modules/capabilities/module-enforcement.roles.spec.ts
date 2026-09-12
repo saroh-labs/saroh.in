@@ -21,6 +21,8 @@ jest.mock("@saroh/database", () => ({
         siteApproval: {
             create: jest.fn().mockResolvedValue({ id: "approval_1" }),
             findFirst: jest.fn().mockResolvedValue(null),
+            // #278 reads every verdict to decide where the site stands.
+            findMany: jest.fn().mockResolvedValue([]),
         },
     },
 }));
