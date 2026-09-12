@@ -1,22 +1,39 @@
 import sanitizeHtml from "sanitize-html";
 
 /**
- * The publish-time HTML sanitizer (S2-005).
+ * The HTML sanitizer for everything a merchant authors as rich text.
  *
  * The section contract validates the *shape* of `Section.content` but NEVER
- * sanitizes (see `packages/database/src/cms/section-contract.ts`). Fields that
+ * sanitizes (see `packages/block-contract/src/section-contract.ts`). Fields that
  * carry authorable HTML are flagged by the contract in `sanitizedFields`
- * (e.g. `richText.value`). Those fields MUST be run through this sanitizer
- * DURING publish — before the value is written into the immutable Publication
- * snapshot — so the public renderer only ever reads already-safe HTML and never
- * needs to sanitize at read time.
+ * (e.g. `richText.value`), and the site footer carries the same shape.
  *
- * Policy: an allowlist of formatting/structural tags and safe attributes.
- * Everything else is dropped, which removes `<script>`/`<style>`/`<iframe>`,
- * `on*` event-handler attributes, and `javascript:` URLs. Being an allowlist,
- * it fails closed: an unknown/dangerous tag is stripped rather than passed
- * through.
+ * It runs at three boundaries:
+ * - when a draft is SAVED (`replaceDraftSections`, `updateFooter`);
+ * - when the editor LOADS a draft (`getPageDraft`), which cleans rows saved
+ *   before the first boundary existed;
+ * - at PUBLISH, before the immutable Publication snapshot is written.
+ *
+ * It used to run only at publish (#280). That was enough for the public
+ * renderer, which reads only snapshots, but the editor's preview renders the
+ * DRAFT as HTML on app.saroh.in. Anything a direct API call stored ran as
+ * script in the session of whoever opened the editor next.
+ *
+ * Policy: an allowlist of formatting/structural tags, attributes and CSS
+ * properties. Everything else is dropped, which removes `<script>`/`<style>`/
+ * `<iframe>`, `on*` event handlers, `javascript:` URLs, and CSS that could lift
+ * content out of its section. Being an allowlist, it fails closed.
+ *
+ * It is idempotent: sanitizing already-sanitized HTML returns it unchanged, so
+ * running at all three boundaries changes nothing after the first.
  */
+
+/** `#rgb`, `#rrggbb`, `#rrggbbaa`, and `rgb()`/`rgba()` — what a colour picker writes. */
+const COLOUR = [
+    /^#[0-9a-f]{3,8}$/i,
+    /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*(0|1|0?\.\d+)\s*)?\)$/i,
+];
+
 const OPTIONS: sanitizeHtml.IOptions = {
     allowedTags: [
         "p",
@@ -43,6 +60,10 @@ const OPTIONS: sanitizeHtml.IOptions = {
         "em",
         "u",
         "s",
+        // The editor's highlight (#208) renders as <mark>. It was missing
+        // here, so every highlight a merchant applied was stripped at publish:
+        // present in the editor, gone on the live site.
+        "mark",
         "sub",
         "sup",
         "img",
@@ -58,21 +79,67 @@ const OPTIONS: sanitizeHtml.IOptions = {
     allowedAttributes: {
         a: ["href", "title", "target", "rel"],
         img: ["src", "alt", "title", "width", "height"],
+        mark: ["data-color"],
+        th: ["colspan", "rowspan"],
+        td: ["colspan", "rowspan"],
         "*": ["style"],
+    },
+    /*
+     * Exactly the CSS the rich text editor writes (#280), and nothing else.
+     *
+     * `style` used to be allowed on every tag with any property, so a draft
+     * could `position: fixed` itself over the whole page, including over the
+     * share link's "not live" bar. Each property here corresponds to an editor
+     * extension:
+     * - `color`, `font-family`, `font-size`: TextStyleKit;
+     * - `background-color`: Highlight (`color: inherit` rides along with it);
+     * - `text-align`: TextAlign.
+     *
+     * An extension that writes a new property needs it added here first, or its
+     * formatting silently vanishes on save.
+     */
+    allowedStyles: {
+        "*": {
+            color: [...COLOUR, /^inherit$/i],
+            "background-color": COLOUR,
+            "text-align": [/^(left|right|center|justify)$/i],
+            "font-family": [/^[a-z0-9 ,'"-]+$/i],
+            "font-size": [/^\d{1,3}(\.\d{1,3})?(rem|em|px|%)$/i],
+        },
     },
     // Only safe URL schemes survive; `javascript:` and friends are dropped.
     allowedSchemes: ["http", "https", "mailto", "tel"],
     allowedSchemesByTag: { img: ["http", "https", "data"] },
+    transformTags: {
+        /*
+         * A link that opens a new tab always gets `rel="noopener noreferrer"`
+         * (#280), so the page it opens cannot reach back through
+         * `window.opener`. The target is normalised to `_blank`: `_top` or
+         * `_parent` would let a link replace the page it sits on, which no
+         * editor control asks for.
+         */
+        a: (tagName, attribs) =>
+            attribs.target
+                ? {
+                      tagName,
+                      attribs: {
+                          ...attribs,
+                          target: "_blank",
+                          rel: "noopener noreferrer",
+                      },
+                  }
+                : { tagName, attribs },
+    },
     // Drop the *contents* of these tags entirely (not just the tag), so no
-    // inline script/style text leaks into the snapshot as text.
+    // inline script/style text leaks through as text.
     nonTextTags: ["script", "style", "textarea", "option", "noscript"],
     disallowedTagsMode: "discard",
 };
 
 /**
  * Sanitize a single authorable HTML string. Safe to call on any string; a
- * non-string is coerced to `""` (the contract guarantees strings, but publish
- * is the last line of defense before an immutable write).
+ * non-string is coerced to `""` (the contract guarantees strings, but this is
+ * the last line of defense before a write).
  */
 export function sanitizeRichHtml(value: unknown): string {
     if (typeof value !== "string") return "";

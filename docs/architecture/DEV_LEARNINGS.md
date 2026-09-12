@@ -180,3 +180,34 @@ read-only. Touching a source file did not trigger a recompile.
 `dist`. If the watcher's last line is "Found N errors" while `tsc --noEmit`
 passes, the API is running an old build.
 **Category**: local dev · note in `docs/patterns/frontend-error-feedback.md`
+
+## Sites — draft HTML ran in the editor, and highlights vanished at publish (#280)
+
+**Problem**: Two symptoms at the same boundary.
+
+- Rich text saved through `PUT …/draft/sections` rendered raw in the editor
+  preview on app.saroh.in, event handlers included.
+- A merchant's highlighted words showed in the editor and were gone on the
+  live site.
+
+**Root cause**: The sanitizer ran only at publish. The public renderer reads
+only snapshots, so it was safe, but the editor preview renders the DRAFT
+through the same `RichTextSection`, whose own comment said never to feed it
+unsnapshotted HTML. Separately, the allowlist had no `<mark>`, which is what
+Tiptap's Highlight renders, and it kept `style` with any CSS property. So
+highlights were stripped, and `position: fixed` was not.
+
+**Fix**:
+
+- `sanitize.ts` runs on save (`replaceDraftSections`, `updateFooter`), on the
+  editor's load (`getPageDraft`) and at publish.
+- The allowlist keeps `<mark>`, table cell spans, and only the CSS properties
+  the editor writes. It forces `rel="noopener noreferrer"` on targeted links.
+- Button links are refused unless they are `http`, `https`, `mailto`, `tel` or
+  a path, checked with control characters stripped first; `ctaHref` repeats
+  the check for stored content.
+
+An editor extension that writes a new CSS property needs it added to
+`allowedStyles`, or its formatting disappears on save.
+**Category**: security · rules in `sanitize.ts`, `sanitize.spec.ts` and
+`packages/block-contract/src/links.test.ts`

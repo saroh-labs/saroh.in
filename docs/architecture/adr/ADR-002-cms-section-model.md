@@ -54,6 +54,21 @@ The `snapshot` is self-contained and already sanitized, so the public renderer (
 
 ### Sanitization boundary
 
+> **Update 2026-09-11:** publish is no longer the only enforcement point, so the
+> "single, explicit enforcement point" consequence below no longer holds (#280).
+> The editor preview in app.saroh.in renders the DRAFT as HTML, so sanitizing
+> only on the way into the snapshot left the preview rendering raw author
+> input. The same sanitizer (`apps/api.saroh.in/src/modules/sites/sanitize.ts`)
+> now also runs, still keyed off `sanitizedFields`:
+>
+> - when a draft is saved;
+> - when the editor loads a draft;
+> - on the site footer.
+>
+> Publish still sanitizes before writing the snapshot. Button hrefs are
+> restricted to `http`, `https`, `mailto`, `tel` or a path by the contract
+> itself.
+
 The contract validates **shape only; it never sanitizes.** Types carrying authorable HTML/markdown declare their rich fields in `sanitizedFields` (today: `richText.value`); `requiresSanitization(type, version)` reports this. **Publish (S2-005) MUST run those fields through an HTML sanitizer before writing the immutable `Publication.snapshot`.** Because sanitization happens on the way _in_, the renderer only ever reads already-safe content. The sanitizer implementation is out of scope for this ticket — only the boundary is defined here.
 
 ## 4. Mapping plan for existing models (DEFERRED)
