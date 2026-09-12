@@ -370,6 +370,64 @@ jobs:
             e2e/test-results/
             e2e/playwright-report/
           retention-days: 7
+  # The permission-denied states, rendered by a PRODUCTION build (#287).
+  #
+  # It existed and never ran. `e2e/permissions.config.ts` and its suite shipped
+  # with #274, CI ran only `test:e2e`, and the day #275 replaced the read-only
+  # site view the suite went stale with nothing to say so. Tests that exist and
+  # are invisible are worse than tests that do not exist: they read as coverage.
+  #
+  # Separate from the seeded browser job because it needs neither a database
+  # nor a real sign-in. A ~100-line fake API answers per role, and the app is
+  # built and served for real — `next dev` keeps the error messages production
+  # redacts, and redaction is exactly what these tests are about.
+  permissions-e2e:
+    name: Permission states (production build)
+    runs-on: ubuntu-latest
+
+    env:
+      # Bare ports: a runner has no portless, so the config's `.localhost`
+      # hostnames would resolve to nothing. Setting these switches both the
+      # URLs under test and how the two servers are started.
+      PERMISSIONS_APP_URL: http://localhost:3004
+      PERMISSIONS_API_URL: http://localhost:3334
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.9.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm --filter @saroh/e2e install:browsers
+
+      # Playwright's own webServer builds and starts both servers, and tears
+      # them down afterwards — there is no stack to poll for here.
+      - name: Run the permission suite
+        run: pnpm --filter @saroh/e2e test:permissions
+
+      - name: Upload the report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: permissions-report
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          retention-days: 7
+
   # Secret scanning runs as its own job over the full git history so a secret
   # committed in an earlier commit is still caught.
   #
