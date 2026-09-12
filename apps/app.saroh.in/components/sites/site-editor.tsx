@@ -127,7 +127,7 @@ export function SiteEditor({
     initialFlags,
     initialComments,
     initialReview,
-    neverPublished,
+    neverPublished: initialNeverPublished,
     unreadableSections,
     initialPendingChanges,
     initialPendingSiteChanges,
@@ -147,6 +147,11 @@ export function SiteEditor({
     initialComments: SiteCommentView[];
     initialReview: ReviewState;
     /** Never-published sites say "Publish site", not "Publish changes". */
+    /**
+     * Whether anything has ever been published. The INITIAL value: publishing
+     * makes it false without a reload (#288), so the editor keeps this in
+     * state rather than reading the prop directly.
+     */
     neverPublished: boolean;
     /**
      * Keys of sections whose stored content no longer matches their contract
@@ -204,6 +209,20 @@ export function SiteEditor({
     const [comments, setComments] =
         useState<SiteCommentView[]>(initialComments);
     const [review, setReview] = useState<ReviewState>(initialReview);
+    /*
+     * Whether anything is live yet (#288).
+     *
+     * State, not the prop it starts from: after the first publish the button
+     * still read "Publish site" and "Nothing's live yet" stayed above the
+     * preview until a reload, which is the editor telling a merchant their
+     * publish did not happen.
+     *
+     * `router.refresh()` would fix it and cost more than it fixes — it
+     * remounts the editor, dropping the selected section and the scroll
+     * position, so the merchant would lose their place as a reward for
+     * publishing.
+     */
+    const [neverPublished, setNeverPublished] = useState(initialNeverPublished);
     const openNotes = review.openNotes;
 
     /*
@@ -735,6 +754,9 @@ export function SiteEditor({
          * than after a reload. Flags are re-read for the same reason.
          */
         setPendingChanges(0);
+        // Something is live now, so the button stops offering to publish the
+        // site and the "nothing's live yet" line goes (#288).
+        setNeverPublished(false);
         await Promise.all([refreshFlags(), refreshReview()]);
     }
 
