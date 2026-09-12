@@ -17,5 +17,17 @@ export default defineConfig({
         environment: "jsdom",
         globals: true,
         setupFiles: ["./vitest.setup.ts"],
+        /*
+         * The booking block prints the VISITOR's resolved timezone ("Times
+         * shown in Asia/Kolkata"), so its snapshot recorded whichever zone the
+         * machine that wrote it was in. That went unnoticed for as long as the
+         * suite only ever ran on one developer's laptop; the first CI run
+         * (#287) failed on it, because a runner is UTC.
+         *
+         * Pinning a zone here makes the snapshot say the same thing everywhere.
+         * A real one, not UTC: UTC would still pass if someone replaced the
+         * resolved zone with a hardcoded string.
+         */
+        env: { TZ: "America/New_York" },
     },
 });
