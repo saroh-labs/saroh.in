@@ -1654,8 +1654,16 @@ model SiteComment {
   siteId String
   site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
-  pageId String
-  page   Page   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  // SetNull, not Cascade (#277): deleting a page used to delete every note
+  // anyone had left on it. A note is a record of what a person said about the
+  // work — the Review tab has always had a group for "On a page that no longer
+  // exists", and it could never render because the rows were gone.
+  pageId String?
+  page   Page?   @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  // The page's title when the note was written. Kept so a note whose page is
+  // gone can still say where it was; the live title wins while the page exists.
+  pageTitle String?
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

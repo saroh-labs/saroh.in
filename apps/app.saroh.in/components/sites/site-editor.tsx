@@ -29,6 +29,7 @@ import type { ServiceOption } from "@/components/sites/section-fields";
 import { SectionFields } from "@/components/sites/section-fields";
 import { SectionPadding } from "@/components/sites/section-fields/padding";
 
+import { NoteComposer } from "@/components/sites/note-composer";
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
 import { ReviewPanel } from "@/components/sites/review-panel";
@@ -1471,6 +1472,21 @@ export function SiteEditor({
                                     replaceAt(active.index, next)
                                 }
                             />
+
+                            {/*
+                             * Leaving a note is an action taken ON this
+                             * section (#277), so it sits under its fields —
+                             * the same place the design puts it, which is why
+                             * the composer needs no section picker.
+                             */}
+                            <div className="border-t pt-3">
+                                <NoteComposer
+                                    siteId={siteId}
+                                    pageId={pageId}
+                                    sectionKey={active.section.key}
+                                    onAdded={refreshReview}
+                                />
+                            </div>
 
                             {/*
                              * Per-field markers, the other half of what flags

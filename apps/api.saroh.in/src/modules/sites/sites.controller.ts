@@ -251,6 +251,19 @@ export class SitesController {
     }
 
     /**
+     * A page's draft outline — section keys, types and labels — for a caller
+     * who may read the site but not edit it (#277). Requires `site:read`.
+     */
+    @Get(":siteId/pages/:pageId/outline")
+    getPageOutline(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+    ) {
+        return this.sites.getPageOutline(ctx, siteId, pageId);
+    }
+
+    /**
      * Replace a page's DRAFT sections with an ordered list. Each section is
      * contract-validated before any write; the whole request is rejected if any
      * is invalid. Requires `section:write`.

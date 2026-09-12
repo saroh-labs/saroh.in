@@ -110,6 +110,14 @@ describe("the REVIEWER role reaching a request", () => {
 describe("SitesService.createComment", () => {
     it("pins the note to the section key and the acting user", async () => {
         commentCreate.mockResolvedValue({ id: "c1" });
+        // The key must be on the page's draft (#277): assertPageInSite first,
+        // then the draft lookup createComment checks it against.
+        (prisma.page.findFirst as jest.Mock)
+            .mockResolvedValueOnce({ id: "page_1" })
+            .mockResolvedValueOnce({
+                title: "Home",
+                versions: [{ sections: [{ key: "sec-abc" }] }],
+            });
 
         await service.createComment(ctx({ role: "REVIEWER" }), "site_1", {
             body: "This headline is too long.",

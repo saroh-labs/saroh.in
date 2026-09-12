@@ -2,13 +2,17 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError } from "@saroh/ui/toast";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
 import { PreviewLinks } from "@/components/sites/preview-links";
-import { setCommentResolved } from "@/lib/sites/actions";
+import { createApproval, setCommentResolved } from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
-import type { SiteCommentView, SitePage } from "@/lib/sites/service";
+import type {
+    ReviewerVerdict,
+    SiteCommentView,
+    SitePage,
+} from "@/lib/sites/service";
 
 /**
  * The rail's Review tab (#193).
@@ -32,12 +36,62 @@ export function ReviewPanel({
     siteId: string;
     pages: SitePage[];
     comments: SiteCommentView[];
-    /** Re-read after a note changes, so the counts and dots follow. */
+    /** Re-read after a note or a verdict changes, so the badge follows. */
     onChanged: () => void;
     onJump: (pageId: string, sectionKey: string) => void;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [showResolved, setShowResolved] = useState(false);
+    const [recording, setRecording] = useState(false);
+
+    /**
+     * Say what you think (#277). The api gates both on `site:approve`, which
+     * OWNER, ADMIN and REVIEWER hold.
+     *
+     * Neither verdict changes what the public sees: approving does not
+     * publish, and asking for changes does not block a publish — it is
+     * recorded, and publishing over it is recorded as a bypass (#199).
+     */
+    async function record(outcome: ReviewerVerdict) {
+        setRecording(true);
+        const res = await createApproval(siteId, outcome);
+        setRecording(false);
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        showSuccess(
+            outcome === "APPROVED"
+                ? "Marked as approved."
+                : "Recorded that you asked for changes.",
+        );
+        onChanged();
+    }
+
+    const verdict = (
+        <div className="flex gap-2 border-b px-3 py-2">
+            <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                disabled={recording}
+                onClick={() => void record("APPROVED")}
+            >
+                Approve
+            </Button>
+            <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                disabled={recording}
+                onClick={() => void record("CHANGES_REQUESTED")}
+            >
+                Ask for changes
+            </Button>
+        </div>
+    );
 
     const open = comments.filter((c) => c.resolvedAt === null);
     const shown = showResolved ? comments : open;
@@ -61,6 +115,7 @@ export function ReviewPanel({
         return (
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
                 <PreviewLinks siteId={siteId} />
+                {verdict}
                 {/*
                  * The design's empty state, which states the whole feature in
                  * one sentence. Until #198 it described an action that did
@@ -68,10 +123,16 @@ export function ReviewPanel({
                  * a merchant would form the plan and then fail to find the
                  * button. The control now sits directly above this sentence.
                  */}
+                {/*
+                 * Every action this sentence names now exists: share a preview
+                 * above, leave a note under a selected section, and the two
+                 * verdict buttons. Until #277 the note half described nothing
+                 * — the api took notes and no screen ever posted one.
+                 */}
                 <p className="p-4 text-xs leading-relaxed text-muted-foreground">
                     No notes on this site yet. Share a preview above so people
-                    can read the draft; anyone with the Reviewer role can pin
-                    notes to sections from this editor.
+                    can read the draft. Select a section to leave a note on it,
+                    and say here whether the site is good to go.
                 </p>
             </div>
         );
@@ -88,11 +149,16 @@ export function ReviewPanel({
     // A note whose page is gone entirely — rarer than an orphaned section, but
     // the same rule applies: it does not disappear.
     const pageIds = new Set(pages.map((p) => p.id));
-    const strays = shown.filter((c) => !pageIds.has(c.pageId));
+    // Null since #277: deleting a page now leaves its notes behind rather than
+    // deleting them with it.
+    const strays = shown.filter(
+        (c) => c.pageId === null || !pageIds.has(c.pageId),
+    );
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
             <PreviewLinks siteId={siteId} />
+            {verdict}
             <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
                 <span className="text-xs text-muted-foreground">
                     {open.length === 0
@@ -167,6 +233,9 @@ function Note({
     onJump: (pageId: string, sectionKey: string) => void;
 }) {
     const settled = note.resolvedAt !== null;
+    // A local const narrows where the property access does not: the page is
+    // null once it has been deleted (#277).
+    const pageId = note.pageId;
     return (
         <li
             className={cn(
@@ -196,18 +265,22 @@ function Note({
                  * nothing would read as broken.
                  */
                 <p className="mt-1.5 text-[0.625rem] leading-relaxed text-muted-foreground/70">
-                    The section this was about is no longer on the page.
+                    {note.pageId === null
+                        ? note.pageTitle === null
+                            ? "The page this was about has been deleted."
+                            : `The page this was about, ${note.pageTitle}, has been deleted.`
+                        : "The section this was about is no longer on the page."}
                 </p>
             ) : null}
 
             <div className="mt-2 flex items-center gap-1">
-                {note.orphaned ? null : (
+                {note.orphaned || pageId === null ? null : (
                     <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         className="h-6 px-1.5 text-[0.6875rem]"
-                        onClick={() => onJump(note.pageId, note.sectionKey)}
+                        onClick={() => onJump(pageId, note.sectionKey)}
                     >
                         Go to section
                     </Button>
