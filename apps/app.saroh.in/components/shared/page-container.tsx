@@ -28,6 +28,11 @@ import { cn } from "@saroh/ui/lib/utils";
  * anew on every navigation. The sidebar already anchors the layout to the left;
  * the content starts in the same place on every screen and only its right edge
  * moves.
+ *
+ * Two kinds of page are deliberately outside it: the full-bleed editors, which
+ * own their whole viewport, and the arrival screens (`/join/:token`,
+ * `/invitations/:token`), which are a centred card on an otherwise empty page
+ * rather than a screen of the workspace.
  */
 export function PageContainer({
     width = "default",
