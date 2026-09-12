@@ -50,6 +50,7 @@ import {
     assertSiteInOrg,
     buildTemplateContext,
     getOrCreateDraftVersion,
+    reviewerScope,
 } from "./site-access";
 import type { Flag, FlagType } from "./site-flags";
 import { checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
@@ -559,7 +560,13 @@ export class SitesService {
     async listSites(ctx: OrganizationContext) {
         authorize(ctx, "site:read");
         const sites = await prisma.site.findMany({
-            where: { organizationId: ctx.organizationId, deletedAt: null },
+            where: {
+                organizationId: ctx.organizationId,
+                deletedAt: null,
+                // A reviewer's list holds only the sites they were invited to
+                // (#276) — not "every site, greyed out".
+                ...reviewerScope(ctx),
+            },
             orderBy: { createdAt: "desc" },
             select: {
                 id: true,
@@ -688,6 +695,8 @@ export class SitesService {
                 id: siteId,
                 organizationId: ctx.organizationId,
                 deletedAt: null,
+                // A reviewer sees the sites they were invited to (#276).
+                ...reviewerScope(ctx),
             },
             select: {
                 id: true,
@@ -1992,6 +2001,7 @@ export class SitesService {
                 id: siteId,
                 organizationId: ctx.organizationId,
                 deletedAt: null,
+                ...reviewerScope(ctx),
             },
             select: {
                 seoDescription: true,

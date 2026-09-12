@@ -8,6 +8,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
+import { assertSiteInOrg as assertSiteVisible } from "../sites/site-access";
 import { slugify } from "../stores/slug";
 import type { CreatePostCategoryDto, UpdatePostCategoryDto } from "./dto";
 
@@ -114,22 +115,15 @@ export class PostCategoriesService {
         return { id: categoryId };
     }
 
-    /** Prove the site belongs to the ctx org, or 404. */
+    /**
+     * Prove the site is one this caller may reach, or 404. Delegates to the
+     * shared helper so a reviewer's per-site scope (#276) applies here too.
+     */
     private async assertSiteInOrg(
         ctx: OrganizationContext,
         siteId: string,
     ): Promise<void> {
-        const site = await prisma.site.findFirst({
-            where: {
-                id: siteId,
-                organizationId: ctx.organizationId,
-                deletedAt: null,
-            },
-            select: { id: true },
-        });
-        if (!site) {
-            throw new NotFoundException(`Site "${siteId}" not found`);
-        }
+        await assertSiteVisible(ctx, siteId);
     }
 
     private async assertSlugFree(siteId: string, slug: string): Promise<void> {

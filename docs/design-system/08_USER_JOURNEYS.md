@@ -277,7 +277,14 @@
 | 4   | submit invite                                                         |                                                                             |
 | —   | invitee                                                               | opens `/invitations/[token]` (`app/invitations/[token]/page.tsx`) to accept |
 
-**Current clicks: ~4**, and invites are **scoped to one store only** — there is **no org-level team**. `canManage` is owner-only. To staff three stores you invite the same person three times.
+**Current clicks: ~4** for the per-store path above, which still exists.
+
+**Since 2026-09-12 (#276) there IS an org-level team:** `Settings → People`
+(`app/(shell)/settings/people/page.tsx`) invites someone to the organization at
+an org role — owner, admin, member or reviewer — with pending-invite rows and a
+withdraw. A reviewer is invited to named sites, and reaches only those. The
+accept link is `/join/[token]`. What remains of the tax below is the per-store
+`StoreMembers` path, which this did not replace.
 
 ### Ideal
 

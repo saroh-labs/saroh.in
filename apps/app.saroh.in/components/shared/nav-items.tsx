@@ -235,6 +235,7 @@ export const NAV_GROUPS: NavGroup[] = [
                 label: "Organization",
                 icon: Building2,
             },
+            { href: "/settings/people", label: "People", icon: Users },
             { href: "/settings/modules", label: "Modules", icon: Blocks },
             { href: "/settings/providers", label: "Providers", icon: Plug },
         ],

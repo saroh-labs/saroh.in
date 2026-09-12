@@ -34,6 +34,30 @@ export async function assertPathIsFree(siteId: string, path: string) {
     }
 }
 
+/**
+ * The extra condition a REVIEWER's site lookups carry (#276).
+ *
+ * REVIEWER holds org-wide `site:read` — the policy has no way to say "this
+ * site" — so without this a reviewer invited to look at one page could list
+ * every site the business has, read every publication and every draft note.
+ * `SiteReviewer` is what narrows the role to what was actually asked of them.
+ *
+ * Spread into the `where` of every site lookup rather than enforced in a guard:
+ * `listSites` and several services query Site directly, so a guard would be
+ * something to forget. An empty object for every other role, so this costs
+ * them nothing.
+ *
+ * A site with no grant does not 403, it 404s — the reviewer is not told which
+ * other sites exist.
+ */
+export function reviewerScope(ctx: OrganizationContext): {
+    reviewers?: { some: { userId: string } };
+} {
+    return ctx.role === "REVIEWER"
+        ? { reviewers: { some: { userId: ctx.userId } } }
+        : {};
+}
+
 export async function assertSiteInOrg(
     ctx: OrganizationContext,
     siteId: string,
@@ -43,6 +67,7 @@ export async function assertSiteInOrg(
             id: siteId,
             organizationId: ctx.organizationId,
             deletedAt: null,
+            ...reviewerScope(ctx),
         },
         // Returns the row it already had to fetch. Callers that only need
         // the guard ignore it; version history needs to know which
