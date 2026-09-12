@@ -309,6 +309,19 @@ export interface SiteDetailView {
     styleOptions: SiteStyleOptions;
 }
 
+/**
+ * Version history means the SITE's publishes, not every row in the table.
+ *
+ * Publishing a blog post writes a Publication too (`postId` set, `templateId`
+ * "post", a snapshot holding one post and no pages). Those rows were reaching
+ * version history, where they read as ordinary site versions: an undated-looking
+ * entry a merchant could restore, which would point `currentPublicationId` at a
+ * snapshot with no pages and take the live site down. A post publish is not a
+ * version of the site, so it is not offered as one — restoring one is a 404, not
+ * a broken home page.
+ */
+const SITE_VERSION = { postId: null } as const;
+
 export interface PublicationDetail {
     id: string;
     publishedAt: Date;
@@ -935,7 +948,11 @@ export class SitesService {
         const site = await assertSiteInOrg(ctx, siteId);
 
         const publications = await prisma.publication.findMany({
-            where: { siteId, organizationId: ctx.organizationId },
+            where: {
+                siteId,
+                organizationId: ctx.organizationId,
+                ...SITE_VERSION,
+            },
             orderBy: { publishedAt: "desc" },
             select: {
                 id: true,
@@ -995,6 +1012,7 @@ export class SitesService {
                 id: publicationId,
                 siteId,
                 organizationId: ctx.organizationId,
+                ...SITE_VERSION,
             },
             select: {
                 id: true,
@@ -1070,6 +1088,7 @@ export class SitesService {
                 id: publicationId,
                 siteId,
                 organizationId: ctx.organizationId,
+                ...SITE_VERSION,
             },
             select: {
                 snapshot: true,

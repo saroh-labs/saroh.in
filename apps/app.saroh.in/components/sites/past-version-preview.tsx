@@ -31,7 +31,11 @@ export function PastVersionPreview({
     return (
         <div
             inert
-            className={`${SCOPE} space-y-4 rounded-[var(--site-radius)] bg-[hsl(var(--site-bg))] p-[var(--site-page-margin)] text-[hsl(var(--site-fg))]`}
+            // Framed and clipped, unlike the editor's preview, which already
+            // sits in a panel. Here the merchant's site would otherwise run
+            // straight into Saroh's own chrome, and the two must not read as
+            // one page.
+            className={`${SCOPE} space-y-4 overflow-hidden rounded-[var(--site-radius)] border bg-[hsl(var(--site-bg))] p-[var(--site-page-margin)] text-[hsl(var(--site-fg))]`}
         >
             <SiteTheme variables={variables ?? null} selector={`.${SCOPE}`} />
             {sections.length === 0 ? (

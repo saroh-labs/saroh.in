@@ -122,45 +122,54 @@ export function SiteVersions({
                                     ) : null}
                                 </div>
 
-                                <Button size="sm" variant="ghost" asChild>
-                                    <Link
-                                        href={`/sites/${siteId}/versions/${p.id}`}
-                                    >
-                                        Preview
-                                    </Link>
-                                </Button>
-                                {p.isCurrent ? null : confirming === p.id ? (
-                                    <div className="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="brand"
-                                            disabled={pending}
-                                            onClick={() => onRestore(p.id)}
+                                {/* One actions group: with these loose in a
+                                 * justify-between row, Preview drifted into
+                                 * the dead space between the date and
+                                 * Restore. */}
+                                <div className="flex items-center gap-2">
+                                    <Button size="sm" variant="ghost" asChild>
+                                        <Link
+                                            href={`/sites/${siteId}/versions/${p.id}`}
                                         >
-                                            {pending
-                                                ? "Restoring…"
-                                                : changesRequested
-                                                  ? "Restore without approval"
-                                                  : "Yes, restore"}
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            disabled={pending}
-                                            onClick={() => setConfirming(null)}
-                                        >
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setConfirming(p.id)}
-                                    >
-                                        Restore
+                                            Preview
+                                        </Link>
                                     </Button>
-                                )}
+                                    {p.isCurrent ? null : confirming ===
+                                      p.id ? (
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="brand"
+                                                disabled={pending}
+                                                onClick={() => onRestore(p.id)}
+                                            >
+                                                {pending
+                                                    ? "Restoring…"
+                                                    : changesRequested
+                                                      ? "Restore without approval"
+                                                      : "Yes, restore"}
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                disabled={pending}
+                                                onClick={() =>
+                                                    setConfirming(null)
+                                                }
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setConfirming(p.id)}
+                                        >
+                                            Restore
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
                             {confirming === p.id ? (

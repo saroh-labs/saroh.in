@@ -92,6 +92,31 @@ describe("SitesService.listPublications names the publisher (#283)", () => {
     });
 });
 
+describe("version history holds site publishes only (#283)", () => {
+    it("asks only for rows that are not a post publish", async () => {
+        publicationFindMany.mockResolvedValue([]);
+
+        await service.listPublications(ctx, "site_1");
+
+        expect(publicationFindMany.mock.calls[0][0].where).toMatchObject({
+            siteId: "site_1",
+            postId: null,
+        });
+    });
+
+    it("does not open a post publish as a version", async () => {
+        // The filter is in the query, so a post publish simply does not match.
+        publicationFindFirst.mockResolvedValue(null);
+
+        await expect(
+            service.getPublication(ctx, "site_1", "pub_post"),
+        ).rejects.toThrow(/not found/);
+        expect(publicationFindFirst.mock.calls[0][0].where).toMatchObject({
+            postId: null,
+        });
+    });
+});
+
 describe("SitesService.getPublication reports what it can draw (#283)", () => {
     it("returns the publisher and a renderability check of the snapshot", async () => {
         publicationFindFirst.mockResolvedValue({
