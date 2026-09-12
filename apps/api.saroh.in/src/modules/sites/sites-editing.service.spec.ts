@@ -478,6 +478,9 @@ describe("SitesService.restorePublication (#279)", () => {
                     id: "pub_elsewhere",
                     siteId: "site_1",
                     organizationId: "org_1",
+                    // A post publish is not a version of the site (#283), so
+                    // restore cannot resurrect one as the live site.
+                    postId: null,
                 },
             }),
         );
