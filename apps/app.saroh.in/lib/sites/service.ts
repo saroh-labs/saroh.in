@@ -810,8 +810,12 @@ export async function createComment(
     return { ok: false, ...readError(data, "Could not leave that note.") };
 }
 
-/** The verdicts a reviewer can record (#277). */
-export type ApprovalOutcome = "APPROVED" | "CHANGES_REQUESTED";
+/**
+ * The verdicts a REVIEWER can record (#277) — every outcome except the one
+ * publish writes for itself. Derived from {@link ApprovalOutcome} rather than
+ * repeated, so a fourth outcome cannot be added to one list and not the other.
+ */
+export type ReviewerVerdict = Exclude<ApprovalOutcome, "BYPASSED">;
 
 /**
  * Record a verdict on the site. Requires `site:approve`.
@@ -821,7 +825,7 @@ export type ApprovalOutcome = "APPROVED" | "CHANGES_REQUESTED";
  */
 export async function createApproval(
     siteId: string,
-    outcome: ApprovalOutcome,
+    outcome: ReviewerVerdict,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };

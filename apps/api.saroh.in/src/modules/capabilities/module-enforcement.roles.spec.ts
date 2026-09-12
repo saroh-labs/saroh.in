@@ -4,7 +4,13 @@ jest.mock("@saroh/database", () => ({
         store: { findFirst: jest.fn() },
         site: { findFirst: jest.fn().mockResolvedValue({ id: "site_1" }) },
         page: {
-            findFirst: jest.fn().mockResolvedValue({ id: "page_1" }),
+            // The page, with the draft section a note can be pinned to (#277):
+            // createComment refuses a key that is not on the page.
+            findFirst: jest.fn().mockResolvedValue({
+                id: "page_1",
+                title: "Home",
+                versions: [{ sections: [{ key: "hero" }] }],
+            }),
             findMany: jest.fn().mockResolvedValue([]),
         },
         siteComment: {

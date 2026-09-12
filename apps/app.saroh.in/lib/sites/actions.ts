@@ -1,9 +1,9 @@
 "use server";
 
 import type {
-    ApprovalOutcome,
     CreateSiteInput,
     PreviewLinkDays,
+    ReviewerVerdict,
     SectionInput,
     SiteFooter,
     SiteNavigation,
@@ -61,7 +61,7 @@ export async function createComment(
 }
 
 /** Record a verdict on the site (#277). */
-export async function createApproval(siteId: string, outcome: ApprovalOutcome) {
+export async function createApproval(siteId: string, outcome: ReviewerVerdict) {
     return createApprovalApi(siteId, outcome);
 }
 

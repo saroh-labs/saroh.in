@@ -9,7 +9,7 @@ import { PreviewLinks } from "@/components/sites/preview-links";
 import { createApproval, setCommentResolved } from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
 import type {
-    ApprovalOutcome,
+    ReviewerVerdict,
     SiteCommentView,
     SitePage,
 } from "@/lib/sites/service";
@@ -52,7 +52,7 @@ export function ReviewPanel({
      * publish, and asking for changes does not block a publish — it is
      * recorded, and publishing over it is recorded as a bypass (#199).
      */
-    async function record(outcome: ApprovalOutcome) {
+    async function record(outcome: ReviewerVerdict) {
         setRecording(true);
         const res = await createApproval(siteId, outcome);
         setRecording(false);
