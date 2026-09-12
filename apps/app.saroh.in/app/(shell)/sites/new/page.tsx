@@ -1,5 +1,6 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
+import { PageContainer } from "@/components/shared/page-container";
 import { CreateSiteForm } from "@/components/sites/create-site-form";
 import { requireSession } from "@/lib/session";
 import { listTemplates } from "@/lib/sites/service";
@@ -15,12 +16,12 @@ export default async function NewSitePage() {
     const templates = await listTemplates();
 
     return (
-        <main className="mx-auto max-w-2xl p-8">
+        <PageContainer width="form">
             <PageHeader
                 title="Create a site"
                 description="Pick a template and name your new site."
             />
             <CreateSiteForm templates={templates} />
-        </main>
+        </PageContainer>
     );
 }

@@ -2,6 +2,7 @@ import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { OrganizationSettingsForm } from "@/components/organizations/organization-settings-form";
+import { PageContainer } from "@/components/shared/page-container";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
 
@@ -22,7 +23,7 @@ export default async function OrganizationSettingsPage() {
     const settings = await getOrganizationSettings();
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        <PageContainer width="form">
             <PageHeader
                 title="Organization"
                 description="Your workspace name and the business identity used across Saroh."
@@ -35,6 +36,6 @@ export default async function OrganizationSettingsPage() {
                     description="Choose an organization to view its settings."
                 />
             )}
-        </main>
+        </PageContainer>
     );
 }

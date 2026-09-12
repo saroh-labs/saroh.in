@@ -106,10 +106,49 @@ It looks fine locally because `apps/api.saroh.in/.env` sets `PORT`. Anywhere
 without a `.env` — CI, a container — you must pass every value the app needs,
 including the ones that "have a default". This cost a red CI run.
 
+## Checking a change in a browser
+
+**Drive the PERSISTENT Chrome window. Never `playwright test` with its own
+throwaway browser.** A throwaway launch uses a fresh profile and closes itself:
+the session is gone every run, nothing you did is inspectable afterwards, and
+nobody watching the screen sees anything happen.
+
+Start the window once, and leave it open:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9333 \
+  --user-data-dir="$HOME/.saroh-dev-chrome" \
+  --no-first-run --no-default-browser-check --ignore-certificate-errors
+```
+
+`--ignore-certificate-errors` is for portless's own CA on the `.localhost`
+names. Sign in once as the seeded demo owner; the profile keeps the session, so
+later runs start already signed in.
+
+Attach to it from a script, drive it, and detach — the window stays open:
+
+```js
+import { chromium } from "playwright-core";
+
+const browser = await chromium.connectOverCDP("http://127.0.0.1:9333");
+const page = browser.contexts()[0].pages()[0];
+await page.bringToFront();
+await page.goto("https://app.saroh.localhost/sites");
+// …drive, screenshot, measure…
+await browser.close(); // detaches; the window is still there
+```
+
+Take the screenshots at 1440 and 400 wide and LOOK at them — a layout question
+is not answered by a passing assertion. `page.evaluate` measuring a real
+`getBoundingClientRect` is how you check a gutter or an overflow.
+
 ## Browser tests
 
-The only tests that can answer a cross-origin or a layout question. Everything
-in `e2e/` needs the stack actually running.
+Automated regression tests, which is a different job from the check above: they
+run in CI, where there is no window to watch. The only tests that can answer a
+cross-origin or a layout question. Everything in `e2e/` needs the stack actually
+running.
 
 ```bash
 pnpm dev                                          # in another terminal

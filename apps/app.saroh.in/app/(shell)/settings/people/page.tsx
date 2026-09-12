@@ -1,6 +1,7 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { PeopleManager } from "@/components/organizations/people-manager";
+import { PageContainer } from "@/components/shared/page-container";
 import { listInvitations, listMembers } from "@/lib/organizations/members";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -37,7 +38,7 @@ export default async function PeoplePage() {
     ]);
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        <PageContainer>
             <PageHeader
                 title="People"
                 description="Who can reach this workspace, and what each of them may do."
@@ -48,6 +49,6 @@ export default async function PeoplePage() {
                 sites={sites.map((s) => ({ id: s.id, name: s.name }))}
                 canManage={canManage}
             />
-        </main>
+        </PageContainer>
     );
 }

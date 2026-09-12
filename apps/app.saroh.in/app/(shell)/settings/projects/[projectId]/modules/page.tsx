@@ -1,6 +1,7 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { ProjectModuleSelector } from "@/components/projects/project-module-selector";
+import { PageContainer } from "@/components/shared/page-container";
 import { listModules } from "@/lib/modules/service";
 import { requireSession } from "@/lib/session";
 
@@ -22,12 +23,12 @@ export default async function ProjectModulesPage({
     const modules = await listModules(projectId);
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        <PageContainer width="form">
             <PageHeader
                 title="Project modules"
                 description="Choose which of your organization's modules appear in this project. Organization settings always take precedence."
             />
             <ProjectModuleSelector projectId={projectId} modules={modules} />
-        </main>
+        </PageContainer>
     );
 }

@@ -1,6 +1,7 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { ModuleCatalog } from "@/components/modules/module-catalog";
+import { PageContainer } from "@/components/shared/page-container";
 import { listModules } from "@/lib/modules/service";
 import { requireSession } from "@/lib/session";
 
@@ -17,12 +18,12 @@ export default async function ModulesSettingsPage() {
     const modules = await listModules();
 
     return (
-        <main className="mx-auto max-w-5xl p-8">
+        <PageContainer>
             <PageHeader
                 title="Modules"
                 description="Turn on the capabilities your business needs. Disabling a module stops new activity but never deletes your history."
             />
             <ModuleCatalog modules={modules} />
-        </main>
+        </PageContainer>
     );
 }

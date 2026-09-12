@@ -3,6 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PageContainer } from "@/components/shared/page-container";
 import { SiteVersions } from "@/components/sites/site-versions";
 import { requireSession } from "@/lib/session";
 import { getReviewState, getSite, listPublications } from "@/lib/sites/service";
@@ -34,7 +35,7 @@ export default async function SiteVersionsPage({
     if (!site) notFound();
 
     return (
-        <div className="max-w-3xl space-y-6">
+        <PageContainer>
             <PageHeader
                 title="Version history"
                 description={site.name}
@@ -49,6 +50,6 @@ export default async function SiteVersionsPage({
                 publications={publications}
                 changesRequested={review.outstanding}
             />
-        </div>
+        </PageContainer>
     );
 }

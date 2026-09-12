@@ -4,6 +4,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PageContainer } from "@/components/shared/page-container";
 import { PastVersionPreview } from "@/components/sites/past-version-preview";
 import { RestoreVersion } from "@/components/sites/restore-version";
 import { requireSession } from "@/lib/session";
@@ -63,7 +64,7 @@ export default async function PastVersionPage({
     const base = `/sites/${siteId}/versions/${publicationId}`;
 
     return (
-        <div className="max-w-5xl space-y-6">
+        <PageContainer>
             <PageHeader
                 title={`Version from ${exactDate(publication.publishedAt)}`}
                 description={
@@ -141,6 +142,6 @@ export default async function PastVersionPage({
                     This version holds no pages.
                 </p>
             )}
-        </div>
+        </PageContainer>
     );
 }

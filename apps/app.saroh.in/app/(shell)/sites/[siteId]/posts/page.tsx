@@ -5,6 +5,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PageContainer } from "@/components/shared/page-container";
 import { listPosts } from "@/lib/content/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
@@ -34,7 +35,7 @@ export default async function ContentPage({
     const base = `/sites/${siteId}/posts`;
 
     return (
-        <div className="space-y-6">
+        <PageContainer>
             <PageHeader
                 title="Posts"
                 description="Writing published on this site."
@@ -94,6 +95,6 @@ export default async function ContentPage({
                     ))}
                 </ul>
             )}
-        </div>
+        </PageContainer>
     );
 }
