@@ -131,6 +131,18 @@ jobs:
       - name: Unit tests (api, no database)
         run: pnpm --filter @saroh/api test:unit
 
+      # Everything else with a `test` script: seven packages and the workspace
+      # app (#287). They existed and never ran — vitest suites in
+      # block-contract, object-storage, auth, ui, database, site-blocks and
+      # templates, none of them reachable from any CI step, so a red one would
+      # have gone unnoticed until somebody ran it by hand.
+      #
+      # `@saroh/api` is excluded: its bare `test` script is `jest`, which picks
+      # up the integration specs that need a database. Its unit suite runs
+      # above, and its int suite in its own job with the Postgres service.
+      - name: Unit tests (packages and the app)
+        run: pnpm run test
+
       - name: Build
         run: pnpm run build
 
