@@ -46,8 +46,7 @@ export interface Form {
  * (`field` is unused today but kept for shape-parity with the sites client.)
  */
 export type FormsResult<T> =
-    | { ok: true; data: T }
-    | { ok: false; error: string; field?: string };
+    { ok: true; data: T } | { ok: false; error: string; field?: string };
 
 /** The input to {@link ensureFormForSection}. */
 export interface EnsureFormInput {
@@ -83,8 +82,7 @@ async function createForm(
         body: JSON.stringify({ name: input.name, fields: input.fields }),
     });
     const data = (await res.json().catch(() => null)) as
-        | (Partial<Form> & { message?: string; error?: string })
-        | null;
+        (Partial<Form> & { message?: string; error?: string }) | null;
     if (res.ok && data?.id) {
         return { ok: true, data: { formId: data.id } };
     }
@@ -102,8 +100,7 @@ async function patchForm(
         body: JSON.stringify({ name: input.name, fields: input.fields }),
     });
     const data = (await res.json().catch(() => null)) as
-        | (Partial<Form> & { message?: string; error?: string })
-        | null;
+        (Partial<Form> & { message?: string; error?: string }) | null;
     if (res.ok && data?.id) {
         return { ok: true, data: { formId: data.id } };
     }
@@ -117,8 +114,10 @@ async function patchForm(
  *   - no `formId` → create a new Form (POST) and return its id;
  *   - a `formId`  → PATCH that Form's name + fields to match, keeping ids stable.
  *
- * The Form is the source of truth the PUBLIC submit endpoint validates against,
- * so the editor MUST call this on save to keep the two in sync. Returns a typed
+ * The Form is what the PUBLIC submit endpoint targets, so the editor calls this
+ * on save to give each enquiry section one. A submission from the live site is
+ * validated against the fields in the current publication, not these, which
+ * are the draft's (#281). Returns a typed
  * error (never throws) so the editor can surface a toast — including the
  * missing-active-org case.
  */

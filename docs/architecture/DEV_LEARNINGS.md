@@ -211,3 +211,22 @@ An editor extension that writes a new CSS property needs it added to
 `allowedStyles`, or its formatting disappears on save.
 **Category**: security · rules in `sanitize.ts`, `sanitize.spec.ts` and
 `packages/block-contract/src/links.test.ts`
+
+## Enquiry — the live form refuses visitors after a draft edit (#281)
+
+**Problem**: After a merchant added a required field to an enquiry section and
+kept editing, visitors submitting the form on the live site got
+`Field "budget" is required`, for a field their form did not have. Nothing was
+published, and the merchant saw no error.
+**Root cause**: The live site draws the form from its publication snapshot and
+posts to the section's `formId`. The public submit validated against
+`Form.fields`, and the site editor PATCHes those fields on every autosave to
+keep the Form in step with the draft. The one draft edit that reached the
+public was validation.
+**Fix**: `EnquiryService` validates against the fields in the current
+publication's enquiry section for that `formId`, falling back to `Form.fields`
+only when no live publication carries the form (`live-form-fields.ts`).
+Publishing switches the fields, and restoring switches them back. The editor
+now stamps only new formIds onto current state, instead of overwriting typing
+done during the sync.
+**Category**: enquiry · rule in `docs/patterns/backend-data-and-money.md`
