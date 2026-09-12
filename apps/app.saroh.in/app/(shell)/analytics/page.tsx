@@ -3,6 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
+import { PageContainer } from "@/components/shared/page-container";
 import {
     getAnalyticsDashboard,
     summarizeAnalytics,
@@ -56,7 +57,7 @@ export default async function AnalyticsPage({
     const view = summarizeAnalytics(rows);
 
     return (
-        <main className="mx-auto max-w-5xl p-8">
+        <PageContainer width="wide">
             <PageHeader
                 title="Analytics"
                 description={`Last ${range.label} · site views, enquiries and sales.`}
@@ -87,6 +88,6 @@ export default async function AnalyticsPage({
             />
 
             <AnalyticsDashboard view={view} />
-        </main>
+        </PageContainer>
     );
 }

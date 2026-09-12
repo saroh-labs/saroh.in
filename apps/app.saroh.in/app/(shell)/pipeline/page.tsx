@@ -5,6 +5,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { MoveStageControl } from "@/components/crm/move-stage-control";
+import { PageContainer } from "@/components/shared/page-container";
 import { contactName, formatValue } from "@/lib/crm/format";
 import type { LeadListItem, LeadStage } from "@/lib/leads/service";
 import { listLeads } from "@/lib/leads/service";
@@ -35,13 +36,13 @@ export default async function PipelinePage() {
 
     if (pipelines.length === 0) {
         return (
-            <main className="mx-auto max-w-7xl p-8">
+            <PageContainer width="wide">
                 <Header />
                 <EmptyState
                     title="No pipeline yet"
                     description="One is created automatically with your first enquiry or hand-created lead."
                 />
-            </main>
+            </PageContainer>
         );
     }
 
@@ -64,7 +65,7 @@ export default async function PipelinePage() {
     }));
 
     return (
-        <main className="mx-auto max-w-full p-8">
+        <PageContainer width="wide" className="max-w-full">
             <Header pipelineName={pipeline.name} />
 
             <div className="mt-6 flex gap-4 overflow-x-auto pb-4">
@@ -133,7 +134,7 @@ export default async function PipelinePage() {
                     );
                 })}
             </div>
-        </main>
+        </PageContainer>
     );
 }
 

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { AvailabilityRulesEditor } from "@/components/bookings/availability-rules-editor";
 import { EditServiceForm } from "@/components/bookings/edit-service-form";
+import { PageContainer } from "@/components/shared/page-container";
 import { getService, listRules } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 
@@ -27,7 +28,7 @@ export default async function ServiceEditorPage({
     const rules = await listRules(serviceId);
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        <PageContainer>
             <PageHeader
                 title={service.name}
                 description="Set this service's terms and weekly availability."
@@ -58,6 +59,6 @@ export default async function ServiceEditorPage({
                     initialRules={rules}
                 />
             </section>
-        </main>
+        </PageContainer>
     );
 }

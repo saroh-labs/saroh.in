@@ -2,6 +2,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { redirect } from "next/navigation";
 
 import { HomeDashboard } from "@/components/home/home-dashboard";
+import { PageContainer } from "@/components/shared/page-container";
 import { getHome } from "@/lib/home/service";
 import { listOrganizations } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -25,7 +26,7 @@ export default async function Home() {
         // A dashboard, so the width matches the other data screens rather than
         // the old reading measure — the schedule column needs room to sit
         // beside the work instead of below it.
-        <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">
+        <PageContainer>
             <PageHeader
                 title="Home"
                 description="What needs you, what's coming up, and where everything stands."
@@ -33,6 +34,6 @@ export default async function Home() {
             <div className="mt-6">
                 <HomeDashboard home={home} />
             </div>
-        </main>
+        </PageContainer>
     );
 }

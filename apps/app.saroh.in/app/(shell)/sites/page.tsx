@@ -6,6 +6,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
+import { PageContainer } from "@/components/shared/page-container";
 import { env } from "@/env";
 import { requireSession } from "@/lib/session";
 import { pendingChangeCount } from "@/lib/sites/pending";
@@ -86,7 +87,7 @@ export default async function SitesPage() {
     const sites = await listSites();
 
     return (
-        <main className="mx-auto max-w-5xl p-8">
+        <PageContainer>
             <PageHeader
                 title="Your sites"
                 description="Websites you publish for this organization."
@@ -175,6 +176,6 @@ export default async function SitesPage() {
                     })}
                 </div>
             )}
-        </main>
+        </PageContainer>
     );
 }

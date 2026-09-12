@@ -3,6 +3,7 @@ import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
+import { PageContainer } from "@/components/shared/page-container";
 import { StoreCard } from "@/components/stores/store-card";
 import { requireSession } from "@/lib/session";
 import { listStores } from "@/lib/stores/service";
@@ -22,7 +23,7 @@ export default async function CommercePage() {
     const stores = await listStores();
 
     return (
-        <main className="mx-auto max-w-5xl p-8">
+        <PageContainer>
             <PageHeader
                 title="Commerce"
                 description="Your sales channels — catalog, orders, and fulfilment live inside each store."
@@ -52,6 +53,6 @@ export default async function CommercePage() {
                     ))}
                 </div>
             )}
-        </main>
+        </PageContainer>
     );
 }
