@@ -22,6 +22,7 @@ import {
     listComments as listCommentsApi,
     listPreviewLinks as listPreviewLinksApi,
     publishSite as publishSiteApi,
+    requestReview as requestReviewApi,
     restorePublication as restorePublicationApi,
     revokePreviewLink as revokePreviewLinkApi,
     saveDraftSections as saveDraftSectionsApi,
@@ -63,6 +64,9 @@ export async function createComment(
 /** Record a verdict on the site (#277). */
 export async function createApproval(siteId: string, outcome: ReviewerVerdict) {
     return createApprovalApi(siteId, outcome);
+/** Ask for a review (#278). */
+export async function requestReview(siteId: string) {
+    return requestReviewApi(siteId);
 }
 
 export async function publishSite(siteId: string) {

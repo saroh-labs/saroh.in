@@ -1707,13 +1707,28 @@ model SiteApproval {
   byUserId String
   by       User   @relation(fields: [byUserId], references: [id], onDelete: Cascade)
 
-  // APPROVED | CHANGES_REQUESTED | BYPASSED. The first two are what a reviewer
-  // records; the spec's "approved with notes" is APPROVED plus the open note
-  // count, not a third verdict. BYPASSED is written by PUBLISH, never by a
-  // reviewer (#199): when a site goes live while a change request is still
-  // outstanding, the fact is appended here — who, when, and which publication
-  // — because the epic's rule is that bypassing is recorded, not prevented.
+  // REQUESTED | APPROVED | CHANGES_REQUESTED | BYPASSED.
+  //
+  // REQUESTED is the merchant asking for a review (#278) — the act that makes a
+  // review pending, which the model previously had no way to express: a review
+  // nobody had answered simply did not exist.
+  //
+  // APPROVED and CHANGES_REQUESTED are what a reviewer records; the spec's
+  // "approved with notes" is APPROVED plus the open note count, not a third
+  // verdict. BYPASSED is written by PUBLISH, never by a reviewer (#199): when a
+  // site goes live while a review is still outstanding, the fact is appended
+  // here — who, when, and which publication — because the epic's rule is that
+  // bypassing is recorded, not prevented.
   outcome String
+
+  // Which draft this row is about (#278): a hash of the snapshot publishing
+  // would write, minus its timestamp.
+  //
+  // #193: an approval "does not survive later edits to that draft". Without
+  // this, approve → change three sections → publish still read "Approved".
+  // Written on REQUESTED and APPROVED; null on the other two, which record an
+  // act rather than a state of the work.
+  draftFingerprint String?
 
   // The publication a BYPASSED row is about, so version history can show
   // which publish went past an outstanding review. Null on a verdict.
@@ -1866,6 +1881,15 @@ model Publication {
 
   publishedByUserId String?
   publishedAt       DateTime @default(now()) // immutable; republish == new row
+
+  // Which route this publish took (#278): APPROVED, BYPASSED or NONE.
+  //
+  // #193 asks that all three be distinguishable after the fact. Only a bypass
+  // was recorded before, through a SiteApproval row, so "a reviewer approved
+  // this" and "nobody was ever asked" read identically in version history.
+  // Null on rows published before this column existed, which is honest: we do
+  // not know which route they took.
+  reviewRoute String?
 
   // Back-relation for Site.currentPublication (the live pointer above).
   currentForSite Site?          @relation("SiteCurrentPublication")

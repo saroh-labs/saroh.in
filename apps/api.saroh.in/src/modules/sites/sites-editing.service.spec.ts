@@ -35,6 +35,8 @@ jest.mock("@saroh/database", () => {
         },
         siteApproval: {
             findFirst: jest.fn(),
+            // #278 reads every verdict and decides the route from all of them.
+            findMany: jest.fn(),
             create: jest.fn(),
         },
     };
@@ -51,6 +53,8 @@ jest.mock("@saroh/database", () => {
 
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+
+import { draftFingerprint } from "./review-route";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { UpdateDraftSectionsDto } from "./dto";
@@ -69,6 +73,40 @@ const publicationCreate = prisma.publication.create as jest.Mock;
 const publicationFindFirst = prisma.publication.findFirst as jest.Mock;
 const approvalFindFirst = prisma.siteApproval.findFirst as jest.Mock;
 const approvalCreate = prisma.siteApproval.create as jest.Mock;
+const approvalFindMany = prisma.siteApproval.findMany as jest.Mock;
+
+/**
+ * The fingerprint the service will compute for the draft `siteWithRichText`
+ * describes — asked of the same builder, so the test states the rule rather
+ * than a hash literal that would rot on the next snapshot change.
+ */
+async function fingerprintOfDraft(): Promise<string> {
+    approvalFindMany.mockResolvedValueOnce([]);
+    await service.publishSite(ctx(), "site_1");
+    const { snapshot } = publicationCreate.mock.calls.at(-1)![0].data as {
+        snapshot: unknown;
+    };
+    publicationCreate.mockClear();
+    return draftFingerprint(snapshot);
+}
+
+/**
+ * Verdict rows, written in the order they happened and returned newest first —
+ * the order the service reads them in.
+ */
+function verdicts(
+    ...rows: { outcome: string; byUserId?: string; fingerprint?: string }[]
+) {
+    let tick = 0;
+    return rows
+        .map((r) => ({
+            outcome: r.outcome,
+            byUserId: r.byUserId ?? "reviewer",
+            draftFingerprint: r.fingerprint ?? null,
+            createdAt: new Date(Date.UTC(2026, 8, 12, 0, 0, tick++)),
+        }))
+        .reverse();
+}
 const transaction = prisma.$transaction as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
@@ -502,6 +540,8 @@ describe("SitesService.restorePublication (#279)", () => {
 
 describe("SitesService.publishSite", () => {
     beforeEach(() => {
+        // Nobody asked for a review, unless a test says otherwise (#278).
+        approvalFindMany.mockResolvedValue([]);
         publicationCreate.mockResolvedValue({
             id: "pub_1",
             publishedAt: new Date("2026-07-18T00:00:00.000Z"),
@@ -646,7 +686,9 @@ describe("SitesService.publishSite", () => {
 
     it("records a BYPASSED approval when publishing past a change request (#199)", async () => {
         siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
-        approvalFindFirst.mockResolvedValue({ outcome: "CHANGES_REQUESTED" });
+        approvalFindMany.mockResolvedValue(
+            verdicts({ outcome: "CHANGES_REQUESTED" }),
+        );
         approvalCreate.mockResolvedValue({ id: "a_bypass" });
 
         const result = await service.publishSite(ctx(), "site_1");
@@ -665,21 +707,90 @@ describe("SitesService.publishSite", () => {
         });
         // The outstanding question reads VERDICTS only: a BYPASSED row from an
         // earlier publish must not count as the reviewer changing their mind.
-        expect(approvalFindFirst.mock.calls[0][0].where.outcome).toEqual({
-            in: ["APPROVED", "CHANGES_REQUESTED"],
+        expect(approvalFindMany.mock.calls[0][0].where.outcome).toEqual({
+            in: ["REQUESTED", "APPROVED", "CHANGES_REQUESTED"],
         });
+        // And the publication says which route it took (#278).
+        expect(publicationCreate.mock.calls[0][0].data.reviewRoute).toBe(
+            "BYPASSED",
+        );
     });
 
     it("records nothing when the site is approved, or nobody reviewed it", async () => {
         siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
-        approvalFindFirst.mockResolvedValueOnce({ outcome: "APPROVED" });
+        // An approval of THIS draft, by someone other than the publisher
+        // (#278): the fingerprint the service computes for the snapshot it is
+        // about to write is the one the approval has to carry.
+        const fingerprint = await fingerprintOfDraft();
+        approvalFindMany.mockResolvedValue(
+            verdicts(
+                { outcome: "REQUESTED", byUserId: "user_1", fingerprint },
+                { outcome: "APPROVED", byUserId: "reviewer", fingerprint },
+            ),
+        );
         const approved = await service.publishSite(ctx(), "site_1");
         expect(approved.bypassed).toBe(false);
+        expect(publicationCreate.mock.calls[0][0].data.reviewRoute).toBe(
+            "APPROVED",
+        );
 
-        approvalFindFirst.mockResolvedValueOnce(null);
+        approvalFindMany.mockResolvedValue([]);
         const unreviewed = await service.publishSite(ctx(), "site_1");
         expect(unreviewed.bypassed).toBe(false);
+        expect(publicationCreate.mock.calls[1][0].data.reviewRoute).toBe(
+            "NONE",
+        );
         expect(approvalCreate).not.toHaveBeenCalled();
+    });
+
+    it("records a bypass when the only approval is the publisher's own (#278)", async () => {
+        siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
+        approvalCreate.mockResolvedValue({ id: "a_bypass" });
+        const fingerprint = await fingerprintOfDraft();
+        approvalFindMany.mockResolvedValue(
+            verdicts(
+                { outcome: "REQUESTED", byUserId: "user_1", fingerprint },
+                // The person who then publishes.
+                { outcome: "APPROVED", byUserId: "user_1", fingerprint },
+            ),
+        );
+
+        const result = await service.publishSite(ctx(), "site_1");
+
+        // Signing off your own work is not a second pair of eyes, and the
+        // record does not claim it was. Nothing is prevented.
+        expect(result.bypassed).toBe(true);
+        expect(publicationCreate.mock.calls[0][0].data.reviewRoute).toBe(
+            "BYPASSED",
+        );
+    });
+
+    it("treats an approval of an EARLIER draft as no approval at all (#278)", async () => {
+        siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
+        approvalCreate.mockResolvedValue({ id: "a_bypass" });
+        approvalFindMany.mockResolvedValue(
+            verdicts(
+                {
+                    outcome: "REQUESTED",
+                    byUserId: "user_1",
+                    fingerprint: "older",
+                },
+                {
+                    outcome: "APPROVED",
+                    byUserId: "reviewer",
+                    fingerprint: "older",
+                },
+            ),
+        );
+
+        const result = await service.publishSite(ctx(), "site_1");
+
+        // Approve, change three sections, publish: #193 says the approval does
+        // not survive the edits.
+        expect(result.bypassed).toBe(true);
+        expect(publicationCreate.mock.calls[0][0].data.reviewRoute).toBe(
+            "BYPASSED",
+        );
     });
 
     it("asks the database for visible pages only — a hidden page never publishes", async () => {

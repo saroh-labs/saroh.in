@@ -80,18 +80,31 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
  * outcome is a type error here rather than a badge that falls through to
  * "asked for changes". Only an approval takes the accent: it is the one
  * good-news verdict.
+ *
+ * `stale` is whether the newest approval was of a different draft than the one
+ * that would go live now (#278). #193: an approval "does not survive later
+ * edits to that draft" — so the badge must not keep claiming it does, and an
+ * approval that no longer covers the work does not keep the accent either.
  */
 const APPROVAL_BADGE: Record<
     ApprovalOutcome,
-    { approved: boolean; text: (by: string) => string }
+    { approved: (stale: boolean) => boolean; text: (by: string, stale: boolean) => string }
 > = {
-    APPROVED: { approved: true, text: (by) => `Approved by ${by}` },
+    REQUESTED: {
+        approved: () => false,
+        text: (by) => `In review — asked by ${by}`,
+    },
+    APPROVED: {
+        approved: (stale) => !stale,
+        text: (by, stale) =>
+            stale ? `Approved by ${by}, then edited` : `Approved by ${by}`,
+    },
     CHANGES_REQUESTED: {
-        approved: false,
+        approved: () => false,
         text: (by) => `${by} asked for changes`,
     },
     BYPASSED: {
-        approved: false,
+        approved: () => false,
         text: (by) => `Published without approval by ${by}`,
     },
 };
@@ -870,8 +883,9 @@ export function SiteEditor({
                     <span
                         className={cn(
                             "flex h-[22px] items-center gap-1.5 rounded-[3px] border px-2 text-xs",
-                            APPROVAL_BADGE[review.latestApproval.outcome]
-                                .approved
+                            APPROVAL_BADGE[
+                                review.latestApproval.outcome
+                            ].approved(review.approvalIsStale)
                                 ? "border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
                                 : "border-border text-muted-foreground",
                         )}
@@ -879,6 +893,7 @@ export function SiteEditor({
                     >
                         {APPROVAL_BADGE[review.latestApproval.outcome].text(
                             review.latestApproval.by,
+                            review.approvalIsStale,
                         )}
                         {openNotes > 0 ? (
                             <span className="tabular-nums opacity-80">
@@ -1067,6 +1082,7 @@ export function SiteEditor({
                                 siteId={siteId}
                                 pages={pages}
                                 comments={comments}
+                                review={review}
                                 onChanged={() => void refreshReview()}
                                 onJump={(jumpPageId, sectionKey) => {
                                     /*

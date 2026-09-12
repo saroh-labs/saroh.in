@@ -95,16 +95,30 @@ export function SiteVersions({
                                         ) : null}
                                     </div>
                                     {/*
-                                     * Who put it live (#283). This used to read
-                                     * "Template starter v1" on every row: every
-                                     * publication is stamped with the starter,
-                                     * so the line told a merchant nothing.
+                                     * Who put it live (#283), and whether a
+                                     * reviewer approved it (#278).
+                                     *
+                                     * The row used to read "Template starter
+                                     * v1", which every publication is stamped
+                                     * with and so told a merchant nothing.
+                                     *
+                                     * The route line appears only when it says
+                                     * something to act on: a bypass already
+                                     * has the warning below, and "nobody was
+                                     * asked" is the ordinary case — repeating
+                                     * it down a list of fifteen versions is
+                                     * noise.
                                      */}
                                     <p className="text-xs text-muted-foreground">
                                         {p.publishedBy
                                             ? `Published by ${p.publishedBy}`
                                             : "Publisher not recorded"}
                                     </p>
+                                    {p.reviewRoute === "APPROVED" ? (
+                                        <p className="text-xs text-muted-foreground">
+                                            A reviewer approved this version
+                                        </p>
+                                    ) : null}
                                     {p.bypass ? (
                                         /*
                                          * The record the epic asked for (#199):
