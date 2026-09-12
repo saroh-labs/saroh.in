@@ -712,7 +712,8 @@ export async function restorePublication(
 
 export interface SiteCommentView {
     id: string;
-    pageId: string;
+    /** Null once the page it was left on has been deleted (#277). */
+    pageId: string | null;
     pageTitle: string | null;
     sectionKey: string;
     body: string;
@@ -784,6 +785,53 @@ export async function getReviewState(siteId: string): Promise<ReviewState> {
     } catch {
         return empty;
     }
+}
+
+/**
+ * Leave a note on a section (#277). Requires `site:comment`, which a REVIEWER
+ * has and a MEMBER does not.
+ *
+ * The api rejects a section key that is not on the page's draft, so a note
+ * pinned from a stale screen fails loudly instead of being stored as an
+ * orphan nobody can act on.
+ */
+export async function createComment(
+    siteId: string,
+    input: { pageId: string; sectionKey: string; body: string },
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/comments`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as { id?: string } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not leave that note.") };
+}
+
+/** The verdicts a reviewer can record (#277). */
+export type ApprovalOutcome = "APPROVED" | "CHANGES_REQUESTED";
+
+/**
+ * Record a verdict on the site. Requires `site:approve`.
+ *
+ * Approving does not publish and asking for changes does not block one — the
+ * reviewer says what they think, the owner decides (#199).
+ */
+export async function createApproval(
+    siteId: string,
+    outcome: ApprovalOutcome,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/approvals`, {
+        method: "POST",
+        body: JSON.stringify({ outcome }),
+    });
+    const data = (await res.json().catch(() => null)) as { id?: string } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not record that.") };
 }
 
 /** Mark a note settled, or reopen it. Requires `section:write` on the api. */

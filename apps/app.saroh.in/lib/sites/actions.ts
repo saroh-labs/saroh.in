@@ -1,6 +1,7 @@
 "use server";
 
 import type {
+    ApprovalOutcome,
     CreateSiteInput,
     PreviewLinkDays,
     SectionInput,
@@ -10,6 +11,8 @@ import type {
     SiteStyle,
 } from "./service";
 import {
+    createApproval as createApprovalApi,
+    createComment as createCommentApi,
     createPage as createPageApi,
     createPreviewLink as createPreviewLinkApi,
     createSite as createSiteApi,
@@ -47,6 +50,19 @@ export async function saveDraftSections(
     sections: SectionInput[],
 ) {
     return saveDraftSectionsApi(siteId, pageId, sections);
+}
+
+/** Leave a note on a section (#277). */
+export async function createComment(
+    siteId: string,
+    input: { pageId: string; sectionKey: string; body: string },
+) {
+    return createCommentApi(siteId, input);
+}
+
+/** Record a verdict on the site (#277). */
+export async function createApproval(siteId: string, outcome: ApprovalOutcome) {
+    return createApprovalApi(siteId, outcome);
 }
 
 export async function publishSite(siteId: string) {

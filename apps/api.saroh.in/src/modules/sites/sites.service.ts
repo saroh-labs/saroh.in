@@ -96,7 +96,8 @@ export interface CreatedSite {
 /** A reviewer's note as the Review tab shows it. */
 export interface CommentView {
     id: string;
-    pageId: string;
+    /** Null once the page it was left on has been deleted (#277). */
+    pageId: string | null;
     pageTitle: string | null;
     sectionKey: string;
     body: string;
@@ -1767,6 +1768,7 @@ export class SitesService {
                 select: {
                     id: true,
                     pageId: true,
+                    pageTitle: true,
                     sectionKey: true,
                     body: true,
                     resolvedAt: true,
@@ -1803,7 +1805,11 @@ export class SitesService {
         return comments.map((c) => ({
             id: c.id,
             pageId: c.pageId,
-            pageTitle: titles.get(c.pageId) ?? null,
+            // The live title while the page exists; the one stored with the
+            // note once it does not (#277).
+            pageTitle:
+                (c.pageId === null ? null : titles.get(c.pageId)) ??
+                c.pageTitle,
             sectionKey: c.sectionKey,
             body: c.body,
             resolvedAt: c.resolvedAt,
@@ -1813,7 +1819,10 @@ export class SitesService {
                 // A name is nicer, but an email always exists.
                 name: c.author.name ?? c.author.email,
             },
-            orphaned: !(live.get(c.pageId)?.has(c.sectionKey) ?? false),
+            // A note whose page is gone is orphaned by definition.
+            orphaned:
+                c.pageId === null ||
+                !(live.get(c.pageId)?.has(c.sectionKey) ?? false),
         }));
     }
 
@@ -1821,6 +1830,51 @@ export class SitesService {
      * Leave a note. Requires `site:comment` — the action a REVIEWER has and a
      * MEMBER does not, because leaving a note is not a read.
      */
+    /**
+     * A page's draft as a REVIEWER may see it: which sections are on it, in
+     * order, and what each one is (#277).
+     *
+     * Section keys reached the client only through `getPageDraft`, which needs
+     * `section:write` — a role a reviewer does not have and must not be given.
+     * So a reviewer had no way to learn the key of the section they were
+     * looking at, which made "pin a note to a section" impossible for exactly
+     * the person the feature was built for.
+     *
+     * Keys, types and a short label only. Not the content: this is the outline
+     * a note is attached to, and the content is already on the page they are
+     * reading through the share link.
+     */
+    async getPageOutline(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+    ): Promise<{ key: string; type: string; label: string | null }[]> {
+        authorize(ctx, "site:read");
+        await assertSiteInOrg(ctx, siteId);
+        await assertPageInSite(ctx, siteId, pageId);
+
+        const version = await prisma.pageVersion.findFirst({
+            where: {
+                pageId,
+                organizationId: ctx.organizationId,
+                status: "DRAFT",
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+                sections: {
+                    orderBy: { order: "asc" },
+                    select: { key: true, type: true, content: true },
+                },
+            },
+        });
+
+        return (version?.sections ?? []).map((section) => ({
+            key: section.key,
+            type: section.type,
+            label: sectionLabel(section.content),
+        }));
+    }
+
     async createComment(
         ctx: OrganizationContext,
         siteId: string,
@@ -1830,10 +1884,44 @@ export class SitesService {
         await assertSiteInOrg(ctx, siteId);
         await assertPageInSite(ctx, siteId, dto.pageId);
 
+        /*
+         * The key must name a section that is actually on the page's draft
+         * (#277). It used to accept any string, so a note pinned from a stale
+         * screen — or a typo — was stored and then read as orphaned for ever:
+         * the reviewer saw it saved, the owner saw a note about nothing, and
+         * no error was ever raised. A 400 is the honest answer.
+         */
+        const page = await prisma.page.findFirst({
+            where: {
+                id: dto.pageId,
+                siteId,
+                organizationId: ctx.organizationId,
+            },
+            select: {
+                title: true,
+                versions: {
+                    where: { status: "DRAFT" },
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                    select: { sections: { select: { key: true } } },
+                },
+            },
+        });
+        const keys = new Set(
+            page?.versions.flatMap((v) => v.sections.map((x) => x.key)) ?? [],
+        );
+        if (!keys.has(dto.sectionKey)) {
+            throw new BadRequestException(
+                "That section is no longer on the page. Reload the draft and try again.",
+            );
+        }
+
         const comment = await prisma.siteComment.create({
             data: {
                 siteId,
                 pageId: dto.pageId,
+                // Where the note was, for when the page itself is gone (#277).
+                pageTitle: page?.title ?? null,
                 organizationId: ctx.organizationId,
                 sectionKey: dto.sectionKey,
                 authorUserId: ctx.userId,
@@ -2234,4 +2322,28 @@ export class SitesService {
         await prisma.page.delete({ where: { id: pageId } });
         return { deleted: true };
     }
+}
+
+/**
+ * A few words naming a section, for a list that has to distinguish two heroes
+ * (#277). Whatever the block calls its most prominent line — every one of them
+ * has one under a different name — trimmed to something that fits a rail.
+ */
+function sectionLabel(content: unknown): string | null {
+    if (content === null || typeof content !== "object") return null;
+    const c = content as Record<string, unknown>;
+    for (const field of [
+        "heading",
+        "title",
+        "label",
+        "eyebrow",
+        "subheading",
+    ]) {
+        const value = c[field];
+        if (typeof value === "string" && value.trim().length > 0) {
+            const text = value.trim();
+            return text.length > 60 ? `${text.slice(0, 57)}…` : text;
+        }
+    }
+    return null;
 }

@@ -110,9 +110,9 @@ export class DraftSectionInputDto {
     hidden?: boolean;
 
     /*
-     * The section's stable identity across saves. The editor sends back the key
-     * it was given for an existing section and omits it for a new one, which
-     * the server then mints.
+     * The section's stable identity across saves. The editor mints one when the
+     * section is added (#277) and sends it back on every save; a request that
+     * omits it still works, and the server mints one.
      *
      * This is what a reviewer's note is pinned to, so sending the WRONG key
      * moves someone's comment onto a different section. It is not a security
