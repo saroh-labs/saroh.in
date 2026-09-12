@@ -1,5 +1,5 @@
 import { PageHeader } from "@saroh/ui/page-header";
-import { Blocks, Building2, Plug, UserCog } from "lucide-react";
+import { Blocks, Building2, Plug, UserCog, Users } from "lucide-react";
 import Link from "next/link";
 
 import { accountsUrl } from "@/lib/accounts";
@@ -23,6 +23,13 @@ const SECTIONS = [
         description:
             "Workspace name and the business identity used across Saroh.",
         icon: Building2,
+    },
+    {
+        href: "/settings/people",
+        label: "People",
+        description:
+            "Who can reach this workspace, and what each of them may do.",
+        icon: Users,
     },
     {
         href: "/settings/modules",

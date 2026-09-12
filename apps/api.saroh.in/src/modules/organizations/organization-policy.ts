@@ -26,8 +26,10 @@ import type {
  *                  MEMBER cannot see it (audit trails leak who-did-what).
  *  - `store:*`   — Organization-owned commerce channels (Stores).
  *  - `site:*`    — Organization-owned publishing properties (Sites, S2-003).
- *                  `site:read` is in the read-only floor (every role, including
- *                  MEMBER, may list/read the org's sites). `site:create` /
+ *                  `site:read` is in the read-only floor (OWNER, ADMIN and
+ *                  MEMBER may list/read the org's sites). A REVIEWER holds it
+ *                  too, but `SiteReviewer` narrows it to the sites they were
+ *                  invited to (#276) — see `sites/site-access.ts`. `site:create` /
  *                  `site:update` / `site:delete` are OWNER/ADMIN-only: they are
  *                  NOT in READ_ONLY_ACTIONS, so a MEMBER cannot create or mutate
  *                  a site. (Widening authoring to MEMBER later — so contributors
@@ -198,7 +200,13 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "module:manage",
 ];
 
-/** Read-only actions — the floor every role (including MEMBER) may perform. */
+/**
+ * Read-only actions — the floor OWNER, ADMIN and MEMBER share.
+ *
+ * NOT every role: REVIEWER is enumerated separately below and deliberately does
+ * not get this floor (#276). The floor includes the roster, the stores and the
+ * media library, which is not what inviting someone to look at one site means.
+ */
 const READ_ONLY_ACTIONS: readonly OrgAction[] = [
     "org:read",
     "member:read",
@@ -220,11 +228,15 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
  *             `org:delete`. (Guarding the "last OWNER" — i.e. an ADMIN must not
  *             be able to demote/remove the final OWNER via member:role:update /
  *             member:remove — is a data-integrity invariant enforced at the
- *             write layer in a later ticket, S1-006; it is not expressible as a
- *             coarse role→action capability and so is intentionally out of
- *             scope here.)
+ *             write layer, S1-006; it is not expressible as a coarse
+ *             role→action capability. It IS enforced now: `assertNotLastOwner`
+ *             in `organization-members.service.ts` (#276), inside a
+ *             serializable transaction.)
  *  - MEMBER — read-only: can see the org, its roster, and its stores, but
  *             mutates nothing.
+ *  - REVIEWER — website only, and narrower than MEMBER rather than beneath it.
+ *             Its three actions are enumerated in CAPABILITIES below, and
+ *             `SiteReviewer` narrows them to named sites (#276).
  *
  * Sets are frozen-by-construction (never mutated after build) so a leaked
  * reference can't widen a role's capabilities.

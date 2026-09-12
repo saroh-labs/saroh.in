@@ -26,7 +26,7 @@ function delay(index: number): React.CSSProperties {
     } as React.CSSProperties;
 }
 
-export function SignupForm() {
+export function SignupForm({ returnTo }: { returnTo?: string | null }) {
     const router = useRouter();
     const { signUp } = authClient;
     const [name, setName] = useState("");
@@ -52,7 +52,14 @@ export function SignupForm() {
         // verified email first, and it has already mailed a code. Sending the
         // user to a session-gated page here is what used to bounce them to
         // /login with "Email not verified" and no way to act on it.
-        router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+        // Carried through verification, so an invitee lands on the
+        // invitation they clicked rather than in their own onboarding (#276).
+        const destination = returnTo
+            ? `&redirect=${encodeURIComponent(returnTo)}`
+            : "";
+        router.push(
+            `/verify-email?email=${encodeURIComponent(email)}${destination}`,
+        );
     }
 
     return (

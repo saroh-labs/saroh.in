@@ -10,6 +10,11 @@ import { apiFetch, getActiveOrgId } from "@/lib/api/http";
  * Server-only: imports next/headers (via the shared HTTP plumbing).
  */
 
+/**
+ * REVIEWER joined the set in #276: website-only, and narrowed further to the
+ * sites it was invited to. The API is the authority — this type exists so the
+ * UI can name a role, not decide one.
+ */
 export type OrganizationRole = "OWNER" | "ADMIN" | "MEMBER" | "REVIEWER";
 
 /** A membership row as returned by GET /organizations. */

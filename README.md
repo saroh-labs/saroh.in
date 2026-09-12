@@ -91,7 +91,7 @@ Tooling lives in `tooling/*` (eslint config, tailwind config, tsconfig).
 Store dashboard, all backed by the NestJS API with per-store ownership/membership
 authorization:
 
-- **Team members & invitations** — per-store members with email invitation + accept flow
+- **Team members & invitations** — organization members with roles (owner, admin, member, reviewer), email invitations and an accept flow; per-store members alongside them
 - **Products catalog** — products, categories, variants and inventory
 - **Orders & customers** — order lifecycle with reserve / commit / release inventory transitions
 - **Content (blog)** — posts and post categories
