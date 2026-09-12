@@ -8,6 +8,7 @@ import Link from "next/link";
 
 import { env } from "@/env";
 import { requireSession } from "@/lib/session";
+import { pendingChangeCount } from "@/lib/sites/pending";
 import type { SiteSummary } from "@/lib/sites/service";
 import { listSites } from "@/lib/sites/service";
 
@@ -50,7 +51,12 @@ function siteState(site: SiteSummary): {
      * The fallback without a number covers the case where something is waiting
      * but no section differs: real, and not worth inventing a count for.
      */
-    const pending = site.pendingSectionChanges ?? 0;
+    // Sections plus site-level settings (#282), the same things the editor bar
+    // and settings screen describe.
+    const pending = pendingChangeCount(
+        site.pendingSectionChanges,
+        site.pendingSiteChanges,
+    );
     if (pending > 0) {
         return {
             label: `Live · ${pending} thing${pending === 1 ? "" : "s"} to look at`,

@@ -41,6 +41,7 @@ export type {
  * start demanding their entries instead of silently accepting six.
  */
 import type { SectionType } from "@saroh/block-contract";
+import type { SiteChangeKind } from "./pending";
 
 export type { SectionType };
 
@@ -265,6 +266,11 @@ export interface SiteSummary {
      * this same number, computed once in the API.
      */
     pendingSectionChanges?: number | null;
+    /**
+     * Which site-level settings publishing would change (#282). Null before the
+     * first publish. Described through `describePendingChanges`.
+     */
+    pendingSiteChanges?: SiteChangeKind[] | null;
     /** A claimed hostname that has not verified yet, if any. */
     pendingDomain?: string | null;
 }
@@ -299,6 +305,7 @@ export interface SiteDetail extends SiteSummary {
     pages: SitePage[];
     /** Always present on a detail read; null only before the first publish. */
     pendingSectionChanges: number | null;
+    pendingSiteChanges: SiteChangeKind[] | null;
     /**
      * Search and social settings (#188). Null means "not set" and must render
      * as absent — never as an empty title or a broken image.
@@ -348,6 +355,7 @@ export interface PageDraft {
     sections: DraftSection[];
     /** What publishing would change, site-wide, as of this read (#190). */
     pendingSectionChanges: number | null;
+    pendingSiteChanges: SiteChangeKind[] | null;
 }
 
 export interface CreateSiteInput {
@@ -500,6 +508,7 @@ export async function saveDraftSections(
     SitesResult<{
         pageVersionId?: string;
         pendingSectionChanges?: number | null;
+        pendingSiteChanges?: SiteChangeKind[] | null;
     }>
 > {
     const base = await sitesBase();
@@ -514,6 +523,7 @@ export async function saveDraftSections(
     const data = (await res.json().catch(() => null)) as {
         pageVersionId?: string;
         pendingSectionChanges?: number | null;
+        pendingSiteChanges?: SiteChangeKind[] | null;
         message?: string;
         error?: string;
         index?: number;
@@ -529,6 +539,7 @@ export async function saveDraftSections(
                  * deciding for itself what "changed" means.
                  */
                 pendingSectionChanges: data?.pendingSectionChanges ?? null,
+                pendingSiteChanges: data?.pendingSiteChanges ?? null,
             },
         };
     }

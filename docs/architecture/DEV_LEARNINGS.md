@@ -247,3 +247,23 @@ the restore confirm now says a change request is outstanding before it
 happens. Any new path that repoints `Site.currentPublicationId` must do the
 same.
 **Category**: sites · tests in `sites-editing.service.spec.ts`
+
+## Sites — a changed search title reads "the live site matches your draft" (#282)
+
+**Problem**: After changing only the site's search title, share image, style,
+menu, footer or a page name, the settings screen said "Nothing — the live site
+matches your draft". The editor bar showed no pending work, the sites list read
+"Live", and publishing was the only way the change would reach Google.
+**Root cause**: `countPendingSectionChanges` diffed sections only, and every
+surface trusted it. The snapshot carries far more than sections.
+Separately, the unpublished-changes flag compared timestamps, and saving a
+section never bumps `PageVersion.updatedAt`. Style autosave was not part of the
+check that disables Publish, and it had no in-flight guard.
+**Fix**: The pending count loads the site with `draftSiteSelect`, builds the
+site block with `buildSnapshot` (lenient, so it can never throw) and diffs it
+against the live snapshot into `SITE_CHANGE_KINDS`. It is returned as
+`pendingSiteChanges` beside the section count and described through
+`lib/sites/pending.ts`. The flag reads the same diff. Publish waits on an
+unsaved style, and style saves run one at a time. A new snapshot field a
+merchant can change needs a kind, or it goes uncounted.
+**Category**: sites · tests in `pending-site-changes.spec.ts`

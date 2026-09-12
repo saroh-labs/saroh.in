@@ -63,22 +63,63 @@ function flagsRow(over: { published?: boolean; pageUpdatedAt?: Date } = {}) {
     };
 }
 
-/** The same site as the pending-changes diff loads it. */
-function pendingRow(draftSections: unknown[], liveSections: unknown[]) {
+/** A site as the pending-changes diff loads it: every field publish reads. */
+function draftSite(
+    over: Record<string, unknown> = {},
+    sections: unknown[] = [],
+) {
     return {
         id: "site_1",
-        currentPublication: {
-            snapshot: { pages: [{ path: "/", sections: liveSections }] },
-        },
+        name: "Northwind Supply",
+        slug: "northwind",
+        postsPrefix: "/blog",
+        style: null,
+        seoTitle: null,
+        seoDescription: "Racking and shelving for small warehouses.",
+        socialImageUrl: null,
+        socialImageWidth: null,
+        socialImageHeight: null,
+        socialImageBytes: null,
+        footer: null,
+        navigation: null,
         pages: [
             {
                 id: "page_1",
                 path: "/",
                 title: "Home",
                 isHome: true,
-                versions: [{ sections: draftSections }],
+                versions: [{ sections }],
             },
         ],
+        ...over,
+    };
+}
+
+/**
+ * The site the diff loads, with the publication it is compared against.
+ *
+ * The live snapshot is built FROM a draft by the same builder publish runs
+ * (#282), so "nothing has changed" is true by construction. A test that wants
+ * a difference states the difference — rather than hand-writing a snapshot
+ * that would quietly drift from the builder and make this test lie.
+ */
+function pendingRow(
+    draftSections: unknown[],
+    liveSections: unknown[],
+    over: {
+        draft?: Record<string, unknown>;
+        live?: Record<string, unknown>;
+    } = {},
+) {
+    return {
+        ...draftSite(over.draft, draftSections),
+        currentPublication: {
+            snapshot: service.buildSnapshot(
+                draftSite(over.live, liveSections) as never,
+                new Date(0),
+                { lenient: true },
+            ),
+        },
     };
 }
 
@@ -112,11 +153,37 @@ describe("SitesService.getSiteFlags — unpublished changes", () => {
         });
     });
 
-    it("still fires for a page-row edit the diff does not count", async () => {
-        siteFindFirst.mockResolvedValue(
-            flagsRow({ pageUpdatedAt: AFTER_PUBLISH }),
-        );
-        siteFindMany.mockResolvedValue([pendingRow([], [])]);
+    it("fires for a page rename, which the diff counts as a site change", async () => {
+        // #282: the page's own timestamp is no longer consulted. A rename,
+        // a move or a hide all change what the snapshot would say about the
+        // site's pages, so the diff is what sees them.
+        siteFindFirst.mockResolvedValue(flagsRow());
+        siteFindMany.mockResolvedValue([
+            pendingRow([], [], {
+                draft: {
+                    pages: [
+                        {
+                            id: "page_1",
+                            path: "/",
+                            title: "Home page",
+                            isHome: true,
+                            versions: [{ sections: [] }],
+                        },
+                    ],
+                },
+            }),
+        ]);
+
+        const result = await service.getSiteFlags(ctx(), "site_1");
+
+        expect(flagTypes(result)).toContain("unpublishedChanges");
+    });
+
+    it("fires for a settings edit that touches no page at all (#282)", async () => {
+        siteFindFirst.mockResolvedValue(flagsRow());
+        siteFindMany.mockResolvedValue([
+            pendingRow([], [], { draft: { seoTitle: "Racking, delivered" } }),
+        ]);
 
         const result = await service.getSiteFlags(ctx(), "site_1");
 
