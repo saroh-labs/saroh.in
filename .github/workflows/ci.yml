@@ -287,7 +287,11 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
       NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
-      NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
+      # `localhost`, not `saroh.app`: this is the renderer's OWN apex, and on a
+      # runner that is what it is reached at. Told `saroh.app`, the middleware
+      # reads `localhost` as a tenant subdomain and rewrites every request —
+      # `/preview/<token>` included — into a tenant lookup that finds nothing.
+      NEXT_PUBLIC_ROOT_DOMAIN: localhost
       EMAIL_FROM: Saroh <noreply@saroh.in>
       E2E_APP_URL: http://localhost:3003
       E2E_ACCOUNTS_URL: http://localhost:3000
