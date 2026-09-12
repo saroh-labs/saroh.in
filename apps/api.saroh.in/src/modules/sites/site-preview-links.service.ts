@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
 import { sanitizeRichHtml } from "./sanitize";
+import { assertSiteInOrg } from "./site-access";
 import type { SiteSnapshot } from "./sites.service";
 import { SitesService } from "./sites.service";
 
@@ -176,7 +177,7 @@ export class SitePreviewLinksService {
         input: { expiresInDays: PreviewLinkDays },
     ): Promise<PreviewLinkView> {
         authorize(ctx, "site:update");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
 
         const now = new Date();
         const expiresAt = new Date(
@@ -207,7 +208,7 @@ export class SitePreviewLinksService {
         siteId: string,
     ): Promise<PreviewLinkView[]> {
         authorize(ctx, "site:read");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
         const now = new Date();
         const links = await prisma.sitePreviewLink.findMany({
             where: { siteId, organizationId: ctx.organizationId },
@@ -228,7 +229,7 @@ export class SitePreviewLinksService {
         linkId: string,
     ): Promise<PreviewLinkView> {
         authorize(ctx, "site:update");
-        await this.assertSiteInOrg(ctx, siteId);
+        await assertSiteInOrg(ctx, siteId);
         const existing = await prisma.sitePreviewLink.findFirst({
             where: { id: linkId, siteId, organizationId: ctx.organizationId },
             select: { id: true, revokedAt: true },
@@ -378,22 +379,5 @@ export class SitePreviewLinksService {
             .catch(() => undefined);
 
         return link;
-    }
-
-    private async assertSiteInOrg(
-        ctx: OrganizationContext,
-        siteId: string,
-    ): Promise<void> {
-        const site = await prisma.site.findFirst({
-            where: {
-                id: siteId,
-                organizationId: ctx.organizationId,
-                deletedAt: null,
-            },
-            select: { id: true },
-        });
-        if (!site) {
-            throw new NotFoundException(`Site "${siteId}" not found`);
-        }
     }
 }

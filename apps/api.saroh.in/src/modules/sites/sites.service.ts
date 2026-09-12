@@ -1864,7 +1864,6 @@ export class SitesService {
                             orderBy: { createdAt: "desc" },
                             take: 1,
                             select: {
-                                updatedAt: true,
                                 sections: {
                                     orderBy: { order: "asc" },
                                     select: {
@@ -1885,28 +1884,31 @@ export class SitesService {
 
         const publishedAt = site.currentPublication?.publishedAt ?? null;
         /*
-         * The page's OWN timestamp counts, not just its versions'.
+         * Two places a change can land, and each needs its own test.
          *
-         * This compared `PageVersion.updatedAt` alone, which silently missed
-         * every change that lives on the Page row rather than inside a draft:
-         * hiding a page (#197), renaming one, moving one. All three alter the
-         * snapshot publishing would write — title and path travel in it, and a
-         * hidden page does not travel at all — so a merchant could hide a page
-         * and be told there was nothing waiting to publish, leaving it live.
+         * The page's OWN timestamp catches what lives on the Page row rather
+         * than inside a draft: hiding a page (#197), renaming one, moving one.
+         * All three alter the snapshot publishing would write — title and path
+         * travel in it, and a hidden page does not travel at all.
          *
-         * The authoritative answer to "how much is waiting" is the diff in
-         * `pending-changes.ts`, which the sites list already uses. This path
-         * wants a boolean rather than a count and runs on a different query, so
-         * it stays a timestamp comparison — but it now looks at both places a
-         * change can land.
+         * Section edits leave no timestamp to compare. Saving a draft deletes
+         * and recreates the page's Section rows and never updates the
+         * PageVersion row, so the `PageVersion.updatedAt` comparison this used
+         * to make sat at whenever the version was created and never fired for
+         * the edit merchants make most — the same over-claim `listSites` had
+         * (#191). Those are counted by the diff in `pending-changes.ts`
+         * instead, the one the editor's "N sections changed" line shows, so
+         * this flag cannot say "nothing waiting" beside a non-zero count.
+         * Skipped before the first publish, where there is nothing to diff.
          */
+        const pending =
+            publishedAt === null
+                ? null
+                : await this.pendingSectionChanges([siteId]);
         const hasUnpublishedChanges =
             publishedAt !== null &&
-            site.pages.some(
-                (page) =>
-                    page.updatedAt > publishedAt ||
-                    page.versions.some((v) => v.updatedAt > publishedAt),
-            );
+            (site.pages.some((page) => page.updatedAt > publishedAt) ||
+                (pending?.get(siteId) ?? 0) > 0);
 
         const flags = checkSite({
             navigation: parseSiteNavigation(site.navigation),

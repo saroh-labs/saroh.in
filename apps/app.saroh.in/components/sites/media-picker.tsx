@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { ImagePlus } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { completeUpload, createUpload } from "@/lib/media/actions";
 
@@ -58,6 +58,22 @@ export function MediaPicker({
     const [progress, setProgress] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [over, setOver] = useState(false);
+    /*
+     * Whether the picker is still on screen. An upload from a phone can outlast
+     * the field that started it — the merchant picks another section or leaves
+     * the panel — and a late finish must not hand a picture to a field they
+     * have moved on from, or write state into a component that is gone. The
+     * upload itself is left to finish; only what it would write back is
+     * skipped. Set in the effect as well as the initialiser so a remount in
+     * development's double-invoked effects starts true again.
+     */
+    const mounted = useRef(true);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
 
     async function handleFile(file: File) {
         setError(null);
@@ -79,7 +95,7 @@ export function MediaPicker({
                 filename: file.name,
             });
             if (!ticket.ok) {
-                setError(ticket.error);
+                if (mounted.current) setError(ticket.error);
                 return;
             }
 
@@ -87,10 +103,15 @@ export function MediaPicker({
                 ticket.data.uploadUrl,
                 ticket.data.headers,
                 file,
-                setProgress,
+                (pct) => {
+                    if (mounted.current) setProgress(pct);
+                },
             );
 
             const done = await completeUpload(ticket.data.mediaId);
+            // Past the last wait: nothing below may reach a picker that has
+            // gone, least of all `onPick`.
+            if (!mounted.current) return;
             if (!done.ok) {
                 setError(done.error);
                 return;
@@ -105,17 +126,21 @@ export function MediaPicker({
             }
             onPick({ src: done.data.url, ...dims, bytes: file.size });
         } catch (e) {
+            if (!mounted.current) return;
             setError(
                 e instanceof Error && e.message
                     ? e.message
                     : "The upload did not go through. Try again.",
             );
         } finally {
-            setBusy(false);
-            setProgress(null);
-            // Let the same file be chosen twice in a row — a retry after a
-            // failure is the common case, and a file input ignores a repeat.
-            if (inputRef.current) inputRef.current.value = "";
+            if (mounted.current) {
+                setBusy(false);
+                setProgress(null);
+                // Let the same file be chosen twice in a row — a retry after a
+                // failure is the common case, and a file input ignores a
+                // repeat.
+                if (inputRef.current) inputRef.current.value = "";
+            }
         }
     }
 
