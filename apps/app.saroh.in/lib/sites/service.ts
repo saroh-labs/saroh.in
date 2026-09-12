@@ -370,6 +370,11 @@ export interface SiteSettingsInput {
 
 export interface PageDraft {
     pageVersionId: string;
+    /**
+     * Which edit of this draft the sections are (#285). Sent back on save;
+     * a save against a revision the server has moved past is refused.
+     */
+    revision: number;
     sections: DraftSection[];
     /** What publishing would change, site-wide, as of this read (#190). */
     pendingSectionChanges: number | null;
@@ -388,7 +393,19 @@ export interface CreateSiteInput {
  * failing section index the API names in a 400). */
 export type SitesResult<T> =
     | { ok: true; data: T }
-    | { ok: false; error: string; field?: string; index?: number };
+    | {
+          ok: false;
+          error: string;
+          field?: string;
+          index?: number;
+          /**
+           * The draft moved on under this editor (#285). A different kind of
+           * failure from the rest: nothing is wrong with what the merchant
+           * wrote, and retrying the same save would only overwrite someone
+           * else's work — so the screen offers to reload rather than to retry.
+           */
+          conflict?: boolean;
+      };
 
 // ---------------------------------------------------------------------------
 // Fetch plumbing (shared apiFetch/getActiveOrgId from @/lib/api/http)
@@ -522,9 +539,12 @@ export async function saveDraftSections(
     siteId: string,
     pageId: string,
     sections: SectionInput[],
+    /** The revision this editor loaded, so a stale save is refused (#285). */
+    revision?: number,
 ): Promise<
     SitesResult<{
         pageVersionId?: string;
+        revision?: number;
         pendingSectionChanges?: number | null;
         pendingSiteChanges?: SiteChangeKind[] | null;
     }>
@@ -535,22 +555,40 @@ export async function saveDraftSections(
         `${base}/${siteId}/pages/${pageId}/draft/sections`,
         {
             method: "PUT",
-            body: JSON.stringify({ sections }),
+            body: JSON.stringify({ sections, revision }),
         },
     );
     const data = (await res.json().catch(() => null)) as {
         pageVersionId?: string;
+        revision?: number;
         pendingSectionChanges?: number | null;
         pendingSiteChanges?: SiteChangeKind[] | null;
         message?: string;
         error?: string;
+        code?: string;
         index?: number;
     } | null;
+    if (res.status === 409) {
+        /*
+         * Someone else saved this page while this editor was open (#285). The
+         * local copy is NOT discarded and nothing is written: the caller
+         * decides, and the editor offers to reload.
+         */
+        return {
+            ok: false,
+            conflict: true,
+            ...readError(
+                data,
+                "Someone else saved this page while you were editing.",
+            ),
+        };
+    }
     if (res.ok) {
         return {
             ok: true,
             data: {
                 pageVersionId: data?.pageVersionId,
+                revision: data?.revision,
                 /*
                  * The save returns the recomputed count so the top bar stays
                  * true through a long editing session without the browser ever

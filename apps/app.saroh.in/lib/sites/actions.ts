@@ -49,8 +49,10 @@ export async function saveDraftSections(
     siteId: string,
     pageId: string,
     sections: SectionInput[],
+    /** The revision the editor loaded, so a stale save is refused (#285). */
+    revision?: number,
 ) {
-    return saveDraftSectionsApi(siteId, pageId, sections);
+    return saveDraftSectionsApi(siteId, pageId, sections, revision);
 }
 
 /** Leave a note on a section (#277). */

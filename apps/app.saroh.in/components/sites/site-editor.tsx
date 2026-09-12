@@ -132,6 +132,7 @@ export function SiteEditor({
     initialPendingChanges,
     initialPendingSiteChanges,
     initialSections,
+    initialRevision,
     siteName,
     address,
     initialStyle,
@@ -167,6 +168,8 @@ export function SiteEditor({
     /** Site-level settings publishing would change (#282). Null before the first publish. */
     initialPendingSiteChanges: SiteChangeKind[] | null;
     initialSections: Section[];
+    /** Which edit of the draft `initialSections` are (#285). */
+    initialRevision: number;
     siteName: string;
     initialStyle: SiteStyle;
     styleOptions: SiteStyleOptions;
@@ -378,6 +381,16 @@ export function SiteEditor({
     );
     const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
     const [saveError, setSaveError] = useState(false);
+    /*
+     * The draft's revision, and whether someone else has moved past it (#285).
+     *
+     * On a conflict the editor stops saving and says so. It does NOT reload by
+     * itself: the merchant's unsaved work is the thing at risk, and throwing it
+     * away to fetch someone else's version is the failure this was written to
+     * prevent, only faster.
+     */
+    const [revision, setRevision] = useState(initialRevision);
+    const [conflict, setConflict] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     // The org's services for the booking-section picker. Loaded once on mount;
     // Services are authored in the service editor, never inline here.
@@ -577,6 +590,7 @@ export function SiteEditor({
             siteId,
             pageId,
             synced.sections,
+            revision,
         ).catch(() => ({
             ok: false as const,
             error: "Could not reach Saroh — your work is still here. It will save again with your next edit.",
@@ -584,6 +598,9 @@ export function SiteEditor({
         setSaving(false);
         if (res.ok) {
             failedJson.current = null;
+            if (typeof res.data.revision === "number") {
+                setRevision(res.data.revision);
+            }
             setLastSavedJson(JSON.stringify(synced.sections));
             setLastSavedAt(new Date());
             setSaveError(false);
@@ -605,6 +622,11 @@ export function SiteEditor({
         }
         failedJson.current = JSON.stringify(synced.sections);
         setSaveError(true);
+        if ("conflict" in res && res.conflict === true) {
+            // Stops the autosave loop from retrying a save that can only lose
+            // one side's work. The banner offers the reload instead.
+            setConflict(true);
+        }
         if ("index" in res && typeof res.index === "number") {
             setErrorIndex(res.index);
             setErrorMessage(res.error);
@@ -626,6 +648,13 @@ export function SiteEditor({
      */
     useEffect(() => {
         if (!dirty || saving || publishing) return;
+        /*
+         * Nothing autosaves once the draft has moved on under this editor
+         * (#285). Every later edit would carry the same stale revision and be
+         * refused, so retrying is noise — and if it were not refused, it would
+         * be overwriting the other editor's work keystroke by keystroke.
+         */
+        if (conflict) return;
         // Not the draft that just failed, again: see `failedJson`. Any edit
         // changes the JSON, so the next edit is still the retry.
         if (saveError && JSON.stringify(sections) === failedJson.current) {
@@ -638,7 +667,7 @@ export function SiteEditor({
         // `onSave` is redefined each render; depending on it would restart the
         // timer on every keystroke and never fire.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dirty, saving, publishing, saveError, sections]);
+    }, [dirty, saving, publishing, saveError, conflict, sections]);
 
     /*
      * Style autosave.
@@ -1657,6 +1686,40 @@ export function SiteEditor({
                     }}
                     className="min-h-0 overflow-y-auto bg-background p-6"
                 >
+                    {/*
+                     * Someone else saved this page while this editor was open
+                     * (#285). Loud, because everything typed since is now
+                     * unsaveable — and the merchant has to choose what happens
+                     * to it. Reloading takes the other version and drops this
+                     * one, so it is offered, never done automatically.
+                     */}
+                    {conflict ? (
+                        <div
+                            role="alert"
+                            className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm"
+                        >
+                            <p className="font-medium">
+                                Someone else saved this page while you were
+                                editing.
+                            </p>
+                            <p className="mt-1 text-muted-foreground">
+                                Nothing you have written has been lost, and
+                                nothing more will save until you reload.
+                                Reloading shows their version and discards
+                                yours, so copy anything you want to keep first.
+                            </p>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="mt-3"
+                                onClick={() => window.location.reload()}
+                            >
+                                Reload the latest
+                            </Button>
+                        </div>
+                    ) : null}
+
                     {/*
                      * The first-run nudge (spec §5), in the spec's own words.
                      * "It does not nag" — so it is one quiet line above the

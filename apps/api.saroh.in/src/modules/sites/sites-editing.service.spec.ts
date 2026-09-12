@@ -23,6 +23,8 @@ jest.mock("@saroh/database", () => {
         pageVersion: {
             findFirst: jest.fn(),
             create: jest.fn(),
+            // The revision bump a save makes in the same transaction (#285).
+            update: jest.fn(),
         },
         section: {
             findMany: jest.fn(),
@@ -65,6 +67,7 @@ const siteFindFirst = prisma.site.findFirst as jest.Mock;
 const siteUpdate = prisma.site.update as jest.Mock;
 const pageFindFirst = prisma.page.findFirst as jest.Mock;
 const versionFindFirst = prisma.pageVersion.findFirst as jest.Mock;
+const versionUpdate = prisma.pageVersion.update as jest.Mock;
 const versionCreate = prisma.pageVersion.create as jest.Mock;
 const sectionFindMany = prisma.section.findMany as jest.Mock;
 const sectionDeleteMany = prisma.section.deleteMany as jest.Mock;
@@ -130,6 +133,7 @@ beforeEach(() => jest.clearAllMocks());
 
 describe("SitesService.replaceDraftSections", () => {
     beforeEach(() => {
+        versionUpdate.mockResolvedValue({ revision: 1 });
         siteFindFirst.mockResolvedValue({ id: "site_1" });
         pageFindFirst.mockResolvedValue({ id: "page_1" });
         versionFindFirst.mockResolvedValue({ id: "ver_1" });

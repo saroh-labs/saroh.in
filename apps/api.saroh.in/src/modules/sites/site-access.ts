@@ -110,7 +110,7 @@ export async function getOrCreateDraftVersion(
     client: Prisma.TransactionClient,
     ctx: OrganizationContext,
     pageId: string,
-): Promise<{ id: string }> {
+): Promise<{ id: string; revision: number }> {
     const existing = await client.pageVersion.findFirst({
         where: {
             pageId,
@@ -118,7 +118,10 @@ export async function getOrCreateDraftVersion(
             status: "DRAFT",
         },
         orderBy: { createdAt: "desc" },
-        select: { id: true },
+        // The revision travels with the id (#285): every caller that writes
+        // sections has to check it, and one that had to ask separately could
+        // read it outside the transaction that guards it.
+        select: { id: true, revision: true },
     });
     if (existing) {
         return existing;
@@ -130,7 +133,7 @@ export async function getOrCreateDraftVersion(
             status: "DRAFT",
             createdByUserId: ctx.userId,
         },
-        select: { id: true },
+        select: { id: true, revision: true },
     });
 }
 

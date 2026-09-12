@@ -166,6 +166,12 @@ export interface PageDraftView {
     pageId: string;
     pageVersionId: string;
     status: "DRAFT";
+    /**
+     * Which edit of this draft these sections are (#285). The editor sends it
+     * back when it saves; a save against a stale revision is a 409 rather than
+     * a silent overwrite of whoever saved in between.
+     */
+    revision: number;
     sections: DraftSectionView[];
     /**
      * How many sections publishing the whole site would change (#190), as of
@@ -1292,6 +1298,8 @@ export class SitesService {
             pageId,
             pageVersionId: version.id,
             status: "DRAFT",
+            // What the editor has to send back when it saves (#285).
+            revision: version.revision,
             /*
              * Sanitized on the way OUT as well (#280). The editor's preview
              * renders rich fields as HTML, and a row saved before sanitize-on-
@@ -1383,6 +1391,35 @@ export class SitesService {
 
         const draft = await prisma.$transaction(async (tx) => {
             const version = await getOrCreateDraftVersion(tx, ctx, pageId);
+
+            /*
+             * Optimistic concurrency (#285).
+             *
+             * This method DELETES every section on the page and recreates the
+             * list the client sent, so two tabs — or two people — on one page
+             * each save their whole list and the last write wins. The loser's
+             * work vanishes with no conflict, no error and no trace, and any
+             * note pinned to a section only they had is orphaned with it.
+             *
+             * A client that sends the revision it was given gets a 409 when the
+             * draft has moved on. One that sends none is trusted, because a
+             * caller that never read the draft cannot be clobbering an edit it
+             * saw — and requiring it would break every existing client the day
+             * this shipped.
+             */
+            if (
+                dto.revision !== undefined &&
+                dto.revision !== version.revision
+            ) {
+                throw new ConflictException({
+                    message:
+                        "Someone else saved this page while you were editing. Reload to see their version.",
+                    code: "DRAFT_REVISION_MISMATCH",
+                    yours: dto.revision,
+                    current: version.revision,
+                });
+            }
+
             await tx.section.deleteMany({
                 where: { pageVersionId: version.id },
             });
@@ -1413,10 +1450,19 @@ export class SitesService {
                     key: true,
                 },
             });
+            // Bumped in the same transaction as the write it describes, so a
+            // reader can never see the new sections at the old revision.
+            const bumped = await tx.pageVersion.update({
+                where: { id: version.id },
+                data: { revision: { increment: 1 } },
+                select: { revision: true },
+            });
+
             return {
                 pageId,
                 pageVersionId: version.id,
                 status: "DRAFT" as const,
+                revision: bumped.revision,
                 sections,
             };
         });
