@@ -198,6 +198,12 @@ const SITE_LAYER_ALLOWED = new Set([
     // which is the point: a past version has to be shown by the renderer that
     // served it, or the preview is a second opinion about what went live.
     "apps/app.saroh.in/components/sites/past-version-preview.tsx",
+    // The reviewer's read of the draft (#275). Same category again: it gives
+    // each section the merchant's page ground to sit on, in the merchant's
+    // palette, and hands the section itself to PageSections. Drawing a block
+    // here would put a reviewer's notes on a rendering the live site never
+    // makes, which is the whole failure #189 was.
+    "apps/app.saroh.in/components/sites/section-review.tsx",
 ]);
 
 /**

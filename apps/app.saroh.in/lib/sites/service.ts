@@ -299,9 +299,27 @@ export interface SitePage {
     hidden: boolean;
 }
 
+/**
+ * What the caller may do with this site, decided by the API's policy (#275).
+ *
+ * Read from the server, never computed here: a screen that decides for itself
+ * which buttons a role gets is a second policy, and it drifts from the one that
+ * actually refuses the request.
+ */
+export interface SiteCapabilities {
+    edit: boolean;
+    publish: boolean;
+    comment: boolean;
+    approve: boolean;
+    manageSettings: boolean;
+    manageDomain: boolean;
+}
+
 export interface SiteDetail extends SiteSummary {
     /** Server-owned permission for the draft editor. */
     canEdit: boolean;
+    /** Everything this caller may do here (#275). */
+    can: SiteCapabilities;
     pages: SitePage[];
     /** Always present on a detail read; null only before the first publish. */
     pendingSectionChanges: number | null;
@@ -769,14 +787,15 @@ export interface ReviewState {
 export async function listComments(siteId: string): Promise<SiteCommentView[]> {
     const base = await sitesBase();
     if (!base) return [];
-    try {
-        const res = await apiFetch(`${base}/${siteId}/comments`);
-        if (!res.ok) return [];
-        const data = (await res.json()) as unknown;
-        return Array.isArray(data) ? (data as SiteCommentView[]) : [];
-    } catch {
-        return [];
-    }
+    /*
+     * A failure THROWS now (#275). This used to turn any error into an empty
+     * array, so an outage read as "No notes on this site yet" — the one
+     * sentence a reviewer must be able to trust, since acting on it means
+     * assuming nobody has said anything. `getList` distinguishes an absent
+     * resource (404 → empty) from a failure, and the segment boundary explains
+     * the failure.
+     */
+    return getList<SiteCommentView>(`${base}/${siteId}/comments`);
 }
 
 export async function getReviewState(siteId: string): Promise<ReviewState> {
@@ -789,20 +808,25 @@ export async function getReviewState(siteId: string): Promise<ReviewState> {
     };
     const base = await sitesBase();
     if (!base) return empty;
-    try {
-        const res = await apiFetch(`${base}/${siteId}/review`);
-        if (!res.ok) return empty;
-        const data = (await res.json()) as Partial<ReviewState> | null;
-        return {
-            openNotes: typeof data?.openNotes === "number" ? data.openNotes : 0,
-            latestApproval: data?.latestApproval ?? null,
-            outstanding: data?.outstanding === true,
-            pending: data?.pending === true,
-            approvalIsStale: data?.approvalIsStale === true,
-        };
-    } catch {
-        return empty;
-    }
+    /*
+     * A failure THROWS now (#275), for the same reason notes do: a swallowed
+     * error read as "nobody has reviewed this", which is the answer a merchant
+     * publishes on.
+     *
+     * The fields are still read defensively — an older API that does not send
+     * `pending` yet is a missing field, not a failure.
+     */
+    const data = await getJson<Partial<ReviewState>>(
+        `${base}/${siteId}/review`,
+    );
+    if (!data) return empty;
+    return {
+        openNotes: typeof data.openNotes === "number" ? data.openNotes : 0,
+        latestApproval: data.latestApproval ?? null,
+        outstanding: data.outstanding === true,
+        pending: data.pending === true,
+        approvalIsStale: data.approvalIsStale === true,
+    };
 }
 
 /**
@@ -860,6 +884,40 @@ export async function createApproval(
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
     return { ok: false, ...readError(data, "Could not record that.") };
+}
+
+/** One section of a page, as a reviewer reads it (#275). */
+export interface ReviewableSection {
+    key: string;
+    type: string;
+    contractVersion: number;
+    label: string | null;
+    hidden: boolean;
+    content: unknown;
+}
+
+/** A page as a reviewer reads it: its sections, in order (#275). */
+export interface ReviewablePage {
+    sections: ReviewableSection[];
+}
+
+/**
+ * Read a page without asking for the editor's draft (#275).
+ *
+ * `getPageDraft` requires `section:write` and creates a DRAFT version when the
+ * page has none — an authoring load, which a reviewer must not make. This one
+ * needs only `site:read` and writes nothing.
+ */
+export async function getPageForReview(
+    siteId: string,
+    pageId: string,
+): Promise<ReviewablePage> {
+    const base = await sitesBase();
+    if (!base) return { sections: [] };
+    const page = await getJson<ReviewablePage>(
+        `${base}/${siteId}/pages/${pageId}/read`,
+    );
+    return page ?? { sections: [] };
 }
 
 /**

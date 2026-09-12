@@ -263,16 +263,17 @@ export class SitesController {
     }
 
     /**
-     * A page's draft outline — section keys, types and labels — for a caller
-     * who may read the site but not edit it (#277). Requires `site:read`.
+     * A page as a reviewer reads it (#275): its sections, in order, with their
+     * keys and content. Requires `site:read` and writes nothing — unlike the
+     * editor's draft load, which requires `section:write` and creates a draft.
      */
-    @Get(":siteId/pages/:pageId/outline")
-    getPageOutline(
+    @Get(":siteId/pages/:pageId/read")
+    getPageForReview(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
         @Param("pageId") pageId: string,
     ) {
-        return this.sites.getPageOutline(ctx, siteId, pageId);
+        return this.sites.getPageForReview(ctx, siteId, pageId);
     }
 
     /**

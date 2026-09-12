@@ -1,9 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { SiteEditor } from "@/components/sites/site-editor";
-import { SiteReadView } from "@/components/sites/site-read-view";
 import { env } from "@/env";
 import { requireSession } from "@/lib/session";
+import { parseSectionContent } from "@saroh/block-contract";
+
 import type { Section } from "@/lib/sites/service";
 import {
     getPageDraft,
@@ -36,11 +37,16 @@ export default async function SiteEditorPage({
     const site = await getSite(siteId);
     if (!site) notFound();
 
-    // Reading a site does not grant access to the write-protected draft loader.
-    if (!site.canEdit) {
-        const comments = await listComments(siteId);
-        return <SiteReadView site={site} comments={comments} />;
-    }
+    /*
+     * Someone who may read the site but not author it gets a different screen
+     * (#275), in the shell, where they keep their navigation: this group is
+     * deliberately chrome-less, which is right for a three-pane editor and
+     * wrong for someone reading and commenting.
+     *
+     * A redirect rather than a render, so the link an owner shares — this one —
+     * works for whoever opens it.
+     */
+    if (!site.can.edit) redirect(`/sites/${siteId}/review`);
 
     if (site.pages.length === 0) notFound();
     /*
@@ -65,14 +71,34 @@ export default async function SiteEditorPage({
         listComments(siteId),
         getReviewState(siteId),
     ]);
-    // Drop the `order` carried by DraftSection — array position is the order.
-    // Everything else travels: `hidden` in particular, because a field dropped
-    // here would come back visible after a reload and republish work the
-    // merchant had deliberately taken off the site.
-    const initialSections: Section[] = (draft?.sections ?? []).map(
-        ({ type, contractVersion, content, hidden, key }) =>
-            ({ type, contractVersion, content, hidden, key }) as Section,
+    /*
+     * Checked against the block contract, not cast into it (#275).
+     *
+     * This used to `as Section` whatever the API returned, so a row that had
+     * drifted from its contract — written by an older build, or by a path that
+     * did not validate — reached the field components as a shape they promise
+     * they have. What the merchant then saw depended on which field was read
+     * first: a blank input, or a crash inside the preview.
+     *
+     * A section that fails is kept and flagged rather than dropped: it is the
+     * merchant's work, and silently removing it from the editor would delete it
+     * on the next save.
+     *
+     * `order` is dropped because array position is the order. Everything else
+     * travels — `hidden` in particular, because a field lost here would come
+     * back visible after a reload and republish work taken off the site.
+     */
+    const parsed = (draft?.sections ?? []).map(
+        ({ type, contractVersion, content, hidden, key }) => ({
+            section: { type, contractVersion, content, hidden, key } as Section,
+            valid: parseSectionContent(type, contractVersion, content).success,
+        }),
     );
+    const initialSections: Section[] = parsed.map((p) => p.section);
+    const unreadableSections = parsed
+        .filter((p) => !p.valid)
+        .map((p) => p.section.key)
+        .filter((key): key is string => key !== undefined);
 
     // Full-bleed: the editor is a three-pane workspace, not a document. A
     // centred measure would leave the preview narrower than the phone it is
@@ -91,6 +117,10 @@ export default async function SiteEditorPage({
             initialComments={comments}
             initialReview={review}
             neverPublished={site.currentPublicationId === null}
+            // Sections whose stored content no longer matches their contract
+            // (#275). Named so the editor can say which, rather than letting a
+            // field component meet a shape it was promised it would not.
+            unreadableSections={unreadableSections}
             /*
              * From the DRAFT read, not from `site`: both carry the same
              * server-side count, and the draft's is the one that was computed

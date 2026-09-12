@@ -263,10 +263,66 @@ function slugify(input: string): string {
  * inferred type cannot be named across the package boundary, and callers must
  * parse it against the section contract anyway rather than trusting its shape.
  */
+/**
+ * What this caller may do with this site (#275).
+ *
+ * Computed here with `can()`, and sent, so the app never mirrors
+ * `organization-policy.ts`. A screen that decides for itself which buttons a
+ * role gets is a second policy, and the two drift: today every website surface
+ * renders Save, Restore, Create link and Connect to roles the API refuses, so
+ * the first press is where a merchant learns they cannot.
+ *
+ * This is for rendering, never for enforcement — the API still authorizes every
+ * call. A control that is absent because of this cannot be pressed; one that is
+ * reached anyway is still refused.
+ */
+export interface SiteCapabilities {
+    /** Load and write editable drafts: the editor's whole premise. */
+    edit: boolean;
+    /** Put the site, or a past version of it, in front of the public. */
+    publish: boolean;
+    /** Leave a note on a section. */
+    comment: boolean;
+    /** Record a verdict on the site. */
+    approve: boolean;
+    /** Change the site's name, search, style, menu and footer. */
+    manageSettings: boolean;
+    /** Claim or connect a domain. */
+    manageDomain: boolean;
+}
+
+/**
+ * A page as a REVIEWER reads it (#275): the sections, in order, with what they
+ * say.
+ *
+ * Not the editor's draft. `getPageDraft` requires `section:write` and creates a
+ * DRAFT version if the page has none — it is an authoring load, and a reviewer
+ * is not authoring. This one requires `site:read`, writes nothing, and returns
+ * what the sections contain so the same blocks the live site uses can draw
+ * them.
+ *
+ * It carries each section's key because that is what a note is pinned to, and
+ * a reviewer with no key has nothing to pin to.
+ */
+export interface ReviewablePage {
+    sections: {
+        key: string;
+        type: string;
+        contractVersion: number;
+        /** A few words naming the section, for a list that has two heroes. */
+        label: string | null;
+        /** Hidden sections are shown, marked: they are part of the draft. */
+        hidden: boolean;
+        content: unknown;
+    }[];
+}
+
 /** One site as the editor and settings screens read it. */
 export interface SiteDetailView {
     /** Whether this caller may load and write editable drafts. */
     canEdit: boolean;
+    /** Everything this caller may do here, decided by the policy (#275). */
+    can: SiteCapabilities;
     id: string;
     name: string;
     slug: string;
@@ -758,6 +814,14 @@ export class SitesService {
         return {
             ...rest,
             canEdit: can(ctx.role, "section:write"),
+            can: {
+                edit: can(ctx.role, "section:write"),
+                publish: can(ctx.role, "site:publish"),
+                comment: can(ctx.role, "site:comment"),
+                approve: can(ctx.role, "site:approve"),
+                manageSettings: can(ctx.role, "site:update"),
+                manageDomain: can(ctx.role, "domain:manage"),
+            },
             /*
              * What publishing would change (#190). The editor's top bar and the
              * settings screen both render this, so neither computes its own —
@@ -1888,11 +1952,11 @@ export class SitesService {
      * a note is attached to, and the content is already on the page they are
      * reading through the share link.
      */
-    async getPageOutline(
+    async getPageForReview(
         ctx: OrganizationContext,
         siteId: string,
         pageId: string,
-    ): Promise<{ key: string; type: string; label: string | null }[]> {
+    ): Promise<ReviewablePage> {
         authorize(ctx, "site:read");
         await assertSiteInOrg(ctx, siteId);
         await assertPageInSite(ctx, siteId, pageId);
@@ -1907,16 +1971,34 @@ export class SitesService {
             select: {
                 sections: {
                     orderBy: { order: "asc" },
-                    select: { key: true, type: true, content: true },
+                    select: {
+                        key: true,
+                        type: true,
+                        contractVersion: true,
+                        content: true,
+                        hidden: true,
+                    },
                 },
             },
         });
 
-        return (version?.sections ?? []).map((section) => ({
-            key: section.key,
-            type: section.type,
-            label: sectionLabel(section.content),
-        }));
+        return {
+            sections: (version?.sections ?? []).map((section) => ({
+                key: section.key,
+                type: section.type,
+                contractVersion: section.contractVersion,
+                label: sectionLabel(section.content),
+                hidden: section.hidden,
+                // Sanitized on the way out, for the same reason the editor's
+                // draft is (#280): this content is rendered as HTML, and a row
+                // written before sanitize-on-write must not reach a reader raw.
+                content: sanitizeSectionContent(
+                    section.content,
+                    getSectionContract(section.type, section.contractVersion)
+                        ?.sanitizedFields ?? [],
+                ),
+            })),
+        };
     }
 
     async createComment(

@@ -29,9 +29,17 @@ export function SiteVersions({
     siteId,
     publications,
     changesRequested,
+    canRestore,
 }: {
     siteId: string;
     publications: SitePublication[];
+    /**
+     * Whether this caller may put a version back (#275). Restoring is a
+     * publish, so it needs `site:publish`; without it the control is absent
+     * rather than disabled — a Restore that refuses on the press is where a
+     * merchant currently learns the rule.
+     */
+    canRestore: boolean;
     /**
      * A reviewer's change request is outstanding (#279). Restoring still works,
      * because the rule is recorded, not prevented. But the confirm says so
@@ -148,8 +156,8 @@ export function SiteVersions({
                                             Preview
                                         </Link>
                                     </Button>
-                                    {p.isCurrent ? null : confirming ===
-                                      p.id ? (
+                                    {p.isCurrent ||
+                                    !canRestore ? null : confirming === p.id ? (
                                         <div className="flex gap-2">
                                             <Button
                                                 size="sm"
