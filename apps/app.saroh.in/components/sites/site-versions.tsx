@@ -6,6 +6,7 @@ import { Card, CardContent } from "@saroh/ui/card";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { History } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -93,9 +94,16 @@ export function SiteVersions({
                                             </Badge>
                                         ) : null}
                                     </div>
+                                    {/*
+                                     * Who put it live (#283). This used to read
+                                     * "Template starter v1" on every row: every
+                                     * publication is stamped with the starter,
+                                     * so the line told a merchant nothing.
+                                     */}
                                     <p className="text-xs text-muted-foreground">
-                                        Template {p.templateId} v
-                                        {p.templateVersion}
+                                        {p.publishedBy
+                                            ? `Published by ${p.publishedBy}`
+                                            : "Publisher not recorded"}
                                     </p>
                                     {p.bypass ? (
                                         /*
@@ -114,38 +122,54 @@ export function SiteVersions({
                                     ) : null}
                                 </div>
 
-                                {p.isCurrent ? null : confirming === p.id ? (
-                                    <div className="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="brand"
-                                            disabled={pending}
-                                            onClick={() => onRestore(p.id)}
+                                {/* One actions group: with these loose in a
+                                 * justify-between row, Preview drifted into
+                                 * the dead space between the date and
+                                 * Restore. */}
+                                <div className="flex items-center gap-2">
+                                    <Button size="sm" variant="ghost" asChild>
+                                        <Link
+                                            href={`/sites/${siteId}/versions/${p.id}`}
                                         >
-                                            {pending
-                                                ? "Restoring…"
-                                                : changesRequested
-                                                  ? "Restore without approval"
-                                                  : "Yes, restore"}
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            disabled={pending}
-                                            onClick={() => setConfirming(null)}
-                                        >
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setConfirming(p.id)}
-                                    >
-                                        Restore
+                                            Preview
+                                        </Link>
                                     </Button>
-                                )}
+                                    {p.isCurrent ? null : confirming ===
+                                      p.id ? (
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="brand"
+                                                disabled={pending}
+                                                onClick={() => onRestore(p.id)}
+                                            >
+                                                {pending
+                                                    ? "Restoring…"
+                                                    : changesRequested
+                                                      ? "Restore without approval"
+                                                      : "Yes, restore"}
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                disabled={pending}
+                                                onClick={() =>
+                                                    setConfirming(null)
+                                                }
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setConfirming(p.id)}
+                                        >
+                                            Restore
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
                             {confirming === p.id ? (

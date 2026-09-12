@@ -41,6 +41,8 @@ import {
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
+import type { Renderability } from "./publication-renderability";
+import { checkRenderability } from "./publication-renderability";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
 import {
     assertPageInSite,
@@ -307,13 +309,30 @@ export interface SiteDetailView {
     styleOptions: SiteStyleOptions;
 }
 
+/**
+ * Version history means the SITE's publishes, not every row in the table.
+ *
+ * Publishing a blog post writes a Publication too (`postId` set, `templateId`
+ * "post", a snapshot holding one post and no pages). Those rows were reaching
+ * version history, where they read as ordinary site versions: an undated-looking
+ * entry a merchant could restore, which would point `currentPublicationId` at a
+ * snapshot with no pages and take the live site down. A post publish is not a
+ * version of the site, so it is not offered as one — restoring one is a 404, not
+ * a broken home page.
+ */
+const SITE_VERSION = { postId: null } as const;
+
 export interface PublicationDetail {
     id: string;
     publishedAt: Date;
     publishedByUserId: string | null;
+    /** Who published it: their name, else their email; null if unknown (#283). */
+    publishedBy: string | null;
     templateId: string;
     templateVersion: number;
     snapshot: unknown;
+    /** Whether this build can still draw every section it holds (#283). */
+    renderability: Renderability;
 }
 
 /**
@@ -929,7 +948,11 @@ export class SitesService {
         const site = await assertSiteInOrg(ctx, siteId);
 
         const publications = await prisma.publication.findMany({
-            where: { siteId, organizationId: ctx.organizationId },
+            where: {
+                siteId,
+                organizationId: ctx.organizationId,
+                ...SITE_VERSION,
+            },
             orderBy: { publishedAt: "desc" },
             select: {
                 id: true,
@@ -950,8 +973,17 @@ export class SitesService {
             },
         });
 
+        // Names, not ids (#283). "Who put this live" is a question the list
+        // exists to answer, and a Publication records only the user id.
+        const publishers = await this.userNames(
+            publications.map((p) => p.publishedByUserId),
+        );
+
         return publications.map(({ approvals, ...p }) => ({
             ...p,
+            publishedBy: p.publishedByUserId
+                ? (publishers.get(p.publishedByUserId) ?? null)
+                : null,
             bypass:
                 approvals.length === 0
                     ? null
@@ -980,6 +1012,7 @@ export class SitesService {
                 id: publicationId,
                 siteId,
                 organizationId: ctx.organizationId,
+                ...SITE_VERSION,
             },
             select: {
                 id: true,
@@ -995,7 +1028,34 @@ export class SitesService {
                 `Publication "${publicationId}" not found`,
             );
         }
-        return publication;
+        const publishers = await this.userNames([
+            publication.publishedByUserId,
+        ]);
+        return {
+            ...publication,
+            publishedBy: publication.publishedByUserId
+                ? (publishers.get(publication.publishedByUserId) ?? null)
+                : null,
+            renderability: checkRenderability(publication.snapshot),
+        };
+    }
+
+    /**
+     * Display names for user ids (#283): a name, else the email every user has.
+     * One query for every distinct id, however many versions share a publisher.
+     */
+    private async userNames(
+        ids: (string | null)[],
+    ): Promise<Map<string, string>> {
+        const unique = [
+            ...new Set(ids.filter((id): id is string => id !== null)),
+        ];
+        if (unique.length === 0) return new Map();
+        const users = await prisma.user.findMany({
+            where: { id: { in: unique } },
+            select: { id: true, name: true, email: true },
+        });
+        return new Map(users.map((u) => [u.id, u.name ?? u.email]));
     }
 
     /**
@@ -1028,6 +1088,7 @@ export class SitesService {
                 id: publicationId,
                 siteId,
                 organizationId: ctx.organizationId,
+                ...SITE_VERSION,
             },
             select: {
                 snapshot: true,
