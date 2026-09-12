@@ -268,6 +268,17 @@ describe("SitesService.updatePage", () => {
             service.updatePage(ctx(), "site_1", "nope", { title: "x" }),
         ).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it("denies site:update to a MEMBER before touching the database", async () => {
+        await expect(
+            service.updatePage(ctx({ role: "MEMBER" }), "site_1", "page_2", {
+                title: "Our story",
+            }),
+        ).rejects.toThrow(/MEMBER.*site:update/);
+        expect(siteFindFirst).not.toHaveBeenCalled();
+        expect(pageFindFirst).not.toHaveBeenCalled();
+        expect(pageUpdate).not.toHaveBeenCalled();
+    });
 });
 
 describe("SitesService.deletePage", () => {

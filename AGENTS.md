@@ -106,10 +106,49 @@ It looks fine locally because `apps/api.saroh.in/.env` sets `PORT`. Anywhere
 without a `.env` — CI, a container — you must pass every value the app needs,
 including the ones that "have a default". This cost a red CI run.
 
+## Checking a change in a browser
+
+**Drive the PERSISTENT Chrome window. Never `playwright test` with its own
+throwaway browser.** A throwaway launch uses a fresh profile and closes itself:
+the session is gone every run, nothing you did is inspectable afterwards, and
+nobody watching the screen sees anything happen.
+
+Start the window once, and leave it open:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9333 \
+  --user-data-dir="$HOME/.saroh-dev-chrome" \
+  --no-first-run --no-default-browser-check --ignore-certificate-errors
+```
+
+`--ignore-certificate-errors` is for portless's own CA on the `.localhost`
+names. Sign in once as the seeded demo owner; the profile keeps the session, so
+later runs start already signed in.
+
+Attach to it from a script, drive it, and detach — the window stays open:
+
+```js
+import { chromium } from "playwright-core";
+
+const browser = await chromium.connectOverCDP("http://127.0.0.1:9333");
+const page = browser.contexts()[0].pages()[0];
+await page.bringToFront();
+await page.goto("https://app.saroh.localhost/sites");
+// …drive, screenshot, measure…
+await browser.close(); // detaches; the window is still there
+```
+
+Take the screenshots at 1440 and 400 wide and LOOK at them — a layout question
+is not answered by a passing assertion. `page.evaluate` measuring a real
+`getBoundingClientRect` is how you check a gutter or an overflow.
+
 ## Browser tests
 
-The only tests that can answer a cross-origin or a layout question. Everything
-in `e2e/` needs the stack actually running.
+Automated regression tests, which is a different job from the check above: they
+run in CI, where there is no window to watch. The only tests that can answer a
+cross-origin or a layout question. Everything in `e2e/` needs the stack actually
+running.
 
 ```bash
 pnpm dev                                          # in another terminal
@@ -134,28 +173,28 @@ every agent loads skills on its own — Claude Code in this repo does not — so
 this table is how a pattern reaches you. Find what you are about to do and read
 the right-hand files **before** writing code.
 
-| When you are about to…                                                                              | Read first                                                                                     |
-| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Make any change                                                                                     | `docs/patterns/00-universal.md`                                                                |
-| Design or change anything a merchant sees, decide what to build, or write copy, a claim or a status | `docs/patterns/saroh-product.md` · `PRODUCT.md`                                                |
-| Debug anything non-obvious                                                                          | `docs/architecture/DEV_LEARNINGS.md`                                                           |
-| Add a route, page, layout, component or `lib/` module in a Next app                                 | `docs/patterns/frontend-app-structure.md` · `.agents/skills/saroh-architecture/SKILL.md`       |
-| Read or write API data from a Next app, or add client or URL state                                  | `docs/patterns/frontend-data-and-state.md`                                                     |
-| Build or change a form                                                                              | `docs/patterns/frontend-forms.md`                                                              |
-| Show a toast, an error, or an empty, loading or failed state                                        | `docs/patterns/frontend-error-feedback.md` · `.agents/skills/saroh-product-states/SKILL.md`    |
-| Touch session handling, `packages/auth`, or anything that redirects to sign-in                      | `docs/patterns/frontend-error-feedback.md` · `docs/patterns/backend-auth-and-access.md`        |
-| Style anything, add a token, icon or animation, or draw on a merchant's page                        | `docs/patterns/frontend-design-system.md`                                                      |
-| Build or change merchant-facing UI in `app.saroh.in`                                                | `.agents/skills/saroh-four-scenes/SKILL.md`                                                    |
-| Call a UI change done                                                                               | `docs/patterns/frontend-verification.md` · `.agents/skills/saroh-browser-tests/SKILL.md`       |
-| Add or change an API module, controller, service, DTO or guard                                      | `docs/patterns/backend-nestjs.md` · `.agents/skills/saroh-architecture/SKILL.md`               |
-| Change `schema.prisma`, add a model, or store money                                                 | `docs/patterns/backend-data-and-money.md` · `.agents/skills/saroh-migrations/SKILL.md`         |
-| Touch roles, organization context, capability gates, entitlements or staff access                   | `docs/patterns/backend-auth-and-access.md` · `.agents/skills/saroh-module-capability/SKILL.md` |
-| Enqueue a background job, or write or register a handler                                            | `docs/patterns/backend-jobs.md`                                                                |
-| Call a payment, billing, messaging or storage provider, or receive a webhook                        | `docs/patterns/backend-integrations.md`                                                        |
-| Add an environment variable, an environment check or a feature flag                                 | `docs/patterns/devops-environments-and-flags.md`                                               |
-| Handle a credential, or find one where it should not be                                             | `docs/patterns/devops-secrets.md`                                                              |
-| Add logging, a degraded path, a health check or error tracking                                      | `docs/patterns/devops-observability.md`                                                        |
-| Change lint, TypeScript, CI, tests or dependencies, or ship the API                                 | `docs/patterns/devops-tooling-and-deploy.md`                                                   |
+| When you are about to…                                                                                     | Read first                                                                                     |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Make any change                                                                                            | `docs/patterns/00-universal.md`                                                                |
+| Design or change anything a merchant sees, decide what to build, or write copy, a claim or a status        | `docs/patterns/saroh-product.md` · `PRODUCT.md`                                                |
+| Debug anything non-obvious                                                                                 | `docs/architecture/DEV_LEARNINGS.md`                                                           |
+| Add a route, page, layout, component or `lib/` module in a Next app                                        | `docs/patterns/frontend-app-structure.md` · `.agents/skills/saroh-architecture/SKILL.md`       |
+| Read or write API data from a Next app, or add client or URL state                                         | `docs/patterns/frontend-data-and-state.md`                                                     |
+| Build or change a form                                                                                     | `docs/patterns/frontend-forms.md`                                                              |
+| Show a toast, an error, or an empty, loading or failed state                                               | `docs/patterns/frontend-error-feedback.md` · `.agents/skills/saroh-product-states/SKILL.md`    |
+| Touch session handling, `packages/auth`, or anything that redirects to sign-in                             | `docs/patterns/frontend-error-feedback.md` · `docs/patterns/backend-auth-and-access.md`        |
+| Style anything, add a token, icon or animation, or draw on a merchant's page                               | `docs/patterns/frontend-design-system.md`                                                      |
+| Build or change merchant-facing UI in `app.saroh.in`                                                       | `.agents/skills/saroh-four-scenes/SKILL.md`                                                    |
+| Call a UI change done                                                                                      | `docs/patterns/frontend-verification.md` · `.agents/skills/saroh-browser-tests/SKILL.md`       |
+| Add or change an API module, controller, service, DTO or guard                                             | `docs/patterns/backend-nestjs.md` · `.agents/skills/saroh-architecture/SKILL.md`               |
+| Change `schema.prisma`, add a model, or store money                                                        | `docs/patterns/backend-data-and-money.md` · `.agents/skills/saroh-migrations/SKILL.md`         |
+| Touch roles, membership, invitations, organization context, capability gates, entitlements or staff access | `docs/patterns/backend-auth-and-access.md` · `.agents/skills/saroh-module-capability/SKILL.md` |
+| Enqueue a background job, or write or register a handler                                                   | `docs/patterns/backend-jobs.md`                                                                |
+| Call a payment, billing, messaging or storage provider, or receive a webhook                               | `docs/patterns/backend-integrations.md`                                                        |
+| Add an environment variable, an environment check or a feature flag                                        | `docs/patterns/devops-environments-and-flags.md`                                               |
+| Handle a credential, or find one where it should not be                                                    | `docs/patterns/devops-secrets.md`                                                              |
+| Add logging, a degraded path, a health check or error tracking                                             | `docs/patterns/devops-observability.md`                                                        |
+| Change lint, TypeScript, CI, tests or dependencies, or ship the API                                        | `docs/patterns/devops-tooling-and-deploy.md`                                                   |
 
 ## Before you finish
 

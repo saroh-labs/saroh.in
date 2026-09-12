@@ -6,6 +6,9 @@ jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
         form: { findUnique: jest.fn() },
+        // #281: the live publication's fields are looked up before Form.fields.
+        // No live site by default, so these tests validate against Form.fields.
+        site: { findMany: jest.fn().mockResolvedValue([]) },
         submission: { findUnique: jest.fn(), create: jest.fn() },
         contact: { upsert: jest.fn() },
         pipeline: {

@@ -1,7 +1,8 @@
 import { PageHeader } from "@saroh/ui/page-header";
-import { Blocks, Building2, Plug, UserCog } from "lucide-react";
+import { Blocks, Building2, Plug, UserCog, Users } from "lucide-react";
 import Link from "next/link";
 
+import { PageContainer } from "@/components/shared/page-container";
 import { accountsUrl } from "@/lib/accounts";
 import { requireSession } from "@/lib/session";
 
@@ -25,6 +26,13 @@ const SECTIONS = [
         icon: Building2,
     },
     {
+        href: "/settings/people",
+        label: "People",
+        description:
+            "Who can reach this workspace, and what each of them may do.",
+        icon: Users,
+    },
+    {
         href: "/settings/modules",
         label: "Modules",
         description: "Turn the capabilities your business needs on or off.",
@@ -43,7 +51,7 @@ export default async function SettingsPage() {
     await requireSession();
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        <PageContainer>
             <PageHeader
                 title="Settings"
                 description="Configure this organization. Your personal sign-in details live in your Saroh account."
@@ -85,6 +93,6 @@ export default async function SettingsPage() {
                     </span>
                 </a>
             </div>
-        </main>
+        </PageContainer>
     );
 }

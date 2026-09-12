@@ -6,8 +6,12 @@ import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
+import { navRoleCan } from "@/components/shared/nav-items";
+import { PageContainer } from "@/components/shared/page-container";
 import { env } from "@/env";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { pendingChangeCount } from "@/lib/sites/pending";
 import type { SiteSummary } from "@/lib/sites/service";
 import { listSites } from "@/lib/sites/service";
 
@@ -50,7 +54,12 @@ function siteState(site: SiteSummary): {
      * The fallback without a number covers the case where something is waiting
      * but no section differs: real, and not worth inventing a count for.
      */
-    const pending = site.pendingSectionChanges ?? 0;
+    // Sections plus site-level settings (#282), the same things the editor bar
+    // and settings screen describe.
+    const pending = pendingChangeCount(
+        site.pendingSectionChanges,
+        site.pendingSiteChanges,
+    );
     if (pending > 0) {
         return {
             label: `Live · ${pending} thing${pending === 1 ? "" : "s"} to look at`,
@@ -77,15 +86,51 @@ export const metadata = { title: "Website" };
 export default async function SitesPage() {
     await requireSession();
 
-    const sites = await listSites();
+    // Concurrent: the list does not depend on the role, and the role is only
+    // needed to decide what this screen may CLAIM.
+    const [sites, organization] = await Promise.all([
+        listSites(),
+        resolveActiveOrganization(),
+    ]);
+    const role = organization?.role ?? null;
+    const mayCreate = navRoleCan(role, "site:create");
+
+    /*
+     * Three roles reach this list and it said the same thing to all of them.
+     *
+     * "Websites you publish for this organization", above a New site button, is
+     * true for an owner and an over-claim for everyone else: a MEMBER publishes
+     * nothing, and a REVIEWER is looking at one site they were invited to, not
+     * at a business's web presence (#313). The list itself is already narrowed
+     * for them — this is the sentence above it catching up.
+     */
+    const description = mayCreate
+        ? "Websites you publish for this organization."
+        : role === "REVIEWER"
+          ? "Websites you were asked to look at."
+          : "Websites this organization publishes.";
+
+    const nothingHere =
+        role === "REVIEWER"
+            ? {
+                  title: "Nothing to review yet",
+                  description:
+                      "A website appears here when someone asks you to look at it.",
+              }
+            : {
+                  title: "No sites yet",
+                  description: mayCreate
+                      ? "Create your first site to start editing and previewing sections."
+                      : "An owner or admin creates the first one.",
+              };
 
     return (
-        <main className="mx-auto max-w-5xl p-8">
+        <PageContainer>
             <PageHeader
                 title="Your sites"
-                description="Websites you publish for this organization."
+                description={description}
                 actions={
-                    sites.length > 0 ? (
+                    sites.length > 0 && mayCreate ? (
                         <Button asChild variant="brand">
                             <Link href="/sites/new">New site</Link>
                         </Button>
@@ -95,12 +140,14 @@ export default async function SitesPage() {
 
             {sites.length === 0 ? (
                 <EmptyState
-                    title="No sites yet"
-                    description="Create your first site to start editing and previewing sections."
+                    title={nothingHere.title}
+                    description={nothingHere.description}
                     action={
-                        <Button asChild variant="brand">
-                            <Link href="/sites/new">Create a site</Link>
-                        </Button>
+                        mayCreate ? (
+                            <Button asChild variant="brand">
+                                <Link href="/sites/new">Create a site</Link>
+                            </Button>
+                        ) : undefined
                     }
                 />
             ) : (
@@ -169,6 +216,6 @@ export default async function SitesPage() {
                     })}
                 </div>
             )}
-        </main>
+        </PageContainer>
     );
 }

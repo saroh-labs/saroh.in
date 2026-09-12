@@ -265,6 +265,22 @@ describe("SitesService.getSite", () => {
 
     beforeEach(() => jest.clearAllMocks());
 
+    it.each([
+        ["OWNER", true],
+        ["ADMIN", true],
+        ["MEMBER", false],
+        ["REVIEWER", false],
+    ] as const)(
+        "reports draft edit permission for %s",
+        async (role, canEdit) => {
+            siteFindFirst.mockResolvedValue({ id: "site_1", pages: [] });
+            (prisma.site.findMany as jest.Mock).mockResolvedValue([]);
+            await expect(
+                service.getSite(ctx({ role }), "site_1"),
+            ).resolves.toMatchObject({ canEdit });
+        },
+    );
+
     it("returns 404 for a site in another org (cross-tenant read)", async () => {
         siteFindFirst.mockResolvedValue(null);
 

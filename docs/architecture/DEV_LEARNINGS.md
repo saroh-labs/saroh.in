@@ -132,3 +132,176 @@ no-op that resolved, so the worker completed each job.
 type to a registered handler and lists the gaps still open. The handler itself
 is still unwritten.
 **Category**: jobs
+
+## App — a role denial reads "turned off" in the gate, and "try again" in production (#274)
+
+**Problem**: A MEMBER opening a website page was told "Website is not switched
+on for this organization", which was false. Where a 403 did reach an error
+boundary, `next dev` showed "You do not have access to this" while a
+production build showed "Couldn't load this — try again".
+**Root cause**: Two separate causes.
+
+- `ModuleGate` rendered `CapabilityOffState` for every `DISABLED` readiness, and
+  a failed authorization gate also makes a module `DISABLED`. WEBSITE's
+  `requiredAction` was `site:update`, so every read-only role failed it; under
+  `MODULE_ENFORCEMENT` the same gate 404s every sites route for them.
+- `SectionError` found the status by parsing the thrown `ApiError`'s message,
+  which Next replaces with a digest for server errors in production. The parse
+  returned null, and the denial rendered as a failure.
+
+**Fix**:
+
+- WEBSITE gates on `site:read`.
+- `ModuleGate` renders `AccessDenied` for an `UNAUTHORIZED` blocker.
+- `getJson` calls `forbidden()` on a 403 (`experimental.authInterrupts`), caught
+  by `forbidden.tsx` in `(shell)`, `(editor)` and the app root.
+- Required Settings reads propagate permission interrupts and server failures.
+- Site detail reports `canEdit` from server policy. Read-only roles get a site
+  overview and review notes without requesting a draft, which requires write access.
+- `module-enforcement.roles.spec.ts` runs the guard per role with the real
+  availability service, which the stubbed guard spec never could.
+
+Check a denial in `next build && next start`, not only in dev.
+**Category**: auth · rules in `docs/patterns/frontend-error-feedback.md` and
+`.agents/skills/saroh-module-capability`
+
+## Local dev — an OWNER sees the read-only site view after a test run
+
+**Problem**: With `pnpm dev` running, the site editor showed an OWNER "You can
+view this site. Editing and publishing are limited to owners and admins."
+`tsc` was clean, and the service returned `canEdit: true` in its spec.
+**Root cause**: `pnpm --filter @saroh/e2e test:permissions` runs
+`turbo run build`, which rebuilds `@saroh/database`'s `dist`. The API's dev
+watcher recompiled mid-rebuild, reported missing exports from
+`@saroh/database`, and kept serving its previous build, from before `canEdit`
+existed. The field came back `undefined`, which the editor page treats as
+read-only. Touching a source file did not trigger a recompile.
+**Fix**: Restart `pnpm dev` after anything that rebuilds a workspace package's
+`dist`. If the watcher's last line is "Found N errors" while `tsc --noEmit`
+passes, the API is running an old build.
+**Category**: local dev · note in `docs/patterns/frontend-error-feedback.md`
+
+## Sites — draft HTML ran in the editor, and highlights vanished at publish (#280)
+
+**Problem**: Two symptoms at the same boundary.
+
+- Rich text saved through `PUT …/draft/sections` rendered raw in the editor
+  preview on app.saroh.in, event handlers included.
+- A merchant's highlighted words showed in the editor and were gone on the
+  live site.
+
+**Root cause**: The sanitizer ran only at publish. The public renderer reads
+only snapshots, so it was safe, but the editor preview renders the DRAFT
+through the same `RichTextSection`, whose own comment said never to feed it
+unsnapshotted HTML. Separately, the allowlist had no `<mark>`, which is what
+Tiptap's Highlight renders, and it kept `style` with any CSS property. So
+highlights were stripped, and `position: fixed` was not.
+
+**Fix**:
+
+- `sanitize.ts` runs on save (`replaceDraftSections`, `updateFooter`), on the
+  editor's load (`getPageDraft`) and at publish.
+- The allowlist keeps `<mark>`, table cell spans, and only the CSS properties
+  the editor writes. It forces `rel="noopener noreferrer"` on targeted links.
+- Button links are refused unless they are `http`, `https`, `mailto`, `tel` or
+  a path, checked with control characters stripped first; `ctaHref` repeats
+  the check for stored content.
+
+An editor extension that writes a new CSS property needs it added to
+`allowedStyles`, or its formatting disappears on save.
+**Category**: security · rules in `sanitize.ts`, `sanitize.spec.ts` and
+`packages/block-contract/src/links.test.ts`
+
+## Enquiry — the live form refuses visitors after a draft edit (#281)
+
+**Problem**: After a merchant added a required field to an enquiry section and
+kept editing, visitors submitting the form on the live site got
+`Field "budget" is required`, for a field their form did not have. Nothing was
+published, and the merchant saw no error.
+**Root cause**: The live site draws the form from its publication snapshot and
+posts to the section's `formId`. The public submit validated against
+`Form.fields`, and the site editor PATCHes those fields on every autosave to
+keep the Form in step with the draft. The one draft edit that reached the
+public was validation.
+**Fix**: `EnquiryService` validates against the fields in the current
+publication's enquiry section for that `formId`, falling back to `Form.fields`
+only when no live publication carries the form (`live-form-fields.ts`).
+Publishing switches the fields, and restoring switches them back. The editor
+now stamps only new formIds onto current state, instead of overwriting typing
+done during the sync.
+**Category**: enquiry · rule in `docs/patterns/backend-data-and-money.md`
+
+## Sites — restoring a version went live past a change request unrecorded (#279)
+
+**Problem**: A reviewer asked for changes. The merchant restored last week's
+version from version history instead of publishing, and nothing, neither
+version history nor the approval record, said the site had gone live past the
+request.
+**Root cause**: #199 added the bypass record to `publishSite` only.
+`restorePublication` also appends a Publication and repoints the site, which is
+a publish by effect, but it never called `reviewOutstanding`.
+**Fix**: `restorePublication` reads `reviewOutstanding` and appends a
+`BYPASSED` approval linked to the restored publication, inside the same
+transaction. Version history already marks bypass rows by `publicationId`, and
+the restore confirm now says a change request is outstanding before it
+happens. Any new path that repoints `Site.currentPublicationId` must do the
+same.
+**Category**: sites · tests in `sites-editing.service.spec.ts`
+
+## Sites — a changed search title reads "the live site matches your draft" (#282)
+
+**Problem**: After changing only the site's search title, share image, style,
+menu, footer or a page name, the settings screen said "Nothing — the live site
+matches your draft". The editor bar showed no pending work, the sites list read
+"Live", and publishing was the only way the change would reach Google.
+**Root cause**: `countPendingSectionChanges` diffed sections only, and every
+surface trusted it. The snapshot carries far more than sections.
+Separately, the unpublished-changes flag compared timestamps, and saving a
+section never bumps `PageVersion.updatedAt`. Style autosave was not part of the
+check that disables Publish, and it had no in-flight guard.
+**Fix**: The pending count loads the site with `draftSiteSelect`, builds the
+site block with `buildSnapshot` (lenient, so it can never throw) and diffs it
+against the live snapshot into `SITE_CHANGE_KINDS`. It is returned as
+`pendingSiteChanges` beside the section count and described through
+`lib/sites/pending.ts`. The flag reads the same diff. Publish waits on an
+unsaved style, and style saves run one at a time. A new snapshot field a
+merchant can change needs a kind, or it goes uncounted.
+**Category**: sites · tests in `pending-site-changes.spec.ts`
+
+## Sites — anyone who could list share links could open the draft (#284)
+
+**Problem**: A MEMBER cannot load a site's draft, but opening Review, listing
+the share links and following one showed it to them anyway. A revoked link that
+a reviewer already had open went blank on their next click.
+**Root cause**: `SitePreviewLinksService.list` returned the raw `token` to any
+`site:read` role, and tokens were stored in plaintext, so every row was a
+working link. Separately, the three preview pages returned `null` when the link
+was gone. Only the layout explained why, and Next keeps a layout mounted
+across navigation inside it.
+**Fix**: Only `tokenHash` (SHA-256 hex) is stored; migration
+`20260911120000_preview_link_token_hash` hashes existing rows in place with the
+same function. The raw token is returned once, from `create`, and lookups hash
+what the visitor presents. `PreviewGone` is shared and rendered by every
+preview page. The share-link UI keeps this session's addresses and says older
+ones were shown once.
+**Category**: security · tests in `site-preview-links.service.spec.ts`
+
+## API — "false" settles a note: implicit conversion and inline body types (#286)
+
+**Problem**: `PATCH …/comments/:id` with `{"resolved": "true"}` reopened a note
+instead of being refused. The obvious fix, a DTO with `@IsBoolean()`, would
+have made `{"resolved": "false"}` settle it.
+**Root cause**: Two layers.
+
+- The handler took `@Body() dto: { resolved?: boolean }`. An inline type
+  reflects as `Object`, and `ValidationPipe` skips validation for `Object`.
+- The pipe's `enableImplicitConversion` converts a value to the declared
+  property type BEFORE validators run, and a boolean conversion is truthiness.
+  Any string, `"false"` included, becomes `true` and then passes
+  `@IsBoolean()`.
+
+**Fix**: `SetCommentResolvedDto` reads the raw value with
+`@Transform(({ obj }) => obj.resolved)` ahead of `@IsBoolean()`. The pipe's
+options moved to `common/validation.ts` so `dto.validation.spec.ts` validates
+through exactly what `main.ts` applies.
+**Category**: api · rule in `docs/patterns/backend-nestjs.md`

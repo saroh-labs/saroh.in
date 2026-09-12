@@ -25,6 +25,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import {
+    hashPreviewToken,
     previewLinkState,
     SitePreviewLinksService,
 } from "./site-preview-links.service";
@@ -56,7 +57,6 @@ const service = new SitePreviewLinksService({
 const DAY = 24 * 60 * 60 * 1000;
 const row = (over: Partial<Record<string, unknown>> = {}) => ({
     id: "link_1",
-    token: "tok",
     createdAt: new Date("2026-09-04T10:00:00Z"),
     expiresAt: new Date(Date.now() + 7 * DAY),
     revokedAt: null,
@@ -94,9 +94,7 @@ describe("previewLinkState", () => {
 describe("SitePreviewLinksService.create", () => {
     it("mints an unguessable token that expires when the sharer chose", async () => {
         linkCreate.mockImplementation(({ data }) =>
-            Promise.resolve(
-                row({ token: data.token, expiresAt: data.expiresAt }),
-            ),
+            Promise.resolve(row({ expiresAt: data.expiresAt })),
         );
         const before = Date.now();
         const view = await service.create(OWNER, "site_1", {
@@ -107,8 +105,12 @@ describe("SitePreviewLinksService.create", () => {
         expect(data.siteId).toBe("site_1");
         expect(data.organizationId).toBe("org_1");
         expect(data.createdByUserId).toBe("user_1");
-        // 32 bytes, base64url: 43 characters, no padding, path-safe.
-        expect(data.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+        // 32 bytes, base64url: 43 characters, no padding, path-safe. Returned
+        // to the creator once; only its hash is stored (#284).
+        expect(view.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+        expect(data).not.toHaveProperty("token");
+        expect(data.tokenHash).toMatch(/^[0-9a-f]{64}$/);
+        expect(data.tokenHash).toBe(hashPreviewToken(view.token));
         // Seven days from the moment the service read its clock, which is at
         // or after `before` — so at least 7 days from here, and not more
         // than a minute over. The first version asserted "<= 7" against a
@@ -153,6 +155,21 @@ describe("SitePreviewLinksService.list", () => {
             organizationId: "org_1",
         });
     });
+
+    it.each([
+        ["an OWNER", OWNER],
+        ["a MEMBER", MEMBER],
+    ])(
+        "gives %s no token, because none is stored (#284)",
+        async (_label, ctx) => {
+            linkFindMany.mockResolvedValue([row({ id: "a" })]);
+            const views = await service.list(ctx, "site_1");
+            expect(views[0]).not.toHaveProperty("token");
+            const { select } = linkFindMany.mock.calls[0][0];
+            expect(select).not.toHaveProperty("token");
+            expect(select).not.toHaveProperty("tokenHash");
+        },
+    );
 });
 
 describe("SitePreviewLinksService.revoke", () => {
@@ -172,6 +189,15 @@ describe("SitePreviewLinksService.revoke", () => {
             service.revoke(OWNER, "site_1", "link_x"),
         ).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it("is the owner's call: a MEMBER is refused before any I/O", async () => {
+        await expect(
+            service.revoke(MEMBER, "site_1", "link_1"),
+        ).rejects.toThrow();
+        expect(siteFindFirst).not.toHaveBeenCalled();
+        expect(linkFindFirst).not.toHaveBeenCalled();
+        expect(linkUpdate).not.toHaveBeenCalled();
+    });
 });
 
 describe("SitePreviewLinksService.resolve (public)", () => {
@@ -188,6 +214,11 @@ describe("SitePreviewLinksService.resolve (public)", () => {
         linkUpdate.mockResolvedValue({ id: "link_1" });
 
         const view = await service.resolve("tok");
+
+        // Looked up by the hash of what the visitor presented (#284).
+        expect(linkFindUnique.mock.calls[0][0].where).toEqual({
+            tokenHash: hashPreviewToken("tok"),
+        });
 
         expect(loadDraftSite.mock.calls[0][0]).toEqual({
             id: "site_1",

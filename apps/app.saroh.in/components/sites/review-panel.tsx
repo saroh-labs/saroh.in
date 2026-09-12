@@ -2,13 +2,22 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError } from "@saroh/ui/toast";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
 import { PreviewLinks } from "@/components/sites/preview-links";
-import { setCommentResolved } from "@/lib/sites/actions";
+import {
+    createApproval,
+    requestReview,
+    setCommentResolved,
+} from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
-import type { SiteCommentView, SitePage } from "@/lib/sites/service";
+import type {
+    ReviewerVerdict,
+    ReviewState,
+    SiteCommentView,
+    SitePage,
+} from "@/lib/sites/service";
 
 /**
  * The rail's Review tab (#193).
@@ -26,18 +35,122 @@ export function ReviewPanel({
     siteId,
     pages,
     comments,
+    review,
     onChanged,
     onJump,
 }: {
     siteId: string;
     pages: SitePage[];
     comments: SiteCommentView[];
-    /** Re-read after a note changes, so the counts and dots follow. */
+    /** The site's standing with its reviewers: pending, stale, latest verdict. */
+    review: ReviewState;
+    /** Re-read after a note, a verdict or a request, so the bar follows. */
     onChanged: () => void;
     onJump: (pageId: string, sectionKey: string) => void;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [showResolved, setShowResolved] = useState(false);
+    const [recording, setRecording] = useState(false);
+    const [asking, setAsking] = useState(false);
+
+    /**
+     * Say what you think (#277). The api gates both on `site:approve`, which
+     * OWNER, ADMIN and REVIEWER hold.
+     *
+     * Neither verdict changes what the public sees: approving does not
+     * publish, and asking for changes does not block a publish — it is
+     * recorded, and publishing over it is recorded as a bypass (#199).
+     */
+    async function record(outcome: ReviewerVerdict) {
+        setRecording(true);
+        const res = await createApproval(siteId, outcome);
+        setRecording(false);
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        showSuccess(
+            outcome === "APPROVED"
+                ? "Marked as approved."
+                : "Recorded that you asked for changes.",
+        );
+        onChanged();
+    }
+
+    /**
+     * Ask for a review (#278).
+     *
+     * The act the model was missing: until this existed, a review nobody had
+     * answered could not be expressed, so "waiting on someone" and "nobody was
+     * asked" looked identical. It blocks nothing — publishing while it stands
+     * still works, and is recorded as a bypass.
+     */
+    async function ask() {
+        setAsking(true);
+        const res = await requestReview(siteId);
+        setAsking(false);
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        showSuccess("Asked for a review. Share a preview so they can read it.");
+        onChanged();
+    }
+
+    const verdict = (
+        <div className="flex gap-2 border-b px-3 py-2">
+            <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                disabled={recording}
+                onClick={() => void record("APPROVED")}
+            >
+                Approve
+            </Button>
+            <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                disabled={recording}
+                onClick={() => void record("CHANGES_REQUESTED")}
+            >
+                Ask for changes
+            </Button>
+        </div>
+    );
+
+    const askForReview = (
+        <div className="border-b px-3 py-2">
+            {review.pending ? (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                    In review. Publishing still works — it is recorded as going
+                    ahead without approval.
+                </p>
+            ) : (
+                <>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        disabled={asking}
+                        onClick={() => void ask()}
+                    >
+                        {asking ? "Asking…" : "Ask for a review"}
+                    </Button>
+                    {review.approvalIsStale ? (
+                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                            This site was approved, and has been edited since.
+                            The approval does not cover the changes.
+                        </p>
+                    ) : null}
+                </>
+            )}
+        </div>
+    );
 
     const open = comments.filter((c) => c.resolvedAt === null);
     const shown = showResolved ? comments : open;
@@ -61,6 +174,8 @@ export function ReviewPanel({
         return (
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
                 <PreviewLinks siteId={siteId} />
+                {verdict}
+                {askForReview}
                 {/*
                  * The design's empty state, which states the whole feature in
                  * one sentence. Until #198 it described an action that did
@@ -68,10 +183,16 @@ export function ReviewPanel({
                  * a merchant would form the plan and then fail to find the
                  * button. The control now sits directly above this sentence.
                  */}
+                {/*
+                 * Every action this sentence names now exists: share a preview
+                 * above, leave a note under a selected section, and the two
+                 * verdict buttons. Until #277 the note half described nothing
+                 * — the api took notes and no screen ever posted one.
+                 */}
                 <p className="p-4 text-xs leading-relaxed text-muted-foreground">
                     No notes on this site yet. Share a preview above so people
-                    can read the draft; anyone with the Reviewer role can pin
-                    notes to sections from this editor.
+                    can read the draft. Select a section to leave a note on it,
+                    and say here whether the site is good to go.
                 </p>
             </div>
         );
@@ -88,12 +209,31 @@ export function ReviewPanel({
     // A note whose page is gone entirely — rarer than an orphaned section, but
     // the same rule applies: it does not disappear.
     const pageIds = new Set(pages.map((p) => p.id));
-    const strays = shown.filter((c) => !pageIds.has(c.pageId));
+    // Null since #277: deleting a page now leaves its notes behind rather than
+    // deleting them with it.
+    const strays = shown.filter(
+        (c) => c.pageId === null || !pageIds.has(c.pageId),
+    );
 
+    /*
+     * ONE scroller for the whole panel, which is what the empty state above
+     * already does.
+     *
+     * This column held four fixed blocks — the share links, the verdict, the
+     * ask-for-review prompt, the counts row — above a notes list that was the
+     * only thing allowed to scroll. Flex children shrink; their CONTENT does
+     * not, so once the four were taller than the pane the panel overflowed it
+     * and painted over the fields panel below. On a phone, where the rail gets
+     * a third of the screen, "Create link" ended up drawn on top of another
+     * pane and could not be clicked at all — the browser flow in
+     * `e2e/tests/site-review.spec.ts` failed on exactly that.
+     */
     return (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <PreviewLinks siteId={siteId} />
-            <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+            {verdict}
+            {askForReview}
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
                 <span className="text-xs text-muted-foreground">
                     {open.length === 0
                         ? "Nothing open"
@@ -112,7 +252,7 @@ export function ReviewPanel({
                 ) : null}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            <div className="min-h-0 flex-1 p-2">
                 {groups.map(({ page, notes }) => (
                     <section key={page.id} className="mb-4">
                         <h3 className="px-1 pb-1 text-[0.625rem] uppercase tracking-[0.08em] text-muted-foreground">
@@ -167,6 +307,9 @@ function Note({
     onJump: (pageId: string, sectionKey: string) => void;
 }) {
     const settled = note.resolvedAt !== null;
+    // A local const narrows where the property access does not: the page is
+    // null once it has been deleted (#277).
+    const pageId = note.pageId;
     return (
         <li
             className={cn(
@@ -196,18 +339,22 @@ function Note({
                  * nothing would read as broken.
                  */
                 <p className="mt-1.5 text-[0.625rem] leading-relaxed text-muted-foreground/70">
-                    The section this was about is no longer on the page.
+                    {note.pageId === null
+                        ? note.pageTitle === null
+                            ? "The page this was about has been deleted."
+                            : `The page this was about, ${note.pageTitle}, has been deleted.`
+                        : "The section this was about is no longer on the page."}
                 </p>
             ) : null}
 
             <div className="mt-2 flex items-center gap-1">
-                {note.orphaned ? null : (
+                {note.orphaned || pageId === null ? null : (
                     <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         className="h-6 px-1.5 text-[0.6875rem]"
-                        onClick={() => onJump(note.pageId, note.sectionKey)}
+                        onClick={() => onJump(pageId, note.sectionKey)}
                     >
                         Go to section
                     </Button>

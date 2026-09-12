@@ -109,15 +109,25 @@ describe("ModuleAvailabilityService", () => {
 
     it("links OWNER to Settings when the module is disabled, but not MEMBER", async () => {
         const owner = await build({ installed: false }).service.evaluate(base);
-        const orgDisabled = owner.blockers.find(
+        const ownerBlocker = owner.blockers.find(
             (b) => b.code === "ORG_MODULE_DISABLED",
         );
-        expect(orgDisabled?.actionHref).toBe("/settings/modules");
-
-        // A MEMBER would be UNAUTHORIZED before ORG_MODULE_DISABLED, so use a
-        // module a MEMBER is authorized to read: none in v1 have a MEMBER-level
-        // requiredAction, so assert the OWNER href gating via canManage instead.
         expect(owner.blockers[0].code).toBe("ORG_MODULE_DISABLED");
+        expect(ownerBlocker?.actionHref).toBe("/settings/modules");
+
+        // WEBSITE is gated on site:read, which a MEMBER holds, so a MEMBER
+        // gets past authorization to the same ORG_MODULE_DISABLED gate. They
+        // are not offered a link to a settings page they cannot use.
+        const member = await build({ installed: false }).service.evaluate({
+            ...base,
+            moduleKey: "WEBSITE",
+            organizationRole: "MEMBER",
+        });
+        const memberBlocker = member.blockers.find(
+            (b) => b.code === "ORG_MODULE_DISABLED",
+        );
+        expect(member.blockers[0].code).toBe("ORG_MODULE_DISABLED");
+        expect(memberBlocker?.actionHref).toBeUndefined();
     });
 
     it("blocks PROJECT_MODULE_UNSELECTED when a Project has not selected it", async () => {
@@ -128,5 +138,34 @@ describe("ModuleAvailabilityService", () => {
             (b) => b.code === "PROJECT_MODULE_UNSELECTED",
         );
         expect(blocker?.actionHref).toBe("/projects/proj_1/settings/modules");
+    });
+
+    describe("WEBSITE and the read-only roles (#274)", () => {
+        it.each(["MEMBER", "REVIEWER"] as const)(
+            "authorizes a %s, who may read a site",
+            async (role) => {
+                const { service } = build({});
+                const r = await service.evaluate({
+                    ...base,
+                    moduleKey: "WEBSITE",
+                    organizationRole: role,
+                });
+                expect(r.authorized).toBe(true);
+                expect(r.blockers.map((b) => b.code)).not.toContain(
+                    "UNAUTHORIZED",
+                );
+                expect(r.readiness).not.toBe("DISABLED");
+            },
+        );
+
+        it("still refuses a REVIEWER every module that is not the website", async () => {
+            const { service } = build({});
+            const r = await service.evaluate({
+                ...base,
+                organizationRole: "REVIEWER",
+            });
+            expect(r.authorized).toBe(false);
+            expect(r.blockers[0].code).toBe("UNAUTHORIZED");
+        });
     });
 });

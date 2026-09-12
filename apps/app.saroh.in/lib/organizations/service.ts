@@ -10,7 +10,12 @@ import { apiFetch, getActiveOrgId } from "@/lib/api/http";
  * Server-only: imports next/headers (via the shared HTTP plumbing).
  */
 
-export type OrganizationRole = "OWNER" | "ADMIN" | "MEMBER";
+/**
+ * REVIEWER joined the set in #276: website-only, and narrowed further to the
+ * sites it was invited to. The API is the authority — this type exists so the
+ * UI can name a role, not decide one.
+ */
+export type OrganizationRole = "OWNER" | "ADMIN" | "MEMBER" | "REVIEWER";
 
 /** A membership row as returned by GET /organizations. */
 export interface Organization {
@@ -36,8 +41,7 @@ export interface CreateOrganizationInput {
 
 /** Discriminated result so the UI can surface field errors inline. */
 export type OrganizationResult<T> =
-    | { ok: true; data: T }
-    | { ok: false; error: string; field?: "name" };
+    { ok: true; data: T } | { ok: false; error: string; field?: "name" };
 
 /**
  * The caller's organizations with their role. Empty on ANY failure — this

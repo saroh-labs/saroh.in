@@ -3,11 +3,12 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
+        "build": "next build",
         "dev": "portless app.saroh next dev",
         "dev:app": "next dev",
-        "build": "next build",
-        "start": "next start",
         "lint": "eslint .",
+        "start": "next start",
+        "test": "vitest run",
         "typecheck": "tsc --noEmit"
     },
     "portless": "app.saroh",
@@ -93,6 +94,7 @@
         "prettier-plugin-tailwindcss": "^0.8.1",
         "tailwindcss": "catalog:",
         "tailwindcss-animate": "^1.0.7",
-        "typescript": "catalog:"
+        "typescript": "catalog:",
+        "vitest": "^4.1.11"
     }
 }

@@ -5,6 +5,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    ServiceUnavailableException,
 } from "@nestjs/common";
 import type { AdminAccessSession } from "@saroh/database";
 import { prisma } from "@saroh/database";
@@ -347,6 +348,15 @@ export class AdminAccessService {
             this.logger.error(
                 `UNRECORDED DENIAL of Organization support access ` +
                     `(actor=${input.actorUserId} session=${input.targetId ?? "?"}): ${message}`,
+            );
+            // Fail closed. A log line is not the ledger: if the denial cannot be
+            // written down, the caller must not receive a clean 403 that looks
+            // like a normally-audited refusal. Surfacing 503 keeps the request
+            // refused AND makes the audit outage visible to the caller and to
+            // anything watching error rates, rather than leaving an incident
+            // whose only trace is a line in a log nobody is grepping.
+            throw new ServiceUnavailableException(
+                "Organization access denial could not be audited",
             );
         }
     }

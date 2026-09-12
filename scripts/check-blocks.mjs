@@ -191,6 +191,19 @@ const SITE_LAYER_ALLOWED = new Set([
     // merchant's page ground and the selection outlines around each block, and
     // delegates every block to @saroh/site-blocks rather than drawing one.
     "apps/app.saroh.in/components/sites/section-preview.tsx",
+    // Version history's preview of a past version (#283). The same category as
+    // the editor's frame directly above: it supplies the merchant's page ground
+    // — in the palette THAT version was published with, read from its snapshot —
+    // and hands every section to PageSections. It draws no block of its own,
+    // which is the point: a past version has to be shown by the renderer that
+    // served it, or the preview is a second opinion about what went live.
+    "apps/app.saroh.in/components/sites/past-version-preview.tsx",
+    // The reviewer's read of the draft (#275). Same category again: it gives
+    // each section the merchant's page ground to sit on, in the merchant's
+    // palette, and hands the section itself to PageSections. Drawing a block
+    // here would put a reviewer's notes on a rendering the live site never
+    // makes, which is the whole failure #189 was.
+    "apps/app.saroh.in/components/sites/section-review.tsx",
 ]);
 
 /**

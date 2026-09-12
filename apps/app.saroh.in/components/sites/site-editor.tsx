@@ -29,6 +29,7 @@ import type { ServiceOption } from "@/components/sites/section-fields";
 import { SectionFields } from "@/components/sites/section-fields";
 import { SectionPadding } from "@/components/sites/section-fields/padding";
 
+import { NoteComposer } from "@/components/sites/note-composer";
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
 import { ReviewPanel } from "@/components/sites/review-panel";
@@ -60,7 +61,10 @@ import {
     subscribe,
 } from "@/lib/sites/editor-prefs";
 import { exactDate } from "@/lib/sites/format-date";
+import type { SiteChangeKind } from "@/lib/sites/pending";
+import { describePendingChanges } from "@/lib/sites/pending";
 import type {
+    ApprovalOutcome,
     Flag,
     ReviewState,
     Section,
@@ -70,6 +74,43 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+
+/**
+ * The bar's verdict badge, worded per outcome. Keyed by the union so a new
+ * outcome is a type error here rather than a badge that falls through to
+ * "asked for changes". Only an approval takes the accent: it is the one
+ * good-news verdict.
+ *
+ * `stale` is whether the newest approval was of a different draft than the one
+ * that would go live now (#278). #193: an approval "does not survive later
+ * edits to that draft" — so the badge must not keep claiming it does, and an
+ * approval that no longer covers the work does not keep the accent either.
+ */
+const APPROVAL_BADGE: Record<
+    ApprovalOutcome,
+    {
+        approved: (stale: boolean) => boolean;
+        text: (by: string, stale: boolean) => string;
+    }
+> = {
+    REQUESTED: {
+        approved: () => false,
+        text: (by) => `In review — asked by ${by}`,
+    },
+    APPROVED: {
+        approved: (stale) => !stale,
+        text: (by, stale) =>
+            stale ? `Approved by ${by}, then edited` : `Approved by ${by}`,
+    },
+    CHANGES_REQUESTED: {
+        approved: () => false,
+        text: (by) => `${by} asked for changes`,
+    },
+    BYPASSED: {
+        approved: () => false,
+        text: (by) => `Published without approval by ${by}`,
+    },
+};
 
 /**
  * SiteEditor (S2-004) — the ticket's core deliverable. A client-side editable
@@ -86,9 +127,12 @@ export function SiteEditor({
     initialFlags,
     initialComments,
     initialReview,
-    neverPublished,
+    neverPublished: initialNeverPublished,
+    unreadableSections,
     initialPendingChanges,
+    initialPendingSiteChanges,
     initialSections,
+    initialRevision,
     siteName,
     address,
     initialStyle,
@@ -104,13 +148,28 @@ export function SiteEditor({
     initialComments: SiteCommentView[];
     initialReview: ReviewState;
     /** Never-published sites say "Publish site", not "Publish changes". */
+    /**
+     * Whether anything has ever been published. The INITIAL value: publishing
+     * makes it false without a reload (#288), so the editor keeps this in
+     * state rather than reading the prop directly.
+     */
     neverPublished: boolean;
+    /**
+     * Keys of sections whose stored content no longer matches their contract
+     * (#275). Shown, not hidden: it is the merchant's work, and a section
+     * quietly missing from the list would be deleted by the next save.
+     */
+    unreadableSections: string[];
     /**
      * How many sections publishing would change, as the server counted it on
      * load (#190). Null before the first publish. Refreshed by every autosave.
      */
     initialPendingChanges: number | null;
+    /** Site-level settings publishing would change (#282). Null before the first publish. */
+    initialPendingSiteChanges: SiteChangeKind[] | null;
     initialSections: Section[];
+    /** Which edit of the draft `initialSections` are (#285). */
+    initialRevision: number;
     siteName: string;
     initialStyle: SiteStyle;
     styleOptions: SiteStyleOptions;
@@ -146,25 +205,58 @@ export function SiteEditor({
     const [pendingChanges, setPendingChanges] = useState<number | null>(
         initialPendingChanges,
     );
+    const [pendingSiteChanges, setPendingSiteChanges] = useState<
+        SiteChangeKind[] | null
+    >(initialPendingSiteChanges);
     const [checking, setChecking] = useState(false);
     const [comments, setComments] =
         useState<SiteCommentView[]>(initialComments);
     const [review, setReview] = useState<ReviewState>(initialReview);
+    /*
+     * Whether anything is live yet (#288).
+     *
+     * State, not the prop it starts from: after the first publish the button
+     * still read "Publish site" and "Nothing's live yet" stayed above the
+     * preview until a reload, which is the editor telling a merchant their
+     * publish did not happen.
+     *
+     * `router.refresh()` would fix it and cost more than it fixes — it
+     * remounts the editor, dropping the selected section and the scroll
+     * position, so the merchant would lose their place as a reward for
+     * publishing.
+     */
+    const [neverPublished, setNeverPublished] = useState(initialNeverPublished);
     const openNotes = review.openNotes;
+
+    /*
+     * One counter per re-read below. Both fire from several places — every
+     * autosave, opening the check, publishing, a note changing — and nothing
+     * orders their responses, so a slow early read landing after a fast later
+     * one would put back the state from before. Each call takes the next
+     * number and only the newest may write; the same rule `measuring` keeps
+     * for the share image in site settings.
+     */
+    const reviewRequest = useRef(0);
+    const flagsRequest = useRef(0);
 
     /** Re-read notes and the verdict together — they move together. */
     async function refreshReview() {
+        const request = ++reviewRequest.current;
         const [next, state] = await Promise.all([
             listComments(siteId),
             getReviewState(siteId),
         ]);
+        if (request !== reviewRequest.current) return;
         setComments(next);
         setReview(state);
     }
 
     /** Re-read flags from the server. They settle after a save, not per key. */
     async function refreshFlags() {
-        setSiteFlags(await getSiteFlags(siteId));
+        const request = ++flagsRequest.current;
+        const next = await getSiteFlags(siteId);
+        if (request !== flagsRequest.current) return;
+        setSiteFlags(next);
     }
 
     const [errorIndex, setErrorIndex] = useState<number | null>(null);
@@ -289,6 +381,16 @@ export function SiteEditor({
     );
     const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
     const [saveError, setSaveError] = useState(false);
+    /*
+     * The draft's revision, and whether someone else has moved past it (#285).
+     *
+     * On a conflict the editor stops saving and says so. It does NOT reload by
+     * itself: the merchant's unsaved work is the thing at risk, and throwing it
+     * away to fetch someone else's version is the failure this was written to
+     * prevent, only faster.
+     */
+    const [revision, setRevision] = useState(initialRevision);
+    const [conflict, setConflict] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     // The org's services for the booking-section picker. Loaded once on mount;
     // Services are authored in the service editor, never inline here.
@@ -309,6 +411,16 @@ export function SiteEditor({
     }, []);
 
     const dirty = JSON.stringify(sections) !== lastSavedJson;
+    /*
+     * A style change that is unsaved or still saving counts as unpublished
+     * work too (#282). Publish only waited on the sections, so publishing inside
+     * the style debounce snapshotted the previous look.
+     */
+    const styleDirty = styleSaving || JSON.stringify(style) !== savedStyleJson;
+    const pendingSummary = describePendingChanges(
+        pendingChanges,
+        pendingSiteChanges,
+    );
 
     function replaceAt(index: number, next: Section) {
         setSections((prev) => prev.map((s, i) => (i === index ? next : s)));
@@ -358,9 +470,11 @@ export function SiteEditor({
     /**
      * Sync each enquiry section's backing Form to its authored fields before
      * saving, writing the returned `formId` back into the section content. The
-     * PUBLIC submit endpoint validates against that Form, so the two MUST stay
-     * in sync. On any failure (including a missing active org) the offending
-     * section index + message are surfaced and the save is aborted.
+     * Form is what a submission targets. It is NOT what a live submission is
+     * validated against: that is the published snapshot's fields (#281), so a
+     * draft edit synced here cannot change what the live site accepts. On any
+     * failure (including a missing active org) the offending section index +
+     * message are surfaced and the save is aborted.
      */
     async function syncEnquiryForms(
         current: Section[],
@@ -391,6 +505,15 @@ export function SiteEditor({
         return { ok: true, sections: next };
     }
 
+    /*
+     * The draft the last save failed on, as JSON. Without it a failure re-arms
+     * the autosave below — still dirty, no longer saving — and the same draft
+     * goes out again every 1.5s, each attempt with a fresh error toast, for as
+     * long as the failure lasts. A ref rather than state: it only gates the
+     * timer, and nothing on screen reads it.
+     */
+    const failedJson = useRef<string | null>(null);
+
     async function onSave(auto = false) {
         setSaving(true);
         setErrorIndex(null);
@@ -401,13 +524,55 @@ export function SiteEditor({
         const synced = await syncEnquiryForms(sections);
         if (!synced.ok) {
             setSaving(false);
+            // Not saved, and the bar has to say so (#281). A failed form sync
+            // used to leave saveError alone, so the bar kept showing the last
+            // successful save while this one had failed.
+            setSaveError(true);
             setErrorIndex(synced.index);
             setErrorMessage(synced.error);
             showError(synced.error);
             return;
         }
-        if (JSON.stringify(synced.sections) !== JSON.stringify(sections)) {
-            setSections(synced.sections);
+        /*
+         * Stamp ONLY the new formIds onto what is on screen now (#281). This
+         * used to replace the whole list with the copy taken before the sync,
+         * so anything typed while the form request was in flight was lost.
+         *
+         * A section is matched by identity first, meaning it is unchanged since
+         * the save began. Failing that, it is matched by position, for an
+         * enquiry section still waiting for its first formId. That way a section
+         * edited mid-save still gets its id, instead of creating a second Form
+         * on the next autosave.
+         */
+        const newFormIds = synced.sections.flatMap((next, index) => {
+            const before = sections[index];
+            return next.type === "enquiry" &&
+                before.type === "enquiry" &&
+                next.content.formId &&
+                next.content.formId !== before.content.formId
+                ? [{ index, before, formId: next.content.formId }]
+                : [];
+        });
+        if (newFormIds.length > 0) {
+            setSections((current) =>
+                current.map((section, index) => {
+                    if (section.type !== "enquiry" || section.content.formId) {
+                        return section;
+                    }
+                    const hit =
+                        newFormIds.find((n) => n.before === section) ??
+                        newFormIds.find((n) => n.index === index);
+                    return hit
+                        ? {
+                              ...section,
+                              content: {
+                                  ...section.content,
+                                  formId: hit.formId,
+                              },
+                          }
+                        : section;
+                }),
+            );
         }
 
         /*
@@ -425,18 +590,24 @@ export function SiteEditor({
             siteId,
             pageId,
             synced.sections,
+            revision,
         ).catch(() => ({
             ok: false as const,
             error: "Could not reach Saroh — your work is still here. It will save again with your next edit.",
         }));
         setSaving(false);
         if (res.ok) {
+            failedJson.current = null;
+            if (typeof res.data.revision === "number") {
+                setRevision(res.data.revision);
+            }
             setLastSavedJson(JSON.stringify(synced.sections));
             setLastSavedAt(new Date());
             setSaveError(false);
             // The save recounted what publishing would change; take its answer
             // rather than guessing at one from what was just sent.
             setPendingChanges(res.data.pendingSectionChanges ?? null);
+            setPendingSiteChanges(res.data.pendingSiteChanges ?? null);
             // An autosave that announces itself every few seconds is noise; the
             // bar already states when it last saved.
             if (!auto) showSuccess("Draft saved.");
@@ -449,7 +620,13 @@ export function SiteEditor({
             void refreshFlags();
             return;
         }
+        failedJson.current = JSON.stringify(synced.sections);
         setSaveError(true);
+        if ("conflict" in res && res.conflict === true) {
+            // Stops the autosave loop from retrying a save that can only lose
+            // one side's work. The banner offers the reload instead.
+            setConflict(true);
+        }
         if ("index" in res && typeof res.index === "number") {
             setErrorIndex(res.index);
             setErrorMessage(res.error);
@@ -471,6 +648,18 @@ export function SiteEditor({
      */
     useEffect(() => {
         if (!dirty || saving || publishing) return;
+        /*
+         * Nothing autosaves once the draft has moved on under this editor
+         * (#285). Every later edit would carry the same stale revision and be
+         * refused, so retrying is noise — and if it were not refused, it would
+         * be overwriting the other editor's work keystroke by keystroke.
+         */
+        if (conflict) return;
+        // Not the draft that just failed, again: see `failedJson`. Any edit
+        // changes the JSON, so the next edit is still the retry.
+        if (saveError && JSON.stringify(sections) === failedJson.current) {
+            return;
+        }
         const id = setTimeout(() => {
             void onSave(true);
         }, 1500);
@@ -478,7 +667,7 @@ export function SiteEditor({
         // `onSave` is redefined each render; depending on it would restart the
         // timer on every keystroke and never fire.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dirty, saving, publishing, sections]);
+    }, [dirty, saving, publishing, saveError, conflict, sections]);
 
     /*
      * Style autosave.
@@ -489,22 +678,45 @@ export function SiteEditor({
      * palette. Debounced longer, because dragging a slider produces a value on
      * every pixel and none of the intermediate ones is worth a request.
      */
+    /*
+     * One style save at a time (#282). Without that, an older PUT could land
+     * after a newer one and leave the older palette saved. The effect waits
+     * while a save is in flight, then runs again for the newest style.
+     *
+     * A style that failed to save is not retried until it changes, or a 400
+     * would retry every 700ms with a toast each time. A request that never
+     * reached the API resolves to a failure too, instead of leaving
+     * `styleSaving` stuck on and every later style unsaved.
+     */
+    const failedStyleJson = useRef<string | null>(null);
     useEffect(() => {
-        if (JSON.stringify(style) === savedStyleJson) return;
+        const json = JSON.stringify(style);
+        if (json === savedStyleJson || styleSaving) return;
+        if (failedStyleJson.current === json) return;
         const id = setTimeout(() => {
             const payload = style;
+            const payloadJson = JSON.stringify(payload);
             setStyleSaving(true);
-            void updateSiteStyle(siteId, payload).then((res) => {
-                setStyleSaving(false);
-                if (res.ok) {
-                    setSavedStyleJson(JSON.stringify(payload));
-                } else {
-                    showError(res.error);
-                }
-            });
+            updateSiteStyle(siteId, payload)
+                .then((res) => {
+                    if (res.ok) {
+                        failedStyleJson.current = null;
+                        setSavedStyleJson(payloadJson);
+                    } else {
+                        failedStyleJson.current = payloadJson;
+                        showError(res.error);
+                    }
+                })
+                .catch(() => {
+                    failedStyleJson.current = payloadJson;
+                    showError(
+                        "Could not reach Saroh. Your style is still here and will save with your next change.",
+                    );
+                })
+                .finally(() => setStyleSaving(false));
         }, 700);
         return () => clearTimeout(id);
-    }, [style, savedStyleJson, siteId]);
+    }, [style, savedStyleJson, siteId, styleSaving]);
 
     function resetStyle() {
         // Back to the business's own defaults — which is what the site looked
@@ -562,7 +774,19 @@ export function SiteEditor({
                 ? `${live} Recorded as published without approval.`
                 : live,
         );
-        await refreshFlags();
+        /*
+         * Everything the bar counted just went live, so the count is zero —
+         * set here rather than left for the next autosave to recount, which
+         * never comes if the merchant only opened the editor to publish. The
+         * review state moves too: publishing over a request for changes writes
+         * a bypass record, and the approval line should say so now rather
+         * than after a reload. Flags are re-read for the same reason.
+         */
+        setPendingChanges(0);
+        // Something is live now, so the button stops offering to publish the
+        // site and the "nothing's live yet" line goes (#288).
+        setNeverPublished(false);
+        await Promise.all([refreshFlags(), refreshReview()]);
     }
 
     /*
@@ -639,7 +863,24 @@ export function SiteEditor({
              * one irreversible action on one line — a merchant should be able to
              * tell what will happen when they press Publish without scrolling.
              */}
-            <header className="flex h-[52px] shrink-0 flex-wrap items-center gap-3 border-b px-3.5">
+            {/*
+             * ONE line, and it has to stay one line.
+             *
+             * This was `flex-wrap` inside a fixed `h-[52px]`, which is a
+             * contradiction: the moment the bar's contents were wider than the
+             * window — a site name, an address, an autosave time, what has
+             * changed, and a reviewer's verdict is not a rare amount — the
+             * actions wrapped onto a second row the bar has no height for, and
+             * overflowed 14px into the panes below. Publish ended up half
+             * underneath the canvas and could not be clicked at all: the
+             * browser flow in `e2e/tests/site-versions.spec.ts` failed on
+             * exactly that, at 1440×900, which is a common desk width.
+             *
+             * So the middle facts shrink and truncate instead, and the actions
+             * never do. Losing the end of an address is a smaller loss than
+             * losing the one action that puts a site in front of the public.
+             */}
+            <header className="flex h-[52px] shrink-0 items-center gap-3 overflow-hidden border-b px-3.5">
                 {/*
                  * "Workspace", not "Sites" — the design's wording, and the
                  * truer one: leaving the editor returns you to the whole
@@ -653,9 +894,11 @@ export function SiteEditor({
                 </Link>
                 {/* The design separates the way out from the site's identity. */}
                 <span aria-hidden className="h-[18px] w-px bg-border" />
-                <span className="text-[0.8125rem] font-medium">{siteName}</span>
+                <span className="shrink-0 text-[0.8125rem] font-medium">
+                    {siteName}
+                </span>
                 {address ? (
-                    <span className="hidden text-xs text-muted-foreground sm:inline">
+                    <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">
                         {address}
                     </span>
                 ) : null}
@@ -703,11 +946,9 @@ export function SiteEditor({
                  * left, and the two together say the whole truth: your work is
                  * safe, and this much of it is not live yet.
                  */}
-                {pendingChanges !== null && pendingChanges > 0 ? (
-                    <span className="text-xs text-muted-foreground">
-                        {pendingChanges === 1
-                            ? "1 section changed"
-                            : `${pendingChanges} sections changed`}
+                {pendingSummary ? (
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">
+                        {pendingSummary} changed
                     </span>
                 ) : null}
 
@@ -721,18 +962,19 @@ export function SiteEditor({
                 {review.latestApproval === null ? null : (
                     <span
                         className={cn(
-                            "flex h-[22px] items-center gap-1.5 rounded-[3px] border px-2 text-xs",
-                            review.latestApproval.outcome === "APPROVED"
+                            "flex h-[22px] min-w-0 shrink items-center gap-1.5 truncate rounded-[3px] border px-2 text-xs",
+                            APPROVAL_BADGE[
+                                review.latestApproval.outcome
+                            ].approved(review.approvalIsStale)
                                 ? "border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
                                 : "border-border text-muted-foreground",
                         )}
                         title={exactDate(review.latestApproval.at)}
                     >
-                        {review.latestApproval.outcome === "APPROVED"
-                            ? `Approved by ${review.latestApproval.by}`
-                            : review.latestApproval.outcome === "BYPASSED"
-                              ? `Published without approval by ${review.latestApproval.by}`
-                              : `${review.latestApproval.by} asked for changes`}
+                        {APPROVAL_BADGE[review.latestApproval.outcome].text(
+                            review.latestApproval.by,
+                            review.approvalIsStale,
+                        )}
                         {openNotes > 0 ? (
                             <span className="tabular-nums opacity-80">
                                 · {openNotes}{" "}
@@ -742,7 +984,7 @@ export function SiteEditor({
                     </span>
                 )}
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex shrink-0 items-center gap-2">
                     {/*
                      * Device preview. §18 makes the phone co-primary for the
                      * merchant's CUSTOMERS as much as the merchant: without this
@@ -838,7 +1080,7 @@ export function SiteEditor({
                     <Button
                         className="wk-press h-7 rounded bg-[#8a5a3c] px-3 text-xs font-medium text-white hover:bg-[#794e34]"
                         onClick={() => void openCheck()}
-                        disabled={publishing || dirty || saving}
+                        disabled={publishing || dirty || saving || styleDirty}
                     >
                         {publishing
                             ? "Publishing…"
@@ -920,6 +1162,7 @@ export function SiteEditor({
                                 siteId={siteId}
                                 pages={pages}
                                 comments={comments}
+                                review={review}
                                 onChanged={() => void refreshReview()}
                                 onJump={(jumpPageId, sectionKey) => {
                                     /*
@@ -929,6 +1172,19 @@ export function SiteEditor({
                                      * first and a selection after it.
                                      */
                                     if (jumpPageId !== pageId) {
+                                        /*
+                                         * The same guard the Pages tab puts on
+                                         * opening a page, in its words: leaving
+                                         * mid-flight loses whatever autosave
+                                         * has not sent yet, and a note is no
+                                         * reason to lose work.
+                                         */
+                                        if (dirty) {
+                                            showError(
+                                                "Save this page before opening another.",
+                                            );
+                                            return;
+                                        }
                                         router.push(
                                             `/sites/${siteId}?page=${jumpPageId}`,
                                         );
@@ -1314,6 +1570,21 @@ export function SiteEditor({
                             />
 
                             {/*
+                             * Leaving a note is an action taken ON this
+                             * section (#277), so it sits under its fields —
+                             * the same place the design puts it, which is why
+                             * the composer needs no section picker.
+                             */}
+                            <div className="border-t pt-3">
+                                <NoteComposer
+                                    siteId={siteId}
+                                    pageId={pageId}
+                                    sectionKey={active.section.key}
+                                    onAdded={refreshReview}
+                                />
+                            </div>
+
+                            {/*
                              * Per-field markers, the other half of what flags
                              * are allowed to show while editing. Listed under
                              * the fields rather than inline beside each one:
@@ -1322,6 +1593,24 @@ export function SiteEditor({
                              * a advisory note would cost more than it is worth
                              * until the notes need to sit on the input itself.
                              */}
+                            {active.section.key !== undefined &&
+                            unreadableSections.includes(active.section.key) ? (
+                                /*
+                                 * Said, not hidden (#275). This section's
+                                 * stored content does not match the shape its
+                                 * block promises, so the fields below may show
+                                 * blanks that are not what was written. The
+                                 * work is still here; saving over it is what
+                                 * would lose it.
+                                 */
+                                <p className="rounded-md border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
+                                    Saroh cannot read this section&apos;s saved
+                                    content. The fields may look empty even
+                                    though something is stored. Editing and
+                                    saving will replace whatever is there.
+                                </p>
+                            ) : null}
+
                             {activeFlags.length > 0 ? (
                                 <ul className="grid gap-1.5 border-t pt-3">
                                     {activeFlags.map((flag, i) => (
@@ -1416,6 +1705,40 @@ export function SiteEditor({
                     }}
                     className="min-h-0 overflow-y-auto bg-background p-6"
                 >
+                    {/*
+                     * Someone else saved this page while this editor was open
+                     * (#285). Loud, because everything typed since is now
+                     * unsaveable — and the merchant has to choose what happens
+                     * to it. Reloading takes the other version and drops this
+                     * one, so it is offered, never done automatically.
+                     */}
+                    {conflict ? (
+                        <div
+                            role="alert"
+                            className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm"
+                        >
+                            <p className="font-medium">
+                                Someone else saved this page while you were
+                                editing.
+                            </p>
+                            <p className="mt-1 text-muted-foreground">
+                                Nothing you have written has been lost, and
+                                nothing more will save until you reload.
+                                Reloading shows their version and discards
+                                yours, so copy anything you want to keep first.
+                            </p>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="mt-3"
+                                onClick={() => window.location.reload()}
+                            >
+                                Reload the latest
+                            </Button>
+                        </div>
+                    ) : null}
+
                     {/*
                      * The first-run nudge (spec §5), in the spec's own words.
                      * "It does not nag" — so it is one quiet line above the

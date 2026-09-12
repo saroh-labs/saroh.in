@@ -11,6 +11,7 @@ import { MessageComposer } from "@/components/crm/message-composer";
 import { MessageHistory } from "@/components/crm/message-history";
 import { MoveStageControl } from "@/components/crm/move-stage-control";
 import { TaskForm } from "@/components/crm/task-form";
+import { PageContainer } from "@/components/shared/page-container";
 import { contactName, formatValue } from "@/lib/crm/format";
 import { getLead } from "@/lib/leads/service";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/service";
@@ -63,7 +64,7 @@ export default async function LeadDetailPage({
     }, {});
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        <PageContainer>
             <PageHeader
                 title={lead.title}
                 description={
@@ -162,6 +163,6 @@ export default async function LeadDetailPage({
 
             <h2 className="mb-3 text-lg font-semibold">Activity</h2>
             <ActivityTimeline leadId={lead.id} activities={timeline} />
-        </main>
+        </PageContainer>
     );
 }

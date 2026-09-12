@@ -103,13 +103,16 @@ export class DraftSectionInputDto {
     // so an older client that never sends the field cannot hide anything by
     // omission.
     @IsOptional()
+    // Raw value, not implicit conversion's truthiness: "false" must be
+    // refused, never read as true, which would HIDE the section (#286).
+    @Transform(({ obj }: { obj: Record<string, unknown> }) => obj.hidden)
     @IsBoolean({ message: "hidden must be a boolean" })
     hidden?: boolean;
 
     /*
-     * The section's stable identity across saves. The editor sends back the key
-     * it was given for an existing section and omits it for a new one, which
-     * the server then mints.
+     * The section's stable identity across saves. The editor mints one when the
+     * section is added (#277) and sends it back on every save; a request that
+     * omits it still works, and the server mints one.
      *
      * This is what a reviewer's note is pinned to, so sending the WRONG key
      * moves someone's comment onto a different section. It is not a security
@@ -131,6 +134,19 @@ export class DraftSectionInputDto {
  * An empty array is allowed and clears the draft's sections.
  */
 export class UpdateDraftSectionsDto {
+    /**
+     * The revision the editor was handed when it loaded this draft (#285).
+     *
+     * Optional, and checked when present: a save that carries one the server
+     * has moved past is refused with 409 rather than deleting whatever the
+     * other editor wrote. A caller that sends none never read the draft, so it
+     * cannot be overwriting an edit it saw.
+     */
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    revision?: number;
+
     @IsArray()
     @ArrayMaxSize(200)
     @ValidateNested({ each: true })
@@ -198,6 +214,9 @@ export class UpdatePageDto {
      * parked page back on a live site simply by not mentioning it.
      */
     @IsOptional()
+    // Raw value, not implicit conversion's truthiness: "false" must be
+    // refused, never read as true, which would HIDE the section (#286).
+    @Transform(({ obj }: { obj: Record<string, unknown> }) => obj.hidden)
     @IsBoolean({ message: "hidden must be a boolean" })
     hidden?: boolean;
 }
@@ -223,6 +242,25 @@ export class CreateCommentDto {
     @MinLength(1, { message: "sectionKey is required" })
     @MaxLength(64)
     sectionKey!: string;
+}
+
+/**
+ * Mark a note settled, or reopen it (#286).
+ *
+ * This body used to be an inline `{ resolved?: boolean }`. An inline type
+ * reflects as `Object`, and the ValidationPipe validates nothing for `Object`:
+ * no whitelist, no type check. `{"resolved": "true"}` silently reopened the
+ * note.
+ *
+ * `resolved` is read RAW, before class-transformer's implicit conversion. That
+ * conversion runs first and turns any string into a boolean by truthiness, so
+ * `"false"` would settle a note. A real boolean is required, and anything else
+ * is a 400.
+ */
+export class SetCommentResolvedDto {
+    @Transform(({ obj }: { obj: Record<string, unknown> }) => obj.resolved)
+    @IsBoolean({ message: "resolved must be true or false" })
+    resolved!: boolean;
 }
 
 /**

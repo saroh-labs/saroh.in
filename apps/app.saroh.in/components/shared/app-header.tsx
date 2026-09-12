@@ -7,6 +7,7 @@ import { CommandTrigger } from "@/components/shared/command-trigger";
 import { HelpLink } from "@/components/shared/help-link";
 import { MobileNav } from "@/components/shared/mobile-nav";
 import type { NavCounts } from "@/components/shared/nav-items";
+import { navRoleCan } from "@/components/shared/nav-items";
 import { SkinSwitcher } from "@/components/shared/skin-switcher";
 import { UserMenu } from "@/components/shared/user-menu";
 import type { Organization } from "@/lib/organizations/service";
@@ -87,6 +88,10 @@ export function AppHeader(props: AppHeaderProps) {
                 <MobileNav
                     unread={unread}
                     moduleKeys={moduleKeys}
+                    // The role travels with the active organization already, so
+                    // the drawer needs no prop of its own to agree with the
+                    // rail about what this person may reach.
+                    role={activeOrg?.role ?? null}
                     counts={counts}
                     sites={props.sites}
                     organizationName={activeOrg?.name}
@@ -134,7 +139,17 @@ export function AppHeader(props: AppHeaderProps) {
                     <HelpLink />
                     <SkinSwitcher />
                     <ThemeToggle />
-                    <UserMenu name={user.name} email={user.email} />
+                    <UserMenu
+                        name={user.name}
+                        email={user.email}
+                        // Same rule as the rail: an entry whose only content is
+                        // a refusal should not be offered (#313). The API keeps
+                        // `org:settings:read` to owners and admins.
+                        showOrganizationSettings={navRoleCan(
+                            activeOrg?.role ?? null,
+                            "org:settings:read",
+                        )}
+                    />
                 </div>
             </div>
         </header>

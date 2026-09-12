@@ -3,6 +3,7 @@
 import type {
     CreateSiteInput,
     PreviewLinkDays,
+    ReviewerVerdict,
     SectionInput,
     SiteFooter,
     SiteNavigation,
@@ -10,6 +11,8 @@ import type {
     SiteStyle,
 } from "./service";
 import {
+    createApproval as createApprovalApi,
+    createComment as createCommentApi,
     createPage as createPageApi,
     createPreviewLink as createPreviewLinkApi,
     createSite as createSiteApi,
@@ -19,6 +22,7 @@ import {
     listComments as listCommentsApi,
     listPreviewLinks as listPreviewLinksApi,
     publishSite as publishSiteApi,
+    requestReview as requestReviewApi,
     restorePublication as restorePublicationApi,
     revokePreviewLink as revokePreviewLinkApi,
     saveDraftSections as saveDraftSectionsApi,
@@ -45,8 +49,28 @@ export async function saveDraftSections(
     siteId: string,
     pageId: string,
     sections: SectionInput[],
+    /** The revision the editor loaded, so a stale save is refused (#285). */
+    revision?: number,
 ) {
-    return saveDraftSectionsApi(siteId, pageId, sections);
+    return saveDraftSectionsApi(siteId, pageId, sections, revision);
+}
+
+/** Leave a note on a section (#277). */
+export async function createComment(
+    siteId: string,
+    input: { pageId: string; sectionKey: string; body: string },
+) {
+    return createCommentApi(siteId, input);
+}
+
+/** Record a verdict on the site (#277). */
+export async function createApproval(siteId: string, outcome: ReviewerVerdict) {
+    return createApprovalApi(siteId, outcome);
+}
+
+/** Ask for a review (#278). */
+export async function requestReview(siteId: string) {
+    return requestReviewApi(siteId);
 }
 
 export async function publishSite(siteId: string) {

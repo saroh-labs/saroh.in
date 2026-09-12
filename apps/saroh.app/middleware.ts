@@ -39,13 +39,23 @@ function isApexHost(hostname: string): boolean {
 export default function middleware(req: NextRequest) {
     const url = req.nextUrl;
 
-    // e.g. demo.saroh.app — or demo.saroh.app.localhost in development, where
-    // NEXT_PUBLIC_ROOT_DOMAIN is `saroh.app.localhost` and every app runs at
-    // its production hostname with `.localhost` appended (the `portless` field
-    // in each app's package.json).
-    // Nothing here knows about ports: the host is parsed the same way in both
-    // environments, which is the point of running development that way.
-    const hostname = req.headers.get("host") ?? "";
+    /*
+     * e.g. demo.saroh.app — or demo.saroh.app.localhost in development, where
+     * NEXT_PUBLIC_ROOT_DOMAIN is `saroh.app.localhost` and every app runs at
+     * its production hostname with `.localhost` appended (the `portless` field
+     * in each app's package.json).
+     *
+     * The PORT is dropped. `Host` carries one whenever the server is not on 80
+     * or 443, so a renderer reached at `localhost:3005` — a CI runner, a
+     * container, anyone running this app without the proxy — never matched its
+     * own apex and rewrote every request, `/preview/<token>` included, to a
+     * tenant lookup for a host called "localhost:3005". It looked correct in
+     * development only because portless answers on 443, where there is no port
+     * to carry. A port never distinguishes one tenant from another.
+     */
+    const hostname = (req.headers.get("host") ?? "")
+        .split(":")[0]
+        .toLowerCase();
     const path = url.pathname;
 
     // The legacy scaffold domain still has DNS pointed here.

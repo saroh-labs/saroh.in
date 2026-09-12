@@ -60,7 +60,24 @@ src/
 
 - `class-validator` and `class-transformer`, with trimming and normalising
   transforms on the DTO (`modules/leads/dto.ts`).
-- The global `ValidationPipe` sets `whitelist` and `forbidNonWhitelisted`.
+- The global `ValidationPipe` sets `whitelist` and `forbidNonWhitelisted`. Its
+  options live in `common/validation.ts`, shared by `main.ts` and DTO specs.
+- **A body is a DTO class, never an inline type.** `@Body() dto: { … }` reflects
+  as `Object`, and the pipe validates nothing for `Object`: no whitelist, no
+  type check (#286).
+- **Implicit conversion makes booleans truthy.** `enableImplicitConversion` runs
+  before the validators, so a `boolean` property turns the string `"false"` into
+  `true`. A field that must arrive as a real boolean reads the raw value with
+  `@Transform(({ obj }) => obj.field)` ahead of `@IsBoolean()`
+  (`SetCommentResolvedDto`, `sites/dto.validation.spec.ts`).
+- **The one exception is structured JSON with a hand-written parser.** Site
+  style, footer and menu (`site-style.ts`, `site-footer.ts`,
+  `site-navigation.ts`) take `@Body() body: unknown`, because their rules
+  (palette keys, page references, bounds) are not expressible as decorators.
+    - Each parser throws `BadRequestException` with a message a merchant can
+      read, and the filter gives it the same 400 envelope as a DTO failure.
+    - Only `details` is absent, since there are no field-level messages to list.
+    - A new body that can be a DTO must be one.
 - Enumerations are `as const` arrays with a derived type (`LEAD_STATUSES`).
 
 ## Responses and errors — **Current**

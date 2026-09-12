@@ -3,6 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { LeadsView } from "@/components/leads/leads-view";
+import { PageContainer } from "@/components/shared/page-container";
 import { listLeads } from "@/lib/leads/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
@@ -28,7 +29,7 @@ export default async function LeadsPage({
     const [leads, params] = await Promise.all([listLeads(), searchParams]);
 
     return (
-        <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">
+        <PageContainer width="wide">
             <PageHeader
                 title="Leads"
                 description="Opportunities in your pipeline — what they're worth, and how long they've waited."
@@ -41,6 +42,6 @@ export default async function LeadsPage({
             <div className="mt-6">
                 <LeadsView leads={leads} initialView={viewParam(params)} />
             </div>
-        </main>
+        </PageContainer>
     );
 }

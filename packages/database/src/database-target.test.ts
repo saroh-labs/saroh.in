@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { assertDatabaseTarget, resolveDatabaseTarget } from "./database-target";
 
@@ -8,6 +8,10 @@ const SAROH_DEV =
 const NEONDB =
     "postgresql://user:pw@ep-billowing-cloud-a1lajgqk-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
 
+afterEach(() => {
+    vi.unstubAllEnvs();
+});
+
 describe("resolveDatabaseTarget", () => {
     it("extracts the database and host", () => {
         expect(resolveDatabaseTarget(SAROH_DEV)).toEqual({
@@ -16,7 +20,20 @@ describe("resolveDatabaseTarget", () => {
         });
     });
 
+    it("falls back to the environment when given no argument", () => {
+        // The parameter DEFAULTS to process.env.DATABASE_URL, so passing
+        // `undefined` is not "no URL" — it is "read the environment". Every
+        // caller in the package relies on this.
+        vi.stubEnv("DATABASE_URL", SAROH_DEV);
+        expect(resolveDatabaseTarget(undefined).database).toBe("saroh-dev");
+    });
+
     it("refuses an unset URL rather than defaulting to something", () => {
+        // Clearing the variable is what makes this the case it claims to be.
+        // Without the stub the test only passed in a shell that happened not
+        // to export DATABASE_URL — which is why it went red the first time CI
+        // ever ran this suite (#287): the workflow sets it at job level.
+        vi.stubEnv("DATABASE_URL", "");
         expect(() => resolveDatabaseTarget(undefined)).toThrow(/not set/i);
     });
 

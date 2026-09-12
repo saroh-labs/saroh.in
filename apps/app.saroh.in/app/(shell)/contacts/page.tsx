@@ -1,6 +1,7 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { ContactsView } from "@/components/contacts/contacts-view";
+import { PageContainer } from "@/components/shared/page-container";
 import { listContacts } from "@/lib/contacts/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
@@ -31,7 +32,7 @@ export default async function ContactsPage({
         // Wider than the old `max-w-7xl`: this is a table now, and a dashboard
         // that reserves a third of a monitor for margin is wasting the density
         // the merchant came for.
-        <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">
+        <PageContainer width="wide">
             <PageHeader
                 title="Contacts"
                 description="Everyone who has enquired, booked or bought."
@@ -42,6 +43,6 @@ export default async function ContactsPage({
                     initialView={viewParam(params)}
                 />
             </div>
-        </main>
+        </PageContainer>
     );
 }

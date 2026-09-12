@@ -2,6 +2,7 @@ import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { ProviderHealthCard } from "@/components/providers/provider-health-card";
+import { PageContainer } from "@/components/shared/page-container";
 import { listProviderHealth } from "@/lib/provider-health/service";
 import { requireSession } from "@/lib/session";
 
@@ -18,7 +19,7 @@ export default async function ProvidersSettingsPage() {
     const result = await listProviderHealth();
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        <PageContainer width="form">
             <PageHeader
                 title="Providers & health"
                 description="The external services your modules depend on, and whether each is ready."
@@ -43,6 +44,6 @@ export default async function ProvidersSettingsPage() {
                     ))}
                 </div>
             )}
-        </main>
+        </PageContainer>
     );
 }

@@ -3,7 +3,9 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PageContainer } from "@/components/shared/page-container";
 import { SiteSettings } from "@/components/sites/site-settings";
+import { SiteSettingsRead } from "@/components/sites/site-settings-read";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
 
@@ -37,17 +39,25 @@ export default async function SiteSettingsPage({
         // own main carries no padding — pages own it — and this one wrapped
         // itself in a bare div, so the heading sat flush against the rail and
         // the top bar while the sites list next door had 32px of air.
-        <main className="mx-auto w-full max-w-3xl space-y-6 p-6 sm:p-8">
+        <PageContainer width="form">
             <PageHeader
                 title="Website settings"
                 description={site.name}
                 actions={
                     <Button variant="brand" asChild>
-                        <Link href={`/sites/${siteId}`}>Open editor</Link>
+                        <Link href={`/sites/${siteId}`}>
+                            {site.can.edit ? "Open editor" : "Read the site"}
+                        </Link>
                     </Button>
                 }
             />
-            <SiteSettings site={site} />
-        </main>
+            {site.can.manageSettings ? (
+                <SiteSettings site={site} />
+            ) : (
+                // The values, and none of the controls the API would refuse
+                // (#275).
+                <SiteSettingsRead site={site} />
+            )}
+        </PageContainer>
     );
 }

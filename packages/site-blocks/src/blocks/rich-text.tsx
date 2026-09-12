@@ -4,13 +4,17 @@ import type { RenderedRichText } from "@saroh/block-contract";
  * `richText` v1 — authored rich content.
  *
  * SAFETY NOTE. When `format === "html"` we render `value` via
- * `dangerouslySetInnerHTML`. This is safe ONLY because the value was sanitized
- * server-side at publish: the publish step (S2-005) runs the contract's
- * `sanitizedFields` (here, `richText.value`) through an HTML sanitizer BEFORE
- * writing it into the immutable publication snapshot, so everything this
- * renderer reads back is already-cleaned, controlled HTML. This app never
- * receives raw/unsanitized author input — the only source is the public
- * snapshot API. Do NOT feed un-snapshotted HTML into this component.
+ * `dangerouslySetInnerHTML`. This is safe ONLY because the value has been
+ * through the API's HTML sanitizer (`apps/api.saroh.in/.../sites/sanitize.ts`)
+ * before it reaches this component. Two callers render it:
+ * - the public renderer, from the publication snapshot, which publish writes
+ *   only after sanitizing the contract's `sanitizedFields` (here
+ *   `richText.value`);
+ * - the editor preview in app.saroh.in, from the draft, which the API sanitizes
+ *   when a draft is saved and again when it is loaded (#280). Until then the
+ *   draft was cleaned only at publish, and the preview rendered it raw.
+ *
+ * Do NOT feed this component HTML that did not come through one of those paths.
  *
  * When `format === "markdown"` there is no markdown library in this app's deps,
  * so we render the raw markdown as pre-wrapped text (escaped by React) rather

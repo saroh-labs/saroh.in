@@ -10,6 +10,15 @@ const nextConfig = {
     // shipping the product with a development overlay in it. It carries no
     // information this project relies on.
     devIndicators: false,
+    // For `forbidden()`, which `getJson` calls on a 403 (lib/api/http.ts,
+    // #274). In production Next replaces a server error's message with a
+    // digest, so a 403 thrown to error.tsx looks exactly like a 500 there, and
+    // the boundary told someone whose role doesn't reach a page to "try again".
+    // forbidden() carries the status to its own boundary instead. Still
+    // experimental in Next 16.3; see docs/architecture/DEV_LEARNINGS.md.
+    experimental: {
+        authInterrupts: true,
+    },
     images: {
         domains: [
             "public.blob.vercel-storage.com",
