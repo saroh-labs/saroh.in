@@ -863,7 +863,24 @@ export function SiteEditor({
              * one irreversible action on one line — a merchant should be able to
              * tell what will happen when they press Publish without scrolling.
              */}
-            <header className="flex h-[52px] shrink-0 flex-wrap items-center gap-3 border-b px-3.5">
+            {/*
+             * ONE line, and it has to stay one line.
+             *
+             * This was `flex-wrap` inside a fixed `h-[52px]`, which is a
+             * contradiction: the moment the bar's contents were wider than the
+             * window — a site name, an address, an autosave time, what has
+             * changed, and a reviewer's verdict is not a rare amount — the
+             * actions wrapped onto a second row the bar has no height for, and
+             * overflowed 14px into the panes below. Publish ended up half
+             * underneath the canvas and could not be clicked at all: the
+             * browser flow in `e2e/tests/site-versions.spec.ts` failed on
+             * exactly that, at 1440×900, which is a common desk width.
+             *
+             * So the middle facts shrink and truncate instead, and the actions
+             * never do. Losing the end of an address is a smaller loss than
+             * losing the one action that puts a site in front of the public.
+             */}
+            <header className="flex h-[52px] shrink-0 items-center gap-3 overflow-hidden border-b px-3.5">
                 {/*
                  * "Workspace", not "Sites" — the design's wording, and the
                  * truer one: leaving the editor returns you to the whole
@@ -877,9 +894,11 @@ export function SiteEditor({
                 </Link>
                 {/* The design separates the way out from the site's identity. */}
                 <span aria-hidden className="h-[18px] w-px bg-border" />
-                <span className="text-[0.8125rem] font-medium">{siteName}</span>
+                <span className="shrink-0 text-[0.8125rem] font-medium">
+                    {siteName}
+                </span>
                 {address ? (
-                    <span className="hidden text-xs text-muted-foreground sm:inline">
+                    <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">
                         {address}
                     </span>
                 ) : null}
@@ -928,7 +947,7 @@ export function SiteEditor({
                  * safe, and this much of it is not live yet.
                  */}
                 {pendingSummary ? (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">
                         {pendingSummary} changed
                     </span>
                 ) : null}
@@ -943,7 +962,7 @@ export function SiteEditor({
                 {review.latestApproval === null ? null : (
                     <span
                         className={cn(
-                            "flex h-[22px] items-center gap-1.5 rounded-[3px] border px-2 text-xs",
+                            "flex h-[22px] min-w-0 shrink items-center gap-1.5 truncate rounded-[3px] border px-2 text-xs",
                             APPROVAL_BADGE[
                                 review.latestApproval.outcome
                             ].approved(review.approvalIsStale)
@@ -965,7 +984,7 @@ export function SiteEditor({
                     </span>
                 )}
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex shrink-0 items-center gap-2">
                     {/*
                      * Device preview. §18 makes the phone co-primary for the
                      * merchant's CUSTOMERS as much as the merchant: without this
