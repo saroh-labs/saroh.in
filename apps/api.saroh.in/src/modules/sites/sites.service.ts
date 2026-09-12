@@ -41,6 +41,8 @@ import {
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
+import type { Renderability } from "./publication-renderability";
+import { checkRenderability } from "./publication-renderability";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
 import {
     assertPageInSite,
@@ -311,9 +313,13 @@ export interface PublicationDetail {
     id: string;
     publishedAt: Date;
     publishedByUserId: string | null;
+    /** Who published it: their name, else their email; null if unknown (#283). */
+    publishedBy: string | null;
     templateId: string;
     templateVersion: number;
     snapshot: unknown;
+    /** Whether this build can still draw every section it holds (#283). */
+    renderability: Renderability;
 }
 
 /**
@@ -950,8 +956,17 @@ export class SitesService {
             },
         });
 
+        // Names, not ids (#283). "Who put this live" is a question the list
+        // exists to answer, and a Publication records only the user id.
+        const publishers = await this.userNames(
+            publications.map((p) => p.publishedByUserId),
+        );
+
         return publications.map(({ approvals, ...p }) => ({
             ...p,
+            publishedBy: p.publishedByUserId
+                ? (publishers.get(p.publishedByUserId) ?? null)
+                : null,
             bypass:
                 approvals.length === 0
                     ? null
@@ -995,7 +1010,34 @@ export class SitesService {
                 `Publication "${publicationId}" not found`,
             );
         }
-        return publication;
+        const publishers = await this.userNames([
+            publication.publishedByUserId,
+        ]);
+        return {
+            ...publication,
+            publishedBy: publication.publishedByUserId
+                ? (publishers.get(publication.publishedByUserId) ?? null)
+                : null,
+            renderability: checkRenderability(publication.snapshot),
+        };
+    }
+
+    /**
+     * Display names for user ids (#283): a name, else the email every user has.
+     * One query for every distinct id, however many versions share a publisher.
+     */
+    private async userNames(
+        ids: (string | null)[],
+    ): Promise<Map<string, string>> {
+        const unique = [
+            ...new Set(ids.filter((id): id is string => id !== null)),
+        ];
+        if (unique.length === 0) return new Map();
+        const users = await prisma.user.findMany({
+            where: { id: { in: unique } },
+            select: { id: true, name: true, email: true },
+        });
+        return new Map(users.map((u) => [u.id, u.name ?? u.email]));
     }
 
     /**

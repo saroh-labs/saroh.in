@@ -6,6 +6,7 @@ import { Card, CardContent } from "@saroh/ui/card";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { History } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -93,9 +94,16 @@ export function SiteVersions({
                                             </Badge>
                                         ) : null}
                                     </div>
+                                    {/*
+                                     * Who put it live (#283). This used to read
+                                     * "Template starter v1" on every row: every
+                                     * publication is stamped with the starter,
+                                     * so the line told a merchant nothing.
+                                     */}
                                     <p className="text-xs text-muted-foreground">
-                                        Template {p.templateId} v
-                                        {p.templateVersion}
+                                        {p.publishedBy
+                                            ? `Published by ${p.publishedBy}`
+                                            : "Publisher not recorded"}
                                     </p>
                                     {p.bypass ? (
                                         /*
@@ -114,6 +122,13 @@ export function SiteVersions({
                                     ) : null}
                                 </div>
 
+                                <Button size="sm" variant="ghost" asChild>
+                                    <Link
+                                        href={`/sites/${siteId}/versions/${p.id}`}
+                                    >
+                                        Preview
+                                    </Link>
+                                </Button>
                                 {p.isCurrent ? null : confirming === p.id ? (
                                     <div className="flex gap-2">
                                         <Button

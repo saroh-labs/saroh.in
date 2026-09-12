@@ -605,6 +605,8 @@ export interface SitePublication {
     id: string;
     publishedAt: string;
     publishedByUserId: string | null;
+    /** Who published it, by name (email when unnamed); null if unknown (#283). */
+    publishedBy: string | null;
     templateId: string;
     templateVersion: number;
     /** Whether this is the version the public is being served right now. */
@@ -620,6 +622,54 @@ export async function listPublications(
     const base = await sitesBase();
     if (!base) return [];
     return getList<SitePublication>(`${base}/${siteId}/publications`);
+}
+
+/** One page of a published snapshot, as it was served (#283). */
+export interface PublishedPage {
+    path: string;
+    title: string;
+    isHome: boolean;
+    sections: { type: string; content: unknown }[];
+}
+
+/** The parts of a publication snapshot the version preview reads (#283). */
+export interface PublishedSnapshot {
+    site?: { name?: string; styleVariables?: Record<string, string> | null };
+    pages?: PublishedPage[];
+}
+
+/** A section a past version holds that this build can no longer draw. */
+export interface UnrenderableSection {
+    path: string;
+    index: number;
+    type: string;
+}
+
+/** One past publish with its stored snapshot, for previewing it as served. */
+export interface SitePublicationDetail {
+    id: string;
+    publishedAt: string;
+    publishedByUserId: string | null;
+    publishedBy: string | null;
+    templateId: string;
+    templateVersion: number;
+    snapshot: PublishedSnapshot;
+    renderability: { renderable: boolean; unrenderable: UnrenderableSection[] };
+}
+
+/**
+ * One past publish of a site (#283), or null when this site has no such
+ * version (a 404 from the API).
+ */
+export async function getPublication(
+    siteId: string,
+    publicationId: string,
+): Promise<SitePublicationDetail | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    return getJson<SitePublicationDetail>(
+        `${base}/${siteId}/publications/${encodeURIComponent(publicationId)}`,
+    );
 }
 
 /**
