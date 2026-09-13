@@ -65,11 +65,20 @@ src/
 - **A body is a DTO class, never an inline type.** `@Body() dto: { … }` reflects
   as `Object`, and the pipe validates nothing for `Object`: no whitelist, no
   type check (#286).
-- **Implicit conversion makes booleans truthy.** `enableImplicitConversion` runs
-  before the validators, so a `boolean` property turns the string `"false"` into
-  `true`. A field that must arrive as a real boolean reads the raw value with
-  `@Transform(({ obj }) => obj.field)` ahead of `@IsBoolean()`
-  (`SetCommentResolvedDto`, `sites/dto.validation.spec.ts`).
+- **Nothing is converted implicitly.** `enableImplicitConversion` was on until
+  #314 and coerced every value to its declared type before the validators ran —
+  for a boolean, by TRUTHINESS, so `"false"` arrived as `true` and `@IsBoolean()`
+  passed. Eleven fields were exposed; three carried a per-field workaround and
+  the rest did not, because it had to be remembered.
+    - A body is JSON and already carries real numbers, strings and booleans, so
+      a body DTO needs no conversion and a mistyped value is now a 400.
+    - A value that arrives as TEXT — a query string or a route param — converts
+      explicitly with `@Type(() => Number)` on the property
+      (`ListAdminAuditDto.limit` is the only one today).
+    - `transform: true` stays on: it is what builds the DTO class at all, so
+      `@Type`, nested `ValidateNested` DTOs and every `@Transform` still run.
+    - `common/validation.spec.ts` holds the table — every boolean the API takes,
+      against every value truthiness used to swallow.
 - **The one exception is structured JSON with a hand-written parser.** Site
   style, footer and menu (`site-style.ts`, `site-footer.ts`,
   `site-navigation.ts`) take `@Body() body: unknown`, because their rules
