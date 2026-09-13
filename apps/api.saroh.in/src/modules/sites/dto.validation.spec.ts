@@ -21,7 +21,15 @@ function asBody(metatype: new (...args: never[]) => unknown) {
     return { type: "body" as const, metatype };
 }
 
-/** The obvious DTO, without the raw-value transform, to show why it is needed. */
+/**
+ * The obvious DTO — one decorator, no workaround.
+ *
+ * It exists to prove the trap is gone. While the pipe converted implicitly
+ * (#286) this class accepted the string `"false"` and handed back `true`, which
+ * is why every boolean in the API had to read its own raw value first. The pipe
+ * no longer converts (#314), so the obvious spelling is now the correct one —
+ * and this is the test that fails if anyone turns conversion back on.
+ */
 class NaiveResolvedDto {
     @IsBoolean()
     resolved!: boolean;
@@ -49,12 +57,13 @@ describe("the comments PATCH body (#286)", () => {
         ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('needs the raw-value transform: implicit conversion alone turns "false" into true', async () => {
-        const out = (await pipe.transform(
-            { resolved: "false" },
-            asBody(NaiveResolvedDto),
-        )) as NaiveResolvedDto;
-        expect(out.resolved).toBe(true);
+    it('refuses "false" for a plain @IsBoolean, with no workaround on the field', async () => {
+        // This used to resolve to `{ resolved: true }`. That it now throws is
+        // the whole of #314: the seven fields that never had the workaround
+        // are safe by default rather than by remembering.
+        await expect(
+            pipe.transform({ resolved: "false" }, asBody(NaiveResolvedDto)),
+        ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it("validates nothing for an inline body type, which is why the route had to change", async () => {

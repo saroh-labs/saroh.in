@@ -300,8 +300,17 @@ have made `{"resolved": "false"}` settle it.
   Any string, `"false"` included, becomes `true` and then passes
   `@IsBoolean()`.
 
-**Fix**: `SetCommentResolvedDto` reads the raw value with
+**Fix**: `SetCommentResolvedDto` read the raw value with
 `@Transform(({ obj }) => obj.resolved)` ahead of `@IsBoolean()`. The pipe's
 options moved to `common/validation.ts` so `dto.validation.spec.ts` validates
 through exactly what `main.ts` applies.
+
+**Then (#314)**: the workaround was the wrong shape. It had to be remembered on
+every new boolean, and seven fields elsewhere in the API never got it — among
+them whether an automation rule RUNS and whether a billing change applies
+immediately. `enableImplicitConversion` is off now: a body is JSON and carries
+real types already, and the one field that genuinely arrives as text converts
+explicitly with `@Type(() => Number)`. The per-field transforms are gone, and
+the plain decorator is the whole rule again. The lesson generalises — a trap you
+step around in code review is a trap you will fall into; the fix is to remove it.
 **Category**: api · rule in `docs/patterns/backend-nestjs.md`

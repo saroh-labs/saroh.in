@@ -1,4 +1,4 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
     IsBoolean,
     IsInt,
@@ -60,7 +60,18 @@ export class ListAdminAuditDto {
     @MaxLength(200)
     cursor?: string;
 
+    /**
+     * The one field in the API that arrives as TEXT and is declared a number:
+     * this DTO is bound to the QUERY STRING, where `?limit=50` is the string
+     * "50" and nothing else is possible.
+     *
+     * Converted here, explicitly. The pipe used to do it for every property of
+     * every DTO — which is also how the string "false" became `true` on eleven
+     * boolean fields (#314). `Number("abc")` is NaN and `@IsInt` refuses it, so
+     * a bad limit is still a 400 rather than a silent default.
+     */
     @IsOptional()
+    @Type(() => Number)
     @IsInt()
     @Min(1)
     @Max(100)

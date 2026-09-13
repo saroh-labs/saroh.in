@@ -103,9 +103,10 @@ export class DraftSectionInputDto {
     // so an older client that never sends the field cannot hide anything by
     // omission.
     @IsOptional()
-    // Raw value, not implicit conversion's truthiness: "false" must be
-    // refused, never read as true, which would HIDE the section (#286).
-    @Transform(({ obj }: { obj: Record<string, unknown> }) => obj.hidden)
+    // A real boolean, and nothing else. The pipe used to convert by
+    // truthiness, so this field read the raw value to keep "false" from
+    // HIDING the section (#286); the pipe no longer converts anything (#314),
+    // so `@IsBoolean` is the whole rule again.
     @IsBoolean({ message: "hidden must be a boolean" })
     hidden?: boolean;
 
@@ -214,9 +215,10 @@ export class UpdatePageDto {
      * parked page back on a live site simply by not mentioning it.
      */
     @IsOptional()
-    // Raw value, not implicit conversion's truthiness: "false" must be
-    // refused, never read as true, which would HIDE the section (#286).
-    @Transform(({ obj }: { obj: Record<string, unknown> }) => obj.hidden)
+    // A real boolean, and nothing else. The pipe used to convert by
+    // truthiness, so this field read the raw value to keep "false" from
+    // HIDING the section (#286); the pipe no longer converts anything (#314),
+    // so `@IsBoolean` is the whole rule again.
     @IsBoolean({ message: "hidden must be a boolean" })
     hidden?: boolean;
 }
@@ -252,13 +254,12 @@ export class CreateCommentDto {
  * no whitelist, no type check. `{"resolved": "true"}` silently reopened the
  * note.
  *
- * `resolved` is read RAW, before class-transformer's implicit conversion. That
- * conversion runs first and turns any string into a boolean by truthiness, so
- * `"false"` would settle a note. A real boolean is required, and anything else
- * is a 400.
+ * `resolved` must be a REAL boolean. It used to read the raw value ahead of the
+ * validators, because the pipe converted by truthiness and `"false"` would have
+ * settled a note; the pipe no longer converts anything (#314), so the decorator
+ * says the whole rule and anything but true or false is a 400.
  */
 export class SetCommentResolvedDto {
-    @Transform(({ obj }: { obj: Record<string, unknown> }) => obj.resolved)
     @IsBoolean({ message: "resolved must be true or false" })
     resolved!: boolean;
 }
