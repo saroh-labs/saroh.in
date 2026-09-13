@@ -3,6 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { NotificationsInbox } from "@/components/notifications/notifications-inbox";
+import { PageContainer } from "@/components/shared/page-container";
 import { listNotifications } from "@/lib/notifications/service";
 import { requireSession } from "@/lib/session";
 
@@ -24,7 +25,7 @@ export default async function NotificationsPage() {
     const notifications = await listNotifications();
 
     return (
-        <main className="mx-auto max-w-5xl p-8">
+        <PageContainer>
             <PageHeader
                 title="Notifications"
                 description="New enquiries and activity across your organization."
@@ -36,6 +37,6 @@ export default async function NotificationsPage() {
             />
 
             <NotificationsInbox notifications={notifications} />
-        </main>
+        </PageContainer>
     );
 }

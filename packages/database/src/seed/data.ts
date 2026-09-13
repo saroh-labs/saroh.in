@@ -16,6 +16,21 @@ export const OWNER_EMAIL = "demo@saroh.dev";
 /** Not a secret: this database is allow-listed as development-only. */
 export const OWNER_PASSWORD = "demo-password-123";
 
+/**
+ * Someone invited to look at the website and say what they think (#193, #276).
+ *
+ * REVIEWER is the narrowest role in the product and the hardest to see: it has
+ * its own screen, its own scoping, and a list that holds only the sites it was
+ * invited to. Until this row existed, looking at any of that meant writing a
+ * `Membership` and a `SiteReviewer` by hand, so in practice nobody did — and
+ * the one browser test that could have caught #274 had nobody to sign in as.
+ *
+ * Invited to the FIRST seeded site only. That is the point of the role: the
+ * second site must not appear in their list.
+ */
+export const REVIEWER_EMAIL = "reviewer@saroh.dev";
+export const REVIEWER_PASSWORD = "demo-password-123";
+
 export const ORG_SLUG = "demo-org";
 export const ORG_NAME = "Northwind Supply";
 export const STORE_SLUG = "demo-store";

@@ -23,6 +23,40 @@
 The frontends, `admin.saroh.in` included, decide none of these. They render
 what the API allows.
 
+## The roles — **Current**
+
+`OrgRole` has four values (`common/types/organization-context.ts`), and
+`organization-policy.ts` maps each to a closed set of actions.
+
+| Role       | What it may do                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------- |
+| `OWNER`    | Everything, including `org:delete`.                                                                     |
+| `ADMIN`    | Everything except `org:delete`.                                                                         |
+| `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`. |
+| `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                     |
+
+- **Current** — **REVIEWER is enumerated, never derived** (#276). The read-only
+  floor includes the roster, the stores and the media library; a reviewer is an
+  outside pair of eyes on one site. Deriving their set from the floor would mean
+  every future addition to it silently widened what a reviewer can see.
+- **Current** — **A reviewer's site:read is narrowed per site.**
+  `SiteReviewer(siteId, userId)` is the grant; `reviewerScope(ctx)` in
+  `sites/site-access.ts` is spread into the `where` of every site lookup —
+  `assertSiteInOrg`, `listSites`, `getSite`, `getSiteFlags`, posts, post
+  categories and preview links. A guard would not do: several services query
+  `Site` directly, and a guard is something to forget. An ungranted site is a 404.
+- **Current** — **Membership is assignable, and invitations are hashed.**
+  `OrganizationInvitation` holds the role, a reviewer's sites, and a sha256 of
+  the token; the plaintext exists only in the invitee's email. Seven-day expiry,
+  one live invite per address per org, and accepting spends the token. The
+  routes are `member:read` / `member:invite` / `member:role:update` /
+  `member:remove`, plus `POST /organization-invitations/:token/accept`, which
+  runs on the session alone because the caller is not a member yet.
+- **Current** — **The last OWNER cannot be demoted or removed.** The S1-006
+  invariant, enforced in `organization-members.service.ts` inside a serializable
+  transaction — it is about the state of the roster, not what a role may do, so
+  no role→action map can express it.
+
 ## Rules
 
 - **Current** — **Derive the organization; never accept it.** `:organizationId`

@@ -1,7 +1,8 @@
-import { ForbiddenException, Injectable, Optional } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { authorize } from "../organizations/organization-policy";
 
 /**
  * Provider & dependency health (#123, Task 8).
@@ -14,11 +15,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
  * distinct and actionable; each maps to the exact place to fix it.
  */
 export type HealthStatus =
-    | "NOT_CONFIGURED"
-    | "PENDING"
-    | "ACTIVE"
-    | "DEGRADED"
-    | "FAILED";
+    "NOT_CONFIGURED" | "PENDING" | "ACTIVE" | "DEGRADED" | "FAILED";
 
 export interface ProviderHealth {
     key: "PAYMENTS" | "COMMUNICATIONS" | "DOMAINS";
@@ -43,12 +40,18 @@ export class ProviderHealthService {
     constructor(@Optional() private readonly db: typeof prisma = prisma) {}
 
     async list(ctx: OrganizationContext): Promise<ProviderHealth[]> {
-        // Provider configuration is an OWNER/ADMIN concern.
-        if (ctx.role === "MEMBER") {
-            throw new ForbiddenException(
-                "Only owners and admins can view provider health.",
-            );
-        }
+        /*
+         * Through the policy, not by naming a role.
+         *
+         * This used to refuse `role === "MEMBER"` — a denylist, written when
+         * MEMBER was the only role below ADMIN. REVIEWER arrived later (#276)
+         * and was not in it, so someone invited to look at one website could
+         * read which payment and messaging providers the business runs on and
+         * whether each was healthy. Nothing was wrong with the intent; the
+         * shape was wrong, and a denylist is wrong again the next time a role
+         * is added. `provider:read` is OWNER/ADMIN by construction.
+         */
+        authorize(ctx, "provider:read");
         const where = { organizationId: ctx.organizationId };
 
         const [payments, comms, domains] = await Promise.all([

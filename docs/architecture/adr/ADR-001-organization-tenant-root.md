@@ -34,9 +34,10 @@ This ambiguity is the root problem S1-001 resolves.
 
 ### Role vocabulary (canonical)
 
-- **Organization roles** (on `Membership`): `OWNER`, `ADMIN`, `MEMBER`. OWNER/ADMIN see every Project; MEMBER access is direct or Team-derived.
+- **Organization roles** (on `Membership`): `OWNER`, `ADMIN`, `MEMBER`, `REVIEWER`. OWNER/ADMIN see every Project; MEMBER access is direct or Team-derived. `REVIEWER` (#276) is website-only — `site:read`, `site:comment`, `site:approve` and nothing else, not even the read-only floor — and sees no Projects.
 - **Project roles** (later, S1-010, on Team/direct `ProjectAccess`): `MANAGER`, `EDITOR`, `VIEWER`.
-- These are the _only_ role enums. `StoreOwner.role` (OWNER/ADMIN) and `WorkspaceMember.role` (OWNER/ADMIN/MEMBER) collapse into Organization `Membership.role`.
+- These are the _only_ role enums. `StoreOwner.role` (OWNER/ADMIN) and `WorkspaceMember.role` (OWNER/ADMIN/MEMBER) collapse into Organization `Membership.role`. `OrganizationInvitation.role` carries the same four values.
+- `SiteReviewer(siteId, userId)` is **not** a role enum — it is a per-site grant that narrows `REVIEWER`, which is how one role can mean "this site" without a role per site. An ungranted site 404s.
 
 ## 3. Canonical vocabulary
 

@@ -24,25 +24,25 @@ A pattern that a lint rule, a check script or a test can enforce is enforced
 there, and the file names the enforcement. Trust the enforcement; read the file
 for the reason, so the enforcement is not mistaken for bureaucracy and removed.
 
-| File                                                                 | Read when                                                                                                    |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [00-universal.md](00-universal.md)                                   | Before any change                                                                                            |
-| [saroh-product.md](saroh-product.md)                                 | Designing or changing anything a merchant sees, deciding what to build, or writing copy, a claim or a status |
-| [frontend-app-structure.md](frontend-app-structure.md)               | Adding a route, page, layout, component or `lib/` module in a Next app                                       |
-| [frontend-data-and-state.md](frontend-data-and-state.md)             | Reading or writing API data from a Next app, or adding client or URL state                                   |
-| [frontend-forms.md](frontend-forms.md)                               | Building or changing a form                                                                                  |
-| [frontend-error-feedback.md](frontend-error-feedback.md)             | Showing a toast, an error, an empty or loading state, or touching session redirects                          |
-| [frontend-design-system.md](frontend-design-system.md)               | Styling, tokens, skins, icons, motion, accessibility, or anything drawn on a merchant's page                 |
-| [frontend-verification.md](frontend-verification.md)                 | Before calling a UI change done                                                                              |
-| [backend-nestjs.md](backend-nestjs.md)                               | Adding or changing an API module, controller, service, DTO or guard                                          |
-| [backend-data-and-money.md](backend-data-and-money.md)               | Changing the schema, adding a tenant-owned model, storing money, or shipping a migration                     |
-| [backend-auth-and-access.md](backend-auth-and-access.md)             | Touching sessions, organization context, roles, capability gates, entitlements or staff access               |
-| [backend-jobs.md](backend-jobs.md)                                   | Enqueueing a background job, or writing or registering a handler                                             |
-| [backend-integrations.md](backend-integrations.md)                   | Calling a payment, billing, messaging or storage provider, or receiving a webhook                            |
-| [devops-environments-and-flags.md](devops-environments-and-flags.md) | Adding an env variable, an environment check or a feature flag                                               |
-| [devops-secrets.md](devops-secrets.md)                               | Handling a credential, or finding one where it should not be                                                 |
-| [devops-observability.md](devops-observability.md)                   | Adding logging, a degraded path, a health check or error tracking                                            |
-| [devops-tooling-and-deploy.md](devops-tooling-and-deploy.md)         | Changing lint, TypeScript, CI, tests or dependencies, or shipping the API                                    |
+| File                                                                 | Read when                                                                                                               |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| [00-universal.md](00-universal.md)                                   | Before any change                                                                                                       |
+| [saroh-product.md](saroh-product.md)                                 | Designing or changing anything a merchant sees, deciding what to build, or writing copy, a claim or a status            |
+| [frontend-app-structure.md](frontend-app-structure.md)               | Adding a route, page, layout, component or `lib/` module in a Next app                                                  |
+| [frontend-data-and-state.md](frontend-data-and-state.md)             | Reading or writing API data from a Next app, or adding client or URL state                                              |
+| [frontend-forms.md](frontend-forms.md)                               | Building or changing a form                                                                                             |
+| [frontend-error-feedback.md](frontend-error-feedback.md)             | Showing a toast, an error, an empty or loading state, or touching session redirects                                     |
+| [frontend-design-system.md](frontend-design-system.md)               | Styling, tokens, skins, icons, motion, accessibility, or anything drawn on a merchant's page                            |
+| [frontend-verification.md](frontend-verification.md)                 | Before calling a UI change done                                                                                         |
+| [backend-nestjs.md](backend-nestjs.md)                               | Adding or changing an API module, controller, service, DTO or guard                                                     |
+| [backend-data-and-money.md](backend-data-and-money.md)               | Changing the schema, adding a tenant-owned model, storing money, or shipping a migration                                |
+| [backend-auth-and-access.md](backend-auth-and-access.md)             | Touching sessions, organization context, roles, membership, invitations, capability gates, entitlements or staff access |
+| [backend-jobs.md](backend-jobs.md)                                   | Enqueueing a background job, or writing or registering a handler                                                        |
+| [backend-integrations.md](backend-integrations.md)                   | Calling a payment, billing, messaging or storage provider, or receiving a webhook                                       |
+| [devops-environments-and-flags.md](devops-environments-and-flags.md) | Adding an env variable, an environment check or a feature flag                                                          |
+| [devops-secrets.md](devops-secrets.md)                               | Handling a credential, or finding one where it should not be                                                            |
+| [devops-observability.md](devops-observability.md)                   | Adding logging, a degraded path, a health check or error tracking                                                       |
+| [devops-tooling-and-deploy.md](devops-tooling-and-deploy.md)         | Changing lint, TypeScript, CI, tests or dependencies, or shipping the API                                               |
 
 ## Not adopted from the library
 

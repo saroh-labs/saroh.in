@@ -11,6 +11,12 @@
 
 ## 1. The problem we are fixing
 
+> **Resolved, 2026-09-12.** The container half of this is done:
+> `components/shared/page-container.tsx` in `app.saroh.in` is the one wrapper,
+> with three of the widths below (`form` `max-w-2xl`, default `max-w-5xl`,
+> `wide` `max-w-7xl`) and a single left-aligned gutter. The audit that follows
+> describes what it replaced. The shared page HEADER is still per-page.
+
 Today **every page hand-rolls its own container and header**. There is no shared
 layout primitive, so widths and heading markup drift page to page:
 

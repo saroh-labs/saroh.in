@@ -18,6 +18,11 @@
   `docs/architecture/RLS_ROLLOUT_AND_OPS.md`. Application filters stay mandatory.
 - **Current** — **Publications are immutable,** and the public renderer reads only
   them (ADR-002). No draft table is ever on the public read path.
+  **A public write that depends on what the site shows reads the publication
+  too.** An enquiry submission is validated against the form fields in the
+  current snapshot, not the `Form` row the editor rewrites on every autosave
+  (#281). Validating against the draft let an unpublished edit refuse live
+  visitors.
 - **Current** — **Disabling a capability never deletes data;** deactivation runs a
   policy (§25, ADR-003).
 

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { PostArticle } from "@/components/post-view";
+import { PreviewGone } from "@/components/preview-gone";
 import {
     getPreviewByToken,
     getPreviewPost,
@@ -31,8 +32,11 @@ export default async function PreviewPostPage({
 }) {
     const { token, slug, postSlug } = await params;
     const preview = await getPreviewByToken(token);
-    // The layout has already explained an expired or revoked link.
-    if (!preview.ok) return null;
+    // Explained here too, not left blank: see the home page's note (#284).
+    if (!preview.ok) {
+        if (preview.reason === "missing") notFound();
+        return <PreviewGone reason={preview.reason} />;
+    }
 
     // Only under the merchant's own prefix. Without this a post would answer
     // at every two-segment path in the preview, which the live site does not do.

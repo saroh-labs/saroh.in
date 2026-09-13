@@ -1,6 +1,7 @@
 import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
+import { PageContainer } from "@/components/shared/page-container";
 import { PostCategoriesManager } from "@/components/sites/post-categories-manager";
 import { listPostCategories } from "@/lib/content/service";
 import { requireSession } from "@/lib/session";
@@ -19,12 +20,12 @@ export default async function PostCategoriesPage({
     const categories = await listPostCategories(siteId);
 
     return (
-        <div className="space-y-6">
+        <PageContainer width="form">
             <PageHeader
                 title="Post categories"
                 description="Group this site's posts."
             />
             <PostCategoriesManager siteId={siteId} categories={categories} />
-        </div>
+        </PageContainer>
     );
 }

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { SiteTheme } from "@saroh/site-blocks";
 
+import { PreviewGone } from "@/components/preview-gone";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { getPreviewByToken } from "@/lib/publication";
 
@@ -101,29 +102,6 @@ function PreviewBar({
                 This link stops working on {longDate(expiresAt)}.
             </span>
         </div>
-    );
-}
-
-/** A dead link explains itself; it does not 404. */
-function PreviewGone({ reason }: { reason: "expired" | "revoked" }) {
-    return (
-        <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-6 text-neutral-900">
-            <div className="max-w-md space-y-3 text-center">
-                <p className="text-xs uppercase tracking-wide text-neutral-500">
-                    Draft preview
-                </p>
-                <h1 className="text-xl font-semibold">
-                    {reason === "revoked"
-                        ? "This preview link was taken back."
-                        : "This preview link has stopped working."}
-                </h1>
-                <p className="text-sm text-neutral-600">
-                    {reason === "revoked"
-                        ? "Whoever shared it with you turned it off. Ask them for a new one if you still need to look."
-                        : "Preview links last a set number of days. Ask whoever shared it for a new one."}
-                </p>
-            </div>
-        </main>
     );
 }
 

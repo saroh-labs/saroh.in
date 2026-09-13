@@ -15,13 +15,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-import type { NavCounts } from "@/components/shared/nav-items";
+import type { NavCounts, NavRole } from "@/components/shared/nav-items";
 import {
-    NAV_GROUPS,
     NOTIFICATIONS_HREF,
-    filterNavGroups,
     isNavItemActive,
-    navGroupsWithSites,
+    navFor,
     showsGroupLabel,
 } from "@/components/shared/nav-items";
 
@@ -34,6 +32,7 @@ import {
 export function MobileNav({
     unread = 0,
     moduleKeys = null,
+    role = null,
     counts,
     sites = [],
     organizationName,
@@ -41,6 +40,8 @@ export function MobileNav({
     unread?: number;
     /** `null` = availability unknown; see `filterNavGroups`. */
     moduleKeys?: string[] | null;
+    /** The actor's role here; `null` = unknown, and the nav fails open. */
+    role?: NavRole | null;
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
     /** The merchant's own sites, hung under Website — same tree as the rail. */
@@ -50,10 +51,7 @@ export function MobileNav({
 }) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
-    const groups = filterNavGroups(
-        navGroupsWithSites(NAV_GROUPS, sites),
-        moduleKeys,
-    );
+    const groups = navFor({ role, moduleKeys, sites });
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>

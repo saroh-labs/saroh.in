@@ -6,6 +6,7 @@ import { Card, CardContent } from "@saroh/ui/card";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { History } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -27,9 +28,24 @@ import type { SitePublication } from "@/lib/sites/service";
 export function SiteVersions({
     siteId,
     publications,
+    changesRequested,
+    canRestore,
 }: {
     siteId: string;
     publications: SitePublication[];
+    /**
+     * Whether this caller may put a version back (#275). Restoring is a
+     * publish, so it needs `site:publish`; without it the control is absent
+     * rather than disabled — a Restore that refuses on the press is where a
+     * merchant currently learns the rule.
+     */
+    canRestore: boolean;
+    /**
+     * A reviewer's change request is outstanding (#279). Restoring still works,
+     * because the rule is recorded, not prevented. But the confirm says so
+     * before it happens, as the pre-publish check does for a publish.
+     */
+    changesRequested: boolean;
 }) {
     const router = useRouter();
     const [confirming, setConfirming] = useState<string | null>(null);
@@ -56,7 +72,11 @@ export function SiteVersions({
             }
             setConfirming(null);
             router.refresh();
-            showSuccess("That version is live again.");
+            showSuccess(
+                res.data.bypassed
+                    ? "That version is live again. Going live without approval is recorded in this list."
+                    : "That version is live again.",
+            );
         });
     }
 
@@ -82,10 +102,31 @@ export function SiteVersions({
                                             </Badge>
                                         ) : null}
                                     </div>
+                                    {/*
+                                     * Who put it live (#283), and whether a
+                                     * reviewer approved it (#278).
+                                     *
+                                     * The row used to read "Template starter
+                                     * v1", which every publication is stamped
+                                     * with and so told a merchant nothing.
+                                     *
+                                     * The route line appears only when it says
+                                     * something to act on: a bypass already
+                                     * has the warning below, and "nobody was
+                                     * asked" is the ordinary case — repeating
+                                     * it down a list of fifteen versions is
+                                     * noise.
+                                     */}
                                     <p className="text-xs text-muted-foreground">
-                                        Template {p.templateId} v
-                                        {p.templateVersion}
+                                        {p.publishedBy
+                                            ? `Published by ${p.publishedBy}`
+                                            : "Publisher not recorded"}
                                     </p>
+                                    {p.reviewRoute === "APPROVED" ? (
+                                        <p className="text-xs text-muted-foreground">
+                                            A reviewer approved this version
+                                        </p>
+                                    ) : null}
                                     {p.bypass ? (
                                         /*
                                          * The record the epic asked for (#199):
@@ -103,36 +144,54 @@ export function SiteVersions({
                                     ) : null}
                                 </div>
 
-                                {p.isCurrent ? null : confirming === p.id ? (
-                                    <div className="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="brand"
-                                            disabled={pending}
-                                            onClick={() => onRestore(p.id)}
+                                {/* One actions group: with these loose in a
+                                 * justify-between row, Preview drifted into
+                                 * the dead space between the date and
+                                 * Restore. */}
+                                <div className="flex items-center gap-2">
+                                    <Button size="sm" variant="ghost" asChild>
+                                        <Link
+                                            href={`/sites/${siteId}/versions/${p.id}`}
                                         >
-                                            {pending
-                                                ? "Restoring…"
-                                                : "Yes, restore"}
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            disabled={pending}
-                                            onClick={() => setConfirming(null)}
-                                        >
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setConfirming(p.id)}
-                                    >
-                                        Restore
+                                            Preview
+                                        </Link>
                                     </Button>
-                                )}
+                                    {p.isCurrent ||
+                                    !canRestore ? null : confirming === p.id ? (
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="brand"
+                                                disabled={pending}
+                                                onClick={() => onRestore(p.id)}
+                                            >
+                                                {pending
+                                                    ? "Restoring…"
+                                                    : changesRequested
+                                                      ? "Restore without approval"
+                                                      : "Yes, restore"}
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                disabled={pending}
+                                                onClick={() =>
+                                                    setConfirming(null)
+                                                }
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setConfirming(p.id)}
+                                        >
+                                            Restore
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
                             {confirming === p.id ? (
@@ -145,6 +204,9 @@ export function SiteVersions({
                                     published again as a new entry, so you can
                                     undo it from this same list. Your
                                     unpublished draft is left alone.
+                                    {changesRequested
+                                        ? " A reviewer has asked for changes, so this goes live without their approval, and this list will record that it did."
+                                        : null}
                                 </p>
                             ) : null}
                         </CardContent>

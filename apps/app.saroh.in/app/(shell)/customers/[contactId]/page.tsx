@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { CustomerTimeline } from "@/components/customers/customer-timeline";
 import { IdentityLinkDialog } from "@/components/customers/identity-link-dialog";
+import { PageContainer } from "@/components/shared/page-container";
 import { getContact } from "@/lib/contacts/service";
 import { getSuggestions, getTimeline } from "@/lib/customer-workspace/service";
 import { requireSession } from "@/lib/session";
@@ -34,7 +35,7 @@ export default async function CustomerWorkspacePage({
         contact.email;
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        <PageContainer>
             <PageHeader
                 title={name}
                 description={contact.email}
@@ -46,6 +47,6 @@ export default async function CustomerWorkspacePage({
                 }
             />
             <CustomerTimeline events={events} />
-        </main>
+        </PageContainer>
     );
 }

@@ -3,6 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { BookingsView } from "@/components/bookings/bookings-view";
+import { PageContainer } from "@/components/shared/page-container";
 import { listBookingsWithPast } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
@@ -38,7 +39,7 @@ export default async function BookingsPage({
     ]);
 
     return (
-        <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">
+        <PageContainer width="wide">
             <PageHeader
                 title="Bookings"
                 description="Reservations across your services, in the timezone each was booked in."
@@ -54,6 +55,6 @@ export default async function BookingsPage({
                     initialView={viewParam(params)}
                 />
             </div>
-        </main>
+        </PageContainer>
     );
 }

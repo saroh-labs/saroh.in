@@ -37,12 +37,29 @@ const transporter = getTransporter();
 // Minimal inline HTML. The richer React-Email templates in @saroh/emails need
 // that package to ship a build (it currently exports raw .tsx, unusable from
 // plain Node) — wiring them is a follow-up; links are delivered fine here.
+/**
+ * Escape a value before it lands in the HTML above.
+ *
+ * These bodies carry tenant-chosen text — an organization's name, a site's
+ * name — which is to say text a stranger can choose. Interpolating it raw put
+ * whatever they typed into an email we send in our own name.
+ */
+function esc(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 function actionEmail(heading: string, body: string, url: string, cta: string) {
+    const href = esc(url);
     return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-  <h2>${heading}</h2>
-  <p>${body}</p>
-  <p><a href="${url}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">${cta}</a></p>
-  <p style="color:#666;font-size:12px">Or paste this link: ${url}</p>
+  <h2>${esc(heading)}</h2>
+  <p>${esc(body)}</p>
+  <p><a href="${href}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">${esc(cta)}</a></p>
+  <p style="color:#666;font-size:12px">Or paste this link: ${href}</p>
 </div>`;
 }
 
@@ -110,10 +127,7 @@ const OTP_COPY: Record<
 };
 
 export type VerificationOtpType =
-    | "sign-in"
-    | "email-verification"
-    | "forget-password"
-    | "change-email";
+    "sign-in" | "email-verification" | "forget-password" | "change-email";
 
 /**
  * Deliver a one-time code. This is what a signing-up user actually receives —
@@ -302,6 +316,38 @@ export function sendStoreInvitationEmail(
         html: actionEmail(
             `Join ${storeName}`,
             `You've been invited to collaborate on ${storeName}. Accept below to join the team.`,
+            acceptUrl,
+            "Accept invitation",
+        ),
+    });
+    return Promise.resolve();
+}
+
+/**
+ * Invite someone to an ORGANIZATION (#276) — the tenant root, not a store.
+ *
+ * The subject names the workspace because the recipient often knows the
+ * business and has never heard of Saroh: an outside reviewer asked to look at
+ * a client's site should not have to guess what the email is about.
+ */
+export function sendOrganizationInvitationEmail(
+    to: string,
+    acceptUrl: string,
+    organizationName: string,
+): Promise<void> {
+    if (!transporter) {
+        console.info(
+            `[Workspace invite] (no SMTP) ${to} -> ${organizationName}: ${acceptUrl}`,
+        );
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: `You've been invited to ${organizationName} on Saroh`,
+        html: actionEmail(
+            `Join ${organizationName}`,
+            `You've been invited to work on ${organizationName} in Saroh. Accept below to join — the link expires in a week.`,
             acceptUrl,
             "Accept invitation",
         ),

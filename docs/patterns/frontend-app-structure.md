@@ -25,6 +25,15 @@ components/shared/             app shell, navigation, command menu
 
 ## Rules
 
+- **Current** — **Every shell page renders inside `PageContainer`.**
+  `components/shared/page-container.tsx` owns the page's gutter and measure, so
+  a screen cannot arrive with its own. Three widths, the scale
+  `docs/design-system/04_LAYOUT_SYSTEM.md` proposed: `form` (`max-w-2xl`,
+  settings and create/edit forms), the default (`max-w-5xl`, lists, details and
+  dashboards) and `wide` (`max-w-7xl`, tables, boards and analytics grids).
+  It is LEFT-ALIGNED: centring each page inside its own max-width moved the
+  heading between screens, which is what made the app feel unsettled. Full-bleed
+  editors — the site editor, the post editor — are deliberately outside it.
 - **Current** — **Pages are Server Components that read.** A `page.tsx` calls
   `requireSession()` and its `lib/<domain>/service.ts`, and may hold
   view-shaping helpers for that page (`siteState()` in `sites/page.tsx`).

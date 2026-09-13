@@ -9,6 +9,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
 import { sanitizeRichHtml } from "../sites/sanitize";
+import { assertSiteInOrg, reviewerScope } from "../sites/site-access";
 import { slugify } from "../stores/slug";
 import type { CreatePostDto, PostStatus, UpdatePostDto } from "./dto";
 import { postPath } from "./posts-prefix";
@@ -328,6 +329,7 @@ export class PostsService {
                 id: siteId,
                 organizationId: ctx.organizationId,
                 deletedAt: null,
+                ...reviewerScope(ctx),
             },
             select: { id: true, postsPrefix: true },
         });
@@ -338,24 +340,17 @@ export class PostsService {
     }
 
     /**
-     * Prove the site belongs to the ctx org, or 404 — a 404 rather than a 403
-     * so a caller cannot probe which sites exist in another organization.
+     * Prove the site is one this caller may reach, or 404 — a 404 rather than a
+     * 403 so a caller cannot probe which sites exist in another organization.
+     *
+     * The shared helper, not a copy: it is where the reviewer scope lives
+     * (#276), and a second implementation is a site a reviewer can still read.
      */
     private async assertSiteInOrg(
         ctx: OrganizationContext,
         siteId: string,
     ): Promise<void> {
-        const site = await prisma.site.findFirst({
-            where: {
-                id: siteId,
-                organizationId: ctx.organizationId,
-                deletedAt: null,
-            },
-            select: { id: true },
-        });
-        if (!site) {
-            throw new NotFoundException(`Site "${siteId}" not found`);
-        }
+        await assertSiteInOrg(ctx, siteId);
     }
 
     private async assertSlugFree(siteId: string, slug: string): Promise<void> {

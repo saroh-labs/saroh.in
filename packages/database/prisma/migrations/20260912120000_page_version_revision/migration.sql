@@ -1,0 +1,11 @@
+-- Which edit of a draft the sections are (#285).
+--
+-- Saving a draft deletes every section on the page and recreates the list the
+-- client sent. With no revision to check, two tabs — or two people — on one
+-- page each save their whole list and the last write wins: the other person's
+-- edits vanish with no conflict, no error and no trace, and any note pinned to
+-- a section only they had is orphaned with them.
+--
+-- Defaults to 0, so every draft that already exists starts at a revision the
+-- editor will be handed on its next load. Nothing needs backfilling.
+ALTER TABLE "PageVersion" ADD COLUMN "revision" INTEGER NOT NULL DEFAULT 0;

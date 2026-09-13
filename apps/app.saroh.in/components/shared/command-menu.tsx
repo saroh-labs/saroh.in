@@ -24,7 +24,8 @@ import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 
-import { NAV_GROUPS, filterNavGroups, navGroupsWithSites } from "./nav-items";
+import type { NavAction, NavRole } from "./nav-items";
+import { navFor, navRoleCan } from "./nav-items";
 
 const OPEN_EVENT = "saroh:open-command";
 
@@ -100,11 +101,21 @@ const HELP_ITEMS: { label: string; topic: HelpTopic }[] = [
  * with: a confident call to action that terminates in "Page not found".
  * `pnpm check:routes` fails the build on these, and it is checked here.
  */
+/*
+ * Quick actions. Every one of them MAKES something, so every one of them needs
+ * a role that may: the palette was offering "New site" to a reviewer, whose
+ * only powers are reading a site and saying what they think (#313).
+ *
+ * The other two are module-gated and the module gate already asks the API
+ * whether this actor is authorized, so `COMMERCE` and `APPOINTMENTS` never
+ * reach a role that could not use them.
+ */
 const ACTIONS: {
     href: string;
     label: string;
     icon: typeof UserRound;
     moduleKey?: string;
+    action?: NavAction;
 }[] = [
     {
         href: "/services/new",
@@ -117,6 +128,7 @@ const ACTIONS: {
         label: "New site",
         icon: Globe,
         moduleKey: "WEBSITE",
+        action: "site:create",
     },
     {
         href: "/stores/new",
@@ -150,9 +162,12 @@ const ACTIONS: {
  */
 export function CommandMenu({
     moduleKeys = null,
+    role = null,
     sites = [],
 }: {
     moduleKeys?: string[] | null;
+    /** The actor's role here; `null` = unknown, and the palette fails open. */
+    role?: NavRole | null;
     /**
      * The merchant's own sites. They join the nav results, so a site is
      * reachable by typing its name — which is the payoff for putting the tree
@@ -165,14 +180,13 @@ export function CommandMenu({
     const [query, setQuery] = useState("");
     const [hits, setHits] = useState<SearchHit[]>([]);
     const [searching, setSearching] = useState(false);
-    const groups = filterNavGroups(
-        navGroupsWithSites(NAV_GROUPS, sites),
-        moduleKeys,
-    );
+    const groups = navFor({ role, moduleKeys, sites });
 
     const available = moduleKeys === null ? null : new Set(moduleKeys);
     const actions = ACTIONS.filter(
-        (a) => !a.moduleKey || !available || available.has(a.moduleKey),
+        (a) =>
+            (!a.moduleKey || !available || available.has(a.moduleKey)) &&
+            (!a.action || navRoleCan(role, a.action)),
     );
 
     useEffect(() => {

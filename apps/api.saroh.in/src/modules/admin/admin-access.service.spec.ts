@@ -24,6 +24,7 @@ import {
     ConflictException,
     ForbiddenException,
     NotFoundException,
+    ServiceUnavailableException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
@@ -262,6 +263,25 @@ describe("AdminAccessService", () => {
                 intent: "READ",
             }),
         ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // SEC-008. The refusal itself is not the point — that already worked. The
+    // point is that a denial nobody could write down must not come back looking
+    // like a normally-audited 403, because that is indistinguishable from a
+    // denial that WAS recorded and leaves an incident with no evidence.
+    it("fails the request when a denial cannot be audited", async () => {
+        audit.write.mockRejectedValueOnce(
+            new Error("audit ledger unavailable"),
+        );
+
+        await expect(
+            service.authorize({
+                sessionId: "access_1",
+                organizationId: "org_1",
+                staff,
+                intent: "WRITE",
+            }),
+        ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
     it("expires and audits a stale session", async () => {

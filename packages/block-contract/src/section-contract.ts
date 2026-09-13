@@ -91,9 +91,49 @@ const paddingOverride = z.number().int().min(24).max(96).optional();
  */
 const variant = z.string().min(1).optional();
 
+/**
+ * The link schemes a button may use (#280).
+ *
+ * A button's href reaches the live site as an `<a href>`, and `javascript:`
+ * there runs script for every visitor on the merchant's own domain. React 19
+ * happens to refuse such URLs today; the contract should not depend on that.
+ * So a link is a web address, an email or phone link, or a path on the site.
+ * Anything else that carries a scheme is refused when it is authored.
+ */
+const SAFE_LINK_SCHEMES: readonly string[] = ["http", "https", "mailto", "tel"];
+
+/**
+ * Whether an authored href is safe to draw as a link on a merchant's site.
+ *
+ * The scheme is read the way a browser reads it: tabs, newlines, spaces and
+ * other control characters are removed first, so `java\nscript:` cannot pass
+ * as a relative path. A value with no scheme (`/products`, `#contact`,
+ * `products`) is a path on the site and is allowed.
+ */
+export function isSafeHref(href: string): boolean {
+    const compact = Array.from(href)
+        .filter((ch) => {
+            const code = ch.charCodeAt(0);
+            return code > 0x20 && code !== 0x7f;
+        })
+        .join("");
+    const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(compact)?.[1];
+    return (
+        scheme === undefined || SAFE_LINK_SCHEMES.includes(scheme.toLowerCase())
+    );
+}
+
+const linkHref = z
+    .string()
+    .min(1)
+    .refine(
+        isSafeHref,
+        "A link must be a web address, an email or phone link, or a path on this site",
+    );
+
 const ctaSchema = z.object({
     label: z.string().min(1),
-    href: z.string().min(1),
+    href: linkHref,
     style: z.enum(["primary", "secondary", "link"]).default("primary"),
 });
 
@@ -123,7 +163,7 @@ const phone = z
 
 export const ctaActionSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("page"), pageId: z.string().min(1) }),
-    z.object({ kind: z.literal("url"), href: z.string().min(1) }),
+    z.object({ kind: z.literal("url"), href: linkHref }),
     z.object({
         kind: z.literal("email"),
         address: z.string().trim().email("Enter an email address"),
@@ -168,7 +208,10 @@ export function ctaHref(
         case "page":
             return resolvePage(action.pageId) ?? "";
         case "url":
-            return action.href;
+            // Checked again here, not only by the contract: a url saved before
+            // the contract refused unsafe schemes (#280) still reaches this,
+            // and drawing no link beats drawing a script.
+            return isSafeHref(action.href) ? action.href : "";
         case "email": {
             const q = action.subject?.trim()
                 ? `?subject=${encodeURIComponent(action.subject.trim())}`
@@ -210,8 +253,9 @@ const heroV1 = z.object({
 
 /**
  * richText v1 — authorable rich content. REQUIRES SANITIZATION: `value` holds
- * HTML/markdown authored in the editor and MUST be sanitized during publish
- * before it reaches the immutable snapshot (see `sanitizedFields` below).
+ * HTML/markdown authored in the editor. The API sanitizes it when a draft is
+ * saved, when the editor loads it and at publish (#280), all driven by
+ * `sanitizedFields` below.
  */
 const richTextV1 = z.object({
     variant,
@@ -225,7 +269,7 @@ const ctaV1 = z.object({
     variant,
     padding: paddingOverride,
     label: z.string().min(1),
-    href: z.string().min(1),
+    href: linkHref,
     style: z.enum(["primary", "secondary", "link"]).default("primary"),
 });
 

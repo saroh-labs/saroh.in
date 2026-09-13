@@ -66,6 +66,9 @@ module.exports = {
         "<rootDir>/src/modules/capabilities/capabilities.controller.spec.ts",
         // #117 dark module-enforcement guard (mocked reflector + availability).
         "<rootDir>/src/modules/capabilities/module-enforcement.guard.spec.ts",
+        // #274 the same guard with the REAL availability service, per role:
+        // which roles reach which module under MODULE_ENFORCEMENT (mocked I/O).
+        "<rootDir>/src/modules/capabilities/module-enforcement.roles.spec.ts",
         // S1-006 store authorization: pure unit specs with mocked Prisma +
         // mocked FeatureFlagService (never touch a DB). Only *.authorization
         // specs run here; the legacy DB-backed stores.service.spec.ts stays in

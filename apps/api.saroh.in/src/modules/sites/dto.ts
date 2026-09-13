@@ -103,13 +103,17 @@ export class DraftSectionInputDto {
     // so an older client that never sends the field cannot hide anything by
     // omission.
     @IsOptional()
+    // A real boolean, and nothing else. The pipe used to convert by
+    // truthiness, so this field read the raw value to keep "false" from
+    // HIDING the section (#286); the pipe no longer converts anything (#314),
+    // so `@IsBoolean` is the whole rule again.
     @IsBoolean({ message: "hidden must be a boolean" })
     hidden?: boolean;
 
     /*
-     * The section's stable identity across saves. The editor sends back the key
-     * it was given for an existing section and omits it for a new one, which
-     * the server then mints.
+     * The section's stable identity across saves. The editor mints one when the
+     * section is added (#277) and sends it back on every save; a request that
+     * omits it still works, and the server mints one.
      *
      * This is what a reviewer's note is pinned to, so sending the WRONG key
      * moves someone's comment onto a different section. It is not a security
@@ -131,6 +135,19 @@ export class DraftSectionInputDto {
  * An empty array is allowed and clears the draft's sections.
  */
 export class UpdateDraftSectionsDto {
+    /**
+     * The revision the editor was handed when it loaded this draft (#285).
+     *
+     * Optional, and checked when present: a save that carries one the server
+     * has moved past is refused with 409 rather than deleting whatever the
+     * other editor wrote. A caller that sends none never read the draft, so it
+     * cannot be overwriting an edit it saw.
+     */
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    revision?: number;
+
     @IsArray()
     @ArrayMaxSize(200)
     @ValidateNested({ each: true })
@@ -198,6 +215,10 @@ export class UpdatePageDto {
      * parked page back on a live site simply by not mentioning it.
      */
     @IsOptional()
+    // A real boolean, and nothing else. The pipe used to convert by
+    // truthiness, so this field read the raw value to keep "false" from
+    // HIDING the section (#286); the pipe no longer converts anything (#314),
+    // so `@IsBoolean` is the whole rule again.
     @IsBoolean({ message: "hidden must be a boolean" })
     hidden?: boolean;
 }
@@ -223,6 +244,24 @@ export class CreateCommentDto {
     @MinLength(1, { message: "sectionKey is required" })
     @MaxLength(64)
     sectionKey!: string;
+}
+
+/**
+ * Mark a note settled, or reopen it (#286).
+ *
+ * This body used to be an inline `{ resolved?: boolean }`. An inline type
+ * reflects as `Object`, and the ValidationPipe validates nothing for `Object`:
+ * no whitelist, no type check. `{"resolved": "true"}` silently reopened the
+ * note.
+ *
+ * `resolved` must be a REAL boolean. It used to read the raw value ahead of the
+ * validators, because the pipe converted by truthiness and `"false"` would have
+ * settled a note; the pipe no longer converts anything (#314), so the decorator
+ * says the whole rule and anything but true or false is a 400.
+ */
+export class SetCommentResolvedDto {
+    @IsBoolean({ message: "resolved must be true or false" })
+    resolved!: boolean;
 }
 
 /**

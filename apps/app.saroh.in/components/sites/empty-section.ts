@@ -1,21 +1,38 @@
 import type { Section, SectionType } from "@/lib/sites/service";
 
+/**
+ * A new section carries its key from the moment it exists (#277).
+ *
+ * The server used to mint it (`claimKey`) and the editor never merged the
+ * returned keys back into local state, so every autosave gave a just-added
+ * section a NEW key until the page was reloaded. A note pinned in between was
+ * attached to a key that no longer existed a few seconds later, and read as
+ * orphaned for ever after. `claimKey` keeps a key the client supplies, so
+ * minting it here is enough to make it stable.
+ */
+function newKey(): string {
+    return crypto.randomUUID();
+}
+
 export function emptySection(type: SectionType): Section {
     switch (type) {
         case "hero":
             return {
+                key: newKey(),
                 type,
                 contractVersion: 1,
                 content: { heading: "", subheading: "" },
             };
         case "richText":
             return {
+                key: newKey(),
                 type,
                 contractVersion: 1,
                 content: { format: "html", value: "" },
             };
         case "cta":
             return {
+                key: newKey(),
                 type,
                 contractVersion: 2,
                 content: {
@@ -26,12 +43,14 @@ export function emptySection(type: SectionType): Section {
             };
         case "gallery":
             return {
+                key: newKey(),
                 type,
                 contractVersion: 1,
                 content: { images: [], layout: "grid" },
             };
         case "enquiry":
             return {
+                key: newKey(),
                 type,
                 contractVersion: 1,
                 content: {
@@ -57,6 +76,7 @@ export function emptySection(type: SectionType): Section {
              * they are filling in rather than an empty box with an Add button.
              */
             return {
+                key: newKey(),
                 type,
                 contractVersion: 1,
                 content: {
@@ -66,6 +86,7 @@ export function emptySection(type: SectionType): Section {
             };
         case "booking":
             return {
+                key: newKey(),
                 type,
                 contractVersion: 1,
                 content: {

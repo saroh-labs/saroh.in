@@ -5,7 +5,12 @@ import {
     InternalServerErrorException,
     NotFoundException,
 } from "@nestjs/common";
-import { parseSectionContent, Prisma, prisma } from "@saroh/database";
+import {
+    getSectionContract,
+    parseSectionContent,
+    Prisma,
+    prisma,
+} from "@saroh/database";
 import {
     getTemplate,
     instantiateTemplate,
@@ -18,7 +23,7 @@ import { randomUUID } from "node:crypto";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { parsePostsPrefix } from "../content/posts-prefix";
-import { authorize } from "../organizations/organization-policy";
+import { authorize, can } from "../organizations/organization-policy";
 import type {
     CreateApprovalDto,
     CreateCommentDto,
@@ -28,19 +33,26 @@ import type {
     UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
+import type { SiteChangeKind } from "./pending-changes";
 import {
     countPendingSectionChanges,
     pagePathResolver,
+    pendingSiteChanges,
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
-import { sanitizeRichHtml } from "./sanitize";
+import type { Renderability } from "./publication-renderability";
+import { checkRenderability } from "./publication-renderability";
+import type { ApprovalRow, ReviewRoute } from "./review-route";
+import { draftFingerprint, reviewStanding } from "./review-route";
+import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
 import {
     assertPageInSite,
     assertPathIsFree,
     assertSiteInOrg,
     buildTemplateContext,
     getOrCreateDraftVersion,
+    reviewerScope,
 } from "./site-access";
 import type { Flag, FlagType } from "./site-flags";
 import { checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
@@ -86,7 +98,8 @@ export interface CreatedSite {
 /** A reviewer's note as the Review tab shows it. */
 export interface CommentView {
     id: string;
-    pageId: string;
+    /** Null once the page it was left on has been deleted (#277). */
+    pageId: string | null;
     pageTitle: string | null;
     sectionKey: string;
     body: string;
@@ -100,6 +113,13 @@ export interface CommentView {
 /** The site's review state — the latest verdict plus what is still open. */
 export interface ReviewState {
     openNotes: number;
+    /** A review has been asked for and nobody has answered it yet (#278). */
+    pending: boolean;
+    /**
+     * The newest approval was of a different draft than the one that would go
+     * live now — someone approved, then the work carried on (#278).
+     */
+    approvalIsStale: boolean;
     /**
      * The latest event of any kind — a reviewer's verdict, or a BYPASSED row
      * publish wrote (#199). What the badge shows.
@@ -146,6 +166,12 @@ export interface PageDraftView {
     pageId: string;
     pageVersionId: string;
     status: "DRAFT";
+    /**
+     * Which edit of this draft these sections are (#285). The editor sends it
+     * back when it saves; a save against a stale revision is a 409 rather than
+     * a silent overwrite of whoever saved in between.
+     */
+    revision: number;
     sections: DraftSectionView[];
     /**
      * How many sections publishing the whole site would change (#190), as of
@@ -163,6 +189,11 @@ export interface PageDraftView {
      * against, and the button says "Publish site" rather than a count.
      */
     pendingSectionChanges: number | null;
+    /**
+     * Which site-level settings publishing would change (#282): search, share
+     * image, style, menu, footer, page list. Null before the first publish.
+     */
+    pendingSiteChanges: SiteChangeKind[] | null;
 }
 
 /** What a publish returns: the new immutable Publication + the live pointer. */
@@ -238,8 +269,66 @@ function slugify(input: string): string {
  * inferred type cannot be named across the package boundary, and callers must
  * parse it against the section contract anyway rather than trusting its shape.
  */
+/**
+ * What this caller may do with this site (#275).
+ *
+ * Computed here with `can()`, and sent, so the app never mirrors
+ * `organization-policy.ts`. A screen that decides for itself which buttons a
+ * role gets is a second policy, and the two drift: today every website surface
+ * renders Save, Restore, Create link and Connect to roles the API refuses, so
+ * the first press is where a merchant learns they cannot.
+ *
+ * This is for rendering, never for enforcement — the API still authorizes every
+ * call. A control that is absent because of this cannot be pressed; one that is
+ * reached anyway is still refused.
+ */
+export interface SiteCapabilities {
+    /** Load and write editable drafts: the editor's whole premise. */
+    edit: boolean;
+    /** Put the site, or a past version of it, in front of the public. */
+    publish: boolean;
+    /** Leave a note on a section. */
+    comment: boolean;
+    /** Record a verdict on the site. */
+    approve: boolean;
+    /** Change the site's name, search, style, menu and footer. */
+    manageSettings: boolean;
+    /** Claim or connect a domain. */
+    manageDomain: boolean;
+}
+
+/**
+ * A page as a REVIEWER reads it (#275): the sections, in order, with what they
+ * say.
+ *
+ * Not the editor's draft. `getPageDraft` requires `section:write` and creates a
+ * DRAFT version if the page has none — it is an authoring load, and a reviewer
+ * is not authoring. This one requires `site:read`, writes nothing, and returns
+ * what the sections contain so the same blocks the live site uses can draw
+ * them.
+ *
+ * It carries each section's key because that is what a note is pinned to, and
+ * a reviewer with no key has nothing to pin to.
+ */
+export interface ReviewablePage {
+    sections: {
+        key: string;
+        type: string;
+        contractVersion: number;
+        /** A few words naming the section, for a list that has two heroes. */
+        label: string | null;
+        /** Hidden sections are shown, marked: they are part of the draft. */
+        hidden: boolean;
+        content: unknown;
+    }[];
+}
+
 /** One site as the editor and settings screens read it. */
 export interface SiteDetailView {
+    /** Whether this caller may load and write editable drafts. */
+    canEdit: boolean;
+    /** Everything this caller may do here, decided by the policy (#275). */
+    can: SiteCapabilities;
     id: string;
     name: string;
     slug: string;
@@ -270,6 +359,11 @@ export interface SiteDetailView {
      * that shows this number reads this one computation.
      */
     pendingSectionChanges: number | null;
+    /**
+     * Which site-level settings publishing would change (#282): search, share
+     * image, style, menu, footer, page list. Null before the first publish.
+     */
+    pendingSiteChanges: SiteChangeKind[] | null;
     /** Always complete — absent choices are filled from the defaults. */
     style: SiteStyle;
     /**
@@ -288,13 +382,30 @@ export interface SiteDetailView {
     styleOptions: SiteStyleOptions;
 }
 
+/**
+ * Version history means the SITE's publishes, not every row in the table.
+ *
+ * Publishing a blog post writes a Publication too (`postId` set, `templateId`
+ * "post", a snapshot holding one post and no pages). Those rows were reaching
+ * version history, where they read as ordinary site versions: an undated-looking
+ * entry a merchant could restore, which would point `currentPublicationId` at a
+ * snapshot with no pages and take the live site down. A post publish is not a
+ * version of the site, so it is not offered as one — restoring one is a 404, not
+ * a broken home page.
+ */
+const SITE_VERSION = { postId: null } as const;
+
 export interface PublicationDetail {
     id: string;
     publishedAt: Date;
     publishedByUserId: string | null;
+    /** Who published it: their name, else their email; null if unknown (#283). */
+    publishedBy: string | null;
     templateId: string;
     templateVersion: number;
     snapshot: unknown;
+    /** Whether this build can still draw every section it holds (#283). */
+    renderability: Renderability;
 }
 
 /**
@@ -355,6 +466,14 @@ const draftSiteSelect = {
 
 /** A site as {@link draftSiteSelect} loads it. */
 type DraftSite = Prisma.SiteGetPayload<{ select: typeof draftSiteSelect }>;
+
+/** What publishing a site would change (#190, #282). */
+interface PendingChanges {
+    /** How many sections would be added, removed or changed. */
+    sections: number;
+    /** Which site-level settings differ from what is live. */
+    site: SiteChangeKind[];
+}
 
 @Injectable()
 export class SitesService {
@@ -513,7 +632,13 @@ export class SitesService {
     async listSites(ctx: OrganizationContext) {
         authorize(ctx, "site:read");
         const sites = await prisma.site.findMany({
-            where: { organizationId: ctx.organizationId, deletedAt: null },
+            where: {
+                organizationId: ctx.organizationId,
+                deletedAt: null,
+                // A reviewer's list holds only the sites they were invited to
+                // (#276) — not "every site, greyed out".
+                ...reviewerScope(ctx),
+            },
             orderBy: { createdAt: "desc" },
             select: {
                 id: true,
@@ -547,10 +672,13 @@ export class SitesService {
              * something once there is something to compare against, and until
              * then the site's state is "never published", which says more.
              */
-            const pendingSectionChanges = pending.get(site.id) ?? null;
+            const changes = pending.get(site.id) ?? null;
+            const pendingSectionChanges = changes?.sections ?? null;
+            const pendingSiteChanges = changes?.site ?? null;
             return {
                 ...site,
                 pendingSectionChanges,
+                pendingSiteChanges,
                 /*
                  * Derived from the diff, not from a timestamp.
                  *
@@ -562,7 +690,9 @@ export class SitesService {
                  * work saw a list that said "Live" — the exact over-claim #191
                  * exists to remove.
                  */
-                hasUnpublishedChanges: (pendingSectionChanges ?? 0) > 0,
+                hasUnpublishedChanges:
+                    (pendingSectionChanges ?? 0) > 0 ||
+                    (pendingSiteChanges?.length ?? 0) > 0,
                 pendingDomain:
                     claimedDomains.find((d) => d.status !== "VERIFIED")
                         ?.hostname ?? null,
@@ -571,7 +701,8 @@ export class SitesService {
     }
 
     /**
-     * How many sections publishing would change, per site (#190, #191).
+     * What publishing would change, per site (#190, #191, #282): how many
+     * sections, and which site-level settings.
      *
      * `null` for a site that has never published: there is no baseline to diff
      * against, and "never published" is a stronger thing to say than any number
@@ -584,59 +715,39 @@ export class SitesService {
      */
     private async pendingSectionChanges(
         siteIds: string[],
-    ): Promise<Map<string, number | null>> {
-        const byId = new Map<string, number | null>();
+    ): Promise<Map<string, PendingChanges | null>> {
+        const byId = new Map<string, PendingChanges | null>();
         if (siteIds.length === 0) return byId;
 
         const sites = await prisma.site.findMany({
             where: { id: { in: siteIds } },
+            /*
+             * Exactly what publish loads (#282). The site block is then built by
+             * the same code publish runs, so this diff compares the bytes
+             * publishing would actually write, sections and settings alike.
+             */
             select: {
-                id: true,
+                ...draftSiteSelect,
                 currentPublication: { select: { snapshot: true } },
-                pages: {
-                    // Hidden pages do not travel, on exactly the reasoning that
-                    // keeps hidden sections out below: the snapshot IS the
-                    // published site, and a Publication is immutable once
-                    // written, so a page that leaked in could not be taken back
-                    // out without republishing.
-                    where: { hidden: false },
-                    orderBy: { path: "asc" },
-                    select: {
-                        id: true,
-                        path: true,
-                        title: true,
-                        isHome: true,
-                        versions: {
-                            where: { status: "DRAFT" },
-                            orderBy: { createdAt: "desc" },
-                            take: 1,
-                            select: {
-                                sections: {
-                                    where: { hidden: false },
-                                    orderBy: { order: "asc" },
-                                    select: {
-                                        type: true,
-                                        contractVersion: true,
-                                        content: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
             },
         });
 
         for (const site of sites) {
-            byId.set(
-                site.id,
-                site.currentPublication === null
-                    ? null
-                    : countPendingSectionChanges(
-                          toPendingPages(site.pages),
-                          site.currentPublication.snapshot,
-                      ),
-            );
+            if (site.currentPublication === null) {
+                byId.set(site.id, null);
+                continue;
+            }
+            const live = site.currentPublication.snapshot;
+            const pages = toPendingPages(site.pages);
+            // Lenient: counting is a read, and one stale section must not
+            // make the sites list throw.
+            const draft = this.buildSnapshot(site, new Date(0), {
+                lenient: true,
+            });
+            byId.set(site.id, {
+                sections: countPendingSectionChanges(pages, live),
+                site: pendingSiteChanges(draft.site, pages, live),
+            });
         }
         return byId;
     }
@@ -656,6 +767,8 @@ export class SitesService {
                 id: siteId,
                 organizationId: ctx.organizationId,
                 deletedAt: null,
+                // A reviewer sees the sites they were invited to (#276).
+                ...reviewerScope(ctx),
             },
             select: {
                 id: true,
@@ -706,13 +819,24 @@ export class SitesService {
         const pending = await this.pendingSectionChanges([site.id]);
         return {
             ...rest,
+            canEdit: can(ctx.role, "section:write"),
+            can: {
+                edit: can(ctx.role, "section:write"),
+                publish: can(ctx.role, "site:publish"),
+                comment: can(ctx.role, "site:comment"),
+                approve: can(ctx.role, "site:approve"),
+                manageSettings: can(ctx.role, "site:update"),
+                manageDomain: can(ctx.role, "domain:manage"),
+            },
             /*
              * What publishing would change (#190). The editor's top bar and the
              * settings screen both render this, so neither computes its own —
              * the whole point of the number is that a merchant can read it in
              * two places and get the same answer.
              */
-            pendingSectionChanges: pending.get(site.id) ?? null,
+            pendingSectionChanges: pending.get(site.id)?.sections ?? null,
+            // The settings that travel into the snapshot too (#282).
+            pendingSiteChanges: pending.get(site.id)?.site ?? null,
             style: parseSiteStyle(style),
             styleOptions: siteStyleOptions(),
             footer: parseSiteFooter(footer),
@@ -846,7 +970,13 @@ export class SitesService {
 
         // Validate BEFORE writing, for the same reason style does: a malformed
         // body is a 400 now rather than a footer that fails to render later.
-        const footer = parseSiteFooter(input);
+        const parsed = parseSiteFooter(input);
+        // Sanitized on the way IN as well as at publish (#280). Publish is not
+        // the only reader of what is stored here, and "safe because publish
+        // cleans it" left every other reader trusting HTML nobody had cleaned.
+        const footer: SiteFooter | null = parsed
+            ? { format: parsed.format, value: sanitizeRichHtml(parsed.value) }
+            : null;
 
         await prisma.site.update({
             where: { id: siteId },
@@ -907,7 +1037,11 @@ export class SitesService {
         const site = await assertSiteInOrg(ctx, siteId);
 
         const publications = await prisma.publication.findMany({
-            where: { siteId, organizationId: ctx.organizationId },
+            where: {
+                siteId,
+                organizationId: ctx.organizationId,
+                ...SITE_VERSION,
+            },
             orderBy: { publishedAt: "desc" },
             select: {
                 id: true,
@@ -915,6 +1049,9 @@ export class SitesService {
                 publishedByUserId: true,
                 templateId: true,
                 templateVersion: true,
+                // Which of the three routes this publish took (#278). Null on
+                // rows published before it was recorded.
+                reviewRoute: true,
                 // Whether this publish went past an outstanding change
                 // request (#199): the bypass row names its publication.
                 approvals: {
@@ -928,8 +1065,17 @@ export class SitesService {
             },
         });
 
+        // Names, not ids (#283). "Who put this live" is a question the list
+        // exists to answer, and a Publication records only the user id.
+        const publishers = await this.userNames(
+            publications.map((p) => p.publishedByUserId),
+        );
+
         return publications.map(({ approvals, ...p }) => ({
             ...p,
+            publishedBy: p.publishedByUserId
+                ? (publishers.get(p.publishedByUserId) ?? null)
+                : null,
             bypass:
                 approvals.length === 0
                     ? null
@@ -958,6 +1104,7 @@ export class SitesService {
                 id: publicationId,
                 siteId,
                 organizationId: ctx.organizationId,
+                ...SITE_VERSION,
             },
             select: {
                 id: true,
@@ -973,7 +1120,34 @@ export class SitesService {
                 `Publication "${publicationId}" not found`,
             );
         }
-        return publication;
+        const publishers = await this.userNames([
+            publication.publishedByUserId,
+        ]);
+        return {
+            ...publication,
+            publishedBy: publication.publishedByUserId
+                ? (publishers.get(publication.publishedByUserId) ?? null)
+                : null,
+            renderability: checkRenderability(publication.snapshot),
+        };
+    }
+
+    /**
+     * Display names for user ids (#283): a name, else the email every user has.
+     * One query for every distinct id, however many versions share a publisher.
+     */
+    private async userNames(
+        ids: (string | null)[],
+    ): Promise<Map<string, string>> {
+        const unique = [
+            ...new Set(ids.filter((id): id is string => id !== null)),
+        ];
+        if (unique.length === 0) return new Map();
+        const users = await prisma.user.findMany({
+            where: { id: { in: unique } },
+            select: { id: true, name: true, email: true },
+        });
+        return new Map(users.map((u) => [u.id, u.name ?? u.email]));
     }
 
     /**
@@ -989,7 +1163,9 @@ export class SitesService {
      * lost publish for another.
      *
      * Requires `site:publish`: this changes what the public sees, which is the
-     * same act as publishing.
+     * same act as publishing. For the same reason, going live past an
+     * outstanding change request is recorded as a bypass, exactly as
+     * `publishSite` records it (#279).
      */
     async restorePublication(
         ctx: OrganizationContext,
@@ -1004,6 +1180,7 @@ export class SitesService {
                 id: publicationId,
                 siteId,
                 organizationId: ctx.organizationId,
+                ...SITE_VERSION,
             },
             select: {
                 snapshot: true,
@@ -1019,7 +1196,28 @@ export class SitesService {
             );
         }
 
+        /*
+         * A restore puts a version live, so it is a publish. A publish past an
+         * outstanding review is RECORDED, not prevented (#199, #278). This
+         * path used to skip the check, so rolling back while a reviewer had
+         * asked for changes went live with nothing anywhere saying so (#279).
+         *
+         * The fingerprint is of the version being restored, because that is
+         * what goes live: an approval counts only if a reviewer approved this
+         * exact content, which a draft approval almost never is.
+         */
+        const fingerprint = draftFingerprint(source.snapshot);
+
         return prisma.$transaction(async (tx) => {
+            const standing = await this.reviewStandingFor(
+                tx,
+                siteId,
+                ctx.organizationId,
+                fingerprint,
+                ctx.userId,
+            );
+            const bypass = standing.outstanding;
+
             const restored = await tx.publication.create({
                 data: {
                     siteId,
@@ -1030,6 +1228,9 @@ export class SitesService {
                     templateId: source.templateId,
                     templateVersion: source.templateVersion,
                     publishedByUserId: ctx.userId,
+                    // A restore is a publish, and says which route it took
+                    // (#278) like any other.
+                    reviewRoute: standing.route satisfies ReviewRoute,
                 },
                 select: { id: true, publishedAt: true },
             });
@@ -1037,9 +1238,24 @@ export class SitesService {
                 where: { id: siteId },
                 data: { currentPublicationId: restored.id },
             });
+            if (bypass) {
+                // Linked to the restored publication, so version history marks
+                // this entry the way it marks a bypassed publish.
+                await tx.siteApproval.create({
+                    data: {
+                        siteId,
+                        organizationId: ctx.organizationId,
+                        byUserId: ctx.userId,
+                        outcome: "BYPASSED",
+                        publicationId: restored.id,
+                    },
+                    select: { id: true },
+                });
+            }
             return {
                 publicationId: restored.id,
                 publishedAt: restored.publishedAt,
+                bypassed: bypass,
             };
         });
     }
@@ -1082,9 +1298,26 @@ export class SitesService {
             pageId,
             pageVersionId: version.id,
             status: "DRAFT",
-            sections,
+            // What the editor has to send back when it saves (#285).
+            revision: version.revision,
+            /*
+             * Sanitized on the way OUT as well (#280). The editor's preview
+             * renders rich fields as HTML, and a row saved before sanitize-on-
+             * write existed, or written by any other path, must not reach it
+             * raw. It also cleans the row for good: the editor saves back what
+             * it was given.
+             */
+            sections: sections.map((section) => ({
+                ...section,
+                content: sanitizeSectionContent(
+                    section.content,
+                    getSectionContract(section.type, section.contractVersion)
+                        ?.sanitizedFields ?? [],
+                ) as typeof section.content,
+            })),
             // The editor's first read of the count, before any autosave.
-            pendingSectionChanges: pending.get(siteId) ?? null,
+            pendingSectionChanges: pending.get(siteId)?.sections ?? null,
+            pendingSiteChanges: pending.get(siteId)?.site ?? null,
         };
     }
 
@@ -1097,8 +1330,9 @@ export class SitesService {
      * existing Section rows are deleted and replaced with new rows whose
      * `order = array index` (a whole-list replace keeps ordering gap-free and
      * the write atomic). The persisted `content` is the contract-NORMALIZED
-     * value (defaults applied). Sanitization is deferred to publish, per the
-     * contract's sanitization boundary.
+     * value (defaults applied), with the contract's rich fields SANITIZED. Publish
+     * sanitizes again, but the editor preview renders what is stored here, so
+     * cleaning only at publish left it rendering raw HTML (#280).
      */
     async replaceDraftSections(
         ctx: OrganizationContext,
@@ -1133,7 +1367,10 @@ export class SitesService {
                 type: section.type,
                 contractVersion: section.contractVersion,
                 order: index,
-                content: result.data,
+                content: sanitizeSectionContent(
+                    result.data,
+                    result.contract.sanitizedFields,
+                ),
                 // Absent means visible — see DraftSectionInputDto.hidden.
                 hidden: section.hidden ?? false,
                 /*
@@ -1154,6 +1391,35 @@ export class SitesService {
 
         const draft = await prisma.$transaction(async (tx) => {
             const version = await getOrCreateDraftVersion(tx, ctx, pageId);
+
+            /*
+             * Optimistic concurrency (#285).
+             *
+             * This method DELETES every section on the page and recreates the
+             * list the client sent, so two tabs — or two people — on one page
+             * each save their whole list and the last write wins. The loser's
+             * work vanishes with no conflict, no error and no trace, and any
+             * note pinned to a section only they had is orphaned with it.
+             *
+             * A client that sends the revision it was given gets a 409 when the
+             * draft has moved on. One that sends none is trusted, because a
+             * caller that never read the draft cannot be clobbering an edit it
+             * saw — and requiring it would break every existing client the day
+             * this shipped.
+             */
+            if (
+                dto.revision !== undefined &&
+                dto.revision !== version.revision
+            ) {
+                throw new ConflictException({
+                    message:
+                        "Someone else saved this page while you were editing. Reload to see their version.",
+                    code: "DRAFT_REVISION_MISMATCH",
+                    yours: dto.revision,
+                    current: version.revision,
+                });
+            }
+
             await tx.section.deleteMany({
                 where: { pageVersionId: version.id },
             });
@@ -1184,10 +1450,19 @@ export class SitesService {
                     key: true,
                 },
             });
+            // Bumped in the same transaction as the write it describes, so a
+            // reader can never see the new sections at the old revision.
+            const bumped = await tx.pageVersion.update({
+                where: { id: version.id },
+                data: { revision: { increment: 1 } },
+                select: { revision: true },
+            });
+
             return {
                 pageId,
                 pageVersionId: version.id,
                 status: "DRAFT" as const,
+                revision: bumped.revision,
                 sections,
             };
         });
@@ -1201,7 +1476,8 @@ export class SitesService {
         const pending = await this.pendingSectionChanges([siteId]);
         return {
             ...draft,
-            pendingSectionChanges: pending.get(siteId) ?? null,
+            pendingSectionChanges: pending.get(siteId)?.sections ?? null,
+            pendingSiteChanges: pending.get(siteId)?.site ?? null,
         };
     }
 
@@ -1228,7 +1504,16 @@ export class SitesService {
      * write — a resolved menu, a sanitized footer, a hidden section — and
      * their notes would be about a site that never goes live.
      */
-    buildSnapshot(site: DraftSite, publishedAt: Date): SiteSnapshot {
+    buildSnapshot(
+        site: DraftSite,
+        publishedAt: Date,
+        /**
+         * `lenient` keeps a section that fails its contract instead of
+         * throwing (#282). The pending-change count is a read and must not
+         * fail; publish is not lenient.
+         */
+        options: { lenient?: boolean } = {},
+    ): SiteSnapshot {
         // v2 buttons name a page by id; the snapshot needs its path (#207).
         // Built from the pages this publish will write, so a hidden page
         // resolves to nothing rather than to a path the live site 404s.
@@ -1252,6 +1537,13 @@ export class SitesService {
                      * this writes, not over the raw draft.
                      */
                     const result = toPublishableSection(section, resolvePage);
+                    if (!result.ok && options.lenient) {
+                        return {
+                            type: section.type,
+                            contractVersion: section.contractVersion,
+                            content: section.content,
+                        };
+                    }
                     if (!result.ok) {
                         throw new BadRequestException(
                             `Cannot publish: page "${page.path}" has an invalid "${section.type}" section (${result.error})`,
@@ -1389,25 +1681,43 @@ export class SitesService {
         const publishedAt = new Date();
         const snapshot = this.buildSnapshot(site, publishedAt);
         /*
-         * Approval gates nothing, and says so (#199). The epic's rule: if a
-         * review was asked for and has not approved, publishing is RECORDED
-         * as a bypass, not prevented. Read before the transaction, written
-         * inside it, so the record and the publication land together or not
-         * at all.
+         * Approval gates nothing, and says so (#199, #278). The epic's rule: if
+         * a review was asked for and has not been answered for THIS draft,
+         * publishing is RECORDED as a bypass, not prevented.
+         *
+         * The fingerprint is of the snapshot about to be written, so an
+         * approval of an earlier draft does not cover this one.
          */
-        const bypass = await this.reviewOutstanding(
-            site.id,
-            ctx.organizationId,
-        );
+        const fingerprint = draftFingerprint(snapshot);
 
         // The Site does not track which template produced it; default the
         // Publication's required (non-null) template stamp to the starter
         // template's identity/version.
         return prisma.$transaction(async (tx) => {
+            /*
+             * Asked INSIDE the transaction (#278). It used to be read before
+             * one, so a verdict posted while a publish was in flight was
+             * missed — the narrow window in which the record would have been
+             * wrong is exactly the window a reviewer racing a publisher falls
+             * into.
+             */
+            const standing = await this.reviewStandingFor(
+                tx,
+                site.id,
+                ctx.organizationId,
+                fingerprint,
+                ctx.userId,
+            );
+            const bypass = standing.outstanding;
+
             const publication = await tx.publication.create({
                 data: {
                     siteId: site.id,
                     organizationId: ctx.organizationId,
+                    // Which of the three routes this took, so version history
+                    // can tell "a reviewer approved it" from "nobody was
+                    // asked" (#193).
+                    reviewRoute: standing.route satisfies ReviewRoute,
                     // Through `unknown`: SiteStyle is a precise interface, and
                     // Prisma's InputJsonValue index signature does not accept
                     // one directly even though the value is plain JSON.
@@ -1612,6 +1922,7 @@ export class SitesService {
                 select: {
                     id: true,
                     pageId: true,
+                    pageTitle: true,
                     sectionKey: true,
                     body: true,
                     resolvedAt: true,
@@ -1648,7 +1959,11 @@ export class SitesService {
         return comments.map((c) => ({
             id: c.id,
             pageId: c.pageId,
-            pageTitle: titles.get(c.pageId) ?? null,
+            // The live title while the page exists; the one stored with the
+            // note once it does not (#277).
+            pageTitle:
+                (c.pageId === null ? null : titles.get(c.pageId)) ??
+                c.pageTitle,
             sectionKey: c.sectionKey,
             body: c.body,
             resolvedAt: c.resolvedAt,
@@ -1658,7 +1973,10 @@ export class SitesService {
                 // A name is nicer, but an email always exists.
                 name: c.author.name ?? c.author.email,
             },
-            orphaned: !(live.get(c.pageId)?.has(c.sectionKey) ?? false),
+            // A note whose page is gone is orphaned by definition.
+            orphaned:
+                c.pageId === null ||
+                !(live.get(c.pageId)?.has(c.sectionKey) ?? false),
         }));
     }
 
@@ -1666,6 +1984,69 @@ export class SitesService {
      * Leave a note. Requires `site:comment` — the action a REVIEWER has and a
      * MEMBER does not, because leaving a note is not a read.
      */
+    /**
+     * A page's draft as a REVIEWER may see it: which sections are on it, in
+     * order, and what each one is (#277).
+     *
+     * Section keys reached the client only through `getPageDraft`, which needs
+     * `section:write` — a role a reviewer does not have and must not be given.
+     * So a reviewer had no way to learn the key of the section they were
+     * looking at, which made "pin a note to a section" impossible for exactly
+     * the person the feature was built for.
+     *
+     * Keys, types and a short label only. Not the content: this is the outline
+     * a note is attached to, and the content is already on the page they are
+     * reading through the share link.
+     */
+    async getPageForReview(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+    ): Promise<ReviewablePage> {
+        authorize(ctx, "site:read");
+        await assertSiteInOrg(ctx, siteId);
+        await assertPageInSite(ctx, siteId, pageId);
+
+        const version = await prisma.pageVersion.findFirst({
+            where: {
+                pageId,
+                organizationId: ctx.organizationId,
+                status: "DRAFT",
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+                sections: {
+                    orderBy: { order: "asc" },
+                    select: {
+                        key: true,
+                        type: true,
+                        contractVersion: true,
+                        content: true,
+                        hidden: true,
+                    },
+                },
+            },
+        });
+
+        return {
+            sections: (version?.sections ?? []).map((section) => ({
+                key: section.key,
+                type: section.type,
+                contractVersion: section.contractVersion,
+                label: sectionLabel(section.content),
+                hidden: section.hidden,
+                // Sanitized on the way out, for the same reason the editor's
+                // draft is (#280): this content is rendered as HTML, and a row
+                // written before sanitize-on-write must not reach a reader raw.
+                content: sanitizeSectionContent(
+                    section.content,
+                    getSectionContract(section.type, section.contractVersion)
+                        ?.sanitizedFields ?? [],
+                ),
+            })),
+        };
+    }
+
     async createComment(
         ctx: OrganizationContext,
         siteId: string,
@@ -1675,10 +2056,44 @@ export class SitesService {
         await assertSiteInOrg(ctx, siteId);
         await assertPageInSite(ctx, siteId, dto.pageId);
 
+        /*
+         * The key must name a section that is actually on the page's draft
+         * (#277). It used to accept any string, so a note pinned from a stale
+         * screen — or a typo — was stored and then read as orphaned for ever:
+         * the reviewer saw it saved, the owner saw a note about nothing, and
+         * no error was ever raised. A 400 is the honest answer.
+         */
+        const page = await prisma.page.findFirst({
+            where: {
+                id: dto.pageId,
+                siteId,
+                organizationId: ctx.organizationId,
+            },
+            select: {
+                title: true,
+                versions: {
+                    where: { status: "DRAFT" },
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                    select: { sections: { select: { key: true } } },
+                },
+            },
+        });
+        const keys = new Set(
+            page?.versions.flatMap((v) => v.sections.map((x) => x.key)) ?? [],
+        );
+        if (!keys.has(dto.sectionKey)) {
+            throw new BadRequestException(
+                "That section is no longer on the page. Reload the draft and try again.",
+            );
+        }
+
         const comment = await prisma.siteComment.create({
             data: {
                 siteId,
                 pageId: dto.pageId,
+                // Where the note was, for when the page itself is gone (#277).
+                pageTitle: page?.title ?? null,
                 organizationId: ctx.organizationId,
                 sectionKey: dto.sectionKey,
                 authorUserId: ctx.userId,
@@ -1749,6 +2164,13 @@ export class SitesService {
                 organizationId: ctx.organizationId,
                 byUserId: ctx.userId,
                 outcome: dto.outcome,
+                // An approval names the draft it approved (#278), so later
+                // edits do not inherit it. A change request does not: it is
+                // about the work as a whole and stands until it is answered.
+                draftFingerprint:
+                    dto.outcome === "APPROVED"
+                        ? await this.currentDraftFingerprint(ctx, siteId)
+                        : null,
             },
             select: { id: true },
         });
@@ -1766,7 +2188,7 @@ export class SitesService {
         authorize(ctx, "site:read");
         await assertSiteInOrg(ctx, siteId);
 
-        const [latest, outstanding, openNotes] = await Promise.all([
+        const [latest, standing, openNotes] = await Promise.all([
             prisma.siteApproval.findFirst({
                 where: { siteId, organizationId: ctx.organizationId },
                 orderBy: { createdAt: "desc" },
@@ -1776,7 +2198,17 @@ export class SitesService {
                     by: { select: { name: true, email: true } },
                 },
             }),
-            this.reviewOutstanding(siteId, ctx.organizationId),
+            // Asked as "what would happen if THIS caller published now",
+            // because that is the question the editor's bar is answering.
+            this.currentDraftFingerprint(ctx, siteId).then((fingerprint) =>
+                this.reviewStandingFor(
+                    prisma,
+                    siteId,
+                    ctx.organizationId,
+                    fingerprint,
+                    ctx.userId,
+                ),
+            ),
             prisma.siteComment.count({
                 where: {
                     siteId,
@@ -1788,7 +2220,12 @@ export class SitesService {
 
         return {
             openNotes,
-            outstanding,
+            outstanding: standing.outstanding,
+            // "In review" is the state a REQUESTED row creates and only a
+            // verdict clears (#278).
+            pending:
+                standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED",
+            approvalIsStale: standing.approvalIsStale,
             latestApproval:
                 latest === null
                     ? null
@@ -1801,25 +2238,106 @@ export class SitesService {
     }
 
     /**
-     * Is a change request still standing? Reads the latest VERDICT — a
-     * BYPASSED row is publish's own record, not a reviewer changing their
-     * mind, so it does not clear the request. Only an APPROVED after the
-     * CHANGES_REQUESTED does.
+     * Ask for a review (#278, #193).
+     *
+     * The act the model was missing. "Outstanding" used to mean only "the
+     * latest verdict is CHANGES_REQUESTED", so a review nobody had answered
+     * yet could not exist: asking someone to look and their not having looked
+     * was indistinguishable from never having asked.
+     *
+     * Requires `site:update` — this is the person whose work it is saying they
+     * are ready for eyes, not a reviewer's action. It blocks nothing:
+     * publishing while it stands still succeeds, and records a bypass.
      */
-    private async reviewOutstanding(
+    async requestReview(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<{ id: string }> {
+        authorize(ctx, "site:update");
+        await assertSiteInOrg(ctx, siteId);
+
+        return prisma.siteApproval.create({
+            data: {
+                siteId,
+                organizationId: ctx.organizationId,
+                byUserId: ctx.userId,
+                outcome: "REQUESTED",
+                // Which draft is being put up for review, so "approved" can
+                // later be checked against the same work.
+                draftFingerprint: await this.currentDraftFingerprint(
+                    ctx,
+                    siteId,
+                ),
+            },
+            select: { id: true },
+        });
+    }
+
+    /**
+     * A hash of the draft as publishing would write it, for binding an
+     * approval to the work it approved (#278).
+     */
+    private async currentDraftFingerprint(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<string> {
+        const site = await this.loadDraftSite({
+            id: siteId,
+            organizationId: ctx.organizationId,
+            deletedAt: null,
+        });
+        if (!site) {
+            throw new NotFoundException(`Site "${siteId}" not found`);
+        }
+        /*
+         * The canonical snapshot, which is what an approval is really about:
+         * the thing that would go live. The date passed is arbitrary because
+         * the fingerprint excludes it.
+         *
+         * A draft mid-edit can hold a section that fails its contract, and
+         * `buildSnapshot` throws on one — correct for publishing, wrong here,
+         * where the question is only "is this the same draft as before". The
+         * fallback hashes the draft rows instead: a different answer for the
+         * same work, but a stable one, and a draft that cannot build cannot be
+         * published either, so no approval can be carried across the switch.
+         */
+        try {
+            return draftFingerprint(this.buildSnapshot(site, new Date(0)));
+        } catch {
+            return draftFingerprint({ unbuildableDraft: site });
+        }
+    }
+
+    /**
+     * Where the site stands with its reviewers, as {@link reviewStanding}
+     * decides it. The query lives here; the rule lives in `review-route.ts`,
+     * where publish can apply it to its own transaction's rows.
+     */
+    private async reviewStandingFor(
+        client: Pick<typeof prisma, "siteApproval">,
         siteId: string,
         organizationId: string,
-    ): Promise<boolean> {
-        const verdict = await prisma.siteApproval.findFirst({
+        currentFingerprint: string,
+        publisherUserId: string | null,
+    ) {
+        const verdicts = (await client.siteApproval.findMany({
             where: {
                 siteId,
                 organizationId,
-                outcome: { in: ["APPROVED", "CHANGES_REQUESTED"] },
+                // BYPASSED is publish's own record, not a verdict: it must not
+                // settle the request it was written about.
+                outcome: { in: ["REQUESTED", "APPROVED", "CHANGES_REQUESTED"] },
             },
             orderBy: { createdAt: "desc" },
-            select: { outcome: true },
-        });
-        return verdict?.outcome === "CHANGES_REQUESTED";
+            select: {
+                outcome: true,
+                byUserId: true,
+                draftFingerprint: true,
+                createdAt: true,
+            },
+        })) as ApprovalRow[];
+
+        return reviewStanding(verdicts, currentFingerprint, publisherUserId);
     }
 
     // -----------------------------------------------------------------------
@@ -1846,6 +2364,7 @@ export class SitesService {
                 id: siteId,
                 organizationId: ctx.organizationId,
                 deletedAt: null,
+                ...reviewerScope(ctx),
             },
             select: {
                 seoDescription: true,
@@ -1864,7 +2383,6 @@ export class SitesService {
                             orderBy: { createdAt: "desc" },
                             take: 1,
                             select: {
-                                updatedAt: true,
                                 sections: {
                                     orderBy: { order: "asc" },
                                     select: {
@@ -1885,28 +2403,32 @@ export class SitesService {
 
         const publishedAt = site.currentPublication?.publishedAt ?? null;
         /*
-         * The page's OWN timestamp counts, not just its versions'.
+         * From the same diff the editor bar, settings and the sites list read
+         * (#282), not from timestamps.
          *
-         * This compared `PageVersion.updatedAt` alone, which silently missed
-         * every change that lives on the Page row rather than inside a draft:
-         * hiding a page (#197), renaming one, moving one. All three alter the
-         * snapshot publishing would write — title and path travel in it, and a
-         * hidden page does not travel at all — so a merchant could hide a page
-         * and be told there was nothing waiting to publish, leaving it live.
+         * Timestamps missed two whole categories. Everything that lives on the
+         * Site row — search, share image, style, menu, footer — has no page to
+         * date. And a section edit leaves no timestamp to compare at all:
+         * saving a draft deletes and recreates the page's Section rows without
+         * touching `PageVersion.updatedAt`, so that comparison sat at whenever
+         * the version was created and never fired for the edit merchants make
+         * most (#191).
          *
-         * The authoritative answer to "how much is waiting" is the diff in
-         * `pending-changes.ts`, which the sites list already uses. This path
-         * wants a boolean rather than a count and runs on a different query, so
-         * it stays a timestamp comparison — but it now looks at both places a
-         * change can land.
+         * The diff also covers what the page's own timestamp used to catch —
+         * hiding a page (#197), renaming one, moving one — because a page's
+         * title, path and presence all travel in the snapshot, and `pages` is
+         * one of the kinds it compares.
+         *
+         * Skipped before the first publish: there is nothing to diff against.
          */
+        const pending =
+            publishedAt === null
+                ? undefined
+                : (await this.pendingSectionChanges([siteId])).get(siteId);
         const hasUnpublishedChanges =
             publishedAt !== null &&
-            site.pages.some(
-                (page) =>
-                    page.updatedAt > publishedAt ||
-                    page.versions.some((v) => v.updatedAt > publishedAt),
-            );
+            !!pending &&
+            (pending.sections > 0 || pending.site.length > 0);
 
         const flags = checkSite({
             navigation: parseSiteNavigation(site.navigation),
@@ -2075,4 +2597,28 @@ export class SitesService {
         await prisma.page.delete({ where: { id: pageId } });
         return { deleted: true };
     }
+}
+
+/**
+ * A few words naming a section, for a list that has to distinguish two heroes
+ * (#277). Whatever the block calls its most prominent line — every one of them
+ * has one under a different name — trimmed to something that fits a rail.
+ */
+function sectionLabel(content: unknown): string | null {
+    if (content === null || typeof content !== "object") return null;
+    const c = content as Record<string, unknown>;
+    for (const field of [
+        "heading",
+        "title",
+        "label",
+        "eyebrow",
+        "subheading",
+    ]) {
+        const value = c[field];
+        if (typeof value === "string" && value.trim().length > 0) {
+            const text = value.trim();
+            return text.length > 60 ? `${text.slice(0, 57)}…` : text;
+        }
+    }
+    return null;
 }

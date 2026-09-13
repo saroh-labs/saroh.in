@@ -1,6 +1,7 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { CreateServiceForm } from "@/components/bookings/create-service-form";
+import { PageContainer } from "@/components/shared/page-container";
 import { requireSession } from "@/lib/session";
 
 /**
@@ -12,12 +13,12 @@ export default async function NewServicePage() {
     await requireSession();
 
     return (
-        <main className="mx-auto max-w-2xl p-8">
+        <PageContainer width="form">
             <PageHeader
                 title="Create a service"
                 description="Name your bookable service and set its duration; add availability next."
             />
             <CreateServiceForm />
-        </main>
+        </PageContainer>
     );
 }

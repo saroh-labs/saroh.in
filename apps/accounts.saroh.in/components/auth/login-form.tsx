@@ -187,7 +187,7 @@ export function LoginForm({
                 >
                     Don&apos;t have an account?{" "}
                     <Link
-                        href="/signup"
+                        href={`/signup?redirect=${encodeURIComponent(returnTo)}`}
                         className="text-foreground underline-offset-4 transition-colors hover:underline"
                     >
                         Sign up

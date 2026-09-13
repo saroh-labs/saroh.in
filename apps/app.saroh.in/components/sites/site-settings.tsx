@@ -36,6 +36,7 @@ import {
     updateSiteSettings,
 } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
+import { describePendingChanges } from "@/lib/sites/pending";
 import type {
     SiteDetail,
     SiteFooter,
@@ -319,8 +320,14 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                  */}
                 {live ? (
                     <Row label="Waiting to publish">
-                        {site.pendingSectionChanges ? (
-                            `${site.pendingSectionChanges} section${site.pendingSectionChanges === 1 ? "" : "s"} changed since the last publish`
+                        {describePendingChanges(
+                            site.pendingSectionChanges,
+                            site.pendingSiteChanges,
+                        ) ? (
+                            // Sections AND settings (#282). This used to count
+                            // sections only, and said the live site matched
+                            // the draft after a search title had changed.
+                            `${describePendingChanges(site.pendingSectionChanges, site.pendingSiteChanges)} changed since the last publish`
                         ) : (
                             <span className="text-muted-foreground/70">
                                 Nothing — the live site matches your draft

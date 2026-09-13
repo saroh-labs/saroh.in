@@ -41,6 +41,7 @@ export type {
  * start demanding their entries instead of silently accepting six.
  */
 import type { SectionType } from "@saroh/block-contract";
+import type { SiteChangeKind } from "./pending";
 
 export type { SectionType };
 
@@ -265,6 +266,11 @@ export interface SiteSummary {
      * this same number, computed once in the API.
      */
     pendingSectionChanges?: number | null;
+    /**
+     * Which site-level settings publishing would change (#282). Null before the
+     * first publish. Described through `describePendingChanges`.
+     */
+    pendingSiteChanges?: SiteChangeKind[] | null;
     /** A claimed hostname that has not verified yet, if any. */
     pendingDomain?: string | null;
 }
@@ -293,10 +299,31 @@ export interface SitePage {
     hidden: boolean;
 }
 
+/**
+ * What the caller may do with this site, decided by the API's policy (#275).
+ *
+ * Read from the server, never computed here: a screen that decides for itself
+ * which buttons a role gets is a second policy, and it drifts from the one that
+ * actually refuses the request.
+ */
+export interface SiteCapabilities {
+    edit: boolean;
+    publish: boolean;
+    comment: boolean;
+    approve: boolean;
+    manageSettings: boolean;
+    manageDomain: boolean;
+}
+
 export interface SiteDetail extends SiteSummary {
+    /** Server-owned permission for the draft editor. */
+    canEdit: boolean;
+    /** Everything this caller may do here (#275). */
+    can: SiteCapabilities;
     pages: SitePage[];
     /** Always present on a detail read; null only before the first publish. */
     pendingSectionChanges: number | null;
+    pendingSiteChanges: SiteChangeKind[] | null;
     /**
      * Search and social settings (#188). Null means "not set" and must render
      * as absent — never as an empty title or a broken image.
@@ -343,9 +370,15 @@ export interface SiteSettingsInput {
 
 export interface PageDraft {
     pageVersionId: string;
+    /**
+     * Which edit of this draft the sections are (#285). Sent back on save;
+     * a save against a revision the server has moved past is refused.
+     */
+    revision: number;
     sections: DraftSection[];
     /** What publishing would change, site-wide, as of this read (#190). */
     pendingSectionChanges: number | null;
+    pendingSiteChanges: SiteChangeKind[] | null;
 }
 
 export interface CreateSiteInput {
@@ -360,7 +393,19 @@ export interface CreateSiteInput {
  * failing section index the API names in a 400). */
 export type SitesResult<T> =
     | { ok: true; data: T }
-    | { ok: false; error: string; field?: string; index?: number };
+    | {
+          ok: false;
+          error: string;
+          field?: string;
+          index?: number;
+          /**
+           * The draft moved on under this editor (#285). A different kind of
+           * failure from the rest: nothing is wrong with what the merchant
+           * wrote, and retrying the same save would only overwrite someone
+           * else's work — so the screen offers to reload rather than to retry.
+           */
+          conflict?: boolean;
+      };
 
 // ---------------------------------------------------------------------------
 // Fetch plumbing (shared apiFetch/getActiveOrgId from @/lib/api/http)
@@ -494,10 +539,14 @@ export async function saveDraftSections(
     siteId: string,
     pageId: string,
     sections: SectionInput[],
+    /** The revision this editor loaded, so a stale save is refused (#285). */
+    revision?: number,
 ): Promise<
     SitesResult<{
         pageVersionId?: string;
+        revision?: number;
         pendingSectionChanges?: number | null;
+        pendingSiteChanges?: SiteChangeKind[] | null;
     }>
 > {
     const base = await sitesBase();
@@ -506,27 +555,47 @@ export async function saveDraftSections(
         `${base}/${siteId}/pages/${pageId}/draft/sections`,
         {
             method: "PUT",
-            body: JSON.stringify({ sections }),
+            body: JSON.stringify({ sections, revision }),
         },
     );
     const data = (await res.json().catch(() => null)) as {
         pageVersionId?: string;
+        revision?: number;
         pendingSectionChanges?: number | null;
+        pendingSiteChanges?: SiteChangeKind[] | null;
         message?: string;
         error?: string;
+        code?: string;
         index?: number;
     } | null;
+    if (res.status === 409) {
+        /*
+         * Someone else saved this page while this editor was open (#285). The
+         * local copy is NOT discarded and nothing is written: the caller
+         * decides, and the editor offers to reload.
+         */
+        return {
+            ok: false,
+            conflict: true,
+            ...readError(
+                data,
+                "Someone else saved this page while you were editing.",
+            ),
+        };
+    }
     if (res.ok) {
         return {
             ok: true,
             data: {
                 pageVersionId: data?.pageVersionId,
+                revision: data?.revision,
                 /*
                  * The save returns the recomputed count so the top bar stays
                  * true through a long editing session without the browser ever
                  * deciding for itself what "changed" means.
                  */
                 pendingSectionChanges: data?.pendingSectionChanges ?? null,
+                pendingSiteChanges: data?.pendingSiteChanges ?? null,
             },
         };
     }
@@ -592,12 +661,19 @@ export interface SitePublication {
     id: string;
     publishedAt: string;
     publishedByUserId: string | null;
+    /** Who published it, by name (email when unnamed); null if unknown (#283). */
+    publishedBy: string | null;
     templateId: string;
     templateVersion: number;
     /** Whether this is the version the public is being served right now. */
     isCurrent: boolean;
     /** Set when this publish went past an outstanding change request (#199). */
     bypass: { at: string; by: string } | null;
+    /**
+     * Which route this publish took: APPROVED, BYPASSED or NONE (#278). Null on
+     * versions published before it was recorded.
+     */
+    reviewRoute: string | null;
 }
 
 /** Every publish of a site, newest first. Empty if it has never been published. */
@@ -609,6 +685,54 @@ export async function listPublications(
     return getList<SitePublication>(`${base}/${siteId}/publications`);
 }
 
+/** One page of a published snapshot, as it was served (#283). */
+export interface PublishedPage {
+    path: string;
+    title: string;
+    isHome: boolean;
+    sections: { type: string; content: unknown }[];
+}
+
+/** The parts of a publication snapshot the version preview reads (#283). */
+export interface PublishedSnapshot {
+    site?: { name?: string; styleVariables?: Record<string, string> | null };
+    pages?: PublishedPage[];
+}
+
+/** A section a past version holds that this build can no longer draw. */
+export interface UnrenderableSection {
+    path: string;
+    index: number;
+    type: string;
+}
+
+/** One past publish with its stored snapshot, for previewing it as served. */
+export interface SitePublicationDetail {
+    id: string;
+    publishedAt: string;
+    publishedByUserId: string | null;
+    publishedBy: string | null;
+    templateId: string;
+    templateVersion: number;
+    snapshot: PublishedSnapshot;
+    renderability: { renderable: boolean; unrenderable: UnrenderableSection[] };
+}
+
+/**
+ * One past publish of a site (#283), or null when this site has no such
+ * version (a 404 from the API).
+ */
+export async function getPublication(
+    siteId: string,
+    publicationId: string,
+): Promise<SitePublicationDetail | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    return getJson<SitePublicationDetail>(
+        `${base}/${siteId}/publications/${encodeURIComponent(publicationId)}`,
+    );
+}
+
 /**
  * Put a past version back. Appends a new publication rather than deleting the
  * ones after it, so this can itself be undone.
@@ -616,7 +740,7 @@ export async function listPublications(
 export async function restorePublication(
     siteId: string,
     publicationId: string,
-): Promise<SitesResult<{ publicationId: string }>> {
+): Promise<SitesResult<{ publicationId: string; bypassed: boolean }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(
@@ -625,11 +749,19 @@ export async function restorePublication(
     );
     const data = (await res.json().catch(() => null)) as {
         publicationId?: string;
+        bypassed?: boolean;
         message?: string;
         error?: string;
     } | null;
     if (res.ok && data?.publicationId) {
-        return { ok: true, data: { publicationId: data.publicationId } };
+        return {
+            ok: true,
+            data: {
+                publicationId: data.publicationId,
+                // Whether this restore went live past a change request (#279).
+                bypassed: data.bypassed === true,
+            },
+        };
     }
     return { ok: false, ...readError(data, "Could not restore that version.") };
 }
@@ -641,7 +773,8 @@ export async function restorePublication(
 
 export interface SiteCommentView {
     id: string;
-    pageId: string;
+    /** Null once the page it was left on has been deleted (#277). */
+    pageId: string | null;
     pageTitle: string | null;
     sectionKey: string;
     body: string;
@@ -652,14 +785,36 @@ export interface SiteCommentView {
     orphaned: boolean;
 }
 
+/**
+ * What the latest verdict on a site was. `BYPASSED` is not a reviewer's word:
+ * it is the record that someone published over a request for changes (#199).
+ * A union rather than a string so every place that words a verdict has to
+ * word all three — a new outcome is a type error, not a line that quietly
+ * renders as "asked for changes".
+ */
+export type ApprovalOutcome =
+    "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED";
+
 export interface ReviewState {
     openNotes: number;
-    latestApproval: { outcome: string; at: string; by: string } | null;
+    latestApproval: {
+        outcome: ApprovalOutcome;
+        at: string;
+        by: string;
+    } | null;
     /**
-     * A reviewer's latest verdict asked for changes and no approval has
-     * followed (#199). Publishing still works; it is recorded as a bypass.
+     * A review was asked for, or changes were, and neither has been settled
+     * for the draft as it stands (#199, #278). Publishing still works; it is
+     * recorded as a bypass.
      */
     outstanding: boolean;
+    /** Asked for and not yet answered — the "In review" state (#278). */
+    pending: boolean;
+    /**
+     * The newest approval was of a different draft than the one that would go
+     * live now: approved, then the work carried on (#278).
+     */
+    approvalIsStale: boolean;
 }
 
 /**
@@ -670,36 +825,154 @@ export interface ReviewState {
 export async function listComments(siteId: string): Promise<SiteCommentView[]> {
     const base = await sitesBase();
     if (!base) return [];
-    try {
-        const res = await apiFetch(`${base}/${siteId}/comments`);
-        if (!res.ok) return [];
-        const data = (await res.json()) as unknown;
-        return Array.isArray(data) ? (data as SiteCommentView[]) : [];
-    } catch {
-        return [];
-    }
+    /*
+     * A failure THROWS now (#275). This used to turn any error into an empty
+     * array, so an outage read as "No notes on this site yet" — the one
+     * sentence a reviewer must be able to trust, since acting on it means
+     * assuming nobody has said anything. `getList` distinguishes an absent
+     * resource (404 → empty) from a failure, and the segment boundary explains
+     * the failure.
+     */
+    return getList<SiteCommentView>(`${base}/${siteId}/comments`);
 }
 
 export async function getReviewState(siteId: string): Promise<ReviewState> {
     const empty: ReviewState = {
         openNotes: 0,
+        pending: false,
+        approvalIsStale: false,
         latestApproval: null,
         outstanding: false,
     };
     const base = await sitesBase();
     if (!base) return empty;
-    try {
-        const res = await apiFetch(`${base}/${siteId}/review`);
-        if (!res.ok) return empty;
-        const data = (await res.json()) as Partial<ReviewState> | null;
-        return {
-            openNotes: typeof data?.openNotes === "number" ? data.openNotes : 0,
-            latestApproval: data?.latestApproval ?? null,
-            outstanding: data?.outstanding === true,
-        };
-    } catch {
-        return empty;
-    }
+    /*
+     * A failure THROWS now (#275), for the same reason notes do: a swallowed
+     * error read as "nobody has reviewed this", which is the answer a merchant
+     * publishes on.
+     *
+     * The fields are still read defensively — an older API that does not send
+     * `pending` yet is a missing field, not a failure.
+     */
+    const data = await getJson<Partial<ReviewState>>(
+        `${base}/${siteId}/review`,
+    );
+    if (!data) return empty;
+    return {
+        openNotes: typeof data.openNotes === "number" ? data.openNotes : 0,
+        latestApproval: data.latestApproval ?? null,
+        outstanding: data.outstanding === true,
+        pending: data.pending === true,
+        approvalIsStale: data.approvalIsStale === true,
+    };
+}
+
+/**
+ * Leave a note on a section (#277). Requires `site:comment`, which a REVIEWER
+ * has and a MEMBER does not.
+ *
+ * The api rejects a section key that is not on the page's draft, so a note
+ * pinned from a stale screen fails loudly instead of being stored as an
+ * orphan nobody can act on.
+ */
+export async function createComment(
+    siteId: string,
+    input: { pageId: string; sectionKey: string; body: string },
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/comments`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as { id?: string } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not leave that note.") };
+}
+
+/**
+ * The verdicts a REVIEWER can record (#277): an answer to the work, and
+ * nothing else. REQUESTED is the merchant asking (#278) and BYPASSED is what
+ * publish writes for itself, so neither is a reviewer's to record.
+ *
+ * Derived from {@link ApprovalOutcome} rather than repeated, so an outcome
+ * cannot be added to one list and forgotten in the other.
+ */
+export type ReviewerVerdict = Exclude<
+    ApprovalOutcome,
+    "REQUESTED" | "BYPASSED"
+>;
+
+/**
+ * Record a verdict on the site. Requires `site:approve`.
+ *
+ * Approving does not publish and asking for changes does not block one — the
+ * reviewer says what they think, the owner decides (#199).
+ */
+export async function createApproval(
+    siteId: string,
+    outcome: ReviewerVerdict,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/approvals`, {
+        method: "POST",
+        body: JSON.stringify({ outcome }),
+    });
+    const data = (await res.json().catch(() => null)) as { id?: string } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not record that.") };
+}
+
+/** One section of a page, as a reviewer reads it (#275). */
+export interface ReviewableSection {
+    key: string;
+    type: string;
+    contractVersion: number;
+    label: string | null;
+    hidden: boolean;
+    content: unknown;
+}
+
+/** A page as a reviewer reads it: its sections, in order (#275). */
+export interface ReviewablePage {
+    sections: ReviewableSection[];
+}
+
+/**
+ * Read a page without asking for the editor's draft (#275).
+ *
+ * `getPageDraft` requires `section:write` and creates a DRAFT version when the
+ * page has none — an authoring load, which a reviewer must not make. This one
+ * needs only `site:read` and writes nothing.
+ */
+export async function getPageForReview(
+    siteId: string,
+    pageId: string,
+): Promise<ReviewablePage> {
+    const base = await sitesBase();
+    if (!base) return { sections: [] };
+    const page = await getJson<ReviewablePage>(
+        `${base}/${siteId}/pages/${pageId}/read`,
+    );
+    return page ?? { sections: [] };
+}
+
+/**
+ * Ask for a review (#278). Requires `site:update` — the person whose work it
+ * is saying they are ready for eyes. It blocks nothing.
+ */
+export async function requestReview(
+    siteId: string,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/review/request`, {
+        method: "POST",
+    });
+    const data = (await res.json().catch(() => null)) as { id?: string } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return { ok: false, ...readError(data, "Could not ask for a review.") };
 }
 
 /** Mark a note settled, or reopen it. Requires `section:write` on the api. */
@@ -916,7 +1189,11 @@ export type PreviewLinkState = "active" | "expired" | "revoked";
 
 export interface SitePreviewLinkView {
     id: string;
-    token: string;
+    /**
+     * The link's secret. Present ONLY on the response that created the link
+     * (#284): the API stores its hash, so a list or a revoke never carries it.
+     */
+    token?: string;
     state: PreviewLinkState;
     createdAt: string;
     expiresAt: string;
@@ -941,7 +1218,7 @@ export async function listPreviewLinks(
 export async function createPreviewLink(
     siteId: string,
     expiresInDays: PreviewLinkDays,
-): Promise<SitesResult<SitePreviewLinkView>> {
+): Promise<SitesResult<SitePreviewLinkView & { token: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/${siteId}/preview-links`, {
@@ -950,7 +1227,9 @@ export async function createPreviewLink(
     });
     const data = (await res.json().catch(() => null)) as
         (SitePreviewLinkView & { message?: string; error?: string }) | null;
-    if (res.ok && data?.id) return { ok: true, data };
+    if (res.ok && data?.id && data.token) {
+        return { ok: true, data: { ...data, token: data.token } };
+    }
     return {
         ok: false,
         ...readError(data, "Could not create a preview link."),

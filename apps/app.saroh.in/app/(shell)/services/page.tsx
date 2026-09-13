@@ -3,6 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { ServicesView } from "@/components/services/services-view";
+import { PageContainer } from "@/components/shared/page-container";
 import { listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
@@ -34,7 +35,7 @@ export default async function ServicesPage({
     ]);
 
     return (
-        <main className="mx-auto w-full max-w-7xl p-6 sm:p-8">
+        <PageContainer width="wide">
             <PageHeader
                 title="Services"
                 description="Bookable services visitors can reserve from your sites."
@@ -55,6 +56,6 @@ export default async function ServicesPage({
                     initialView={viewParam(params)}
                 />
             </div>
-        </main>
+        </PageContainer>
     );
 }

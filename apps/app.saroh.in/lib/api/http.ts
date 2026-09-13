@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import { forbidden } from "next/navigation";
 import { cache } from "react";
 
 import { ApiError } from "@/lib/api/errors";
@@ -123,18 +124,31 @@ export function readError(
 
 /**
  * GET a single resource, distinguishing a genuine absence from a real failure
- * (#101): a 404 → `null` (the resource legitimately doesn't exist), any other
- * non-2xx → THROW so the failure surfaces via the route error boundary
- * (app/error.tsx) rather than masquerading as an empty/absent resource. A
- * network error rejects naturally (not caught). A 2xx returns the parsed body.
+ * (#101):
+ * - a 404 returns `null`, because the resource legitimately doesn't exist;
+ * - a 403 calls `forbidden()`, because the caller's role doesn't reach it (#274);
+ * - any other non-2xx THROWS, so the failure surfaces via the route error
+ *   boundary rather than masquerading as an empty or absent resource.
+ *
+ * A network error rejects naturally (not caught). A 2xx returns the parsed body.
  */
 export async function getJson<T>(path: string): Promise<T | null> {
     const res = await apiFetch(path);
     if (res.status === 404) return null;
+    /*
+     * A 403 is a role decision, not a failure, and it has to render as one in
+     * production. There, Next replaces a thrown server error's message with a
+     * digest, so the segment boundary could no longer read the status off an
+     * ApiError and told the person to "try again" (#274). `forbidden()` throws
+     * an interrupt the nearest `forbidden.tsx` catches, status intact. It needs
+     * `experimental.authInterrupts` (next.config.js), and a read that may call
+     * it must never sit inside a try/catch, which would swallow the interrupt.
+     */
+    if (res.status === 403) forbidden();
     if (!res.ok) {
-        // An ApiError, not a bare Error: the segment boundary has to tell a
-        // 403 (explain it — §30) from a 500 (offer a retry), and it can only
-        // do that if the status survives the throw. See lib/api/errors.ts.
+        // An ApiError, not a bare Error, so the status survives the throw
+        // wherever the message does: in development, and on the client. See
+        // lib/api/errors.ts.
         throw new ApiError(res.status, `GET ${path}`);
     }
     return (await res.json()) as T;

@@ -25,6 +25,8 @@ import {
     PLAN,
     POSTS,
     PRODUCTS,
+    REVIEWER_EMAIL,
+    REVIEWER_PASSWORD,
     SEED_PREFIX,
     SEEDED_FOOTER,
     SEEDED_STYLE_VARIABLES,
@@ -262,6 +264,7 @@ export async function seed(): Promise<void> {
     // gated, and an org on the FREE default may hold neither.
     await seedBilling(prisma, org.id, now);
     const siteIds = await seedWebsite(prisma, org.id, user.id, now);
+    await seedReviewer(prisma, org.id, user.id, siteIds[0]);
     // Content after the website: a post belongs to the site it is published on
     // (ADR-004), so there has to be a site first.
     await seedContent(prisma, org.id, siteIds[0] ?? "", user.id);
@@ -798,6 +801,81 @@ async function seedBilling(prisma: Db, orgId: string, now: Date) {
 // --- Website ------------------------------------------------------------
 
 /**
+ * Someone invited to review the first site, and nothing else.
+ *
+ * A signed-in REVIEWER is the one actor in the product that could not be tried
+ * out: the role has its own screen, its own list scoping and its own refusals,
+ * and seeing any of it meant writing a Membership and a SiteReviewer by hand.
+ * Nobody did, which is part of why #274 — every website route 404ing for this
+ * role — went unnoticed for as long as it did.
+ *
+ * The grant covers the FIRST site only, deliberately. A reviewer who could see
+ * every site would be a MEMBER with extra powers; the second site staying out
+ * of their list is what the role actually means (#276), and a fixture that hid
+ * that distinction would make the narrowing untestable.
+ */
+async function seedReviewer(
+    prisma: Db,
+    orgId: string,
+    grantedByUserId: string,
+    siteId: string | undefined,
+): Promise<void> {
+    const reviewer = await prisma.user.upsert({
+        where: { email: REVIEWER_EMAIL },
+        update: { name: "Priya (reviewer)", emailVerified: true },
+        create: {
+            id: id("user", "reviewer"),
+            email: REVIEWER_EMAIL,
+            name: "Priya (reviewer)",
+            emailVerified: true,
+        },
+    });
+
+    // better-auth's own hasher, for the same reason the owner's uses it: a
+    // credential built any other way is a second source of truth.
+    await prisma.account.upsert({
+        where: { id: id("account", "reviewer") },
+        update: { password: await hashPassword(REVIEWER_PASSWORD) },
+        create: {
+            id: id("account", "reviewer"),
+            accountId: reviewer.id,
+            providerId: "credential",
+            userId: reviewer.id,
+            password: await hashPassword(REVIEWER_PASSWORD),
+        },
+    });
+
+    await prisma.membership.upsert({
+        where: {
+            organizationId_userId: {
+                organizationId: orgId,
+                userId: reviewer.id,
+            },
+        },
+        update: { role: "REVIEWER" },
+        create: {
+            id: id("membership", "reviewer"),
+            organizationId: orgId,
+            userId: reviewer.id,
+            role: "REVIEWER",
+        },
+    });
+
+    if (!siteId) return;
+    await prisma.siteReviewer.upsert({
+        where: { siteId_userId: { siteId, userId: reviewer.id } },
+        update: {},
+        create: {
+            id: id("sitereviewer", 0),
+            organizationId: orgId,
+            siteId,
+            userId: reviewer.id,
+            grantedByUserId,
+        },
+    });
+}
+
+/**
  * Build the org's sites, pages, drafts and publications.
  *
  * Two things here mirror the product rather than inventing a shape. Publishing
@@ -885,6 +963,29 @@ async function seedWebsite(
                     status: "DRAFT",
                     createdByUserId: userId,
                     createdAt,
+                },
+            });
+
+            /*
+             * Clear whatever an editor left on this draft before rewriting it.
+             *
+             * Saving a draft REPLACES its sections — `replaceDraftSections`
+             * deletes the rows and writes new ones with fresh ids — so the
+             * moment anybody opened the seeded site in the editor, this page
+             * version held sections the seed does not own. The upserts below
+             * are keyed by seeded id, so they tried to INSERT, and the
+             * `(pageVersionId, key)` unique constraint refused it: re-seeding
+             * failed for any developer who had used the product, which is
+             * everyone the fixture is for.
+             *
+             * Scoped to this seeded version and to rows without the seed
+             * prefix. Restoring the fixture is exactly what re-running the
+             * seed means; nothing outside a seeded page version is touched.
+             */
+            await prisma.section.deleteMany({
+                where: {
+                    pageVersionId: version.id,
+                    id: { not: { startsWith: SEED_PREFIX } },
                 },
             });
 
@@ -1349,6 +1450,9 @@ export async function reset(): Promise<void> {
         // Before the Site: Site.currentPublicationId is SetNull, so dropping
         // the Publication first clears the pointer instead of blocking on it.
         () => prisma.publication.deleteMany({ where }),
+        // Cascades from either side, but removed explicitly so the count the
+        // reset reports is the number of rows the seed actually wrote.
+        () => prisma.siteReviewer.deleteMany({ where }),
         () => prisma.site.deleteMany({ where }),
         () => prisma.subscription.deleteMany({ where }),
         () => prisma.plan.deleteMany({ where }),
@@ -1435,4 +1539,8 @@ async function report(prisma: Db, organizationId: string) {
             `comms:${providers[1]} domains:${providers[2]}`,
     );
     console.log(`[seed] sign in: ${OWNER_EMAIL} / ${OWNER_PASSWORD}`);
+    // Printed because a role nobody can sign in as is a role nobody looks at.
+    console.log(
+        `[seed] or as a reviewer of the first site: ${REVIEWER_EMAIL} / ${REVIEWER_PASSWORD}`,
+    );
 }

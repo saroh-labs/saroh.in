@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { PageSections } from "@saroh/site-blocks";
 
+import { PreviewGone } from "@/components/preview-gone";
 import { publicApiUrl } from "@/lib/api-url";
 import { findHomePage, getPreviewByToken } from "@/lib/publication";
 
@@ -13,9 +14,16 @@ export default async function PreviewHomePage({
 }) {
     const { token } = await params;
     const preview = await getPreviewByToken(token);
-    // The layout has already explained an expired or revoked link; a page
-    // under it renders nothing rather than a second, contradictory message.
-    if (!preview.ok) return null;
+    /*
+     * Explained HERE as well as in the layout (#284). Next keeps the layout
+     * mounted while a reviewer navigates inside the preview, so a link revoked
+     * mid-session is met by this page on their next click, and returning null
+     * left them an empty page under the draft bar.
+     */
+    if (!preview.ok) {
+        if (preview.reason === "missing") notFound();
+        return <PreviewGone reason={preview.reason} />;
+    }
 
     const home = findHomePage(preview.snapshot);
     if (!home) notFound();

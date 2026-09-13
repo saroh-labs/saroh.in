@@ -5,13 +5,15 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import type { NavChild, NavCounts } from "@/components/shared/nav-items";
+import type {
+    NavChild,
+    NavCounts,
+    NavRole,
+} from "@/components/shared/nav-items";
 import {
-    NAV_GROUPS,
     NOTIFICATIONS_HREF,
-    filterNavGroups,
     isNavItemActive,
-    navGroupsWithSites,
+    navFor,
     showsGroupLabel,
 } from "@/components/shared/nav-items";
 
@@ -25,22 +27,22 @@ import {
 export function AppSidebar({
     unread = 0,
     moduleKeys = null,
+    role = null,
     counts,
     sites = [],
 }: {
     unread?: number;
     /** `null` = availability unknown; see `filterNavGroups`. */
     moduleKeys?: string[] | null;
+    /** The actor's role here; `null` = unknown, and the nav fails open. */
+    role?: NavRole | null;
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
     /** The merchant's own sites, hung under Website. */
     sites?: { id: string; name: string }[];
 }) {
     const pathname = usePathname();
-    const groups = filterNavGroups(
-        navGroupsWithSites(NAV_GROUPS, sites),
-        moduleKeys,
-    );
+    const groups = navFor({ role, moduleKeys, sites });
 
     return (
         // `sticky top-0 h-screen` so the rail stays put on a long page. Without

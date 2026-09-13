@@ -3,6 +3,7 @@ import { CapabilityOffState } from "@saroh/ui/data-state";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { AccessDenied } from "@/components/shared/access-denied";
 import { moduleAccess } from "@/lib/modules/guard";
 import type { ModuleView } from "@/lib/modules/schema";
 
@@ -52,6 +53,26 @@ export async function ModuleGate({
 }) {
     const access = await moduleAccess(moduleKey);
     if (access.state === "unavailable") {
+        /*
+         * Readiness is DISABLED for ANY closed gate, and authorization is one
+         * of them. Rendering every DISABLED as "turned off" told a MEMBER that
+         * a capability their colleagues were using had been switched off for
+         * the whole organization (#274). A role that does not reach a module
+         * is a denial, and says so. When the module is off AND out of reach,
+         * the denial wins: the person reading this can do nothing about the
+         * switch.
+         */
+        const unauthorized = access.module.blockers.some(
+            (b) => b.code === "UNAUTHORIZED",
+        );
+        if (unauthorized) {
+            return (
+                <AccessDenied
+                    title={`You do not have access to ${access.module.label}`}
+                    description={`Your role in this organization doesn't include ${access.module.label}. An owner or admin can change what you can reach.`}
+                />
+            );
+        }
         return <Unavailable capability={access.module} />;
     }
     // `available` and `unknown` both render. See moduleAccess: claiming a

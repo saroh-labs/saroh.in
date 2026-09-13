@@ -4,6 +4,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PageContainer } from "@/components/shared/page-container";
 import { getContact } from "@/lib/contacts/service";
 import { contactName, formatValue } from "@/lib/crm/format";
 import { requireSession } from "@/lib/session";
@@ -26,7 +27,7 @@ export default async function ContactDetailPage({
     if (!contact) notFound();
 
     return (
-        <main className="mx-auto max-w-3xl p-8">
+        <PageContainer>
             <PageHeader
                 title={contactName(contact)}
                 description={contact.email}
@@ -105,6 +106,6 @@ export default async function ContactDetailPage({
                     })}
                 </div>
             )}
-        </main>
+        </PageContainer>
     );
 }

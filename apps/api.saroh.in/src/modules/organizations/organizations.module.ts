@@ -3,6 +3,8 @@ import { Module } from "@nestjs/common";
 import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { AuditModule } from "../audit/audit.module";
 import { OrganizationContextModule } from "./organization-context.module";
+import { OrganizationMembersController } from "./organization-members.controller";
+import { OrganizationMembersService } from "./organization-members.service";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
 import { OrganizationSettingsService } from "./organization-settings.service";
 import { OrganizationsController } from "./organizations.controller";
@@ -22,8 +24,12 @@ import { OrganizationsController } from "./organizations.controller";
  */
 @Module({
     imports: [OrganizationContextModule, AuditModule, AnalyticsCoreModule],
-    controllers: [OrganizationsController],
-    providers: [OrganizationOnboardingService, OrganizationSettingsService],
+    controllers: [OrganizationsController, OrganizationMembersController],
+    providers: [
+        OrganizationOnboardingService,
+        OrganizationSettingsService,
+        OrganizationMembersService,
+    ],
     exports: [OrganizationContextModule],
 })
 export class OrganizationsModule {}

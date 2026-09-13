@@ -131,6 +131,18 @@ jobs:
       - name: Unit tests (api, no database)
         run: pnpm --filter @saroh/api test:unit
 
+      # Everything else with a `test` script: seven packages and the workspace
+      # app (#287). They existed and never ran — vitest suites in
+      # block-contract, object-storage, auth, ui, database, site-blocks and
+      # templates, none of them reachable from any CI step, so a red one would
+      # have gone unnoticed until somebody ran it by hand.
+      #
+      # `@saroh/api` is excluded: its bare `test` script is `jest`, which picks
+      # up the integration specs that need a database. Its unit suite runs
+      # above, and its int suite in its own job with the Postgres service.
+      - name: Unit tests (packages and the app)
+        run: pnpm run test
+
       - name: Build
         run: pnpm run build
 
@@ -275,11 +287,21 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
       NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
-      NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
+      # `localhost`, not `saroh.app`: this is the renderer's OWN apex, and on a
+      # runner that is what it is reached at. Told `saroh.app`, the middleware
+      # reads `localhost` as a tenant subdomain and rewrites every request —
+      # `/preview/<token>` included — into a tenant lookup that finds nothing.
+      NEXT_PUBLIC_ROOT_DOMAIN: localhost
       EMAIL_FROM: Saroh <noreply@saroh.in>
       E2E_APP_URL: http://localhost:3003
       E2E_ACCOUNTS_URL: http://localhost:3000
       E2E_API_URL: http://localhost:3333
+      # The renderer, where a draft preview is served. As an ORIGIN, because
+      # the app builds a preview address from NEXT_PUBLIC_ROOT_DOMAIN as
+      # `https://saroh.app/...` — right in production, and unreachable here.
+      # The site-review flow takes the token out of that address and opens it
+      # against this origin instead.
+      E2E_RENDERER_URL: http://localhost:3005
 
     steps:
       - name: Checkout
@@ -313,7 +335,7 @@ jobs:
         run: pnpm turbo run db:seed --filter=@saroh/database
 
       - name: Build the apps under test
-        run: pnpm turbo run build --filter=@saroh/api --filter=auth --filter=application
+        run: pnpm turbo run build --filter=@saroh/api --filter=auth --filter=application --filter=sites
 
       - name: Install Playwright browser
         run: pnpm --filter @saroh/e2e install:browsers
@@ -327,17 +349,30 @@ jobs:
           pnpm --filter @saroh/api start > /tmp/api.log 2>&1 &
           pnpm --filter auth exec next start -p 3000 > /tmp/accounts.log 2>&1 &
           pnpm --filter application exec next start -p 3003 > /tmp/app.log 2>&1 &
+          # The renderer: a shared preview link is served by THIS app, on the
+          # renderer's own origin, and the not-live bar is its markup.
+          pnpm --filter sites exec next start -p 3005 > /tmp/renderer.log 2>&1 &
 
           wait_for() {
             name="$1"
             url="$2"
+            # Which statuses count as "serving", space separated. 307 is the
+            # workspace bouncing an anonymous visitor to sign in; 404 is the
+            # renderer answering for a token that does not exist. Both mean the
+            # server is up, which is the only thing being asked here.
+            #
+            # Compared one at a time rather than as a `case` pattern: `|` is
+            # case SYNTAX, parsed before the variable expands, so a pattern
+            # built from a variable would never have matched anything.
+            accept="${3:-200 307}"
             for attempt in $(seq 1 60); do
               code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo 000)
-              # 307 is the workspace bouncing an anonymous visitor to sign in,
-              # which means it is serving.
-              case "$code" in
-                200|307) echo "$name is up ($code)"; return 0 ;;
-              esac
+              for want in $accept; do
+                if [ "$code" = "$want" ]; then
+                  echo "$name is up ($code)"
+                  return 0
+                fi
+              done
               sleep 2
             done
             echo "::error::$name never came up (last status ${code})"
@@ -347,12 +382,17 @@ jobs:
           # `tail -n 50`, not `tail -50`: the obsolete form is rejected in this
           # context, so the first version of this dump failed silently and a
           # failed run reported nothing about WHY the stack did not start.
+          # The renderer serves tenants by hostname and a runner has none, so
+          # it is polled on a preview token instead; a 404 there is the app
+          # answering, which is what "up" means for it.
           if ! wait_for api http://localhost:3333/health \
             || ! wait_for accounts http://localhost:3000/login \
-            || ! wait_for app http://localhost:3003/; then
+            || ! wait_for app http://localhost:3003/ \
+            || ! wait_for renderer http://localhost:3005/preview/not-a-token '200 307 404'; then
             echo "----- api -----";      tail -n 50 /tmp/api.log      || true
             echo "----- accounts -----"; tail -n 50 /tmp/accounts.log || true
             echo "----- app -----";      tail -n 50 /tmp/app.log      || true
+            echo "----- renderer -----"; tail -n 50 /tmp/renderer.log || true
             exit 1
           fi
 
@@ -370,6 +410,64 @@ jobs:
             e2e/test-results/
             e2e/playwright-report/
           retention-days: 7
+  # The permission-denied states, rendered by a PRODUCTION build (#287).
+  #
+  # It existed and never ran. `e2e/permissions.config.ts` and its suite shipped
+  # with #274, CI ran only `test:e2e`, and the day #275 replaced the read-only
+  # site view the suite went stale with nothing to say so. Tests that exist and
+  # are invisible are worse than tests that do not exist: they read as coverage.
+  #
+  # Separate from the seeded browser job because it needs neither a database
+  # nor a real sign-in. A ~100-line fake API answers per role, and the app is
+  # built and served for real — `next dev` keeps the error messages production
+  # redacts, and redaction is exactly what these tests are about.
+  permissions-e2e:
+    name: Permission states (production build)
+    runs-on: ubuntu-latest
+
+    env:
+      # Bare ports: a runner has no portless, so the config's `.localhost`
+      # hostnames would resolve to nothing. Setting these switches both the
+      # URLs under test and how the two servers are started.
+      PERMISSIONS_APP_URL: http://localhost:3004
+      PERMISSIONS_API_URL: http://localhost:3334
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.9.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm --filter @saroh/e2e install:browsers
+
+      # Playwright's own webServer builds and starts both servers, and tears
+      # them down afterwards — there is no stack to poll for here.
+      - name: Run the permission suite
+        run: pnpm --filter @saroh/e2e test:permissions
+
+      - name: Upload the report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: permissions-report
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          retention-days: 7
+
   # Secret scanning runs as its own job over the full git history so a secret
   # committed in an earlier commit is still caught.
   #

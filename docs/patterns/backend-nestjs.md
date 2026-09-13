@@ -60,7 +60,33 @@ src/
 
 - `class-validator` and `class-transformer`, with trimming and normalising
   transforms on the DTO (`modules/leads/dto.ts`).
-- The global `ValidationPipe` sets `whitelist` and `forbidNonWhitelisted`.
+- The global `ValidationPipe` sets `whitelist` and `forbidNonWhitelisted`. Its
+  options live in `common/validation.ts`, shared by `main.ts` and DTO specs.
+- **A body is a DTO class, never an inline type.** `@Body() dto: { … }` reflects
+  as `Object`, and the pipe validates nothing for `Object`: no whitelist, no
+  type check (#286).
+- **Nothing is converted implicitly.** `enableImplicitConversion` was on until
+  #314 and coerced every value to its declared type before the validators ran —
+  for a boolean, by TRUTHINESS, so `"false"` arrived as `true` and `@IsBoolean()`
+  passed. Eleven fields were exposed; three carried a per-field workaround and
+  the rest did not, because it had to be remembered.
+    - A body is JSON and already carries real numbers, strings and booleans, so
+      a body DTO needs no conversion and a mistyped value is now a 400.
+    - A value that arrives as TEXT — a query string or a route param — converts
+      explicitly with `@Type(() => Number)` on the property
+      (`ListAdminAuditDto.limit` is the only one today).
+    - `transform: true` stays on: it is what builds the DTO class at all, so
+      `@Type`, nested `ValidateNested` DTOs and every `@Transform` still run.
+    - `common/validation.spec.ts` holds the table — every boolean the API takes,
+      against every value truthiness used to swallow.
+- **The one exception is structured JSON with a hand-written parser.** Site
+  style, footer and menu (`site-style.ts`, `site-footer.ts`,
+  `site-navigation.ts`) take `@Body() body: unknown`, because their rules
+  (palette keys, page references, bounds) are not expressible as decorators.
+    - Each parser throws `BadRequestException` with a message a merchant can
+      read, and the filter gives it the same 400 envelope as a DTO failure.
+    - Only `details` is absent, since there are no field-level messages to list.
+    - A new body that can be a DTO must be one.
 - Enumerations are `as const` arrays with a derived type (`LEAD_STATUSES`).
 
 ## Responses and errors — **Current**

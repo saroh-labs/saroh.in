@@ -17,13 +17,13 @@ The delivery rule is vertical: complete one customer journey before expanding ho
 ## Stage 1: Authentication, Organizations and tenant security
 
 - Objective/user value: a user safely creates and switches between business Organizations.
-- Scope: Better Auth cleanup, BusinessProfile, mandatory Organization ownership, invitations, OWNER/ADMIN/MEMBER permissions, Teams, optional Projects and Project access, Organization switcher, audit events and RLS.
+- Scope: Better Auth cleanup, BusinessProfile, mandatory Organization ownership, organization invitations, OWNER/ADMIN/MEMBER/REVIEWER permissions, Teams, optional Projects and Project access, Organization switcher, audit events and RLS.
 - Non-goals: custom roles, SSO, 2FA or billing.
 - Backend/database: Organization application service/policy; Team and Project grants; backfill legacy stores; transaction-local context, compound constraints, RLS and dual-read/write transition.
 - Frontend: onboarding, business profile, Organization switcher and Team/Project access management.
 - Security/tests: actor-derived context, no trusted client Organization ID, role/Team/Project matrix, negative cross-tenant and connection-pool RLS tests, cookie/CSRF E2E.
 - Migration concerns: one Organization per existing store tenant initially; preserve store routes through adapters.
-- Acceptance: a multi-Organization user switches safely; OWNER/ADMIN see every Project; MEMBER sees only directly/Team-granted Projects; cross-Organization SQL is blocked; NextAuth references are zero.
+- Acceptance: a multi-Organization user switches safely; OWNER/ADMIN see every Project; MEMBER sees only directly/Team-granted Projects; a REVIEWER reaches only the sites it was invited to and cannot see the roster, stores or media; the last OWNER cannot be demoted or removed; cross-Organization SQL is blocked; NextAuth references are zero.
 - Dependencies/risks: Stage 0 and Store semantic product decision.
 
 ## Stage 2: Site management, CMS and section-based page builder

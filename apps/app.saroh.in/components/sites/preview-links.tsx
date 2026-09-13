@@ -26,6 +26,11 @@ import type { PreviewLinkDays, SitePreviewLinkView } from "@/lib/sites/service";
  *
  * The link is copied the moment it is created. Creating it and then hunting
  * for a copy button is two steps where one was asked for.
+ *
+ * That moment is also the only time its address exists outside the reviewer's
+ * inbox (#284). The API stores a hash, so a link created in this session can
+ * be copied again, and an older one says plainly that its address was shown
+ * once. It can still be turned off.
  */
 
 const DEFAULT_DAYS: PreviewLinkDays = 7;
@@ -62,6 +67,9 @@ async function copy(text: string): Promise<boolean> {
 
 export function PreviewLinks({ siteId }: { siteId: string }) {
     const [links, setLinks] = useState<SitePreviewLinkView[] | null>(null);
+    // Addresses of links created in this session, by id. Nothing else can
+    // supply one: the API never returns a token after creation (#284).
+    const [secrets, setSecrets] = useState<Record<string, string>>({});
     const [days, setDays] = useState<PreviewLinkDays>(DEFAULT_DAYS);
     const [busy, setBusy] = useState<string | null>(null);
 
@@ -86,6 +94,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
             return;
         }
         setLinks((prev) => [res.data, ...(prev ?? [])]);
+        setSecrets((prev) => ({ ...prev, [res.data.id]: res.data.token }));
         const copied = await copy(previewUrl(res.data.token));
         showSuccess(
             copied
@@ -109,7 +118,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
     }
 
     return (
-        <section className="border-b p-3">
+        <section className="shrink-0 border-b p-3">
             <h3 className="text-[0.625rem] uppercase tracking-[0.08em] text-muted-foreground">
                 Share a preview
             </h3>
@@ -122,21 +131,23 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                 <ul className="mt-2 grid gap-2">
                     {active.map((link) => (
                         <li key={link.id} className="rounded border p-2">
-                            <div className="flex items-center gap-1">
-                                <code
-                                    className="min-w-0 flex-1 truncate text-[0.6875rem]"
-                                    title={previewUrl(link.token)}
-                                >
-                                    {previewUrl(link.token)}
-                                </code>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 shrink-0 px-1.5 text-[0.6875rem]"
-                                    onClick={() =>
-                                        void copy(previewUrl(link.token)).then(
-                                            (ok) =>
+                            {secrets[link.id] ? (
+                                <div className="flex items-center gap-1">
+                                    <code
+                                        className="min-w-0 flex-1 truncate text-[0.6875rem]"
+                                        title={previewUrl(secrets[link.id])}
+                                    >
+                                        {previewUrl(secrets[link.id])}
+                                    </code>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-6 shrink-0 px-1.5 text-[0.6875rem]"
+                                        onClick={() =>
+                                            void copy(
+                                                previewUrl(secrets[link.id]),
+                                            ).then((ok) =>
                                                 ok
                                                     ? showSuccess(
                                                           "Link copied.",
@@ -144,12 +155,22 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                                     : showError(
                                                           "Could not copy. Select the link and copy it yourself.",
                                                       ),
-                                        )
-                                    }
-                                >
-                                    Copy
-                                </Button>
-                            </div>
+                                            )
+                                        }
+                                    >
+                                        Copy
+                                    </Button>
+                                </div>
+                            ) : (
+                                <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
+                                    Shared {shortDate(link.createdAt)}
+                                    {link.createdBy.name
+                                        ? ` by ${link.createdBy.name}`
+                                        : ""}
+                                    . Its address was shown once, when it was
+                                    made; create a new link to share it again.
+                                </p>
+                            )}
                             <p className="mt-1.5 text-[0.6875rem] leading-relaxed text-muted-foreground">
                                 Stops working on {dayOf(link.expiresAt)}.{" "}
                                 {link.lastUsedAt ? (

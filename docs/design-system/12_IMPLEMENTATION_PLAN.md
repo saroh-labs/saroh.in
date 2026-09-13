@@ -126,7 +126,7 @@ Total ≈ **100–135 person-days**. Milestones are largely sequential (each dep
 
 - **Commerce:** org-level Orders rollup — D‑16; store overview → real KPI dashboard (`@saroh/charts`) — D‑24; dense **tables** + **pagination** + **bulk actions** for products/orders/customers — D‑23, D‑23a, D‑55; **card fallback** on mobile — D‑47.
 - **Appointments:** merge `app/services/*` + `app/bookings/*` into one Appointments goal; services/hours as one-time setup — D‑15.
-- **Team:** org-level `Settings → Team` with scoped invites (replaces per-store `members`) — D‑25; **pending-invite** rows — D‑26; **Settings** surface (profile/billing/domains) — D‑27.
+- **Team:** org-level team with scoped invites — D‑25 and the **pending-invite** rows D‑26 shipped on 2026-09-12 (#276) as `Settings → People`, alongside rather than replacing the per-store `members` screen; **Settings** surface (profile/billing/domains) — D‑27.
 - **Marketing:** `/marketing` with teaching empty state + campaign templates (empty-state-first, ahead of backend) — D‑39.
 - **Analytics → Insights:** real charts + date range — D‑28.
 

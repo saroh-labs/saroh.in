@@ -45,6 +45,11 @@ model User {
   sessions Session[]
   accounts Account[]
 
+  // Sites this user was invited to review (#276), and the invitations they sent.
+  siteReviews        SiteReviewer[]           @relation("SiteReviewerUser")
+  siteReviewsGranted SiteReviewer[]           @relation("SiteReviewerGrantedBy")
+  invitationsSent    OrganizationInvitation[]
+
   siteComments     SiteComment[]
   posts            Post[] // Posts they wrote (ADR-004)
   siteApprovals    SiteApproval[]
@@ -98,6 +103,12 @@ model Organization {
 
   // Saved list views (#124): per-actor, per-resource named filter sets.
   savedViews SavedView[]
+
+  // Pending and settled invitations to join this organization (#276).
+  invitations OrganizationInvitation[]
+
+  // Per-site review grants held by this org's REVIEWER members (#276).
+  siteReviewers SiteReviewer[]
 
   // Optional 1:1 business identity captured at onboarding (S1-004)
   businessProfile BusinessProfile?
@@ -222,7 +233,9 @@ model Membership {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  role String @default("MEMBER") // OWNER, ADMIN, MEMBER
+  // OWNER, ADMIN, MEMBER, REVIEWER (#276). REVIEWER is website-only and sees
+  // just the sites it is granted through SiteReviewer — see organization-policy.ts.
+  role String @default("MEMBER")
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -236,6 +249,78 @@ model Membership {
 // then flipped to `READY` once the client confirms (via the complete endpoint)
 // that the bytes landed. `key` is the server-derived, tenant-scoped storage key
 // (`org/<organizationId>/...`) — never client-supplied — and is globally unique.
+// SiteReviewer: one person's permission to review ONE site (#276).
+//
+// A REVIEWER's org role grants site:read, site:comment and site:approve, but a
+// reviewer is brought in to look at a particular site — often an outside
+// copywriter or a client's own manager. Without this table the role would mean
+// "read every site this business has", which is not what anyone inviting a
+// reviewer intends. Enforced in site-access.ts (assertSiteInOrg) and listSites:
+// to a REVIEWER, a site with no grant does not exist.
+//
+// Deleted with the site, the user, or the org. A grant outliving any of the
+// three is meaningless.
+model SiteReviewer {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("SiteReviewerUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Who granted it. SetNull, not cascade: the grant survives the granter
+  // leaving, the same way an approval survives its author.
+  grantedByUserId String?
+  grantedBy       User?   @relation("SiteReviewerGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([siteId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// OrganizationInvitation: an offer to join an Organization at a role (#276).
+//
+// Separate from StoreInvitation, which invites to a Store with the store role
+// vocabulary. Organization is the tenant root (ADR-001), and org roles are what
+// authorization is actually decided from.
+//
+// The token is stored HASHED (sha256 hex), like SitePreviewLink: the plaintext
+// exists only in the invitee's email. A leaked database row cannot be used to
+// join an organization.
+model OrganizationInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  email String // who was invited; they need not have an account yet
+  role  String // OWNER, ADMIN, MEMBER, REVIEWER
+
+  // Sites a REVIEWER invite grants on accept. Empty for every other role.
+  // Held here rather than as rows because the invitee has no User row yet.
+  siteIds String[]
+
+  tokenHash String @unique // sha256 of the token carried in the accept link
+  status    String @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+
+  // SetNull: an invitation outlives the person who sent it.
+  invitedByUserId String?
+  invitedBy       User?   @relation(fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([organizationId, email]) // one live invite per email per org
+  @@index([organizationId])
+}
+
+// ============================================================================
 model Media {
   id             String       @id @default(cuid())
   organizationId String
@@ -1492,6 +1577,8 @@ model Site {
   approvals      SiteApproval[]
   previewLinks   SitePreviewLink[]
   publications   Publication[]     @relation("SitePublications")
+  // Who may review this site (#276).
+  reviewers      SiteReviewer[]
 
   // Verified subdomain / custom-domain claims routed to this Site (S2-007).
   // Nullable on the Domain side (Domain.siteId) — a claim exists before it is
@@ -1567,8 +1654,16 @@ model SiteComment {
   siteId String
   site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
-  pageId String
-  page   Page   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  // SetNull, not Cascade (#277): deleting a page used to delete every note
+  // anyone had left on it. A note is a record of what a person said about the
+  // work — the Review tab has always had a group for "On a page that no longer
+  // exists", and it could never render because the rows were gone.
+  pageId String?
+  page   Page?   @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  // The page's title when the note was written. Kept so a note whose page is
+  // gone can still say where it was; the live title wins while the page exists.
+  pageTitle String?
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1612,13 +1707,28 @@ model SiteApproval {
   byUserId String
   by       User   @relation(fields: [byUserId], references: [id], onDelete: Cascade)
 
-  // APPROVED | CHANGES_REQUESTED | BYPASSED. The first two are what a reviewer
-  // records; the spec's "approved with notes" is APPROVED plus the open note
-  // count, not a third verdict. BYPASSED is written by PUBLISH, never by a
-  // reviewer (#199): when a site goes live while a change request is still
-  // outstanding, the fact is appended here — who, when, and which publication
-  // — because the epic's rule is that bypassing is recorded, not prevented.
+  // REQUESTED | APPROVED | CHANGES_REQUESTED | BYPASSED.
+  //
+  // REQUESTED is the merchant asking for a review (#278) — the act that makes a
+  // review pending, which the model previously had no way to express: a review
+  // nobody had answered simply did not exist.
+  //
+  // APPROVED and CHANGES_REQUESTED are what a reviewer records; the spec's
+  // "approved with notes" is APPROVED plus the open note count, not a third
+  // verdict. BYPASSED is written by PUBLISH, never by a reviewer (#199): when a
+  // site goes live while a review is still outstanding, the fact is appended
+  // here — who, when, and which publication — because the epic's rule is that
+  // bypassing is recorded, not prevented.
   outcome String
+
+  // Which draft this row is about (#278): a hash of the snapshot publishing
+  // would write, minus its timestamp.
+  //
+  // #193: an approval "does not survive later edits to that draft". Without
+  // this, approve → change three sections → publish still read "Approved".
+  // Written on REQUESTED and APPROVED; null on the other two, which record an
+  // act rather than a state of the work.
+  draftFingerprint String?
 
   // The publication a BYPASSED row is about, so version history can show
   // which publish went past an outstanding review. Null on a verdict.
@@ -1652,7 +1762,9 @@ model SitePreviewLink {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  token String @unique
+  // SHA-256 (hex) of the link's secret, never the secret itself (#284). The raw
+  // token is returned once, when the link is created.
+  tokenHash String @unique
 
   createdByUserId String
   createdBy       User   @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
@@ -1678,6 +1790,17 @@ model PageVersion {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   status PageVersionStatus @default(DRAFT)
+
+  // Which edit of this draft the sections are (#285). Incremented inside the
+  // replace transaction, and checked against the revision the editor was given
+  // when it loaded.
+  //
+  // Saving a draft DELETES every section and recreates the list the client
+  // sent, so without this two tabs on one page silently undo each other: each
+  // one saves its whole list, the last write wins, and the loser's work is gone
+  // with no conflict, error or trace. A counter is enough — there is exactly
+  // one writer path, and it holds a transaction.
+  revision Int @default(0)
 
   createdByUserId String? // authoring user, when known
 
@@ -1769,6 +1892,15 @@ model Publication {
 
   publishedByUserId String?
   publishedAt       DateTime @default(now()) // immutable; republish == new row
+
+  // Which route this publish took (#278): APPROVED, BYPASSED or NONE.
+  //
+  // #193 asks that all three be distinguishable after the fact. Only a bypass
+  // was recorded before, through a SiteApproval row, so "a reviewer approved
+  // this" and "nobody was ever asked" read identically in version history.
+  // Null on rows published before this column existed, which is honest: we do
+  // not know which route they took.
+  reviewRoute String?
 
   // Back-relation for Site.currentPublication (the live pointer above).
   currentForSite Site?          @relation("SiteCurrentPublication")
@@ -1895,7 +2027,12 @@ model Form {
   site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
 
   name   String
-  fields Json // ordered field descriptors: [{ name, label, type, required }]
+  // Ordered field descriptors: [{ name, label, type, required }]. The site
+  // editor rewrites these on every autosave, so they are the DRAFT's fields. A
+  // live submission is validated against the current publication's copy
+  // instead, and falls back to these only when no publication carries the form
+  // (#281).
+  fields Json
 
   // The Pipeline new leads from this form land in. Null → the org's default.
   pipelineId String?
