@@ -23,7 +23,7 @@ until someone opened a 320px viewport.
 
 ## Verify in a browser, at these widths
 
-Run the stack under portless (see the root `AGENTS.md` — never bare ports), then
+Run the stack under portless (see `docs/architecture/LOCAL_DEV.md` — never bare ports), then
 emulate a real viewport. **Resizing the window is not enough**: Chrome has a
 ~500px minimum window width, so `resize_page` to 320 silently gives you 500 and
 everything looks fine.
