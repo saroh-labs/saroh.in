@@ -10,10 +10,15 @@ name: Build and deploy API
 # not in this public repo. CI's key is restricted to that one command, so the
 # only thing this workflow can do there is name the image tag to ship. Where the
 # host is, and its pinned host key, come from repository secrets.
+#
+# Which environment is decided here, and enforced there by which key is used:
+#   push to main         -> production   (VPS_SSH_KEY)
+#   push to development  -> development  (VPS_DEV_SSH_KEY, which cannot reach production)
+#   manual run           -> the `target` input, development unless you pick production
 
 on:
     push:
-        branches: [main]
+        branches: [main, development]
         # Skip the build for changes that cannot affect the image. The api's own
         # tree, everything it imports, and the build inputs are all covered.
         paths:
@@ -26,8 +31,15 @@ on:
             - "turbo.json"
             - ".dockerignore"
             - ".github/workflows/deploy-api.yml"
-    # Manual trigger, for redeploying an unchanged tree or building off a branch.
+    # Manual trigger, for redeploying an unchanged tree or building off a branch
+    # (a production rollout of `development` ahead of the merge to main).
     workflow_dispatch:
+        inputs:
+            target:
+                description: Where to deploy the build
+                type: choice
+                options: [development, production]
+                default: development
 
 env:
     REGISTRY: ghcr.io
@@ -65,7 +77,7 @@ jobs:
               uses: docker/metadata-action@v5
               with:
                   images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-                  # A moving `latest` plus an immutable `sha-<commit>`. deploy.sh
+                  # A moving `latest` plus an immutable `sha-<commit>`. The deploy
                   # pins the SHA tag, which is what makes rollback a matter of
                   # naming the previous one rather than rebuilding it.
                   tags: |
@@ -108,16 +120,20 @@ jobs:
         runs-on: ubuntu-latest
         permissions:
             contents: none
-        # One production rollout at a time, across every ref.
+        env:
+            TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref == 'refs/heads/main' && 'production' || 'development') }}
+        # One rollout per environment at a time, across every ref.
         concurrency:
-            group: deploy-api-production
+            group: deploy-api-${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref == 'refs/heads/main' && 'production' || 'development') }}
             cancel-in-progress: false
 
         steps:
             - name: Deploy
               env:
                   VPS_HOST: ${{ secrets.VPS_HOST }}
-                  VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+                  # The key decides the environment on the host; the dev key is
+                  # forced to the development target and cannot deploy production.
+                  VPS_SSH_KEY: ${{ (github.event_name == 'workflow_dispatch' && inputs.target || (github.ref == 'refs/heads/main' && 'production' || 'development')) == 'production' && secrets.VPS_SSH_KEY || secrets.VPS_DEV_SSH_KEY }}
                   VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
                   # Full 40 characters, matching `type=sha,format=long` above.
                   TAG: sha-${{ github.sha }}
@@ -132,4 +148,4 @@ jobs:
                       -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts \
                       -o ServerAliveInterval=30 \
                       "root@${VPS_HOST}" "$TAG"
-                  echo "### Deployed \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+                  echo "### Deployed \`$TAG\` to $TARGET" >> "$GITHUB_STEP_SUMMARY"
