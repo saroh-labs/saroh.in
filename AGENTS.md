@@ -1,7 +1,8 @@
 # Working in this repository
 
-Saroh is a multi-tenant platform where a business runs its website, bookings,
-orders and customers. It is a pnpm (`pnpm@9`) + Turborepo monorepo.
+Saroh is a multi-tenant business platform: one place a small business sells,
+takes bookings, follows up on enquiries and keeps a website in step. It is a
+pnpm (`pnpm@9`) + Turborepo monorepo.
 
 ## Layout
 
@@ -18,8 +19,10 @@ orders and customers. It is a pnpm (`pnpm@9`) + Turborepo monorepo.
   port** — CORS and the shared session silently break otherwise.
   `docs/architecture/LOCAL_DEV.md`.
 - **Only `api.saroh.in` touches the database.** Frontends never import
-  `@saroh/database`, nor a package that depends on it (`@saroh/templates` is
-  the one that catches people). ESLint enforces it.
+  `@saroh/database` or Prisma, nor the root or `/server` entry of `@saroh/auth`,
+  which pulls it in — use `@saroh/auth/client`, `/next`, `/middleware`,
+  `/auth-status` or `/constants`. ESLint enforces it
+  (`tooling/eslint-config-custom/nextjs.js`).
 - **Organization is the tenant root**, not Store (ADR-001).
 - **Merchant sites never inherit Saroh's brand**; the `--site-*` token layer is
   separate by design.

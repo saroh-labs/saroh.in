@@ -10,7 +10,9 @@ Every app is reached at its **production hostname with `.localhost` appended**
 (`https://app.saroh.localhost`, `https://api.saroh.localhost`, …). `portless`, a
 root devDependency installed once as an OS service, terminates HTTPS on 443 and
 routes each hostname to its dev server. Each app's `portless` field in its
-`package.json` declares its name.
+`package.json` declares its name. `portless` is a root devDependency; the proxy
+itself is installed once per machine, in a real terminal (it asks for sudo):
+`npm install -g portless && portless service install --wildcard`.
 
 ```bash
 pnpm dev                                    # everything
@@ -22,8 +24,8 @@ pnpm portless:status                        # is the proxy up?
 **Do not start apps with `next dev -p 3003` or `nest start` and a `PORT`.** It
 looks equivalent and is not:
 
-- `api.saroh.in`'s CORS allowlist is built from the `.localhost` hostnames
-  (`main.ts`), so sign-in from an app on a bare port is refused by the browser
+- Unless `CORS_ORIGIN` is set, `api.saroh.in`'s CORS allowlist is the trusted
+  origins plus the `.localhost` hostnames (`main.ts`), so sign-in from an app on a bare port is refused by the browser
   before it reaches the API — with no error in the API log, because no request
   arrives.
 - Better Auth scopes its cookie to the shared parent domain. Apps on different
@@ -35,7 +37,7 @@ looks equivalent and is not:
 **Set `BETTER_AUTH_TRUSTED_ORIGINS` when you run the stack yourself.** Unset, it
 falls back to the `*.saroh.in` production list, so a return-to on a `.localhost`
 origin is correctly refused and sign-in lands on the app launcher instead of the
-page asked for (#222). `.env.example` has the value; an ad-hoc `turbo run dev`
+page asked for (#222). The root `.env.example` has the value; an ad-hoc `turbo run dev`
 with your own env does not inherit it.
 
 A **merchant's own site** hangs off the renderer's apex, so the seeded
@@ -49,8 +51,9 @@ why `portless service install` takes `--wildcard`. A **draft preview** lives at
 pnpm --filter @saroh/database db:seed        # "Northwind Supply"
 ```
 
-Sign in as `demo@saroh.dev` / `demo-password-123` (fixture values for a
-throwaway database, printed by the seed itself). The seed lays down 24
+Sign in as the owner `demo@saroh.dev` / `demo-password-123`, or as
+`reviewer@saroh.dev` (same password) to see the Reviewer role — fixture values
+for a throwaway database, from `packages/database/src/seed/data.ts`. The seed lays down 24
 contacts, 16 leads, 3 services, 10 bookings, 12 products, 10 orders and 3 sites
 — enough for every operational surface to have something on it.
 
@@ -74,7 +77,7 @@ throwaway browser** for a manual check. A throwaway launch uses a fresh profile
 and closes itself: the session is gone every run, nothing you did is
 inspectable afterwards, and nobody watching the screen sees anything happen.
 
-Start the window once, and leave it open:
+Start the window once, and leave it open (macOS path shown):
 
 ```bash
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
@@ -86,10 +89,11 @@ Start the window once, and leave it open:
 `--ignore-certificate-errors` is for portless's own CA on the `.localhost`
 names. Sign in once as the seeded demo owner; the profile keeps the session.
 
-Attach from a script, drive it, and detach — the window stays open:
+Attach from a script run inside `e2e/` (where `@playwright/test` is installed),
+drive it, and detach — the window stays open:
 
 ```js
-import { chromium } from "playwright-core";
+import { chromium } from "@playwright/test";
 
 const browser = await chromium.connectOverCDP("http://127.0.0.1:9333");
 const page = browser.contexts()[0].pages()[0];
