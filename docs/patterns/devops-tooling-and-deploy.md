@@ -76,9 +76,12 @@ audit that blocks on critical advisories; plus integration tests,
 ## Shipping the API
 
 - **Current** — `.github/workflows/deploy-api.yml` builds
-  `apps/api.saroh.in/Dockerfile` on pushes to `main` (or a manual run on any
-  branch), pushes it to GHCR tagged `latest` and `sha-<commit>`, **and deploys
-  that SHA tag.** Rollback means deploying the previous tag. The image builds in
+  `apps/api.saroh.in/Dockerfile`, pushes it to GHCR tagged `latest` and
+  `sha-<commit>`, **and deploys that SHA tag**: a push to `main` goes to
+  production, a push to `development` goes to the development API, and a manual
+  run deploys to the `target` it is given (development by default). Each
+  environment has its own deploy key, and the development key cannot reach
+  production. Rollback means deploying the previous tag. The image builds in
   CI because the host also runs Postgres, and a workspace build there would
   evict its page cache.
 - **Current** — The rollout itself lives on the host, not in this public repo:
