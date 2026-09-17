@@ -22,7 +22,7 @@ left the page. Separately, Better Auth scopes its cookie to the shared parent
 domain, which apps on different ports of bare `localhost` do not share — so
 even a successful sign-in bounces back to the login screen.
 **Fix**: Run apps through portless at their `.localhost` names (`pnpm dev`).
-**Category**: local dev · rule in `AGENTS.md`
+**Category**: local dev · rule in `docs/architecture/LOCAL_DEV.md`
 
 ## API — `PORT` default never applies, app binds a random port
 
@@ -34,7 +34,7 @@ validation. `app.listen(undefined)` picks a random port. Locally
 `apps/api.saroh.in/.env` sets `PORT`, which hides it.
 **Fix**: Anywhere without a `.env`, pass every value the app needs, including
 the ones that "have a default". This cost a red CI run.
-**Category**: env · rule in `AGENTS.md`
+**Category**: env · rule in `docs/patterns/devops-environments-and-flags.md` and `apps/api.saroh.in/AGENTS.md`
 
 ## Auth — sign-in lands on the app launcher, not the page asked for (#222)
 
@@ -45,7 +45,7 @@ back to the `*.saroh.in` production list, so a return-to on a `.localhost`
 origin is — correctly — refused.
 **Fix**: Set `BETTER_AUTH_TRUSTED_ORIGINS` when running the stack yourself;
 `.env.example` has the value. An ad-hoc `turbo run dev` does not inherit it.
-**Category**: auth · rule in `AGENTS.md`
+**Category**: auth · rule in `docs/architecture/LOCAL_DEV.md`
 
 ## Auth — every signed-in user sent to sign-in during an api restart
 

@@ -141,10 +141,23 @@ pnpm portless:doctor     # diagnose routing, DNS, and certificate issues
 Other focused shortcuts: `dev:api`, `dev:accounts`, `dev:web`, `dev:docs`,
 `dev:help`, `dev:templates`, and `dev:ui`. You can also run `pnpm dev` inside
 any app. Each app declares its hostname in `portless` and invokes
-`portless <name> <server command>` directly, matching the Virashi setup.
+`portless <name> <server command>` directly.
 Shared package `tsup --watch` scripts remain build watchers; only HTTP servers
 need Portless. Set `BETTER_AUTH_TRUSTED_ORIGINS` to the local origins in
 `.env.example` when starting the API.
+
+To have something on every screen, seed a demo business and sign in as
+`demo@saroh.dev` / `demo-password-123`:
+
+```bash
+pnpm --filter @saroh/database db:seed
+```
+
+- [`LOCAL_DEV.md`](docs/architecture/LOCAL_DEV.md) — why apps must run under
+  portless, the seeded data, throwaway databases, and checking a change in a
+  browser
+- [`ENVIRONMENT.md`](docs/architecture/ENVIRONMENT.md) — every app's URL and
+  every environment variable, with what happens when one is unset
 
 ## Environment & secrets
 
@@ -169,6 +182,17 @@ implementation backlog live in [`docs/architecture/`](docs/architecture/):
 | [`PRODUCT_ROADMAP.md`](docs/architecture/PRODUCT_ROADMAP.md)               | Stages 0–9 delivery plan                           |
 | [`IMPLEMENTATION_BACKLOG.md`](docs/architecture/IMPLEMENTATION_BACKLOG.md) | Sized tickets (S0-001…S9-003)                      |
 | [`RISKS_AND_TECH_DEBT.md`](docs/architecture/RISKS_AND_TECH_DEBT.md)       | Risk register (R-01…R-18)                          |
+| [`adr/`](docs/architecture/adr/)                                           | Architecture decision records (ADR-001…)           |
+| [`DEV_LEARNINGS.md`](docs/architecture/DEV_LEARNINGS.md)                   | Non-obvious bugs, their root causes and fixes      |
+
+## How the codebase is built
+
+- [`docs/patterns/`](docs/patterns/README.md) — the conventions this repository
+  follows, by area (frontend, backend, devops, product), each opening with when
+  to read it
+- [`AGENTS.md`](AGENTS.md) — the entry point for AI coding agents: the rules
+  that fail silently, and which pattern or skill to read before a given change.
+  The API has its own [`apps/api.saroh.in/AGENTS.md`](apps/api.saroh.in/AGENTS.md)
 
 ## Auth
 

@@ -84,7 +84,7 @@ what the API allows.
   `/middleware`, `/next`, `/auth-status` or `/constants`. The package root pulls
   Prisma into the bundle (ESLint).
 - **Current** — **Local sign-in needs portless and `BETTER_AUTH_TRUSTED_ORIGINS`**
-  (AGENTS.md; `docs/architecture/DEV_LEARNINGS.md`, #222).
+  (`docs/architecture/LOCAL_DEV.md`; `docs/architecture/DEV_LEARNINGS.md`, #222).
 - **Adopted** — **Write business rules down.** Plan limits, role actions and what
   a disabled module preserves belong in the ADRs and runbooks
   (`docs/architecture/runbooks/MODULE_ROLLOUT.md`), not only in code.

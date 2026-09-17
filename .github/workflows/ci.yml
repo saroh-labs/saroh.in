@@ -246,7 +246,7 @@ jobs:
   # Bare ports here, not the `.localhost` hostnames a developer uses: there is
   # no portless proxy on a runner, so the URLs are passed in explicitly and the
   # trusted-origin list is set to match. That list is exactly why the local
-  # names exist — see the root AGENTS.md.
+  # names exist — see docs/architecture/LOCAL_DEV.md.
   browser-e2e:
     name: Browser E2E (seeded stack)
     runs-on: ubuntu-latest

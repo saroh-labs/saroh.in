@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, "..");
  * Where this suite's two servers live.
  *
  * Locally: portless hostnames, the same way every other app is reached (see
- * the root AGENTS.md). On a CI runner there is no portless — no proxy, no
+ * docs/architecture/LOCAL_DEV.md). On a CI runner there is no portless — no proxy, no
  * wildcard DNS, nothing listening on 443 — so the ports are plain, exactly as
  * `playwright.config.ts` already does for the seeded stack.
  *
