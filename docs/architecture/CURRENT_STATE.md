@@ -38,7 +38,7 @@ The implemented product is currently a store-oriented content and commerce dashb
 | `help.saroh.in` (`help`)                | End-user help                                                 | Small, partially populated                                                                                        |
 | `saroh.in` (`web`)                      | Marketing site and waitlist                                   | UI exists; waitlist logs email and returns success without persistence                                            |
 
-`.github/copilot-instructions.md` documents 15+ apps, including absent `dashboard`, `chatbot`, and `email` apps, while calling `app.saroh.in` legacy. The repository actually has the 10 apps above, and `app.saroh.in` is the active dashboard.
+The repository has the 10 apps above, and `app.saroh.in` is the active dashboard. (An older `.github/copilot-instructions.md` listed 15+ apps, including absent `dashboard`, `chatbot` and `email` apps; it now points at `AGENTS.md` instead of describing the apps.)
 
 ## Shared-package inventory
 
