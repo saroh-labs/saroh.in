@@ -1,14 +1,15 @@
-name: Build API image
+name: Build and deploy API
 
-# Builds apps/api.saroh.in and pushes it to GHCR.
+# Builds apps/api.saroh.in, pushes it to GHCR, then rolls it out.
 #
 # The build happens here rather than on the deployment host: that box also runs
 # the database, and a pnpm install plus turbo build across the workspace would
 # evict Postgres's page cache for the duration. The host only ever pulls.
 #
-# This workflow does NOT deploy. It ends with an image in the registry; rolling
-# it out is `./deploy.sh` on the VM, deliberately kept as a human action so a
-# merge to main cannot restart production on its own.
+# The rollout (backup, migrate, deploy, wait for readiness) lives on the host,
+# not in this public repo. CI's key is restricted to that one command, so the
+# only thing this workflow can do there is name the image tag to ship. Where the
+# host is, and its pinned host key, come from repository secrets.
 
 on:
     push:
@@ -33,9 +34,10 @@ env:
     IMAGE_NAME: ${{ github.repository_owner }}/saroh-api
 
 concurrency:
-    # Never let two builds race to move the `latest` tag.
+    # Never let two builds race to move the `latest` tag, and never cancel a
+    # run mid-deploy: a killed ssh session could stop between migrate and deploy.
     group: build-api-${{ github.ref }}
-    cancel-in-progress: true
+    cancel-in-progress: false
 
 jobs:
     build:
@@ -99,9 +101,35 @@ jobs:
                     echo '```'
                     echo "${{ steps.meta.outputs.tags }}"
                     echo '```'
-                    echo
-                    echo "Deploy it on the VM:"
-                    echo '```bash'
-                    echo "cd /srv/saroh/infra/azure && ./deploy.sh --tag sha-${{ github.sha }}"
-                    echo '```'
                   } >> "$GITHUB_STEP_SUMMARY"
+
+    deploy:
+        needs: build
+        runs-on: ubuntu-latest
+        permissions:
+            contents: none
+        # One production rollout at a time, across every ref.
+        concurrency:
+            group: deploy-api-production
+            cancel-in-progress: false
+
+        steps:
+            - name: Deploy
+              env:
+                  VPS_HOST: ${{ secrets.VPS_HOST }}
+                  VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+                  VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+                  # Full 40 characters, matching `type=sha,format=long` above.
+                  TAG: sha-${{ github.sha }}
+              run: |
+                  set -euo pipefail
+                  install -m 700 -d ~/.ssh
+                  printf '%s\n' "$VPS_SSH_KEY" | install -m 600 /dev/stdin ~/.ssh/deploy
+                  printf '%s\n' "$VPS_KNOWN_HOSTS" | install -m 600 /dev/stdin ~/.ssh/known_hosts
+                  # StrictHostKeyChecking=yes against the pinned key: refuse a
+                  # host we do not recognise rather than trust it on first use.
+                  ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes \
+                      -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts \
+                      -o ServerAliveInterval=30 \
+                      "root@${VPS_HOST}" "$TAG"
+                  echo "### Deployed \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"

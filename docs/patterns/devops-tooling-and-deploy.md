@@ -76,14 +76,17 @@ audit that blocks on critical advisories; plus integration tests,
 ## Shipping the API
 
 - **Current** — `.github/workflows/deploy-api.yml` builds
-  `apps/api.saroh.in/Dockerfile` on pushes to `main` and pushes it to GHCR tagged
-  `latest` and `sha-<commit>`. **It does not deploy.**
-- **Current** — Rollout is `./deploy.sh` on the VM — deliberately a human action,
-  so a merge cannot restart production — and it pins the SHA tag, so rollback
-  means naming the previous tag. The image builds in CI because the VM also runs
-  Postgres, and a workspace build there would evict its page cache.
-- **Adopted** — **Migrations apply before the new image serves traffic.** Gap: not
-  wired; the image's `CMD` only starts the app, and `RLS_ROLLOUT_AND_OPS.md` §2
-  lists `db:migrate:deploy` wiring as an open follow-up.
+  `apps/api.saroh.in/Dockerfile` on pushes to `main` (or a manual run on any
+  branch), pushes it to GHCR tagged `latest` and `sha-<commit>`, **and deploys
+  that SHA tag.** Rollback means deploying the previous tag. The image builds in
+  CI because the host also runs Postgres, and a workspace build there would
+  evict its page cache.
+- **Current** — The rollout itself lives on the host, not in this public repo:
+  backup, `db:migrate:deploy` with the new image, deploy, and wait until that
+  image reports `/health/ready`. CI's SSH key can run only that command. Host
+  details and credentials stay in repository secrets and on the host — never
+  commit them.
+- **Current** — **Migrations apply before the new image serves traffic**, and
+  never without a fresh backup.
 - **Adopted** — **Production writes need explicit approval at the time** —
   restarts, deploys, migrations, database writes. Read-only inspection does not.
