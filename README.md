@@ -141,7 +141,7 @@ pnpm portless:doctor     # diagnose routing, DNS, and certificate issues
 Other focused shortcuts: `dev:api`, `dev:accounts`, `dev:web`, `dev:docs`,
 `dev:help`, `dev:templates`, and `dev:ui`. You can also run `pnpm dev` inside
 any app. Each app declares its hostname in `portless` and invokes
-`portless <name> <server command>` directly, matching the Virashi setup.
+`portless <name> <server command>` directly.
 Shared package `tsup --watch` scripts remain build watchers; only HTTP servers
 need Portless. Set `BETTER_AUTH_TRUSTED_ORIGINS` to the local origins in
 `.env.example` when starting the API.
