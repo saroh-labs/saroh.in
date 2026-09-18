@@ -111,6 +111,44 @@ export interface FeaturesContent {
     items: FeatureItem[];
 }
 
+/** One question in an FAQ section (mirror of the section contract). */
+export interface FaqItem {
+    question: string;
+    answer: string;
+}
+
+/** `faq` — questions and their answers. */
+export interface FaqContent {
+    heading?: string;
+    intro?: string;
+    items: FaqItem[];
+}
+
+/** One quote in a testimonials section (mirror of the section contract). */
+export interface TestimonialItem {
+    quote: string;
+    name: string;
+    role?: string;
+}
+
+/** `testimonials` — what customers said, under their names. */
+export interface TestimonialsContent {
+    heading?: string;
+    items: TestimonialItem[];
+}
+
+/** `contact` — where to find the business and how to reach it. */
+export interface ContactContent {
+    heading?: string;
+    intro?: string;
+    address?: string;
+    hours?: string;
+    phone?: string;
+    email?: string;
+    whatsapp?: string;
+    mapUrl?: string;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -161,6 +199,9 @@ export interface SectionContentByType {
     enquiry: EnquiryContent;
     booking: BookingContent;
     features: FeaturesContent;
+    faq: FaqContent;
+    testimonials: TestimonialsContent;
+    contact: ContactContent;
 }
 
 /**

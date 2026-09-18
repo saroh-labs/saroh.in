@@ -1,20 +1,26 @@
 import type {
     RenderedBooking,
+    RenderedContact,
     RenderedCtaSection,
     RenderedEnquiry,
+    RenderedFaq,
     RenderedFeatures,
     RenderedGallery,
     RenderedHero,
     RenderedRichText,
+    RenderedTestimonials,
 } from "@saroh/block-contract";
 
 import BookingSection from "./blocks/booking";
+import ContactSection from "./blocks/contact";
 import CtaSection from "./blocks/cta";
 import EnquirySection from "./blocks/enquiry";
+import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import RichTextSection from "./blocks/rich-text";
+import TestimonialsSection from "./blocks/testimonials";
 
 /**
  * One section of a published page, as the snapshot carries it.
@@ -84,6 +90,18 @@ export default function SectionRenderer({
                 <FeaturesSection
                     content={section.content as RenderedFeatures}
                 />
+            );
+        case "faq":
+            return <FaqSection content={section.content as RenderedFaq} />;
+        case "testimonials":
+            return (
+                <TestimonialsSection
+                    content={section.content as RenderedTestimonials}
+                />
+            );
+        case "contact":
+            return (
+                <ContactSection content={section.content as RenderedContact} />
             );
         case "booking":
             return (

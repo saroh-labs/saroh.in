@@ -197,3 +197,71 @@ describe("features", () => {
         expect(resolveVariant("features", {})).toBe("grid");
     });
 });
+
+/** #255 — the three content blocks that followed `features`. */
+describe("faq, testimonials and contact", () => {
+    it("caps an FAQ at twenty questions and needs one", () => {
+        const q = { question: "Open Sundays?", answer: "No." };
+        const twenty = Array.from({ length: 20 }, () => q);
+        expect(parseSectionContent("faq", 1, { items: [] }).success).toBe(
+            false,
+        );
+        expect(parseSectionContent("faq", 1, { items: twenty }).success).toBe(
+            true,
+        );
+        expect(
+            parseSectionContent("faq", 1, { items: [...twenty, q] }).success,
+        ).toBe(false);
+    });
+
+    it("refuses a question with no answer", () => {
+        expect(
+            parseSectionContent("faq", 1, {
+                items: [{ question: "Open Sundays?", answer: "  " }],
+            }).success,
+        ).toBe(false);
+    });
+
+    it("refuses an unattributed testimonial", () => {
+        expect(
+            parseSectionContent("testimonials", 1, {
+                items: [{ quote: "Quick and friendly.", name: "" }],
+            }).success,
+        ).toBe(false);
+    });
+
+    it("needs at least one way to reach the business", () => {
+        expect(
+            parseSectionContent("contact", 1, { heading: "Find us" }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("contact", 1, { email: "hello@example.com" })
+                .success,
+        ).toBe(true);
+    });
+
+    it("takes a map link only as a web address", () => {
+        const base = { address: "Unit 4, Riverside Trade Park" };
+        for (const mapUrl of ["javascript:alert(1)", "/map", "maps"]) {
+            expect(
+                parseSectionContent("contact", 1, { ...base, mapUrl }).success,
+            ).toBe(false);
+        }
+        expect(
+            parseSectionContent("contact", 1, {
+                ...base,
+                mapUrl: "https://maps.example.com/?q=riverside",
+            }).success,
+        ).toBe(true);
+    });
+
+    it("checks phone and WhatsApp numbers like a call button does", () => {
+        expect(
+            parseSectionContent("contact", 1, { phone: "call us" }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("contact", 1, { whatsapp: "+44 7700 900000" })
+                .success,
+        ).toBe(true);
+    });
+});

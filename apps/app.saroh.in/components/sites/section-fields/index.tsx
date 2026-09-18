@@ -3,12 +3,15 @@
 import type { Section, SitePage } from "@/lib/sites/service";
 
 import { BookingFields } from "./booking";
+import { ContactFields } from "./contact";
 import { CtaFields } from "./cta";
 import { EnquiryFields } from "./enquiry";
+import { FaqFields } from "./faq";
 import { FeaturesFields } from "./features";
 import { GalleryFields } from "./gallery";
 import { HeroFields } from "./hero";
 import { RichTextFields } from "./rich-text";
+import { TestimonialsFields } from "./testimonials";
 import type { ServiceOption } from "./types";
 import { VariantField } from "./variant-field";
 
@@ -116,6 +119,33 @@ function perTypeFields({
         case "features":
             return (
                 <FeaturesFields
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    onChange={onChange}
+                />
+            );
+        case "faq":
+            return (
+                <FaqFields
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    onChange={onChange}
+                />
+            );
+        case "testimonials":
+            return (
+                <TestimonialsFields
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    onChange={onChange}
+                />
+            );
+        case "contact":
+            return (
+                <ContactFields
                     section={section}
                     pages={pages}
                     services={services}
