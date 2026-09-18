@@ -5,7 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { createPage, deletePage, updatePage } from "@/lib/sites/actions";
@@ -48,6 +48,9 @@ export function PagesPanel({
     const [path, setPath] = useState("");
     const [renaming, setRenaming] = useState<string | null>(null);
     const [renameTitle, setRenameTitle] = useState("");
+    // The confirm action stays clickable during the dialog's exit animation,
+    // so a double click can fire this twice before `busy` re-renders.
+    const removeInFlight = useRef(false);
 
     function open(pageId: string) {
         if (pageId === activePageId) return;
@@ -118,16 +121,22 @@ export function PagesPanel({
     }
 
     async function remove(page: SitePage) {
+        if (removeInFlight.current) return;
+        removeInFlight.current = true;
         setBusy(true);
-        const res = await deletePage(siteId, page.id);
-        setBusy(false);
-        if (!res.ok) {
-            showError(res.error);
-            return;
+        try {
+            const res = await deletePage(siteId, page.id);
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            showSuccess(`Deleted ${page.title}.`);
+            if (page.id === activePageId) router.push(`/sites/${siteId}`);
+            router.refresh();
+        } finally {
+            setBusy(false);
+            removeInFlight.current = false;
         }
-        showSuccess(`Deleted ${page.title}.`);
-        if (page.id === activePageId) router.push(`/sites/${siteId}`);
-        router.refresh();
     }
 
     return (

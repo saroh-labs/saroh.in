@@ -1,6 +1,12 @@
 import type { RenderedBooking } from "@saroh/block-contract";
 import { BLOCK_META } from "@saroh/block-contract";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import BookingSection from "./booking";
@@ -27,12 +33,6 @@ describe("booking availability response", () => {
             await Promise.resolve();
         });
     }
-
-    const json = (body: unknown) =>
-        new Response(JSON.stringify(body), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-        });
 
     it.each([
         ["an object instead of a list", json({ slots: [] })],
@@ -78,7 +78,7 @@ const CONTENT = {
     title: "Book a visit",
 } as RenderedBooking;
 
-function json(body: unknown, status: number): Response {
+function json(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {
         status,
         headers: { "content-type": "application/json" },
@@ -164,12 +164,54 @@ describe("booking block — submit failures", () => {
         );
     }
 
-    it("shows the API's message from a 4xx error envelope", async () => {
-        stubFetch(json([{ startAt, endAt }], 200), apiError(400, "x"));
-        await pickSlotAndSubmit();
+    // The booking API's 400s are written for developers; a visitor never
+    // sees one (review of #327). The times are refreshed, so the third
+    // response is the reload.
+    it.each(["Validation failed", "startAt is not a valid instant"])(
+        "never shows a 400's own words (%s)",
+        async (message) => {
+            const fetchMock = stubFetch(
+                json([{ startAt, endAt }], 200),
+                apiError(400, message),
+                json([{ startAt, endAt }], 200),
+            );
+            await pickSlotAndSubmit();
 
-        expect(await screen.findByRole("alert")).toHaveTextContent(/^x$/);
-    });
+            const alert = await screen.findByRole("alert");
+            expect(alert).toHaveTextContent(
+                "We couldn't book that — please check your email address and choose a time again.",
+            );
+            expect(alert).not.toHaveTextContent(message);
+            await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+        },
+    );
+
+    it.each([404, 410])(
+        "shows the closed notice when booking closes at submit (%i)",
+        async (status) => {
+            stubFetch(
+                json([{ startAt, endAt }], 200),
+                apiError(
+                    status,
+                    "This business isn't taking online bookings right now",
+                ),
+            );
+            await pickSlotAndSubmit();
+
+            expect(
+                await screen.findByText(/Online booking isn't open right now/),
+            ).toBeInTheDocument();
+            expect(screen.queryByRole("alert")).toBeNull();
+            expect(
+                screen
+                    .getByRole("button", {
+                        name: "Confirm booking",
+                        hidden: true,
+                    })
+                    .closest("form"),
+            ).toHaveAttribute("hidden");
+        },
+    );
 
     it("never shows a 5xx body", async () => {
         stubFetch(
