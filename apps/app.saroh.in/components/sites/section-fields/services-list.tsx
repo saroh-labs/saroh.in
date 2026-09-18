@@ -20,6 +20,7 @@ import type { ServicesListContent } from "@/lib/sites/service";
 import { CtaActionFields, actionOf } from "./cta-action-fields";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
+import { ServicesLoadNotice } from "./services-load-notice";
 
 /** The contract's cap. */
 const MAX_SERVICES = 24;
@@ -35,10 +36,13 @@ const MAX_SERVICES = 24;
  */
 export function ServicesListFields({
     section,
-    services,
+    services: load,
     pages,
     onChange,
 }: SectionFieldsProps<"servicesList">) {
+    // Until the read is in, nothing may be called deleted or missing: an
+    // unknown id means "not loaded", not "gone".
+    const services = load.status === "ready" ? load.services : [];
     const c = section.content;
     const patch = (next: Partial<ServicesListContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
@@ -74,7 +78,18 @@ export function ServicesListFields({
             </Field>
 
             <Field label="Services shown">
-                {services.length === 0 && c.serviceIds.length === 0 ? (
+                {load.status !== "ready" ? (
+                    <div className="grid gap-2">
+                        <ServicesLoadNotice load={load} />
+                        {c.serviceIds.length > 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                {c.serviceIds.length === 1
+                                    ? "1 service chosen."
+                                    : `${c.serviceIds.length} services chosen.`}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : services.length === 0 && c.serviceIds.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                         No services yet.{" "}
                         <Link

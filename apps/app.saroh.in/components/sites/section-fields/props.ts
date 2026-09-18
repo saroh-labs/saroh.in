@@ -1,6 +1,6 @@
 import type { Section, SectionType, SitePage } from "@/lib/sites/service";
 
-import type { ServiceOption } from "./types";
+import type { ServicesLoad } from "./types";
 
 /**
  * What every per-type section editor is handed (#260).
@@ -17,7 +17,7 @@ export interface SectionFieldsProps<K extends SectionType> {
     section: Extract<Section, { type: K }>;
     /** The site's pages, so a button can pick one rather than type a path. */
     pages: SitePage[];
-    /** The org's bookable services, for the booking picker. */
-    services: ServiceOption[];
+    /** The editor's read of the org's services, for the service pickers. */
+    services: ServicesLoad;
     onChange: (next: Section) => void;
 }

@@ -13,7 +13,7 @@ import { HeroFields } from "./hero";
 import { RichTextFields } from "./rich-text";
 import { ServicesListFields } from "./services-list";
 import { TestimonialsFields } from "./testimonials";
-import type { ServiceOption } from "./types";
+import type { ServicesLoad } from "./types";
 import { VariantField } from "./variant-field";
 
 /**
@@ -41,7 +41,7 @@ export function SectionFields({
     onChange,
 }: {
     section: Section;
-    services: ServiceOption[];
+    services: ServicesLoad;
     /** The site's pages, so a button can pick one rather than type a path. */
     pages: SitePage[];
     onChange: (next: Section) => void;
@@ -67,7 +67,7 @@ function perTypeFields({
     onChange,
 }: {
     section: Section;
-    services: ServiceOption[];
+    services: ServicesLoad;
     pages: SitePage[];
     onChange: (next: Section) => void;
 }) {
@@ -189,4 +189,4 @@ function assertExhaustive(_section: never): null {
     return null;
 }
 
-export type { ServiceOption } from "./types";
+export type { ServiceOption, ServicesLoad } from "./types";

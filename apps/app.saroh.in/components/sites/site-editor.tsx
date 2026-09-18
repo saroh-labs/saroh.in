@@ -28,7 +28,10 @@ import {
 import { emptySection } from "@/components/sites/empty-section";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { saveableSections } from "@/components/sites/saveable-sections";
-import type { ServiceOption } from "@/components/sites/section-fields";
+import type {
+    ServiceOption,
+    ServicesLoad,
+} from "@/components/sites/section-fields";
 import { SectionFields } from "@/components/sites/section-fields";
 import { SectionPadding } from "@/components/sites/section-fields/padding";
 
@@ -427,23 +430,45 @@ export function SiteEditor({
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     // The Remove-section confirmation (replaces window.confirm, §9).
     const [removeOpen, setRemoveOpen] = useState(false);
-    // The org's services for the booking-section picker. Loaded once on mount;
-    // Services are authored in the service editor, never inline here.
-    const [services, setServices] = useState<ServiceOption[]>([]);
+    // The org's services for the booking and services-list pickers. Loaded on
+    // mount, and again on "Try again"; Services are authored in the service
+    // editor, never inline here. A failed read is kept distinct from an empty
+    // one, so a picker never says "No services yet" or calls a chosen service
+    // deleted because the read failed (review of #255).
+    const [servicesRead, setServicesRead] = useState<
+        | "loading"
+        | { ok: true; services: ServiceOption[] }
+        | { ok: false; forbidden: boolean }
+    >("loading");
+    const [servicesAttempt, setServicesAttempt] = useState(0);
 
     useEffect(() => {
         let active = true;
         listServicesForPicker()
-            .then((list) => {
-                if (active) setServices(list);
+            .then((read) => {
+                if (active) setServicesRead(read);
             })
             .catch(() => {
-                /* leave the picker empty on failure */
+                if (active) setServicesRead({ ok: false, forbidden: false });
             });
         return () => {
             active = false;
         };
-    }, []);
+    }, [servicesAttempt]);
+
+    const services: ServicesLoad =
+        servicesRead === "loading"
+            ? { status: "loading" }
+            : servicesRead.ok
+              ? { status: "ready", services: servicesRead.services }
+              : {
+                    status: "failed",
+                    forbidden: servicesRead.forbidden,
+                    retry: () => {
+                        setServicesRead("loading");
+                        setServicesAttempt((n) => n + 1);
+                    },
+                };
 
     const sectionsJson = JSON.stringify(sections);
     const dirty = sectionsJson !== lastSavedJson;
