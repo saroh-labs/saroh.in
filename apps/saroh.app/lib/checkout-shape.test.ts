@@ -45,14 +45,9 @@ describe("checkout response shapes", () => {
         ).toBe(true);
     });
 
-    it.each([
-        "subtotal",
-        "tax",
-        "shipping",
-        "discount",
-        "fulfilmentStatus",
-        "latestPayment",
-    ])("refuses a receipt missing %s", (field) => {
+    // Every field, derived from the valid receipt so a new field cannot be
+    // left untested.
+    it.each(Object.keys(receipt))("refuses a receipt missing %s", (field) => {
         const { [field]: _omit, ...rest } = receipt as Record<string, unknown>;
         expect(isReceipt(rest)).toBe(false);
     });
@@ -70,16 +65,10 @@ describe("checkout response shapes", () => {
         expect(isIntent({ ...intent, publicKey: "rzp_test_1" })).toBe(true);
     });
 
-    it.each(["paymentIntentId", "publicKey", "clientParams"])(
-        "refuses an intent missing %s",
-        (field) => {
-            const { [field]: _omit, ...rest } = intent as Record<
-                string,
-                unknown
-            >;
-            expect(isIntent(rest)).toBe(false);
-        },
-    );
+    it.each(Object.keys(intent))("refuses an intent missing %s", (field) => {
+        const { [field]: _omit, ...rest } = intent as Record<string, unknown>;
+        expect(isIntent(rest)).toBe(false);
+    });
 
     it("refuses an intent whose amount is not a number", () => {
         expect(isIntent({ ...intent, amountCents: "4800" })).toBe(false);

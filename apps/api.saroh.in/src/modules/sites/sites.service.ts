@@ -19,6 +19,7 @@ import {
     TemplateInstantiationError,
 } from "@saroh/templates";
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
@@ -473,6 +474,40 @@ interface PendingChanges {
     sections: number;
     /** Which site-level settings differ from what is live. */
     site: SiteChangeKind[];
+}
+
+/** A section as stored on a page's current draft. */
+interface StoredSection {
+    type: string;
+    contractVersion: number;
+    content: unknown;
+}
+
+/** The current draft's sections for `pageId`, by key (#275). */
+async function storedDraftSectionsByKey(
+    ctx: OrganizationContext,
+    pageId: string,
+): Promise<Map<string, StoredSection>> {
+    // The same version getOrCreateDraftVersion writes to: the newest draft.
+    const draft = await prisma.pageVersion.findFirst({
+        where: {
+            pageId,
+            organizationId: ctx.organizationId,
+            status: "DRAFT",
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+    });
+    if (!draft) return new Map();
+    const rows = await prisma.section.findMany({
+        where: { pageVersionId: draft.id },
+        select: { key: true, type: true, contractVersion: true, content: true },
+    });
+    const byKey = new Map<string, StoredSection>();
+    for (const row of rows) {
+        if (row.key) byKey.set(row.key, row);
+    }
+    return byKey;
 }
 
 @Injectable()
@@ -1345,14 +1380,52 @@ export class SitesService {
         await assertPageInSite(ctx, siteId, pageId);
 
         // Validate the entire list up front — reject before touching the DB.
-        const seenKeys = new Set<string>();
-        const validated = dto.sections.map((section, index) => {
-            const result = parseSectionContent(
+        const parsed = dto.sections.map((section) =>
+            parseSectionContent(
                 section.type,
                 section.contractVersion,
                 section.content,
-            );
+            ),
+        );
+        /*
+         * A section this request does not CHANGE is not re-validated (#275,
+         * review of #328). One stored before its contract tightened fails
+         * validation for ever, and since every save sends the whole list, it
+         * used to make every save of its page fail too: nothing on that page
+         * could be saved until someone found and rewrote it. A section equal
+         * to the stored one under the same key (type, version and content;
+         * key order ignored, since jsonb reorders keys) is carried through as
+         * stored. Anything new or changed is validated as before, so nothing
+         * invalid can be ADDED this way. Read only when something fails, so
+         * an ordinary save costs nothing extra.
+         */
+        const stored = parsed.some((r) => !r.success)
+            ? await storedDraftSectionsByKey(ctx, pageId)
+            : new Map<string, StoredSection>();
+        const seenKeys = new Set<string>();
+        const validated = dto.sections.map((section, index) => {
+            const result = parsed[index];
             if (!result.success) {
+                const unchanged = section.key
+                    ? stored.get(section.key)
+                    : undefined;
+                if (
+                    unchanged?.type === section.type &&
+                    unchanged.contractVersion === section.contractVersion &&
+                    isDeepStrictEqual(unchanged.content, section.content)
+                ) {
+                    return {
+                        type: section.type,
+                        contractVersion: section.contractVersion,
+                        order: index,
+                        // Already sanitized when it was first stored.
+                        content: unchanged.content,
+                        // Hiding is not content: a stored-invalid section can
+                        // still be hidden or shown.
+                        hidden: section.hidden ?? false,
+                        key: claimKey(seenKeys, section.key),
+                    };
+                }
                 throw new BadRequestException({
                     message: `Section at index ${index} is invalid: ${result.error.message}`,
                     index,

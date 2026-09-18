@@ -1,6 +1,5 @@
 "use client";
 
-import { parseSectionContent } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -27,15 +26,18 @@ import {
     ZOOMS,
 } from "@/components/sites/editor-constants";
 import { emptySection } from "@/components/sites/empty-section";
+import {
+    heldBackSummary,
+    unfinishedPhrase,
+} from "@/components/sites/held-back-copy";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { saveableSections } from "@/components/sites/saveable-sections";
-import type {
-    ServiceOption,
-    ServicesLoad,
-} from "@/components/sites/section-fields";
 import { SectionFields } from "@/components/sites/section-fields";
 import { SectionPadding } from "@/components/sites/section-fields/padding";
 import { withVariant } from "@/components/sites/section-fields/variant-field";
+import { syncEnquiryForms } from "@/components/sites/sync-enquiry-forms";
+import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { useServicesForPicker } from "@/components/sites/use-services-for-picker";
 
 import { NoteComposer } from "@/components/sites/note-composer";
 import { PagesPanel } from "@/components/sites/pages-panel";
@@ -44,7 +46,6 @@ import { ReviewPanel } from "@/components/sites/review-panel";
 import { DraftPreview } from "@/components/sites/section-preview";
 import { StylePanel } from "@/components/sites/style-panel";
 import { ensureFormForSection } from "@/lib/forms/actions";
-import { listServicesForPicker } from "@/lib/services/actions";
 import {
     getReviewState,
     getSiteFlags,
@@ -120,19 +121,6 @@ const APPROVAL_BADGE: Record<
         text: (by) => `Published without approval by ${by}`,
     },
 };
-
-/**
- * The bar's words when everything saved except unfinished sections, naming
- * them so the merchant knows what is holding publish back.
- */
-function heldBackSummary(heldBack: HeldBackSection[]): string {
-    const names = heldBack.map((h) => SECTION_LABELS[h.type]).join(", ");
-    const count =
-        heldBack.length === 1
-            ? "1 section not finished"
-            : `${heldBack.length} sections not finished`;
-    return `Saved · ${count}: ${names}`;
-}
 
 /**
  * SiteEditor (S2-004) — the ticket's core deliverable. A client-side editable
@@ -211,14 +199,6 @@ export function SiteEditor({
         () => JSON.stringify(savedSections),
         [savedSections],
     );
-    /*
-     * Sections the last save kept back because they are not finished, and the
-     * on-screen list that save was made from. While the list is still that one,
-     * everything else is saved and only these are waiting — the bar says so,
-     * and the autosave does not send the same list again.
-     */
-    const [heldBack, setHeldBack] = useState<HeldBackSection[]>([]);
-    const [heldBackJson, setHeldBackJson] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const router = useRouter();
     const [publishing, setPublishing] = useState(false);
@@ -442,45 +422,7 @@ export function SiteEditor({
         title: string;
     } | null>(null);
     const [removeOpen, setRemoveOpen] = useState(false);
-    // The org's services for the booking and services-list pickers. Loaded on
-    // mount, and again on "Try again"; Services are authored in the service
-    // editor, never inline here. A failed read is kept distinct from an empty
-    // one, so a picker never says "No services yet" or calls a chosen service
-    // deleted because the read failed (review of #255).
-    const [servicesRead, setServicesRead] = useState<
-        | "loading"
-        | { ok: true; services: ServiceOption[] }
-        | { ok: false; forbidden: boolean }
-    >("loading");
-    const [servicesAttempt, setServicesAttempt] = useState(0);
-
-    useEffect(() => {
-        let active = true;
-        listServicesForPicker()
-            .then((read) => {
-                if (active) setServicesRead(read);
-            })
-            .catch(() => {
-                if (active) setServicesRead({ ok: false, forbidden: false });
-            });
-        return () => {
-            active = false;
-        };
-    }, [servicesAttempt]);
-
-    const services: ServicesLoad =
-        servicesRead === "loading"
-            ? { status: "loading" }
-            : servicesRead.ok
-              ? { status: "ready", services: servicesRead.services }
-              : {
-                    status: "failed",
-                    forbidden: servicesRead.forbidden,
-                    retry: () => {
-                        setServicesRead("loading");
-                        setServicesAttempt((n) => n + 1);
-                    },
-                };
+    const services = useServicesForPicker();
 
     const sectionsJson = JSON.stringify(sections);
     const dirty = sectionsJson !== lastSavedJson;
@@ -489,18 +431,35 @@ export function SiteEditor({
      * waiting. Still `dirty` — publish stays blocked, because the page on
      * screen is not the page that would go live.
      */
+    /*
+     * What a save would send right now, and what it would hold back. DERIVED
+     * from the sections on screen, not stored from the last save: a stored
+     * list went stale whenever the page changed without a save — a revert, a
+     * removal, a fix typed while a save was in flight, a failed save (review
+     * of #328). The save itself runs the same function, so the markers and
+     * what is actually sent cannot disagree.
+     */
+    const livePlan = useMemo(
+        () => saveableSections(sections, savedSections),
+        [sections, savedSections],
+    );
+    const heldBack = livePlan.heldBack;
     const onlyHeldBack =
-        dirty && heldBack.length > 0 && sectionsJson === heldBackJson;
+        dirty &&
+        heldBack.length > 0 &&
+        JSON.stringify(livePlan.toSend) === lastSavedJson;
+
+    // Unfinished sections that were never saved live only in this tab, and the
+    // bar reads "Saved · …" for everything else (review of #328).
+    useLeaveGuard(dirty);
 
     /** Why the section at this position is not saved, if the last save held it back. */
     function heldBackAt(index: number): HeldBackSection | undefined {
-        // A revert back to the saved content leaves nothing to finish, even
-        // though the stale entry is still sitting in `heldBack`.
+        // Nothing differs from what is saved, so nothing is waiting. (A
+        // section stored invalid before its contract tightened is reported
+        // by `unreadableSections` instead.)
         if (!dirty) return undefined;
-        const key = sections[index]?.key;
-        return heldBack.find((h) =>
-            h.key !== undefined ? h.key === key : h.index === index,
-        );
+        return heldBack.find((h) => h.index === index);
     }
     /*
      * A style change that is unsaved or still saving counts as unpublished
@@ -528,20 +487,7 @@ export function SiteEditor({
     }
 
     function removeAt(index: number) {
-        const key = sections[index]?.key;
         setSections((prev) => prev.filter((_, i) => i !== index));
-        // A deleted section has nothing left to finish. Mirror heldBackAt's
-        // own matching rule, and reindex the entries after it since their
-        // positions shifted down by one.
-        setHeldBack((prev) =>
-            prev
-                .filter((h) =>
-                    key !== undefined ? h.key !== key : h.index !== index,
-                )
-                .map((h) =>
-                    h.index > index ? { ...h, index: h.index - 1 } : h,
-                ),
-        );
         setErrorIndex(null);
         setErrorMessage(null);
     }
@@ -586,51 +532,6 @@ export function SiteEditor({
      * failure (including a missing active org) the offending section index +
      * message are surfaced and the save is aborted.
      */
-    async function syncEnquiryForms(
-        current: Section[],
-    ): Promise<
-        | { ok: true; sections: Section[] }
-        | { ok: false; index: number; error: string }
-    > {
-        const next = [...current];
-        for (let i = 0; i < next.length; i++) {
-            const section = next[i];
-            if (section.type !== "enquiry") continue;
-            /*
-             * An unfinished enquiry section is held back from the save (#328),
-             * so its Form is not synced yet either. Syncing it anyway failed
-             * on the empty field and stopped the WHOLE save, which is the
-             * very thing holding back was for (review of #328). It syncs on
-             * the save after it is finished.
-             */
-            if (
-                !parseSectionContent(
-                    section.type,
-                    section.contractVersion,
-                    section.content,
-                ).success
-            ) {
-                continue;
-            }
-            const content = section.content;
-            const res = await ensureFormForSection({
-                formId: content.formId,
-                name:
-                    [content.title?.trim()].find((s) => s) ??
-                    `${siteName} enquiry`,
-                fields: content.fields,
-            });
-            if (!res.ok) {
-                return { ok: false, index: i, error: res.error };
-            }
-            next[i] = {
-                ...section,
-                content: { ...content, formId: res.data.formId },
-            };
-        }
-        return { ok: true, sections: next };
-    }
-
     /*
      * The draft the last save failed on, as JSON. Without it a failure re-arms
      * the autosave below — still dirty, no longer saving — and the same draft
@@ -647,7 +548,11 @@ export function SiteEditor({
 
         // Keep every enquiry section's Form in sync first — this stamps the
         // returned formId into the content we then persist + publish.
-        const synced = await syncEnquiryForms(sections);
+        const synced = await syncEnquiryForms(
+            sections,
+            siteName,
+            ensureFormForSection,
+        );
         if (!synced.ok) {
             setSaving(false);
             // Not saved, and the bar has to say so (#281). A failed form sync
@@ -732,8 +637,6 @@ export function SiteEditor({
             setSaving(false);
             failedJson.current = null;
             setSaveError(false);
-            setHeldBack(plan.heldBack);
-            setHeldBackJson(JSON.stringify(synced.sections));
             return;
         }
         const res = await saveDraftSections(
@@ -752,12 +655,6 @@ export function SiteEditor({
                 setRevision(res.data.revision);
             }
             setSavedSections(plan.toSend);
-            setHeldBack(plan.heldBack);
-            setHeldBackJson(
-                plan.heldBack.length > 0
-                    ? JSON.stringify(synced.sections)
-                    : null,
-            );
             setLastSavedAt(new Date());
             setSaveError(false);
             // The save recounted what publishing would change; take its answer
@@ -909,7 +806,13 @@ export function SiteEditor({
      */
     async function openCheck() {
         if (dirty) {
-            showError("You have unsaved changes — save the draft first.");
+            // "Save first" cannot help when everything saveable IS saved and
+            // only unfinished sections are waiting; name what will.
+            showError(
+                onlyHeldBack
+                    ? `Finish or remove ${unfinishedPhrase(heldBack)} before publishing.`
+                    : "You have unsaved changes — save the draft first.",
+            );
             return;
         }
         setChecking(true);
@@ -1320,6 +1223,11 @@ export function SiteEditor({
                                 pages={pages}
                                 activePageId={pageId}
                                 dirty={dirty}
+                                unfinished={
+                                    onlyHeldBack
+                                        ? unfinishedPhrase(heldBack)
+                                        : undefined
+                                }
                             />
                         </>
                     ) : rail === "review" ? (

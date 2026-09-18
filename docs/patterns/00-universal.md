@@ -62,7 +62,9 @@ says why.
 
 ## 9. No `alert()` or `confirm()`
 
-**Current** — none in app code. Use `@saroh/ui/alert-dialog` or
+**Current** — none in app code (the last three went in #329). For a
+destructive confirmation in `app.saroh.in` use
+`components/shared/confirm-dialog.tsx`; otherwise `@saroh/ui/alert-dialog` or
 `@saroh/ui/dialog`, and `@saroh/ui/toast`.
 
 ## 10. Uploads go straight to storage
