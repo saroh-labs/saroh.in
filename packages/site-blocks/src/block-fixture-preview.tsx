@@ -2,7 +2,11 @@
 
 import { useSyncExternalStore } from "react";
 
-import type { RenderedServicesList, SectionType } from "@saroh/block-contract";
+import type {
+    RenderedBooking,
+    RenderedServicesList,
+    SectionType,
+} from "@saroh/block-contract";
 import { blockFixture } from "@saroh/block-contract";
 
 import type { Slot } from "./blocks/booking";
@@ -100,6 +104,29 @@ function useMounted(): boolean {
     );
 }
 
+/**
+ * The blocks that read live data, and how each is drawn from sample data
+ * instead. ONE list: a block here is both drawn with samples and held until
+ * mount, so the two cannot drift apart (review of #267). A new live-data
+ * block is one entry.
+ */
+const LIVE_DATA_PREVIEWS: Partial<
+    Record<SectionType, (content: unknown) => React.ReactNode>
+> = {
+    booking: (content) => (
+        <BookingSection
+            content={content as RenderedBooking}
+            slots={sampleSlots()}
+        />
+    ),
+    servicesList: (content) => (
+        <ServicesListSection
+            content={content as RenderedServicesList}
+            services={SAMPLE_SERVICES}
+        />
+    ),
+};
+
 export function BlockFixturePreview({
     type,
     variant,
@@ -110,19 +137,7 @@ export function BlockFixturePreview({
     const mounted = useMounted();
     const content = blockFixture(type, variant);
     if (!content) return null;
-    if ((type === "booking" || type === "servicesList") && !mounted) {
-        return null;
-    }
-    if (type === "booking") {
-        return <BookingSection content={content} slots={sampleSlots()} />;
-    }
-    if (type === "servicesList") {
-        return (
-            <ServicesListSection
-                content={content as RenderedServicesList}
-                services={SAMPLE_SERVICES}
-            />
-        );
-    }
+    const live = LIVE_DATA_PREVIEWS[type];
+    if (live) return mounted ? live(content) : null;
     return <SectionRenderer section={{ type, content }} />;
 }
