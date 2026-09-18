@@ -48,11 +48,14 @@ export function BlockThumbnail({
     const [scale, setScale] = useState(0.2);
 
     // Fit the desk-width frame to whatever width the card turns out to have.
+    // React 19 runs a ref callback's returned cleanup when the node detaches.
     const measureBox = useCallback((box: HTMLDivElement | null) => {
         if (!box) return;
         const fit = () => setScale(box.clientWidth / FRAME_WIDTH);
         fit();
-        new ResizeObserver(fit).observe(box);
+        const observer = new ResizeObserver(fit);
+        observer.observe(box);
+        return () => observer.disconnect();
     }, []);
 
     const attachFrame = useCallback((frame: HTMLIFrameElement | null) => {
@@ -75,6 +78,8 @@ export function BlockThumbnail({
         };
         frame.addEventListener("load", ready);
         if (frame.contentDocument?.readyState === "complete") ready();
+        // Cleanup on detach, as in measureBox (React 19).
+        return () => frame.removeEventListener("load", ready);
     }, []);
 
     return (

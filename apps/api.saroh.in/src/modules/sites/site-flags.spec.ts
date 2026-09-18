@@ -247,6 +247,20 @@ describe("breaks at phone width", () => {
         expect(types(four)).toContain("phoneWidth");
         expect(types(three)).not.toContain("phoneWidth");
     });
+
+    it("flags a four-image grid named as a gallery@2 variant", () => {
+        const img = { src: "x.jpg" };
+        const flags = checkPage(
+            page([
+                {
+                    type: "gallery",
+                    content: { variant: "grid", images: [img, img, img, img] },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(flags)).toContain("phoneWidth");
+    });
 });
 
 describe("hidden sections", () => {

@@ -22,6 +22,8 @@
  * wrong in the merchant's own terms, not the schema's.
  */
 
+import { resolveVariant } from "@saroh/database";
+
 /**
  * The nine types, spelled out even where the data to detect them does not exist
  * yet. Naming all nine keeps the vocabulary the spec settled on, and makes the
@@ -267,9 +269,13 @@ function checkSection(
             /*
              * Four across is the case the spec names: three stack cleanly on a
              * phone, four leaves a widow on the second row and the images end
-             * up too small to make out.
+             * up too small to make out. The look is resolved, not read: v2
+             * content names it as `variant`, v1 as `layout`.
              */
-            if (c.layout === "grid" && images.length === 4) {
+            if (
+                resolveVariant("gallery", c) === "grid" &&
+                images.length === 4
+            ) {
                 at(
                     "phoneWidth",
                     "Four images in a grid do not stack evenly on a phone.",
