@@ -14,7 +14,7 @@ import { IANAZone } from "luxon";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { authorize } from "../organizations/organization-policy";
-import { appointmentsOpen } from "./appointments-open";
+import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type {
     AvailabilityRuleWindow,
     AvailabilityService,
@@ -393,14 +393,9 @@ export class BookingsService {
                 id: { in: ids },
                 deletedAt: null,
                 status: "ACTIVE",
-                organization: {
-                    organizationModules: {
-                        none: {
-                            moduleKey: "APPOINTMENTS",
-                            status: { not: "ENABLED" },
-                        },
-                    },
-                },
+                // The same rule public booking closes on (#327), so a list
+                // never offers a service its booking block would refuse.
+                organization: APPOINTMENTS_OPEN,
             },
             select: {
                 id: true,
