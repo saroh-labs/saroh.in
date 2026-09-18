@@ -31,6 +31,7 @@ jest.mock("@saroh/database", () => {
         bookingEvent: { create: jest.fn() },
         job: { create: jest.fn() },
         site: { findUnique: jest.fn() },
+        organizationModule: { findFirst: jest.fn() },
     };
     return {
         ...actual,
@@ -68,6 +69,8 @@ const siteFindUnique = prisma.site.findUnique as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
 const eventCreate = prisma.bookingEvent.create as jest.Mock;
 const ruleFindMany = prisma.availabilityRule.findMany as jest.Mock;
+const bookingFindMany = prisma.booking.findMany as jest.Mock;
+const moduleFindFirst = prisma.organizationModule.findFirst as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -124,6 +127,7 @@ function wireBookHappyPath() {
         ...SERVICE,
         availabilityRules: RULES,
     });
+    moduleFindFirst.mockResolvedValue(null);
     bookingFindUnique.mockResolvedValue(null);
     bookingCount.mockResolvedValue(0);
     contactUpsert.mockResolvedValue({ id: "contact_1" });
@@ -317,6 +321,91 @@ describe("BookingsService.book — capacity-one reservation", () => {
         }
         expect(status).toBe(429);
         expect(transaction).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("BookingsService — public booking follows the Appointments module", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const FROM = "2026-07-20T00:00:00.000Z";
+    const TO = "2026-07-21T00:00:00.000Z";
+    const OFF_MESSAGE = "This business isn't taking online bookings right now";
+
+    function wireAvailability() {
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            availabilityRules: RULES,
+        });
+        moduleFindFirst.mockResolvedValue(null);
+        bookingFindMany.mockResolvedValue([]);
+    }
+
+    it("asks for the organization's APPOINTMENTS row in any state but ENABLED", async () => {
+        wireAvailability();
+
+        await new BookingsService().publicAvailability("svc_1", FROM, TO);
+
+        expect(moduleFindFirst).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_SVC",
+                moduleKey: "APPOINTMENTS",
+                status: { not: "ENABLED" },
+            },
+            select: { id: true },
+        });
+    });
+
+    it.each(["DISABLED", "ARCHIVED"])(
+        "410s availability when Appointments is %s",
+        async () => {
+            wireAvailability();
+            // The query only returns a row whose status is not ENABLED.
+            moduleFindFirst.mockResolvedValueOnce({ id: "om_1" });
+
+            const attempt = new BookingsService().publicAvailability(
+                "svc_1",
+                FROM,
+                TO,
+            );
+            await expect(attempt).rejects.toBeInstanceOf(GoneException);
+            await expect(attempt).rejects.toThrow(OFF_MESSAGE);
+            expect(bookingFindMany).not.toHaveBeenCalled();
+        },
+    );
+
+    it("410s a booking when Appointments is switched off, before any write", async () => {
+        const service = new BookingsService();
+        wireBookHappyPath();
+        moduleFindFirst.mockResolvedValueOnce({ id: "om_1" });
+
+        await expect(
+            service.book("svc_1", baseInput(), "iphash"),
+        ).rejects.toThrow(OFF_MESSAGE);
+        expect(transaction).not.toHaveBeenCalled();
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("keeps booking open when the organization has no APPOINTMENTS row (or it is ENABLED)", async () => {
+        const service = new BookingsService();
+        wireBookHappyPath();
+
+        await expect(
+            service.book("svc_1", baseInput(), "iphash"),
+        ).resolves.toEqual({ id: "bk_1", status: "CONFIRMED" });
+
+        wireAvailability();
+        await expect(
+            service.publicAvailability("svc_1", FROM, TO),
+        ).resolves.toEqual(expect.any(Array));
+    });
+
+    it("still 404s a missing service without asking about the module", async () => {
+        serviceFindUnique.mockResolvedValueOnce(null);
+
+        await expect(
+            new BookingsService().publicAvailability("nope", FROM, TO),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(moduleFindFirst).not.toHaveBeenCalled();
     });
 });
 

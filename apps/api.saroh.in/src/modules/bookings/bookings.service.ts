@@ -14,6 +14,7 @@ import { IANAZone } from "luxon";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { authorize } from "../organizations/organization-policy";
+import { appointmentsOpen } from "./appointments-open";
 import type {
     AvailabilityRuleWindow,
     AvailabilityService,
@@ -338,8 +339,9 @@ export class BookingsService {
 
     /**
      * PUBLIC availability for a bookable service — no auth, org-agnostic. Loads
-     * the ACTIVE service (404/410 otherwise) and returns open slots for the
-     * range. The org is never surfaced.
+     * the ACTIVE service of an organization with Appointments on (404/410
+     * otherwise) and returns open slots for the range. The org is never
+     * surfaced.
      */
     async publicAvailability(
         serviceId: string,
@@ -884,7 +886,12 @@ export class BookingsService {
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
-    /** Load an ACTIVE, non-deleted bookable service + its rules, or throw (404/410). */
+    /**
+     * Load an ACTIVE, non-deleted bookable service + its rules, or throw
+     * (404/410). A service whose organization switched Appointments off is 410
+     * like an archived one: the booking would otherwise land behind a module
+     * the merchant can no longer open.
+     */
     private async loadBookableService(
         serviceId: string,
     ): Promise<{ service: Service; rules: AvailabilityRuleWindow[] }> {
@@ -897,6 +904,11 @@ export class BookingsService {
         }
         if (service.status !== "ACTIVE") {
             throw new GoneException("This service is not accepting bookings");
+        }
+        if (!(await appointmentsOpen(service.organizationId))) {
+            throw new GoneException(
+                "This business isn't taking online bookings right now",
+            );
         }
         const { availabilityRules, ...rest } = service;
         return { service: rest, rules: availabilityRules };
