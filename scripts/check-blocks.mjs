@@ -66,22 +66,6 @@ const G2_EXCEPTIONS = new Map([
         "packages/site-blocks/src/alert.ts",
         /^(?:bg|text)-destructive(?:-foreground)?$/,
     ],
-    /*
-     * KNOWN ISSUE, not a sanctioned exception — see #263.
-     *
-     * These two are a bare `text-destructive` on a required-field asterisk,
-     * drawn straight onto the merchant's page ground. That is precisely what
-     * `alert.ts` explains cannot be done: `--destructive` measures 5.43:1 on
-     * the merchant light ground and only 3.87:1 on the dark one, which is why
-     * the alert a few lines away brings its OWN opaque ground and is measured
-     * against itself. The asterisks were missed because nothing was checking.
-     *
-     * Listed rather than fixed because #252 Step 2 moved these files verbatim,
-     * and changing what a published merchant site draws is not something to
-     * smuggle into a move. Remove both entries with the fix.
-     */
-    ["packages/site-blocks/src/blocks/enquiry.tsx", /^text-destructive$/],
-    ["packages/site-blocks/src/blocks/booking.tsx", /^text-destructive$/],
 ]);
 
 /** `--site-*` drawn either as a `site-` utility or as an arbitrary value. */
