@@ -40,7 +40,11 @@ export class PublicBookingsController {
      * {@link BookingsService.publicServices}.
      */
     @Get()
-    services(@Query("ids") ids?: string): Promise<PublicService[]> {
+    services(@Query("ids") ids?: unknown): Promise<PublicService[]> {
+        // `?ids=a&ids=b` arrives as an array; only one comma list is accepted.
+        if (ids !== undefined && typeof ids !== "string") {
+            throw new BadRequestException("ids must be a comma-separated list");
+        }
         const list = [
             ...new Set(
                 (ids ?? "")
