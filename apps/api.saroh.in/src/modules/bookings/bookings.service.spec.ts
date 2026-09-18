@@ -355,23 +355,36 @@ describe("BookingsService — public booking follows the Appointments module", (
         });
     });
 
-    it.each(["DISABLED", "ARCHIVED"])(
-        "410s availability when Appointments is %s",
-        async () => {
-            wireAvailability();
-            // The query only returns a row whose status is not ENABLED.
-            moduleFindFirst.mockResolvedValueOnce({ id: "om_1" });
+    it("410s availability when the org has switched Appointments off", async () => {
+        wireAvailability();
+        moduleFindFirst.mockResolvedValueOnce({ id: "om_1" });
 
-            const attempt = new BookingsService().publicAvailability(
-                "svc_1",
-                FROM,
-                TO,
-            );
-            await expect(attempt).rejects.toBeInstanceOf(GoneException);
-            await expect(attempt).rejects.toThrow(OFF_MESSAGE);
-            expect(bookingFindMany).not.toHaveBeenCalled();
-        },
-    );
+        const attempt = new BookingsService().publicAvailability(
+            "svc_1",
+            FROM,
+            TO,
+        );
+        await expect(attempt).rejects.toBeInstanceOf(GoneException);
+        await expect(attempt).rejects.toThrow(OFF_MESSAGE);
+        expect(bookingFindMany).not.toHaveBeenCalled();
+    });
+
+    /*
+     * "Switched off" is decided by the query, so pin the query: any
+     * APPOINTMENTS row that is NOT ENABLED — DISABLED and ARCHIVED alike —
+     * counts, and a missing row does not. (This used to be an it.each over
+     * the two statuses whose mock answered the same for both, so it never
+     * distinguished them.)
+     */
+    it("counts any APPOINTMENTS row that is not ENABLED as switched off", async () => {
+        wireAvailability();
+        moduleFindFirst.mockResolvedValueOnce(null);
+        await new BookingsService().publicAvailability("svc_1", FROM, TO);
+        expect(moduleFindFirst.mock.calls[0][0].where).toMatchObject({
+            moduleKey: "APPOINTMENTS",
+            status: { not: "ENABLED" },
+        });
+    });
 
     it("410s a booking when Appointments is switched off, before any write", async () => {
         const service = new BookingsService();
