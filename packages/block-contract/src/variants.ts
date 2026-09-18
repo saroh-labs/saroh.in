@@ -107,6 +107,10 @@ const LEGACY_RESOLVERS = {
      * signature demands an answer, not because a section will ever need one.
      */
     features: () => defaultVariant("features"),
+    // Born with variants, like `features`: nothing predates them.
+    faq: () => defaultVariant("faq"),
+    testimonials: () => defaultVariant("testimonials"),
+    contact: () => defaultVariant("contact"),
 } satisfies Record<SectionType, LegacyResolver>;
 
 /**

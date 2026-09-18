@@ -18,6 +18,9 @@ export const SECTION_LABELS: Record<SectionType, string> = {
     enquiry: "Enquiry form",
     booking: "Booking",
     features: "Features",
+    faq: "FAQ",
+    testimonials: "Testimonials",
+    contact: "Contact",
 };
 
 /** Preview widths. The phone value is a real handset, not a breakpoint. */
@@ -78,6 +81,9 @@ export const SECTION_ORDER: SectionType[] = [
     "enquiry",
     "booking",
     "features",
+    "faq",
+    "testimonials",
+    "contact",
 ];
 
 /** A sensible empty section for the chosen type (contract v1). */

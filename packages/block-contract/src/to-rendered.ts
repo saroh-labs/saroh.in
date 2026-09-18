@@ -104,6 +104,10 @@ export const TO_RENDERED = {
     booking: identity,
     // Text only: nothing to resolve. Stated, not assumed.
     features: identity,
+    faq: identity,
+    testimonials: identity,
+    // Contact links are built by the renderer from validated values.
+    contact: identity,
 } satisfies Record<SectionType, ToRendered>;
 
 /**

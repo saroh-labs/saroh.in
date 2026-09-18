@@ -16,13 +16,16 @@ export { PageSections, default as SectionRenderer } from "./section-renderer";
 export type { Section } from "./section-renderer";
 
 export { default as BookingSection } from "./blocks/booking";
+export { default as ContactSection } from "./blocks/contact";
 export { CtaButton, default as CtaSection, ctaClasses } from "./blocks/cta";
 export type { CtaSurface } from "./blocks/cta";
 export { default as EnquirySection } from "./blocks/enquiry";
+export { default as FaqSection } from "./blocks/faq";
 export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";
 export { default as HeroSection } from "./blocks/hero";
 export { default as RichTextSection } from "./blocks/rich-text";
+export { default as TestimonialsSection } from "./blocks/testimonials";
 
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
