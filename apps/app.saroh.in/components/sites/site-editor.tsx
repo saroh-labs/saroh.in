@@ -25,6 +25,8 @@ import {
     ZOOMS,
 } from "@/components/sites/editor-constants";
 import { emptySection } from "@/components/sites/empty-section";
+import type { HeldBackSection } from "@/components/sites/saveable-sections";
+import { saveableSections } from "@/components/sites/saveable-sections";
 import type { ServiceOption } from "@/components/sites/section-fields";
 import { SectionFields } from "@/components/sites/section-fields";
 import { SectionPadding } from "@/components/sites/section-fields/padding";
@@ -113,6 +115,19 @@ const APPROVAL_BADGE: Record<
 };
 
 /**
+ * The bar's words when everything saved except unfinished sections, naming
+ * them so the merchant knows what is holding publish back.
+ */
+function heldBackSummary(heldBack: HeldBackSection[]): string {
+    const names = heldBack.map((h) => SECTION_LABELS[h.type]).join(", ");
+    const count =
+        heldBack.length === 1
+            ? "1 section not finished"
+            : `${heldBack.length} sections not finished`;
+    return `Saved · ${count}: ${names}`;
+}
+
+/**
  * SiteEditor (S2-004) — the ticket's core deliverable. A client-side editable
  * list of sections rendered next to a LIVE `DraftPreview` that reflects local
  * state with no network round-trip (that is the "preview without publishing"
@@ -177,9 +192,26 @@ export function SiteEditor({
     address?: string | null;
 }) {
     const [sections, setSections] = useState<Section[]>(initialSections);
-    const [lastSavedJson, setLastSavedJson] = useState(() =>
-        JSON.stringify(initialSections),
+    /*
+     * The list the server holds for this page: what the last accepted save
+     * SENT, which is not always what is on screen. A section that fails its
+     * contract is held back from the save (`saveable-sections.ts`), and this is
+     * where its previously saved version is found.
+     */
+    const [savedSections, setSavedSections] =
+        useState<Section[]>(initialSections);
+    const lastSavedJson = useMemo(
+        () => JSON.stringify(savedSections),
+        [savedSections],
     );
+    /*
+     * Sections the last save kept back because they are not finished, and the
+     * on-screen list that save was made from. While the list is still that one,
+     * everything else is saved and only these are waiting — the bar says so,
+     * and the autosave does not send the same list again.
+     */
+    const [heldBack, setHeldBack] = useState<HeldBackSection[]>([]);
+    const [heldBackJson, setHeldBackJson] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const router = useRouter();
     const [publishing, setPublishing] = useState(false);
@@ -410,7 +442,23 @@ export function SiteEditor({
         };
     }, []);
 
-    const dirty = JSON.stringify(sections) !== lastSavedJson;
+    const sectionsJson = JSON.stringify(sections);
+    const dirty = sectionsJson !== lastSavedJson;
+    /*
+     * Everything that could be saved is, and only unfinished sections are
+     * waiting. Still `dirty` — publish stays blocked, because the page on
+     * screen is not the page that would go live.
+     */
+    const onlyHeldBack =
+        dirty && heldBack.length > 0 && sectionsJson === heldBackJson;
+
+    /** Why the section at this position is not saved, if the last save held it back. */
+    function heldBackAt(index: number): HeldBackSection | undefined {
+        const key = sections[index]?.key;
+        return heldBack.find((h) =>
+            h.key !== undefined ? h.key === key : h.index === index,
+        );
+    }
     /*
      * A style change that is unsaved or still saving counts as unpublished
      * work too (#282). Publish only waited on the sections, so publishing inside
@@ -431,7 +479,12 @@ export function SiteEditor({
     }
 
     function removeAt(index: number) {
+        const key = sections[index]?.key;
         setSections((prev) => prev.filter((_, i) => i !== index));
+        // A deleted section has nothing left to finish.
+        setHeldBack((prev) =>
+            prev.filter((h) => (key !== undefined ? h.key !== key : true)),
+        );
         setErrorIndex(null);
         setErrorMessage(null);
     }
@@ -586,10 +639,31 @@ export function SiteEditor({
          * than a Save button that visibly fails. An outage has to look like a
          * failure, and the retry is the next edit.
          */
+        /*
+         * Send only what passes its contract. The API refuses the whole list
+         * on the first invalid section, and a section is added empty — so one
+         * new section used to stop every other edit on the page from saving.
+         * An unfinished section is held back instead: left out if it was never
+         * saved, or sent as its saved version so the save does not delete it.
+         */
+        const plan = saveableSections(synced.sections, savedSections);
+        if (
+            plan.heldBack.length > 0 &&
+            JSON.stringify(plan.toSend) === lastSavedJson
+        ) {
+            // The server already has everything that can be sent: only the
+            // unfinished sections changed. No request, nothing to announce.
+            setSaving(false);
+            failedJson.current = null;
+            setSaveError(false);
+            setHeldBack(plan.heldBack);
+            setHeldBackJson(JSON.stringify(synced.sections));
+            return;
+        }
         const res = await saveDraftSections(
             siteId,
             pageId,
-            synced.sections,
+            plan.toSend,
             revision,
         ).catch(() => ({
             ok: false as const,
@@ -601,7 +675,13 @@ export function SiteEditor({
             if (typeof res.data.revision === "number") {
                 setRevision(res.data.revision);
             }
-            setLastSavedJson(JSON.stringify(synced.sections));
+            setSavedSections(plan.toSend);
+            setHeldBack(plan.heldBack);
+            setHeldBackJson(
+                plan.heldBack.length > 0
+                    ? JSON.stringify(synced.sections)
+                    : null,
+            );
             setLastSavedAt(new Date());
             setSaveError(false);
             // The save recounted what publishing would change; take its answer
@@ -628,7 +708,9 @@ export function SiteEditor({
             setConflict(true);
         }
         if ("index" in res && typeof res.index === "number") {
-            setErrorIndex(res.index);
+            // The server counts positions in what was SENT; the editor's list
+            // may have held-back sections in between.
+            setErrorIndex(plan.sentFrom[res.index] ?? res.index);
             setErrorMessage(res.error);
         }
         showError(res.error);
@@ -660,6 +742,9 @@ export function SiteEditor({
         if (saveError && JSON.stringify(sections) === failedJson.current) {
             return;
         }
+        // Nor a list whose only unsaved part is unfinished sections: sending
+        // it again changes nothing until one of them is filled in.
+        if (onlyHeldBack) return;
         const id = setTimeout(() => {
             void onSave(true);
         }, 1500);
@@ -667,7 +752,15 @@ export function SiteEditor({
         // `onSave` is redefined each render; depending on it would restart the
         // timer on every keystroke and never fire.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dirty, saving, publishing, saveError, conflict, sections]);
+    }, [
+        dirty,
+        saving,
+        publishing,
+        saveError,
+        conflict,
+        sections,
+        onlyHeldBack,
+    ]);
 
     /*
      * Style autosave.
@@ -926,11 +1019,13 @@ export function SiteEditor({
                         ? "Saving…"
                         : saveError
                           ? "Not saved"
-                          : dirty
-                            ? "Draft changes"
-                            : lastSavedAt
-                              ? `Draft changes · autosaved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                              : "Draft"}
+                          : onlyHeldBack
+                            ? heldBackSummary(heldBack)
+                            : dirty
+                              ? "Draft changes"
+                              : lastSavedAt
+                                ? `Draft changes · autosaved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                                : "Draft"}
                 </span>
 
                 {/*
@@ -1265,7 +1360,8 @@ export function SiteEditor({
                                                 selectedIndex === index
                                                     ? "bg-secondary"
                                                     : "hover:bg-muted active:bg-secondary",
-                                                errorIndex === index &&
+                                                (errorIndex === index ||
+                                                    heldBackAt(index)) &&
                                                     "text-destructive",
                                                 dragIndex === index &&
                                                     "opacity-40",
@@ -1642,6 +1738,13 @@ export function SiteEditor({
                             {errorIndex === active.index && errorMessage ? (
                                 <p className="text-sm text-destructive">
                                     {errorMessage}
+                                </p>
+                            ) : heldBackAt(active.index) ? (
+                                <p
+                                    role="status"
+                                    className="text-sm text-destructive"
+                                >
+                                    {heldBackAt(active.index)?.message}
                                 </p>
                             ) : null}
 

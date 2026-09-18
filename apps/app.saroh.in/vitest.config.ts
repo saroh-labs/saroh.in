@@ -22,6 +22,8 @@ export default defineConfig({
     test: {
         environment: "node",
         globals: true,
-        include: ["lib/**/*.test.ts"],
+        // Plus the editor's pure helpers that sit beside the component using
+        // them, such as what a save can send (`saveable-sections.ts`).
+        include: ["lib/**/*.test.ts", "components/**/*.test.ts"],
     },
 });
