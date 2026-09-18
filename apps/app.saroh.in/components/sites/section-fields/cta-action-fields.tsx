@@ -32,6 +32,33 @@ export function actionOf(cta: CtaValue | undefined): CtaAction {
     return { kind: "url", href: cta?.href ?? "" };
 }
 
+/**
+ * The button after its label is typed, in the v2 shape. `undefined` when the
+ * merchant has emptied it back to nothing (no label and no address), so a
+ * cleared button disappears rather than saving as an invalid empty one.
+ *
+ * Shared by every block that carries a button (hero, services list) so the
+ * "is this button gone?" rule has one home.
+ */
+export function withCtaLabel(
+    cta: CtaValue | undefined,
+    label: string,
+): CtaValue | undefined {
+    const action = actionOf(cta);
+    const blank = !label.trim() && action.kind === "url" && !action.href.trim();
+    return blank
+        ? undefined
+        : { label, action, style: cta?.style ?? "primary" };
+}
+
+/** The button after its action is changed, in the v2 shape. */
+export function withCtaAction(
+    cta: CtaValue | undefined,
+    action: CtaAction,
+): CtaValue {
+    return { label: cta?.label ?? "", action, style: cta?.style ?? "primary" };
+}
+
 const CTA_KINDS: { value: CtaKind; label: string }[] = [
     { value: "page", label: "Open a page on this site" },
     { value: "url", label: "Open a web address" },

@@ -17,7 +17,12 @@ import { Textarea } from "@saroh/ui/textarea";
 
 import type { ServicesListContent } from "@/lib/sites/service";
 
-import { CtaActionFields, actionOf } from "./cta-action-fields";
+import {
+    CtaActionFields,
+    actionOf,
+    withCtaAction,
+    withCtaLabel,
+} from "./cta-action-fields";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 import { ServicesLoadNotice } from "./services-load-notice";
@@ -245,23 +250,9 @@ export function ServicesListFields({
             <Field label="Button label">
                 <Input
                     value={c.cta?.label ?? ""}
-                    onChange={(e) => {
-                        const label = e.target.value;
-                        const action = actionOf(c.cta);
-                        const blank =
-                            !label.trim() &&
-                            action.kind === "url" &&
-                            !action.href.trim();
-                        patch({
-                            cta: blank
-                                ? undefined
-                                : {
-                                      label,
-                                      action,
-                                      style: c.cta?.style ?? "primary",
-                                  },
-                        });
-                    }}
+                    onChange={(e) =>
+                        patch({ cta: withCtaLabel(c.cta, e.target.value) })
+                    }
                     placeholder="Book now. Optional."
                 />
             </Field>
@@ -270,13 +261,7 @@ export function ServicesListFields({
                     action={actionOf(c.cta)}
                     pages={pages}
                     onChange={(action) =>
-                        patch({
-                            cta: {
-                                label: c.cta?.label ?? "",
-                                action,
-                                style: c.cta?.style ?? "primary",
-                            },
-                        })
+                        patch({ cta: withCtaAction(c.cta, action) })
                     }
                 />
             ) : null}

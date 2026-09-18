@@ -5,7 +5,12 @@ import { Input } from "@saroh/ui/input";
 
 import type { HeroContent } from "@/lib/sites/service";
 import { buildImage } from "./build-image";
-import { CtaActionFields, actionOf } from "./cta-action-fields";
+import {
+    CtaActionFields,
+    actionOf,
+    withCtaAction,
+    withCtaLabel,
+} from "./cta-action-fields";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
@@ -47,30 +52,18 @@ export function HeroFields({
             <Field label="Button label">
                 <Input
                     value={c.cta?.label ?? ""}
-                    onChange={(e) => {
+                    onChange={(e) =>
                         // Writing the button writes it as v2, lifting
                         // a v1 href into an action on the way.
-                        const label = e.target.value;
-                        const action = actionOf(c.cta);
-                        const blank =
-                            !label.trim() &&
-                            action.kind === "url" &&
-                            !action.href.trim();
                         onChange({
                             ...section,
                             contractVersion: 2,
                             content: {
                                 ...c,
-                                cta: blank
-                                    ? undefined
-                                    : {
-                                          label,
-                                          action,
-                                          style: c.cta?.style ?? "primary",
-                                      },
+                                cta: withCtaLabel(c.cta, e.target.value),
                             },
-                        });
-                    }}
+                        })
+                    }
                     placeholder="Get started"
                 />
             </Field>
@@ -84,11 +77,7 @@ export function HeroFields({
                             contractVersion: 2,
                             content: {
                                 ...c,
-                                cta: {
-                                    label: c.cta?.label ?? "",
-                                    action,
-                                    style: c.cta?.style ?? "primary",
-                                },
+                                cta: withCtaAction(c.cta, action),
                             },
                         })
                     }
