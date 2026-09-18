@@ -45,7 +45,7 @@ import { ctaClasses } from "./cta";
 const WINDOW_DAYS = 14;
 
 /** A bookable slot as returned by the public availability endpoint (UTC ISO). */
-interface Slot {
+export interface Slot {
     startAt: string;
     endAt: string;
 }
@@ -151,10 +151,17 @@ function groupByDay(slots: Slot[]): DayGroup[] {
 export default function BookingSection({
     content,
     apiUrl = DEFAULT_API_URL,
+    slots: givenSlots,
 }: {
     content: RenderedBooking;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
+    /**
+     * Sample slots to draw instead of fetching (previews, #267). A fixture's
+     * Service id belongs to no Service, and a picker thumbnail must not show a
+     * healthy block as broken because a request it never needed failed.
+     */
+    slots?: Slot[];
 }) {
     const baseId = useId();
     // A stable idempotency key per mount so a double-click / retry can't create
@@ -165,9 +172,9 @@ export default function BookingSection({
             : Math.random().toString(36).slice(2),
     );
 
-    const [slotsState, setSlotsState] = useState<SlotsState>({
-        kind: "loading",
-    });
+    const [slotsState, setSlotsState] = useState<SlotsState>(
+        givenSlots ? { kind: "ready", slots: givenSlots } : { kind: "loading" },
+    );
     const [selected, setSelected] = useState<string | null>(null);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
@@ -240,6 +247,7 @@ export default function BookingSection({
     }, [fetchSlots, applyResult]);
 
     useEffect(() => {
+        if (givenSlots) return;
         let active = true;
         void fetchSlots().then((next) => {
             if (active) applyResult(next);
@@ -247,7 +255,7 @@ export default function BookingSection({
         return () => {
             active = false;
         };
-    }, [fetchSlots, applyResult]);
+    }, [givenSlots, fetchSlots, applyResult]);
 
     // No service picked → nothing to book against. Render nothing.
     if (!serviceId) return null;
