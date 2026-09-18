@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { RenderedServicesList } from "@saroh/block-contract";
 
@@ -52,6 +52,7 @@ function isPublicService(value: unknown): value is PublicService {
     return (
         typeof v.id === "string" &&
         typeof v.name === "string" &&
+        (v.description === null || typeof v.description === "string") &&
         typeof v.durationMinutes === "number" &&
         (v.priceCents === null || typeof v.priceCents === "number") &&
         (v.currency === null || typeof v.currency === "string")
@@ -67,22 +68,28 @@ export function formatDuration(minutes: number): string {
 }
 
 /**
- * A price from minor units, or null when there is none to show. The currency
- * decides the decimal places (JPY has none, INR and GBP two), so a price is
- * never off by a factor of a hundred, and an absent price is never "0".
+ * A service price, or null when there is none to show; an absent price is
+ * never "0".
+ *
+ * `priceCents` is the amount x 100 for EVERY currency: that is how the service
+ * form writes it (`Math.round(price * 100)`) and how the workspace reads it
+ * (`formatMoney`, amount / 100). Dividing by the currency's own minor unit
+ * instead showed a ¥1,500 service as ¥150,000 (review of #255). Intl still
+ * chooses the decimals to DISPLAY, so yen shows none.
+ *
+ * `locale` defaults to the visitor's; tests pin one.
  */
 export function formatPrice(
     priceCents: number | null,
     currency: string | null,
+    locale?: string,
 ): string | null {
     if (priceCents === null || !currency) return null;
     try {
-        const format = new Intl.NumberFormat(undefined, {
+        return new Intl.NumberFormat(locale, {
             style: "currency",
             currency,
-        });
-        const digits = format.resolvedOptions().maximumFractionDigits ?? 2;
-        return format.format(priceCents / 10 ** digits);
+        }).format(priceCents / 100);
     } catch {
         // An unknown currency code: better no price than a wrong one.
         return null;
@@ -104,6 +111,11 @@ export default function ServicesListSection({
         given ? { kind: "ready", services: given } : { kind: "loading" },
     );
     const ids = content.serviceIds.join(",");
+    // The ids on screen now, so a retry that lands late cannot overwrite them.
+    const idsRef = useRef(ids);
+    useEffect(() => {
+        idsRef.current = ids;
+    }, [ids]);
 
     const load = useCallback(async (): Promise<LoadState> => {
         if (!ids) return { kind: "ready", services: [] };
@@ -137,8 +149,11 @@ export default function ServicesListSection({
     }, [given, load]);
 
     const retry = () => {
+        const asked = ids;
         setState({ kind: "loading" });
-        void load().then(setState);
+        void load().then((next) => {
+            if (idsRef.current === asked) setState(next);
+        });
     };
 
     if (state.kind === "ready" && state.services.length === 0) return null;

@@ -75,6 +75,10 @@ describe("servicesList (#255)", () => {
         ["a failed request", json({ error: {} }, 500)],
         ["a malformed body", json({ services: [] })],
         ["a body that is not JSON", new Response("<html>")],
+        [
+            "a service whose description is not text",
+            json([{ ...cut, description: 42 }]),
+        ],
     ])("shows its error state for %s", async (_label, response) => {
         await renderFetching(response);
         expect(screen.getByRole("alert").textContent).toMatch(
@@ -99,9 +103,13 @@ describe("servicesList (#255)", () => {
         expect(formatDuration(30)).toBe("30 min");
         expect(formatDuration(60)).toBe("1 hr");
         expect(formatDuration(90)).toBe("1 hr 30 min");
-        expect(formatPrice(3800, "GBP")).toMatch(/38\.00/);
-        // JPY has no minor unit: 1500 is ¥1,500, not ¥15.
-        expect(formatPrice(1500, "JPY")).toMatch(/1,500/);
+        expect(formatPrice(3800, "GBP", "en-GB")).toBe("£38.00");
+        // Stored as amount x 100 for every currency, like the service form
+        // writes it: 150000 is ¥1,500, shown without decimals.
+        const yen = formatPrice(150000, "JPY", "en-GB");
+        expect(yen).toMatch(/¥1,500$/);
+        expect(yen).not.toContain("150,000");
+        expect(formatPrice(250000, "INR", "en-IN")).toBe("₹2,500.00");
         expect(formatPrice(null, "GBP")).toBeNull();
         expect(formatPrice(100, "NOT-A-CODE")).toBeNull();
     });
