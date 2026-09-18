@@ -60,6 +60,16 @@ export default function ContactSection({
             : null,
     ].filter((c) => c !== null);
     const map = mapHref(content);
+    const mapLink = map ? (
+        <a
+            href={map}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-site-fg focus-visible:ring-site-accent mt-2 inline-block text-sm font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2"
+        >
+            Open in maps
+        </a>
+    ) : null;
 
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
@@ -75,7 +85,7 @@ export default function ContactSection({
             ) : null}
 
             <div className="mt-10 grid gap-[var(--site-grid-gap)] md:grid-cols-2">
-                {content.address || content.hours ? (
+                {content.address || content.hours || map ? (
                     <div className="grid content-start gap-6">
                         {content.address ? (
                             <div>
@@ -85,16 +95,17 @@ export default function ContactSection({
                                 <address className="text-site-fg mt-1 whitespace-pre-line not-italic leading-relaxed">
                                     {content.address}
                                 </address>
-                                {map ? (
-                                    <a
-                                        href={map}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-site-fg focus-visible:ring-site-accent mt-2 inline-block text-sm font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2"
-                                    >
-                                        Open in maps
-                                    </a>
-                                ) : null}
+                                {mapLink}
+                            </div>
+                        ) : mapLink ? (
+                            // A map link with no address still earns its
+                            // place: a merchant who pinned the shop but left
+                            // the address out should not lose the pin.
+                            <div>
+                                <h3 className="text-site-muted text-sm font-medium">
+                                    Location
+                                </h3>
+                                {mapLink}
                             </div>
                         ) : null}
                         {content.hours ? (

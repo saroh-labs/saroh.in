@@ -259,6 +259,21 @@ describe("block rendering", () => {
         ]);
     });
 
+    it("keeps a map link that has no address beside it", () => {
+        const { container } = render(
+            <ContactSection
+                content={{
+                    phone: "+44 113 496 0000",
+                    mapUrl: "https://maps.example.com/?q=riverside",
+                }}
+            />,
+        );
+        const link = container.querySelector(
+            'a[href="https://maps.example.com/?q=riverside"]',
+        );
+        expect(link?.textContent).toBe("Open in maps");
+    });
+
     it("draws no map link from an unsafe snapshot value", () => {
         const { container } = render(
             <ContactSection

@@ -1,13 +1,13 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
-import type { FaqContent, FaqItem } from "@/lib/sites/service";
+import type { FaqContent } from "@/lib/sites/service";
 
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
+import { RepeatedItems } from "./repeated-items";
 
 /** The contract's cap, so "Add" stops where the save would start failing. */
 const MAX_ITEMS = 20;
@@ -17,13 +17,6 @@ export function FaqFields({ section, onChange }: SectionFieldsProps<"faq">) {
     const c = section.content;
     const patch = (next: Partial<FaqContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
-
-    const setItem = (index: number, next: Partial<FaqItem>) =>
-        patch({
-            items: c.items.map((item, i) =>
-                i === index ? { ...item, ...next } : item,
-            ),
-        });
 
     return (
         <div className="grid gap-3">
@@ -43,71 +36,39 @@ export function FaqFields({ section, onChange }: SectionFieldsProps<"faq">) {
                 />
             </Field>
 
-            {c.items.map((item, index) => (
-                <div key={index} className="grid gap-2 rounded-md border p-3">
-                    <div className="flex items-center justify-between">
-                        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                            Question {index + 1}
-                        </span>
-                        {/* The contract needs at least one question. */}
-                        {c.items.length > 1 ? (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                    patch({
-                                        items: c.items.filter(
-                                            (_, i) => i !== index,
-                                        ),
-                                    })
+            <RepeatedItems
+                items={c.items}
+                onChange={(items) => patch({ items })}
+                max={MAX_ITEMS}
+                itemNoun="Question"
+                addLabel="Add a question"
+                fullMessage="That is the most this block carries. Twenty questions is a page of its own."
+                newItem={() => ({ question: "", answer: "" })}
+            >
+                {(item, set) => (
+                    <>
+                        <Field label="Question">
+                            <Input
+                                value={item.question}
+                                onChange={(e) =>
+                                    set({ question: e.target.value })
                                 }
-                            >
-                                Remove
-                            </Button>
-                        ) : null}
-                    </div>
-                    <Field label="Question">
-                        <Input
-                            value={item.question}
-                            onChange={(e) =>
-                                setItem(index, { question: e.target.value })
-                            }
-                            placeholder="Do you deliver?"
-                        />
-                    </Field>
-                    <Field label="Answer">
-                        <Textarea
-                            value={item.answer}
-                            onChange={(e) =>
-                                setItem(index, { answer: e.target.value })
-                            }
-                            rows={3}
-                            placeholder="Line breaks are kept."
-                        />
-                    </Field>
-                </div>
-            ))}
-
-            {c.items.length < MAX_ITEMS ? (
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                        patch({
-                            items: [...c.items, { question: "", answer: "" }],
-                        })
-                    }
-                >
-                    Add a question
-                </Button>
-            ) : (
-                <p className="text-sm text-muted-foreground">
-                    That is the most this block carries. Twenty questions is a
-                    page of its own.
-                </p>
-            )}
+                                placeholder="Do you deliver?"
+                            />
+                        </Field>
+                        <Field label="Answer">
+                            <Textarea
+                                value={item.answer}
+                                onChange={(e) =>
+                                    set({ answer: e.target.value })
+                                }
+                                rows={3}
+                                placeholder="Line breaks are kept."
+                            />
+                        </Field>
+                    </>
+                )}
+            </RepeatedItems>
         </div>
     );
 }
