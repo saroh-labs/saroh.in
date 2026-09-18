@@ -211,14 +211,6 @@ export function SiteEditor({
         () => JSON.stringify(savedSections),
         [savedSections],
     );
-    /*
-     * Sections the last save kept back because they are not finished, and the
-     * on-screen list that save was made from. While the list is still that one,
-     * everything else is saved and only these are waiting — the bar says so,
-     * and the autosave does not send the same list again.
-     */
-    const [heldBack, setHeldBack] = useState<HeldBackSection[]>([]);
-    const [heldBackJson, setHeldBackJson] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const router = useRouter();
     const [publishing, setPublishing] = useState(false);
@@ -489,18 +481,31 @@ export function SiteEditor({
      * waiting. Still `dirty` — publish stays blocked, because the page on
      * screen is not the page that would go live.
      */
+    /*
+     * What a save would send right now, and what it would hold back. DERIVED
+     * from the sections on screen, not stored from the last save: a stored
+     * list went stale whenever the page changed without a save — a revert, a
+     * removal, a fix typed while a save was in flight, a failed save (review
+     * of #328). The save itself runs the same function, so the markers and
+     * what is actually sent cannot disagree.
+     */
+    const livePlan = useMemo(
+        () => saveableSections(sections, savedSections),
+        [sections, savedSections],
+    );
+    const heldBack = livePlan.heldBack;
     const onlyHeldBack =
-        dirty && heldBack.length > 0 && sectionsJson === heldBackJson;
+        dirty &&
+        heldBack.length > 0 &&
+        JSON.stringify(livePlan.toSend) === lastSavedJson;
 
     /** Why the section at this position is not saved, if the last save held it back. */
     function heldBackAt(index: number): HeldBackSection | undefined {
-        // A revert back to the saved content leaves nothing to finish, even
-        // though the stale entry is still sitting in `heldBack`.
+        // Nothing differs from what is saved, so nothing is waiting. (A
+        // section stored invalid before its contract tightened is reported
+        // by `unreadableSections` instead.)
         if (!dirty) return undefined;
-        const key = sections[index]?.key;
-        return heldBack.find((h) =>
-            h.key !== undefined ? h.key === key : h.index === index,
-        );
+        return heldBack.find((h) => h.index === index);
     }
     /*
      * A style change that is unsaved or still saving counts as unpublished
@@ -528,20 +533,7 @@ export function SiteEditor({
     }
 
     function removeAt(index: number) {
-        const key = sections[index]?.key;
         setSections((prev) => prev.filter((_, i) => i !== index));
-        // A deleted section has nothing left to finish. Mirror heldBackAt's
-        // own matching rule, and reindex the entries after it since their
-        // positions shifted down by one.
-        setHeldBack((prev) =>
-            prev
-                .filter((h) =>
-                    key !== undefined ? h.key !== key : h.index !== index,
-                )
-                .map((h) =>
-                    h.index > index ? { ...h, index: h.index - 1 } : h,
-                ),
-        );
         setErrorIndex(null);
         setErrorMessage(null);
     }
@@ -732,8 +724,6 @@ export function SiteEditor({
             setSaving(false);
             failedJson.current = null;
             setSaveError(false);
-            setHeldBack(plan.heldBack);
-            setHeldBackJson(JSON.stringify(synced.sections));
             return;
         }
         const res = await saveDraftSections(
@@ -752,12 +742,6 @@ export function SiteEditor({
                 setRevision(res.data.revision);
             }
             setSavedSections(plan.toSend);
-            setHeldBack(plan.heldBack);
-            setHeldBackJson(
-                plan.heldBack.length > 0
-                    ? JSON.stringify(synced.sections)
-                    : null,
-            );
             setLastSavedAt(new Date());
             setSaveError(false);
             // The save recounted what publishing would change; take its answer
