@@ -45,10 +45,31 @@ export function withCtaLabel(
     label: string,
 ): CtaValue | undefined {
     const action = actionOf(cta);
-    const blank = !label.trim() && action.kind === "url" && !action.href.trim();
+    const blank = !label.trim() && actionIsEmpty(action);
     return blank
         ? undefined
         : { label, action, style: cta?.style ?? "primary" };
+}
+
+/**
+ * Whether an action has nothing in it yet. Any kind, not only a web address:
+ * a Call or WhatsApp button whose label and number were both cleared used to
+ * stay behind as an empty, invalid button nobody could remove (review of
+ * #255). A label cleared on its own keeps the button, so retyping the label
+ * does not lose the number.
+ */
+export function actionIsEmpty(action: CtaAction): boolean {
+    switch (action.kind) {
+        case "url":
+            return !action.href.trim();
+        case "call":
+        case "whatsapp":
+            return !action.number.trim();
+        case "email":
+            return !action.address.trim();
+        case "page":
+            return !action.pageId;
+    }
 }
 
 /** The button after its action is changed, in the v2 shape. */
