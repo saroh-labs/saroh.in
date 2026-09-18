@@ -4,6 +4,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { refundOrder } from "@/lib/payments/actions";
 
 /**
@@ -15,15 +16,9 @@ import { refundOrder } from "@/lib/payments/actions";
 export function RefundButton({ orderId }: { orderId: string }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
+    const [confirming, setConfirming] = useState(false);
 
     async function onRefund() {
-        if (
-            !window.confirm(
-                "Refund this order's payment in full? This can't be undone.",
-            )
-        ) {
-            return;
-        }
         setBusy(true);
         const res = await refundOrder(orderId);
         setBusy(false);
@@ -36,13 +31,24 @@ export function RefundButton({ orderId }: { orderId: string }) {
     }
 
     return (
-        <button
-            type="button"
-            onClick={onRefund}
-            disabled={busy}
-            className="wk-press h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
-        >
-            {busy ? "Refunding…" : "Refund"}
-        </button>
+        <>
+            <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                disabled={busy}
+                className="wk-press h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+            >
+                {busy ? "Refunding…" : "Refund"}
+            </button>
+            <ConfirmDialog
+                open={confirming}
+                onOpenChange={setConfirming}
+                title="Refund this order's payment in full?"
+                description="The whole payment goes back to the customer. This can't be undone."
+                confirmLabel="Refund payment"
+                cancelLabel="Keep payment"
+                onConfirm={() => void onRefund()}
+            />
+        </>
     );
 }

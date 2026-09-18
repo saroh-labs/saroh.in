@@ -13,6 +13,7 @@ import {
     useSyncExternalStore,
 } from "react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PanelDivider, RailTabs } from "@/components/sites/editor-chrome";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
 import {
@@ -392,6 +393,8 @@ export function SiteEditor({
     const [revision, setRevision] = useState(initialRevision);
     const [conflict, setConflict] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    // The Remove-section confirmation (replaces window.confirm, §9).
+    const [removeOpen, setRemoveOpen] = useState(false);
     // The org's services for the booking-section picker. Loaded once on mount;
     // Services are authored in the service editor, never inline here.
     const [services, setServices] = useState<ServiceOption[]>([]);
@@ -1543,20 +1546,27 @@ export function SiteEditor({
                                              * an error is cheaper to prevent
                                              * than to apologise for.
                                              */
-                                            const title = sectionTitle(
-                                                active.section,
-                                            );
-                                            const ok = window.confirm(
-                                                `Remove "${title}"? Anything written here since your last publish cannot be brought back. To take it off the site and keep the work, hide it instead.`,
-                                            );
-                                            if (!ok) return;
-                                            removeAt(active.index);
-                                            setSelectedIndex(null);
-                                            showSuccess(`Removed ${title}.`);
+                                            setRemoveOpen(true);
                                         }}
                                     >
                                         Remove
                                     </Button>
+                                    <ConfirmDialog
+                                        open={removeOpen}
+                                        onOpenChange={setRemoveOpen}
+                                        title={`Remove "${sectionTitle(active.section)}"?`}
+                                        description="Anything written here since your last publish cannot be brought back. To take it off the site and keep the work, hide it instead."
+                                        confirmLabel="Remove section"
+                                        cancelLabel="Keep section"
+                                        onConfirm={() => {
+                                            const title = sectionTitle(
+                                                active.section,
+                                            );
+                                            removeAt(active.index);
+                                            setSelectedIndex(null);
+                                            showSuccess(`Removed ${title}.`);
+                                        }}
+                                    />
                                 </div>
                             </div>
 
