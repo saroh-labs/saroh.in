@@ -11,6 +11,7 @@ import { FeaturesFields } from "./features";
 import { GalleryFields } from "./gallery";
 import { HeroFields } from "./hero";
 import { RichTextFields } from "./rich-text";
+import { ServicesListFields } from "./services-list";
 import { TestimonialsFields } from "./testimonials";
 import type { ServiceOption } from "./types";
 import { VariantField } from "./variant-field";
@@ -137,6 +138,15 @@ function perTypeFields({
         case "testimonials":
             return (
                 <TestimonialsFields
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    onChange={onChange}
+                />
+            );
+        case "servicesList":
+            return (
+                <ServicesListFields
                     section={section}
                     pages={pages}
                     services={services}

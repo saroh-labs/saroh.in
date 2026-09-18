@@ -108,6 +108,8 @@ export const TO_RENDERED = {
     testimonials: identity,
     // Contact links are built by the renderer from validated values.
     contact: identity,
+    // Its button resolves like hero's; the services themselves are read live.
+    servicesList: resolvesNestedCta,
 } satisfies Record<SectionType, ToRendered>;
 
 /**

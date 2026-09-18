@@ -100,6 +100,15 @@ export function emptySection(type: SectionType): Section {
                 contractVersion: 1,
                 content: { heading: "", items: [{ quote: "", name: "" }] },
             };
+        case "servicesList":
+            // Empty until the merchant picks a service; the editor lists
+            // theirs, or says there are none yet.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { heading: "Services", serviceIds: [] },
+            };
         case "contact":
             // Invalid until one channel is filled in, and the editor says so.
             return {

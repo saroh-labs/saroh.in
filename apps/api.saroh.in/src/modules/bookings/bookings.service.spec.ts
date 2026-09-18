@@ -1019,3 +1019,60 @@ describe("BookingsService.recordOutcome", () => {
         expect(transaction).toHaveBeenCalledTimes(1);
     });
 });
+
+describe("BookingsService.publicServices — the website's services list (#255)", () => {
+    beforeEach(() => jest.clearAllMocks());
+    const serviceFindMany = prisma.service.findMany as jest.Mock;
+
+    const row = (id: string) => ({
+        id,
+        name: `Service ${id}`,
+        description: null,
+        durationMinutes: 30,
+        priceCents: 2500,
+        currency: "GBP",
+    });
+
+    it("returns services in the merchant's order and drops unknown ids", async () => {
+        serviceFindMany.mockResolvedValue([row("b"), row("a")]);
+        const result = await new BookingsService().publicServices([
+            "a",
+            "gone",
+            "b",
+        ]);
+        expect(result.map((s) => s.id)).toEqual(["a", "b"]);
+    });
+
+    it("asks only for active, undeleted services whose Appointments is not disabled", async () => {
+        serviceFindMany.mockResolvedValue([]);
+        await new BookingsService().publicServices(["a"]);
+        const { where, select } = serviceFindMany.mock.calls[0][0];
+        expect(where).toMatchObject({
+            id: { in: ["a"] },
+            deletedAt: null,
+            status: "ACTIVE",
+            organization: {
+                organizationModules: {
+                    none: {
+                        moduleKey: "APPOINTMENTS",
+                        status: { not: "ENABLED" },
+                    },
+                },
+            },
+        });
+        // Nothing internal leaves: no org, site, capacity or buffers.
+        expect(Object.keys(select).sort()).toEqual([
+            "currency",
+            "description",
+            "durationMinutes",
+            "id",
+            "name",
+            "priceCents",
+        ]);
+    });
+
+    it("does not query for an empty list", async () => {
+        expect(await new BookingsService().publicServices([])).toEqual([]);
+        expect(serviceFindMany).not.toHaveBeenCalled();
+    });
+});

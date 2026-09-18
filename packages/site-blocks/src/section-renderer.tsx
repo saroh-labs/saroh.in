@@ -8,6 +8,7 @@ import type {
     RenderedGallery,
     RenderedHero,
     RenderedRichText,
+    RenderedServicesList,
     RenderedTestimonials,
 } from "@saroh/block-contract";
 
@@ -20,6 +21,7 @@ import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import RichTextSection from "./blocks/rich-text";
+import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
 
 /**
@@ -97,6 +99,13 @@ export default function SectionRenderer({
             return (
                 <TestimonialsSection
                     content={section.content as RenderedTestimonials}
+                />
+            );
+        case "servicesList":
+            return (
+                <ServicesListSection
+                    content={section.content as RenderedServicesList}
+                    apiUrl={apiUrl}
                 />
             );
         case "contact":

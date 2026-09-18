@@ -8,6 +8,7 @@ import type {
     RenderedGallery,
     RenderedHero,
     RenderedRichText,
+    RenderedServicesList,
     RenderedTestimonials,
 } from "@saroh/block-contract";
 import { BLOCK_META, blockFixture } from "@saroh/block-contract";
@@ -23,6 +24,7 @@ import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import RichTextSection from "./blocks/rich-text";
+import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
 
 /**
@@ -284,6 +286,29 @@ describe("block rendering", () => {
             />,
         );
         expect(container.innerHTML).not.toContain("javascript:");
+    });
+
+    // Sample services rather than a fetch: fixture ids belong to no Service.
+    it("servicesList", () => {
+        const { container } = render(
+            <ServicesListSection
+                content={
+                    BLOCK_META.servicesList.fixtures
+                        .default as RenderedServicesList
+                }
+                services={[
+                    {
+                        id: "fixture-cut",
+                        name: "Cut and finish",
+                        description: "Wash, cut and blow-dry.",
+                        durationMinutes: 45,
+                        priceCents: 3800,
+                        currency: "GBP",
+                    },
+                ]}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
     });
 
     /**

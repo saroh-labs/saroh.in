@@ -1,10 +1,23 @@
-import { Body, Controller, Get, Ip, Param, Post, Query } from "@nestjs/common";
+import {
+    BadRequestException,
+    Body,
+    Controller,
+    Get,
+    Ip,
+    Param,
+    Post,
+    Query,
+} from "@nestjs/common";
 import type { Booking } from "@saroh/database";
 import { createHash } from "node:crypto";
 
 import type { Slot } from "./availability";
+import type { PublicService } from "./bookings.service";
 import { BookingsService } from "./bookings.service";
 import { BookServiceDto } from "./dto";
+
+/** The section contract's cap on a services list (#255). */
+const MAX_PUBLIC_SERVICE_IDS = 24;
 
 /**
  * PUBLIC booking API (S4-002), mounted at `/public/services` with NO guards —
@@ -20,6 +33,29 @@ import { BookServiceDto } from "./dto";
 @Controller("public/services")
 export class PublicBookingsController {
     constructor(private readonly bookings: BookingsService) {}
+
+    /**
+     * The services a website's services list shows, `?ids=a,b,c`, in that
+     * order (#255). Only services that may be offered come back; see
+     * {@link BookingsService.publicServices}.
+     */
+    @Get()
+    services(@Query("ids") ids?: string): Promise<PublicService[]> {
+        const list = [
+            ...new Set(
+                (ids ?? "")
+                    .split(",")
+                    .map((id) => id.trim())
+                    .filter(Boolean),
+            ),
+        ];
+        if (list.length > MAX_PUBLIC_SERVICE_IDS) {
+            throw new BadRequestException(
+                `At most ${MAX_PUBLIC_SERVICE_IDS} services at a time`,
+            );
+        }
+        return this.bookings.publicServices(list);
+    }
 
     /** Open slots for a bookable service over `?from=&to=` (ISO instants). */
     @Get(":serviceId/availability")

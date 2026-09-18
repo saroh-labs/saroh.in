@@ -253,6 +253,17 @@ const renderedContact = z.object({
     mapUrl: z.string().optional(),
 });
 
+/** `servicesList`, as published: the button's href resolved, nothing else. */
+const renderedServicesList = z.object({
+    variant,
+    padding,
+    heading: z.string().optional(),
+    intro: z.string().optional(),
+    serviceIds: z.array(z.string()),
+    showPrices: z.boolean().optional(),
+    cta: renderedCtaSchema.optional(),
+});
+
 /**
  * The rendered schema for every block type.
  *
@@ -278,6 +289,7 @@ export const RENDERED_SCHEMAS = {
     faq: renderedFaq,
     testimonials: renderedTestimonials,
     contact: renderedContact,
+    servicesList: renderedServicesList,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -294,6 +306,7 @@ export type RenderedFeatures = RenderedContent<"features">;
 export type RenderedFaq = RenderedContent<"faq">;
 export type RenderedTestimonials = RenderedContent<"testimonials">;
 export type RenderedContact = RenderedContent<"contact">;
+export type RenderedServicesList = RenderedContent<"servicesList">;
 
 /**
  * Validate rendered content for a block type.
