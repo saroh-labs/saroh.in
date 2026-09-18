@@ -28,12 +28,6 @@ describe("booking availability response", () => {
         });
     }
 
-    const json = (body: unknown) =>
-        new Response(JSON.stringify(body), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-        });
-
     it.each([
         ["an object instead of a list", json({ slots: [] })],
         ["a slot without a start", json([{ endAt: "2026-09-20T10:00:00Z" }])],
@@ -78,7 +72,7 @@ const CONTENT = {
     title: "Book a visit",
 } as RenderedBooking;
 
-function json(body: unknown, status: number): Response {
+function json(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {
         status,
         headers: { "content-type": "application/json" },

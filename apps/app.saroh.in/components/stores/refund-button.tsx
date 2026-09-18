@@ -2,7 +2,7 @@
 
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { refundOrder } from "@/lib/payments/actions";
@@ -17,17 +17,26 @@ export function RefundButton({ orderId }: { orderId: string }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [confirming, setConfirming] = useState(false);
+    // The confirm action stays clickable during the dialog's exit animation,
+    // so a double click can fire this twice before `busy` re-renders.
+    const inFlight = useRef(false);
 
     async function onRefund() {
+        if (inFlight.current) return;
+        inFlight.current = true;
         setBusy(true);
-        const res = await refundOrder(orderId);
-        setBusy(false);
-        if (!res.ok) {
-            showError(res.error);
-            return;
+        try {
+            const res = await refundOrder(orderId);
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            showSuccess("Refund initiated — it will settle once confirmed.");
+            router.refresh();
+        } finally {
+            setBusy(false);
+            inFlight.current = false;
         }
-        showSuccess("Refund initiated — it will settle once confirmed.");
-        router.refresh();
     }
 
     return (

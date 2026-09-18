@@ -431,7 +431,15 @@ export function SiteEditor({
     const [revision, setRevision] = useState(initialRevision);
     const [conflict, setConflict] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    // The Remove-section confirmation (replaces window.confirm, §9).
+    // The Remove-section confirmation (replaces window.confirm, §9). Mirrors
+    // pages-panel.tsx's pendingDelete + deleteOpen: the section removed is
+    // kept after the dialog closes so its title does not blank out during
+    // the closing animation, and so onConfirm still has something to remove
+    // once removeAt has cleared the selection and `active` has gone null.
+    const [pendingRemove, setPendingRemove] = useState<{
+        index: number;
+        title: string;
+    } | null>(null);
     const [removeOpen, setRemoveOpen] = useState(false);
     // The org's services for the booking and services-list pickers. Loaded on
     // mount, and again on "Try again"; Services are authored in the service
@@ -485,6 +493,9 @@ export function SiteEditor({
 
     /** Why the section at this position is not saved, if the last save held it back. */
     function heldBackAt(index: number): HeldBackSection | undefined {
+        // A revert back to the saved content leaves nothing to finish, even
+        // though the stale entry is still sitting in `heldBack`.
+        if (!dirty) return undefined;
         const key = sections[index]?.key;
         return heldBack.find((h) =>
             h.key !== undefined ? h.key === key : h.index === index,
@@ -518,9 +529,17 @@ export function SiteEditor({
     function removeAt(index: number) {
         const key = sections[index]?.key;
         setSections((prev) => prev.filter((_, i) => i !== index));
-        // A deleted section has nothing left to finish.
+        // A deleted section has nothing left to finish. Mirror heldBackAt's
+        // own matching rule, and reindex the entries after it since their
+        // positions shifted down by one.
         setHeldBack((prev) =>
-            prev.filter((h) => (key !== undefined ? h.key !== key : true)),
+            prev
+                .filter((h) =>
+                    key !== undefined ? h.key !== key : h.index !== index,
+                )
+                .map((h) =>
+                    h.index > index ? { ...h, index: h.index - 1 } : h,
+                ),
         );
         setErrorIndex(null);
         setErrorMessage(null);
@@ -1672,27 +1691,17 @@ export function SiteEditor({
                                              * an error is cheaper to prevent
                                              * than to apologise for.
                                              */
+                                            setPendingRemove({
+                                                index: active.index,
+                                                title: sectionTitle(
+                                                    active.section,
+                                                ),
+                                            });
                                             setRemoveOpen(true);
                                         }}
                                     >
                                         Remove
                                     </Button>
-                                    <ConfirmDialog
-                                        open={removeOpen}
-                                        onOpenChange={setRemoveOpen}
-                                        title={`Remove "${sectionTitle(active.section)}"?`}
-                                        description="Anything written here since your last publish cannot be brought back. To take it off the site and keep the work, hide it instead."
-                                        confirmLabel="Remove section"
-                                        cancelLabel="Keep section"
-                                        onConfirm={() => {
-                                            const title = sectionTitle(
-                                                active.section,
-                                            );
-                                            removeAt(active.index);
-                                            setSelectedIndex(null);
-                                            showSuccess(`Removed ${title}.`);
-                                        }}
-                                    />
                                 </div>
                             </div>
 
@@ -1808,6 +1817,28 @@ export function SiteEditor({
                             appear in the preview as you type.
                         </p>
                     )}
+                    {/*
+                     * Rendered here, outside the `active` branch: confirming
+                     * removes the section, which sets `active` to null and
+                     * would otherwise unmount this dialog mid-close, losing
+                     * its exit animation. `pendingRemove` carries what it
+                     * needs (title, onConfirm) past that.
+                     */}
+                    <ConfirmDialog
+                        open={removeOpen}
+                        onOpenChange={setRemoveOpen}
+                        title={`Remove "${pendingRemove?.title ?? ""}"?`}
+                        description="Anything written here since your last publish cannot be brought back. To take it off the site and keep the work, hide it instead."
+                        confirmLabel="Remove section"
+                        cancelLabel="Keep section"
+                        onConfirm={() => {
+                            if (!pendingRemove) return;
+                            const { index, title } = pendingRemove;
+                            removeAt(index);
+                            setSelectedIndex(null);
+                            showSuccess(`Removed ${title}.`);
+                        }}
+                    />
                 </div>
 
                 <PanelDivider
