@@ -34,8 +34,16 @@ export function ctaClasses(
     style: RenderedCta["style"],
     surface: CtaSurface = "page",
 ): string {
+    /*
+     * `coarse:min-h-11`: 44px on a touch pointer, the target the design system
+     * sets (frontend-design-system.md). `text-sm` plus `py-2.5` is 40px, which
+     * is fine under a mouse and short under a thumb. `coarse:` is a pointer
+     * query, not a width, so a desk keeps today's size. Link-style buttons get
+     * the same height with no padding change: the tap area grows, the underline
+     * does not move.
+     */
     const base =
-        "inline-flex items-center justify-center rounded-[var(--site-radius)] text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+        "inline-flex items-center justify-center rounded-[var(--site-radius)] text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 coarse:min-h-11";
     const ring =
         surface === "band"
             ? "focus-visible:ring-site-cta-fg focus-visible:ring-offset-site-cta-bg"
