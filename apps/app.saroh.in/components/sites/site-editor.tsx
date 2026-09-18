@@ -513,6 +513,19 @@ export function SiteEditor({
         heldBack.length > 0 &&
         JSON.stringify(livePlan.toSend) === lastSavedJson;
 
+    /*
+     * The browser's own guard against closing the tab or navigating away with
+     * work that is not saved, as the post editor has. It matters most for
+     * unfinished sections: one that was never saved lives only in this tab,
+     * and the bar reads "Saved · …" for everything else (review of #328).
+     */
+    useEffect(() => {
+        if (!dirty) return;
+        const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+        window.addEventListener("beforeunload", warn);
+        return () => window.removeEventListener("beforeunload", warn);
+    }, [dirty]);
+
     /** Why the section at this position is not saved, if the last save held it back. */
     function heldBackAt(index: number): HeldBackSection | undefined {
         // Nothing differs from what is saved, so nothing is waiting. (A
