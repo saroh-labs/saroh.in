@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MediaPicker } from "@/components/sites/media-picker";
+import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import {
     createPost,
     deletePost,
@@ -189,12 +190,7 @@ export function PostEditor({
     }, [dirty, saving, title, content, slug, excerpt, categoryId, image, save]);
 
     // The browser's own guard, for the case the timer has not yet fired.
-    useEffect(() => {
-        if (!dirty) return;
-        const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-        window.addEventListener("beforeunload", warn);
-        return () => window.removeEventListener("beforeunload", warn);
-    }, [dirty]);
+    useLeaveGuard(dirty);
 
     function touched<T>(setter: (v: T) => void) {
         return (v: T) => {
