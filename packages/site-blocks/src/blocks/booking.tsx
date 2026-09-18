@@ -416,13 +416,9 @@ export default function BookingSection({
                         className="text-site-fg text-sm font-medium"
                     >
                         Email
-                        {/* Decorative and aria-hidden — the field's own
-                            `required` carries the meaning — so this marker is
-                            held to the 3:1 non-text floor on the merchant's
-                            ground, which it clears in both registers. */}
-                        <span aria-hidden="true" className="text-destructive">
-                            {" *"}
-                        </span>
+                        {/* The label's own colour, not a red (#263); see
+                            the enquiry block. */}
+                        <span aria-hidden="true">{" *"}</span>
                     </label>
                     <input
                         id={`${baseId}-email`}

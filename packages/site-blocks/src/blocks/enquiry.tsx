@@ -175,19 +175,13 @@ export default function EnquirySection({
                             >
                                 {label}
                                 {field.required ? (
-                                    // The only Saroh colour allowed to sit
-                                    // directly on the merchant's ground. It is
-                                    // aria-hidden and redundant with the
-                                    // control's own `required`, so it is a
-                                    // decorative marker held to the 3:1
-                                    // non-text floor rather than 4.5:1 — which
-                                    // it clears (5.43:1 light, 3.87:1 dark).
-                                    <span
-                                        aria-hidden="true"
-                                        className="text-destructive"
-                                    >
-                                        {" *"}
-                                    </span>
+                                    // The label's own colour, not a red: the
+                                    // glyph is the signal, and --site-fg is
+                                    // the one colour measured against the
+                                    // merchant's ground (#263). aria-hidden
+                                    // because the control's `required` already
+                                    // tells a screen reader.
+                                    <span aria-hidden="true">{" *"}</span>
                                 ) : null}
                             </label>
                             {field.type === "textarea" ? (
