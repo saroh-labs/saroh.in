@@ -34,12 +34,16 @@ const API_URL = env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
 export type CheckoutResult<T> =
     { ok: true; data: T } | { ok: false; error: string };
 
-async function readError(res: Response, fallback: string): Promise<string> {
-    const body = (await res.json().catch(() => null)) as {
-        message?: string;
-    } | null;
-    return body?.message ?? fallback;
-}
+/*
+ * No API error text reaches the buyer, on purpose. The public checkout
+ * endpoints' messages are written for the MERCHANT and can describe their
+ * setup ("Stored provider credentials are malformed", "Multiple providers
+ * connected — specify which provider to use"). A `readError` here used to
+ * try to show them and only failed because it read `body.message` while the
+ * API sends `{ error: { message } }` (review of #322). Reading the right
+ * field would have leaked those lines to buyers, so each failure gets the
+ * page's own sentence instead.
+ */
 
 /** Fetch the buyer-safe receipt for `orderId`. */
 export async function fetchReceipt(
@@ -61,7 +65,7 @@ export async function fetchReceipt(
         }
         return {
             ok: false,
-            error: await readError(res, "Couldn't load this order."),
+            error: "Couldn't load this order.",
         };
     } catch {
         return {
@@ -103,10 +107,7 @@ export async function createPaymentIntent(
         }
         return {
             ok: false,
-            error: await readError(
-                res,
-                "We couldn't start the payment — please try again.",
-            ),
+            error: "We couldn't start the payment — please try again.",
         };
     } catch {
         return {
