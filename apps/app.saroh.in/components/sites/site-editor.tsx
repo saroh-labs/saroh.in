@@ -1,5 +1,6 @@
 "use client";
 
+import { parseSectionContent } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -595,6 +596,22 @@ export function SiteEditor({
         for (let i = 0; i < next.length; i++) {
             const section = next[i];
             if (section.type !== "enquiry") continue;
+            /*
+             * An unfinished enquiry section is held back from the save (#328),
+             * so its Form is not synced yet either. Syncing it anyway failed
+             * on the empty field and stopped the WHOLE save, which is the
+             * very thing holding back was for (review of #328). It syncs on
+             * the save after it is finished.
+             */
+            if (
+                !parseSectionContent(
+                    section.type,
+                    section.contractVersion,
+                    section.content,
+                ).success
+            ) {
+                continue;
+            }
             const content = section.content;
             const res = await ensureFormForSection({
                 formId: content.formId,
@@ -640,6 +657,9 @@ export function SiteEditor({
             setErrorIndex(synced.index);
             setErrorMessage(synced.error);
             showError(synced.error);
+            // Recorded like any other failed save, so the autosave does not
+            // send the same draft again every 1.5s with a fresh toast.
+            failedJson.current = JSON.stringify(sections);
             return;
         }
         /*

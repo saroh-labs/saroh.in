@@ -316,22 +316,35 @@ export default function BookingSection({
                 return;
             }
 
-            // The API's error envelope is `{ error: { code, message, … } }`.
-            // Its 4xx messages are written for the visitor; a 5xx message is
-            // generic at best, so it is never shown.
-            const body =
-                res.status < 500
-                    ? ((await res.json().catch(() => null)) as {
-                          error?: { message?: unknown };
-                      } | null)
-                    : null;
-            const apiMessage = body?.error?.message;
+            if (res.status === 404 || res.status === 410) {
+                // Booking closed while the visitor was filling the form (the
+                // service went, or Appointments was switched off). Show the
+                // same notice a fresh page would, instead of a form that can
+                // only keep failing.
+                setSelected(null);
+                setSlotsState({ kind: "closed" });
+                setSubmit({ kind: "idle" });
+                return;
+            }
+
+            if (res.status === 400) {
+                // The booking API's 400s are written for developers
+                // ("Validation failed", "startAt is not a valid instant"), so
+                // none is shown. A rejected time is the likely cause after
+                // the email, so the times are refreshed too.
+                reload();
+                setSubmit({
+                    kind: "error",
+                    message:
+                        "We couldn't book that — please check your email address and choose a time again.",
+                });
+                return;
+            }
+
             setSubmit({
                 kind: "error",
                 message:
-                    typeof apiMessage === "string" && apiMessage
-                        ? apiMessage
-                        : "Something went wrong — please check your details and try again.",
+                    "Something went wrong — please check your details and try again.",
             });
         } catch {
             setSubmit({
