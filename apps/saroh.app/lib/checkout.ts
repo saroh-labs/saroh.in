@@ -1,5 +1,16 @@
 import { env } from "@/env";
 
+import type { CheckoutIntent, CheckoutReceipt } from "./checkout-shape";
+import { isIntent, isReceipt } from "./checkout-shape";
+
+// Re-exported for the checkout view. Imported first so the names are bound
+// here too: `export type { X } from` alone would not bind them locally.
+export type {
+    CheckoutIntent,
+    CheckoutReceipt,
+    ReceiptPaymentStatus,
+} from "./checkout-shape";
+
 /**
  * PUBLIC checkout client helpers (S5-004). These hit the guardless checkout
  * surface on api.saroh.in from the buyer's browser:
@@ -19,70 +30,9 @@ import { env } from "@/env";
 
 const API_URL = env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
 
-export type ReceiptPaymentStatus = "UNPAID" | "PAID" | "FAILED" | "REFUNDED";
-
-/** The buyer-safe receipt returned by the public receipt endpoint. */
-export interface CheckoutReceipt {
-    orderNumber: string;
-    currency: string;
-    subtotal: string;
-    tax: string;
-    shipping: string;
-    discount: string;
-    total: string;
-    paymentStatus: ReceiptPaymentStatus;
-    fulfilmentStatus: string;
-    latestPayment: {
-        provider: string;
-        status: string;
-        amountCents: number;
-        currency: string;
-    } | null;
-}
-
-/** The non-secret handoff returned by the public create-intent endpoint. */
-export interface CheckoutIntent {
-    paymentIntentId: string;
-    provider: string;
-    providerIntentId: string;
-    amountCents: number;
-    currency: string;
-    publicKey: string | null;
-    clientParams: Record<string, unknown>;
-}
-
 /** Discriminated result so the UI can surface a message inline. */
 export type CheckoutResult<T> =
     { ok: true; data: T } | { ok: false; error: string };
-
-/**
- * The response bodies are narrowed rather than cast (#264): the receipt view
- * reads these fields during render, so a 200 in the wrong shape — or `null` —
- * would throw there and blank the page instead of showing its error state.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null;
-}
-
-function isReceipt(value: unknown): value is CheckoutReceipt {
-    return (
-        isRecord(value) &&
-        typeof value.orderNumber === "string" &&
-        typeof value.currency === "string" &&
-        typeof value.total === "string" &&
-        typeof value.paymentStatus === "string"
-    );
-}
-
-function isIntent(value: unknown): value is CheckoutIntent {
-    return (
-        isRecord(value) &&
-        typeof value.provider === "string" &&
-        typeof value.providerIntentId === "string" &&
-        typeof value.amountCents === "number" &&
-        typeof value.currency === "string"
-    );
-}
 
 async function readError(res: Response, fallback: string): Promise<string> {
     const body = (await res.json().catch(() => null)) as {
