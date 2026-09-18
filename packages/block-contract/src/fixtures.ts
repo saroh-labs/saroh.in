@@ -310,9 +310,10 @@ export const BLOCK_META = {
                 // Caught by looking at the page, which is the argument for
                 // having one.
                 //
-                // The id belongs to no Service, so availability 404s and the
-                // widget shows its "no times" state. That is a real state a
-                // visitor sees, and an honest thing to put in a catalog.
+                // The id belongs to no Service, so previews (the catalog, the
+                // editor's Add-section picker) hand the widget sample open
+                // times instead of fetching (#267); the G5 snapshot stubs the
+                // fetch and shows the "no times" state.
                 serviceId: "fixture-service",
                 title: "Book a table",
                 description: "Lunch and dinner, seven days a week.",

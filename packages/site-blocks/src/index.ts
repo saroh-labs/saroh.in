@@ -15,6 +15,7 @@
 export { PageSections, default as SectionRenderer } from "./section-renderer";
 export type { Section } from "./section-renderer";
 
+export { BlockFixturePreview, SAMPLE_SERVICES } from "./block-fixture-preview";
 export { default as BookingSection } from "./blocks/booking";
 export { default as ContactSection } from "./blocks/contact";
 export { CtaButton, default as CtaSection, ctaClasses } from "./blocks/cta";

@@ -47,7 +47,7 @@ import { Field } from "./field";
  * button lifts a hero to v2 (#207) — that is what turns a `gallery@1` carrying
  * `layout` into a `gallery@2` carrying `variant`.
  */
-function withVariant(section: Section, id: string): Section {
+export function withVariant(section: Section, id: string): Section {
     return {
         ...section,
         contractVersion: latestContractVersion(section.type),

@@ -14,6 +14,7 @@ import {
 } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { AddSectionDialog } from "@/components/sites/add-section-dialog";
 import { PanelDivider, RailTabs } from "@/components/sites/editor-chrome";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
 import {
@@ -21,7 +22,6 @@ import {
     DEVICE_WIDTH,
     DEVICES,
     SECTION_LABELS,
-    SECTION_ORDER,
     sectionTitle,
     ZOOMS,
 } from "@/components/sites/editor-constants";
@@ -34,6 +34,7 @@ import type {
 } from "@/components/sites/section-fields";
 import { SectionFields } from "@/components/sites/section-fields";
 import { SectionPadding } from "@/components/sites/section-fields/padding";
+import { withVariant } from "@/components/sites/section-fields/variant-field";
 
 import { NoteComposer } from "@/components/sites/note-composer";
 import { PagesPanel } from "@/components/sites/pages-panel";
@@ -80,6 +81,7 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import { resolveStyleVariables } from "@/lib/sites/style";
 
 /**
  * The bar's verdict badge, worded per outcome. Keyed by the union so a new
@@ -411,6 +413,7 @@ export function SiteEditor({
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
     const [style, setStyle] = useState<SiteStyle>(initialStyle);
+    const [addOpen, setAddOpen] = useState(false);
     const [styleSaving, setStyleSaving] = useState(false);
     const [savedStyleJson, setSavedStyleJson] = useState(() =>
         JSON.stringify(initialStyle),
@@ -502,8 +505,14 @@ export function SiteEditor({
         setSections((prev) => prev.map((s, i) => (i === index ? next : s)));
     }
 
-    function addSection(type: SectionType) {
-        setSections((prev) => [...prev, emptySection(type)]);
+    function addSection(type: SectionType, variant?: string) {
+        const section = emptySection(type);
+        // A look chosen in the picker is set the way the Look field sets it,
+        // so the two cannot disagree (#267, #254).
+        setSections((prev) => [
+            ...prev,
+            variant ? withVariant(section, variant) : section,
+        ]);
     }
 
     function removeAt(index: number) {
@@ -1503,33 +1512,29 @@ export function SiteEditor({
                                  * The design draws this as a dashed outline
                                  * spanning the rail — reading as a slot waiting
                                  * to be filled rather than another row in the
-                                 * list, which is what it is. Still a disclosure:
-                                 * the type picker only matters once you have
-                                 * decided to add something.
+                                 * list, which is what it is. It opens the
+                                 * picker, which shows each block before it is
+                                 * added (#267).
                                  */}
-                                <details className="group">
-                                    <summary className="cursor-pointer list-none rounded-md border border-dashed px-2 py-2 text-center text-sm text-muted-foreground transition-colors hover:border-solid hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                        + Add section
-                                    </summary>
-                                    <div className="flex flex-wrap gap-1 px-2 pt-2">
-                                        {SECTION_ORDER.map((type) => (
-                                            <Button
-                                                key={type}
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    addSection(type);
-                                                    setSelectedIndex(
-                                                        sections.length,
-                                                    );
-                                                }}
-                                            >
-                                                {SECTION_LABELS[type]}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </details>
+                                <button
+                                    type="button"
+                                    onClick={() => setAddOpen(true)}
+                                    className="w-full rounded-md border border-dashed px-2 py-2 text-center text-sm text-muted-foreground transition-colors hover:border-solid hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    + Add section
+                                </button>
+                                <AddSectionDialog
+                                    open={addOpen}
+                                    onOpenChange={setAddOpen}
+                                    variables={resolveStyleVariables(
+                                        style,
+                                        styleOptions,
+                                    )}
+                                    onAdd={(type, variant) => {
+                                        addSection(type, variant);
+                                        setSelectedIndex(sections.length);
+                                    }}
+                                />
                             </div>
                         </>
                     )}

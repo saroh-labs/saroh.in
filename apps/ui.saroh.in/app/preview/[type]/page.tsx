@@ -1,14 +1,8 @@
-import type { RenderedServicesList } from "@saroh/block-contract";
 import { BLOCK_META, blockFixture, isSectionType } from "@saroh/block-contract";
-import {
-    SectionRenderer,
-    ServicesListSection,
-    SiteTheme,
-} from "@saroh/site-blocks";
+import { BlockFixturePreview, SiteTheme } from "@saroh/site-blocks";
 import { notFound } from "next/navigation";
 
 import { paletteById } from "@/lib/data/palettes";
-import { SAMPLE_SERVICES } from "@/lib/data/sample-services";
 
 /**
  * ONE block, in ONE merchant palette, with nothing else on the page.
@@ -53,16 +47,7 @@ export default async function BlockPreviewPage({
                 one. Without it the block would float on the browser default and
                 every palette would look the same behind the section. */}
             <div className="min-h-screen bg-site-bg text-site-fg">
-                {/* The services list reads live Services, and a fixture's ids
-                    belong to none; the catalog shows it with sample ones. */}
-                {type === "servicesList" ? (
-                    <ServicesListSection
-                        content={content as RenderedServicesList}
-                        services={SAMPLE_SERVICES}
-                    />
-                ) : (
-                    <SectionRenderer section={{ type, content }} />
-                )}
+                <BlockFixturePreview type={type} variant={variantId} />
             </div>
         </>
     );
