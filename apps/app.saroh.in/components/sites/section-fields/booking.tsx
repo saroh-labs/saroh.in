@@ -15,6 +15,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import type { BookingContent } from "@/lib/sites/service";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
+import { ServicesLoadNotice } from "./services-load-notice";
 
 /**
  * The `booking` section's editor fields.
@@ -29,9 +30,10 @@ import type { SectionFieldsProps } from "./props";
  */
 export function BookingFields({
     section,
-    services,
+    services: load,
     onChange,
 }: SectionFieldsProps<"booking">) {
+    const services = load.status === "ready" ? load.services : [];
     const c = section.content;
     const patch = (next: Partial<BookingContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
@@ -46,7 +48,9 @@ export function BookingFields({
     return (
         <div className="grid gap-3">
             <Field label="Service">
-                {services.length === 0 ? (
+                {load.status !== "ready" ? (
+                    <ServicesLoadNotice load={load} />
+                ) : services.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                         No services yet.{" "}
                         <Link
@@ -77,7 +81,7 @@ export function BookingFields({
                         </SelectContent>
                     </Select>
                 )}
-                {selectedMissing && (
+                {load.status === "ready" && selectedMissing && (
                     <p className="text-xs text-muted-foreground">
                         The selected service is no longer available — choose
                         another.

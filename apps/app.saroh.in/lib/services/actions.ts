@@ -13,7 +13,7 @@ import {
     cancelBooking as cancelBookingApi,
     createService as createServiceApi,
     listAvailability as listAvailabilityApi,
-    listServices as listServicesApi,
+    readServices,
     recordBookingOutcome as recordBookingOutcomeApi,
     replaceRules as replaceRulesApi,
     rescheduleBooking as rescheduleBookingApi,
@@ -83,12 +83,28 @@ export async function listAvailability(
 
 /**
  * The org's services as a light picker list `{ id, name, status }`, used by the
- * site editor's booking-section service picker. Services are authored in the
+ * site editor's booking and services-list pickers. Services are authored in the
  * service editor (not inline), so the editor reads them through this action.
+ *
+ * Returns a result rather than an empty list on failure, so a picker never
+ * tells a merchant they have no services, or that chosen ones were deleted,
+ * because a read failed.
  */
 export async function listServicesForPicker(): Promise<
-    { id: string; name: string; status: Service["status"] }[]
+    | {
+          ok: true;
+          services: { id: string; name: string; status: Service["status"] }[];
+      }
+    | { ok: false; forbidden: boolean }
 > {
-    const services = await listServicesApi();
-    return services.map((s) => ({ id: s.id, name: s.name, status: s.status }));
+    const read = await readServices();
+    if (!read.ok) return read;
+    return {
+        ok: true,
+        services: read.services.map((s) => ({
+            id: s.id,
+            name: s.name,
+            status: s.status,
+        })),
+    };
 }

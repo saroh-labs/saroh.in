@@ -25,6 +25,8 @@ export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";
 export { default as HeroSection } from "./blocks/hero";
 export { default as RichTextSection } from "./blocks/rich-text";
+export { default as ServicesListSection } from "./blocks/services-list";
+export type { PublicService } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
 
 export { destructiveAlertClasses } from "./alert";

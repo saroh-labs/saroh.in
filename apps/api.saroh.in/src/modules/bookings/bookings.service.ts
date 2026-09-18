@@ -14,7 +14,7 @@ import { IANAZone } from "luxon";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { authorize } from "../organizations/organization-policy";
-import { appointmentsOpen } from "./appointments-open";
+import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type {
     AvailabilityRuleWindow,
     AvailabilityService,
@@ -95,6 +95,16 @@ export type BookingDetail = Prisma.BookingGetPayload<{
  * SERIALIZABLE transaction that re-counts CONFIRMED overlaps INSIDE the tx (see
  * {@link book} for the full race argument).
  */
+/** A service as a website visitor sees it (#255). No internal fields. */
+export interface PublicService {
+    id: string;
+    name: string;
+    description: string | null;
+    durationMinutes: number;
+    priceCents: number | null;
+    currency: string | null;
+}
+
 @Injectable()
 export class BookingsService {
     /**
@@ -358,6 +368,49 @@ export class BookingsService {
             to,
             confirmed,
         );
+    }
+
+    /**
+     * The public view of a merchant's chosen services, for the website's
+     * services list (#255). Guardless like availability: the ids come from a
+     * published section, and only fields a visitor is meant to see leave here.
+     *
+     * Read live, not frozen at publish, so a changed price or a deleted service
+     * is right on the next page view. Filtered to what may be offered:
+     * - not deleted, and ACTIVE (an archived service is not on offer);
+     * - its Organization has not DISABLED Appointments. A missing module row
+     *   counts as on: enforcement is still dark (#117) and the backfill may not
+     *   have written one, and hiding a merchant's services over an absent row
+     *   would be the wrong way to fail.
+     *
+     * Returned in the order asked for, which is the order the merchant set.
+     * Unknown ids are dropped, never an error: the page must degrade, not 404.
+     */
+    async publicServices(ids: string[]): Promise<PublicService[]> {
+        if (ids.length === 0) return [];
+        const rows = await prisma.service.findMany({
+            where: {
+                id: { in: ids },
+                deletedAt: null,
+                status: "ACTIVE",
+                // The same rule public booking closes on (#327), so a list
+                // never offers a service its booking block would refuse.
+                organization: APPOINTMENTS_OPEN,
+            },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                durationMinutes: true,
+                priceCents: true,
+                currency: true,
+            },
+        });
+        const byId = new Map(rows.map((row) => [row.id, row]));
+        return ids.flatMap((id) => {
+            const row = byId.get(id);
+            return row ? [row] : [];
+        });
     }
 
     // ── Bookings (management) ──────────────────────────────────────────────

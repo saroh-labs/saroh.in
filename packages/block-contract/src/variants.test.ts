@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { BLOCK_META } from "./fixtures";
 import { parseSectionContent, SECTION_TYPES } from "./section-contract";
+import { toRendered } from "./to-rendered";
 import { defaultVariant, isKnownVariant, resolveVariant } from "./variants";
 
 /**
@@ -263,5 +264,50 @@ describe("faq, testimonials and contact", () => {
             parseSectionContent("contact", 1, { whatsapp: "+44 7700 900000" })
                 .success,
         ).toBe(true);
+    });
+});
+
+/** #255 — the first block that shows module data. */
+describe("servicesList", () => {
+    it("needs at least one service, and no service twice", () => {
+        expect(
+            parseSectionContent("servicesList", 1, { serviceIds: [] }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("servicesList", 1, {
+                serviceIds: ["a", "a"],
+            }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("servicesList", 1, { serviceIds: ["a", "b"] })
+                .success,
+        ).toBe(true);
+    });
+
+    it("caps the list at 24", () => {
+        const ids = (n: number) => Array.from({ length: n }, (_, i) => `s${i}`);
+        expect(
+            parseSectionContent("servicesList", 1, { serviceIds: ids(24) })
+                .success,
+        ).toBe(true);
+        expect(
+            parseSectionContent("servicesList", 1, { serviceIds: ids(25) })
+                .success,
+        ).toBe(false);
+    });
+
+    it("resolves its button's page at publish, like hero", () => {
+        const rendered = toRendered(
+            "servicesList",
+            {
+                serviceIds: ["a"],
+                cta: {
+                    label: "Book now",
+                    action: { kind: "page", pageId: "p1" },
+                },
+            },
+            { resolvePage: (id) => (id === "p1" ? "/book" : undefined) },
+        ) as { cta: { href: string } };
+        expect(rendered.cta.href).toBe("/book");
     });
 });

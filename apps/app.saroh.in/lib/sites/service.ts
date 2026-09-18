@@ -149,6 +149,18 @@ export interface ContactContent {
     mapUrl?: string;
 }
 
+/**
+ * `servicesList` — which of the org's Services to show, in order. Their names
+ * and prices are read live by the site, not stored here.
+ */
+export interface ServicesListContent {
+    heading?: string;
+    intro?: string;
+    serviceIds: string[];
+    showPrices?: boolean;
+    cta?: CtaValue;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -202,6 +214,7 @@ export interface SectionContentByType {
     faq: FaqContent;
     testimonials: TestimonialsContent;
     contact: ContactContent;
+    servicesList: ServicesListContent;
 }
 
 /**

@@ -440,6 +440,39 @@ const contactV1 = z
         },
     );
 
+/**
+ * servicesList v1 — the merchant's real Services, read live (#255).
+ *
+ * The first block that shows module data. It stores only WHICH services and in
+ * what order; names, prices and durations are fetched when the page is viewed,
+ * so a changed price or a deleted service is right without a republish. What a
+ * visitor sees when the data is not there:
+ * - a service deleted or archived after publish: it is left out;
+ * - none left, or Appointments switched off: the block renders nothing, rather
+ *   than a heading over an empty list or a claim the business cannot keep;
+ * - the API unreachable: the block's own error state, with a retry.
+ * A price is never drawn as 0 when absent (`saroh-product.md`).
+ *
+ * `cta` is the usual button (#207), typically "Book now" pointing at the page
+ * with the booking block. Up to 24 services: past that it is a catalogue.
+ */
+const servicesListV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    heading: z.string().max(160).optional(),
+    intro: z.string().max(600).optional(),
+    serviceIds: z
+        .array(z.string().min(1))
+        .min(1, "Choose at least one service")
+        .max(24)
+        .refine(
+            (ids) => new Set(ids).size === ids.length,
+            "A service is listed twice",
+        ),
+    showPrices: z.boolean().optional(),
+    cta: ctaSchemaV2.optional(),
+});
+
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
 const enquiryFieldTypes = ["text", "email", "tel", "textarea"] as const;
 
@@ -536,6 +569,7 @@ export const SECTION_TYPES = [
     "faq",
     "testimonials",
     "contact",
+    "servicesList",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -639,6 +673,13 @@ const REGISTRY: Record<string, SectionContract> = {
         // Plain text; its links are built from validated numbers, addresses
         // and an http(s) map URL, never taken as authored hrefs.
         schema: contactV1,
+        sanitizedFields: [],
+    },
+    [key("servicesList", 1)]: {
+        type: "servicesList",
+        version: 1,
+        // Ids, a flag and a button; the service text comes from the API live.
+        schema: servicesListV1,
         sanitizedFields: [],
     },
     [key("booking", 1)]: {

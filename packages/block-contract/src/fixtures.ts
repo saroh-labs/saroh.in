@@ -406,6 +406,34 @@ export const BLOCK_META = {
             },
         },
     },
+    servicesList: {
+        label: "Services",
+        description:
+            "Your bookable services with their duration and price, kept current from Appointments.",
+        variants: soleVariant(
+            "Services in a list, each with its duration and price.",
+        ),
+        fixtures: {
+            default: {
+                variant: "default",
+                heading: "Services",
+                intro: "Book online; we confirm by email straight away.",
+                // Ids that belong to no Service: the catalog and the snapshot
+                // hand the component sample services instead of fetching.
+                serviceIds: [
+                    "fixture-cut",
+                    "fixture-colour",
+                    "fixture-consult",
+                ],
+                cta: {
+                    label: "Book now",
+                    href: "/book",
+                    style: "primary",
+                    action: { kind: "page" },
+                },
+            },
+        },
+    },
 } satisfies { [K in SectionType]: BlockMeta<K> };
 
 /** Every block's catalog entry, for a picker or the catalog index. */
