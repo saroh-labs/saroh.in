@@ -30,12 +30,19 @@ export function PagesPanel({
     pages,
     activePageId,
     dirty,
+    unfinished,
 }: {
     siteId: string;
     pages: SitePage[];
     activePageId: string;
     /** Unsaved section edits on the page currently open. */
     dirty: boolean;
+    /**
+     * When the only unsaved work is unfinished sections, a phrase naming them
+     * ("the unfinished FAQ section"). Saving
+     * cannot help then, so the message says what will.
+     */
+    unfinished?: string;
 }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
@@ -60,7 +67,11 @@ export function PagesPanel({
          * merchant would have no way to know it happened.
          */
         if (dirty) {
-            showError("Save this page before opening another.");
+            showError(
+                unfinished
+                    ? `Finish or remove ${unfinished} before opening another page.`
+                    : "Save this page before opening another.",
+            );
             return;
         }
         router.push(`/sites/${siteId}?page=${pageId}`);

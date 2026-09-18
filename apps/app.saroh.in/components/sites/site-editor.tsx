@@ -125,6 +125,20 @@ const APPROVAL_BADGE: Record<
  * The bar's words when everything saved except unfinished sections, naming
  * them so the merchant knows what is holding publish back.
  */
+/**
+ * "the unfinished FAQ section" / "the unfinished FAQ and Contact sections":
+ * what is holding the page back, for messages that tell the merchant what to
+ * finish.
+ */
+function unfinishedPhrase(heldBack: HeldBackSection[]): string {
+    const names = heldBack.map((h) => SECTION_LABELS[h.type]);
+    const list =
+        names.length <= 1
+            ? (names[0] ?? "")
+            : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+    return `the unfinished ${list} section${names.length > 1 ? "s" : ""}`;
+}
+
 function heldBackSummary(heldBack: HeldBackSection[]): string {
     const names = heldBack.map((h) => SECTION_LABELS[h.type]).join(", ");
     const count =
@@ -893,7 +907,13 @@ export function SiteEditor({
      */
     async function openCheck() {
         if (dirty) {
-            showError("You have unsaved changes — save the draft first.");
+            // "Save first" cannot help when everything saveable IS saved and
+            // only unfinished sections are waiting; name what will.
+            showError(
+                onlyHeldBack
+                    ? `Finish or remove ${unfinishedPhrase(heldBack)} before publishing.`
+                    : "You have unsaved changes — save the draft first.",
+            );
             return;
         }
         setChecking(true);
@@ -1304,6 +1324,11 @@ export function SiteEditor({
                                 pages={pages}
                                 activePageId={pageId}
                                 dirty={dirty}
+                                unfinished={
+                                    onlyHeldBack
+                                        ? unfinishedPhrase(heldBack)
+                                        : undefined
+                                }
                             />
                         </>
                     ) : rail === "review" ? (
