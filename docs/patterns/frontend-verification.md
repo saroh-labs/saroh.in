@@ -13,7 +13,8 @@ insufficient" (PRODUCT_STRATEGY §18).
 
 - **Current** — **Run the real stack through portless** (`pnpm dev`) at the
   `.localhost` hostname the app ships as. Bare ports break CORS and the shared
-  session (AGENTS.md).
+  session (`docs/architecture/LOCAL_DEV.md`). Check by hand in the persistent Chrome window
+  described there, never a throwaway `playwright test` browser.
 - **Adopted** — **Check the four scenes at real widths:** 320px (the floor),
   390px (a phone) and 1440px (the desk), in light and dark, with a touch pointer
   for the phone. Emulate the viewport — resizing a Chrome window stops at about

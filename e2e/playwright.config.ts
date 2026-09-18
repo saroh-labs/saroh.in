@@ -18,7 +18,7 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * ## Running it
  *
- * Locally, against portless (the normal dev setup — see the root AGENTS.md):
+ * Locally, against portless (the normal dev setup — see docs/architecture/LOCAL_DEV.md):
  *
  *     pnpm dev
  *     pnpm --filter @saroh/e2e install:browsers   # once
