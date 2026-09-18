@@ -88,8 +88,12 @@ const NEVER: Record<string, string> = {
     "admin/admin.controller.ts": "staff control plane, not a tenant surface",
     "health/health.controller.ts": "liveness",
     "self-test/self-test.controller.ts": "diagnostics",
-    // Public surfaces. A merchant switching a module off must not take down a
-    // checkout, a booking page, a published site, or a provider's webhook.
+    // Public surfaces. A visitor has no organization context, so the guard
+    // would answer them 401/403, and a merchant switching a module off must not
+    // take down a checkout, a published site, or a provider's webhook. Where a
+    // public route must still honour a module, the service decides from the
+    // resource: public booking answers 410 when the organization switched
+    // Appointments off (`bookings/appointments-open.ts`).
     "payments/public-payments.controller.ts": "public checkout",
     "bookings/public-bookings.controller.ts": "public booking",
     "sites/public-sites.controller.ts": "published sites",

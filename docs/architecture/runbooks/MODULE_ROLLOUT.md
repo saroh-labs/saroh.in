@@ -57,7 +57,16 @@ imports: [CapabilitiesModule]           // exports ModuleEnforcementGuard
 Guidance: annotate **new commands first**, then existing create/update/publish
 handlers, module by module. NEVER annotate public checkout/booking/publication,
 webhook inboxes, refund/delivery-status, or historical/reconciliation reads —
-those must keep working after a module is disabled.
+the guard needs an organization context a visitor or provider does not have,
+and most of these must keep working after a module is disabled.
+
+Public booking is the exception to "keep working": it stays unannotated, but
+`BookingsService` answers **410** on availability and booking when the
+Organization's `APPOINTMENTS` row exists and is not `ENABLED`
+(`modules/bookings/appointments-open.ts`; a missing row counts as on). This
+check reads the row directly and does not depend on `MODULE_ENFORCEMENT`, so
+turning enforcement off does not reopen booking for a merchant who switched
+Appointments off.
 
 ## Rollback
 

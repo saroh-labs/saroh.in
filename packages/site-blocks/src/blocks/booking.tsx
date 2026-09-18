@@ -32,6 +32,13 @@ import { ctaClasses } from "./cta";
  * `idempotencyKey` is stable per mount so a double-click / retry can't create
  * two bookings. On a 409 ("slot just taken") the slots refresh so the visitor
  * can pick another; a 429 asks them to slow down.
+ *
+ * A 404 or 410 on availability means the service is gone, archived, or its
+ * business switched Appointments off — retrying cannot help, so the section
+ * says booking isn't open and offers no retry. Any other failure keeps the
+ * error and its Try again. A failed booking shows the API's own message only
+ * for a 4xx, where the API words it for visitors; a 5xx body never reaches
+ * the page.
  */
 
 /** How far ahead to offer slots. */
@@ -74,6 +81,8 @@ type SubmitState =
 type SlotsState =
     | { kind: "loading" }
     | { kind: "ready"; slots: Slot[] }
+    /** 404/410: the service can't be booked online. Retrying won't change it. */
+    | { kind: "closed" }
     | { kind: "error"; message: string };
 
 /** The visitor's resolved IANA timezone, for the "times shown in …"note. */
@@ -186,7 +195,15 @@ export default function BookingSection({
                     `&to=${encodeURIComponent(to.toISOString())}`,
                 { headers: { accept: "application/json" } },
             );
-            if (!res.ok) return couldNotLoad;
+            if (!res.ok) {
+                // A 404 or 410 means booking is closed (the service is gone
+                // or the business switched Appointments off); retrying cannot
+                // help, so it is not an error state.
+                if (res.status === 404 || res.status === 410) {
+                    return { kind: "closed" };
+                }
+                return couldNotLoad;
+            }
             // The server answered, so a body that isn't JSON or isn't a list
             // of slots is "couldn't load times", not "couldn't reach".
             const body: unknown = await res.json().catch(() => null);
@@ -291,14 +308,22 @@ export default function BookingSection({
                 return;
             }
 
-            const body = (await res.json().catch(() => null)) as {
-                message?: string;
-            } | null;
+            // The API's error envelope is `{ error: { code, message, … } }`.
+            // Its 4xx messages are written for the visitor; a 5xx message is
+            // generic at best, so it is never shown.
+            const body =
+                res.status < 500
+                    ? ((await res.json().catch(() => null)) as {
+                          error?: { message?: unknown };
+                      } | null)
+                    : null;
+            const apiMessage = body?.error?.message;
             setSubmit({
                 kind: "error",
                 message:
-                    body?.message ??
-                    "Something went wrong — please check your details and try again.",
+                    typeof apiMessage === "string" && apiMessage
+                        ? apiMessage
+                        : "Something went wrong — please check your details and try again.",
             });
         } catch {
             setSubmit({
@@ -349,6 +374,11 @@ export default function BookingSection({
                 {slotsState.kind === "loading" ? (
                     <p className="text-site-muted mt-4 text-sm">
                         Loading available times…
+                    </p>
+                ) : slotsState.kind === "closed" ? (
+                    <p className="text-site-muted mt-4 text-sm">
+                        Online booking isn't open right now — please contact the
+                        business directly.
                     </p>
                 ) : slotsState.kind === "error" ? (
                     <div className="mt-4">
@@ -411,8 +441,9 @@ export default function BookingSection({
                 )}
             </div>
 
-            {/* Booker details */}
+            {/* Booker details — hidden once booking is closed. */}
             <form
+                hidden={slotsState.kind === "closed"}
                 className="mt-8 grid gap-[var(--site-grid-gap)]"
                 onSubmit={onSubmit}
                 noValidate
