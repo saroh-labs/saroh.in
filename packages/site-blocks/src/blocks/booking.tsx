@@ -43,6 +43,28 @@ interface Slot {
     endAt: string;
 }
 
+/**
+ * Narrow the availability response instead of casting it (#264). A 200 in the
+ * wrong shape used to reach `groupByDay` and throw during render, taking the
+ * merchant's page down with it; now it lands in the same error state as a
+ * failed request. `null` means "not a list of slots".
+ */
+function parseSlots(value: unknown): Slot[] | null {
+    if (!Array.isArray(value)) return null;
+    const slots: Slot[] = [];
+    for (const item of value) {
+        if (typeof item !== "object" || item === null) return null;
+        const { startAt, endAt } = item as Record<string, unknown>;
+        if (typeof startAt !== "string" || typeof endAt !== "string") {
+            return null;
+        }
+        // The formatters below throw a RangeError on an invalid date.
+        if (Number.isNaN(Date.parse(startAt))) return null;
+        slots.push({ startAt, endAt });
+    }
+    return slots;
+}
+
 type SubmitState =
     | { kind: "idle" }
     | { kind: "submitting" }
@@ -152,6 +174,11 @@ export default function BookingSection({
         if (!serviceId) return { kind: "ready", slots: [] };
         const from = new Date();
         const to = new Date(from.getTime() + WINDOW_DAYS * 24 * 60 * 60 * 1000);
+        const couldNotLoad: SlotsState = {
+            kind: "error",
+            message:
+                "We couldn't load available times right now — please try again shortly.",
+        };
         try {
             const res = await fetch(
                 `${apiUrl}/public/services/${encodeURIComponent(serviceId)}/availability` +
@@ -159,15 +186,12 @@ export default function BookingSection({
                     `&to=${encodeURIComponent(to.toISOString())}`,
                 { headers: { accept: "application/json" } },
             );
-            if (!res.ok) {
-                return {
-                    kind: "error",
-                    message:
-                        "We couldn't load available times right now — please try again shortly.",
-                };
-            }
-            const slots = (await res.json()) as Slot[];
-            return { kind: "ready", slots };
+            if (!res.ok) return couldNotLoad;
+            // The server answered, so a body that isn't JSON or isn't a list
+            // of slots is "couldn't load times", not "couldn't reach".
+            const body: unknown = await res.json().catch(() => null);
+            const slots = parseSlots(body);
+            return slots ? { kind: "ready", slots } : couldNotLoad;
         } catch {
             return {
                 kind: "error",

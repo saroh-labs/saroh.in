@@ -53,8 +53,36 @@ export interface CheckoutIntent {
 
 /** Discriminated result so the UI can surface a message inline. */
 export type CheckoutResult<T> =
-    | { ok: true; data: T }
-    | { ok: false; error: string };
+    { ok: true; data: T } | { ok: false; error: string };
+
+/**
+ * The response bodies are narrowed rather than cast (#264): the receipt view
+ * reads these fields during render, so a 200 in the wrong shape — or `null` —
+ * would throw there and blank the page instead of showing its error state.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
+
+function isReceipt(value: unknown): value is CheckoutReceipt {
+    return (
+        isRecord(value) &&
+        typeof value.orderNumber === "string" &&
+        typeof value.currency === "string" &&
+        typeof value.total === "string" &&
+        typeof value.paymentStatus === "string"
+    );
+}
+
+function isIntent(value: unknown): value is CheckoutIntent {
+    return (
+        isRecord(value) &&
+        typeof value.provider === "string" &&
+        typeof value.providerIntentId === "string" &&
+        typeof value.amountCents === "number" &&
+        typeof value.currency === "string"
+    );
+}
 
 async function readError(res: Response, fallback: string): Promise<string> {
     const body = (await res.json().catch(() => null)) as {
@@ -73,7 +101,10 @@ export async function fetchReceipt(
             { headers: { "content-type": "application/json" } },
         );
         if (res.ok) {
-            return { ok: true, data: (await res.json()) as CheckoutReceipt };
+            const body: unknown = await res.json().catch(() => null);
+            return isReceipt(body)
+                ? { ok: true, data: body }
+                : { ok: false, error: "Couldn't load this order." };
         }
         if (res.status === 404) {
             return { ok: false, error: "We couldn't find this order." };
@@ -112,7 +143,13 @@ export async function createPaymentIntent(
             },
         );
         if (res.ok) {
-            return { ok: true, data: (await res.json()) as CheckoutIntent };
+            const body: unknown = await res.json().catch(() => null);
+            return isIntent(body)
+                ? { ok: true, data: body }
+                : {
+                      ok: false,
+                      error: "We couldn't start the payment — please try again.",
+                  };
         }
         return {
             ok: false,
