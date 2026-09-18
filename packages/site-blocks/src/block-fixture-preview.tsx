@@ -1,3 +1,7 @@
+"use client";
+
+import { useSyncExternalStore } from "react";
+
 import type { RenderedServicesList, SectionType } from "@saroh/block-contract";
 import { blockFixture } from "@saroh/block-contract";
 
@@ -75,6 +79,27 @@ function sampleSlots(): Slot[] {
  * a picture of the block, and must not show a healthy one as broken because a
  * request it never needed failed.
  */
+/** Nothing to subscribe to: the answer only changes once, at hydration. */
+const noSubscription = () => () => undefined;
+
+/**
+ * False while rendering on the server (and during hydration), true after.
+ *
+ * The two live-data previews draw what only the VIEWER's machine can know:
+ * sample open times formatted in the visitor's time zone, prices in their
+ * locale. Rendered on the server they come out in the server's zone and locale
+ * and then disagree with the browser's first render, which React reports as a
+ * hydration mismatch on the catalog's /preview/booking (review of #267). The
+ * live blocks never hit this: they load in an effect, after mount.
+ */
+function useMounted(): boolean {
+    return useSyncExternalStore(
+        noSubscription,
+        () => true,
+        () => false,
+    );
+}
+
 export function BlockFixturePreview({
     type,
     variant,
@@ -82,8 +107,12 @@ export function BlockFixturePreview({
     type: SectionType;
     variant: string;
 }) {
+    const mounted = useMounted();
     const content = blockFixture(type, variant);
     if (!content) return null;
+    if ((type === "booking" || type === "servicesList") && !mounted) {
+        return null;
+    }
     if (type === "booking") {
         return <BookingSection content={content} slots={sampleSlots()} />;
     }
