@@ -7,6 +7,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { createPage, deletePage, updatePage } from "@/lib/sites/actions";
 import type { SitePage } from "@/lib/sites/service";
 
@@ -38,6 +39,10 @@ export function PagesPanel({
 }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
+    // The page a Delete was last chosen for. Kept after the dialog closes so
+    // its title does not blank out during the closing animation.
+    const [pendingDelete, setPendingDelete] = useState<SitePage | null>(null);
+    const [deleteOpen, setDeleteOpen] = useState(false);
     const [adding, setAdding] = useState(false);
     const [title, setTitle] = useState("");
     const [path, setPath] = useState("");
@@ -113,13 +118,6 @@ export function PagesPanel({
     }
 
     async function remove(page: SitePage) {
-        // Deleting a page destroys every section on it, and nothing here
-        // restores it — the sections are not versioned the way publications
-        // are. So the confirm names the page rather than asking "are you sure".
-        const ok = window.confirm(
-            `Delete "${page.title}" and everything on it? This cannot be undone.`,
-        );
-        if (!ok) return;
         setBusy(true);
         const res = await deletePage(siteId, page.id);
         setBusy(false);
@@ -292,7 +290,10 @@ export function PagesPanel({
                                             aria-label={`Delete ${page.title}`}
                                             className="h-6 w-6 p-0 text-xs hover:text-destructive"
                                             disabled={busy}
-                                            onClick={() => void remove(page)}
+                                            onClick={() => {
+                                                setPendingDelete(page);
+                                                setDeleteOpen(true);
+                                            }}
                                         >
                                             ×
                                         </Button>
@@ -358,6 +359,23 @@ export function PagesPanel({
                     </button>
                 )}
             </div>
+            {/*
+             * Deleting a page destroys every section on it, and nothing here
+             * restores it — the sections are not versioned the way
+             * publications are. So the dialog names the page rather than
+             * asking "are you sure".
+             */}
+            <ConfirmDialog
+                open={deleteOpen}
+                onOpenChange={setDeleteOpen}
+                title={`Delete "${pendingDelete?.title ?? ""}"?`}
+                description="Everything on the page is deleted with it. This cannot be undone."
+                confirmLabel="Delete page"
+                cancelLabel="Keep page"
+                onConfirm={() => {
+                    if (pendingDelete) void remove(pendingDelete);
+                }}
+            />
         </>
     );
 }
