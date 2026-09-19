@@ -1,5 +1,11 @@
 "use client";
 
+import {
+    Avatar,
+    AvatarFallback,
+    avatarInitials,
+    avatarToneForRole,
+} from "@saroh/ui/avatar";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -256,24 +262,39 @@ export function PeopleManager({
                                 style={{ "--wk-i": i } as React.CSSProperties}
                                 className="wk-item flex flex-wrap items-center justify-between gap-3 p-3"
                             >
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-medium">
-                                        {m.name && m.name.length > 0
-                                            ? m.name
-                                            : m.email}
-                                        {m.isSelf ? (
-                                            <span className="text-muted-foreground">
-                                                {" "}
-                                                — you
-                                            </span>
-                                        ) : null}
-                                    </p>
-                                    <p className="truncate text-xs text-muted-foreground">
-                                        {m.email}
-                                        {m.role === "REVIEWER"
-                                            ? ` · ${m.siteIds.length} site${m.siteIds.length === 1 ? "" : "s"}`
-                                            : ""}
-                                    </p>
+                                {/* Fill for the role, ring for you
+                                    (brand file §7). The role name still
+                                    sits beside it: the colour is never the
+                                    only carrier. */}
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <Avatar
+                                        size="list"
+                                        tone={avatarToneForRole(m.role)}
+                                        ring={m.isSelf}
+                                    >
+                                        <AvatarFallback>
+                                            {avatarInitials(m.name, m.email)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium">
+                                            {m.name && m.name.length > 0
+                                                ? m.name
+                                                : m.email}
+                                            {m.isSelf ? (
+                                                <span className="text-muted-foreground">
+                                                    {" "}
+                                                    — you
+                                                </span>
+                                            ) : null}
+                                        </p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {m.email}
+                                            {m.role === "REVIEWER"
+                                                ? ` · ${m.siteIds.length} site${m.siteIds.length === 1 ? "" : "s"}`
+                                                : ""}
+                                        </p>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {canManage && !lastOwner ? (

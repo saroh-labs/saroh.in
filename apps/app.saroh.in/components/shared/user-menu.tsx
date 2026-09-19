@@ -61,8 +61,11 @@ export function UserMenu({
                     aria-label="Your account"
                     className="gap-2 px-1.5"
                 >
-                    <Avatar className="size-7">
-                        <AvatarFallback className="text-xs">
+                    {/* Table size: the header is as dense as a row. Neutral,
+                        because the role is not on screen here to explain a
+                        fill. */}
+                    <Avatar size="table">
+                        <AvatarFallback>
                             {initials(displayName, email)}
                         </AvatarFallback>
                     </Avatar>
