@@ -27,9 +27,9 @@ export function StatCard({
 }: StatCardProps) {
     return (
         <Card className={cn("p-5", className)} {...props}>
-            {/* An eyebrow (11px mono, uppercase) over a figure in Space
+            {/* An eyebrow (11px Geist 600, uppercase) over a figure in Space
                 Grotesk — large figures are one of the display face's jobs. */}
-            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                 {label}
             </p>
             <p className="mt-1.5 font-display text-3xl font-semibold tabular-nums tracking-[-0.02em]">

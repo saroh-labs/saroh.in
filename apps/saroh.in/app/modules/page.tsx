@@ -46,7 +46,7 @@ export default function ModulesIndexPage() {
                                 <p className="mt-2 text-[14px] leading-relaxed text-muted-foreground">
                                     {m.blurb}
                                 </p>
-                                <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.1em] text-brand">
+                                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand">
                                     Requires{" "}
                                     {m.needs
                                         ?.map((k) => LABEL_BY_KEY.get(k) ?? k)

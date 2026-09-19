@@ -31,7 +31,7 @@ export function SiteFooter() {
                     </div>
 
                     <nav aria-label="Modules">
-                        <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                        <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                             Modules
                         </h2>
                         <ul className="mt-4 grid gap-2">
@@ -49,7 +49,7 @@ export function SiteFooter() {
                     </nav>
 
                     <nav aria-label="More modules">
-                        <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                        <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                             &nbsp;
                         </h2>
                         <ul className="mt-4 grid gap-2">
@@ -67,7 +67,7 @@ export function SiteFooter() {
                     </nav>
                 </div>
 
-                <div className="mt-12 flex flex-wrap justify-between gap-4 border-t border-border pt-6 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                <div className="mt-12 flex flex-wrap justify-between gap-4 border-t border-border pt-6 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                     <span>Saroh — modular business platform</span>
                     {/* Stated plainly wherever a screenshot appears: the data in
                         every screen on this site is seeded demo data, not a

@@ -41,7 +41,7 @@ export interface DataColumn<TRow> {
     numeric?: boolean;
     /**
      * A money column: set with `numeric`. Prices take Space Grotesk and
-     * everything else stays in Plus Jakarta Sans (brand file §10) — money is
+     * everything else stays in Geist (brand file §10) — money is
      * the figure people scan for.
      */
     money?: boolean;

@@ -154,7 +154,7 @@ export default function HomePage() {
                     <ol className="mt-11 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
                         {STEPS.map((s) => (
                             <li key={s.n} className="bg-background p-6">
-                                <span className="font-mono text-[11px] tracking-[0.14em] text-muted-foreground">
+                                <span className="text-[11px] font-semibold tracking-[0.1em] text-muted-foreground">
                                     {s.n}
                                 </span>
                                 <h3 className="mt-3 text-[15.5px] font-semibold tracking-[-0.01em]">

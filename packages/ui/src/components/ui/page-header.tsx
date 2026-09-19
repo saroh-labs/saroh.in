@@ -41,7 +41,7 @@ export function PageHeader({
                 {/* Space Grotesk 600 at 30px, as on the brand file's applied
                     screens. The display face runs from Display to H3 and
                     stops there; component titles (CardTitle, DialogTitle)
-                    stay on Plus Jakarta Sans, because below H3 the brand is
+                    stay on Geist, because below H3 the brand is
                     the UI face. */}
                 <h1 className="truncate font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em]">
                     {title}

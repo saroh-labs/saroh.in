@@ -225,7 +225,7 @@ export function DataView<TRow>({
                                 {f.label}
                                 <span
                                     className={cn(
-                                        "rounded-full px-[7px] py-0.5 font-mono text-[11px] font-medium tabular-nums",
+                                        "rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums",
                                         on
                                             ? "bg-muted text-foreground"
                                             : "bg-foreground/[0.04] text-muted-foreground",
@@ -410,7 +410,7 @@ export function DataView<TRow>({
                                                     : undefined
                                             }
                                             className={cn(
-                                                "whitespace-nowrap px-[14px] text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground",
+                                                "whitespace-nowrap px-[14px] text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
                                                 col.numeric && "text-right",
                                             )}
                                         >

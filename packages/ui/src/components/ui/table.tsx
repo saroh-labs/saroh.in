@@ -87,8 +87,8 @@ const TableHead = React.forwardRef<
     <th
         ref={ref}
         className={cn(
-            // Labels stop at 11px: mono, uppercase, tracked (brand file §3).
-            "h-10 px-4 text-left align-middle font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
+            // Labels stop at 11px: Geist 600, uppercase, at 0.1em (brand file §3).
+            "h-10 px-4 text-left align-middle text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
             className,
         )}
         {...props}

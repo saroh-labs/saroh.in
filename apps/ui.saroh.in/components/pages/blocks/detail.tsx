@@ -27,7 +27,7 @@ export default function BlockDetail({ type }: { type: SectionType }) {
             <header className="max-w-[62ch]">
                 <Link
                     href="/blocks"
-                    className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground"
+                    className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground hover:text-foreground"
                 >
                     ← Site blocks
                 </Link>
@@ -80,7 +80,7 @@ export default function BlockDetail({ type }: { type: SectionType }) {
 
                         {PREVIEW_WIDTHS.map((width) => (
                             <div key={width.id} className="mt-8">
-                                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                                     {width.label} · {width.px}px
                                 </p>
                                 <div className="mt-3 flex flex-wrap gap-6">

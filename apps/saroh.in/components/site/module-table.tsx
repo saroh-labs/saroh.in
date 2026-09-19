@@ -14,7 +14,7 @@ import { LABEL_BY_KEY, MODULES } from "@/lib/modules";
 export function ModuleTable() {
     return (
         <div className="mt-12 overflow-hidden rounded-xl border border-border">
-            <div className="grid grid-cols-[1fr] gap-4 border-b border-border bg-muted/40 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground sm:grid-cols-[170px_1fr_110px]">
+            <div className="grid grid-cols-[1fr] gap-4 border-b border-border bg-muted/40 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground sm:grid-cols-[170px_1fr_110px]">
                 <span>Module</span>
                 <span className="hidden sm:block">What it does</span>
                 <span className="hidden text-right sm:block">Requires</span>
@@ -34,13 +34,13 @@ export function ModuleTable() {
                     </span>
                     <span className="sm:text-right">
                         {m.needs?.length ? (
-                            <span className="inline-flex h-[22px] items-center rounded-md border border-brand/30 bg-brand-subtle px-2 font-mono text-[11px] tracking-[0.06em] text-brand-subtle-foreground">
+                            <span className="inline-flex h-[22px] items-center rounded-md border border-brand/30 bg-brand-subtle px-2 text-[11px] font-semibold tracking-[0.02em] text-brand-subtle-foreground">
                                 {m.needs
                                     .map((k) => LABEL_BY_KEY.get(k) ?? k)
                                     .join(" · ")}
                             </span>
                         ) : (
-                            <span className="font-mono text-[11px] text-muted-foreground">
+                            <span className="text-[11px] text-muted-foreground">
                                 —
                             </span>
                         )}

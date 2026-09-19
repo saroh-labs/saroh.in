@@ -141,7 +141,7 @@ export function LoginForm({
                         place, not a second thing to do. */}
                     <div className="sa-rise flex items-center gap-3">
                         <span className="bg-border/70 h-px flex-1" />
-                        <span className="text-muted-foreground font-mono text-[11px] uppercase tracking-[0.14em]">
+                        <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.1em]">
                             or
                         </span>
                         <span className="bg-border/70 h-px flex-1" />

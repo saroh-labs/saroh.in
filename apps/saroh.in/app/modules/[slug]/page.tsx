@@ -44,7 +44,7 @@ export default async function ModulePage({
                 <div className="mx-auto max-w-6xl px-6">
                     <Link
                         href="/modules"
-                        className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground"
+                        className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:text-foreground"
                     >
                         ← Modules
                     </Link>
@@ -65,7 +65,7 @@ export default async function ModulePage({
                            to look intentional and then drifts the moment the
                            subtle tokens are retuned. Same two surfaces, one
                            recipe. */
-                        <p className="mt-6 inline-flex items-center rounded-md border border-brand/30 bg-brand-subtle px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-brand-subtle-foreground">
+                        <p className="mt-6 inline-flex items-center rounded-md border border-brand/30 bg-brand-subtle px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-subtle-foreground">
                             Requires{" "}
                             {m.needs
                                 .map((k) => LABEL_BY_KEY.get(k) ?? k)
