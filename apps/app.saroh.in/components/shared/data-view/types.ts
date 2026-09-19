@@ -39,6 +39,12 @@ export interface DataColumn<TRow> {
      * for this data in the first place.
      */
     numeric?: boolean;
+    /**
+     * A money column: set with `numeric`. Prices take Space Grotesk and
+     * everything else stays in Plus Jakarta Sans (brand file §10) — money is
+     * the figure people scan for.
+     */
+    money?: boolean;
     /** Hide from the table only; useful for a list-only summary line. */
     tableHidden?: boolean;
 }

@@ -80,6 +80,7 @@ export function ServicesView({
             header: "Price",
             priority: "secondary",
             numeric: true,
+            money: true,
             sortValue: (s) => s.priceCents ?? 0,
             cell: (s) => formatMoney(s.priceCents, s.currency) ?? <Missing />,
         },

@@ -93,6 +93,7 @@ export function LeadsView({
             header: "Value",
             priority: "secondary",
             numeric: true,
+            money: true,
             sortValue: (l) => l.value ?? 0,
             // No currency is recorded against a Lead anywhere in the schema, so
             // none is drawn — see `lib/format/money.ts`.

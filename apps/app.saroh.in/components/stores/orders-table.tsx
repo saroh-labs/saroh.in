@@ -107,6 +107,7 @@ export function OrdersTable({
             header: "Total",
             priority: "secondary",
             numeric: true,
+            money: true,
             sortValue: (o) => Number(o.total) || 0,
             cell: (o) => formatMoneyMajor(o.total, o.currency) ?? <Missing />,
         },

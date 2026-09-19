@@ -95,6 +95,7 @@ export function ContactsView({
             header: "Open pipeline",
             priority: "secondary",
             numeric: true,
+            money: true,
             // Sorted on VALUE, so "who owes us the most conversation" is one
             // click. Unvalued open leads sort as 0 but still render their count,
             // which is the honest ordering: we cannot rank an unknown amount.

@@ -273,7 +273,9 @@ export function DataView<TRow>({
                 <div className="overflow-x-auto rounded-xl border border-border">
                     <table className="w-full border-collapse text-sm">
                         <thead>
-                            <tr className="border-b border-border bg-muted/60">
+                            {/* No header fill: a stronger rule under the
+                                head does that job (brand file §10). */}
+                            <tr className="border-b border-border-strong">
                                 {tableColumns.map((col) => {
                                     const active = sort?.id === col.id;
                                     return (
@@ -288,7 +290,7 @@ export function DataView<TRow>({
                                                     : undefined
                                             }
                                             className={cn(
-                                                "whitespace-nowrap px-3 py-2.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground",
+                                                "whitespace-nowrap px-3 py-2.5 text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground",
                                                 col.numeric && "text-right",
                                             )}
                                         >
@@ -339,10 +341,10 @@ export function DataView<TRow>({
                         </thead>
                         <tbody>
                             {/* `wk-item` staggers rows in (workspace.css caps
-                                the delay at 12 items, so a 200-row table's
-                                last row never waits). Transitions stay on
-                                colour only — a table that moves on hover is
-                                unreadable while scanning. */}
+                                it at six items, so no row waits). Hover is
+                                the translucent Ink wash (brand file §22), and
+                                transitions stay on colour only — a table that
+                                moves on hover is unreadable while scanning. */}
                             {visible.map((row, rowIndex) => (
                                 <tr
                                     key={rowKey(row)}
@@ -351,7 +353,7 @@ export function DataView<TRow>({
                                             "--wk-i": rowIndex,
                                         } as React.CSSProperties
                                     }
-                                    className="wk-item border-b border-border transition-colors last:border-b-0 hover:bg-accent/50"
+                                    className="wk-item border-b border-border transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035]"
                                 >
                                     {tableColumns.map((col, colIndex) => {
                                         const href = rowHref?.(row);
@@ -362,6 +364,10 @@ export function DataView<TRow>({
                                                     "px-3 py-2.5 align-middle",
                                                     col.numeric &&
                                                         "text-right tabular-nums",
+                                                    // Money is the figure people
+                                                    // scan for: Space Grotesk.
+                                                    col.money &&
+                                                        "font-display font-semibold",
                                                 )}
                                             >
                                                 {/*
@@ -448,6 +454,8 @@ export function DataView<TRow>({
                                                         "inline-flex items-center gap-1",
                                                         col.numeric &&
                                                             "tabular-nums",
+                                                        col.money &&
+                                                            "font-display font-semibold text-foreground",
                                                     )}
                                                 >
                                                     {col.cell(row)}

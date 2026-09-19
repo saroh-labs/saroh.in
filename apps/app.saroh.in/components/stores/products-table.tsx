@@ -81,6 +81,7 @@ export function ProductsTable({
             header: "Price",
             priority: "secondary",
             numeric: true,
+            money: true,
             sortValue: (p) => Number(p.price) || 0,
             cell: (p) => formatMoneyMajor(p.price, p.currency) ?? <Missing />,
         },
