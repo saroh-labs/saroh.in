@@ -1,8 +1,8 @@
 "use client";
 
+import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
-import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { DataView } from "@/components/shared/data-view/data-view";
@@ -11,6 +11,7 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { formatStatus } from "@/lib/format/status";
 import type { Product } from "@/lib/products/service";
 
 /**
@@ -28,11 +29,11 @@ import type { Product } from "@/lib/products/service";
 
 const Missing = () => <span className="text-muted-foreground/60">—</span>;
 
-const STATUS_CLASS: Record<string, string> = {
-    PUBLISHED:
-        "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground",
-    DRAFT: "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
-    ARCHIVED: "border border-border bg-transparent text-muted-foreground",
+/** Published is success, a draft is Saffron (unfinished, and yours). */
+const STATUS_VARIANT: Record<string, NonNullable<BadgeProps["variant"]>> = {
+    PUBLISHED: "success",
+    DRAFT: "draft",
+    ARCHIVED: "neutral",
 };
 
 const FILTERS: DataFilter<Product>[] = [
@@ -91,14 +92,8 @@ export function ProductsTable({
             priority: "secondary",
             sortValue: (p) => p.status,
             cell: (p) => (
-                <Badge
-                    className={cn(
-                        "text-[0.625rem] font-medium uppercase tracking-wider",
-                        STATUS_CLASS[p.status] ??
-                            "border border-border bg-transparent text-muted-foreground",
-                    )}
-                >
-                    {p.status}
+                <Badge variant={STATUS_VARIANT[p.status] ?? "neutral"}>
+                    {formatStatus(p.status)}
                 </Badge>
             ),
         },

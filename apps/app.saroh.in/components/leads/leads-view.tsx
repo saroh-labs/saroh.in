@@ -1,8 +1,8 @@
 "use client";
 
+import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
-import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { DataView } from "@/components/shared/data-view/data-view";
@@ -14,6 +14,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { contactName } from "@/lib/crm/format";
 import { formatWaiting } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
+import { formatStatus } from "@/lib/format/status";
 import type { LeadListItem, LeadStatus } from "@/lib/leads/service";
 
 /**
@@ -28,13 +29,13 @@ import type { LeadListItem, LeadStatus } from "@/lib/leads/service";
  * hands merchants. See `DataFilter`.
  */
 
-const STATUS: Record<LeadStatus, string> = {
-    // Won is the brand's own colour because it is the outcome the whole screen
-    // is for; lost is muted rather than destructive — a lost lead is a normal
-    // result, not an error the merchant should be alarmed by.
-    OPEN: "border-border text-foreground bg-transparent border",
-    WON: "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground",
-    LOST: "text-muted-foreground border-border bg-transparent border",
+const STATUS: Record<LeadStatus, NonNullable<BadgeProps["variant"]>> = {
+    // Won is success because it is the outcome the whole screen is for; lost
+    // is neutral rather than destructive — a lost lead is a normal result, not
+    // an error the merchant should be alarmed by.
+    OPEN: "outline",
+    WON: "success",
+    LOST: "neutral",
 };
 
 const FILTERS: DataFilter<LeadListItem>[] = [
@@ -119,13 +120,8 @@ export function LeadsView({
             priority: "secondary",
             sortValue: (l) => l.status,
             cell: (l) => (
-                <Badge
-                    className={cn(
-                        "text-[0.625rem] font-medium uppercase tracking-wider",
-                        STATUS[l.status],
-                    )}
-                >
-                    {l.status}
+                <Badge variant={STATUS[l.status]}>
+                    {formatStatus(l.status)}
                 </Badge>
             ),
         },

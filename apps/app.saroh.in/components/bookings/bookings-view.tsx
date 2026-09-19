@@ -17,6 +17,7 @@ import {
 } from "@/lib/format/datetime";
 // From ./booking-state, NOT ./service: this is a client component, and the
 // service module reaches next/headers through the CRM HTTP plumbing.
+import { formatStatus } from "@/lib/format/status";
 import { hasEnded, needsOutcome } from "@/lib/services/booking-state";
 import type { BookingWithService } from "@/lib/services/service";
 
@@ -189,16 +190,15 @@ export function BookingsView({
             sortValue: (b) => b.status,
             cell: (b) => (
                 <Badge
-                    className={cn(
-                        "text-[0.625rem] font-medium uppercase tracking-wider",
+                    variant={
                         b.status === "CONFIRMED"
-                            ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
+                            ? "success"
                             : b.status === "CANCELLED"
-                              ? "border border-border bg-transparent text-muted-foreground"
-                              : "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
-                    )}
+                              ? "neutral"
+                              : "warning"
+                    }
                 >
-                    {b.status}
+                    {formatStatus(b.status)}
                 </Badge>
             ),
         },

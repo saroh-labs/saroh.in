@@ -2,7 +2,6 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
-import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { DataView } from "@/components/shared/data-view/data-view";
@@ -11,6 +10,7 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { formatMoney } from "@/lib/format/money";
+import { formatStatus } from "@/lib/format/status";
 import type { Service } from "@/lib/services/service";
 
 /**
@@ -109,15 +109,8 @@ export function ServicesView({
             priority: "secondary",
             sortValue: (s) => s.status,
             cell: (s) => (
-                <Badge
-                    className={cn(
-                        "text-[0.625rem] font-medium uppercase tracking-wider",
-                        s.status === "ACTIVE"
-                            ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
-                            : "border border-border bg-transparent text-muted-foreground",
-                    )}
-                >
-                    {s.status}
+                <Badge variant={s.status === "ACTIVE" ? "success" : "neutral"}>
+                    {formatStatus(s.status)}
                 </Badge>
             ),
         },
