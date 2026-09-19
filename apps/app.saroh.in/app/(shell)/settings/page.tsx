@@ -27,7 +27,7 @@ const SECTIONS = [
     },
     {
         href: "/settings/people",
-        label: "People",
+        label: "Team",
         description:
             "Who can reach this workspace, and what each of them may do.",
         icon: Users,

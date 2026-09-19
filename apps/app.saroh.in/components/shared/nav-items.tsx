@@ -330,7 +330,7 @@ export const NAV_GROUPS: NavGroup[] = [
             },
             {
                 href: "/settings/people",
-                label: "People",
+                label: "Team",
                 icon: Users,
                 action: "member:read",
             },
