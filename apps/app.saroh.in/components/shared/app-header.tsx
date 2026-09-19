@@ -83,7 +83,7 @@ export function AppHeader(props: AppHeaderProps) {
         // nothing could give while the org switcher reserved a flat 16rem.
         // Now the trailing controls hold their size and the switcher absorbs
         // whatever is left, truncating its label to fit any width.
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b bg-background px-2 min-[380px]:gap-3 min-[380px]:px-4 sm:gap-4 sm:px-6">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b bg-card px-2 min-[380px]:gap-3 min-[380px]:px-4 sm:gap-4 sm:px-6">
             <div className="flex shrink-0 items-center gap-1 min-[380px]:gap-2 sm:gap-3">
                 <MobileNav
                     unread={unread}

@@ -138,7 +138,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 counts={counts}
                 sites={navSites}
             />
-            <div className="flex min-w-0 flex-1 flex-col">
+            {/* The working area is white and the rail sits on Paper: the
+                product spends white surfaces, and the page you work on is
+                the raised one (brand file §5, and the applied screens). */}
+            <div className="flex min-w-0 flex-1 flex-col bg-card">
                 <AppHeader
                     user={session.user}
                     organizations={organizations}

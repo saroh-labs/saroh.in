@@ -105,7 +105,7 @@ export function MobileNav({
                             )}
                         >
                             {showsGroupLabel(group) && (
-                                <p className="px-3 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                                <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                                     {group.label}
                                 </p>
                             )}
@@ -133,6 +133,13 @@ export function MobileNav({
                                             ),
                                     ),
                                 );
+                                // Section vs page, as on the rail (brand
+                                // file §13). This drawer is a white sheet,
+                                // so the page row takes Ink 100 rather than
+                                // white — a white row would vanish here —
+                                // and the Saffron marker stays the same.
+                                const isPage = active && !childIsCurrent;
+                                const isSection = active && childIsCurrent;
                                 const Icon = item.icon;
                                 const waiting =
                                     item.href === NOTIFICATIONS_HREF
@@ -160,9 +167,11 @@ export function MobileNav({
                                             // the same mental model.
                                             "wk-nav flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                                            active
-                                                ? "bg-accent font-medium text-foreground"
-                                                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                                            isPage
+                                                ? "bg-accent font-semibold text-foreground"
+                                                : isSection
+                                                  ? "font-medium text-brand hover:bg-accent"
+                                                  : "font-medium text-foreground hover:bg-accent",
                                         )}
                                     >
                                         <Icon className="h-4 w-4 shrink-0" />
@@ -170,15 +179,10 @@ export function MobileNav({
                                             {item.label}
                                         </span>
                                         {waiting > 0 ? (
-                                            /* Amber, matching the rail. `bg-primary`
-                                               is the luminous ACTION colour in
-                                               Panel and Instrument, so a count of
-                                               things NOT yet done was rendering in
-                                               the same green as the button you press
-                                               when you are finished. */
+                                            /* The waiting count, matching the rail. */
                                             <span
                                                 aria-label={`${waiting} waiting`}
-                                                className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-warning/30 bg-warning-subtle px-1.5 text-xs font-medium tabular-nums text-warning-subtle-foreground"
+                                                className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
                                             >
                                                 {waiting}
                                             </span>
@@ -190,7 +194,7 @@ export function MobileNav({
                                 item.children?.length ? (
                                     <div
                                         key={`${item.href}-children`}
-                                        className="ml-6 flex flex-col gap-1 border-l border-border pl-2"
+                                        className="ml-6 flex flex-col gap-1 border-l border-border pl-2.5"
                                     >
                                         {item.children.map((child) =>
                                             !child.href ? (
@@ -201,7 +205,7 @@ export function MobileNav({
                                                     <div className="truncate px-3 pt-2 text-sm font-medium text-foreground">
                                                         {child.label}
                                                     </div>
-                                                    <div className="ml-3 flex flex-col gap-1 border-l border-border pl-2">
+                                                    <div className="ml-3 flex flex-col gap-1 border-l border-border pl-2.5">
                                                         {(
                                                             child.children ?? []
                                                         ).map((leaf) => (
@@ -223,11 +227,11 @@ export function MobileNav({
                                                                         : undefined
                                                                 }
                                                                 className={cn(
-                                                                    "truncate rounded-md px-3 py-2.5 text-sm transition-colors",
+                                                                    "wk-nav wk-nav-child truncate rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                                                                     pathname ===
                                                                         leaf.href
-                                                                        ? "bg-accent font-medium text-foreground"
-                                                                        : "text-muted-foreground active:bg-accent",
+                                                                        ? "bg-accent text-foreground"
+                                                                        : "text-muted-foreground active:bg-accent-active",
                                                                 )}
                                                             >
                                                                 {leaf.label}
@@ -255,12 +259,10 @@ export function MobileNav({
                                                      * is a miss waiting to happen.
                                                      */
                                                     className={cn(
-                                                        "truncate rounded-md px-3 py-2.5 text-sm transition-colors",
+                                                        "wk-nav wk-nav-child truncate rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                                                         pathname === child.href
-                                                            ? "bg-accent font-medium text-foreground"
-                                                            : "text-muted-foreground active:bg-accent",
-                                                        child.create &&
-                                                            "text-muted-foreground/70",
+                                                            ? "bg-accent text-foreground"
+                                                            : "text-muted-foreground active:bg-accent-active",
                                                     )}
                                                 >
                                                     {child.create
