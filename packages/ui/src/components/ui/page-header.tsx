@@ -10,6 +10,11 @@ export interface PageHeaderProps extends Omit<
     description?: React.ReactNode;
     /** Trailing actions — keep to ONE primary (Button variant="brand") + optional secondary. */
     actions?: React.ReactNode;
+    /**
+     * Where this page sits, above the title: "Workspace › Team". The last
+     * crumb is the page itself and reads in Ink; the rest are muted.
+     */
+    breadcrumb?: React.ReactNode[];
 }
 
 /**
@@ -22,6 +27,7 @@ export function PageHeader({
     title,
     description,
     actions,
+    breadcrumb,
     className,
     ...props
 }: PageHeaderProps) {
@@ -38,6 +44,39 @@ export function PageHeader({
             {...props}
         >
             <div className="min-w-0">
+                {breadcrumb?.length ? (
+                    <nav
+                        aria-label="Breadcrumb"
+                        className="mb-[9px] flex items-center gap-2 text-[12px] text-muted-foreground"
+                    >
+                        {breadcrumb.map((crumb, i) => (
+                            <React.Fragment key={i}>
+                                {i > 0 ? (
+                                    <svg
+                                        aria-hidden
+                                        viewBox="0 0 24 24"
+                                        className="size-3 shrink-0"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="M9 6 L15 12 L9 18" />
+                                    </svg>
+                                ) : null}
+                                <span
+                                    className={cn(
+                                        i === breadcrumb.length - 1 &&
+                                            "text-foreground",
+                                    )}
+                                >
+                                    {crumb}
+                                </span>
+                            </React.Fragment>
+                        ))}
+                    </nav>
+                ) : null}
                 {/* Space Grotesk 600 at 30px, as on the brand file's applied
                     screens. The display face runs from Display to H3 and
                     stops there; component titles (CardTitle, DialogTitle)
