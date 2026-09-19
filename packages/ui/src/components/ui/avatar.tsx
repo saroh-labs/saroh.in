@@ -155,7 +155,11 @@ function RoleDot({
 
 /** Two letters from a name, or the first of an email when there is no name. */
 function avatarInitials(name: string | null | undefined, email?: string) {
-    const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+    // Words that start with a letter: "Priya (reviewer)" is "PR", not "P(".
+    const words = (name ?? "")
+        .trim()
+        .split(/[\s&]+/)
+        .filter((w) => /^[A-Za-zÀ-ÿ]/.test(w));
     const first = words.at(0) ?? "";
     const last = words.at(-1) ?? "";
     if (words.length >= 2) return `${first[0]}${last[0]}`.toUpperCase();

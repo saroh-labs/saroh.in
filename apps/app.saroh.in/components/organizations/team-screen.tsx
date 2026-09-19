@@ -19,6 +19,7 @@ import {
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import {
     Sheet,
     SheetContent,
@@ -183,7 +184,21 @@ export function TeamScreen({
 
     return (
         <div className="space-y-[18px]">
-            <div className="-mt-2 flex items-end justify-between gap-3 border-b border-border">
+            <PageHeader
+                breadcrumb={["Workspace", "Team"]}
+                title="Team"
+                description="Who can reach this business, and what each role may open."
+                className="mb-5"
+                actions={
+                    canManage ? (
+                        <Button onClick={() => setInviteOpen(true)}>
+                            <Plus className="mr-1.5 size-4" />
+                            Invite to {organizationName}
+                        </Button>
+                    ) : undefined
+                }
+            />
+            <div className="flex items-end gap-3 border-b border-border">
                 <div role="group" aria-label="View" className="flex gap-0.5">
                     {tabs.map((t) => {
                         const on = t.id === tab;
@@ -215,15 +230,6 @@ export function TeamScreen({
                         );
                     })}
                 </div>
-                {canManage ? (
-                    <Button
-                        className="mb-2"
-                        onClick={() => setInviteOpen(true)}
-                    >
-                        <Plus className="mr-1.5 size-4" />
-                        Invite to {organizationName}
-                    </Button>
-                ) : null}
             </div>
 
             {tab === "roles" ? (

@@ -1,5 +1,3 @@
-import { PageHeader } from "@saroh/ui/page-header";
-
 import { TeamScreen } from "@/components/organizations/team-screen";
 import { PageContainer } from "@/components/shared/page-container";
 import { listModules } from "@/lib/modules/service";
@@ -49,11 +47,6 @@ export default async function PeoplePage() {
 
     return (
         <PageContainer>
-            <PageHeader
-                breadcrumb={["Workspace", "Team"]}
-                title="Team"
-                description="Who can reach this business, and what each role may open."
-            />
             <TeamScreen
                 organizationName={organization?.name ?? "this business"}
                 members={members}
