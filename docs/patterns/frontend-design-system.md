@@ -137,11 +137,14 @@
 
 ## Type and the mark
 
-- **Current** — **Three faces, self-hosted in `packages/ui/fonts`:** Plus
-  Jakarta Sans (`font-sans`) for all UI and body copy, with 600 for buttons and
-  emphasis; Space Grotesk (`font-display`) for display through H3 and large
-  figures, never body copy; JetBrains Mono (`font-mono`) for code, labels and
-  eyebrows. Nothing is set below 11px. `saroh.app` keeps its old faces.
+- **Current** — **Three product faces, self-hosted in `packages/ui/fonts`:**
+  Geist (`font-sans`) for all UI, body copy, labels and eyebrows, with 600 for
+  buttons and emphasis. Space Grotesk (`font-display`) for display through H3,
+  money and large figures, never body copy. JetBrains Mono (`font-mono`) **only
+  where a value is measured**: a SKU, an order reference, a timestamp, a token
+  value, a route. A label or eyebrow is 11px Geist 600, uppercase at 0.1em —
+  never mono. Nothing is set below 11px. The wordmark's face (Plus Jakarta Sans 600) ships outlined inside `<Wordmark>` and is never loaded. `saroh.app`
+  keeps its old faces.
 - **Current** — **The mark is one SVG master** in `packages/ui/brand`, with
   `<Wordmark>` / `<SarohSymbol>` from `@saroh/ui/wordmark`. Never re-draw it.
   The stroke is never Saffron, and the dot drops below 20px. Every brand app

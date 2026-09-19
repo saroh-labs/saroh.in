@@ -34,9 +34,14 @@ what is deliberately left for later.
    shadows and motion (100/140/200ms, ease-out), in both light and dark.
    New tokens: `-hover`/`-active` action steps, `--border-strong`, `--field`,
    `--disabled`, and `success`/`destructive`/`info` `-subtle` pairs.
-2. **Type.** Plus Jakarta Sans (UI and body, `--font-sans`), Space Grotesk
-   (display to H3, `--font-display`), JetBrains Mono (code, labels and
-   eyebrows, `--font-mono`), all self-hosted woff2 in `packages/ui/fonts`.
+2. **Type.** Geist (all UI, body copy, labels and eyebrows, `--font-sans`),
+   Space Grotesk (display to H3, money and large figures, `--font-display`),
+   JetBrains Mono (only for measured values like SKUs, order references,
+   timestamps and routes, `--font-mono`), all self-hosted woff2 in
+   `packages/ui/fonts`. The wordmark's own face, Plus Jakarta Sans 600, ships
+   outlined inside `<Wordmark>`, so no app loads it. (The brand file moved UI
+   and labels from Plus Jakarta Sans and mono to Geist on 2026-09-19. Checked
+   against the live file.)
 3. **Primitives.**
     - `Button`: 32, 38 and 45px heights with weight 600; hover one ramp step,
       pressed two; one disabled treatment; `highlight` becomes the Saffron fill.
