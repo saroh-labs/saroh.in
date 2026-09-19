@@ -10,10 +10,28 @@
  */
 export const SKINS = [
     {
+        /*
+         * The brand. It has no `[data-skin]` block in globals.css — it IS the
+         * base `:root` / `.dark` register — so `data-skin="saroh"` matches no
+         * override and the page paints the brand.
+         */
+        id: "saroh",
+        name: "Saroh",
+        blurb: "Ink and Paper, one Saffron accent. The brand.",
+        swatch: ["#1C1C1A", "#F5F2EC", "#D98A15", "#6B665A", "#D9D6CC"],
+        hidden: false,
+    },
+    /*
+     * The four pre-brand skins, kept but HIDDEN while Ink & Saffron settles
+     * (2026-09-19). Their CSS is intact (the legacy block and the three skin
+     * blocks in globals.css); showing one again is `hidden: false`.
+     */
+    {
         id: "mono",
         name: "Mono",
         blurb: "Pure black and white, one blue for links. Contrast is the accent.",
         swatch: ["#000000", "#FFFFFF", "#0070F3", "#8F8F8F", "#EAEAEA"],
+        hidden: true,
     },
     {
         id: "panel",
@@ -21,33 +39,31 @@ export const SKINS = [
         blurb: "Razor-edged and deep. Ink violet means actionable.",
         /** Swatches for the picker: ground, then the signal colours. */
         swatch: ["#0B0A0E", "#F5F4F7", "#7C4DE8", "#F5A524", "#E5484D"],
+        hidden: true,
     },
     {
         id: "instrument",
         name: "Instrument",
         blurb: "Matte panel, luminous markings. Teal means actionable.",
         swatch: ["#08090A", "#DDE3E3", "#3FE0DC", "#F5A524", "#E5484D"],
+        hidden: true,
     },
     {
         id: "stockroom",
         name: "Stockroom",
         blurb: "Carbon, stockroom white, rust. Labels name things.",
         swatch: ["#0B0B0B", "#FFFFFF", "#E85A16", "#8C8880", "#262626"],
+        hidden: true,
     },
 ] as const;
 
 export type SkinId = (typeof SKINS)[number]["id"];
 
-/**
- * Mono leads and is the default.
- *
- * It is the only skin with NO `[data-skin]` block in globals.css — it IS the
- * base `:root` / `.dark` register, so selecting it means "add no overrides".
- * That is deliberate: the base tokens are the monochrome ones now, and giving
- * mono its own block would mean maintaining the same palette in two places and
- * letting them drift.
- */
-export const DEFAULT_SKIN: SkinId = "mono";
+/** The brand leads and is the default. */
+export const DEFAULT_SKIN: SkinId = "saroh";
+
+/** The skins the switcher offers. With one, there is nothing to switch. */
+export const VISIBLE_SKINS = SKINS.filter((skin) => !skin.hidden);
 
 /**
  * Versioned deliberately.
@@ -62,8 +78,12 @@ export const DEFAULT_SKIN: SkinId = "mono";
  * and a skin picked from here on is a real choice and is kept. The old
  * `saroh-skin` entry is simply ignored — not read, not migrated, not deleted
  * (clearing other people's storage keys is not this component's business).
+ *
+ * v3 (2026-09-19) did the same for the brand: someone who had picked Panel
+ * would otherwise stay on a skin the switcher no longer shows, with no way
+ * off it.
  */
-export const SKIN_STORAGE_KEY = "saroh-skin-v2";
+export const SKIN_STORAGE_KEY = "saroh-skin-v3";
 
 export function isSkinId(value: unknown): value is SkinId {
     return SKINS.some((skin) => skin.id === value);
