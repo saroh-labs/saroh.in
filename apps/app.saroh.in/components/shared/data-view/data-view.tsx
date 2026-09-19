@@ -435,7 +435,7 @@ export function DataView<TRow>({
                                                         // harness found these;
                                                         // reading the filter row
                                                         // by hand did not.
-                                                        "inline-flex items-center gap-1 hover:text-foreground coarse:min-h-11",
+                                                        "inline-flex items-center gap-1 uppercase hover:text-foreground coarse:min-h-11",
                                                         active &&
                                                             "text-foreground",
                                                     )}
