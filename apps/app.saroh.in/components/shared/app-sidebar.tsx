@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -45,18 +44,14 @@ export function AppSidebar({
     const groups = navFor({ role, moduleKeys, sites });
 
     return (
-        // `sticky top-0 h-screen` so the rail stays put on a long page. Without
+        // Sticky so the rail stays put on a long page. Without
         // it the aside is only as tall as the flex row, and navigation scrolls
         // away the moment a list runs past one viewport.
         <aside
             aria-label="Workspace"
-            className="sticky top-0 hidden h-screen w-[238px] shrink-0 flex-col border-r lg:flex"
+            // Below the 49px top bar, which carries the mark now.
+            className="sticky top-[49px] hidden h-[calc(100vh-49px)] w-[238px] shrink-0 flex-col border-r lg:flex"
         >
-            <div className="flex h-14 items-center border-b px-6">
-                <Link href="/" aria-label="Saroh">
-                    <Wordmark />
-                </Link>
-            </div>
             {/*
              * `gap-0.5` on the nav, and space bought back only where it means
              * something.
