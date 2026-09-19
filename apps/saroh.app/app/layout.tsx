@@ -25,7 +25,11 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en">
+        // `data-skin="mono"` pins the pre-brand register. This app renders
+        // merchants' sites, which carry their own `--site-*` themes; the few
+        // Saroh-drawn surfaces here (404, error, checkout chrome) stay as they
+        // were rather than taking Saroh's Ink & Saffron onto someone else's shop.
+        <html lang="en" data-skin="mono">
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
             >
