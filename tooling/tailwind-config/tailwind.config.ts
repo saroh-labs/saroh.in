@@ -66,22 +66,46 @@ const config = {
         },
         extend: {
             colors: {
-                border: "hsl(var(--border))",
+                border: {
+                    DEFAULT: "hsl(var(--border))",
+                    // The hovered edge of an outline control — one step past
+                    // `border`, the way hover moves one ramp step everywhere.
+                    strong: "hsl(var(--border-strong))",
+                },
                 input: "hsl(var(--input))",
+                // Form field fill: white on Paper, Sunken on dark.
+                field: "hsl(var(--field))",
+                // One disabled treatment for every variant (brand file §22).
+                disabled: {
+                    DEFAULT: "hsl(var(--disabled))",
+                    foreground: "hsl(var(--disabled-foreground))",
+                },
                 ring: "hsl(var(--ring))",
                 background: "hsl(var(--background))",
                 foreground: "hsl(var(--foreground))",
+                // `hover` and `active` are complete colours, not triples: hover
+                // is one ramp step and pressed two, and the legacy skins
+                // express theirs as an alpha of their own fill. They take no
+                // opacity modifier, and do not need one.
                 primary: {
                     DEFAULT: "hsl(var(--primary))",
                     foreground: "hsl(var(--primary-foreground))",
+                    hover: "var(--primary-hover)",
+                    active: "var(--primary-active)",
                 },
                 secondary: {
                     DEFAULT: "hsl(var(--secondary))",
                     foreground: "hsl(var(--secondary-foreground))",
+                    hover: "var(--secondary-hover)",
                 },
                 destructive: {
                     DEFAULT: "hsl(var(--destructive))",
                     foreground: "hsl(var(--destructive-foreground))",
+                    hover: "var(--destructive-hover)",
+                    active: "var(--destructive-active)",
+                    subtle: "hsl(var(--destructive-subtle))",
+                    "subtle-foreground":
+                        "hsl(var(--destructive-subtle-foreground))",
                 },
                 muted: {
                     DEFAULT: "hsl(var(--muted))",
@@ -90,6 +114,7 @@ const config = {
                 accent: {
                     DEFAULT: "hsl(var(--accent))",
                     foreground: "hsl(var(--accent-foreground))",
+                    active: "var(--accent-active)",
                 },
                 popover: {
                     DEFAULT: "hsl(var(--popover))",
@@ -99,10 +124,12 @@ const config = {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
                 },
-                // Saroh brand — midnight navy. `brand` is INTERACTIVE (links,
-                // emphasis) and lightens in dark mode; `brand.surface` is a FILL
-                // (heroes, filled chrome) and stays deep in both themes. Do not
-                // collapse them back into one token — see @saroh/ui globals.css.
+                // Saroh brand — Saffron. `brand` is INTERACTIVE (links,
+                // emphasis) and is the text-capable cut: Saffron 700 on light,
+                // 400 on dark. `brand.surface` is a FILL (heroes, filled
+                // chrome) and stays Ink in both themes. Do not collapse them
+                // back into one token — see @saroh/ui globals.css. The numbered
+                // steps are the Saffron ramp.
                 brand: {
                     DEFAULT: "hsl(var(--brand))",
                     foreground: "hsl(var(--brand-foreground))",
@@ -123,12 +150,16 @@ const config = {
                     900: "hsl(var(--brand-900))",
                     950: "hsl(var(--brand-950))",
                 },
-                // The lime accent. Deliberately NOT `accent` — that name is
-                // taken by shadcn's neutral hover surface and repointing it
-                // would turn every menu hover lime.
+                // The Saffron fill, spent on one action per screen. Deliberately
+                // NOT `accent` — that name is taken by shadcn's neutral hover
+                // surface and repointing it would turn every menu hover
+                // Saffron. The numbered steps are the Ink ramp.
                 highlight: {
                     DEFAULT: "hsl(var(--highlight))",
                     foreground: "hsl(var(--highlight-foreground))",
+                    hover: "var(--highlight-hover)",
+                    active: "var(--highlight-active)",
+                    "active-foreground": "var(--highlight-active-foreground)",
                     border: "hsl(var(--highlight-border))",
                     subtle: "hsl(var(--highlight-subtle))",
                     "subtle-foreground":
@@ -148,6 +179,9 @@ const config = {
                 success: {
                     DEFAULT: "hsl(var(--success))",
                     foreground: "hsl(var(--success-foreground))",
+                    subtle: "hsl(var(--success-subtle))",
+                    "subtle-foreground":
+                        "hsl(var(--success-subtle-foreground))",
                 },
                 warning: {
                     DEFAULT: "hsl(var(--warning))",
@@ -166,6 +200,8 @@ const config = {
                 info: {
                     DEFAULT: "hsl(var(--info))",
                     foreground: "hsl(var(--info-foreground))",
+                    subtle: "hsl(var(--info-subtle))",
+                    "subtle-foreground": "hsl(var(--info-subtle-foreground))",
                 },
                 chart: {
                     1: "hsl(var(--chart-1))",
@@ -176,10 +212,11 @@ const config = {
                 },
             },
             fontFamily: {
-                // The two --font-* vars are set by next/font/local in each app's
-                // root layout. --font-mono is intentionally unset (no mono file
-                // is shipped); the var resolves to nothing and the stack below
-                // takes over.
+                // The --font-* vars are set by next/font/local in each app's
+                // root layout: Plus Jakarta Sans (UI and body), Space Grotesk
+                // (display to H3 — never body copy) and JetBrains Mono (code,
+                // labels, eyebrows). saroh.app sets no --font-mono and falls
+                // back to the stack below.
                 sans: ["var(--font-sans)", ...FALLBACK_SANS],
                 display: ["var(--font-display)", ...FALLBACK_SANS],
                 mono: ["var(--font-mono)", ...FALLBACK_MONO],
@@ -206,15 +243,16 @@ const config = {
              *
              * shadcn ships lg/md/sm derived from a single `--radius` with a
              * 2px spread, which cannot express the shape this system wants:
-             * CONTROLS at 6px and CARDS at 12px. Two extra steps above the
+             * CONTROLS near 9px and CARDS at 14px. Two extra steps above the
              * anchor give that range while everything still moves together if
              * `--radius` changes — a skin can restyle the whole app's corners
              * from one value, which is why the scale is derived rather than
              * hardcoded.
              *
-             * At the default `--radius: 0.5rem`:
-             *   sm 4px · md 6px (buttons, inputs) · lg 8px
-             *   xl 12px (cards, panels) · 2xl 16px (modals, sheets)
+             * At the brand's `--radius: 0.625rem`:
+             *   sm 6px · md 8px (buttons, inputs) · lg 10px
+             *   xl 14px (cards) · 2xl 18px (panels, modals, sheets)
+             * Chips and code blocks take 4px and status pills `rounded-full`.
              */
             borderRadius: {
                 lg: "var(--radius)",
@@ -234,8 +272,10 @@ const config = {
                 },
             },
             animation: {
-                "accordion-down": "accordion-down 0.2s ease-out",
-                "accordion-up": "accordion-up 0.2s ease-out",
+                "accordion-down":
+                    "accordion-down var(--duration-base) var(--ease-out)",
+                "accordion-up":
+                    "accordion-up var(--duration-fast) var(--ease-out)",
             },
         },
     },
