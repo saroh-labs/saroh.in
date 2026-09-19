@@ -37,7 +37,7 @@ export default function BlockDetail({ type }: { type: SectionType }) {
                 <p className="mt-4 text-[15px] leading-relaxed text-muted-foreground">
                     {meta.description}
                 </p>
-                <p className="mt-3 font-mono text-[12px] text-muted-foreground/70">
+                <p className="mt-3 font-mono text-[12px] text-muted-foreground">
                     section type <span className="text-foreground">{type}</span>
                     {" · "}
                     contract v{latestVersionOf(type)}

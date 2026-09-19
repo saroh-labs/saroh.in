@@ -25,7 +25,7 @@ import type { Service } from "@/lib/services/service";
  * (`Service.currency`), so it is drawn — unlike lead values, which have none.
  */
 
-const Missing = () => <span className="text-muted-foreground/60">—</span>;
+const Missing = () => <span className="text-muted-foreground">—</span>;
 
 const FILTERS: DataFilter<Service>[] = [
     { id: "all", label: "All" },

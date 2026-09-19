@@ -205,7 +205,7 @@ export function MediaPicker({
                     className="h-1 w-full overflow-hidden rounded bg-muted"
                 >
                     <div
-                        className="h-full bg-foreground transition-[width] duration-150 ease-out"
+                        className="h-full bg-foreground transition-[width] duration-fast ease-out"
                         style={{ width: `${progress}%` }}
                     />
                 </div>

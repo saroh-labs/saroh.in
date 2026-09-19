@@ -27,7 +27,7 @@ import type { Product } from "@/lib/products/service";
  * a DRAFT product was competing with the page's actual call to action.
  */
 
-const Missing = () => <span className="text-muted-foreground/60">—</span>;
+const Missing = () => <span className="text-muted-foreground">—</span>;
 
 /** Published is success, a draft is Saffron (unfinished, and yours). */
 const STATUS_VARIANT: Record<string, NonNullable<BadgeProps["variant"]>> = {

@@ -45,7 +45,7 @@ const FILTERS: DataFilter<LeadListItem>[] = [
     { id: "lost", label: "Lost", predicate: (l) => l.status === "LOST" },
 ];
 
-const Missing = () => <span className="text-muted-foreground/60">—</span>;
+const Missing = () => <span className="text-muted-foreground">—</span>;
 
 export function LeadsView({
     leads,

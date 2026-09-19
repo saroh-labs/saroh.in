@@ -119,7 +119,7 @@ function DailyViewsChart({ daily }: { daily: DailyPoint[] }) {
                                  * nothing. The full date is still on every
                                  * bar's `title`.
                                  */}
-                                <span className="mt-1 h-4 truncate text-center text-[10px] leading-4 text-muted-foreground">
+                                <span className="mt-1 h-4 truncate text-center text-[11px] leading-4 text-muted-foreground">
                                     {i % Math.ceil(daily.length / 6) === 0
                                         ? d.date.slice(5)
                                         : ""}

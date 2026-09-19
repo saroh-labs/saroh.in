@@ -277,7 +277,7 @@ export function VerifyEmailForm({
                                     type="button"
                                     onClick={resend}
                                     disabled={cooldown > 0 || isResending}
-                                    className="text-foreground underline-offset-4 transition-colors hover:underline disabled:no-underline disabled:opacity-60"
+                                    className="text-foreground disabled:text-disabled-foreground underline-offset-4 transition-colors hover:underline disabled:no-underline"
                                 >
                                     {isResending
                                         ? "Sending…"

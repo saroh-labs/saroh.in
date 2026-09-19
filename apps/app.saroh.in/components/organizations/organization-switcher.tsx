@@ -73,7 +73,7 @@ export function OrganizationSwitcher({
                     className="min-w-0 max-w-[16rem] justify-between gap-2"
                 >
                     <span className="truncate">{active.name}</span>
-                    <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+                    <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64">

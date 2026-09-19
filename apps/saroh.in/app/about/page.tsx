@@ -250,7 +250,7 @@ export default function AboutPage() {
                                         : ""
                                 }`}
                             >
-                                <span className="font-mono text-[11px] tracking-[0.14em] text-muted-foreground/70">
+                                <span className="font-mono text-[11px] tracking-[0.14em] text-muted-foreground">
                                     {String(i + 1).padStart(2, "0")}
                                 </span>
                                 <h3 className="mt-3 text-[15.5px] font-semibold tracking-[-0.01em]">

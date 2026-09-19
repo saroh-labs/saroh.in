@@ -32,7 +32,7 @@ import type { OrderSummary } from "@/lib/orders/service";
 /** Statuses that mean someone outside the business is still waiting. */
 const OPEN_STATUSES = ["PENDING", "PROCESSING"];
 
-const Missing = () => <span className="text-muted-foreground/60">—</span>;
+const Missing = () => <span className="text-muted-foreground">—</span>;
 
 const STATUS_VARIANT: Record<string, NonNullable<BadgeProps["variant"]>> = {
     DELIVERED: "success",

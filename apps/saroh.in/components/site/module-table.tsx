@@ -40,7 +40,7 @@ export function ModuleTable() {
                                     .join(" · ")}
                             </span>
                         ) : (
-                            <span className="font-mono text-[11px] text-muted-foreground/60">
+                            <span className="font-mono text-[11px] text-muted-foreground">
                                 —
                             </span>
                         )}
