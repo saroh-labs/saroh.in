@@ -3,60 +3,108 @@ import * as React from "react";
 export interface WordmarkProps extends React.HTMLAttributes<HTMLSpanElement> {
     /** Optional muted per-app suffix, e.g. "Docs", "Help", "UI". */
     suffix?: string;
+    /** The symbol alone, for rails and tight spaces. It keeps "Saroh" as its accessible name. */
+    symbolOnly?: boolean;
 }
 
 /**
- * The canonical Saroh brand wordmark: "Saroh" in the midnight brand gradient
- * with an optional muted per-app suffix. Styled with INLINE styles only (no
- * Tailwind) so it renders identically in every app — shadcn/Tailwind apps,
- * Nextra docs, or a plain marketing page — without any per-app setup.
- *
- * Every colour is `var(--token, <literal fallback>)`. In an app that loads
- * @saroh/ui tokens the wordmark tracks the live theme (including dark mode);
- * in one that does not (Nextra docs/help), the fallback renders the identical
- * colour. That is why this file no longer needs manual hex syncing — the
- * previous hardcoded blue silently survived the rebrand and left every logo on
- * the old palette.
+ * The single stroke: one path that folds twice, and a Saffron cursor dot. The
+ * geometry is the brand file's 64-unit master; never re-draw it. Below 20px the
+ * dot is dropped (brand file §1).
  */
-export function Wordmark({ suffix, style, ...props }: WordmarkProps) {
+export function SarohSymbol({
+    size = 24,
+    style,
+    ...props
+}: Omit<React.SVGProps<SVGSVGElement>, "width" | "height"> & {
+    /** Pixels, or any CSS length (the lockup passes `1.385em` so it scales with its type). */
+    size?: number | string;
+}) {
+    return (
+        <svg
+            width={size}
+            height={size}
+            viewBox="0 0 64 64"
+            fill="none"
+            aria-hidden
+            focusable="false"
+            style={{ flex: "none", ...style }}
+            {...props}
+        >
+            <path
+                d="M44 11 L27 26 L40 37 L20 53"
+                // The page's ink: Ink 900 on Paper, Paper-side on Ink. Never
+                // Saffron — the stroke measures 2.5:1 on Paper in Saffron.
+                stroke="hsl(var(--foreground, 60 4% 11%))"
+                strokeWidth={8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            {typeof size === "string" || size >= 20 ? (
+                <circle
+                    cx="50"
+                    cy="48"
+                    r="5.6"
+                    // `--highlight` is Saffron 500 on light and Saffron light
+                    // (#F0A92B) on dark — exactly the dot's two cuts.
+                    fill="hsl(var(--highlight, 36 82% 47%))"
+                />
+            ) : null}
+        </svg>
+    );
+}
+
+/**
+ * The canonical Saroh lockup: the symbol, then "Saroh" in Plus Jakarta Sans
+ * SemiBold, title case, never all caps, with an optional muted per-app suffix.
+ * Styled with INLINE styles only (no Tailwind) so it renders identically in
+ * every app — shadcn/Tailwind apps, Nextra docs, or a plain marketing page —
+ * without any per-app setup.
+ *
+ * Every colour is `var(--token, <literal fallback>)`, so it tracks the live
+ * theme (including dark mode) where @saroh/ui tokens are loaded, and falls back
+ * to the brand's light values where they are not.
+ *
+ * Proportions are the brand file's primary lockup: the symbol is 1.385× the
+ * type size and the gap is 0.28× the symbol. Below 104px wide, use
+ * `symbolOnly`.
+ */
+export function Wordmark({
+    suffix,
+    symbolOnly = false,
+    style,
+    ...props
+}: WordmarkProps) {
     return (
         <span
             style={{
                 display: "inline-flex",
-                alignItems: "baseline",
-                gap: "0.4ch",
+                alignItems: "center",
+                // In em, so a call site that sets its own fontSize scales the
+                // symbol and the gap with the type.
+                gap: "0.388em",
                 fontFamily:
-                    "var(--font-display, ui-sans-serif, system-ui, sans-serif)",
-                fontWeight: 700,
+                    "var(--font-sans, ui-sans-serif, system-ui, sans-serif)",
+                fontWeight: 600,
                 fontSize: "1.125rem",
-                letterSpacing: "-0.03em",
+                lineHeight: 1,
+                letterSpacing: "-0.025em",
                 ...style,
             }}
+            {...(symbolOnly ? { role: "img", "aria-label": "Saroh" } : {})}
             {...props}
         >
-            <span
-                style={{
-                    // `--foreground`, not `--brand`. `--brand` is the
-                    // interactive blue now, and a logo rendered in the link
-                    // colour reads as a link — it sat in the sidebar looking
-                    // clickable-in-the-wrong-way. A wordmark should be the
-                    // page's ink: black on white, white on black, inverting
-                    // with the register like everything else.
-                    //
-                    // Still a semantic token, so skins that DO want a coloured
-                    // wordmark only have to move `--foreground`… or override
-                    // this deliberately. The fallback keeps it legible in the
-                    // Nextra docs/help apps, which load no tokens at all.
-                    color: "hsl(var(--foreground, 0 0% 9%))",
-                }}
-            >
-                Saroh
-            </span>
-            {suffix ? (
+            <SarohSymbol size="1.385em" />
+            {symbolOnly ? null : (
+                <span style={{ color: "hsl(var(--foreground, 60 4% 11%))" }}>
+                    Saroh
+                </span>
+            )}
+            {suffix && !symbolOnly ? (
                 <span
                     style={{
                         fontWeight: 500,
-                        color: "hsl(var(--muted-foreground, 222 10% 40%))",
+                        color: "hsl(var(--muted-foreground, 42 9% 39%))",
                     }}
                 >
                     {suffix}
