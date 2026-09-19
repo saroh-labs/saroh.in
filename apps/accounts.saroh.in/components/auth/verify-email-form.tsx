@@ -30,15 +30,6 @@ const RESEND_COOLDOWN_SECONDS = 60;
 const SUCCESS_EXIT_AT_MS = 720;
 const SUCCESS_HOLD_MS = 1140;
 
-const STAGGER_MS = 70;
-const FIELD_BASE_MS = 260;
-
-function delay(index: number): React.CSSProperties {
-    return {
-        "--sa-delay": `${FIELD_BASE_MS + index * STAGGER_MS}ms`,
-    } as React.CSSProperties;
-}
-
 /**
  * Better Auth's own messages here are developer-facing ("Invalid OTP", "OTP
  * expired"). Each of these states has a different next action, so say what it
@@ -201,13 +192,10 @@ export function VerifyEmailForm({
             ) : (
                 <>
                     <CardHeader>
-                        <CardTitle
-                            className="sa-rise font-display text-2xl"
-                            style={delay(0)}
-                        >
+                        <CardTitle className="sa-rise font-display text-2xl">
                             Check your email
                         </CardTitle>
-                        <CardDescription className="sa-rise" style={delay(1)}>
+                        <CardDescription className="sa-rise">
                             We sent a {VERIFICATION_OTP_LENGTH}-digit code to{" "}
                             <span className="text-foreground font-medium">
                                 {email}
@@ -227,7 +215,7 @@ export function VerifyEmailForm({
                                 <p
                                     id="otp-error"
                                     role="alert"
-                                    className="sa-alert border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm"
+                                    className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground rounded-md border px-3 py-2 text-sm"
                                 >
                                     {error}
                                 </p>
@@ -241,7 +229,7 @@ export function VerifyEmailForm({
                                 </p>
                             )}
 
-                            <div className="sa-rise" style={delay(2)}>
+                            <div className="sa-rise">
                                 <OtpInput
                                     value={code}
                                     onChange={(next) => {
@@ -273,7 +261,6 @@ export function VerifyEmailForm({
                                 type="submit"
                                 variant="secondary"
                                 className="sa-press sa-rise w-full font-semibold"
-                                style={delay(3)}
                                 disabled={
                                     isVerifying ||
                                     code.length !== VERIFICATION_OTP_LENGTH
@@ -283,10 +270,7 @@ export function VerifyEmailForm({
                             </Button>
                         </form>
 
-                        <div
-                            className="sa-rise text-muted-foreground mt-5 space-y-2 text-center text-sm"
-                            style={delay(4)}
-                        >
+                        <div className="sa-rise text-muted-foreground mt-5 space-y-2 text-center text-sm">
                             <p>
                                 Didn&apos;t get it?{" "}
                                 <button

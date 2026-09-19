@@ -51,18 +51,13 @@ const apps = [
     },
 ];
 
-const STAGGER_MS = 50;
-
 export default function AppsListPage() {
     const isProduction = env.NODE_ENV === "production";
     const { data: session, isPending, error } = authClient.useSession();
 
     return (
         <div className="flex min-h-screen flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
-            <div
-                className="sa-rise mb-9 flex justify-center"
-                style={{ "--sa-delay": "60ms" } as React.CSSProperties}
-            >
+            <div className="sa-rise mb-9 flex justify-center">
                 <Wordmark style={{ fontSize: "1.75rem" }} />
             </div>
 
@@ -94,23 +89,15 @@ export default function AppsListPage() {
                     {error && (
                         <p
                             role="alert"
-                            className="sa-alert border-destructive/40 bg-destructive/10 text-destructive mb-4 rounded-md border px-3 py-2 text-sm"
+                            className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground mb-4 rounded-md border px-3 py-2 text-sm"
                         >
                             {error.message}
                         </p>
                     )}
 
                     <ul className="grid gap-1">
-                        {apps.map((app, index) => (
-                            <li
-                                key={app.name}
-                                className="sa-rise"
-                                style={
-                                    {
-                                        "--sa-delay": `${240 + index * STAGGER_MS}ms`,
-                                    } as React.CSSProperties
-                                }
-                            >
+                        {apps.map((app) => (
+                            <li key={app.name} className="sa-rise">
                                 <Link
                                     href={
                                         isProduction ? app.prodUrl : app.devUrl
@@ -129,7 +116,7 @@ export default function AppsListPage() {
                                         cue that the link leaves this app. */}
                                     <span
                                         aria-hidden
-                                        className="text-muted-foreground group-hover:text-foreground translate-x-0 transition-all duration-200 group-hover:translate-x-0.5"
+                                        className="text-muted-foreground group-hover:text-foreground duration-fast transition-colors"
                                     >
                                         →
                                     </span>

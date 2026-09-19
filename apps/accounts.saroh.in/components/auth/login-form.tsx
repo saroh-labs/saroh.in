@@ -16,15 +16,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FaGithub } from "react-icons/fa";
 
-const STAGGER_MS = 70;
-const FIELD_BASE_MS = 260;
-
-function delay(index: number): React.CSSProperties {
-    return {
-        "--sa-delay": `${FIELD_BASE_MS + index * STAGGER_MS}ms`,
-    } as React.CSSProperties;
-}
-
 /**
  * `returnTo` is where this sign-in should land (#222) — the page the visitor
  * asked for before they were bounced here, already checked against the
@@ -86,13 +77,10 @@ export function LoginForm({
     return (
         <Card className="sa-panel mx-auto w-full max-w-sm">
             <CardHeader>
-                <CardTitle
-                    className="sa-rise font-display text-2xl"
-                    style={delay(0)}
-                >
+                <CardTitle className="sa-rise font-display text-2xl">
                     Welcome back
                 </CardTitle>
-                <CardDescription className="sa-rise" style={delay(1)}>
+                <CardDescription className="sa-rise">
                     Log in to continue to your workspace.
                 </CardDescription>
             </CardHeader>
@@ -101,12 +89,12 @@ export function LoginForm({
                     {error && (
                         <p
                             role="alert"
-                            className="sa-alert border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm"
+                            className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground rounded-md border px-3 py-2 text-sm"
                         >
                             {error}
                         </p>
                     )}
-                    <div className="sa-rise grid gap-2" style={delay(2)}>
+                    <div className="sa-rise grid gap-2">
                         <Label htmlFor="email">Email</Label>
                         <Input
                             id="email"
@@ -119,7 +107,7 @@ export function LoginForm({
                             disabled={isLoading}
                         />
                     </div>
-                    <div className="sa-rise grid gap-2" style={delay(3)}>
+                    <div className="sa-rise grid gap-2">
                         <div className="flex items-center">
                             <Label htmlFor="password">Password</Label>
                             <Link
@@ -143,7 +131,6 @@ export function LoginForm({
                         type="submit"
                         variant="highlight"
                         className="sa-cta sa-rise mt-1 w-full font-semibold"
-                        style={delay(4)}
                         disabled={isLoading}
                     >
                         {isLoading ? "Signing in…" : "Log in"}
@@ -152,12 +139,9 @@ export function LoginForm({
                     {/* Divider rather than a second stacked button: it makes
                         clear that GitHub is an alternative route to the same
                         place, not a second thing to do. */}
-                    <div
-                        className="sa-rise flex items-center gap-3"
-                        style={delay(5)}
-                    >
+                    <div className="sa-rise flex items-center gap-3">
                         <span className="bg-border/70 h-px flex-1" />
-                        <span className="text-muted-foreground text-xs uppercase tracking-wide">
+                        <span className="text-muted-foreground font-mono text-[11px] uppercase tracking-[0.14em]">
                             or
                         </span>
                         <span className="bg-border/70 h-px flex-1" />
@@ -166,8 +150,7 @@ export function LoginForm({
                     <Button
                         type="button"
                         variant="outline"
-                        className="sa-rise w-full gap-2 transition-transform duration-150 active:scale-[0.985]"
-                        style={delay(6)}
+                        className="sa-rise w-full gap-2"
                         disabled={isLoading}
                         onClick={async () => {
                             setError(null);
@@ -181,10 +164,7 @@ export function LoginForm({
                         Continue with GitHub
                     </Button>
                 </form>
-                <div
-                    className="sa-rise text-muted-foreground mt-5 text-center text-sm"
-                    style={delay(7)}
-                >
+                <div className="sa-rise text-muted-foreground mt-5 text-center text-sm">
                     Don&apos;t have an account?{" "}
                     <Link
                         href={`/signup?redirect=${encodeURIComponent(returnTo)}`}
