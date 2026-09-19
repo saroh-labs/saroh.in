@@ -1,7 +1,6 @@
-import { PageHeader } from "@saroh/ui/page-header";
-
-import { PeopleManager } from "@/components/organizations/people-manager";
+import { TeamScreen } from "@/components/organizations/team-screen";
 import { PageContainer } from "@/components/shared/page-container";
+import { listModules } from "@/lib/modules/service";
 import { listInvitations, listMembers } from "@/lib/organizations/members";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -19,7 +18,7 @@ import { listSites } from "@/lib/sites/service";
  * change it. The API enforces both, and this page hides what it can so a
  * member is not offered controls that would refuse them.
  */
-export const metadata = { title: "People" };
+export const metadata = { title: "Team" };
 
 export default async function PeoplePage() {
     await requireSession();
@@ -28,26 +27,33 @@ export default async function PeoplePage() {
     const canManage =
         organization?.role === "OWNER" || organization?.role === "ADMIN";
 
-    const [members, invitations, sites] = await Promise.all([
+    const [members, invitations, sites, moduleKeys] = await Promise.all([
         listMembers(),
         // Empty for anyone who may not see them, rather than an error: this is
         // one page and a member should still get the roster.
         canManage ? listInvitations() : Promise.resolve([]),
         // Only to name the sites a reviewer can be invited to.
         canManage ? listSites() : Promise.resolve([]),
+        // What each role reaches depends on what this business has turned on;
+        // unknown on failure, so every capability reads as on.
+        listModules()
+            .then((modules) =>
+                modules
+                    .filter((m) => m.readiness !== "DISABLED")
+                    .map((m) => m.key),
+            )
+            .catch(() => null),
     ]);
 
     return (
-        <PageContainer>
-            <PageHeader
-                title="People"
-                description="Who can reach this workspace, and what each of them may do."
-            />
-            <PeopleManager
+        <PageContainer width="full">
+            <TeamScreen
+                organizationName={organization?.name ?? "this business"}
                 members={members}
                 invitations={invitations}
                 sites={sites.map((s) => ({ id: s.id, name: s.name }))}
                 canManage={canManage}
+                moduleKeys={moduleKeys}
             />
         </PageContainer>
     );

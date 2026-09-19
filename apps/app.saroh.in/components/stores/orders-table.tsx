@@ -1,5 +1,6 @@
 "use client";
 
+import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -11,6 +12,7 @@ import type {
 } from "@/components/shared/data-view/types";
 import { formatWaiting } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { formatStatus } from "@/lib/format/status";
 import type { OrderSummary } from "@/lib/orders/service";
 
 /**
@@ -21,27 +23,28 @@ import type { OrderSummary } from "@/lib/orders/service";
  * 1. **Age.** A row now says "6 days waiting" instead of nothing at all. Age is
  *    the fact that decides which unfulfilled order to touch first, and it was
  *    exactly what Home's "Fulfil 5 open orders" could not tell anyone.
- * 2. **Status colour maps to tokens, not badge variants.** `variant="default"`
- *    resolves to `--primary`, which in the Panel and Instrument skins is the
- *    LUMINOUS ACTION colour — so UNPAID and PENDING were drawn in the same
- *    register as DELIVERED. Money owed is amber; money received is brand.
+ * 2. **Status reads through the brand's status pills** (brand file §7): done
+ *    is success, in transit is info, waiting on the merchant is warning, and
+ *    a status with nothing to do — cancelled, refunded — is neutral. The pill
+ *    says the status in words; the colour only reinforces it.
  */
 
 /** Statuses that mean someone outside the business is still waiting. */
 const OPEN_STATUSES = ["PENDING", "PROCESSING"];
 
-const Missing = () => <span className="text-muted-foreground/60">—</span>;
+const Missing = () => <span className="text-muted-foreground">—</span>;
 
-const STATUS_CLASS: Record<string, string> = {
-    DELIVERED:
-        "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground",
-    SHIPPED:
-        "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground",
-    PROCESSING:
-        "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
-    PENDING:
-        "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
-    CANCELLED: "border border-border bg-transparent text-muted-foreground",
+const STATUS_VARIANT: Record<string, NonNullable<BadgeProps["variant"]>> = {
+    DELIVERED: "success",
+    SHIPPED: "info",
+    PROCESSING: "warning",
+    PENDING: "warning",
+    CANCELLED: "neutral",
+};
+
+const PAYMENT_VARIANT: Record<string, NonNullable<BadgeProps["variant"]>> = {
+    PAID: "success",
+    REFUNDED: "neutral",
 };
 
 const FILTERS: DataFilter<OrderSummary>[] = [
@@ -107,6 +110,7 @@ export function OrdersTable({
             header: "Total",
             priority: "secondary",
             numeric: true,
+            money: true,
             sortValue: (o) => Number(o.total) || 0,
             cell: (o) => formatMoneyMajor(o.total, o.currency) ?? <Missing />,
         },
@@ -116,14 +120,8 @@ export function OrdersTable({
             priority: "secondary",
             sortValue: (o) => o.status,
             cell: (o) => (
-                <Badge
-                    className={cn(
-                        "text-[0.625rem] font-medium uppercase tracking-wider",
-                        STATUS_CLASS[o.status] ??
-                            "border border-border bg-transparent text-muted-foreground",
-                    )}
-                >
-                    {o.status}
+                <Badge variant={STATUS_VARIANT[o.status] ?? "neutral"}>
+                    {formatStatus(o.status)}
                 </Badge>
             ),
         },
@@ -133,17 +131,8 @@ export function OrdersTable({
             priority: "secondary",
             sortValue: (o) => o.paymentStatus,
             cell: (o) => (
-                <Badge
-                    className={cn(
-                        "text-[0.625rem] font-medium uppercase tracking-wider",
-                        o.paymentStatus === "PAID"
-                            ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
-                            : o.paymentStatus === "REFUNDED"
-                              ? "border border-border bg-transparent text-muted-foreground"
-                              : "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
-                    )}
-                >
-                    {o.paymentStatus}
+                <Badge variant={PAYMENT_VARIANT[o.paymentStatus] ?? "warning"}>
+                    {formatStatus(o.paymentStatus)}
                 </Badge>
             ),
         },

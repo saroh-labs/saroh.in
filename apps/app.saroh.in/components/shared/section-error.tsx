@@ -71,7 +71,7 @@ export function SectionError({
      */
     const reference =
         !denied && error.digest ? (
-            <p className="font-mono text-xs text-muted-foreground/70">
+            <p className="font-mono text-xs text-muted-foreground">
                 Reference: {error.digest}
             </p>
         ) : null;

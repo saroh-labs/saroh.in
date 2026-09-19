@@ -95,7 +95,7 @@ export function PreviewFrame({
              */}
             {loaded ? null : (
                 <div className="absolute inset-0 grid place-items-center bg-muted/40">
-                    <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                         Loading preview
                     </span>
                 </div>

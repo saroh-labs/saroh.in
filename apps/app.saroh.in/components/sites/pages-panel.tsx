@@ -216,7 +216,7 @@ export function PagesPanel({
                                              * a second vocabulary one tab over.
                                              */
                                             page.hidden &&
-                                                "text-muted-foreground/50 line-through",
+                                                "text-muted-foreground line-through",
                                         )}
                                     >
                                         {page.title}
@@ -226,7 +226,7 @@ export function PagesPanel({
                                      * what the merchant typed and what visitors
                                      * see, and "/" already says home.
                                      */}
-                                    <span className="shrink-0 font-mono text-[0.625rem] text-muted-foreground/70">
+                                    <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
                                         {page.path}
                                     </span>
                                 </button>

@@ -244,6 +244,14 @@ export const NAV_GROUPS: NavGroup[] = [
                 label: "Sell",
                 icon: Store,
                 moduleKey: "COMMERCE",
+                // Sell's screens are destinations, so they nest in the rail
+                // (brand file §13): Sell is the section, the child is the page.
+                // Orders and Customers still live inside each storefront and
+                // join here as they gain business-wide screens.
+                children: [
+                    { href: "/commerce", label: "Storefronts" },
+                    { href: "/commerce/products", label: "Products" },
+                ],
             },
             // Two destinations, two questions: "what is booked?" and "what can
             // be booked?". They lost their own BOOKINGS heading in the regroup;
@@ -324,13 +332,13 @@ export const NAV_GROUPS: NavGroup[] = [
             },
             {
                 href: "/settings/organization",
-                label: "Organization",
+                label: "Business",
                 icon: Building2,
                 action: "org:settings:read",
             },
             {
                 href: "/settings/people",
-                label: "People",
+                label: "Team",
                 icon: Users,
                 action: "member:read",
             },

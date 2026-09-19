@@ -119,7 +119,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
 
     return (
         <section className="shrink-0 border-b p-3">
-            <h3 className="text-[0.625rem] uppercase tracking-[0.08em] text-muted-foreground">
+            <h3 className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
                 Share a preview
             </h3>
 
@@ -239,7 +239,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                     {active.length > 0 ? "New link" : "Create link"}
                 </Button>
             </div>
-            <p className="mt-1.5 text-[0.625rem] leading-relaxed text-muted-foreground/80">
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
                 The link stops working after{" "}
                 {days === 1 ? "a day" : `${days} days`}, or when you turn it
                 off.

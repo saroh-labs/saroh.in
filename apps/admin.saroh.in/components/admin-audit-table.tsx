@@ -19,9 +19,13 @@ import type { AdminAuditPage, AdminAuditQuery } from "@/lib/control-plane";
  * these three values via a CHECK constraint, so the lookup is total.
  */
 const OUTCOME_STYLES = {
-    SUCCESS: "border-success/30 bg-success/10 text-success",
-    FAILURE: "border-destructive/30 bg-destructive/10 text-destructive",
-    DENIED: "border-warning/40 bg-warning/15 text-warning-foreground dark:text-warning",
+    // The status tint mixed into the page, with its 700 text — never an alpha
+    // of the fill (brand file §4).
+    SUCCESS:
+        "border-transparent bg-success-subtle text-success-subtle-foreground",
+    FAILURE:
+        "border-transparent bg-destructive-subtle text-destructive-subtle-foreground",
+    DENIED: "border-transparent bg-warning-subtle text-warning-subtle-foreground",
 } as const;
 
 export function AdminAuditTable({

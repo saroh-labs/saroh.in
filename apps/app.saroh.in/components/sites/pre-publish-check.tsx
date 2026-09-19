@@ -293,7 +293,7 @@ function Group({
             <h2 className="flex items-baseline gap-2 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 {title}
                 {note === undefined ? null : (
-                    <span className="font-mono text-[0.625rem] normal-case tracking-normal opacity-70">
+                    <span className="font-mono text-[11px] normal-case tracking-normal opacity-70">
                         {note}
                     </span>
                 )}

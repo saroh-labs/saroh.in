@@ -338,7 +338,7 @@ export function PostEditor({
                             onChange={(e) => touched(setTitle)(e.target.value)}
                             placeholder="Title"
                             aria-label="Post title"
-                            className="w-full border-0 bg-transparent p-0 font-display text-4xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/40 focus-visible:ring-0"
+                            className="w-full border-0 bg-transparent p-0 font-display text-4xl font-bold tracking-tight outline-none placeholder:text-muted-foreground focus-visible:ring-0"
                         />
                         {/* Borderless on purpose: the title above is a
                             document heading, not a labelled field, and a boxed
@@ -485,7 +485,7 @@ function Field({
             </span>
             {children}
             {hint ? (
-                <p className="text-xs text-muted-foreground/80">{hint}</p>
+                <p className="text-xs text-muted-foreground">{hint}</p>
             ) : null}
         </div>
     );

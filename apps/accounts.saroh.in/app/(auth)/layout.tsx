@@ -15,14 +15,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             {/* The wordmark leads the entrance and the panel follows 120ms
                 later, so the page resolves as brand-then-task rather than
                 everything arriving at once. */}
-            <div
-                className="sa-rise mb-9 flex justify-center"
-                style={{ "--sa-delay": "60ms" } as React.CSSProperties}
-            >
+            <div className="sa-rise mb-9 flex justify-center">
                 <Link
                     href="https://saroh.in"
                     aria-label="Saroh"
-                    className="focus-visible:ring-ring rounded-md transition-transform duration-300 hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent"
+                    className="focus-visible:ring-ring rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent"
                 >
                     <Wordmark style={{ fontSize: "1.75rem" }} />
                 </Link>

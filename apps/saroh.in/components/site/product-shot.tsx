@@ -56,7 +56,7 @@ export function ProductShot({
                 />
             </div>
             {caption ? (
-                <figcaption className="mt-3 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                <figcaption className="mt-3 text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                     {caption}
                 </figcaption>
             ) : null}

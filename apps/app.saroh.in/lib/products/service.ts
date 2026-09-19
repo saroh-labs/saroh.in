@@ -22,6 +22,19 @@ export interface Product {
     category?: { id: string; name: string } | null;
 }
 
+/**
+ * A catalogue row as the list endpoint returns it: the product, how many
+ * variants it has, the SKU it is known by, and its stock against its own
+ * low-stock threshold.
+ */
+export interface ProductListItem extends Product {
+    storeId: string;
+    updatedAt: string;
+    variantCount: number;
+    sku: string | null;
+    inventory: { quantity: number; lowStockAlert: number } | null;
+}
+
 export interface Variant {
     id: string;
     productId: string;
@@ -51,16 +64,10 @@ export interface Category {
 }
 
 export type ResultField =
-    | "name"
-    | "slug"
-    | "price"
-    | "categoryId"
-    | "sku"
-    | "parentId";
+    "name" | "slug" | "price" | "categoryId" | "sku" | "parentId";
 
 export type Result<T = { ok: true }> =
-    | { ok: true; data: T }
-    | { ok: false; error: string; field?: ResultField };
+    { ok: true; data: T } | { ok: false; error: string; field?: ResultField };
 
 async function mutate<T = { id: string }>(
     path: string,
@@ -90,9 +97,9 @@ async function mutate<T = { id: string }>(
 export function listProducts(
     storeId: string,
     status?: ProductStatus,
-): Promise<Product[]> {
+): Promise<ProductListItem[]> {
     const q = status ? `?status=${status}` : "";
-    return getList<Product>(`/stores/${storeId}/products${q}`);
+    return getList<ProductListItem>(`/stores/${storeId}/products${q}`);
 }
 
 export function getProduct(

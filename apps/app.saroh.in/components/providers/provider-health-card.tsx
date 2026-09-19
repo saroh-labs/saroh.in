@@ -1,3 +1,4 @@
+import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@saroh/ui/card";
@@ -24,35 +25,35 @@ import type {
  */
 const STATUS: Record<
     HealthStatus,
-    { label: string; className: string; action: string | null }
+    {
+        label: string;
+        variant: NonNullable<BadgeProps["variant"]>;
+        action: string | null;
+    }
 > = {
     ACTIVE: {
         label: "Connected",
-        className:
-            "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground",
+        variant: "success",
         action: "Manage",
     },
     PENDING: {
         label: "Connecting",
-        className:
-            "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
+        variant: "info",
         action: "Manage",
     },
     DEGRADED: {
         label: "Not working",
-        className:
-            "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
+        variant: "warning",
         action: "Fix",
     },
     FAILED: {
         label: "Not working",
-        className:
-            "border border-destructive/40 bg-destructive/10 text-destructive",
+        variant: "error",
         action: "Fix",
     },
     NOT_CONFIGURED: {
         label: "Not connected",
-        className: "border border-border bg-transparent text-muted-foreground",
+        variant: "neutral",
         action: "Set up",
     },
 };
@@ -72,7 +73,7 @@ export function ProviderHealthCard({ health }: { health: ProviderHealth }) {
         <Card>
             <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
                 <CardTitle className="text-base">{health.label}</CardTitle>
-                <Badge className={status.className}>{status.label}</Badge>
+                <Badge variant={status.variant}>{status.label}</Badge>
             </CardHeader>
             <CardContent className="flex items-center justify-between gap-4">
                 <p className="text-sm text-muted-foreground">

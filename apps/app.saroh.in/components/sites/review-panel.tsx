@@ -255,7 +255,7 @@ export function ReviewPanel({
             <div className="min-h-0 flex-1 p-2">
                 {groups.map(({ page, notes }) => (
                     <section key={page.id} className="mb-4">
-                        <h3 className="px-1 pb-1 text-[0.625rem] uppercase tracking-[0.08em] text-muted-foreground">
+                        <h3 className="px-1 pb-1 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
                             {page.title}
                         </h3>
                         <ul className="grid gap-1">
@@ -274,7 +274,7 @@ export function ReviewPanel({
 
                 {strays.length > 0 ? (
                     <section className="mb-4">
-                        <h3 className="px-1 pb-1 text-[0.625rem] uppercase tracking-[0.08em] text-muted-foreground">
+                        <h3 className="px-1 pb-1 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
                             On a page that no longer exists
                         </h3>
                         <ul className="grid gap-1">
@@ -314,7 +314,7 @@ function Note({
         <li
             className={cn(
                 "rounded border p-2",
-                settled && "opacity-60",
+                settled && "text-muted-foreground",
                 note.orphaned && "border-dashed",
             )}
         >
@@ -322,7 +322,7 @@ function Note({
                 <span className="truncate text-xs font-medium">
                     {note.author.name}
                 </span>
-                <span className="shrink-0 text-[0.625rem] text-muted-foreground">
+                <span className="shrink-0 text-[11px] text-muted-foreground">
                     {shortDate(note.createdAt)}
                 </span>
             </div>
@@ -338,7 +338,7 @@ function Note({
                  * why clicking it goes nowhere — a note that silently did
                  * nothing would read as broken.
                  */
-                <p className="mt-1.5 text-[0.625rem] leading-relaxed text-muted-foreground/70">
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
                     {note.pageId === null
                         ? note.pageTitle === null
                             ? "The page this was about has been deleted."

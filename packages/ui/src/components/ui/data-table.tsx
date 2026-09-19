@@ -81,7 +81,7 @@ export function DataTable<TData, TValue>({
                                                 ) : sorted === "desc" ? (
                                                     <ArrowDown className="h-3.5 w-3.5" />
                                                 ) : (
-                                                    <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
+                                                    <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
                                                 )}
                                             </button>
                                         ) : (

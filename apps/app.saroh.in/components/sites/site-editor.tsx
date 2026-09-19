@@ -988,7 +988,7 @@ export function SiteEditor({
                     className={cn(
                         "flex h-[22px] shrink-0 items-center rounded-[3px] px-2 text-[0.6875rem]",
                         saveError
-                            ? "border border-destructive/30 bg-destructive/10 text-destructive"
+                            ? "border border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
                             : dirty || saving
                               ? "border border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
                               : "border border-[#2a2a2a] bg-[#1a1a1a] text-muted-foreground",
@@ -1368,7 +1368,7 @@ export function SiteEditor({
                                                     setDropIndex(null);
                                                 }}
                                                 aria-hidden="true"
-                                                className="cursor-grab select-none px-1 text-muted-foreground/50 active:cursor-grabbing group-hover:text-muted-foreground"
+                                                className="cursor-grab select-none px-1 text-muted-foreground active:cursor-grabbing group-hover:text-muted-foreground"
                                             >
                                                 ⋮
                                             </span>
@@ -1392,13 +1392,13 @@ export function SiteEditor({
                                                          * one visitors get.
                                                          */
                                                         section.hidden &&
-                                                            "text-muted-foreground/50 line-through",
+                                                            "text-muted-foreground line-through",
                                                     )}
                                                 >
                                                     {sectionTitle(section)}
                                                 </span>
                                                 <span className="flex shrink-0 items-center gap-1.5">
-                                                    <span className="text-[0.625rem] uppercase tracking-[0.06em] text-muted-foreground/70">
+                                                    <span className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground">
                                                         {
                                                             SECTION_LABELS[
                                                                 section.type
@@ -1817,7 +1817,7 @@ export function SiteEditor({
                     {conflict ? (
                         <div
                             role="alert"
-                            className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm"
+                            className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-sm"
                         >
                             <p className="font-medium">
                                 Someone else saved this page while you were
@@ -1877,7 +1877,7 @@ export function SiteEditor({
                          * rather than the 300 it was, because every frame here
                          * costs a layout pass over the whole rendered site.
                          */
-                        className={`mx-auto transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none ${
+                        className={`mx-auto transition-[max-width,opacity,transform] duration-slow ease-out motion-reduce:transition-none ${
                             switching ? "opacity-70" : "opacity-100"
                         }`}
                         style={{
@@ -1923,7 +1923,7 @@ export function SiteEditor({
                         Escape to return
                     </button>
                     <div
-                        className="mx-auto transition-[max-width] duration-200 ease-out motion-reduce:transition-none"
+                        className="mx-auto transition-[max-width] duration-slow ease-out motion-reduce:transition-none"
                         style={{ maxWidth: DEVICE_WIDTH[device] }}
                     >
                         <DraftPreview

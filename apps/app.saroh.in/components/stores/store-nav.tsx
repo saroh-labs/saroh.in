@@ -57,12 +57,12 @@ export function StoreNav({ storeId }: { storeId: string }) {
                     key={label}
                     aria-disabled="true"
                     title="Coming soon"
-                    className="flex cursor-not-allowed items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground/50"
+                    className="flex cursor-not-allowed items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground"
                 >
                     {label}
                     <Badge
                         variant="secondary"
-                        className="px-1.5 py-0 text-[10px]"
+                        className="px-1.5 py-0 text-[11px]"
                     >
                         Soon
                     </Badge>

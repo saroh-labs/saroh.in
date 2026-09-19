@@ -106,7 +106,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     const navSites = sites.map((site) => ({ id: site.id, name: site.name }));
 
     return (
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen flex-col">
             {/*
              * Without this, reaching the page content by keyboard means tabbing
              * through the wordmark, search, every nav item, the org switcher,
@@ -131,34 +131,41 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 role={activeOrg?.role ?? null}
                 sites={navSites}
             />
-            <AppSidebar
+            {/* The top bar runs the full width; the rail and the working
+                area sit below it. */}
+            <AppHeader
+                user={session.user}
+                organizations={organizations}
+                activeOrg={activeOrg}
                 unread={unread}
                 moduleKeys={moduleKeys}
-                role={activeOrg?.role ?? null}
                 counts={counts}
                 sites={navSites}
             />
-            <div className="flex min-w-0 flex-1 flex-col">
-                <AppHeader
-                    user={session.user}
-                    organizations={organizations}
-                    activeOrg={activeOrg}
+            <div className="flex min-h-0 flex-1">
+                <AppSidebar
                     unread={unread}
                     moduleKeys={moduleKeys}
+                    role={activeOrg?.role ?? null}
                     counts={counts}
                     sites={navSites}
                 />
-                {/*
-                 * `tabIndex={-1}` makes this a valid focus target: following the
-                 * skip link must MOVE focus, not just scroll, or the next Tab
-                 * would land back at the top of the nav.
-                 */}
-                <div
-                    id="main-content"
-                    tabIndex={-1}
-                    className="flex flex-1 flex-col outline-none"
-                >
-                    {children}
+                {/* The working area is white and the rail sits on Paper: the
+                product spends white surfaces, and the page you work on is
+                the raised one (brand file §5, and the applied screens). */}
+                <div className="flex min-w-0 flex-1 flex-col bg-card">
+                    {/*
+                     * `tabIndex={-1}` makes this a valid focus target: following the
+                     * skip link must MOVE focus, not just scroll, or the next Tab
+                     * would land back at the top of the nav.
+                     */}
+                    <div
+                        id="main-content"
+                        tabIndex={-1}
+                        className="flex flex-1 flex-col outline-none"
+                    >
+                        {children}
+                    </div>
                 </div>
             </div>
         </div>

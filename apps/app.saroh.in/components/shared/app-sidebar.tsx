@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -45,18 +44,14 @@ export function AppSidebar({
     const groups = navFor({ role, moduleKeys, sites });
 
     return (
-        // `sticky top-0 h-screen` so the rail stays put on a long page. Without
+        // Sticky so the rail stays put on a long page. Without
         // it the aside is only as tall as the flex row, and navigation scrolls
         // away the moment a list runs past one viewport.
         <aside
             aria-label="Workspace"
-            className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r lg:flex"
+            // Below the 61px top bar, which carries the mark now.
+            className="sticky top-[61px] hidden h-[calc(100vh-61px)] w-[238px] shrink-0 flex-col border-r lg:flex"
         >
-            <div className="flex h-14 items-center border-b px-6">
-                <Link href="/" aria-label="Saroh">
-                    <Wordmark />
-                </Link>
-            </div>
             {/*
              * `gap-0.5` on the nav, and space bought back only where it means
              * something.
@@ -69,13 +64,13 @@ export function AppSidebar({
              */}
             <nav
                 aria-label="Primary"
-                className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4"
+                className="flex flex-1 flex-col gap-px overflow-y-auto px-2.5 py-3"
             >
                 {groups.map((group, index) => (
                     <div
                         key={group.label ?? `group-${index}`}
                         className={cn(
-                            "flex flex-col gap-0.5",
+                            "flex flex-col gap-px",
                             // Space belongs to headings, not to every group.
                             showsGroupLabel(group) && "mt-4 first:mt-0",
                             group.separated &&
@@ -83,7 +78,7 @@ export function AppSidebar({
                         )}
                     >
                         {showsGroupLabel(group) && (
-                            <p className="px-2.5 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                            <p className="px-2.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                                 {group.label}
                             </p>
                         )}
@@ -110,6 +105,15 @@ export function AppSidebar({
                                         ),
                                 ),
                             );
+                            /*
+                             * Two states, not one (brand file §13). The
+                             * expanded parent is the SECTION you are in —
+                             * Saffron label and icon, no surface. The row that
+                             * is the PAGE you are on takes the white surface
+                             * and the 2px Saffron marker. Never both.
+                             */
+                            const isPage = active && !childIsCurrent;
+                            const isSection = active && childIsCurrent;
                             const Icon = item.icon;
                             // Notifications counts unread; everything else
                             // counts work waiting. Both mean "something here
@@ -140,32 +144,30 @@ export function AppSidebar({
                                         // scales from the centre rather than
                                         // fading, so changing page reads as the
                                         // marker travelling down the rail.
-                                        "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+                                        "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast",
                                         // The design system's ring, not
                                         // Chrome's default blue: the focus ring
                                         // is a keyboard user's cursor, and it
                                         // was inconsistent in exactly the place
                                         // navigation happens most.
                                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                                        active
-                                            ? "bg-accent font-medium text-foreground"
-                                            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                                        isPage
+                                            ? "bg-card font-semibold text-foreground shadow-xs"
+                                            : isSection
+                                              ? "font-medium text-brand hover:bg-accent"
+                                              : "font-medium text-foreground hover:bg-accent",
                                     )}
                                 >
                                     <Icon className="size-4 shrink-0" />
                                     <span className="flex-1">{item.label}</span>
                                     {waiting > 0 ? (
-                                        /* Amber, not `bg-primary`. In the Panel
-                                           and Instrument skins `--primary` is the
-                                           luminous ACTION colour, so a count of
-                                           things you have not done yet was
-                                           rendering in the same green as the
-                                           button you press when you are done —
-                                           and outshouting it. Amber is the
-                                           workspace's "someone is waiting". */
+                                        /* The brand file's waiting count: a
+                                           Saffron-tinted pill with 700 text.
+                                           It is a count, not a status, so it
+                                           does not borrow Warning's hue. */
                                         <span
                                             aria-label={`${waiting} waiting`}
-                                            className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-warning/30 bg-warning-subtle px-1.5 text-xs font-medium tabular-nums text-warning-subtle-foreground"
+                                            className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
                                         >
                                             {waiting}
                                         </span>
@@ -173,8 +175,13 @@ export function AppSidebar({
                                 </Link>
                             );
                         })}
+                        {/* A section expands because you are in it, not
+                            because you toggled it (brand file §13) — so the
+                            children render only for the section you are in,
+                            and there is no chevron. */}
                         {group.items.map((item) =>
-                            item.children?.length ? (
+                            item.children?.length &&
+                            isNavItemActive(pathname, item.href) ? (
                                 <SiteTree
                                     key={`${item.href}-children`}
                                     children={item.children}
@@ -209,7 +216,7 @@ function SiteTree({
     pathname: string;
 }) {
     return (
-        <div className="ml-[1.0625rem] flex flex-col gap-0.5 border-l border-border pl-2">
+        <div className="mb-1 ml-[19px] mt-0.5 flex flex-col gap-px border-l border-border pl-2.5">
             {children.map((child) => {
                 if (!child.href) {
                     // A label row: the site's name, with its destinations
@@ -219,7 +226,7 @@ function SiteTree({
                             key={child.label}
                             className="flex flex-col gap-0.5"
                         >
-                            <div className="truncate px-2.5 pt-1.5 text-[0.8125rem] font-medium text-foreground">
+                            <div className="truncate px-2.5 pt-1.5 text-[12.5px] font-medium text-foreground">
                                 {child.label}
                             </div>
                             {child.children?.length ? (
@@ -241,15 +248,16 @@ function SiteTree({
                         href={child.href}
                         aria-current={active ? "page" : undefined}
                         className={cn(
-                            "wk-nav truncate rounded-md px-2.5 py-1 text-[0.8125rem] transition-colors",
+                            // `wk-nav-child` stands the marker on the guide
+                            // line rather than in the rail's gutter.
+                            "wk-nav wk-nav-child truncate rounded-md px-2.5 py-[7px] text-[12.5px] font-medium transition-colors duration-fast",
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                            // Same weight either way: the surface and the
+                            // marker say "current", so bolding the label would
+                            // be a third signal.
                             active
-                                ? "bg-accent font-medium text-foreground"
-                                : "text-muted-foreground hover:bg-accent hover:text-foreground active:bg-accent",
-                            // Creating is a different kind of act from opening,
-                            // and reads quieter so the sites themselves stay
-                            // the thing the eye lands on.
-                            child.create && "text-muted-foreground/70",
+                                ? "bg-card text-foreground shadow-xs"
+                                : "text-muted-foreground hover:bg-accent hover:text-foreground active:bg-accent-active",
                         )}
                     >
                         {child.create ? `+ ${child.label}` : child.label}
