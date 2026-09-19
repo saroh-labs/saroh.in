@@ -39,7 +39,9 @@ const badgeVariants = cva(
                 tag: "rounded border-border-strong bg-transparent text-foreground",
                 // A state with no hue of its own: cancelled, archived, not
                 // connected. Present, but asking nothing of anyone.
-                neutral: "border-border bg-transparent text-muted-foreground",
+                // Filled Sunken with Ink 600, as the brand file draws
+                // "Refunded": present, and asking nothing of anyone.
+                neutral: "border-transparent bg-muted text-neutral-600",
             },
         },
         defaultVariants: {
