@@ -6,82 +6,72 @@ import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
     /*
-     * `active:scale-[0.97]` is the whole reason this string carries a transform
-     * transition.
+     * Press is a colour step, not a shrink.
      *
-     * A button that does not move when pressed leaves the merchant asking
-     * whether the tap registered, and the honest answer on a touch device is
-     * that nothing on screen has told them. Hover covers it on a desk; phone
-     * and shop floor are two of the four primary scenes (§18) and have no
-     * pointer at all, so press was the only feedback channel left and it was
-     * unused.
+     * Hover moves one ramp step and pressed two, never a new hue (brand file
+     * §6). That gives a touch device — the phone and the shop floor, two of the
+     * four primary scenes (§18) — a visible acknowledgement under the finger,
+     * which is what `active:scale-[0.97]` used to do. The scale is gone because
+     * the motion rules forbid animating size alongside anything else, and a
+     * colour change says "pressed" without moving the label.
      *
-     * The transition names its properties rather than using `all`: colour and
-     * transform are the two that change, and `all` would animate layout
-     * properties that should never be animated.
+     * The transition names its properties rather than using `all`, at the
+     * 100ms "under the finger" duration.
      *
-     * Under `prefers-reduced-motion` the scale is dropped and the colour
-     * transitions stay. Reduced motion means less movement, not less feedback.
+     * DISABLED IS ONE TREATMENT, NOT FIVE. Every variant collapses to the same
+     * Sunken surface and Ink 500 label — never an opacity. A disabled label
+     * still clears 4.5:1: WCAG exempts disabled text and the brand declines the
+     * exemption, because permissions depend on reading it. Pair a disabled
+     * button with a nearby reason ("Refunds need a manager").
      */
-    "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-[color,background-color,border-color,text-decoration-color,transform] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-colors motion-reduce:active:scale-100",
+    "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-semibold ring-offset-background transition-[color,background-color,border-color,text-decoration-color] duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:border-transparent disabled:bg-disabled disabled:text-disabled-foreground",
     {
         variants: {
             variant: {
                 default:
-                    "bg-primary text-primary-foreground hover:bg-primary/90",
-                // `brand` and `highlight` both render the filled control, and in
-                // the monochrome register that is the SAME control: a near-black
-                // fill on a light page, inverted in dark.
-                //
-                // They deliberately do not use `bg-brand`. `--brand` is the
-                // interactive BLUE — links, focus rings, emphasis — and a
-                // monochrome system cannot have one token be both the link
-                // colour and the button fill without every CTA turning blue.
-                // Filled buttons take `--primary`; blue stays for things you
-                // click through, not things you press.
-                //
-                // The two names are kept apart because call sites use them to
-                // say something different — "the brand action" vs "the one
-                // action this screen exists for" — and a palette that
-                // reintroduces a coloured CTA would want them to diverge again.
-                brand: "bg-primary text-primary-foreground hover:bg-primary/90",
+                    "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
+                // `brand` renders the Ink control, like `default`. The Saffron
+                // fill is `highlight`, and it is budgeted at one per screen;
+                // 34 call sites say "brand" and turning them all Saffron would
+                // spend the accent thirty-four times.
+                brand: "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
+                // "Accent · sparingly". The one action a screen exists for, in
+                // Saffron with an Ink label. Pressed moves two steps, to a fill
+                // dark enough that the label flips to Paper.
                 highlight:
-                    "bg-primary text-primary-foreground hover:bg-primary/90",
+                    "bg-highlight text-highlight-foreground hover:bg-highlight-hover active:bg-highlight-active active:text-highlight-active-foreground",
                 success:
                     "bg-success text-success-foreground hover:bg-success/90",
                 destructive:
-                    "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+                    "bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-active",
+                // The brand file's "Secondary": a raised surface with a visible
+                // edge. The edge darkens a step on hover; the fill steps with it.
                 outline:
-                    "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+                    "border border-border bg-card text-card-foreground hover:border-border-strong hover:bg-accent hover:text-accent-foreground active:border-border-strong active:bg-accent-active",
                 secondary:
-                    "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-                ghost: "hover:bg-accent hover:text-accent-foreground",
-                // Not `active:scale`: this variant renders inline text, and
-                // shrinking a word inside a sentence reads as a rendering
-                // fault rather than a press. twMerge lets the variant win.
-                link: "text-primary underline-offset-4 hover:underline active:scale-100",
+                    "bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-accent-active",
+                ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent-active",
+                // Ink, not Saffron: in the product the accent belongs to the active
+                // state and nothing else, and a link is not a state.
+                link: "text-primary underline-offset-4 hover:underline disabled:bg-transparent",
             },
-            // 32 / 40 / 48 — the Geist control heights. `sm` was 36px and `lg`
-            // 44px, which put every button between two steps and made dense
-            // toolbars sit oddly against 40px inputs.
             /*
-             * `coarse:` is a touch pointer — the phone and the shop floor, two
-             * of the four primary scenes (§18). Every size grows to at least
-             * 44px there and keeps its desk height under a mouse, because §17
-             * asks for phone workflows to be designed rather than compressed
-             * and §19 asks for large touch targets. `default` and `icon` are
-             * already 40 and gain 4; `sm` is 32 on a desk, which is a mouse
-             * target, and becomes 44.
+             * 32 / 38 / 45 — small for toolbars and bulk-action bars, medium
+             * everywhere by default, large for marketing calls to action.
+             * Height is set explicitly, not derived from padding, so a bordered
+             * and a borderless button at the same size match. Nothing is
+             * smaller than 32px.
              *
-             * A media query, not a breakpoint: width says how much room there
-             * is, not what is doing the pointing. A narrow desktop window is
-             * still a mouse; a tablet at 1024px is a thumb.
+             * `coarse:` is a touch pointer — the phone and the shop floor. Every
+             * size grows to at least 44px there and keeps its desk height under
+             * a mouse. A media query, not a breakpoint: width says how much
+             * room there is, not what is doing the pointing.
              */
             size: {
-                default: "h-10 px-4 py-2 coarse:h-11",
-                sm: "h-8 rounded-md px-3 text-[0.8125rem] coarse:h-11 coarse:px-4 coarse:text-sm",
-                lg: "h-12 rounded-md px-6",
-                icon: "h-10 w-10 coarse:h-11 coarse:w-11",
+                default: "h-[38px] px-4 coarse:h-11",
+                sm: "h-8 px-3 text-[0.8125rem] coarse:h-11 coarse:px-4 coarse:text-sm",
+                lg: "h-[45px] px-[22px] text-[0.9375rem] coarse:h-12",
+                icon: "h-[38px] w-[38px] coarse:h-11 coarse:w-11",
             },
         },
         defaultVariants: {
