@@ -988,7 +988,7 @@ export function SiteEditor({
                     className={cn(
                         "flex h-[22px] shrink-0 items-center rounded-[3px] px-2 text-[0.6875rem]",
                         saveError
-                            ? "border border-destructive/30 bg-destructive/10 text-destructive"
+                            ? "border border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
                             : dirty || saving
                               ? "border border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
                               : "border border-[#2a2a2a] bg-[#1a1a1a] text-muted-foreground",
@@ -1817,7 +1817,7 @@ export function SiteEditor({
                     {conflict ? (
                         <div
                             role="alert"
-                            className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm"
+                            className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-sm"
                         >
                             <p className="font-medium">
                                 Someone else saved this page while you were

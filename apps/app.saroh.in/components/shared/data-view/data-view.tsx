@@ -191,7 +191,7 @@ export function DataView<TRow>({
                                                 // where density is the point.
                                                 "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors coarse:h-11 coarse:px-3.5 coarse:text-sm",
                                                 on
-                                                    ? "border-brand/50 bg-brand/10 text-foreground"
+                                                    ? "border-brand/50 bg-brand-subtle text-foreground"
                                                     : "border-border text-muted-foreground hover:bg-accent/50 hover:text-foreground",
                                             )}
                                         >
@@ -244,7 +244,7 @@ export function DataView<TRow>({
             {error ? (
                 <p
                     role="alert"
-                    className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+                    className="rounded-md border border-destructive/40 bg-destructive-subtle px-4 py-3 text-sm text-destructive-subtle-foreground"
                 >
                     {error}
                 </p>
