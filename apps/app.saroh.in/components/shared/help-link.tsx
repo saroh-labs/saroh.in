@@ -27,7 +27,7 @@ export function HelpLink({ topic }: { topic?: HelpTopic }) {
             title="Help"
             className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background coarse:size-11 dark:text-foreground"
         >
-            <CircleHelp className="size-[18px]" />
+            <CircleHelp className="size-4" />
         </a>
     );
 }

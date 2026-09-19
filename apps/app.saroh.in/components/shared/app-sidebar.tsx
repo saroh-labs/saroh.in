@@ -49,8 +49,8 @@ export function AppSidebar({
         // away the moment a list runs past one viewport.
         <aside
             aria-label="Workspace"
-            // Below the 49px top bar, which carries the mark now.
-            className="sticky top-[49px] hidden h-[calc(100vh-49px)] w-[238px] shrink-0 flex-col border-r lg:flex"
+            // Below the 61px top bar, which carries the mark now.
+            className="sticky top-[61px] hidden h-[calc(100vh-61px)] w-[238px] shrink-0 flex-col border-r lg:flex"
         >
             {/*
              * `gap-0.5` on the nav, and space bought back only where it means

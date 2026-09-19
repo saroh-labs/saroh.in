@@ -47,7 +47,7 @@ export function AppHeader(props: AppHeaderProps) {
     // account menu only, so you can see which account you are onboarding as.
     if (props.onboarding) {
         return (
-            <header className="sticky top-0 z-30 flex h-[49px] items-center justify-between border-b bg-background px-3.5">
+            <header className="sticky top-0 z-30 flex h-[61px] items-center justify-between border-b bg-background px-3.5 py-[9px]">
                 <Link href="/" aria-label="Saroh">
                     <Wordmark />
                 </Link>
@@ -65,7 +65,7 @@ export function AppHeader(props: AppHeaderProps) {
     return (
         // Gaps, not controls, give way on a phone: the switcher's name
         // truncates, and search, help and the account button keep their size.
-        <header className="sticky top-0 z-30 flex h-[49px] items-center gap-1 border-b bg-background px-2 sm:px-3.5">
+        <header className="sticky top-0 z-30 flex h-[61px] items-center gap-1 border-b bg-background px-2 py-[9px] sm:px-3.5">
             <MobileNav
                 unread={unread}
                 moduleKeys={moduleKeys}

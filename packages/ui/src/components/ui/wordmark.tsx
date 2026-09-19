@@ -20,6 +20,9 @@ export function SarohSymbol({
     /** Pixels, or any CSS length (the lockup passes `1.385em` so it scales with its type). */
     size?: number | string;
 }) {
+    // The mark thickens as it shrinks (brand file §20): at 32px and below the
+    // stroke is 9 and the dot r6, so its optical weight holds.
+    const small = typeof size === "number" && size <= 32;
     return (
         <svg
             width={size}
@@ -36,7 +39,7 @@ export function SarohSymbol({
                 // The page's ink: Ink 900 on Paper, Paper-side on Ink. Never
                 // Saffron — the stroke measures 2.5:1 on Paper in Saffron.
                 stroke="hsl(var(--foreground, 60 4% 11%))"
-                strokeWidth={8}
+                strokeWidth={small ? 9 : 8}
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
@@ -44,7 +47,7 @@ export function SarohSymbol({
                 <circle
                     cx="50"
                     cy="48"
-                    r="5.6"
+                    r={small ? 6 : 5.6}
                     // `--highlight` is Saffron 500 on light and Saffron light
                     // (#F0A92B) on dark — exactly the dot's two cuts.
                     fill="hsl(var(--highlight, 36 82% 47%))"

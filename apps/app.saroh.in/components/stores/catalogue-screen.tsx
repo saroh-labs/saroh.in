@@ -346,11 +346,11 @@ export function CatalogueScreen({
     const newProductHref = (id: string) => `/stores/${id}/products/new`;
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-5">
             <PageHeader
                 breadcrumb={["Sell", "Products"]}
                 title="Products"
-                className="mb-3"
+                className="mb-0"
                 actions={
                     first ? (
                         <>

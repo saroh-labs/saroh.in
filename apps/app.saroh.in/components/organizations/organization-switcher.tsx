@@ -165,7 +165,7 @@ export function OrganizationSwitcher({
                     </span>
                     <ChevronsUpDown
                         aria-hidden
-                        className="size-4 shrink-0 text-muted-foreground"
+                        className="size-[13px] shrink-0 text-muted-foreground"
                     />
                 </button>
             </PopoverTrigger>

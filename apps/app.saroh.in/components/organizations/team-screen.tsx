@@ -184,51 +184,59 @@ export function TeamScreen({
 
     return (
         <div className="space-y-[18px]">
-            <PageHeader
-                breadcrumb={["Workspace", "Team"]}
-                title="Team"
-                description="Who can reach this business, and what each role may open."
-                className="mb-5"
-                actions={
-                    canManage ? (
-                        <Button onClick={() => setInviteOpen(true)}>
-                            <Plus className="mr-1.5 size-4" />
-                            Invite to {organizationName}
-                        </Button>
-                    ) : undefined
-                }
-            />
-            <div className="flex items-end gap-3 border-b border-border">
-                <div role="group" aria-label="View" className="flex gap-0.5">
-                    {tabs.map((t) => {
-                        const on = t.id === tab;
-                        return (
-                            <button
-                                key={t.id}
-                                type="button"
-                                aria-pressed={on}
-                                onClick={() => setTab(t.id)}
-                                className={cn(
-                                    "flex items-center gap-2 rounded-t-md px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                                    on
-                                        ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                        : "font-medium text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                {t.label}
-                                <span
+            {/* 12px from the title row to the tabs, then 18px to the
+                content, as the design spaces them. */}
+            <div className="space-y-3">
+                <PageHeader
+                    breadcrumb={["Workspace", "Team"]}
+                    title="Team"
+                    description="Who can reach this business, and what each role may open."
+                    className="mb-0"
+                    actions={
+                        canManage ? (
+                            <Button onClick={() => setInviteOpen(true)}>
+                                <Plus className="mr-1.5 size-4" />
+                                Invite to {organizationName}
+                            </Button>
+                        ) : undefined
+                    }
+                />
+                <div className="flex items-end gap-3 border-b border-border">
+                    <div
+                        role="group"
+                        aria-label="View"
+                        className="flex gap-0.5"
+                    >
+                        {tabs.map((t) => {
+                            const on = t.id === tab;
+                            return (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    aria-pressed={on}
+                                    onClick={() => setTab(t.id)}
                                     className={cn(
-                                        "rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums",
+                                        "flex items-center gap-2 rounded-t-md px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
                                         on
-                                            ? "bg-muted text-foreground"
-                                            : "bg-foreground/[0.04] text-muted-foreground",
+                                            ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
+                                            : "font-medium text-muted-foreground hover:text-foreground",
                                     )}
                                 >
-                                    {t.count}
-                                </span>
-                            </button>
-                        );
-                    })}
+                                    {t.label}
+                                    <span
+                                        className={cn(
+                                            "rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums",
+                                            on
+                                                ? "bg-muted text-foreground"
+                                                : "bg-foreground/[0.04] text-muted-foreground",
+                                        )}
+                                    >
+                                        {t.count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
 

@@ -194,7 +194,8 @@ export function DataView<TRow>({
     const tableColumns = columns.filter((c) => !c.tableHidden);
 
     return (
-        <div className="space-y-4">
+        // 14px between tabs, toolbar and table, as the applied screens space them.
+        <div className="space-y-[14px]">
             {/*
              * Header tabs, when they filter (brand file §13): sub-views of the
              * same rows — All, Unfulfilled, Refunds — each with its count.
