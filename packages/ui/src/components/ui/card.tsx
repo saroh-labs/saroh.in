@@ -8,11 +8,10 @@ const Card = React.forwardRef<
     <div
         ref={ref}
         className={cn(
-            // `rounded-xl` (12px) and NO shadow. A card in this register is
-            // defined by its 1px border, not by floating above the page — and
-            // with the page and the card both pure white, a drop shadow was the
-            // only thing implying depth that isn't there. Surfaces that really
-            // are above the page (popovers, dialogs, dropdowns) keep theirs.
+            // `rounded-xl` (14px) and NO shadow. Flat is border only (brand
+            // file §6): a card is defined by its 1px border, not by floating
+            // above the page. Surfaces that really are above the page
+            // (popovers, dialogs, dropdowns) keep theirs.
             "rounded-xl border bg-card text-card-foreground",
             className,
         )}

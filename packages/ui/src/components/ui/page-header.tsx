@@ -38,14 +38,12 @@ export function PageHeader({
             {...props}
         >
             <div className="min-w-0">
-                {/* The display face is reserved for page-level titles. Component
-                    titles (CardTitle, DialogTitle) stay on the UI face — a
-                    display cut at 14px reads as noise in dense screens.
-
-                    Tracking tightens with size here to match the marketing
-                    surface's ramp, so a merchant moving from saroh.in into the
-                    workspace reads the same typographic voice. */}
-                <h1 className="truncate font-display text-[1.625rem] font-semibold leading-[1.15] tracking-[-0.025em]">
+                {/* Space Grotesk 600 at 30px, as on the brand file's applied
+                    screens. The display face runs from Display to H3 and
+                    stops there; component titles (CardTitle, DialogTitle)
+                    stay on Plus Jakarta Sans, because below H3 the brand is
+                    the UI face. */}
+                <h1 className="truncate font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em]">
                     {title}
                 </h1>
                 {description ? (
