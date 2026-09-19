@@ -171,8 +171,7 @@
    Both faces are self-hosted variable woff2 loaded by next/font/local in
    app/layout.jsx, so the build never reaches a font CDN. Nextra funnels its
    base font through `--x-default-font-family`, which reads `--x-font-sans`, so
-   repointing that one variable moves every word on the site onto Plus Jakarta
-   Sans. */
+   repointing that one variable moves every word on the site onto Geist. */
 :root {
     --x-font-sans:
         var(--font-sans), ui-sans-serif, system-ui, sans-serif,

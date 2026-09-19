@@ -213,10 +213,11 @@ const config = {
             },
             fontFamily: {
                 // The --font-* vars are set by next/font/local in each app's
-                // root layout: Plus Jakarta Sans (UI and body), Space Grotesk
-                // (display to H3 — never body copy) and JetBrains Mono (code,
-                // labels, eyebrows). saroh.app sets no --font-mono and falls
-                // back to the stack below.
+                // root layout: Geist (all UI, body copy, labels and eyebrows),
+                // Space Grotesk (display to H3, money and large figures —
+                // never body copy) and JetBrains Mono (only where a value is
+                // measured: SKUs, order references, timestamps, routes). The
+                // wordmark's face ships outlined in <Wordmark>.
                 sans: ["var(--font-sans)", ...FALLBACK_SANS],
                 display: ["var(--font-display)", ...FALLBACK_SANS],
                 mono: ["var(--font-mono)", ...FALLBACK_MONO],

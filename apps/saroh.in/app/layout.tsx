@@ -7,13 +7,15 @@ import localFont from "next/font/local";
 import Script from "next/script";
 import { Toaster } from "sonner";
 
-// The brand's three faces, self-hosted (latin subset, variable) so the build
-// never fetches fonts from a network: Plus Jakarta Sans for UI and body, Space
-// Grotesk for display through H3 (never body copy), JetBrains Mono for code,
-// labels and eyebrows. The same files, loaded the same way, in every Saroh app.
+// The brand's product faces, self-hosted (latin subset, variable) so the
+// build never fetches fonts from a network: Geist for all UI, body copy,
+// labels and eyebrows; Space Grotesk for display through H3, money and large
+// figures (never body copy); JetBrains Mono only where a value is measured —
+// SKUs, order references, timestamps, routes. The wordmark's own face ships
+// outlined inside <Wordmark>, so no app loads it.
 const fontSans = localFont({
-    src: "../../../packages/ui/fonts/PlusJakartaSans-latin.woff2",
-    weight: "200 800",
+    src: "../../../packages/ui/fonts/Geist-latin.woff2",
+    weight: "100 900",
     style: "normal",
     display: "swap",
     variable: "--font-sans",
