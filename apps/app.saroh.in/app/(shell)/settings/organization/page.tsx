@@ -15,7 +15,7 @@ import { requireSession } from "@/lib/session";
  * OWNER/ADMIN only, enforced by the API (`org:settings:read` / `org:update`). A
  * role denial reaches forbidden.tsx; an unavailable API reaches error.tsx.
  */
-export const metadata = { title: "Organization" };
+export const metadata = { title: "Business" };
 
 export default async function OrganizationSettingsPage() {
     await requireSession();
@@ -25,7 +25,7 @@ export default async function OrganizationSettingsPage() {
     return (
         <PageContainer width="form">
             <PageHeader
-                title="Organization"
+                title="Business"
                 description="Your workspace name and the business identity used across Saroh."
             />
             {settings ? (

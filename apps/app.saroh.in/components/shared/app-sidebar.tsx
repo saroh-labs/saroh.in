@@ -180,8 +180,13 @@ export function AppSidebar({
                                 </Link>
                             );
                         })}
+                        {/* A section expands because you are in it, not
+                            because you toggled it (brand file §13) — so the
+                            children render only for the section you are in,
+                            and there is no chevron. */}
                         {group.items.map((item) =>
-                            item.children?.length ? (
+                            item.children?.length &&
+                            isNavItemActive(pathname, item.href) ? (
                                 <SiteTree
                                     key={`${item.href}-children`}
                                     children={item.children}

@@ -20,7 +20,7 @@ export const metadata = { title: "Settings" };
 const SECTIONS = [
     {
         href: "/settings/organization",
-        label: "Organization",
+        label: "Business",
         description:
             "Workspace name and the business identity used across Saroh.",
         icon: Building2,

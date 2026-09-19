@@ -191,7 +191,8 @@ export function MobileNav({
                                 );
                             })}
                             {group.items.map((item) =>
-                                item.children?.length ? (
+                                item.children?.length &&
+                                isNavItemActive(pathname, item.href) ? (
                                     <div
                                         key={`${item.href}-children`}
                                         className="ml-6 flex flex-col gap-1 border-l border-border pl-2.5"

@@ -332,7 +332,7 @@ export const NAV_GROUPS: NavGroup[] = [
             },
             {
                 href: "/settings/organization",
-                label: "Organization",
+                label: "Business",
                 icon: Building2,
                 action: "org:settings:read",
             },
