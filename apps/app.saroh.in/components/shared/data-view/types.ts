@@ -45,6 +45,8 @@ export interface DataColumn<TRow> {
      * the figure people scan for.
      */
     money?: boolean;
+    /** A fixed width for the table column, e.g. "118px". Omit on the one flexible column. */
+    width?: string;
     /** Hide from the table only; useful for a list-only summary line. */
     tableHidden?: boolean;
 }
@@ -117,6 +119,12 @@ export interface DataViewProps<TRow> {
     noun?: { one: string; other: string };
     /** Placeholder for the search field, e.g. "Search products". */
     searchPlaceholder?: string;
+    /**
+     * Hide the Table/List switch. The viewport still decides — a table above
+     * `lg`, the list below — which is what screens without the switch in their
+     * design want.
+     */
+    hideModeToggle?: boolean;
     /** Extra toolbar controls beside the search — a storefront filter, say. */
     toolbarExtra?: ReactNode;
     /** Replaces the plain count at the toolbar's end, e.g. "4 products across 2 storefronts". */

@@ -46,7 +46,7 @@ export default async function PeoplePage() {
     ]);
 
     return (
-        <PageContainer>
+        <PageContainer width="full">
             <TeamScreen
                 organizationName={organization?.name ?? "this business"}
                 members={members}

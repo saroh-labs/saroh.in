@@ -27,6 +27,7 @@ import {
     ChevronDown,
     ExternalLink,
     Info,
+    ListFilter,
     MoreHorizontal,
     Package,
     Plus,
@@ -66,18 +67,23 @@ const STATUS_VARIANT: Record<
     ARCHIVED: "neutral",
 };
 
+/**
+ * Tabs filter the catalogue (brand file §13): the same products, cut three
+ * ways. Collections are the products placed in one; Inventory is the products
+ * whose stock is tracked. Status is not a tab — it is on every row, and the
+ * Filter button narrows by it.
+ */
 const FILTERS: DataFilter<CatalogueRow>[] = [
     { id: "all", label: "All" },
     {
-        id: "published",
-        label: "Published",
-        predicate: (r) => r.status === "PUBLISHED",
+        id: "collections",
+        label: "Collections",
+        predicate: (r) => r.inCollection,
     },
-    { id: "drafts", label: "Drafts", predicate: (r) => r.status === "DRAFT" },
     {
-        id: "archived",
-        label: "Archived",
-        predicate: (r) => r.status === "ARCHIVED",
+        id: "inventory",
+        label: "Inventory",
+        predicate: (r) => r.stock !== null,
     },
 ];
 
@@ -164,21 +170,25 @@ export function CatalogueScreen({
     const [pendingDelete, setPendingDelete] = useState<CatalogueRow[] | null>(
         null,
     );
+    const [statusFilter, setStatusFilter] = useState<ProductStatus | null>(
+        null,
+    );
 
     const catalogue = useMemo(
         () => mergeCatalogue(stores, productsByStore),
         [stores, productsByStore],
     );
-    const rows = useMemo(
-        () =>
-            storeId
-                ? catalogue.flatMap((r) => {
-                      const here = inStorefront(r, storeId);
-                      return here ? [here] : [];
-                  })
-                : catalogue,
-        [catalogue, storeId],
-    );
+    const rows = useMemo(() => {
+        const scoped = storeId
+            ? catalogue.flatMap((r) => {
+                  const here = inStorefront(r, storeId);
+                  return here ? [here] : [];
+              })
+            : catalogue;
+        return statusFilter
+            ? scoped.filter((r) => r.status === statusFilter)
+            : scoped;
+    }, [catalogue, storeId, statusFilter]);
     const store = stores.find((s) => s.id === storeId) ?? null;
     const many = stores.length > 1;
     const first = stores.at(0);
@@ -284,9 +294,13 @@ export function CatalogueScreen({
             id: "status",
             header: "Status",
             priority: "secondary",
+            width: "118px",
             sortValue: (r) => r.status,
             cell: (r) => (
-                <Badge variant={STATUS_VARIANT[r.status]}>
+                <Badge
+                    variant={STATUS_VARIANT[r.status]}
+                    className="px-[9px] py-[3px] text-[11px]"
+                >
                     {STATUS_LABEL[r.status]}
                 </Badge>
             ),
@@ -295,6 +309,7 @@ export function CatalogueScreen({
             id: "inventory",
             header: "Inventory",
             priority: "secondary",
+            width: "128px",
             sortValue: (r) => r.stock ?? -1,
             cell: (r) => {
                 const s = stockOf(r);
@@ -309,6 +324,7 @@ export function CatalogueScreen({
             id: "price",
             header: "Price",
             priority: "secondary",
+            width: "104px",
             numeric: true,
             money: true,
             sortValue: (r) => Number(r.price),
@@ -415,6 +431,7 @@ export function CatalogueScreen({
                     columns={columns}
                     rowKey={(r) => r.key}
                     modes={["table", "list"]}
+                    hideModeToggle
                     noun={{ one: "product", other: "products" }}
                     searchPlaceholder="Search products"
                     searchableColumnIds={["product"]}
@@ -495,14 +512,20 @@ export function CatalogueScreen({
                         </DropdownMenu>
                     )}
                     toolbarExtra={
-                        many ? (
-                            <StorefrontFilter
-                                stores={stores}
-                                catalogue={catalogue}
-                                value={storeId}
-                                onChange={setStoreId}
+                        <>
+                            {many ? (
+                                <StorefrontFilter
+                                    stores={stores}
+                                    catalogue={catalogue}
+                                    value={storeId}
+                                    onChange={setStoreId}
+                                />
+                            ) : null}
+                            <StatusFilter
+                                value={statusFilter}
+                                onChange={setStatusFilter}
                             />
-                        ) : null
+                        </>
                     }
                     countLabel={(visible) =>
                         `${visible} ${visible === 1 ? "product" : "products"}` +
@@ -554,6 +577,53 @@ export function CatalogueScreen({
                 onConfirm={() => void confirmDelete()}
             />
         </div>
+    );
+}
+
+/** The Filter button: narrow the catalogue by status. */
+function StatusFilter({
+    value,
+    onChange,
+}: {
+    value: ProductStatus | null;
+    onChange: (status: ProductStatus | null) => void;
+}) {
+    const choices: { id: ProductStatus | null; label: string }[] = [
+        { id: null, label: "Any status" },
+        { id: "PUBLISHED", label: "Published" },
+        { id: "DRAFT", label: "Draft" },
+        { id: "ARCHIVED", label: "Archived" },
+    ];
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="outline"
+                    className={cn(
+                        "h-[38px] gap-[7px] px-[13px] text-[13px] font-medium text-neutral-600 dark:text-foreground",
+                        value && "border-foreground",
+                    )}
+                    aria-label={`Filter: ${value ? STATUS_LABEL[value] : "any status"}. Change it.`}
+                >
+                    <ListFilter className="size-4" />
+                    {value ? STATUS_LABEL[value] : "Filter"}
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    Status
+                </DropdownMenuLabel>
+                {choices.map((c) => (
+                    <DropdownMenuItem
+                        key={c.id ?? "any"}
+                        onSelect={() => onChange(c.id)}
+                    >
+                        <span className="flex-1">{c.label}</span>
+                        {c.id === value ? <Check aria-hidden /> : null}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 

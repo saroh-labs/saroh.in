@@ -32,6 +32,8 @@ export interface CatalogueRow {
     /** The tightest low-stock threshold among those places. */
     lowStockAlert: number | null;
     updatedAt: string;
+    /** In a collection (a category) in at least one place. */
+    inCollection: boolean;
     places: CataloguePlace[];
 }
 
@@ -105,6 +107,7 @@ function toRow(key: string, places: Places): CatalogueRow {
                 p.product.updatedAt > latest ? p.product.updatedAt : latest,
             first.updatedAt,
         ),
+        inCollection: places.some((p) => p.product.categoryId !== null),
         places,
     };
 }

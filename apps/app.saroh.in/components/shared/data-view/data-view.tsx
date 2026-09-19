@@ -60,12 +60,14 @@ export function DataView<TRow>({
     searchPlaceholder = "Search…",
     toolbarExtra,
     countLabel,
+    hideModeToggle = false,
     onRowClick,
     selectable = false,
     bulkActions,
     emptyState,
 }: DataViewProps<TRow>) {
     const { mode, choose } = useViewMode(viewId, modes, defaultMode);
+    const showModes = modes.length > 1 && !hideModeToggle;
     const [query, setQuery] = useState("");
     const [sort, setSort] = useState<{ id: string; desc: boolean } | null>(
         null,
@@ -242,7 +244,7 @@ export function DataView<TRow>({
             ) : null}
 
             {/* The toolbar: search, density, and how many rows are showing. */}
-            {searchable.length > 0 || modes.length > 1 || toolbarExtra ? (
+            {searchable.length > 0 || showModes || toolbarExtra ? (
                 <div className="flex flex-wrap items-center gap-2.5">
                     {searchable.length > 0 ? (
                         <div className="relative min-w-[200px] max-w-[320px] flex-1">
@@ -262,7 +264,7 @@ export function DataView<TRow>({
 
                     {toolbarExtra}
 
-                    {modes.length > 1 ? (
+                    {showModes ? (
                         <div
                             role="group"
                             aria-label="View density"
@@ -413,6 +415,11 @@ export function DataView<TRow>({
                                                     ? sort.desc
                                                         ? "descending"
                                                         : "ascending"
+                                                    : undefined
+                                            }
+                                            style={
+                                                col.width
+                                                    ? { width: col.width }
                                                     : undefined
                                             }
                                             className={cn(
@@ -752,7 +759,8 @@ export function DataView<TRow>({
             {/* Shown when neither search nor density is on offer, so a list
                 still says how much it holds. */}
             {searchable.length === 0 &&
-            modes.length <= 1 &&
+            !showModes &&
+            !toolbarExtra &&
             visible.length > 0 ? (
                 <p className="text-xs text-muted-foreground" aria-live="polite">
                     {count(rows.length)}

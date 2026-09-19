@@ -33,7 +33,7 @@ export default async function CataloguePage({
     );
 
     return (
-        <PageContainer>
+        <PageContainer width="full">
             <CatalogueScreen
                 stores={stores.map((s) => ({ id: s.id, name: s.name }))}
                 productsByStore={productsByStore}
