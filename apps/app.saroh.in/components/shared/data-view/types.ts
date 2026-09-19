@@ -113,4 +113,39 @@ export interface DataViewProps<TRow> {
     initialFilterId?: string;
     isLoading?: boolean;
     error?: string | null;
+    /** What a row is, for counts and states: "3 products", "No products match…". */
+    noun?: { one: string; other: string };
+    /** Placeholder for the search field, e.g. "Search products". */
+    searchPlaceholder?: string;
+    /**
+     * Opens a row in place — a preview drawer — instead of navigating. The
+     * whole row is the target (brand file §10); the first cell becomes a real
+     * button so the row stays reachable by keyboard.
+     */
+    onRowClick?: (row: TRow) => void;
+    /** Rows can be selected, and the bulk bar offers these actions. */
+    selectable?: boolean;
+    bulkActions?: DataBulkAction<TRow>[];
+    /**
+     * The designed first-run state: shown when there are no rows at all. The
+     * no-match and filtered-to-nothing states are built in, so every list says
+     * the same thing when a search comes back empty.
+     */
+    emptyState?: {
+        icon?: ReactNode;
+        title: string;
+        note?: string;
+        action?: ReactNode;
+    };
+}
+
+/**
+ * One action in the bulk bar. `run` gets the selected rows and a way to clear
+ * the selection; destructive actions confirm before they act (brand file §14).
+ */
+export interface DataBulkAction<TRow> {
+    id: string;
+    label: string;
+    tone?: "default" | "destructive";
+    run: (rows: TRow[], clear: () => void) => void;
 }

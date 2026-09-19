@@ -1,10 +1,18 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Checkbox } from "@saroh/ui/checkbox";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
-import { ArrowDown, ArrowUp, LayoutGrid, List, Table2 } from "lucide-react";
+import {
+    ArrowDown,
+    ArrowUp,
+    LayoutGrid,
+    List,
+    Search,
+    Table2,
+} from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -48,12 +56,22 @@ export function DataView<TRow>({
     initialFilterId,
     isLoading = false,
     error = null,
+    noun = { one: "row", other: "rows" },
+    searchPlaceholder = "Search…",
+    onRowClick,
+    selectable = false,
+    bulkActions,
+    emptyState,
 }: DataViewProps<TRow>) {
     const { mode, choose } = useViewMode(viewId, modes, defaultMode);
     const [query, setQuery] = useState("");
     const [sort, setSort] = useState<{ id: string; desc: boolean } | null>(
         null,
     );
+    const [selected, setSelected] = useState<ReadonlySet<string>>(
+        () => new Set(),
+    );
+    const count = (n: number) => `${n} ${n === 1 ? noun.one : noun.other}`;
 
     /*
      * An unknown `?view=` falls back to the first filter rather than showing
@@ -136,6 +154,33 @@ export function DataView<TRow>({
         );
     };
 
+    // A selection only ever holds rows that still exist: a row deleted or
+    // filtered away by a refresh must not stay counted in the bulk bar.
+    const selectedRows = rows.filter((r) => selected.has(rowKey(r)));
+    const visibleKeys = visible.map(rowKey);
+    const selectedInView = visibleKeys.filter((k) => selected.has(k)).length;
+    const allInView =
+        visibleKeys.length > 0 && selectedInView === visibleKeys.length;
+    const toggleRow = (key: string) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    // Select-all takes the view, never the whole dataset (brand file §10).
+    const toggleAll = () =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            for (const key of visibleKeys) {
+                if (allInView) next.delete(key);
+                else next.add(key);
+            }
+            return next;
+        });
+    const clearSelection = () => setSelected(new Set());
+    const firstFilter = filters?.at(0);
+
     /** Normalised once so the guards below are plain length checks. */
     const searchable = searchableColumnIds ?? [];
     // One filter is not a filter — a lone chip nobody can switch away from is
@@ -146,65 +191,72 @@ export function DataView<TRow>({
 
     return (
         <div className="space-y-4">
-            {/* Controls. Search, subset and density sit together because they
-                are the same job: getting to the rows that matter. */}
-            {searchable.length > 0 || modes.length > 1 || hasFilters ? (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                        {searchable.length > 0 ? (
+            {/*
+             * Header tabs, when they filter (brand file §13): sub-views of the
+             * same rows — All, Unfulfilled, Refunds — each with its count.
+             * They filter the list, they never navigate, so they carry
+             * `aria-pressed`, not `aria-current`; the page marker belongs to
+             * the rail and appears once per screen.
+             */}
+            {hasFilters ? (
+                <div
+                    role="group"
+                    aria-label="Filter"
+                    className="-mt-2 flex flex-wrap gap-0.5 border-b border-border"
+                >
+                    {filters?.map((f) => {
+                        const on = f.id === filterId;
+                        const n = f.predicate
+                            ? rows.filter(f.predicate).length
+                            : rows.length;
+                        return (
+                            <button
+                                key={f.id}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() => chooseFilter(f.id)}
+                                className={cn(
+                                    "flex items-center gap-[7px] rounded-t-md px-[13px] py-[9px] text-[13.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
+                                    on
+                                        ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
+                                        : "font-medium text-muted-foreground hover:text-foreground",
+                                )}
+                            >
+                                {f.label}
+                                <span
+                                    className={cn(
+                                        "rounded-full px-[7px] py-0.5 font-mono text-[11px] font-medium tabular-nums",
+                                        on
+                                            ? "bg-muted text-foreground"
+                                            : "bg-foreground/[0.04] text-muted-foreground",
+                                    )}
+                                >
+                                    {n}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            ) : null}
+
+            {/* The toolbar: search, density, and how many rows are showing. */}
+            {searchable.length > 0 || modes.length > 1 ? (
+                <div className="flex flex-wrap items-center gap-2.5">
+                    {searchable.length > 0 ? (
+                        <div className="relative min-w-[200px] max-w-[320px] flex-1">
+                            <Search
+                                aria-hidden
+                                className="pointer-events-none absolute left-[11px] top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                            />
                             <Input
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search…"
-                                aria-label="Search this view"
-                                className="h-9 w-full max-w-xs coarse:h-11 sm:w-64"
+                                placeholder={searchPlaceholder}
+                                aria-label={searchPlaceholder.replace(/…$/, "")}
+                                className="h-[38px] pl-[34px] text-[13.5px] coarse:h-11"
                             />
-                        ) : null}
-
-                        {hasFilters ? (
-                            <div
-                                role="group"
-                                aria-label="Filter"
-                                className="flex flex-wrap items-center gap-1 coarse:gap-2"
-                            >
-                                {filters?.map((f) => {
-                                    const on = f.id === filterId;
-                                    // The count is on the chip because the
-                                    // question "how many are overdue?" is
-                                    // usually the reason for reaching for it.
-                                    const n = f.predicate
-                                        ? rows.filter(f.predicate).length
-                                        : rows.length;
-                                    return (
-                                        <button
-                                            key={f.id}
-                                            type="button"
-                                            aria-pressed={on}
-                                            onClick={() => chooseFilter(f.id)}
-                                            className={cn(
-                                                // `coarse:` = a touch pointer,
-                                                // i.e. two of the four primary
-                                                // scenes. 32px is a mouse
-                                                // target; a thumb on a shop
-                                                // floor needs 44 (§17, §19).
-                                                // The chip stays 32 on the desk,
-                                                // where density is the point.
-                                                "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors coarse:h-11 coarse:px-3.5 coarse:text-sm",
-                                                on
-                                                    ? "border-brand/50 bg-brand-subtle text-foreground"
-                                                    : "border-border text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-                                            )}
-                                        >
-                                            {f.label}
-                                            <span className="tabular-nums opacity-60">
-                                                {n}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        ) : null}
-                    </div>
+                        </div>
+                    ) : null}
 
                     {modes.length > 1 ? (
                         <div
@@ -238,6 +290,15 @@ export function DataView<TRow>({
                             })}
                         </div>
                     ) : null}
+
+                    <p
+                        className="ml-auto text-xs text-muted-foreground"
+                        aria-live="polite"
+                    >
+                        {visible.length === rows.length
+                            ? count(rows.length)
+                            : `${visible.length} of ${count(rows.length)}`}
+                    </p>
                 </div>
             ) : null}
 
@@ -258,24 +319,83 @@ export function DataView<TRow>({
                     ))}
                 </div>
             ) : visible.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border px-6 py-12 text-center text-sm text-muted-foreground">
-                    {/* Naming the narrowing matters: an empty result under an
-                        active filter must not read as "you have no leads". */}
-                    {query.trim()
-                        ? `Nothing matches “${query.trim()}”.`
-                        : activeFilter?.predicate && rows.length > 0
-                          ? `Nothing in “${activeFilter.label}”. ${rows.length} ${rows.length === 1 ? "row" : "rows"} in total.`
-                          : (empty ?? "Nothing here yet.")}
-                </div>
+                /*
+                 * Three kinds of empty (brand file §14), each answering "what
+                 * do I do now?". No results offers the way back; a filter with
+                 * nothing in it names the narrowing, so it never reads as "you
+                 * have no leads"; first run offers the primary action.
+                 */
+                query.trim() ? (
+                    <EmptyPanel
+                        icon={<Search />}
+                        title={`No ${noun.other} match “${query.trim()}”`}
+                        note="Clear the search to see everything in this view."
+                        action={
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setQuery("")}
+                            >
+                                Clear search
+                            </Button>
+                        }
+                    />
+                ) : activeFilter?.predicate && rows.length > 0 ? (
+                    <EmptyPanel
+                        title={`Nothing in “${activeFilter.label}”`}
+                        note={`${count(rows.length)} in total.`}
+                        action={
+                            firstFilter ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => chooseFilter(firstFilter.id)}
+                                >
+                                    Show {firstFilter.label.toLowerCase()}
+                                </Button>
+                            ) : null
+                        }
+                    />
+                ) : emptyState ? (
+                    <EmptyPanel {...emptyState} />
+                ) : (
+                    <EmptyPanel
+                        title={
+                            typeof empty === "string"
+                                ? empty
+                                : "Nothing here yet."
+                        }
+                    >
+                        {typeof empty === "string" ? null : empty}
+                    </EmptyPanel>
+                )
             ) : mode === "table" ? (
                 // Horizontal scroll is on the wrapper, never the page: a table
                 // that widens the document breaks every other element on it.
-                <div className="overflow-x-auto rounded-xl border border-border">
-                    <table className="w-full border-collapse text-sm">
+                <div className="overflow-x-auto rounded-[11px] border border-border">
+                    <table className="w-full border-collapse text-[13.5px]">
                         <thead>
-                            {/* No header fill: a stronger rule under the
-                                head does that job (brand file §10). */}
-                            <tr className="border-b border-border-strong">
+                            {/* A faint head fill and a stronger rule, as the
+                                applied Products screen draws it. */}
+                            <tr className="h-10 border-b border-border bg-foreground/[0.03]">
+                                {selectable ? (
+                                    <th
+                                        scope="col"
+                                        className="w-[38px] pl-[14px]"
+                                    >
+                                        <Checkbox
+                                            checked={
+                                                allInView
+                                                    ? true
+                                                    : selectedInView > 0
+                                                      ? "indeterminate"
+                                                      : false
+                                            }
+                                            onCheckedChange={toggleAll}
+                                            aria-label={`Select every ${noun.one} in this view`}
+                                        />
+                                    </th>
+                                ) : null}
                                 {tableColumns.map((col) => {
                                     const active = sort?.id === col.id;
                                     return (
@@ -290,7 +410,7 @@ export function DataView<TRow>({
                                                     : undefined
                                             }
                                             className={cn(
-                                                "whitespace-nowrap px-3 py-2.5 text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground",
+                                                "whitespace-nowrap px-[14px] text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground",
                                                 col.numeric && "text-right",
                                             )}
                                         >
@@ -332,7 +452,7 @@ export function DataView<TRow>({
                                 {rowActions ? (
                                     <th
                                         scope="col"
-                                        className="w-px px-3 py-2.5"
+                                        className="w-[44px] px-[14px]"
                                     >
                                         <span className="sr-only">Actions</span>
                                     </th>
@@ -345,71 +465,125 @@ export function DataView<TRow>({
                                 the translucent Ink wash (brand file §22), and
                                 transitions stay on colour only — a table that
                                 moves on hover is unreadable while scanning. */}
-                            {visible.map((row, rowIndex) => (
-                                <tr
-                                    key={rowKey(row)}
-                                    style={
-                                        {
-                                            "--wk-i": rowIndex,
-                                        } as React.CSSProperties
-                                    }
-                                    className="wk-item border-b border-border transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035]"
-                                >
-                                    {tableColumns.map((col, colIndex) => {
-                                        const href = rowHref?.(row);
-                                        return (
+                            {visible.map((row, rowIndex) => {
+                                const key = rowKey(row);
+                                const isSelected = selected.has(key);
+                                return (
+                                    <tr
+                                        key={key}
+                                        style={
+                                            {
+                                                "--wk-i": rowIndex,
+                                            } as React.CSSProperties
+                                        }
+                                        data-state={
+                                            isSelected ? "selected" : undefined
+                                        }
+                                        // The row is the action (brand file §10):
+                                        // anywhere on it opens the item. Controls
+                                        // inside stop the click.
+                                        onClick={
+                                            onRowClick
+                                                ? () => onRowClick(row)
+                                                : undefined
+                                        }
+                                        className={cn(
+                                            "wk-item border-b border-border transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035] data-[state=selected]:bg-brand-subtle",
+                                            onRowClick && "cursor-pointer",
+                                        )}
+                                    >
+                                        {selectable ? (
                                             <td
-                                                key={col.id}
-                                                className={cn(
-                                                    "px-3 py-2.5 align-middle",
-                                                    col.numeric &&
-                                                        "text-right tabular-nums",
-                                                    // Money is the figure people
-                                                    // scan for: Space Grotesk.
-                                                    col.money &&
-                                                        "font-display font-semibold",
-                                                )}
+                                                className="w-[38px] pl-[14px] align-middle"
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
                                             >
-                                                {/*
-                                                 * The FIRST cell carries the
-                                                 * row link, not the row.
-                                                 *
-                                                 * List mode stretches an
-                                                 * overlay anchor across the
-                                                 * row, which a `tr` cannot
-                                                 * hold: `position: relative`
-                                                 * on a table row is not
-                                                 * reliable across browsers, so
-                                                 * the overlay would escape to
-                                                 * the table. Anchoring the
-                                                 * link to one cell keeps a
-                                                 * real, focusable target with
-                                                 * real text, and keeps it out
-                                                 * of the cells where callers
-                                                 * put their own links — a
-                                                 * booking's contact link would
-                                                 * otherwise nest inside it.
-                                                 */}
-                                                {href && colIndex === 0 ? (
-                                                    <Link
-                                                        href={href}
-                                                        className="block rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                                                    >
-                                                        {col.cell(row)}
-                                                    </Link>
-                                                ) : (
-                                                    col.cell(row)
-                                                )}
+                                                <Checkbox
+                                                    checked={isSelected}
+                                                    onCheckedChange={() =>
+                                                        toggleRow(key)
+                                                    }
+                                                    aria-label={`Select ${noun.one}`}
+                                                />
                                             </td>
-                                        );
-                                    })}
-                                    {rowActions ? (
-                                        <td className="whitespace-nowrap px-3 py-2.5 text-right align-middle">
-                                            {rowActions(row)}
-                                        </td>
-                                    ) : null}
-                                </tr>
-                            ))}
+                                        ) : null}
+                                        {tableColumns.map((col, colIndex) => {
+                                            const href = rowHref?.(row);
+                                            return (
+                                                <td
+                                                    key={col.id}
+                                                    className={cn(
+                                                        "px-[14px] py-[11px] align-middle",
+                                                        col.numeric &&
+                                                            "text-right tabular-nums",
+                                                        // Money is the figure people
+                                                        // scan for: Space Grotesk.
+                                                        col.money &&
+                                                            "font-display font-semibold",
+                                                    )}
+                                                >
+                                                    {/*
+                                                     * The FIRST cell carries the
+                                                     * row link, not the row.
+                                                     *
+                                                     * List mode stretches an
+                                                     * overlay anchor across the
+                                                     * row, which a `tr` cannot
+                                                     * hold: `position: relative`
+                                                     * on a table row is not
+                                                     * reliable across browsers, so
+                                                     * the overlay would escape to
+                                                     * the table. Anchoring the
+                                                     * link to one cell keeps a
+                                                     * real, focusable target with
+                                                     * real text, and keeps it out
+                                                     * of the cells where callers
+                                                     * put their own links — a
+                                                     * booking's contact link would
+                                                     * otherwise nest inside it.
+                                                     */}
+                                                    {href && colIndex === 0 ? (
+                                                        <Link
+                                                            href={href}
+                                                            className="block rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                                        >
+                                                            {col.cell(row)}
+                                                        </Link>
+                                                    ) : onRowClick &&
+                                                      colIndex === 0 ? (
+                                                        // A real button, so the row
+                                                        // that opens on click also
+                                                        // opens from the keyboard.
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onRowClick(row);
+                                                            }}
+                                                            className="block w-full min-w-0 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                        >
+                                                            {col.cell(row)}
+                                                        </button>
+                                                    ) : (
+                                                        col.cell(row)
+                                                    )}
+                                                </td>
+                                            );
+                                        })}
+                                        {rowActions ? (
+                                            <td
+                                                className="w-[44px] whitespace-nowrap px-[14px] text-right align-middle"
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
+                                            >
+                                                {rowActions(row)}
+                                            </td>
+                                        ) : null}
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -521,13 +695,105 @@ export function DataView<TRow>({
                 </ul>
             )}
 
-            {visible.length > 0 ? (
+            {/*
+             * The bulk bar (brand file §10, §14): a persistent mode while
+             * anything is selected, pinned to the bottom edge. A toast that
+             * arrives meanwhile stacks above it, never over it.
+             */}
+            {selectable && selectedRows.length > 0 ? (
+                <div
+                    role="region"
+                    aria-label="Selection"
+                    className="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-[11px] bg-primary px-[15px] py-[11px] text-primary-foreground shadow-lg"
+                >
+                    <span className="text-[13px] font-semibold">
+                        {count(selectedRows.length)} selected
+                    </span>
+                    {selectedRows.length > selectedInView ? (
+                        <span className="text-[11.5px] opacity-80">
+                            {selectedInView} in this view
+                        </span>
+                    ) : null}
+                    <div className="ml-auto flex flex-wrap gap-[7px]">
+                        {bulkActions?.map((action) => (
+                            <button
+                                key={action.id}
+                                type="button"
+                                onClick={() =>
+                                    action.run(selectedRows, clearSelection)
+                                }
+                                className={cn(
+                                    "h-8 rounded-lg px-3 text-[12.5px] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground",
+                                    action.tone === "destructive"
+                                        ? "bg-[#B3261E] text-white hover:bg-[#8F1E18]"
+                                        : "border border-primary-foreground/30 hover:bg-primary-foreground/10",
+                                )}
+                            >
+                                {action.label}
+                            </button>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={clearSelection}
+                            className="h-8 rounded-lg px-2.5 text-[12.5px] font-medium opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Shown when neither search nor density is on offer, so a list
+                still says how much it holds. */}
+            {searchable.length === 0 &&
+            modes.length <= 1 &&
+            visible.length > 0 ? (
                 <p className="text-xs text-muted-foreground" aria-live="polite">
-                    {visible.length === rows.length
-                        ? `${rows.length} ${rows.length === 1 ? "row" : "rows"}`
-                        : `${visible.length} of ${rows.length} rows`}
+                    {count(rows.length)}
                 </p>
             ) : null}
+        </div>
+    );
+}
+
+/**
+ * An empty, no-match or failed region, drawn as the brand file draws it
+ * (§14): a dashed Ink 300 edge, an icon, the title in Space Grotesk, one line
+ * saying what to do, and the action that does it.
+ */
+function EmptyPanel({
+    icon,
+    title,
+    note,
+    action,
+    children,
+}: {
+    icon?: React.ReactNode;
+    title: string;
+    note?: string;
+    action?: React.ReactNode;
+    children?: React.ReactNode;
+}) {
+    return (
+        <div className="flex flex-col items-center gap-[9px] rounded-[11px] border border-dashed border-border-strong px-6 py-12 text-center">
+            {icon ? (
+                <div
+                    aria-hidden
+                    className="text-muted-foreground [&_svg]:size-8 [&_svg]:stroke-[1.7]"
+                >
+                    {icon}
+                </div>
+            ) : null}
+            <p className="font-display text-[19px] font-semibold tracking-[-0.025em]">
+                {title}
+            </p>
+            {note ? (
+                <p className="max-w-[44ch] text-[13.5px] leading-[1.55] text-muted-foreground">
+                    {note}
+                </p>
+            ) : null}
+            {children}
+            {action ? <div className="mt-1">{action}</div> : null}
         </div>
     );
 }
