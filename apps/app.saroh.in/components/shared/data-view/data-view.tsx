@@ -58,6 +58,8 @@ export function DataView<TRow>({
     error = null,
     noun = { one: "row", other: "rows" },
     searchPlaceholder = "Search…",
+    toolbarExtra,
+    countLabel,
     onRowClick,
     selectable = false,
     bulkActions,
@@ -240,7 +242,7 @@ export function DataView<TRow>({
             ) : null}
 
             {/* The toolbar: search, density, and how many rows are showing. */}
-            {searchable.length > 0 || modes.length > 1 ? (
+            {searchable.length > 0 || modes.length > 1 || toolbarExtra ? (
                 <div className="flex flex-wrap items-center gap-2.5">
                     {searchable.length > 0 ? (
                         <div className="relative min-w-[200px] max-w-[320px] flex-1">
@@ -257,6 +259,8 @@ export function DataView<TRow>({
                             />
                         </div>
                     ) : null}
+
+                    {toolbarExtra}
 
                     {modes.length > 1 ? (
                         <div
@@ -295,9 +299,11 @@ export function DataView<TRow>({
                         className="ml-auto text-xs text-muted-foreground"
                         aria-live="polite"
                     >
-                        {visible.length === rows.length
-                            ? count(rows.length)
-                            : `${visible.length} of ${count(rows.length)}`}
+                        {countLabel
+                            ? countLabel(visible.length, rows.length)
+                            : visible.length === rows.length
+                              ? count(rows.length)
+                              : `${visible.length} of ${count(rows.length)}`}
                     </p>
                 </div>
             ) : null}

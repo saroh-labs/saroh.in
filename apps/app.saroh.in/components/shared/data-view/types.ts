@@ -117,6 +117,10 @@ export interface DataViewProps<TRow> {
     noun?: { one: string; other: string };
     /** Placeholder for the search field, e.g. "Search products". */
     searchPlaceholder?: string;
+    /** Extra toolbar controls beside the search — a storefront filter, say. */
+    toolbarExtra?: ReactNode;
+    /** Replaces the plain count at the toolbar's end, e.g. "4 products across 2 storefronts". */
+    countLabel?: (visible: number, total: number) => string;
     /**
      * Opens a row in place — a preview drawer — instead of navigating. The
      * whole row is the target (brand file §10); the first cell becomes a real
