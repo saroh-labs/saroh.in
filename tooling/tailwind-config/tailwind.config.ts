@@ -203,6 +203,13 @@ const config = {
                     subtle: "hsl(var(--info-subtle))",
                     "subtle-foreground": "hsl(var(--info-subtle-foreground))",
                 },
+                // The ring and dot each workspace role wears (Team screen).
+                role: {
+                    owner: "hsl(var(--role-owner))",
+                    admin: "hsl(var(--role-admin))",
+                    member: "hsl(var(--role-member))",
+                    reviewer: "hsl(var(--role-reviewer))",
+                },
                 chart: {
                     1: "hsl(var(--chart-1))",
                     2: "hsl(var(--chart-2))",

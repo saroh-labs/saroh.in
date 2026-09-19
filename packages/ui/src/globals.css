@@ -203,6 +203,17 @@
         --info-subtle: 212 42% 94%;
         --info-subtle-foreground: 209 63% 29%; /* 7.67:1 */
 
+        /* ---- role rings (Team screen) ----
+           Each workspace role wears one ring around a neutral monogram, and a
+           dot of the same colour beside its name. A ring only reinforces: the
+           role name is always beside it in words, which is why Member's
+           Saffron may sit under 3:1 on white. Every ring is a pair — the dark
+           cut is for Ink grounds, where the light one would vanish. */
+        --role-owner: 60 4% 11%; /* Ink */
+        --role-admin: 33 85% 31%; /* Clay #91550C */
+        --role-member: 36 82% 47%; /* Saffron #D98A15 */
+        --role-reviewer: 209 44% 27%; /* Slate #264562 */
+
         /* ---- chart series: W6, Saffron and slate ----
            Up to six unrelated series; slate is the only hue from outside the
            brand and stays at low chroma. Use the steps in order. Every fill
@@ -320,6 +331,11 @@
         --info-foreground: 60 4% 11%;
         --info-subtle: 211 37% 13%;
         --info-subtle-foreground: 211 74% 74%;
+
+        --role-owner: 40 31% 94%; /* Paper */
+        --role-admin: 33 58% 50%; /* #CA8837 */
+        --role-member: 36 82% 47%;
+        --role-reviewer: 209 42% 60%; /* #6E9BC4 */
 
         --chart-1: 35 76% 36%;
         --chart-2: 33 58% 50%;
@@ -689,6 +705,10 @@
     --destructive-subtle-foreground: var(--foreground);
     --info-subtle: var(--muted);
     --info-subtle-foreground: var(--foreground);
+    --role-owner: var(--foreground);
+    --role-admin: var(--muted-foreground);
+    --role-member: var(--highlight);
+    --role-reviewer: var(--brand);
 }
 
 .dark:where(
