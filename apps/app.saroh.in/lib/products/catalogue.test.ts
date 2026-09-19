@@ -1,3 +1,6 @@
+import { describe, expect, it } from "vitest";
+
+import type { CatalogueRow } from "./catalogue";
 import { inStorefront, mergeCatalogue } from "./catalogue";
 import type { ProductListItem } from "./service";
 
@@ -21,6 +24,15 @@ function product(
     };
 }
 
+/** The single row a case expects; fails the test when there is not exactly one. */
+function only(rows: CatalogueRow[]): CatalogueRow {
+    const row = rows.at(0);
+    if (!row || rows.length !== 1) {
+        throw new Error(`expected one row, got ${rows.length}`);
+    }
+    return row;
+}
+
 const STORES = [
     { id: "market", name: "Market Street" },
     { id: "online", name: "Online" },
@@ -40,17 +52,16 @@ describe("mergeCatalogue", () => {
                 }),
             ],
         });
-        expect(rows).toHaveLength(1);
-        const [row] = rows;
-        expect(row?.places.map((p) => p.storeName)).toEqual([
+        const row = only(rows);
+        expect(row.places.map((p) => p.storeName)).toEqual([
             "Market Street",
             "Online",
         ]);
         // Price differs by storefront: say "varies", never pick a winner.
-        expect(row?.varies).toBe(true);
-        expect(row?.stock).toBe(72);
-        expect(row?.lowStockAlert).toBe(5);
-        expect(row?.updatedAt).toBe("2026-09-18T08:02:00.000Z");
+        expect(row.varies).toBe(true);
+        expect(row.stock).toBe(72);
+        expect(row.lowStockAlert).toBe(5);
+        expect(row.updatedAt).toBe("2026-09-18T08:02:00.000Z");
     });
 
     it("keeps a product with no SKU as its own row", () => {
@@ -62,38 +73,58 @@ describe("mergeCatalogue", () => {
     });
 
     it("is live when live anywhere, archived only when archived everywhere", () => {
-        const [mixed] = mergeCatalogue(STORES, {
-            market: [product({ id: "p1", storeId: "market", status: "DRAFT" })],
-            online: [product({ id: "p2", storeId: "online" })],
-        });
-        expect(mixed?.status).toBe("PUBLISHED");
-        const [gone] = mergeCatalogue(STORES, {
-            market: [
-                product({ id: "p1", storeId: "market", status: "ARCHIVED" }),
-            ],
-            online: [product({ id: "p2", storeId: "online", status: "DRAFT" })],
-        });
-        expect(gone?.status).toBe("DRAFT");
+        const mixed = only(
+            mergeCatalogue(STORES, {
+                market: [
+                    product({ id: "p1", storeId: "market", status: "DRAFT" }),
+                ],
+                online: [product({ id: "p2", storeId: "online" })],
+            }),
+        );
+        expect(mixed.status).toBe("PUBLISHED");
+        const gone = only(
+            mergeCatalogue(STORES, {
+                market: [
+                    product({
+                        id: "p1",
+                        storeId: "market",
+                        status: "ARCHIVED",
+                    }),
+                ],
+                online: [
+                    product({ id: "p2", storeId: "online", status: "DRAFT" }),
+                ],
+            }),
+        );
+        expect(gone.status).toBe("DRAFT");
     });
 
     it("reads stock as unknown when no place tracks it", () => {
-        const [row] = mergeCatalogue(STORES, {
-            market: [product({ id: "p1", storeId: "market", inventory: null })],
-        });
-        expect(row?.stock).toBeNull();
+        const row = only(
+            mergeCatalogue(STORES, {
+                market: [
+                    product({ id: "p1", storeId: "market", inventory: null }),
+                ],
+            }),
+        );
+        expect(row.stock).toBeNull();
     });
 });
 
 describe("inStorefront", () => {
     it("shows one storefront's price and stock, and keeps where it is sold", () => {
-        const [row] = mergeCatalogue(STORES, {
-            market: [product({ id: "p1", storeId: "market" })],
-            online: [product({ id: "p2", storeId: "online", price: "5.20" })],
-        });
-        const online = row ? inStorefront(row, "online") : null;
+        const row = only(
+            mergeCatalogue(STORES, {
+                market: [product({ id: "p1", storeId: "market" })],
+                online: [
+                    product({ id: "p2", storeId: "online", price: "5.20" }),
+                ],
+            }),
+        );
+        const online = inStorefront(row, "online");
         expect(online?.price).toBe("5.20");
         expect(online?.places).toHaveLength(2);
         expect(online?.varies).toBe(true);
-        expect(row ? inStorefront(row, "elsewhere") : "row").toBeNull();
+        expect(inStorefront(row, "elsewhere")).toBeNull();
     });
 });
