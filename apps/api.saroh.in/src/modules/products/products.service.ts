@@ -11,7 +11,7 @@ import { ActivationEvents } from "../analytics/activation-events";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
 import type { CreateProductDto, ProductStatus, UpdateProductDto } from "./dto";
-import { serializeProduct, serializeProductDetail } from "./serialize";
+import { serializeProductDetail, serializeProductListItem } from "./serialize";
 
 /**
  * Product catalog data layer. Authorization is delegated to StoresService so
@@ -38,9 +38,20 @@ export class ProductsService {
         const products = await prisma.product.findMany({
             where: { storeId, ...(status ? { status } : {}) },
             orderBy: { createdAt: "desc" },
-            include: { category: { select: { id: true, name: true } } },
+            include: {
+                category: { select: { id: true, name: true } },
+                // Enough to draw a catalogue row: the variant count, the SKU
+                // the product is known by, and its stock.
+                _count: { select: { variants: true } },
+                variants: {
+                    select: { sku: true },
+                    orderBy: { createdAt: "asc" },
+                    take: 1,
+                },
+                inventory: { select: { quantity: true, lowStockAlert: true } },
+            },
         });
-        return products.map(serializeProduct);
+        return products.map(serializeProductListItem);
     }
 
     /** A single product with variants + inventory; 404 if no store access. */
