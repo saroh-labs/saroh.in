@@ -260,3 +260,57 @@ describe("what the two filters each answer", () => {
         }
     });
 });
+
+/**
+ * Roles a business invents. The rail renders what the API allows, because a
+ * map compiled into the frontend only knows the four roles that ship.
+ */
+describe("navFor — an invented role", () => {
+    const sites: { id: string; name: string }[] = [];
+    const hrefsOf = (groups: ReturnType<typeof navFor>) =>
+        groups.flatMap((g) => g.items.map((i) => i.href));
+
+    it("uses the actor's own permissions over their built-in role", () => {
+        // `role` is MEMBER — what an invented role maps to — but this business
+        // granted the role the roster and the modules screen, and neither the
+        // business details nor the providers.
+        const hrefs = hrefsOf(
+            navFor({
+                role: "MEMBER",
+                actions: ["member:read", "module:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).toContain("/settings/people");
+        expect(hrefs).toContain("/settings/modules");
+        expect(hrefs).not.toContain("/settings/organization");
+        expect(hrefs).not.toContain("/settings/providers");
+        expect(hrefs).not.toContain("/notifications");
+    });
+
+    it("can offer MORE than the floor the role maps to", () => {
+        const hrefs = hrefsOf(
+            navFor({
+                role: "MEMBER",
+                actions: ["org:settings:read", "member:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        // Business details is OWNER/ADMIN in the shipped map. A business may
+        // grant it to a role it invented, and the rail has to follow.
+        expect(hrefs).toContain("/settings/organization");
+    });
+
+    it("falls back to the role map when permissions were not loaded", () => {
+        const withNull = navFor({
+            role: "OWNER",
+            actions: null,
+            moduleKeys: null,
+            sites,
+        });
+        const without = navFor({ role: "OWNER", moduleKeys: null, sites });
+        expect(withNull).toEqual(without);
+    });
+});

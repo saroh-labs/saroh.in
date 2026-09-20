@@ -8,6 +8,7 @@ jest.mock("@saroh/database", () => ({
         // so the shipped map decides — which is what these tests assert.
         organizationRole: {
             findUnique: jest.fn().mockResolvedValue(null),
+            findMany: jest.fn().mockResolvedValue([]),
         },
         membership: {
             findUnique: jest.fn(),
@@ -130,10 +131,41 @@ describe("OrganizationContextService.listForUser", () => {
 
         const result = await service.listForUser("user_1");
 
-        expect(result).toEqual([
+        expect(result).toMatchObject([
             { id: "org_1", name: "Acme", slug: "acme", role: "OWNER" },
             { id: "org_2", name: "Beta", slug: "beta", role: "MEMBER" },
         ]);
+        // Each membership carries what the actor may do there, so the rail
+        // renders what the API allows instead of a map compiled into it.
+        expect(result[0]!.actions).toContain("org:delete");
+        expect(result[1]!.actions).not.toContain("org:delete");
+        expect(result[1]!.actions).toContain("member:read");
+    });
+
+    it("asks for the stored roles of every membership in one query", async () => {
+        membershipFindMany.mockResolvedValue([
+            {
+                role: "stock-clerk",
+                organization: { id: "org_1", name: "Acme", slug: "acme" },
+            },
+        ]);
+        (prisma.organizationRole.findMany as jest.Mock).mockResolvedValueOnce([
+            {
+                organizationId: "org_1",
+                key: "stock-clerk",
+                actions: ["order:read"],
+            },
+        ]);
+
+        const result = await service.listForUser("user_1");
+
+        // One round trip for the whole list, not one per organization.
+        expect(prisma.organizationRole.findMany).toHaveBeenCalledTimes(1);
+        expect(result[0]).toMatchObject({
+            role: "MEMBER",
+            roleKey: "stock-clerk",
+            actions: ["order:read"],
+        });
     });
 
     it("returns an empty list when the user has no memberships", async () => {

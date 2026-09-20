@@ -18,7 +18,17 @@ export interface UserOrganization {
     id: string;
     name: string;
     slug: string;
+    /** The built-in this maps to; MEMBER for a role the business invented. */
     role: OrgRole;
+    /** The role as stored — a built-in name, or an invented role's key. */
+    roleKey: string;
+    /** What it is called on screen. Same as the key until roles carry labels. */
+    roleLabel: string;
+    /**
+     * What this actor may do here, so the rail can render what the API allows
+     * rather than what a compiled-in map guesses.
+     */
+    actions: string[];
 }
 
 /** Minimal Organization identity returned alongside a resolved context. */
@@ -118,12 +128,43 @@ export class OrganizationContextService {
             orderBy: { organization: { name: "asc" } },
         });
 
-        return memberships.map((membership) => ({
-            id: membership.organization.id,
-            name: membership.organization.name,
-            slug: membership.organization.slug,
-            role: this.toOrgRole(membership.role, membership.organization.id),
-        }));
+        /*
+         * The permissions behind each membership, in ONE query rather than one
+         * per organization. The rail renders from these — a business that
+         * invents roles cannot have its navigation decided by a map compiled
+         * into the frontend, and the pattern doc is explicit that frontends
+         * "render what the API allows".
+         */
+        // No memberships, no second query — and an empty `OR` is a filter
+        // nobody meant to write.
+        if (memberships.length === 0) return [];
+
+        const stored = await prisma.organizationRole.findMany({
+            where: {
+                OR: memberships.map((m) => ({
+                    organizationId: m.organization.id,
+                    key: m.role,
+                })),
+            },
+            select: { organizationId: true, key: true, actions: true },
+        });
+        const byOrgAndKey = new Map(
+            stored.map((r) => [`${r.organizationId}:${r.key}`, r.actions]),
+        );
+
+        return memberships.map((membership) => {
+            const orgId = membership.organization.id;
+            const own = byOrgAndKey.get(`${orgId}:${membership.role}`);
+            return {
+                id: orgId,
+                name: membership.organization.name,
+                slug: membership.organization.slug,
+                role: this.toOrgRole(membership.role, orgId, own !== undefined),
+                roleKey: membership.role,
+                roleLabel: membership.role,
+                actions: [...resolveCapabilities(membership.role, own)],
+            };
+        });
     }
 
     /**

@@ -129,6 +129,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             <CommandMenu
                 moduleKeys={moduleKeys}
                 role={activeOrg?.role ?? null}
+                actions={activeOrg?.actions ?? null}
                 sites={navSites}
             />
             {/* The top bar runs the full width; the rail and the working
@@ -147,6 +148,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     unread={unread}
                     moduleKeys={moduleKeys}
                     role={activeOrg?.role ?? null}
+                    actions={activeOrg?.actions ?? null}
                     counts={counts}
                     sites={navSites}
                 />

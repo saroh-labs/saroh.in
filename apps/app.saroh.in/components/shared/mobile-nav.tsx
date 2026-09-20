@@ -33,6 +33,7 @@ export function MobileNav({
     unread = 0,
     moduleKeys = null,
     role = null,
+    actions = null,
     counts,
     sites = [],
     organizationName,
@@ -42,6 +43,11 @@ export function MobileNav({
     moduleKeys?: string[] | null;
     /** The actor's role here; `null` = unknown, and the nav fails open. */
     role?: NavRole | null;
+    /**
+     * What the actor may do, resolved by the API. Preferred over `role`, which
+     * cannot describe a role the business invented.
+     */
+    actions?: readonly string[] | null;
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
     /** The merchant's own sites, hung under Website — same tree as the rail. */
@@ -51,7 +57,7 @@ export function MobileNav({
 }) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
-    const groups = navFor({ role, moduleKeys, sites });
+    const groups = navFor({ role, actions, moduleKeys, sites });
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>

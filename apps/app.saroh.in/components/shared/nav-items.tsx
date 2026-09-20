@@ -104,6 +104,32 @@ export function navRoleCan(role: NavRole | null, action: NavAction): boolean {
 }
 
 /**
+ * May this actor reach something that needs `action`?
+ *
+ * Prefers the permissions the API resolved for them, because a business can
+ * invent roles and `REACHABLE` above only knows the four that ship — an
+ * invented role would be judged by whichever built-in it happens to map to,
+ * which is the floor, and its rail would be wrong in both directions.
+ *
+ * Every `NavAction` is a real `OrgAction`, deliberately: the rail asks the
+ * same question the server answers, in the same words, so the two cannot mean
+ * different things by "may see the roster".
+ *
+ * Falls back to the role map when permissions have not been loaded, and fails
+ * OPEN on a null role — same convention as `filterNavGroups`. A chrome that
+ * empties itself on a failed read is worse than one offering a destination the
+ * server then refuses, because only one of those is recoverable by the person
+ * looking at it.
+ */
+export function navCan(
+    actor: { role: NavRole | null; actions?: readonly string[] | null },
+    action: NavAction,
+): boolean {
+    if (actor.actions) return actor.actions.includes(action);
+    return navRoleCan(actor.role, action);
+}
+
+/**
  * A row nested under a destination — one of the merchant's OWN things.
  *
  * No icon: a child is identified by its name, and a column of identical globes
@@ -525,13 +551,16 @@ export function filterNavGroups(
 export function filterNavGroupsByRole(
     groups: readonly NavGroup[],
     role: NavRole | null,
+    /** The API-resolved permissions; preferred over `role` when present. */
+    actions?: readonly string[] | null,
 ): NavGroup[] {
-    if (role === null) return [...groups];
+    if (role === null && !actions) return [...groups];
+    const actor = { role, actions };
     return groups
         .map((group) => ({
             ...group,
             items: group.items
-                .filter((item) => !item.action || navRoleCan(role, item.action))
+                .filter((item) => !item.action || navCan(actor, item.action))
                 .map((item) =>
                     item.children === undefined
                         ? item
@@ -540,7 +569,7 @@ export function filterNavGroupsByRole(
                               children: item.children.filter(
                                   (child) =>
                                       !child.action ||
-                                      navRoleCan(role, child.action),
+                                      navCan(actor, child.action),
                               ),
                           },
                 ),
@@ -558,11 +587,17 @@ export function filterNavGroupsByRole(
  */
 export function navFor({
     role,
+    actions,
     moduleKeys,
     sites,
 }: {
     /** `null` when it could not be resolved; the nav then fails open. */
     role: NavRole | null;
+    /**
+     * What the actor may do, as the API resolved it. Preferred over `role`,
+     * which cannot describe a role the business invented.
+     */
+    actions?: readonly string[] | null;
     /** `null` = availability unknown; see {@link filterNavGroups}. */
     moduleKeys: readonly string[] | null;
     sites: readonly { id: string; name: string }[];
@@ -573,6 +608,7 @@ export function navFor({
             moduleKeys,
         ),
         role,
+        actions,
     );
 }
 
