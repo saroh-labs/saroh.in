@@ -200,6 +200,7 @@ model Organization {
 
   createdAt          DateTime            @default(now())
   idempotencyRecords IdempotencyRecord[]
+  roles          OrganizationRole[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -233,11 +234,58 @@ model Membership {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // OWNER, ADMIN, MEMBER, REVIEWER (#276). REVIEWER is website-only and sees
-  // just the sites it is granted through SiteReviewer — see organization-policy.ts.
+  // The role's `key`, resolved against OrganizationRole rows in the SAME
+  // organization. Not a foreign key: a membership must survive its role being
+  // renamed or removed, and a dangling key resolves to the read-only floor
+  // rather than to an error nobody can sign in past. Still OWNER, ADMIN,
+  // MEMBER or REVIEWER for every business that has invented nothing.
   role String @default("MEMBER")
 
   @@unique([organizationId, userId])
+  @@index([organizationId])
+}
+
+// OrganizationRole: a role, and the permissions it grants (custom roles).
+//
+// A business invents the roles it needs — "Stock clerk", "Bookkeeper" — and
+// the owner ticks what each may do from the catalogue in
+// `organization-policy.ts` / `capability-catalogue.ts`. The four built-ins are
+// seeded per organization as `system` rows so the screen can render every role
+// the same way; they cannot be renamed, re-permissioned or deleted.
+//
+// `actions` holds OrgAction strings. Not a join table: the set is small, read
+// on every authorized request, and never queried ACROSS organizations — the
+// question is always "what may this role, in this business, do", which is one
+// row. A join table would add a hop to the hottest path in the API to answer
+// a question nothing asks.
+model OrganizationRole {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Stable, referenced by Membership.role and OrganizationInvitation.role.
+  // Uppercase for the built-ins; a slug for invented ones.
+  key   String
+  label String
+
+  // OrgAction values (organization-policy.ts). Empty is legal and means a role
+  // that can reach nothing yet — a half-built role is not an invalid one.
+  actions String[] @default([])
+
+  // The ring the avatar wears on Team, so two people are never visually
+  // identical. Named, never a hex: the palette belongs to the token layer.
+  ringTone String @default("slate")
+
+  // Built-in. OWNER, ADMIN, MEMBER and REVIEWER are seeded for every
+  // organization and are read-only: their permissions are the shipped policy,
+  // and letting a business edit them would make role names mean different
+  // things in different businesses.
+  system Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, key])
   @@index([organizationId])
 }
 
