@@ -246,11 +246,12 @@ export const NAV_GROUPS: NavGroup[] = [
                 moduleKey: "COMMERCE",
                 // Sell's screens are destinations, so they nest in the rail
                 // (brand file §13): Sell is the section, the child is the page.
-                // Orders and Customers still live inside each storefront and
-                // join here as they gain business-wide screens.
+                // Orders still lives inside each storefront and joins here as
+                // it gains a business-wide screen.
                 children: [
                     { href: "/commerce", label: "Storefronts" },
                     { href: "/commerce/products", label: "Products" },
+                    { href: "/commerce/customers", label: "Customers" },
                 ],
             },
             // Two destinations, two questions: "what is booked?" and "what can

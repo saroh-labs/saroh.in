@@ -45,6 +45,7 @@ import type {
     DataColumn,
     DataFilter,
 } from "@/components/shared/data-view/types";
+import { StorefrontFilter } from "@/components/stores/storefront-filter";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { deleteProduct, updateProduct } from "@/lib/products/actions";
 import type { CatalogueRow } from "@/lib/products/catalogue";
@@ -516,9 +517,22 @@ export function CatalogueScreen({
                             {many ? (
                                 <StorefrontFilter
                                     stores={stores}
-                                    catalogue={catalogue}
+                                    countFor={(id) =>
+                                        catalogue.filter((r) =>
+                                            r.places.some(
+                                                (p) => p.storeId === id,
+                                            ),
+                                        ).length
+                                    }
+                                    total={catalogue.length}
                                     value={storeId}
                                     onChange={setStoreId}
+                                    noun={{
+                                        one: "product",
+                                        other: "products",
+                                    }}
+                                    label="Show products sold at"
+                                    note="A filter, not a scope. The catalogue belongs to the business; a storefront decides what it sells from it."
                                 />
                             ) : null}
                             <StatusFilter
@@ -622,80 +636,6 @@ function StatusFilter({
                         {c.id === value ? <Check aria-hidden /> : null}
                     </DropdownMenuItem>
                 ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
-}
-
-/**
- * "A filter, not a scope": which storefront's view of the catalogue to show.
- * Only offered where there is more than one to choose between.
- */
-function StorefrontFilter({
-    stores,
-    catalogue,
-    value,
-    onChange,
-}: {
-    stores: { id: string; name: string }[];
-    catalogue: CatalogueRow[];
-    value: string | null;
-    onChange: (id: string | null) => void;
-}) {
-    const current = stores.find((s) => s.id === value);
-    const countIn = (id: string) =>
-        catalogue.filter((r) => r.places.some((p) => p.storeId === id)).length;
-    const choices = [
-        { id: null, name: "All storefronts", n: catalogue.length },
-        ...stores.map((s) => ({ id: s.id, name: s.name, n: countIn(s.id) })),
-    ];
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="outline"
-                    className={cn(
-                        "h-[38px] gap-[7px] px-[13px] text-[13px] font-medium text-neutral-600 dark:text-foreground",
-                        current && "border-foreground",
-                    )}
-                    aria-label={`Storefront filter: ${current?.name ?? "all storefronts"}. Change it.`}
-                >
-                    <Store className="size-4" />
-                    {current?.name ?? "All storefronts"}
-                    <ChevronDown className="size-4" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-[244px]">
-                <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Show products sold at
-                </DropdownMenuLabel>
-                {choices.map((c) => {
-                    const on = c.id === value;
-                    return (
-                        <DropdownMenuItem
-                            key={c.id ?? "all"}
-                            onSelect={() => onChange(c.id)}
-                            className={cn(on && "bg-foreground/[0.03]")}
-                        >
-                            <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[12.5px] font-medium">
-                                    {c.name}
-                                </span>
-                                <span className="block text-[11px] text-muted-foreground">
-                                    {c.n === 1
-                                        ? "1 product"
-                                        : `${c.n} products`}
-                                </span>
-                            </span>
-                            {on ? <Check aria-hidden /> : null}
-                        </DropdownMenuItem>
-                    );
-                })}
-                <DropdownMenuSeparator />
-                <p className="px-[9px] pb-1 pt-0.5 text-[11px] leading-[1.45] text-muted-foreground">
-                    A filter, not a scope. The catalogue belongs to the
-                    business; a storefront decides what it sells from it.
-                </p>
             </DropdownMenuContent>
         </DropdownMenu>
     );
