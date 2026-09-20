@@ -48,43 +48,33 @@ export function SplitShell({
 }: SplitShellProps) {
     return (
         <div
-            className={cn(
-                "flex min-h-screen w-full items-center justify-center p-4 sm:p-6",
-                className,
-            )}
+            className={cn("flex min-h-screen w-full bg-card", className)}
             {...props}
         >
-            <div
-                className={cn(
-                    "flex w-full flex-wrap items-stretch overflow-hidden rounded-[16px] border border-border-strong bg-background",
-                    // Below the boundary there is no panel, so the card is
-                    // the form: stretching it to 1080 would leave the fields
-                    // stranded against a column of nothing.
-                    "max-w-[460px] min-[760px]:max-w-[1080px]",
-                )}
-            >
-                <div className="flex min-w-[300px] flex-1 flex-col bg-card px-6 py-8 sm:px-8 sm:py-[34px]">
-                    <Wordmark className="mb-7" style={{ fontSize: "1rem" }} />
-                    <div className="w-full max-w-[372px] flex-1">
-                        {children}
-                    </div>
+            {/* The form takes the room that is left, and its column stays
+                372px wide wherever that lands — a field stretched across a
+                1400px monitor is not a field, it is a horizon. The mark sits
+                in the same column so it lines up with what it introduces. */}
+            <div className="flex flex-1 flex-col justify-center px-6 py-12 sm:px-10">
+                <div className="mx-auto w-full max-w-[372px]">
+                    <Wordmark className="mb-8" style={{ fontSize: "1rem" }} />
+                    {children}
                 </div>
-
-                {panel ? (
-                    <aside
-                        /* Removed below 760 — the same boundary the workspace
-                           rail collapses at — so one number decides what
-                           "narrow" means across the product. `hidden` is
-                           display:none, which takes it away from assistive
-                           technology too; `sr-only` or an opacity treatment
-                           would leave it being read out to exactly the people
-                           who cannot see it. */
-                        className="hidden min-w-[288px] flex-[0_1_392px] flex-col justify-center bg-primary px-8 py-[34px] text-primary-foreground dark:bg-popover dark:text-popover-foreground min-[760px]:flex"
-                    >
-                        {panel}
-                    </aside>
-                ) : null}
             </div>
+
+            {panel ? (
+                <aside
+                    /* Gone below 760 — the same boundary the workspace rail
+                       collapses at — so one number decides what "narrow"
+                       means across the product. `hidden` is display:none,
+                       which takes it away from assistive technology too;
+                       `sr-only` or an opacity treatment would leave it being
+                       read out to exactly the people who cannot see it. */
+                    className="hidden w-[38%] min-w-[320px] max-w-[560px] flex-col justify-center bg-primary px-10 py-12 text-primary-foreground dark:bg-popover dark:text-popover-foreground min-[760px]:flex"
+                >
+                    <div className="mx-auto w-full max-w-[392px]">{panel}</div>
+                </aside>
+            ) : null}
         </div>
     );
 }
