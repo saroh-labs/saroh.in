@@ -9,6 +9,8 @@ import { prisma } from "@saroh/database";
 import { ActivationEvents } from "../analytics/activation-events";
 import { StoresService } from "../stores/stores.service";
 import type { CreateCustomerDto, UpdateCustomerDto } from "./dto";
+import type { CustomerListItemDto } from "./serialize";
+import { serializeCustomerListItem } from "./serialize";
 
 /**
  * Store customers. Authorization delegates to StoresService (read = store
@@ -27,12 +29,33 @@ export class CustomersService {
         @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
-    async list(storeId: string, userId: string) {
+    /**
+     * The list a merchant reads: each customer with their order count, what
+     * they have paid and when they last bought. The orders come back as a
+     * narrow select and are aggregated in `serialize`, because the three
+     * figures are facts about Orders and the frontend would otherwise need
+     * every order of every customer to work them out.
+     */
+    async list(
+        storeId: string,
+        userId: string,
+    ): Promise<CustomerListItemDto[]> {
         await this.stores.getForUser(storeId, userId);
-        return prisma.customer.findMany({
+        const customers = await prisma.customer.findMany({
             where: { storeId },
             orderBy: { createdAt: "desc" },
+            include: {
+                orders: {
+                    select: {
+                        total: true,
+                        currency: true,
+                        paymentStatus: true,
+                        createdAt: true,
+                    },
+                },
+            },
         });
+        return customers.map(serializeCustomerListItem);
     }
 
     async get(storeId: string, customerId: string, userId: string) {

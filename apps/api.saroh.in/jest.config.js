@@ -121,6 +121,9 @@ module.exports = {
         // #175 CSV import: the PURE planning core (what an import will do)
         // and the CSV boundary. Neither touches a DB.
         "<rootDir>/src/modules/imports/**/*.spec.ts",
+        // The customer list's aggregation — order count, what was paid, when
+        // they last bought — is pure serialization over rows handed to it.
+        "<rootDir>/src/modules/customers/serialize.spec.ts",
         "<rootDir>/src/modules/orders/order-state.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         // #173 — organization stamping on create; DB-free so CI catches a
