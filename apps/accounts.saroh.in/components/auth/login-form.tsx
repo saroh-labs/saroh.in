@@ -20,15 +20,22 @@ import { SocialButtons } from "@/components/auth/social-buttons";
  * trusted origins by the server component that renders this form. It is a
  * destination, never a claim: this component does not decide whether it is
  * safe, because it cannot.
+ *
+ * `invitedEmail` fills the address in when the visitor arrived from an
+ * invitation: that invitation can only be taken by the account it was sent to,
+ * so the field starts on the right one rather than on whichever account they
+ * happen to remember.
  */
 export function LoginForm({
     returnTo = "/apps",
+    invitedEmail,
 }: {
     returnTo?: string;
+    invitedEmail?: string;
 } = {}) {
     const router = useRouter();
     const { signIn } = authClient;
-    const [email, setEmail] = useState("");
+    const [email, setEmail] = useState(invitedEmail ?? "");
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);

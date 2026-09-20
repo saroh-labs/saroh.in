@@ -26,13 +26,16 @@ export default async function SignupPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const { redirect } = await searchParams;
+    const { redirect, email } = await searchParams;
     return (
         <SplitShell
             action={<ThemeToggle />}
             panel={<SplitPanel {...SIGNUP_PANEL} />}
         >
-            <SignupForm returnTo={safeDestination(redirect)} />
+            <SignupForm
+                returnTo={safeDestination(redirect)}
+                invitedEmail={typeof email === "string" ? email : undefined}
+            />
         </SplitShell>
     );
 }

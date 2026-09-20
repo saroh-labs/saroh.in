@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { INVITE_PANEL } from "@/components/auth/panel-copy";
+import { getAppUrl } from "@/lib/app-urls";
 import { ROLE_MEANS, getInvitation } from "@/lib/invitations";
 
 export const metadata: Metadata = {
@@ -63,10 +64,16 @@ export default async function InvitePage({
         );
     }
 
+    // Both doors carry where this ends, not where it started. `/join/:token`
+    // on the workspace host is the route that ACCEPTS — coming back here would
+    // only redraw this page and its two doors, forever. It is an absolute URL
+    // on a trusted origin, which `safeDestination` passes and the login form
+    // knows to reach with a full navigation rather than the client router.
+    //
     // The account has to be the one the invitation was sent to — `accept`
-    // refuses any other — so both doors carry the address as well as the token.
+    // refuses any other — so the address rides along and fills the field in.
     const carry =
-        `?redirect=${encodeURIComponent(`/invite/${token}`)}` +
+        `?redirect=${encodeURIComponent(`${getAppUrl()}/join/${token}`)}` +
         `&email=${encodeURIComponent(invitation.email)}`;
 
     return (

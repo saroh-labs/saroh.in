@@ -19,13 +19,16 @@ export default async function LoginPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const { redirect } = await searchParams;
+    const { redirect, email } = await searchParams;
     return (
         <SplitShell
             action={<ThemeToggle />}
             panel={<SplitPanel {...LOGIN_PANEL} />}
         >
-            <LoginForm returnTo={safeReturnTo(redirect)} />
+            <LoginForm
+                returnTo={safeReturnTo(redirect)}
+                invitedEmail={typeof email === "string" ? email : undefined}
+            />
         </SplitShell>
     );
 }
