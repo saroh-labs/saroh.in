@@ -1,6 +1,5 @@
 import { Button } from "@saroh/ui/button";
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
-import { ThemeToggle } from "@saroh/ui/theme-toggle";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -21,10 +20,7 @@ export const metadata: Metadata = {
  */
 export default function PasswordResetDonePage() {
     return (
-        <SplitShell
-            action={<ThemeToggle />}
-            panel={<SplitPanel {...DONE_PANEL} />}
-        >
+        <SplitShell panel={<SplitPanel {...DONE_PANEL} />}>
             <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
                 Password changed
             </h1>

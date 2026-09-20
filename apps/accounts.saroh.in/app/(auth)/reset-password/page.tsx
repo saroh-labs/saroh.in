@@ -1,5 +1,4 @@
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
-import { ThemeToggle } from "@saroh/ui/theme-toggle";
 import type { Metadata } from "next";
 
 import { RESET_PANEL } from "@/components/auth/panel-copy";
@@ -12,10 +11,7 @@ export const metadata: Metadata = {
 
 export default function ResetPasswordPage() {
     return (
-        <SplitShell
-            action={<ThemeToggle />}
-            panel={<SplitPanel {...RESET_PANEL} />}
-        >
+        <SplitShell panel={<SplitPanel {...RESET_PANEL} />}>
             <ResetPasswordForm />
         </SplitShell>
     );

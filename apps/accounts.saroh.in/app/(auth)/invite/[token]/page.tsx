@@ -1,6 +1,5 @@
 import { Button } from "@saroh/ui/button";
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
-import { ThemeToggle } from "@saroh/ui/theme-toggle";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -43,7 +42,7 @@ export default async function InvitePage({
 
     if (!invitation) {
         return (
-            <SplitShell action={<ThemeToggle />}>
+            <SplitShell>
                 <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
                     This invitation is no longer valid
                 </h1>
@@ -77,10 +76,7 @@ export default async function InvitePage({
         `&email=${encodeURIComponent(invitation.email)}`;
 
     return (
-        <SplitShell
-            action={<ThemeToggle />}
-            panel={<SplitPanel {...INVITE_PANEL} />}
-        >
+        <SplitShell panel={<SplitPanel {...INVITE_PANEL} />}>
             <p className="sa-rise text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.1em]">
                 {invitation.invitedByName
                     ? `${invitation.invitedByName} invited you`

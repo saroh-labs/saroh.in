@@ -12,11 +12,6 @@ export interface SplitShellProps extends React.HTMLAttributes<HTMLDivElement> {
      * as an instruction the form depends on.
      */
     panel?: React.ReactNode;
-    /**
-     * A control opposite the mark — the theme pill, and nothing heavier. It
-     * sits in the form column, so it survives the panel disappearing.
-     */
-    action?: React.ReactNode;
     /** The form, the step, whatever this page is for. */
     children: React.ReactNode;
 }
@@ -44,13 +39,26 @@ export interface SplitShellProps extends React.HTMLAttributes<HTMLDivElement> {
  * the inset surface instead put the panel two steps the wrong way and left it
  * sitting lighter than the form it is supposed to sit behind.
  *
- * `accounts.saroh.in` has no theme provider at all (dark mode there is a
- * pre-hydration script reading the OS preference), so there is nothing to scope
- * against even if scoping were right.
+ * ## There is no theme control here, deliberately
+ *
+ * There was one, briefly. It came off because it could not keep its promise:
+ * `next-themes` stores the choice in `localStorage`, which is per-origin, so a
+ * choice made on `accounts.saroh.in` does not reach `app.saroh.in`. It looked
+ * like a preference and behaved like a page-local override that expired one
+ * navigation later.
+ *
+ * Both hosts now default to `system`, so these screens follow the machine, and
+ * the explicit choice lives where a preference belongs — the workspace user
+ * menu's Appearance submenu, which persists for the person rather than for the
+ * page. This is also what the rest of the industry does: of fourteen SaaS
+ * sign-in screens surveyed, none carried a theme control, and WorkOS ships
+ * "System" as the default appearance for the auth pages it hosts.
+ *
+ * If a control comes back here, it needs somewhere to write that both hosts
+ * can read — the user record, not the browser.
  */
 export function SplitShell({
     panel,
-    action,
     children,
     className,
     ...props
@@ -66,9 +74,12 @@ export function SplitShell({
                 in the same column so it lines up with what it introduces. */}
             <div className="flex flex-1 flex-col justify-center px-6 py-12 sm:px-10">
                 <div className="mx-auto w-full max-w-[372px]">
-                    <div className="mb-8 flex items-center justify-between gap-4">
+                    {/* The mark, and then the page. There was a theme pill
+                        opposite it; it is gone, along with the slot that held
+                        it, because a slot nothing fills is an invitation to
+                        put something there. See the theme note below. */}
+                    <div className="mb-8">
                         <Wordmark style={{ fontSize: "1rem" }} />
-                        {action}
                     </div>
                     {children}
                 </div>

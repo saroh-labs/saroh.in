@@ -1,5 +1,4 @@
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
-import { ThemeToggle } from "@saroh/ui/theme-toggle";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -57,7 +56,6 @@ export default async function ChoosePage() {
 
     return (
         <SplitShell
-            action={<ThemeToggle />}
             panel={
                 <SplitPanel
                     eyebrow="Where to"

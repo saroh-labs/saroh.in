@@ -1,5 +1,4 @@
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
-import { ThemeToggle } from "@saroh/ui/theme-toggle";
 import type { Metadata } from "next";
 
 import { SIGNUP_PANEL } from "@/components/auth/panel-copy";
@@ -28,10 +27,7 @@ export default async function SignupPage({
 }) {
     const { redirect, email } = await searchParams;
     return (
-        <SplitShell
-            action={<ThemeToggle />}
-            panel={<SplitPanel {...SIGNUP_PANEL} />}
-        >
+        <SplitShell panel={<SplitPanel {...SIGNUP_PANEL} />}>
             <SignupForm
                 returnTo={safeDestination(redirect)}
                 invitedEmail={typeof email === "string" ? email : undefined}

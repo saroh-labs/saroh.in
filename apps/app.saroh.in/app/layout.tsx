@@ -97,9 +97,16 @@ export default function RootLayout({
                     }}
                 />
                 <Providers>
+                    {/* `system`, matching accounts. It was `light`, which
+                        meant the machine's preference was honoured on the
+                        sign-in screens and ignored one navigation later — the
+                        same person, the same session, two answers. Someone who
+                        has chosen explicitly (user menu → Appearance) still
+                        gets their choice; this only decides for someone who
+                        never has. */}
                     <ThemeProvider
                         attribute="class"
-                        defaultTheme="light"
+                        defaultTheme="system"
                         enableSystem
                         disableTransitionOnChange
                     >

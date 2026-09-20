@@ -1,5 +1,4 @@
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
-import { ThemeToggle } from "@saroh/ui/theme-toggle";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -31,10 +30,7 @@ export default async function ResetLinkSentPage({
     const address = Array.isArray(email) ? email[0] : email;
 
     return (
-        <SplitShell
-            action={<ThemeToggle />}
-            panel={<SplitPanel {...SENT_PANEL} />}
-        >
+        <SplitShell panel={<SplitPanel {...SENT_PANEL} />}>
             <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
                 Check your email
             </h1>
