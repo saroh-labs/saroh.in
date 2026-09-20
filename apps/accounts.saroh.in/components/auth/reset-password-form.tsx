@@ -143,12 +143,25 @@ function ResetPasswordFormInner() {
                         disabled={isLoading}
                     />
                 </div>
+                {/*
+                 * The consequence, BEFORE the button that causes it.
+                 *
+                 * `revokeSessionsOnPasswordReset` is on, so saving here signs
+                 * this person out of every other device. The panel beside the
+                 * form says so too, but the panel is gone below 760px and a
+                 * consequence this size cannot live only in the half that
+                 * disappears.
+                 */}
+                <p className="sa-rise text-muted-foreground mt-1 text-pretty text-[11.5px] leading-[1.45]">
+                    Saving a new password signs you out everywhere else — every
+                    other browser and device, including any you no longer have.
+                </p>
                 <Button
                     type="submit"
                     className="sa-cta mt-1 w-full font-semibold"
                     disabled={isLoading}
                 >
-                    {isLoading ? "Resetting…" : "Reset password"}
+                    {isLoading ? "Resetting…" : "Save new password"}
                 </Button>
             </form>
             <div className="sa-rise text-muted-foreground mt-5 text-[12.5px]">

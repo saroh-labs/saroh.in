@@ -8,10 +8,11 @@ import { VERIFICATION_OTP_EXPIRY_SECONDS } from "@saroh/auth/constants";
  *
  * Every line has to be TRUE, which is why some of it departs from the design:
  *
- * - The reset panel is drawn as "Saving this signs you out everywhere else."
- *   We never set `revokeSessionsOnPasswordReset`, so other sessions survive a
- *   reset — the drawn line would be a false promise on the one screen where
- *   someone is already worried about who else is signed in.
+ * - The reset panel's "ends every other session" was a false promise when
+ *   this file was written; `revokeSessionsOnPasswordReset` is on now, so it
+ *   is true and the design's wording stands. The same sentence appears ON the
+ *   form, because this panel is gone below 760px and a consequence that size
+ *   cannot live only in the half that disappears.
  * - The sign-up panel is drawn with a pricing claim. Billing is not settled
  *   here, and a claim about money on the page where an account is created is
  *   the worst place to be approximately right.
@@ -74,12 +75,45 @@ export const FORGOT_PANEL: PanelCopy = {
 };
 
 export const RESET_PANEL: PanelCopy = {
-    eyebrow: "Almost done",
-    heading: "One link, one use.",
-    body: "This link is spent once a password is saved with it. If it has expired, ask for another from the log-in page — nothing is lost by asking twice.",
+    eyebrow: "Reset password",
+    heading: "Set it, and you are back in.",
+    body: "Choosing a new password ends every other session, which is the point if you are here because something felt wrong. Your current password works until the new one is saved.",
     points: [
         "Eight characters minimum",
-        "Your current password works until the new one is saved",
-        "You will be asked to log in again with the new one",
+        "The link works once, then it is spent",
+        "Anything signed in as you elsewhere gets signed out",
+    ],
+};
+
+export const SENT_PANEL: PanelCopy = {
+    eyebrow: "Check your email",
+    heading: "Nothing has changed yet.",
+    body: "Your current password still works. It only changes when you follow the link and set a new one — so a link requested by mistake costs you nothing.",
+    points: [
+        "Sent to the address you typed, if it has an account",
+        "Not there? Look in spam before asking for another",
+        "Asking again replaces the previous link",
+    ],
+};
+
+export const DONE_PANEL: PanelCopy = {
+    eyebrow: "Done",
+    heading: "Password changed.",
+    body: "Every other session has ended, so anything signed in as you elsewhere — including a device you no longer have — has been signed out.",
+    points: [
+        "The link you used will not work again",
+        "Log in with the new password",
+        "Nothing else about your account changed",
+    ],
+};
+
+export const INVITE_PANEL: PanelCopy = {
+    eyebrow: "Invitation",
+    heading: "You are joining, not starting.",
+    body: "Someone has given you a role in their business. You make an account, and that is all — the business already exists, so there is nothing to set up.",
+    points: [
+        "The role decides what you see and can change",
+        "Whoever invited you can change or withdraw it later",
+        "You can be in as many businesses as you like",
     ],
 };
