@@ -72,9 +72,11 @@ export function AppSidebar({
                         className={cn(
                             "flex flex-col gap-px",
                             // Space belongs to headings, not to every group.
-                            showsGroupLabel(group) && "mt-4 first:mt-0",
+                            // The heading's own 12px of padding is the space
+                            // above a group; a ruled group adds 10px over the
+                            // rule, as the design spaces them.
                             group.separated &&
-                                "mt-4 border-t border-border pt-4",
+                                "mt-[10px] border-t border-border",
                         )}
                     >
                         {showsGroupLabel(group) && (
@@ -154,11 +156,17 @@ export function AppSidebar({
                                         isPage
                                             ? "bg-card font-semibold text-foreground shadow-xs"
                                             : isSection
-                                              ? "font-medium text-brand hover:bg-accent"
-                                              : "font-medium text-foreground hover:bg-accent",
+                                              ? "font-semibold text-brand hover:bg-accent"
+                                              : // Idle rows sit a step back
+                                                // from Ink, so the section and
+                                                // the page read louder.
+                                                "font-medium text-neutral-700 hover:bg-accent dark:text-muted-foreground",
                                     )}
                                 >
-                                    <Icon className="size-4 shrink-0" />
+                                    <Icon
+                                        className="size-[19px] shrink-0"
+                                        strokeWidth={1.9}
+                                    />
                                     <span className="flex-1">{item.label}</span>
                                     {waiting > 0 ? (
                                         /* The brand file's waiting count: a

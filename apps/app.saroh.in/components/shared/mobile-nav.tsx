@@ -170,7 +170,7 @@ export function MobileNav({
                                             isPage
                                                 ? "bg-accent font-semibold text-foreground"
                                                 : isSection
-                                                  ? "font-medium text-brand hover:bg-accent"
+                                                  ? "font-semibold text-brand hover:bg-accent"
                                                   : "font-medium text-foreground hover:bg-accent",
                                         )}
                                     >
