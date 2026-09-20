@@ -26,17 +26,24 @@ export function StatCard({
     ...props
 }: StatCardProps) {
     return (
-        <Card className={cn("p-5", className)} {...props}>
+        // 14/16 padding and an 11px radius, as the workspace design draws a
+        // stat tile.
+        <Card
+            className={cn("rounded-[11px] px-4 py-3.5", className)}
+            {...props}
+        >
             {/* An eyebrow (11px Geist 600, uppercase) over a figure in Space
                 Grotesk — large figures are one of the display face's jobs. */}
             <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                 {label}
             </p>
-            <p className="mt-1.5 font-display text-3xl font-semibold tabular-nums tracking-[-0.02em]">
+            <p className="mt-[7px] font-display text-[25px] font-semibold tabular-nums leading-none tracking-[-0.03em]">
                 {value}
             </p>
             {hint ? (
-                <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+                <p className="mt-[3px] text-[11.5px] leading-[1.45] text-muted-foreground">
+                    {hint}
+                </p>
             ) : null}
         </Card>
     );

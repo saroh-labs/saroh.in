@@ -26,7 +26,7 @@ export default async function Home() {
         // A dashboard, so the width matches the other data screens rather than
         // the old reading measure — the schedule column needs room to sit
         // beside the work instead of below it.
-        <PageContainer>
+        <PageContainer width="full">
             <PageHeader
                 title="Home"
                 description="What needs you, what's coming up, and where everything stands."

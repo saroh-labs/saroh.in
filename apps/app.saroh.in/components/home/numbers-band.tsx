@@ -20,22 +20,25 @@ export function NumbersBand({ numbers }: { numbers: HomeNumber[] }) {
     if (numbers.length === 0) return null;
 
     return (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        // Tiles from 178px up, as the workspace design lays them out.
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(178px,1fr))] gap-3">
             {numbers.map((n, index) => (
                 <Link
                     key={n.key}
                     href={n.href}
                     style={{ "--wk-i": index } as React.CSSProperties}
-                    className="wk-item wk-surface group rounded-md border border-border bg-card px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="wk-item wk-surface group rounded-[11px] border border-border bg-card px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <span className="flex items-center justify-between gap-2">
-                        <span className="font-display text-2xl font-semibold tabular-nums leading-none">
-                            {formatCount(n.value)}
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                            {n.label}
                         </span>
-                        <ArrowUpRight className="size-3.5 text-muted-foreground transition-colors duration-fast group-hover:text-foreground" />
+                        {/* The one thing the design's tile does not carry: a
+                            number here is a door, so it says so. */}
+                        <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground transition-colors duration-fast group-hover:text-foreground" />
                     </span>
-                    <span className="mt-1.5 block truncate text-xs text-muted-foreground">
-                        {n.label}
+                    <span className="mt-[7px] block font-display text-[25px] font-semibold tabular-nums leading-none tracking-[-0.03em]">
+                        {formatCount(n.value)}
                     </span>
                 </Link>
             ))}

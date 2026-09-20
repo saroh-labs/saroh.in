@@ -241,7 +241,10 @@ export function PartialNotice({
         <div
             role="status"
             className={cn(
-                "flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning-subtle p-3 text-sm text-warning-subtle-foreground sm:flex-row sm:items-center sm:justify-between",
+                // Saffron, not Warning: a partial read is something UNKNOWN,
+                // not something wrong. Warning's red-orange would read as a
+                // fault (the workspace design's partial banner).
+                "flex flex-col gap-2 rounded-[10px] border border-brand/50 bg-brand-subtle px-3.5 py-3 text-[13px] leading-[1.5] text-brand-subtle-foreground sm:flex-row sm:items-center sm:justify-between",
                 className,
             )}
             {...props}
