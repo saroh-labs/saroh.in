@@ -78,7 +78,7 @@ const STATUS: Record<
 export function ProviderHealthList({ health }: { health: ProviderHealth[] }) {
     return (
         <>
-            <div className="overflow-hidden rounded-[12px] border border-neutral-300">
+            <div className="overflow-hidden rounded-[12px] border border-border">
                 {health.map((h) => {
                     const status = STATUS[h.status];
                     return (

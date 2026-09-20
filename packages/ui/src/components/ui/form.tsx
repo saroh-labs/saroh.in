@@ -176,7 +176,7 @@ const FormCard = React.forwardRef<
     <div
         ref={ref}
         className={cn(
-            "max-w-[620px] rounded-[12px] border border-neutral-300 px-5 py-[18px]",
+            "max-w-[620px] rounded-[12px] border border-border px-5 py-[18px]",
             // The hairline belongs between fields, never above the first or
             // below the last.
             "[&>*+*]:mt-4 [&>*+*]:border-t [&>*+*]:border-border [&>*+*]:pt-4",

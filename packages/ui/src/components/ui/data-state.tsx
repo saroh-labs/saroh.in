@@ -79,9 +79,7 @@ function StateCard({
                 // text column does not collapse to two words a line.
                 "flex flex-col items-center justify-center gap-[11px] rounded-[12px] border px-6 py-10 text-center sm:py-12",
                 outline === "dashed" ? "border-dashed" : "border-solid",
-                tone === "danger"
-                    ? "border-destructive/60"
-                    : "border-neutral-300",
+                tone === "danger" ? "border-destructive/60" : "border-border",
                 className,
             )}
             {...props}
@@ -322,7 +320,7 @@ export function LoadingState({
             aria-live="polite"
             className={cn(
                 variant === "list"
-                    ? "rounded-[12px] border border-neutral-300 px-4 py-2"
+                    ? "rounded-[12px] border border-border px-4 py-2"
                     : "flex flex-col gap-2",
                 className,
             )}

@@ -33,7 +33,15 @@ export function ModuleList({ modules }: { modules: ModuleView[] }) {
     const canManage = modules.some((m) => m.canManage);
     return (
         <>
-            <div className="overflow-hidden rounded-[12px] border border-neutral-300">
+            {/*
+             * `border-border`, not a palette grey. This card carried
+             * `border-neutral-300` — one of Tailwind's stock neutrals, which
+             * has no dark value — so in dark mode a near-white #D4D4D4 line
+             * was drawn round a card whose own row dividers were correctly
+             * dark. Every `neutral-*` used for TEXT in this codebase is
+             * paired with a `dark:` override; these borders never were.
+             */}
+            <div className="overflow-hidden rounded-[12px] border border-border">
                 {[...modules].sort(byAttentionFirst).map((module) => (
                     <ModuleRow key={module.key} module={module} />
                 ))}
