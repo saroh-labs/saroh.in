@@ -9,8 +9,7 @@ import { cn } from "../../lib/utils";
 const subscribeToNothing = () => () => undefined;
 
 /**
- * The design's theme pill: a light/dark flip that starts out following the
- * system and says so.
+ * A light/dark flip that starts out following the system and says so.
  *
  * Three states, two of them visible. Until someone touches it the theme is
  * `system`, and the control reports that in its accessible name — "Dark,
@@ -19,8 +18,21 @@ const subscribeToNothing = () => () => undefined;
  * reaching for a toggle wants; the workspace's own Appearance menu is where
  * "System" can be chosen back deliberately.
  *
+ * ## It is the quietest thing on the page, deliberately
+ *
+ * It was drawn first as a bordered pill with a text label, sitting opposite
+ * the wordmark. That put a VIEWER PREFERENCE second in the reading order,
+ * ahead of the heading naming what the page is for — on a screen whose entire
+ * job is one question. So: the icon alone, no border, muted until hover.
+ *
+ * The words are not lost, they move to where they were always doing the real
+ * work. A label reading "Dark" beside a moon is ambiguous in the way toggles
+ * are famously ambiguous — is it what I am, or what I will get? The accessible
+ * name answers both in a sentence, and now it is the only answer, so the two
+ * cannot drift apart.
+ *
  * It renders nothing until mounted. `useTheme` cannot know the resolved theme
- * during SSR, so a label rendered on the server is a coin flip that hydrates
+ * during SSR, so a state rendered on the server is a coin flip that hydrates
  * into a mismatch — and this control's whole job is to state the current
  * state correctly.
  */
@@ -37,8 +49,8 @@ export function ThemeToggle({ className }: { className?: string }) {
     );
 
     if (!mounted) {
-        // Holds the space so the header does not jump when the label arrives.
-        return <span aria-hidden className="h-8 w-[84px]" />;
+        // Holds the space so the header does not jump when the icon arrives.
+        return <span aria-hidden className="size-8 coarse:size-11" />;
     }
 
     const isDark = resolvedTheme === "dark";
@@ -54,7 +66,9 @@ export function ThemeToggle({ className }: { className?: string }) {
                 `Switch to ${isDark ? "light" : "dark"}.`
             }
             className={cn(
-                "inline-flex h-8 items-center gap-[7px] rounded-full border border-border bg-card px-3 text-[12px] font-medium text-neutral-600 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:text-muted-foreground dark:hover:text-foreground",
+                // 44px on a coarse pointer: the icon is small on purpose, the
+                // TARGET may not be. Same floor the workspace's own chrome uses.
+                "inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background coarse:size-11",
                 className,
             )}
         >
@@ -66,7 +80,7 @@ export function ThemeToggle({ className }: { className?: string }) {
                 strokeWidth={1.8}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="size-[14px] shrink-0"
+                className="size-[15px] shrink-0"
             >
                 {isDark ? (
                     <path d="M20 14.5 A8.5 8.5 0 0 1 9.5 4 A8.5 8.5 0 1 0 20 14.5 Z" />
@@ -77,7 +91,6 @@ export function ThemeToggle({ className }: { className?: string }) {
                     </>
                 )}
             </svg>
-            {isDark ? "Dark" : "Light"}
         </button>
     );
 }
