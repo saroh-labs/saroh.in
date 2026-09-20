@@ -11,12 +11,21 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@saroh/ui/select";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { formatStatus } from "@/lib/format/status";
 import { trimmedOr } from "@/lib/forms/values";
 import {
     createProduct,
@@ -30,6 +39,9 @@ import type {
 } from "@/lib/products/service";
 
 const STATUSES: ProductStatus[] = ["DRAFT", "PUBLISHED", "ARCHIVED"];
+
+/** Radix forbids an empty option value, so "no category" needs a name. */
+const NONE = "none";
 
 const formSchema = z.object({
     name: z.string().min(1, { message: "Name is required" }),
@@ -208,20 +220,24 @@ export function ProductForm({
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel htmlFor="status">Status</FormLabel>
-                                <FormControl>
-                                    <select
-                                        id="status"
-                                        disabled={isSubmitting}
-                                        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                                        {...field}
-                                    >
+                                <Select
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    disabled={isSubmitting}
+                                >
+                                    <FormControl>
+                                        <SelectTrigger id="status">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
                                         {STATUSES.map((s) => (
-                                            <option key={s} value={s}>
-                                                {s}
-                                            </option>
+                                            <SelectItem key={s} value={s}>
+                                                {formatStatus(s)}
+                                            </SelectItem>
                                         ))}
-                                    </select>
-                                </FormControl>
+                                    </SelectContent>
+                                </Select>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -234,21 +250,34 @@ export function ProductForm({
                                 <FormLabel htmlFor="category">
                                     Category
                                 </FormLabel>
-                                <FormControl>
-                                    <select
-                                        id="category"
-                                        disabled={isSubmitting}
-                                        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                                        {...field}
-                                    >
-                                        <option value="">Uncategorized</option>
+                                <Select
+                                    // Radix has no value for "none", so the
+                                    // uncategorised choice carries a sentinel
+                                    // and the form still stores an empty id.
+                                    value={
+                                        field.value === "" ? NONE : field.value
+                                    }
+                                    onValueChange={(v) =>
+                                        field.onChange(v === NONE ? "" : v)
+                                    }
+                                    disabled={isSubmitting}
+                                >
+                                    <FormControl>
+                                        <SelectTrigger id="category">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value={NONE}>
+                                            Uncategorized
+                                        </SelectItem>
                                         {categories.map((c) => (
-                                            <option key={c.id} value={c.id}>
+                                            <SelectItem key={c.id} value={c.id}>
                                                 {c.name}
-                                            </option>
+                                            </SelectItem>
                                         ))}
-                                    </select>
-                                </FormControl>
+                                    </SelectContent>
+                                </Select>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -264,11 +293,10 @@ export function ProductForm({
                                 Description
                             </FormLabel>
                             <FormControl>
-                                <textarea
+                                <Textarea
                                     id="description"
                                     disabled={isSubmitting}
                                     rows={3}
-                                    className="rounded-md border border-input bg-background px-3 py-2 text-sm"
                                     {...field}
                                 />
                             </FormControl>
