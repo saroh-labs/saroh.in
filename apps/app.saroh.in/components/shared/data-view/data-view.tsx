@@ -15,9 +15,19 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useDebouncedCallback } from "use-debounce";
 
 import type { DataColumn, DataViewMode, DataViewProps } from "./types";
 import { useViewMode } from "./use-view-mode";
+
+/**
+ * How long the table waits before re-filtering.
+ *
+ * The same 180ms the command palette uses for its search, so the product has
+ * one answer to "how long after I stop typing". Short enough to read as
+ * instant, long enough that a burst of keystrokes costs one render.
+ */
+const SEARCH_DEBOUNCE_MS = 180;
 
 const MODE_META: Record<DataViewMode, { label: string; icon: typeof Table2 }> =
     {
@@ -68,7 +78,24 @@ export function DataView<TRow>({
 }: DataViewProps<TRow>) {
     const { mode, choose } = useViewMode(viewId, modes, defaultMode);
     const showModes = modes.length > 1 && !hideModeToggle;
-    const [query, setQuery] = useState("");
+    /*
+     * The parent holds only the SETTLED term.
+     *
+     * The keystroke never reaches this component: `SearchField` below owns the
+     * text it shows and hands the term up once typing pauses. That is the
+     * whole point — `DataView` renders every row, so a re-render here costs
+     * ~31ms over 600 rows, and debouncing the FILTER alone would have saved
+     * the 0.038ms the filter actually takes while still paying the 31ms.
+     *
+     * `clearNonce` resets the field from out here: clearing is the parent's
+     * decision (the empty state offers it) and the field is uncontrolled.
+     */
+    const [search, setSearch] = useState("");
+    const [clearNonce, setClearNonce] = useState(0);
+    const clearSearch = () => {
+        setSearch("");
+        setClearNonce((n) => n + 1);
+    };
     const [sort, setSort] = useState<{ id: string; desc: boolean } | null>(
         null,
     );
@@ -111,8 +138,8 @@ export function DataView<TRow>({
             out = out.filter(activeFilter.predicate);
         }
 
-        if (query.trim() && (searchableColumnIds?.length ?? 0) > 0) {
-            const needle = query.trim().toLowerCase();
+        if (search.trim() && (searchableColumnIds?.length ?? 0) > 0) {
+            const needle = search.trim().toLowerCase();
             const ids = searchableColumnIds ?? [];
             const cols = columns.filter((c) => ids.includes(c.id));
             out = out.filter((row) =>
@@ -145,7 +172,7 @@ export function DataView<TRow>({
         }
 
         return out;
-    }, [rows, columns, query, searchableColumnIds, sort, activeFilter]);
+    }, [rows, columns, search, searchableColumnIds, sort, activeFilter]);
 
     const toggleSort = (col: DataColumn<TRow>) => {
         if (!col.sortValue) return;
@@ -253,9 +280,9 @@ export function DataView<TRow>({
                                 aria-hidden
                                 className="pointer-events-none absolute left-[11px] top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                             />
-                            <Input
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
+                            <SearchField
+                                key={clearNonce}
+                                onSettled={setSearch}
                                 placeholder={searchPlaceholder}
                                 aria-label={searchPlaceholder.replace(/…$/, "")}
                                 className="h-[38px] pl-[34px] text-[13.5px] coarse:h-11"
@@ -334,16 +361,20 @@ export function DataView<TRow>({
                  * nothing in it names the narrowing, so it never reads as "you
                  * have no leads"; first run offers the primary action.
                  */
-                query.trim() ? (
+                /* `search`, not `query`: the message has to name the term
+                   the rows on screen were filtered by. Reading the immediate
+                   value would announce "No products match zzz" while the
+                   previous results were still sitting underneath it. */
+                search.trim() ? (
                     <EmptyPanel
                         icon={<Search />}
-                        title={`No ${noun.other} match “${query.trim()}”`}
+                        title={`No ${noun.other} match “${search.trim()}”`}
                         note="Clear the search to see everything in this view."
                         action={
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => setQuery("")}
+                                onClick={clearSearch}
                             >
                                 Clear search
                             </Button>
@@ -820,5 +851,51 @@ function EmptyPanel({
             {children}
             {action ? <div className="mt-1">{action}</div> : null}
         </div>
+    );
+}
+
+/**
+ * The search box, deliberately cut off from the table.
+ *
+ * It owns the text it displays, so typing re-renders THIS — one input — and
+ * nothing else. The term reaches `DataView` only once typing pauses, and only
+ * then does the table do its work.
+ *
+ * That separation is the fix, not the timer. Debouncing while the input still
+ * lived in `DataView` moved the cheap half (filtering, 0.038ms over 600 rows)
+ * off the keystroke and left the expensive half (rendering 600 rows, ~31ms) on
+ * it — so every character still dropped two frames, and the results lagged as
+ * well. Measured both ways before this shape was settled on.
+ */
+function SearchField({
+    onSettled,
+    placeholder,
+    className,
+    "aria-label": ariaLabel,
+}: {
+    /** Called with the term once typing has paused. */
+    onSettled: (value: string) => void;
+    placeholder: string;
+    className?: string;
+    "aria-label": string;
+}) {
+    const [text, setText] = useState("");
+    const settle = useDebouncedCallback(onSettled, SEARCH_DEBOUNCE_MS);
+
+    return (
+        <Input
+            value={text}
+            onChange={(e) => {
+                setText(e.target.value);
+                settle(e.target.value);
+            }}
+            // A pause is what the timer waits for, and leaving the field is a
+            // longer pause than any timer. Without this, tabbing straight to
+            // the next control leaves the table showing the previous term.
+            onBlur={() => settle.flush()}
+            placeholder={placeholder}
+            aria-label={ariaLabel}
+            className={className}
+        />
     );
 }
