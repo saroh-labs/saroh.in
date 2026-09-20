@@ -1,4 +1,7 @@
+import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
+
 import { LoginForm } from "@/components/auth/login-form";
+import { LOGIN_PANEL } from "@/components/auth/panel-copy";
 import { safeReturnTo } from "@/lib/return-to";
 
 /**
@@ -16,5 +19,9 @@ export default async function LoginPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const { redirect } = await searchParams;
-    return <LoginForm returnTo={safeReturnTo(redirect)} />;
+    return (
+        <SplitShell route="/login" panel={<SplitPanel {...LOGIN_PANEL} />}>
+            <LoginForm returnTo={safeReturnTo(redirect)} />
+        </SplitShell>
+    );
 }

@@ -1,5 +1,8 @@
-import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
+import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import type { Metadata } from "next";
+
+import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
+import { FORGOT_PANEL } from "@/components/auth/panel-copy";
 
 export const metadata: Metadata = {
     title: "Forgot password | Saroh",
@@ -7,5 +10,12 @@ export const metadata: Metadata = {
 };
 
 export default function ForgotPasswordPage() {
-    return <ForgotPasswordForm />;
+    return (
+        <SplitShell
+            route="/forgot-password"
+            panel={<SplitPanel {...FORGOT_PANEL} />}
+        >
+            <ForgotPasswordForm />
+        </SplitShell>
+    );
 }

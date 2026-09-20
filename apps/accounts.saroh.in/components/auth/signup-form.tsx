@@ -2,13 +2,6 @@
 
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@saroh/ui/card";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import Link from "next/link";
@@ -55,84 +48,79 @@ export function SignupForm({ returnTo }: { returnTo?: string | null }) {
     }
 
     return (
-        <Card className="sa-panel mx-auto w-full max-w-sm">
-            <CardHeader>
-                <CardTitle className="sa-rise font-display text-2xl">
-                    Create your account
-                </CardTitle>
-                <CardDescription className="sa-rise">
-                    One account for every Saroh app.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="grid gap-4">
-                    {error && (
-                        <p
-                            role="alert"
-                            className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground rounded-md border px-3 py-2 text-sm"
-                        >
-                            {error}
-                        </p>
-                    )}
-                    <div className="sa-rise grid gap-2">
-                        <Label htmlFor="name">Name</Label>
-                        <Input
-                            id="name"
-                            className="sa-input"
-                            type="text"
-                            placeholder="Your name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                            disabled={isLoading}
-                        />
-                    </div>
-                    <div className="sa-rise grid gap-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                            id="email"
-                            className="sa-input"
-                            type="email"
-                            placeholder="m@example.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            disabled={isLoading}
-                        />
-                    </div>
-                    <div className="sa-rise grid gap-2">
-                        <Label htmlFor="password">Password</Label>
-                        <Input
-                            id="password"
-                            className="sa-input"
-                            type="password"
-                            placeholder="At least 8 characters"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            minLength={8}
-                            disabled={isLoading}
-                        />
-                    </div>
-                    <Button
-                        type="submit"
-                        variant="highlight"
-                        className="sa-cta sa-rise mt-1 w-full font-semibold"
+        <div>
+            <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
+                Create your account
+            </h1>
+            <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
+                One account for every Saroh app.
+            </p>
+            <form onSubmit={handleSubmit} className="grid gap-4">
+                {error && (
+                    <p
+                        role="alert"
+                        className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground rounded-md border px-3 py-2 text-sm"
+                    >
+                        {error}
+                    </p>
+                )}
+                <div className="sa-rise grid gap-2">
+                    <Label htmlFor="name">Name</Label>
+                    <Input
+                        id="name"
+                        className="sa-input"
+                        type="text"
+                        placeholder="Your name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
                         disabled={isLoading}
-                    >
-                        {isLoading ? "Creating account…" : "Create account"}
-                    </Button>
-                </form>
-                <div className="sa-rise text-muted-foreground mt-5 text-center text-sm">
-                    Already have an account?{" "}
-                    <Link
-                        href="/login"
-                        className="text-foreground underline-offset-4 transition-colors hover:underline"
-                    >
-                        Log in
-                    </Link>
+                    />
                 </div>
-            </CardContent>
-        </Card>
+                <div className="sa-rise grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                        id="email"
+                        className="sa-input"
+                        type="email"
+                        placeholder="m@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+                <div className="sa-rise grid gap-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                        id="password"
+                        className="sa-input"
+                        type="password"
+                        placeholder="At least 8 characters"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        minLength={8}
+                        disabled={isLoading}
+                    />
+                </div>
+                <Button
+                    type="submit"
+                    className="sa-cta sa-rise mt-1 w-full font-semibold"
+                    disabled={isLoading}
+                >
+                    {isLoading ? "Creating account…" : "Create account"}
+                </Button>
+            </form>
+            <div className="sa-rise text-muted-foreground mt-5 text-[12.5px]">
+                Already have an account?{" "}
+                <Link
+                    href="/login"
+                    className="text-foreground underline-offset-4 transition-colors hover:underline"
+                >
+                    Log in
+                </Link>
+            </div>
+        </div>
     );
 }

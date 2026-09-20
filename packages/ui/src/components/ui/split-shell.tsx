@@ -57,7 +57,15 @@ export function SplitShell({
             )}
             {...props}
         >
-            <div className="flex w-full max-w-[1080px] flex-wrap items-stretch overflow-hidden rounded-[16px] border border-border-strong bg-background">
+            <div
+                className={cn(
+                    "flex w-full flex-wrap items-stretch overflow-hidden rounded-[16px] border border-border-strong bg-background",
+                    // Below the boundary there is no panel, so the card is
+                    // the form: stretching it to 1080 would leave the fields
+                    // stranded against a column of nothing.
+                    "max-w-[460px] min-[760px]:max-w-[1080px]",
+                )}
+            >
                 <div className="flex min-w-[300px] flex-1 flex-col bg-card px-6 py-8 sm:px-8 sm:py-[34px]">
                     <div className="mb-7 flex items-center gap-2.5">
                         <Wordmark style={{ fontSize: "1rem" }} />

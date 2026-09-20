@@ -2,13 +2,6 @@
 
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@saroh/ui/card";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import Link from "next/link";
@@ -75,105 +68,102 @@ export function LoginForm({
     }
 
     return (
-        <Card className="sa-panel mx-auto w-full max-w-sm">
-            <CardHeader>
-                <CardTitle className="sa-rise font-display text-2xl">
-                    Welcome back
-                </CardTitle>
-                <CardDescription className="sa-rise">
-                    Log in to continue to your workspace.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="grid gap-4">
-                    {error && (
-                        <p
-                            role="alert"
-                            className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground rounded-md border px-3 py-2 text-sm"
-                        >
-                            {error}
-                        </p>
-                    )}
-                    <div className="sa-rise grid gap-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                            id="email"
-                            className="sa-input"
-                            type="email"
-                            placeholder="m@example.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            disabled={isLoading}
-                        />
-                    </div>
-                    <div className="sa-rise grid gap-2">
-                        <div className="flex items-center">
-                            <Label htmlFor="password">Password</Label>
-                            <Link
-                                href="/forgot-password"
-                                className="text-muted-foreground hover:text-foreground ml-auto inline-block text-sm underline-offset-4 transition-colors hover:underline"
-                            >
-                                Forgot your password?
-                            </Link>
-                        </div>
-                        <Input
-                            id="password"
-                            className="sa-input"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            disabled={isLoading}
-                        />
-                    </div>
-                    <Button
-                        type="submit"
-                        variant="highlight"
-                        className="sa-cta sa-rise mt-1 w-full font-semibold"
-                        disabled={isLoading}
+        <div>
+            {/* "Welcome back" moved to the panel beside this form; the heading
+                names the act, as the design does on all five pages. */}
+            <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
+                Log in
+            </h1>
+            <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
+                Continue to your workspace.
+            </p>
+            <form onSubmit={handleSubmit} className="grid gap-4">
+                {error && (
+                    <p
+                        role="alert"
+                        className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground rounded-md border px-3 py-2 text-sm"
                     >
-                        {isLoading ? "Signing in…" : "Log in"}
-                    </Button>
+                        {error}
+                    </p>
+                )}
+                <div className="sa-rise grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                        id="email"
+                        className="sa-input"
+                        type="email"
+                        placeholder="m@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+                <div className="sa-rise grid gap-2">
+                    <div className="flex items-center">
+                        <Label htmlFor="password">Password</Label>
+                        <Link
+                            href="/forgot-password"
+                            className="text-muted-foreground hover:text-foreground ml-auto inline-block text-sm underline-offset-4 transition-colors hover:underline"
+                        >
+                            Forgot your password?
+                        </Link>
+                    </div>
+                    <Input
+                        id="password"
+                        className="sa-input"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+                <Button
+                    type="submit"
+                    className="sa-cta sa-rise mt-1 w-full font-semibold"
+                    disabled={isLoading}
+                >
+                    {isLoading ? "Signing in…" : "Log in"}
+                </Button>
 
-                    {/* Divider rather than a second stacked button: it makes
+                {/* Divider rather than a second stacked button: it makes
                         clear that GitHub is an alternative route to the same
                         place, not a second thing to do. */}
-                    <div className="sa-rise flex items-center gap-3">
-                        <span className="bg-border/70 h-px flex-1" />
-                        <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.1em]">
-                            or
-                        </span>
-                        <span className="bg-border/70 h-px flex-1" />
-                    </div>
-
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className="sa-rise w-full gap-2"
-                        disabled={isLoading}
-                        onClick={async () => {
-                            setError(null);
-                            await signIn.social({
-                                provider: "github",
-                                callbackURL: returnTo,
-                            });
-                        }}
-                    >
-                        <FaGithub aria-hidden className="size-4" />
-                        Continue with GitHub
-                    </Button>
-                </form>
-                <div className="sa-rise text-muted-foreground mt-5 text-center text-sm">
-                    Don&apos;t have an account?{" "}
-                    <Link
-                        href={`/signup?redirect=${encodeURIComponent(returnTo)}`}
-                        className="text-foreground underline-offset-4 transition-colors hover:underline"
-                    >
-                        Sign up
-                    </Link>
+                <div className="sa-rise flex items-center gap-3">
+                    <span className="bg-border/70 h-px flex-1" />
+                    <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.1em]">
+                        or
+                    </span>
+                    <span className="bg-border/70 h-px flex-1" />
                 </div>
-            </CardContent>
-        </Card>
+
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="sa-rise w-full gap-2"
+                    disabled={isLoading}
+                    onClick={async () => {
+                        setError(null);
+                        await signIn.social({
+                            provider: "github",
+                            callbackURL: returnTo,
+                        });
+                    }}
+                >
+                    <FaGithub aria-hidden className="size-4" />
+                    Continue with GitHub
+                </Button>
+            </form>
+            <p className="sa-rise text-muted-foreground mt-5 text-[12.5px]">
+                No account yet?{" "}
+                <Link
+                    href={`/signup?redirect=${encodeURIComponent(returnTo)}`}
+                    className="text-foreground underline-offset-4 transition-colors hover:underline"
+                >
+                    Create one
+                </Link>
+            </p>
+        </div>
     );
 }

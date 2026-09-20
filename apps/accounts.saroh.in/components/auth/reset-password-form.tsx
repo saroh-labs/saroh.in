@@ -2,13 +2,6 @@
 
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@saroh/ui/card";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import Link from "next/link";
@@ -29,43 +22,35 @@ function ResetPasswordFormInner() {
 
     if (!token) {
         return (
-            <Card className="sa-panel mx-auto w-full max-w-sm">
-                <CardHeader>
-                    <CardTitle className="font-display text-2xl">
-                        Invalid link
-                    </CardTitle>
-                    <CardDescription>
-                        This reset link is missing a token. Request a new
-                        password reset from the login page.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Link href="/forgot-password" className="text-sm underline">
-                        Request new reset link
-                    </Link>
-                </CardContent>
-            </Card>
+            <div>
+                <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
+                    Invalid link
+                </h1>
+                <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
+                    This reset link is missing a token. Request a new password
+                    reset from the login page.
+                </p>
+                <Link href="/forgot-password" className="text-sm underline">
+                    Request new reset link
+                </Link>
+            </div>
         );
     }
 
     if (errorParam === "INVALID_TOKEN") {
         return (
-            <Card className="sa-panel mx-auto w-full max-w-sm">
-                <CardHeader>
-                    <CardTitle className="font-display text-2xl">
-                        Link expired
-                    </CardTitle>
-                    <CardDescription>
-                        This reset link is invalid or has expired. Request a new
-                        one.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Link href="/forgot-password" className="text-sm underline">
-                        Request new reset link
-                    </Link>
-                </CardContent>
-            </Card>
+            <div>
+                <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
+                    Link expired
+                </h1>
+                <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
+                    This reset link is invalid or has expired. Request a new
+                    one.
+                </p>
+                <Link href="/forgot-password" className="text-sm underline">
+                    Request new reset link
+                </Link>
+            </div>
         );
     }
 
@@ -99,90 +84,79 @@ function ResetPasswordFormInner() {
 
     if (success) {
         return (
-            <Card className="sa-panel mx-auto w-full max-w-sm">
-                <CardHeader>
-                    <CardTitle className="font-display text-2xl">
-                        Password reset
-                    </CardTitle>
-                    <CardDescription>
-                        Your password has been updated. Redirecting to login…
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Link href="/login" className="text-sm underline">
-                        Go to login
-                    </Link>
-                </CardContent>
-            </Card>
+            <div>
+                <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
+                    Password reset
+                </h1>
+                <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
+                    Your password has been updated. Redirecting to login…
+                </p>
+                <Link href="/login" className="text-sm underline">
+                    Go to login
+                </Link>
+            </div>
         );
     }
 
     return (
-        <Card className="sa-panel mx-auto w-full max-w-sm">
-            <CardHeader>
-                <CardTitle className="font-display text-2xl">
-                    Set new password
-                </CardTitle>
-                <CardDescription>
-                    Enter your new password below.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="grid gap-4">
-                    {error && (
-                        <p
-                            role="alert"
-                            className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground rounded-md border px-3 py-2 text-sm"
-                        >
-                            {error}
-                        </p>
-                    )}
-                    <div className="grid gap-2">
-                        <Label htmlFor="newPassword">New password</Label>
-                        <Input
-                            id="newPassword"
-                            className="sa-input"
-                            type="password"
-                            placeholder="At least 8 characters"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            required
-                            minLength={8}
-                            disabled={isLoading}
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="confirmPassword">
-                            Confirm password
-                        </Label>
-                        <Input
-                            id="confirmPassword"
-                            className="sa-input"
-                            type="password"
-                            placeholder="Repeat password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            required
-                            minLength={8}
-                            disabled={isLoading}
-                        />
-                    </div>
-                    <Button
-                        type="submit"
-                        variant="highlight"
-                        className="sa-cta mt-1 w-full font-semibold"
-                        disabled={isLoading}
+        <div>
+            <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
+                Set new password
+            </h1>
+            <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
+                Enter your new password below.
+            </p>
+            <form onSubmit={handleSubmit} className="grid gap-4">
+                {error && (
+                    <p
+                        role="alert"
+                        className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground rounded-md border px-3 py-2 text-sm"
                     >
-                        {isLoading ? "Resetting…" : "Reset password"}
-                    </Button>
-                </form>
-                <div className="mt-4 text-center text-sm">
-                    <Link href="/login" className="underline">
-                        Back to login
-                    </Link>
+                        {error}
+                    </p>
+                )}
+                <div className="grid gap-2">
+                    <Label htmlFor="newPassword">New password</Label>
+                    <Input
+                        id="newPassword"
+                        className="sa-input"
+                        type="password"
+                        placeholder="At least 8 characters"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        minLength={8}
+                        disabled={isLoading}
+                    />
                 </div>
-            </CardContent>
-        </Card>
+                <div className="grid gap-2">
+                    <Label htmlFor="confirmPassword">Confirm password</Label>
+                    <Input
+                        id="confirmPassword"
+                        className="sa-input"
+                        type="password"
+                        placeholder="Repeat password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        minLength={8}
+                        disabled={isLoading}
+                    />
+                </div>
+                <Button
+                    type="submit"
+                    className="sa-cta mt-1 w-full font-semibold"
+                    disabled={isLoading}
+                >
+                    {isLoading ? "Resetting…" : "Reset password"}
+                </Button>
+            </form>
+            <div className="sa-rise text-muted-foreground mt-5 text-[12.5px]">
+                <Link href="/login" className="underline">
+                    Back to login
+                </Link>
+            </div>
+        </div>
     );
 }
 
@@ -190,13 +164,9 @@ export function ResetPasswordForm() {
     return (
         <Suspense
             fallback={
-                <Card className="sa-panel mx-auto w-full max-w-sm">
-                    <CardContent className="pt-6">
-                        <p className="text-muted-foreground text-sm">
-                            Loading…
-                        </p>
-                    </CardContent>
-                </Card>
+                <div>
+                    <p className="text-muted-foreground text-sm">Loading…</p>
+                </div>
             }
         >
             <ResetPasswordFormInner />
