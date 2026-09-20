@@ -390,7 +390,17 @@ export function DataView<TRow>({
                                 {selectable ? (
                                     <th
                                         scope="col"
-                                        className="w-[38px] pl-[14px]"
+                                        /*
+                                         * `text-left` is load-bearing: a <th>
+                                         * centres its content by default and a
+                                         * <td> does not, so these two cells
+                                         * carried the same classes and put
+                                         * their checkboxes in different
+                                         * places — the header's sat ~4px right
+                                         * of every row's, and the column read
+                                         * as crooked.
+                                         */
+                                        className="w-[38px] pl-[14px] text-left"
                                     >
                                         <Checkbox
                                             checked={

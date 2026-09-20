@@ -23,16 +23,18 @@ import * as React from "react";
 
 /*
  * The design fills a field with the SURFACE it sits on (#FFFFFF light,
- * #1F1F1C dark) and lets the border do the work of separating it. Our
- * `--field` token is Sunken (#0E0E0D) in dark, which on this page read as a
- * black hole cut into the form rather than a field on it.
+ * #1F1F1C dark) and lets the border do the work of separating it. This screen
+ * used to say that locally with `bg-card`, because dark `--field` was Sunken
+ * (#0E0E0D) and read as a black hole cut into the form. The token layer says
+ * it now, so `bg-field` is the surface in both themes and the workaround is
+ * gone — along with the same hole in every select, textarea and OTP cell.
  *
  * The BORDER deliberately stays `--input` rather than the design's `--border`:
  * #D9D6CC on white is about 1.5:1, and a control boundary needs 3:1. That
  * departure is older than this screen and is recorded in the token layer.
  */
 const FIELD =
-    "h-[38px] w-full rounded-[9px] border border-input bg-card px-[11px] text-[13.5px] text-foreground ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground aria-[invalid=true]:border-destructive aria-[invalid=true]:bg-destructive-subtle";
+    "h-[38px] w-full rounded-[9px] border border-input bg-field px-[11px] text-[13.5px] text-foreground ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground aria-[invalid=true]:border-destructive aria-[invalid=true]:bg-destructive-subtle";
 
 export interface AuthFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label: string;
