@@ -27,7 +27,7 @@ export default async function SignupPage({
 }) {
     const { redirect } = await searchParams;
     return (
-        <SplitShell route="/signup" panel={<SplitPanel {...SIGNUP_PANEL} />}>
+        <SplitShell panel={<SplitPanel {...SIGNUP_PANEL} />}>
             <SignupForm returnTo={safeDestination(redirect)} />
         </SplitShell>
     );

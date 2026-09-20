@@ -12,8 +12,6 @@ export interface SplitShellProps extends React.HTMLAttributes<HTMLDivElement> {
      * as an instruction the form depends on.
      */
     panel?: React.ReactNode;
-    /** The route, small and in mono beside the mark — the design's orientation cue. */
-    route?: string;
     /** The form, the step, whatever this page is for. */
     children: React.ReactNode;
 }
@@ -44,7 +42,6 @@ export interface SplitShellProps extends React.HTMLAttributes<HTMLDivElement> {
  */
 export function SplitShell({
     panel,
-    route,
     children,
     className,
     ...props
@@ -67,18 +64,7 @@ export function SplitShell({
                 )}
             >
                 <div className="flex min-w-[300px] flex-1 flex-col bg-card px-6 py-8 sm:px-8 sm:py-[34px]">
-                    <div className="mb-7 flex items-center gap-2.5">
-                        <Wordmark style={{ fontSize: "1rem" }} />
-                        {route ? (
-                            /* Where you are, in the face reserved for measured
-                               values (brand file §3). It is orientation, not
-                               decoration — which is why it is the route and
-                               not a tagline. */
-                            <span className="ml-auto font-mono text-[11px] text-muted-foreground">
-                                {route}
-                            </span>
-                        ) : null}
-                    </div>
+                    <Wordmark className="mb-7" style={{ fontSize: "1rem" }} />
                     <div className="w-full max-w-[372px] flex-1">
                         {children}
                     </div>

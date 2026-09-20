@@ -59,19 +59,9 @@ describe("SplitShell", () => {
         expect(container.querySelector("aside")).toBeNull();
     });
 
-    it("shows the route beside the mark when given one", () => {
-        render(
-            <SplitShell route="/login">
-                <button type="button">Log in</button>
-            </SplitShell>,
-        );
-
-        expect(screen.getByText("/login")).toBeVisible();
-    });
-
     it("names Saroh once, so a screen reader does not hear it twice", () => {
         render(
-            <SplitShell route="/login">
+            <SplitShell>
                 <button type="button">Log in</button>
             </SplitShell>,
         );

@@ -11,10 +11,7 @@ export const metadata: Metadata = {
 
 export default function ResetPasswordPage() {
     return (
-        <SplitShell
-            route="/reset-password"
-            panel={<SplitPanel {...RESET_PANEL} />}
-        >
+        <SplitShell panel={<SplitPanel {...RESET_PANEL} />}>
             <ResetPasswordForm />
         </SplitShell>
     );

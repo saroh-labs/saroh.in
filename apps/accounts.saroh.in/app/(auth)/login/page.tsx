@@ -20,7 +20,7 @@ export default async function LoginPage({
 }) {
     const { redirect } = await searchParams;
     return (
-        <SplitShell route="/login" panel={<SplitPanel {...LOGIN_PANEL} />}>
+        <SplitShell panel={<SplitPanel {...LOGIN_PANEL} />}>
             <LoginForm returnTo={safeReturnTo(redirect)} />
         </SplitShell>
     );

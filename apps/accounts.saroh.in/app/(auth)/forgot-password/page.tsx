@@ -11,10 +11,7 @@ export const metadata: Metadata = {
 
 export default function ForgotPasswordPage() {
     return (
-        <SplitShell
-            route="/forgot-password"
-            panel={<SplitPanel {...FORGOT_PANEL} />}
-        >
+        <SplitShell panel={<SplitPanel {...FORGOT_PANEL} />}>
             <ForgotPasswordForm />
         </SplitShell>
     );
