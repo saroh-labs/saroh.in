@@ -49,7 +49,7 @@ export function SocialButtons({
                         type="button"
                         variant="outline"
                         className="sa-rise h-10 w-full gap-[9px] rounded-[9px] text-[13px] font-semibold"
-                        disabled={disabled || pending !== null}
+                        disabled={disabled === true || pending !== null}
                         onClick={async () => {
                             setError(null);
                             setPending(id);

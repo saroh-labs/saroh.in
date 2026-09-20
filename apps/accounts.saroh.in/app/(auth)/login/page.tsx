@@ -1,4 +1,5 @@
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
+import { ThemeToggle } from "@saroh/ui/theme-toggle";
 
 import { LoginForm } from "@/components/auth/login-form";
 import { LOGIN_PANEL } from "@/components/auth/panel-copy";
@@ -20,7 +21,10 @@ export default async function LoginPage({
 }) {
     const { redirect } = await searchParams;
     return (
-        <SplitShell panel={<SplitPanel {...LOGIN_PANEL} />}>
+        <SplitShell
+            action={<ThemeToggle />}
+            panel={<SplitPanel {...LOGIN_PANEL} />}
+        >
             <LoginForm returnTo={safeReturnTo(redirect)} />
         </SplitShell>
     );

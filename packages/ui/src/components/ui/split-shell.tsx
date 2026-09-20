@@ -12,6 +12,11 @@ export interface SplitShellProps extends React.HTMLAttributes<HTMLDivElement> {
      * as an instruction the form depends on.
      */
     panel?: React.ReactNode;
+    /**
+     * A control opposite the mark — the theme pill, and nothing heavier. It
+     * sits in the form column, so it survives the panel disappearing.
+     */
+    action?: React.ReactNode;
     /** The form, the step, whatever this page is for. */
     children: React.ReactNode;
 }
@@ -45,6 +50,7 @@ export interface SplitShellProps extends React.HTMLAttributes<HTMLDivElement> {
  */
 export function SplitShell({
     panel,
+    action,
     children,
     className,
     ...props
@@ -60,7 +66,10 @@ export function SplitShell({
                 in the same column so it lines up with what it introduces. */}
             <div className="flex flex-1 flex-col justify-center px-6 py-12 sm:px-10">
                 <div className="mx-auto w-full max-w-[372px]">
-                    <Wordmark className="mb-8" style={{ fontSize: "1rem" }} />
+                    <div className="mb-8 flex items-center justify-between gap-4">
+                        <Wordmark style={{ fontSize: "1rem" }} />
+                        {action}
+                    </div>
                     {children}
                 </div>
             </div>

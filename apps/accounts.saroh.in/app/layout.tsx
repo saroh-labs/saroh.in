@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./auth.css";
 
+import { ThemeProvider } from "@saroh/ui/theme-provider";
+
 import Providers from "./providers";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
@@ -46,43 +48,43 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        // `suppressHydrationWarning` because the script below stamps the theme
-        // class onto <html> before React hydrates, so a visitor whose OS prefers
-        // dark always mismatches what the server rendered. It suppresses the
-        // warning on this element's own attributes only, not on its subtree.
+        // `suppressHydrationWarning` because next-themes' blocking script
+        // stamps the resolved theme onto <html> before React hydrates, so a
+        // visitor whose OS prefers dark always mismatches what the server
+        // rendered. It suppresses the warning on this element's own attributes
+        // only, not on its subtree.
         <html lang="en" suppressHydrationWarning>
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} font-sans`}
             >
                 {/*
-                 * Follow the OS, pre-paint. accounts has no theme toggle and
-                 * needs none — there is nothing to remember across five forms —
-                 * so this is a media query, not `next-themes`. That library
-                 * exists to persist a CHOICE and it is not even resolvable from
-                 * this app under pnpm's strict layout; adding a dependency to
-                 * read `prefers-color-scheme` would be a poor trade.
+                 * The suite's provider, not a media query.
                  *
-                 * It must run before first paint or a dark-mode visitor gets a
-                 * white flash. As the FIRST CHILD OF <body> it does: the
-                 * stylesheet in <head> is render-blocking and nothing below has
-                 * been parsed yet. It is not a sibling of <body>, because a raw
-                 * <script> between <html> and <body> gets hoisted into <head>
-                 * and the hydrated DOM would no longer match the rendered tree.
+                 * This app used to read `prefers-color-scheme` in a hand-rolled
+                 * pre-paint script, on the reasoning that accounts has no theme
+                 * toggle and needs none. It has one now — the pages are a
+                 * full-bleed split that honours dark properly rather than a
+                 * light card on a dark backdrop — and a toggle has to REMEMBER,
+                 * which a media query cannot. `next-themes` resolves here
+                 * through `@saroh/ui`, which depends on it; the old comment
+                 * saying otherwise was about importing it directly.
                  */}
-                <script
-                    dangerouslySetInnerHTML={{
-                        __html: `(function(){try{if(matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark")}catch(e){}})()`,
-                    }}
-                />
-                <Providers>
-                    {/* `fixed`, not `absolute` + `h-screen`: the account page is
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="system"
+                    enableSystem
+                    disableTransitionOnChange
+                >
+                    <Providers>
+                        {/* `fixed`, not `absolute` + `h-screen`: the account page is
                         taller than the viewport, and a 100vh backdrop left
                         everything below the fold unstyled. */}
-                    <div className="sa-page" aria-hidden="true" />
-                    <div className="relative z-10 min-h-screen w-full">
-                        {children}
-                    </div>
-                </Providers>
+                        <div className="sa-page" aria-hidden="true" />
+                        <div className="relative z-10 min-h-screen w-full">
+                            {children}
+                        </div>
+                    </Providers>
+                </ThemeProvider>
             </body>
         </html>
     );
