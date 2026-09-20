@@ -132,6 +132,9 @@ module.exports = {
         // Sell -> Orders: what a row's status column says when the goods and
         // the money disagree, and that the business-wide list cannot be
         // widened past its organization.
+        // Custom roles: the permission list an owner picks from must stay the
+        // same list the policy enforces.
+        "<rootDir>/src/modules/organizations/capability-catalogue.spec.ts",
         "<rootDir>/src/modules/orders/order-standing.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
