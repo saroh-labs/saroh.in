@@ -461,6 +461,33 @@ export function navGroupsWithSites(
     }));
 }
 
+/**
+ * Which rail rows a module owns.
+ *
+ * Modules is the screen where a merchant decides what their workspace
+ * contains, so it has to say what each switch actually does — and the honest
+ * answer is here, in the nav itself, rather than in a hand-written sentence
+ * per module that drifts the first time a row moves.
+ */
+export function navRowsForModule(moduleKey: string): string[] {
+    const rows: string[] = [];
+    for (const group of NAV_GROUPS) {
+        for (const item of group.items) {
+            if ((item.moduleKey ?? group.moduleKey) !== moduleKey) continue;
+            rows.push(item.label);
+            // A section's screens count as rows: turning Commerce off takes
+            // Storefronts, Products and Customers with it, and the merchant
+            // should be told the names they navigate by.
+            for (const child of item.children ?? []) {
+                // A child that repeats its parent's destination is the section
+                // landing page, not a second row.
+                if (child.href !== item.href) rows.push(child.label);
+            }
+        }
+    }
+    return rows;
+}
+
 export function filterNavGroups(
     groups: readonly NavGroup[],
     availableModuleKeys: readonly string[] | null,
