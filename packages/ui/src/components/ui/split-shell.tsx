@@ -33,8 +33,11 @@ export interface SplitShellProps extends React.HTMLAttributes<HTMLDivElement> {
  * a `dark` class re-points the tokens the element itself reads, so
  * `bg-primary` on a `dark` node resolves to Paper and the panel comes out
  * white. The panel instead uses the primary pair — Ink on a light page — and
- * steps to the inset surface under `dark:`, where inverting to a Paper card
- * would make it the only white thing on the screen.
+ * RECEDES under `dark:` rather than stepping up. The design's dark table is
+ * explicit about this: the form side is the surface (#1F1F1C) and the panel
+ * is the shell behind it (#141412), which is our `--background`. Reaching for
+ * the inset surface instead put the panel two steps the wrong way and left it
+ * sitting lighter than the form it is supposed to sit behind.
  *
  * `accounts.saroh.in` has no theme provider at all (dark mode there is a
  * pre-hydration script reading the OS preference), so there is nothing to scope
@@ -70,7 +73,7 @@ export function SplitShell({
                        which takes it away from assistive technology too;
                        `sr-only` or an opacity treatment would leave it being
                        read out to exactly the people who cannot see it. */
-                    className="hidden w-[38%] min-w-[320px] max-w-[560px] flex-col justify-center bg-primary px-10 py-12 text-primary-foreground dark:bg-popover dark:text-popover-foreground min-[760px]:flex"
+                    className="hidden w-[38%] min-w-[320px] max-w-[560px] flex-col justify-center bg-primary px-10 py-12 text-primary-foreground dark:bg-background dark:text-foreground min-[760px]:flex"
                 >
                     <div className="mx-auto w-full max-w-[392px]">{panel}</div>
                 </aside>
