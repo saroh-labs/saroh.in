@@ -60,7 +60,7 @@ export function MobileNav({
                     variant="ghost"
                     size="icon"
                     aria-label="Open navigation menu"
-                    className="lg:hidden"
+                    className="min-[760px]:hidden"
                 >
                     <Menu className="h-5 w-5" />
                 </Button>

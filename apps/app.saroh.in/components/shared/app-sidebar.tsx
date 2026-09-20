@@ -1,8 +1,10 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
+import { Popover, PopoverAnchor, PopoverContent } from "@saroh/ui/popover";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCallback, useState, useSyncExternalStore } from "react";
 
 import type {
     NavChild,
@@ -17,12 +19,37 @@ import {
 } from "@/components/shared/nav-items";
 
 /**
- * Desktop primary navigation: a calm, goal-grouped rail replacing the flat
- * horizontal top nav (see `docs/design-system/03_APPLICATION_SHELL.md`). It is
- * `hidden lg:flex` — below `lg` the same nav lives in `MobileNav`'s drawer.
+ * Primary navigation: a calm, goal-grouped rail.
+ *
+ * Three widths, as the workspace design sets them (brand file §21):
+ * above 1100px the full 238px rail; from 760 to 1100 a 64px icon rail, where
+ * labels, group headings and counts are announced but not drawn; below 760 no
+ * rail at all — `MobileNav`'s drawer carries the same nav.
+ *
+ * A section's children are REMOVED on the icon rail rather than hidden, which
+ * would leave controls in the tab order that nobody can see. They are reached
+ * through a flyout on the parent instead, so the only path to a child screen
+ * survives the collapse.
+ *
  * Client-only for `usePathname` active state; the `unread` count is fetched
  * server-side by `AppShell` and passed in (this component never fetches).
  */
+
+/** Is the rail collapsed to icons? Matches the design's 1100px boundary. */
+function useIconRail(): boolean {
+    const subscribe = useCallback((onChange: () => void) => {
+        const mq = window.matchMedia("(max-width: 1100px)");
+        mq.addEventListener("change", onChange);
+        return () => mq.removeEventListener("change", onChange);
+    }, []);
+    return useSyncExternalStore(
+        subscribe,
+        () => window.matchMedia("(max-width: 1100px)").matches,
+        // The server cannot know the width; the full rail is the honest
+        // default, and the first client render corrects it.
+        () => false,
+    );
+}
 export function AppSidebar({
     unread = 0,
     moduleKeys = null,
@@ -42,6 +69,12 @@ export function AppSidebar({
 }) {
     const pathname = usePathname();
     const groups = navFor({ role, moduleKeys, sites });
+    const iconRail = useIconRail();
+    const [flyoutFor, setFlyoutFor] = useState<string | null>(null);
+
+    // Derived, not stored: a flyout only exists on the icon rail, so widening
+    // the window closes it without a second render.
+    const openFlyout = iconRail ? flyoutFor : null;
 
     return (
         // Sticky so the rail stays put on a long page. Without
@@ -50,7 +83,7 @@ export function AppSidebar({
         <aside
             aria-label="Workspace"
             // Below the 61px top bar, which carries the mark now.
-            className="sticky top-[61px] hidden h-[calc(100vh-61px)] w-[238px] shrink-0 flex-col border-r lg:flex"
+            className="sticky top-[61px] hidden h-[calc(100vh-61px)] w-[238px] shrink-0 flex-col border-r max-[1100px]:w-16 min-[760px]:flex"
         >
             {/*
              * `gap-0.5` on the nav, and space bought back only where it means
@@ -64,7 +97,7 @@ export function AppSidebar({
              */}
             <nav
                 aria-label="Primary"
-                className="flex flex-1 flex-col gap-px overflow-y-auto px-2.5 py-3"
+                className="flex flex-1 flex-col gap-px overflow-y-auto px-2.5 py-3 max-[1100px]:px-2"
             >
                 {groups.map((group, index) => (
                     <div
@@ -80,7 +113,7 @@ export function AppSidebar({
                         )}
                     >
                         {showsGroupLabel(group) && (
-                            <p className="px-2.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                            <p className="px-2.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground max-[1100px]:sr-only">
                                 {group.label}
                             </p>
                         )}
@@ -124,70 +157,118 @@ export function AppSidebar({
                                 item.href === NOTIFICATIONS_HREF
                                     ? unread
                                     : (counts?.[item.href] ?? 0);
+                            const hasChildren = Boolean(item.children?.length);
+                            const flyoutOpen = openFlyout === item.href;
                             return (
-                                <Link
+                                <Popover
                                     key={item.href}
-                                    href={item.href}
-                                    aria-current={
-                                        active && !childIsCurrent
-                                            ? "page"
-                                            : undefined
-                                    }
-                                    className={cn(
-                                        // Tighter rows than the drawer's: this
-                                        // rail is `lg`-and-up only, so it is
-                                        // always driven by a pointer, and the
-                                        // 44px touch target that MobileNav needs
-                                        // would only spread twelve items over a
-                                        // screen's worth of height here.
-                                        // `wk-nav` grows a brand bar on the
-                                        // leading edge when this row is the
-                                        // current page (workspace.css). It
-                                        // scales from the centre rather than
-                                        // fading, so changing page reads as the
-                                        // marker travelling down the rail.
-                                        "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast",
-                                        // The design system's ring, not
-                                        // Chrome's default blue: the focus ring
-                                        // is a keyboard user's cursor, and it
-                                        // was inconsistent in exactly the place
-                                        // navigation happens most.
-                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                                        isPage
-                                            ? "bg-card font-semibold text-foreground shadow-xs"
-                                            : isSection
-                                              ? "font-semibold text-brand hover:bg-accent"
-                                              : // Idle rows sit a step back
-                                                // from Ink, so the section and
-                                                // the page read louder.
-                                                "font-medium text-neutral-700 hover:bg-accent dark:text-muted-foreground",
-                                    )}
+                                    open={flyoutOpen}
+                                    onOpenChange={(open) => {
+                                        if (!open) setFlyoutFor(null);
+                                    }}
                                 >
-                                    <Icon
-                                        className="size-[19px] shrink-0"
-                                        strokeWidth={1.9}
-                                    />
-                                    <span className="flex-1">{item.label}</span>
-                                    {waiting > 0 ? (
-                                        /* The brand file's waiting count: a
+                                    <PopoverAnchor asChild>
+                                        <Link
+                                            href={item.href}
+                                            // On the icon rail a section opens its
+                                            // flyout instead of navigating: its
+                                            // children have no other path there.
+                                            onClick={(e) => {
+                                                if (!iconRail || !hasChildren)
+                                                    return;
+                                                e.preventDefault();
+                                                setFlyoutFor(
+                                                    flyoutOpen
+                                                        ? null
+                                                        : item.href,
+                                                );
+                                            }}
+                                            aria-expanded={
+                                                iconRail && hasChildren
+                                                    ? flyoutOpen
+                                                    : undefined
+                                            }
+                                            title={item.label}
+                                            aria-current={
+                                                active && !childIsCurrent
+                                                    ? "page"
+                                                    : undefined
+                                            }
+                                            className={cn(
+                                                // Tighter rows than the drawer's: this
+                                                // rail is `lg`-and-up only, so it is
+                                                // always driven by a pointer, and the
+                                                // 44px touch target that MobileNav needs
+                                                // would only spread twelve items over a
+                                                // screen's worth of height here.
+                                                // `wk-nav` grows a brand bar on the
+                                                // leading edge when this row is the
+                                                // current page (workspace.css). It
+                                                // scales from the centre rather than
+                                                // fading, so changing page reads as the
+                                                // marker travelling down the rail.
+                                                "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast",
+                                                // The icon rail centres the glyph and
+                                                // drops the marker's gutter.
+                                                "max-[1100px]:justify-center max-[1100px]:px-0 max-[1100px]:before:hidden",
+                                                // The design system's ring, not
+                                                // Chrome's default blue: the focus ring
+                                                // is a keyboard user's cursor, and it
+                                                // was inconsistent in exactly the place
+                                                // navigation happens most.
+                                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                                isPage
+                                                    ? "bg-card font-semibold text-foreground shadow-xs"
+                                                    : isSection
+                                                      ? "font-semibold text-brand hover:bg-accent"
+                                                      : // Idle rows sit a step back
+                                                        // from Ink, so the section and
+                                                        // the page read louder.
+                                                        "font-medium text-neutral-700 hover:bg-accent dark:text-muted-foreground",
+                                            )}
+                                        >
+                                            <Icon
+                                                className="size-[19px] shrink-0"
+                                                strokeWidth={1.9}
+                                            />
+                                            <span className="flex-1 max-[1100px]:sr-only">
+                                                {item.label}
+                                            </span>
+                                            {waiting > 0 ? (
+                                                /* The brand file's waiting count: a
                                            Saffron-tinted pill with 700 text.
                                            It is a count, not a status, so it
                                            does not borrow Warning's hue. */
-                                        <span
-                                            aria-label={`${waiting} waiting`}
-                                            className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
-                                        >
-                                            {waiting}
-                                        </span>
+                                                <span
+                                                    aria-label={`${waiting} waiting`}
+                                                    className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground max-[1100px]:sr-only"
+                                                >
+                                                    {waiting}
+                                                </span>
+                                            ) : null}
+                                        </Link>
+                                    </PopoverAnchor>
+                                    {item.children?.length ? (
+                                        <NavFlyout
+                                            label={item.label}
+                                            children={item.children}
+                                            pathname={pathname}
+                                            onLeave={() => setFlyoutFor(null)}
+                                        />
                                     ) : null}
-                                </Link>
+                                </Popover>
                             );
                         })}
                         {/* A section expands because you are in it, not
                             because you toggled it (brand file §13) — so the
                             children render only for the section you are in,
                             and there is no chevron. */}
+                        {/* Removed outright on the icon rail, never hidden:
+                            invisible rows left in the tab order are the worse
+                            outcome (brand file §13). The flyout is their path
+                            at that width. */}
                         {group.items.map((item) =>
+                            !iconRail &&
                             item.children?.length &&
                             isNavItemActive(pathname, item.href) ? (
                                 <SiteTree
@@ -201,6 +282,86 @@ export function AppSidebar({
                 ))}
             </nav>
         </aside>
+    );
+}
+
+/**
+ * A section's screens, on the icon rail.
+ *
+ * An Ink popover anchored to the parent, because at 64px there is nowhere for
+ * children to live — and unlike an accordion, nothing below it moves when it
+ * opens. The current page keeps the 2px Saffron marker; on Ink it sits on a
+ * Paper wash rather than white, which would vanish here (brand file §13).
+ */
+function NavFlyout({
+    label,
+    children,
+    pathname,
+    onLeave,
+}: {
+    label: string;
+    children: NavChild[];
+    pathname: string;
+    onLeave: () => void;
+}) {
+    const rows = children.filter(
+        (child): child is NavChild & { href: string } => Boolean(child.href),
+    );
+    return (
+        // Portalled, not absolute: the rail scrolls, and a box inside a
+        // scroll container is clipped at its edge — which at 64px means the
+        // flyout never appears at all.
+        <PopoverContent
+            side="right"
+            align="start"
+            // The design hangs it at x=60 against a 64px rail; the link stops
+            // at 55 (8px of nav padding inside a 1px border), so 5px carries
+            // it there.
+            sideOffset={5}
+            alignOffset={-4}
+            aria-label={label}
+            onMouseLeave={onLeave}
+            // Focus stays on the rail: the flyout opens under the pointer and
+            // its rows are reachable by Tab in order.
+            onOpenAutoFocus={(e) => e.preventDefault()}
+            className={cn(
+                "w-[186px] rounded-[11px] border-0 p-[7px] shadow-lg",
+                // Ink on Paper, as the design draws it. In dark mode Ink IS
+                // the page, so it steps up to the Inset surface instead —
+                // inverting to a Paper card would be the only white thing on
+                // the screen.
+                "bg-primary text-primary-foreground dark:bg-popover dark:text-popover-foreground",
+            )}
+        >
+            <p className="px-[9px] pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.1em] opacity-70">
+                {label}
+            </p>
+            {rows.map((child) => {
+                const on = pathname === child.href;
+                return (
+                    <Link
+                        key={child.href}
+                        href={child.href}
+                        onClick={onLeave}
+                        aria-current={on ? "page" : undefined}
+                        className={cn(
+                            "relative flex items-center rounded-[7px] py-2 pl-4 pr-3 text-[12.5px] transition-colors duration-fast",
+                            "before:absolute before:left-1.5 before:top-1/2 before:h-[15px] before:w-0.5 before:-translate-y-1/2 before:rounded-[1px] before:bg-highlight before:transition-transform",
+                            // A Paper wash over the Ink, never a white
+                            // fill — which on this surface would read as a
+                            // second card (brand file §13).
+                            on
+                                ? "bg-primary-foreground/[0.12] font-semibold dark:bg-foreground/10"
+                                : "font-medium opacity-90 before:scale-y-0 hover:bg-primary-foreground/[0.09] hover:opacity-100 dark:hover:bg-foreground/[0.07]",
+                        )}
+                    >
+                        <span className="min-w-0 flex-1 truncate">
+                            {child.create ? `+ ${child.label}` : child.label}
+                        </span>
+                    </Link>
+                );
+            })}
+        </PopoverContent>
     );
 }
 

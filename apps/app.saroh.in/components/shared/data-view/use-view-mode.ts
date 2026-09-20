@@ -5,8 +5,12 @@ import { useCallback, useSyncExternalStore } from "react";
 import type { DataViewMode } from "./types";
 
 const STORAGE_PREFIX = "saroh-view-mode:";
-/** Tailwind's `lg`. Below this, a table cannot be read without pinch-zoom. */
-const TABLE_MIN_WIDTH = 1024;
+/**
+ * The design's table boundary (brand file §21): above it a table shows every
+ * column, below it rows become cards. Collapsing the rail to 64px at 1100 is
+ * what buys a table the width to reach down here.
+ */
+const TABLE_MIN_WIDTH = 760;
 
 /**
  * In-memory overrides, so a click updates every mounted view of the same id
