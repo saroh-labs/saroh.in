@@ -1,21 +1,39 @@
 "use client";
 
 import { authClient } from "@/lib/auth.client";
-import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-/** Entrance offsets, in order of appearance. Small enough to read as one
- *  gesture rather than a sequence the user has to wait out. */
+import {
+    AuthError,
+    AuthField,
+    AuthFooter,
+    AuthHeading,
+    AuthSubmit,
+} from "@/components/auth/field";
+import { SocialButtons } from "@/components/auth/social-buttons";
 
-export function SignupForm({ returnTo }: { returnTo?: string | null }) {
+/**
+ * Creating the account.
+ *
+ * `returnTo` is where sign-up should eventually land (#276), already vetted by
+ * the server component above. `invitedEmail` is the address an invitation was
+ * sent to: accepting refuses any other, so the field starts filled and says
+ * why rather than letting someone make an account that cannot take the
+ * invitation they just read.
+ */
+export function SignupForm({
+    returnTo,
+    invitedEmail,
+}: {
+    returnTo?: string | null;
+    invitedEmail?: string;
+}) {
     const router = useRouter();
     const { signUp } = authClient;
     const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
+    const [email, setEmail] = useState(invitedEmail ?? "");
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -49,78 +67,75 @@ export function SignupForm({ returnTo }: { returnTo?: string | null }) {
 
     return (
         <div>
-            <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
-                Create your account
-            </h1>
-            <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
-                One account for every Saroh app.
-            </p>
-            <form onSubmit={handleSubmit} className="grid gap-4">
-                {error && (
-                    <p
-                        role="alert"
-                        className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground rounded-md border px-3 py-2 text-sm"
-                    >
-                        {error}
-                    </p>
-                )}
-                <div className="sa-rise grid gap-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                        id="name"
-                        className="sa-input"
-                        type="text"
-                        placeholder="Your name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        disabled={isLoading}
-                    />
-                </div>
-                <div className="sa-rise grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                        id="email"
-                        className="sa-input"
-                        type="email"
-                        placeholder="m@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        disabled={isLoading}
-                    />
-                </div>
-                <div className="sa-rise grid gap-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                        id="password"
-                        className="sa-input"
-                        type="password"
-                        placeholder="At least 8 characters"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        minLength={8}
-                        disabled={isLoading}
-                    />
-                </div>
-                <Button
-                    type="submit"
-                    className="sa-cta sa-rise mt-1 w-full font-semibold"
+            <AuthHeading
+                title="Create your account"
+                blurb="One account for every Saroh app."
+            />
+            <form onSubmit={handleSubmit} noValidate>
+                {error ? <AuthError>{error}</AuthError> : null}
+                <AuthField
+                    label="Name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    placeholder="Your name"
+                    note="What your team sees when you invite them."
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
                     disabled={isLoading}
-                >
+                />
+                <AuthField
+                    label="Email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    note={
+                        invitedEmail
+                            ? "The invitation was sent to this address, so the account has to use it."
+                            : undefined
+                    }
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                />
+                <AuthField
+                    label="Password"
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="At least 8 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    disabled={isLoading}
+                />
+                <AuthSubmit disabled={isLoading}>
                     {isLoading ? "Creating account…" : "Create account"}
-                </Button>
+                </AuthSubmit>
             </form>
-            <div className="sa-rise text-muted-foreground mt-5 text-[12.5px]">
+
+            <SocialButtons
+                callbackURL={returnTo ?? undefined}
+                disabled={isLoading}
+            />
+
+            <AuthFooter>
                 Already have an account?{" "}
                 <Link
-                    href="/login"
+                    href={
+                        returnTo
+                            ? `/login?redirect=${encodeURIComponent(returnTo)}`
+                            : "/login"
+                    }
                     className="text-foreground underline-offset-4 transition-colors hover:underline"
                 >
                     Log in
                 </Link>
-            </div>
+            </AuthFooter>
         </div>
     );
 }
