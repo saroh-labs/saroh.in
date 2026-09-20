@@ -36,7 +36,24 @@ const FIELD =
 
 export interface AuthFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label: string;
-    /** A quiet line under the field — a rule, not an error. */
+    /**
+     * A quiet line under the field — a rule, not an error.
+     *
+     * ## Note or placeholder?
+     *
+     * A PLACEHOLDER is an example of the format — `you@example.com` — and may
+     * safely vanish, because once someone is typing they no longer need to be
+     * shown the shape of the thing they are typing.
+     *
+     * A NOTE is a rule or a consequence, and has to survive typing. "At least
+     * 8 characters" as a placeholder is the classic version of this mistake:
+     * it disappears the moment the person starts trying to satisfy it, and
+     * returns only as a validation error once they have got it wrong.
+     *
+     * Which is why this is not on every field. A note under each one is
+     * wallpaper, and wallpaper is not read — so the fields that genuinely
+     * carry a rule lose the only thing that would have made them stand out.
+     */
     note?: string;
     /** The link that sits opposite the label, e.g. "Forgot it?" on a password. */
     side?: { href: string; label: string };

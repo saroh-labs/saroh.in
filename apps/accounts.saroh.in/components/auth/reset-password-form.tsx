@@ -1,12 +1,17 @@
 "use client";
 
 import { authClient } from "@/lib/auth.client";
-import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+
+import {
+    AuthError,
+    AuthField,
+    AuthFooter,
+    AuthHeading,
+    AuthSubmit,
+} from "@/components/auth/field";
 
 function ResetPasswordFormInner() {
     const router = useRouter();
@@ -22,16 +27,18 @@ function ResetPasswordFormInner() {
     if (!token) {
         return (
             <div>
-                <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
-                    Invalid link
-                </h1>
-                <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
-                    This reset link is missing a token. Request a new password
-                    reset from the login page.
-                </p>
-                <Link href="/forgot-password" className="text-sm underline">
-                    Request new reset link
-                </Link>
+                <AuthHeading
+                    title="Invalid link"
+                    blurb="This reset link is missing a token. Request a new password reset from the login page."
+                />
+                <AuthFooter>
+                    <Link
+                        href="/forgot-password"
+                        className="text-foreground underline-offset-4 transition-colors hover:underline"
+                    >
+                        Request a new reset link
+                    </Link>
+                </AuthFooter>
             </div>
         );
     }
@@ -39,16 +46,18 @@ function ResetPasswordFormInner() {
     if (errorParam === "INVALID_TOKEN") {
         return (
             <div>
-                <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
-                    Link expired
-                </h1>
-                <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
-                    This reset link is invalid or has expired. Request a new
-                    one.
-                </p>
-                <Link href="/forgot-password" className="text-sm underline">
-                    Request new reset link
-                </Link>
+                <AuthHeading
+                    title="Link expired"
+                    blurb="This reset link is invalid or has already been used. Request a new one."
+                />
+                <AuthFooter>
+                    <Link
+                        href="/forgot-password"
+                        className="text-foreground underline-offset-4 transition-colors hover:underline"
+                    >
+                        Request a new reset link
+                    </Link>
+                </AuthFooter>
             </div>
         );
     }
@@ -85,49 +94,41 @@ function ResetPasswordFormInner() {
 
     return (
         <div>
-            <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
-                Set new password
-            </h1>
-            <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
-                Enter your new password below.
-            </p>
-            <form onSubmit={handleSubmit} className="grid gap-4">
-                {error && (
-                    <p
-                        role="alert"
-                        className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground rounded-md border px-3 py-2 text-sm"
-                    >
-                        {error}
-                    </p>
-                )}
-                <div className="grid gap-2">
-                    <Label htmlFor="newPassword">New password</Label>
-                    <Input
-                        id="newPassword"
-                        className="sa-input"
-                        type="password"
-                        placeholder="At least 8 characters"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        required
-                        minLength={8}
-                        disabled={isLoading}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="confirmPassword">Confirm password</Label>
-                    <Input
-                        id="confirmPassword"
-                        className="sa-input"
-                        type="password"
-                        placeholder="Repeat password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                        minLength={8}
-                        disabled={isLoading}
-                    />
-                </div>
+            <AuthHeading
+                title="Set new password"
+                blurb="Enter your new password below."
+            />
+            <form onSubmit={handleSubmit} noValidate>
+                {error ? <AuthError>{error}</AuthError> : null}
+                <AuthField
+                    label="New password"
+                    name="newPassword"
+                    type="password"
+                    autoComplete="new-password"
+                    // The rule, where it survives being typed against. As a
+                    // placeholder it vanished on the first keystroke and came
+                    // back only as an error after the form was submitted.
+                    note="At least 8 characters."
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    disabled={isLoading}
+                />
+                <AuthField
+                    label="Confirm password"
+                    name="confirmPassword"
+                    type="password"
+                    autoComplete="new-password"
+                    // No note. "They must match" is what the label already
+                    // says, and a second line here would only teach people
+                    // that the line under a field is not worth reading.
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    disabled={isLoading}
+                />
                 {/*
                  * The consequence, BEFORE the button that causes it.
                  *
@@ -136,24 +137,27 @@ function ResetPasswordFormInner() {
                  * form says so too, but the panel is gone below 760px and a
                  * consequence this size cannot live only in the half that
                  * disappears.
+                 *
+                 * Not a field note: it belongs to the ACT, not to either
+                 * password, and hanging it under one of the two would make it
+                 * read as a rule about that box.
                  */}
                 <p className="sa-rise text-muted-foreground mt-1 text-pretty text-[11.5px] leading-[1.45]">
                     Saving a new password signs you out everywhere else — every
                     other browser and device, including any you no longer have.
                 </p>
-                <Button
-                    type="submit"
-                    className="sa-cta mt-1 w-full font-semibold"
-                    disabled={isLoading}
-                >
-                    {isLoading ? "Resetting…" : "Save new password"}
-                </Button>
+                <AuthSubmit disabled={isLoading}>
+                    {isLoading ? "Saving…" : "Save new password"}
+                </AuthSubmit>
             </form>
-            <div className="sa-rise text-muted-foreground mt-5 text-[12.5px]">
-                <Link href="/login" className="underline">
-                    Back to login
+            <AuthFooter>
+                <Link
+                    href="/login"
+                    className="text-foreground underline-offset-4 transition-colors hover:underline"
+                >
+                    Back to log in
                 </Link>
-            </div>
+            </AuthFooter>
         </div>
     );
 }

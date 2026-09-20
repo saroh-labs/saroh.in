@@ -48,7 +48,11 @@ export const SIGNUP_PANEL: PanelCopy = {
     points: [
         "One account can hold as many businesses as you need",
         "Capabilities go on and off later without losing anything",
-        "Your name is what your team sees when you invite them",
+        // Was "Your name is what your team sees when you invite them", which
+        // the Name field's own note now says a few centimetres away. Setting
+        // the expectation of the next screen is worth more than saying one
+        // thing twice.
+        "A code comes by email before you are signed in",
     ],
 };
 
@@ -78,10 +82,15 @@ export const RESET_PANEL: PanelCopy = {
     eyebrow: "Reset password",
     heading: "Set it, and you are back in.",
     body: "Choosing a new password ends every other session, which is the point if you are here because something felt wrong. Your current password works until the new one is saved.",
+    // Two of the three points this panel used to carry are now said on the
+    // form itself, where they belong: the length rule is the password field's
+    // note, and the sign-out is the line above the button. The panel is gone
+    // below 760px, so a consequence cannot live only here — but once it lives
+    // on the form, repeating it here is just noise at desk width.
     points: [
-        "Eight characters minimum",
         "The link works once, then it is spent",
-        "Anything signed in as you elsewhere gets signed out",
+        "You will log in again with the new one",
+        "Nothing else about your account changes",
     ],
 };
 
