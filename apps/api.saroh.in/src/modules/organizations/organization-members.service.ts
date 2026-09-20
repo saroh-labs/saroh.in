@@ -243,6 +243,54 @@ export class OrganizationMembersService {
      * Accept an invitation. Session-scoped, not org-scoped: the whole point is
      * that the caller is not a member yet, so there is no context to resolve.
      */
+    /**
+     * What an invitation says, to whoever holds its link — before they have an
+     * account, and therefore before there is any session to authorize.
+     *
+     * The link IS the credential: the token is high-entropy and stored only as
+     * a hash, so a holder is the intended reader. What comes back is still the
+     * minimum that lets someone decide whether to join — the business, who
+     * asked, the role, and the address it was sent to. Not the organization
+     * id, not the sites a reviewer would get, nothing that would be useful to
+     * someone who stole the link rather than received it.
+     *
+     * The address is included deliberately. `accept` already refuses a
+     * mismatch by naming it ("That invitation was sent to …"), so a token
+     * holder can learn it anyway — and showing it up front turns a dead end at
+     * the last step into a prefilled field at the first.
+     *
+     * One answer for missing, revoked, used and expired. A stranger holding a
+     * token learns nothing from the difference.
+     */
+    async preview(token: string) {
+        const invitation = await prisma.organizationInvitation.findUnique({
+            where: { tokenHash: hashInviteToken(token) },
+            select: {
+                email: true,
+                role: true,
+                status: true,
+                expiresAt: true,
+                organization: { select: { name: true } },
+                invitedBy: { select: { name: true } },
+            },
+        });
+        if (
+            invitation?.status !== "PENDING" ||
+            invitation.expiresAt.getTime() < Date.now()
+        ) {
+            throw new NotFoundException(
+                "That invitation is no longer valid. Ask for a new one.",
+            );
+        }
+        return {
+            organizationName: invitation.organization.name,
+            invitedByName: invitation.invitedBy?.name ?? null,
+            role: toRole(invitation.role),
+            email: invitation.email,
+            expiresAt: invitation.expiresAt,
+        };
+    }
+
     async accept(user: { id: string; email: string }, token: string) {
         const invitation = await prisma.organizationInvitation.findUnique({
             where: { tokenHash: hashInviteToken(token) },

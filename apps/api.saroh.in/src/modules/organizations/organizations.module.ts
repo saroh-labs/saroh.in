@@ -8,6 +8,7 @@ import { OrganizationMembersService } from "./organization-members.service";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
 import { OrganizationSettingsService } from "./organization-settings.service";
 import { OrganizationsController } from "./organizations.controller";
+import { PublicInvitationsController } from "./public-invitations.controller";
 
 /**
  * Organization onboarding and settings (S1-003 / S1-004).
@@ -24,7 +25,11 @@ import { OrganizationsController } from "./organizations.controller";
  */
 @Module({
     imports: [OrganizationContextModule, AuditModule, AnalyticsCoreModule],
-    controllers: [OrganizationsController, OrganizationMembersController],
+    controllers: [
+        OrganizationsController,
+        OrganizationMembersController,
+        PublicInvitationsController,
+    ],
     providers: [
         OrganizationOnboardingService,
         OrganizationSettingsService,

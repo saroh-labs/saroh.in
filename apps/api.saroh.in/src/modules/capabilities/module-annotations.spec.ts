@@ -98,6 +98,8 @@ const NEVER: Record<string, string> = {
     "bookings/public-bookings.controller.ts": "public booking",
     "sites/public-sites.controller.ts": "published sites",
     "enquiry/enquiry.controller.ts": "public forms",
+    "organizations/public-invitations.controller.ts":
+        "someone reads an invitation before they have an account, let alone a module",
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
     "billing/billing-webhook.controller.ts": "billing webhook inbox",
     "waitlist/waitlist.controller.ts": "public waitlist",
