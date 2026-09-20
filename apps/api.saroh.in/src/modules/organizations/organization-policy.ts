@@ -4,6 +4,9 @@ import type {
     OrganizationContext,
     OrgRole,
 } from "../../common/types/organization-context";
+import { ORG_ROLES } from "../../common/types/organization-context";
+import type { OrgAction } from "./organization-actions";
+import { ORG_ACTIONS } from "./organization-actions";
 
 /**
  * Centralized Organization authorization policy (S1-003).
@@ -65,146 +68,8 @@ import type {
  * Add new actions here and to CAPABILITIES; TypeScript then forces every role
  * to make an explicit allow/deny decision (the map is keyed by the union).
  */
-export type OrgAction =
-    | "org:read"
-    // Reading the BusinessProfile is DELIBERATELY not part of the `org:read`
-    // floor: legal name, tax id and contact email are sensitive business
-    // identity, not roster-level facts, so a MEMBER must not see them even
-    // though they may see the org exists.
-    | "org:settings:read"
-    | "org:update"
-    | "org:delete"
-    | "member:read"
-    | "member:invite"
-    | "member:remove"
-    | "member:role:update"
-    | "audit:read"
-    | "store:create"
-    | "store:read"
-    | "store:write"
-    | "store:delete"
-    | "site:create"
-    | "site:read"
-    | "site:update"
-    | "site:delete"
-    | "project:access:manage"
-    | "media:read"
-    | "media:write"
-    | "section:write"
-    | "site:publish"
-    // Review (#193). Separate actions because they are separate powers: a
-    // REVIEWER may do both and nothing else, while a MEMBER may do neither —
-    // leaving a note is not a read, and signing a site off is not an edit.
-    | "site:comment"
-    | "site:approve"
-    | "domain:manage"
-    | "form:read"
-    | "form:write"
-    | "contact:read"
-    | "contact:write"
-    | "lead:read"
-    | "lead:write"
-    | "pipeline:read"
-    | "pipeline:manage"
-    | "activity:read"
-    | "activity:write"
-    | "notification:read"
-    | "notification:write"
-    | "service:read"
-    | "service:write"
-    | "booking:read"
-    | "booking:write"
-    | "order:read"
-    | "order:write"
-    | "payment:read"
-    | "payment:manage"
-    | "message:read"
-    | "message:write"
-    | "comms:manage"
-    | "consent:read"
-    | "consent:write"
-    | "automation:manage"
-    | "analytics:read"
-    | "billing:read"
-    | "billing:manage"
-    // The health of the external services the org depends on — payments,
-    // messaging, domains (#123). Named rather than derived: the surface can
-    // say WHICH provider an organization pays through, so it belongs to the
-    // roles that manage those relationships, not to everyone who may read.
-    | "provider:read"
-    // Modular capabilities (ADR-003). `module:read` is the read floor — every
-    // role may see effective module availability for the Projects it can access.
-    // `module:manage` (OWNER/ADMIN) enables/disables Organization modules and
-    // manages Project selection.
-    | "module:read"
-    | "module:manage";
-
-/** Every action, for exhaustive iteration/testing and building capability sets. */
-export const ORG_ACTIONS: readonly OrgAction[] = [
-    "org:read",
-    "org:settings:read",
-    "org:update",
-    "org:delete",
-    "member:read",
-    "member:invite",
-    "member:remove",
-    "member:role:update",
-    "audit:read",
-    "store:create",
-    "store:read",
-    "store:write",
-    "store:delete",
-    "site:create",
-    "site:read",
-    "site:update",
-    "site:delete",
-    "project:access:manage",
-    "media:read",
-    "media:write",
-    "section:write",
-    "site:publish",
-    "site:comment",
-    "site:approve",
-    "domain:manage",
-    "form:read",
-    "form:write",
-    "contact:read",
-    "contact:write",
-    "lead:read",
-    "lead:write",
-    "pipeline:read",
-    "pipeline:manage",
-    "activity:read",
-    "activity:write",
-    "notification:read",
-    "notification:write",
-    "service:read",
-    "service:write",
-    "booking:read",
-    "booking:write",
-    "order:read",
-    "order:write",
-    "payment:read",
-    "payment:manage",
-    "message:read",
-    "message:write",
-    "comms:manage",
-    "consent:read",
-    "consent:write",
-    "automation:manage",
-    // Stage 7 (S7-002/003 analytics reads, S7-005 billing). All OWNER/ADMIN-only
-    // — none are in READ_ONLY_ACTIONS: analytics is aggregate business
-    // intelligence and billing changes the org's paid plan (money), so a MEMBER
-    // sees neither. Public analytics INTAKE (site.view) is unauthenticated and
-    // never passes through this policy.
-    "analytics:read",
-    "billing:read",
-    "billing:manage",
-    "provider:read",
-    // Modular capabilities (ADR-003).
-    "module:read",
-    "module:manage",
-];
+export { ORG_ACTIONS } from "./organization-actions";
+export type { OrgAction } from "./organization-actions";
 
 /**
  * Read-only actions — the floor OWNER, ADMIN and MEMBER share.
@@ -281,9 +146,60 @@ export function can(role: OrgRole, action: OrgAction): boolean {
  * role does not permit `action`; returns silently when it does.
  */
 export function authorize(ctx: OrganizationContext, action: OrgAction): void {
-    if (!can(ctx.role, action)) {
+    if (!allows(ctx, action)) {
         throw new ForbiddenException(
-            `Role "${ctx.role}" may not perform "${action}"`,
+            `Role "${ctx.roleKey ?? ctx.role}" may not perform "${action}"`,
         );
     }
+}
+
+/**
+ * Whether this actor may take this action.
+ *
+ * Prefers the permissions RESOLVED for the organization's own role, because a
+ * business can invent roles and the shipped map knows nothing about them.
+ * Falls back to that map when a context was built without them — every unit
+ * test and every caller written before roles became rows — so nothing that
+ * does not set `actions` changes behaviour.
+ */
+export function allows(ctx: OrganizationContext, action: OrgAction): boolean {
+    return ctx.actions ? ctx.actions.has(action) : can(ctx.role, action);
+}
+
+/**
+ * What a role may do, given what the organization has stored for it.
+ *
+ * Three cases, and the third is the one that matters:
+ *
+ * 1. The business has a row for this role — its own list wins, filtered to
+ *    actions that actually exist. An unknown string in the column is dropped
+ *    rather than trusted; a role cannot gain a power by being saved with a
+ *    typo, and cannot be broken by one either.
+ * 2. No row, and the key is a built-in — the shipped map. This is why no
+ *    backfill was needed: a business that has invented nothing has no rows,
+ *    and resolves exactly as it did before the table existed.
+ * 3. No row, and the key is unknown — the read-only floor. A membership
+ *    outlives the role it names (the key is deliberately not a foreign key),
+ *    so a renamed or deleted role leaves someone seeing LESS than they
+ *    expected rather than locked out of a business they belong to.
+ */
+export function resolveCapabilities(
+    roleKey: string,
+    stored?: readonly string[] | null,
+): ReadonlySet<OrgAction> {
+    if (stored) {
+        const known = new Set<string>(ORG_ACTIONS);
+        return new Set(stored.filter((a): a is OrgAction => known.has(a)));
+    }
+    return isBuiltInRole(roleKey) ? CAPABILITIES[roleKey] : CAPABILITIES.MEMBER;
+}
+
+/** Whether a stored key names one of the four roles every business has. */
+export function isBuiltInRole(roleKey: string): roleKey is OrgRole {
+    return (ORG_ROLES as readonly string[]).includes(roleKey);
+}
+
+/** The shipped permissions for a built-in, used to seed its row. */
+export function builtInActions(role: OrgRole): readonly OrgAction[] {
+    return [...CAPABILITIES[role]];
 }

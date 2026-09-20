@@ -1,3 +1,5 @@
+import type { OrgAction } from "../../modules/organizations/organization-actions";
+
 /**
  * Organization authorization primitives (S1-003).
  *
@@ -42,5 +44,29 @@ export const ORG_ROLES: readonly OrgRole[] = [
 export interface OrganizationContext {
     organizationId: string;
     userId: string;
+    /**
+     * The BUILT-IN role this actor is treated as by anything still reading a
+     * role name directly.
+     *
+     * For a role the business invented, this is `MEMBER` — the read-only
+     * floor. That is deliberate and fail-safe: a code path that has not
+     * learned about custom roles yet under-grants rather than over-grants, and
+     * the real gate is `authorize()`, which reads `actions` below.
+     */
     role: OrgRole;
+    /**
+     * The role's key as stored on the membership — a built-in name, or the
+     * slug of a role this business invented.
+     */
+    roleKey?: string;
+    /**
+     * What this actor may actually do, resolved from the organization's own
+     * roles.
+     *
+     * Absent when a context was built without consulting them, which every
+     * unit test and every pre-existing caller does. `authorize()` falls back to
+     * the shipped map for `role` in that case, so behaviour is unchanged
+     * wherever this is not set.
+     */
+    actions?: ReadonlySet<OrgAction>;
 }
