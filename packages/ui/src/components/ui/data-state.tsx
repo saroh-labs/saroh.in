@@ -46,6 +46,11 @@ interface StateCardProps extends Omit<
     description?: React.ReactNode;
     /** A single primary action. Never the only way to understand the state. */
     action?: React.ReactNode;
+    /**
+     * A second, quieter line in its own block — who can change this, when the
+     * person reading cannot. Denial is the state that needs it.
+     */
+    note?: React.ReactNode;
     tone?: StateTone;
     /** Dashed reads as "a space waiting to be filled"; solid as "a wall". */
     outline?: "dashed" | "solid";
@@ -60,6 +65,7 @@ function StateCard({
     title,
     description,
     action,
+    note,
     tone = "neutral",
     outline = "dashed",
     className,
@@ -68,9 +74,14 @@ function StateCard({
     return (
         <div
             className={cn(
-                "flex flex-col items-center justify-center gap-3 rounded-lg border p-8 text-center sm:p-12",
+                // The workspace design's state card: 12px, 48/24 of padding
+                // and 11px between the parts. Padding drops on a phone so the
+                // text column does not collapse to two words a line.
+                "flex flex-col items-center justify-center gap-[11px] rounded-[12px] border px-6 py-10 text-center sm:py-12",
                 outline === "dashed" ? "border-dashed" : "border-solid",
-                tone === "danger" && "border-destructive/60",
+                tone === "danger"
+                    ? "border-destructive/60"
+                    : "border-neutral-300",
                 className,
             )}
             {...props}
@@ -78,7 +89,9 @@ function StateCard({
             {icon ? (
                 <div
                     className={cn(
-                        "[&_svg]:h-8 [&_svg]:w-8",
+                        // 30px at stroke 1.8, as the design draws every state
+                        // icon (brand file §20).
+                        "[&_svg]:size-[30px] [&_svg]:stroke-[1.8]",
                         tone === "danger"
                             ? "text-destructive"
                             : "text-muted-foreground",
@@ -87,15 +100,26 @@ function StateCard({
                     {icon}
                 </div>
             ) : null}
-            <div className="space-y-1">
-                <h2 className="text-lg font-semibold">{title}</h2>
-                {description ? (
-                    <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-                        {description}
-                    </p>
-                ) : null}
-            </div>
-            {action}
+            {/* The display face at 19px for the line that names the state,
+                and body copy a step darker than meta text: this is the
+                sentence someone has to read to know what happened. */}
+            <h2 className="font-display text-[19px] font-semibold tracking-[-0.025em]">
+                {title}
+            </h2>
+            {description ? (
+                <p className="mx-auto max-w-[50ch] text-pretty text-[13.5px] leading-[1.55] text-neutral-600">
+                    {description}
+                </p>
+            ) : null}
+            {note ? (
+                // Who can change it, set apart from why it happened: the
+                // design gives this its own sunken block rather than a third
+                // paragraph nobody finishes.
+                <p className="mx-auto max-w-[50ch] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[12.5px] leading-[1.5] text-neutral-600">
+                    {note}
+                </p>
+            ) : null}
+            {action ? <div className="mt-0.5">{action}</div> : null}
         </div>
     );
 }
@@ -266,6 +290,13 @@ export interface LoadingStateProps extends React.HTMLAttributes<HTMLDivElement> 
     rows?: number;
     /** Announced to assistive tech while the rows are meaningless. */
     label?: string;
+    /**
+     * `list` draws the workspace design's shape: a bordered card of rows, each
+     * an avatar and two bars, so the skeleton is the size and rhythm of the
+     * list that replaces it. `plain` is a bare stack for callers that size
+     * their own blocks.
+     */
+    variant?: "plain" | "list";
 }
 
 /**
@@ -274,10 +305,14 @@ export interface LoadingStateProps extends React.HTMLAttributes<HTMLDivElement> 
  * `aria-busy` and a label, so a screen reader is told this is arriving rather
  * than being read a wall of empty boxes. The sweep animation (not a pulse)
  * reads as "arriving" where a synchronised pulse reads as "broken".
+ *
+ * Only the first bar of a row sweeps. Every block moving at once is a light
+ * show; one moving line is a thing loading (the workspace design's skeleton).
  */
 export function LoadingState({
     rows = 3,
     label = "Loading",
+    variant = "plain",
     className,
     ...props
 }: LoadingStateProps) {
@@ -285,13 +320,34 @@ export function LoadingState({
         <div
             aria-busy="true"
             aria-live="polite"
-            className={cn("flex flex-col gap-2", className)}
+            className={cn(
+                variant === "list"
+                    ? "rounded-[12px] border border-neutral-300 px-4 py-2"
+                    : "flex flex-col gap-2",
+                className,
+            )}
             {...props}
         >
             <span className="sr-only">{label}</span>
-            {Array.from({ length: rows }, (_, index) => (
-                <Skeleton key={index} className="h-12 w-full" />
-            ))}
+            {Array.from({ length: rows }, (_, index) =>
+                variant === "list" ? (
+                    <div
+                        key={index}
+                        aria-hidden
+                        className="flex items-center gap-3 border-b border-foreground/10 py-3 last:border-b-0"
+                    >
+                        <Skeleton className="size-[30px] shrink-0 rounded-full" />
+                        <div className="min-w-0 flex-1">
+                            <Skeleton className="h-[11px] w-[30%] rounded-[4px]" />
+                            {/* Still, and a shade paler: a second line that
+                                also swept would read as two things loading. */}
+                            <div className="mt-[7px] h-[7px] w-[19%] rounded-[4px] bg-muted/70" />
+                        </div>
+                    </div>
+                ) : (
+                    <Skeleton key={index} className="h-12 w-full" />
+                ),
+            )}
         </div>
     );
 }
