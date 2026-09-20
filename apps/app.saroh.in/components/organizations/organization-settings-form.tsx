@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import {
     Form,
+    FormCard,
     FormControl,
     FormDescription,
     FormField,
@@ -110,37 +111,35 @@ export function OrganizationSettingsForm({
         <Form {...form}>
             <form
                 onSubmit={form.handleSubmit(onSubmit)}
-                className="grid max-w-xl gap-6"
+                className="grid max-w-[620px] gap-6"
             >
-                <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                        // `wk-item` staggers the form's arrival (workspace.css);
-                        // `--wk-i` is the block's position, not the field's.
-                        <FormItem
-                            className="wk-item"
-                            style={{ "--wk-i": 0 } as React.CSSProperties}
-                        >
-                            <FormLabel>Organization name</FormLabel>
-                            <FormControl>
-                                <Input {...field} maxLength={120} />
-                            </FormControl>
-                            <FormDescription>
-                                Your workspace URL ({settings.slug}) stays the
-                                same — it is used in links that may already be
-                                shared.
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <div
-                    className="wk-item grid gap-4"
-                    style={{ "--wk-i": 1 } as React.CSSProperties}
+                {/* `wk-item` staggers the form's arrival (workspace.css);
+                    `--wk-i` is the block's position, not the field's. One card
+                    now, as the design draws a settings screen: the fields are
+                    one business's identity, not two groups. */}
+                <FormCard
+                    className="wk-item"
+                    style={{ "--wk-i": 0 } as React.CSSProperties}
                 >
-                    <h2 className="text-sm font-medium">Business profile</h2>
+                    <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Organization name</FormLabel>
+                                <FormControl>
+                                    <Input {...field} maxLength={120} />
+                                </FormControl>
+                                <FormDescription>
+                                    Your workspace URL ({settings.slug}) stays
+                                    the same — it is used in links that may
+                                    already be shared.
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
                     {PROFILE_FIELDS.map(({ key, label }) => (
                         <FormField
                             key={key}
@@ -157,11 +156,12 @@ export function OrganizationSettingsForm({
                             )}
                         />
                     ))}
-                    <p className="text-sm text-muted-foreground">
-                        Your legal name appears on published sites, so
-                        correcting it here updates what customers see.
-                    </p>
-                </div>
+                </FormCard>
+
+                <p className="max-w-[620px] text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">
+                    Your legal name appears on published sites, so correcting it
+                    here updates what customers see.
+                </p>
 
                 <Button
                     type="submit"

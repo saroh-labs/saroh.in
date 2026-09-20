@@ -126,6 +126,7 @@ const FormDescription = React.forwardRef<
         <p
             ref={ref}
             id={formDescriptionId}
+            data-slot="form-description"
             className={cn("text-sm text-muted-foreground", className)}
             {...props}
         />
@@ -157,8 +158,43 @@ const FormMessage = React.forwardRef<
 });
 FormMessage.displayName = "FormMessage";
 
+/**
+ * A card of fields, as the workspace design draws a settings screen: one
+ * bordered panel, 620px at most, with a hairline between fields rather than
+ * each one floating in space.
+ *
+ * It styles its children instead of asking every field to opt in. A form is a
+ * list of the same shape repeated, and having each `FormItem` carry the card's
+ * label size and input width is how two settings screens end up looking like
+ * two products. The field components stay unchanged — this only says how they
+ * sit together HERE.
+ */
+const FormCard = React.forwardRef<
+    HTMLDivElement,
+    React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+    <div
+        ref={ref}
+        className={cn(
+            "max-w-[620px] rounded-[12px] border border-neutral-300 px-5 py-[18px]",
+            // The hairline belongs between fields, never above the first or
+            // below the last.
+            "[&>*+*]:mt-4 [&>*+*]:border-t [&>*+*]:border-border [&>*+*]:pt-4",
+            // The design's field scale: a 12.5px label, a note at 11.5px, and
+            // an input that stops at 380px because a name is not 600px long.
+            "[&_label]:text-[12.5px] [&_label]:font-medium",
+            "[&_[data-slot=form-description]]:text-[11.5px] [&_[data-slot=form-description]]:leading-[1.5]",
+            "[&_input]:max-w-[380px] [&_textarea]:max-w-[380px]",
+            className,
+        )}
+        {...props}
+    />
+));
+FormCard.displayName = "FormCard";
+
 export {
     Form,
+    FormCard,
     FormControl,
     FormDescription,
     FormField,
