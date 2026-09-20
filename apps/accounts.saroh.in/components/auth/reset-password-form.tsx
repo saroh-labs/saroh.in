@@ -18,7 +18,6 @@ function ResetPasswordFormInner() {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [success, setSuccess] = useState(false);
 
     if (!token) {
         return (
@@ -78,24 +77,10 @@ function ResetPasswordFormInner() {
         );
         setIsLoading(false);
         if (err) return;
-        setSuccess(true);
-        setTimeout(() => router.push("/login"), 2000);
-    }
-
-    if (success) {
-        return (
-            <div>
-                <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
-                    Password reset
-                </h1>
-                <p className="sa-rise text-muted-foreground mb-[22px] mt-[7px] text-[13px] leading-[1.55]">
-                    Your password has been updated. Redirecting to login…
-                </p>
-                <Link href="/login" className="text-sm underline">
-                    Go to login
-                </Link>
-            </div>
-        );
+        // A route, not a flash: ending every other session is consequential
+        // enough that the person it happened to should be able to sit with the
+        // page rather than watch it vanish on a timer.
+        router.push("/reset-password/done");
     }
 
     return (
