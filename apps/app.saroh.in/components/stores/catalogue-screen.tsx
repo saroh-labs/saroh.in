@@ -46,6 +46,7 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
+import { StorefrontPartial } from "@/components/stores/storefront-partial";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { deleteProduct, updateProduct } from "@/lib/products/actions";
 import type { CatalogueRow } from "@/lib/products/catalogue";
@@ -160,10 +161,13 @@ export function CatalogueScreen({
     stores,
     productsByStore,
     initialView,
+    missing = [],
 }: {
     stores: { id: string; name: string }[];
     productsByStore: Record<string, ProductListItem[]>;
     initialView?: string;
+    /** Storefronts whose list could not be read; see `StorefrontPartial`. */
+    missing?: { id: string; name: string }[];
 }) {
     const router = useRouter();
     const [storeId, setStoreId] = useState<string | null>(null);
@@ -406,6 +410,11 @@ export function CatalogueScreen({
                         </>
                     ) : undefined
                 }
+            />
+
+            <StorefrontPartial
+                missing={missing}
+                missingWhat="products sold only there"
             />
 
             {stores.length === 0 ? (

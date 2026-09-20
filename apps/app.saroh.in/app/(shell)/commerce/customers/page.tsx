@@ -11,7 +11,8 @@ import { listStores } from "@/lib/stores/service";
  * Customers are stored per storefront, so this reads each storefront's list in
  * parallel and the screen merges them by email — a person who buys at two
  * storefronts is one person. A storefront whose list cannot be read is left
- * out rather than failing the page; the rest of the list is still true.
+ * out rather than failing the page — and the screen is told WHICH, so it says
+ * so instead of presenting a subset as everyone.
  */
 export const metadata = { title: "Customers" };
 
@@ -20,18 +21,22 @@ export default async function CustomersPage() {
     const stores = await listStores();
     const lists = await Promise.all(
         stores.map((s) =>
-            listCustomers(s.id).catch((): CustomerListItem[] => []),
+            listCustomers(s.id).catch((): CustomerListItem[] | null => null),
         ),
     );
     const customersByStore = Object.fromEntries(
         stores.map((s, i) => [s.id, lists[i] ?? []]),
     );
+    const missing = stores
+        .filter((_, i) => lists[i] === null)
+        .map((s) => ({ id: s.id, name: s.name }));
 
     return (
         <PageContainer width="full">
             <CustomersScreen
                 stores={stores.map((s) => ({ id: s.id, name: s.name }))}
                 customersByStore={customersByStore}
+                missing={missing}
             />
         </PageContainer>
     );

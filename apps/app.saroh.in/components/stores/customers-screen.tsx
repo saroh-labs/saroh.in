@@ -12,6 +12,7 @@ import { DataView } from "@/components/shared/data-view/data-view";
 import type { DataColumn } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
+import { StorefrontPartial } from "@/components/stores/storefront-partial";
 import type { DirectoryRow } from "@/lib/customers/directory";
 import { inStorefront, mergeCustomers } from "@/lib/customers/directory";
 import type { CustomerListItem } from "@/lib/customers/service";
@@ -56,9 +57,12 @@ function Avatar({ row }: { row: DirectoryRow }) {
 export function CustomersScreen({
     stores,
     customersByStore,
+    missing = [],
 }: {
     stores: { id: string; name: string }[];
     customersByStore: Record<string, CustomerListItem[]>;
+    /** Storefronts whose list could not be read; see `StorefrontPartial`. */
+    missing?: { id: string; name: string }[];
 }) {
     const directory = useMemo(
         () => mergeCustomers(stores, customersByStore),
@@ -167,6 +171,11 @@ export function CustomersScreen({
                         </Button>
                     ) : undefined
                 }
+            />
+
+            <StorefrontPartial
+                missing={missing}
+                missingWhat="people who have only bought there"
             />
 
             {stores.length === 0 ? (
