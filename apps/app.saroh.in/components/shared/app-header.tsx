@@ -7,6 +7,7 @@ import { HelpLink } from "@/components/shared/help-link";
 import { MobileNav } from "@/components/shared/mobile-nav";
 import type { NavCounts } from "@/components/shared/nav-items";
 import { SkinSwitcher } from "@/components/shared/skin-switcher";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { UserMenu } from "@/components/shared/user-menu";
 import type { Organization } from "@/lib/organizations/service";
 
@@ -52,6 +53,7 @@ export function AppHeader(props: AppHeaderProps) {
                     <Wordmark />
                 </Link>
                 <div className="flex items-center gap-1.5">
+                    <ThemeToggle />
                     <SkinSwitcher />
                     <UserMenu name={props.user.name} email={props.user.email} />
                 </div>
@@ -93,6 +95,7 @@ export function AppHeader(props: AppHeaderProps) {
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
                 <CommandTrigger />
                 <HelpLink />
+                <ThemeToggle />
                 {/* Renders nothing while only one skin is offered. */}
                 <SkinSwitcher />
                 <UserMenu

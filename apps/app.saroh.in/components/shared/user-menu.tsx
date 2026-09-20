@@ -20,6 +20,13 @@ import { useTheme } from "next-themes";
 
 import { accountsLoginUrl, accountsUrl } from "@/lib/accounts";
 
+/**
+ * All three, including System — which is the one thing the top bar's toggle
+ * cannot offer, because a two-state flip has nowhere to put a third state.
+ * The toggle is the quick "not this, the other one"; this is where someone
+ * hands the decision back to their machine. Both write the same next-themes
+ * value, so they always agree.
+ */
 const APPEARANCE = [
     { value: "light", label: "Light" },
     { value: "dark", label: "Dark" },
