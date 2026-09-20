@@ -5,10 +5,11 @@ import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { StoresModule } from "../stores/stores.module";
 import { OrdersController } from "./orders.controller";
 import { OrdersService } from "./orders.service";
+import { OrganizationOrdersController } from "./organization-orders.controller";
 
 @Module({
     imports: [StoresModule, CapabilitiesModule, AnalyticsCoreModule],
-    controllers: [OrdersController],
+    controllers: [OrdersController, OrganizationOrdersController],
     providers: [OrdersService],
     exports: [OrdersService],
 })

@@ -260,6 +260,7 @@ export function AppSidebar({
                                             children={item.children}
                                             pathname={pathname}
                                             onLeave={() => setFlyoutFor(null)}
+                                            counts={counts}
                                         />
                                     ) : null}
                                 </Popover>
@@ -281,6 +282,7 @@ export function AppSidebar({
                                     key={`${item.href}-children`}
                                     children={item.children}
                                     pathname={pathname}
+                                    counts={counts}
                                 />
                             ) : null,
                         )}
@@ -304,11 +306,14 @@ function NavFlyout({
     children,
     pathname,
     onLeave,
+    counts,
 }: {
     label: string;
     children: NavChild[];
     pathname: string;
     onLeave: () => void;
+    /** Same counts the expanded rail draws — this is their only path at 64px. */
+    counts?: NavCounts;
 }) {
     const rows = children.filter(
         (child): child is NavChild & { href: string } => Boolean(child.href),
@@ -364,6 +369,14 @@ function NavFlyout({
                         <span className="min-w-0 flex-1 truncate">
                             {child.create ? `+ ${child.label}` : child.label}
                         </span>
+                        {(counts?.[child.href] ?? 0) > 0 ? (
+                            <span
+                                aria-label={`${counts?.[child.href]} waiting`}
+                                className="ml-2 inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
+                            >
+                                {counts?.[child.href]}
+                            </span>
+                        ) : null}
                     </Link>
                 );
             })}
@@ -386,9 +399,19 @@ function NavFlyout({
 function SiteTree({
     children,
     pathname,
+    counts,
 }: {
     children: NavChild[];
     pathname: string;
+    /**
+     * Work waiting behind a CHILD row.
+     *
+     * The count belongs to the screen that holds the work, not to the section
+     * above it: "Sell 4" named a place, and a merchant had to guess which of
+     * four screens the four were on. Sell's children now carry their own, and
+     * the parent carries only what is genuinely its own.
+     */
+    counts?: NavCounts;
 }) {
     return (
         <div className="mb-1 ml-[19px] mt-0.5 flex flex-col gap-px border-l border-border pl-2.5">
@@ -408,6 +431,7 @@ function SiteTree({
                                 <SiteTree
                                     children={child.children}
                                     pathname={pathname}
+                                    counts={counts}
                                 />
                             ) : null}
                         </div>
@@ -417,6 +441,7 @@ function SiteTree({
                 // row for a site whose id happens to start the same way, and
                 // the site rows are siblings of each other rather than nested.
                 const active = pathname === child.href;
+                const waiting = counts?.[child.href] ?? 0;
                 return (
                     <Link
                         key={child.href}
@@ -425,7 +450,11 @@ function SiteTree({
                         className={cn(
                             // `wk-nav-child` stands the marker on the guide
                             // line rather than in the rail's gutter.
-                            "wk-nav wk-nav-child truncate rounded-md px-2.5 py-[7px] text-[12.5px] font-medium transition-colors duration-fast",
+                            // `flex`, not `truncate` on the link itself: the
+                            // label truncates and the count keeps its size,
+                            // rather than a long label pushing the number out
+                            // of the row.
+                            "wk-nav wk-nav-child flex items-center gap-2 rounded-md px-2.5 py-[7px] text-[12.5px] font-medium transition-colors duration-fast",
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                             // Same weight either way: the surface and the
                             // marker say "current", so bolding the label would
@@ -435,7 +464,21 @@ function SiteTree({
                                 : "text-muted-foreground hover:bg-accent hover:text-foreground active:bg-accent-active",
                         )}
                     >
-                        {child.create ? `+ ${child.label}` : child.label}
+                        <span className="flex-1 truncate">
+                            {child.create ? `+ ${child.label}` : child.label}
+                        </span>
+                        {waiting > 0 ? (
+                            /* The same Saffron-tinted pill the parent rows
+                               use — a count is a count wherever it sits, and
+                               giving the child a second treatment would
+                               suggest it meant something different. */
+                            <span
+                                aria-label={`${waiting} waiting`}
+                                className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
+                            >
+                                {waiting}
+                            </span>
+                        ) : null}
                     </Link>
                 );
             })}

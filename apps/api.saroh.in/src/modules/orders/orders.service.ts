@@ -17,7 +17,11 @@ import type {
 import type { OrderLine } from "./order-inventory";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
-import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
+import {
+    serializeOrderDetail,
+    serializeOrderSummary,
+    serializeOrganizationOrder,
+} from "./serialize";
 
 /** Money helpers — integer-cents math so totals never drift on floats. */
 const toCents = (s: string) => Math.round(Number(s) * 100);
@@ -53,6 +57,40 @@ export class OrdersService {
             include: { customer: CUSTOMER_SELECT },
         });
         return orders.map(serializeOrderSummary);
+    }
+
+    /**
+     * Every order in the business, newest first — the list behind Sell →
+     * Orders.
+     *
+     * Scoped by `organizationId` from the request context and NEVER by a store
+     * id the caller sent, which is what lets one screen span storefronts
+     * without becoming a way to read someone else's. `storeId` here only
+     * NARROWS that set, so a tampered value can at worst return nothing.
+     *
+     * Returns the whole set rather than a page or a filtered slice: the tabs
+     * and the search on this screen are applied over loaded rows by the shared
+     * data view, which is the right trade at a merchant's volumes and is what
+     * makes switching tabs instant. When a business outgrows one page this is
+     * where the cursor goes, and the screen's contract does not change.
+     */
+    async listForOrganization(
+        organizationId: string,
+        filter?: { storeId?: string },
+    ) {
+        const orders = await prisma.order.findMany({
+            where: {
+                organizationId,
+                ...(filter?.storeId ? { storeId: filter.storeId } : {}),
+            },
+            orderBy: { createdAt: "desc" },
+            include: {
+                customer: CUSTOMER_SELECT,
+                store: { select: { id: true, name: true } },
+                _count: { select: { items: true } },
+            },
+        });
+        return orders.map(serializeOrganizationOrder);
     }
 
     async get(storeId: string, orderId: string, userId: string) {

@@ -129,6 +129,11 @@ module.exports = {
         // #173 — organization stamping on create; DB-free so CI catches a
         // regression without a provisioned Postgres.
         "<rootDir>/src/modules/orders/orders.service.org-scope.spec.ts",
+        // Sell -> Orders: what a row's status column says when the goods and
+        // the money disagree, and that the business-wide list cannot be
+        // widened past its organization.
+        "<rootDir>/src/modules/orders/order-standing.spec.ts",
+        "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
         // missing-key) and PaymentsService specs with a jest-mocked Prisma
         // (incl. $transaction) + a fake MerchantProvider — connect stores only

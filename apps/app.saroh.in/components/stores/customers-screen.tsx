@@ -95,7 +95,7 @@ export function CustomersScreen({
                                 {r.name}
                             </span>
                             {r.orderCount > 1 ? (
-                                <Badge variant="success">Repeat</Badge>
+                                <Badge variant="success">Returning</Badge>
                             ) : null}
                         </span>
                         <span className="block truncate text-[11.5px] text-muted-foreground">
@@ -166,7 +166,7 @@ export function CustomersScreen({
                         <Button asChild>
                             <Link href={newHref((store ?? first).id)}>
                                 <Plus className="mr-1.5 size-4" />
-                                New customer
+                                Add customer
                             </Link>
                         </Button>
                     ) : undefined
