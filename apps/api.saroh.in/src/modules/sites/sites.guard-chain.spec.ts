@@ -29,6 +29,12 @@
 jest.mock("@saroh/database", () => ({
     ...jest.requireActual("@saroh/database"),
     prisma: {
+        // The role's own permissions, read alongside the membership since
+        // roles became rows. `null` means the business has invented nothing,
+        // so the shipped map decides — which is what these tests assert.
+        organizationRole: {
+            findUnique: jest.fn().mockResolvedValue(null),
+        },
         membership: { findUnique: jest.fn() },
         organization: { findUnique: jest.fn() },
         site: { findFirst: jest.fn(), findMany: jest.fn() },

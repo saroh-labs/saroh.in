@@ -11,6 +11,7 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
+import { resolveCapabilities } from "./organization-policy";
 
 /** A user's Organization membership as surfaced to the switcher/list UI. */
 export interface UserOrganization {
@@ -63,10 +64,34 @@ export class OrganizationContextService {
         });
 
         if (membership) {
+            /*
+             * The role's own permissions, when the business has stored any.
+             *
+             * One indexed read on the unique (organizationId, key), on the
+             * same path that already reads the membership. A business that
+             * has invented nothing has no row, `resolveCapabilities` falls
+             * back to the shipped map, and the two reads cost what one did.
+             */
+            const stored = await prisma.organizationRole.findUnique({
+                where: {
+                    organizationId_key: {
+                        organizationId,
+                        key: membership.role,
+                    },
+                },
+                select: { actions: true },
+            });
+
             return {
                 organizationId,
                 userId,
-                role: this.toOrgRole(membership.role, organizationId),
+                role: this.toOrgRole(
+                    membership.role,
+                    organizationId,
+                    stored !== null,
+                ),
+                roleKey: membership.role,
+                actions: resolveCapabilities(membership.role, stored?.actions),
             };
         }
 
@@ -122,13 +147,33 @@ export class OrganizationContextService {
      * An unrecognized value is treated as the least-privileged `MEMBER` (fail
      * closed) and logged, so a bad row can never silently escalate privileges.
      */
-    private toOrgRole(role: string, organizationId: string): OrgRole {
+    /**
+     * The BUILT-IN role a key maps to, for anything still reading a role name.
+     *
+     * A role the business invented maps to MEMBER — the read-only floor —
+     * which is fail-safe rather than tidy, and never the gate: `authorize()`
+     * reads the resolved `actions` instead.
+     *
+     * `recognised` says whether the business actually has this role. Without
+     * it every invented role logged "Unknown membership role" on every
+     * request, turning a warning that means "a row is wrong" into noise that
+     * means "this business uses the feature". A key that matches NOTHING —
+     * built-in or stored — is still worth a warning, because that one really
+     * is a row nobody can explain.
+     */
+    private toOrgRole(
+        role: string,
+        organizationId: string,
+        recognised = false,
+    ): OrgRole {
         if ((ORG_ROLES as readonly string[]).includes(role)) {
             return role as OrgRole;
         }
-        this.logger.warn(
-            `Unknown membership role "${role}" on organization ${organizationId}; treating as MEMBER`,
-        );
+        if (!recognised) {
+            this.logger.warn(
+                `Unknown membership role "${role}" on organization ${organizationId}; treating as MEMBER`,
+            );
+        }
         return "MEMBER";
     }
 }
