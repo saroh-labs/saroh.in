@@ -19,9 +19,20 @@ const TABLE_MIN_WIDTH = 760;
 const chosen = new Map<string, DataViewMode>();
 const listeners = new Set<() => void>();
 
+/**
+ * A resize counts as a change too: with no stored preference the viewport
+ * decides, so crossing the table boundary has to re-read it. A tablet that
+ * rotates, or a window dragged narrow, otherwise keeps a table it no longer
+ * has the width for.
+ */
 function subscribe(onChange: () => void) {
     listeners.add(onChange);
-    return () => listeners.delete(onChange);
+    const mq = window.matchMedia(`(min-width: ${TABLE_MIN_WIDTH}px)`);
+    mq.addEventListener("change", onChange);
+    return () => {
+        listeners.delete(onChange);
+        mq.removeEventListener("change", onChange);
+    };
 }
 
 function readPreference(
@@ -42,7 +53,7 @@ function readPreference(
         // preference is not worth failing a render over.
     }
 
-    const wide = window.innerWidth >= TABLE_MIN_WIDTH;
+    const wide = window.matchMedia(`(min-width: ${TABLE_MIN_WIDTH}px)`).matches;
     const preferred = wide ? defaultMode : "list";
     return available.includes(preferred) ? preferred : defaultMode;
 }

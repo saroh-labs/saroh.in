@@ -35,16 +35,22 @@ import {
  * server-side by `AppShell` and passed in (this component never fetches).
  */
 
-/** Is the rail collapsed to icons? Matches the design's 1100px boundary. */
+/**
+ * Is the rail collapsed to icons? Only between the design's two boundaries:
+ * below 760 there is no rail at all, and a flyout anchored to a control that
+ * does not exist would float over the page.
+ */
+const ICON_RAIL = "(min-width: 760px) and (max-width: 1100px)";
+
 function useIconRail(): boolean {
     const subscribe = useCallback((onChange: () => void) => {
-        const mq = window.matchMedia("(max-width: 1100px)");
+        const mq = window.matchMedia(ICON_RAIL);
         mq.addEventListener("change", onChange);
         return () => mq.removeEventListener("change", onChange);
     }, []);
     return useSyncExternalStore(
         subscribe,
-        () => window.matchMedia("(max-width: 1100px)").matches,
+        () => window.matchMedia(ICON_RAIL).matches,
         // The server cannot know the width; the full rail is the honest
         // default, and the first client render corrects it.
         () => false,
