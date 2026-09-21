@@ -654,6 +654,25 @@ export function navFor({
  * Active-route match: exact for the Home root (so it isn't lit on every page),
  * prefix for everything else (so detail routes keep their parent highlighted).
  */
+/**
+ * Whether a child row is the page you are on: its own address, or anything
+ * beneath it — a product's page is still Products. A segment boundary, not a
+ * bare prefix, so `/sites/new` never lights a sibling that starts the same.
+ */
+export function isNavChildCurrent(
+    pathname: string,
+    /** A label row has none, and is never the page you are on. */
+    href: string | undefined,
+    /** The rows beside it: the deepest match wins, so only one lights. */
+    siblings: readonly { href?: string }[] = [],
+): boolean {
+    const under = (h: string) => pathname === h || pathname.startsWith(`${h}/`);
+    if (!href || !under(href)) return false;
+    return !siblings.some(
+        (s) => s.href && s.href.length > href.length && under(s.href),
+    );
+}
+
 export function isNavItemActive(pathname: string, href: string): boolean {
     return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }

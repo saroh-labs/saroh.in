@@ -13,11 +13,12 @@ import {
 import { Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import type { NavCounts, NavRole } from "@/components/shared/nav-items";
 import {
     NOTIFICATIONS_HREF,
+    isNavChildCurrent,
     isNavItemActive,
     navFor,
     showsGroupLabel,
@@ -132,10 +133,18 @@ export function MobileNav({
                                 const childIsCurrent = Boolean(
                                     item.children?.some(
                                         (child) =>
-                                            child.href === pathname ||
+                                            isNavChildCurrent(
+                                                pathname,
+                                                child.href,
+                                                item.children,
+                                            ) ||
                                             (child.children ?? []).some(
                                                 (leaf) =>
-                                                    leaf.href === pathname,
+                                                    isNavChildCurrent(
+                                                        pathname,
+                                                        leaf.href,
+                                                        child.children,
+                                                    ),
                                             ),
                                     ),
                                 );
@@ -152,135 +161,156 @@ export function MobileNav({
                                         ? unread
                                         : (counts?.[item.href] ?? 0);
                                 return (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        onClick={() => setOpen(false)}
-                                        aria-current={
-                                            active && !childIsCurrent
-                                                ? "page"
-                                                : undefined
-                                        }
-                                        className={cn(
-                                            // `wk-nav` is the same leading-edge
-                                            // marker the rail carries
-                                            // (workspace.css). Below `lg` this
-                                            // drawer is the ONLY navigation, so
-                                            // without it the active page loses
-                                            // the one cue the desktop nav uses
-                                            // to say where you are — and the
-                                            // two navigations are meant to be
-                                            // the same mental model.
-                                            "wk-nav flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                                            isPage
-                                                ? "bg-accent font-semibold text-foreground"
-                                                : isSection
-                                                  ? "font-semibold text-brand hover:bg-accent"
-                                                  : "font-medium text-foreground hover:bg-accent",
-                                        )}
-                                    >
-                                        <Icon className="h-4 w-4 shrink-0" />
-                                        <span className="flex-1">
-                                            {item.label}
-                                        </span>
-                                        {waiting > 0 ? (
-                                            /* The waiting count, matching the rail. */
-                                            <span
-                                                aria-label={`${waiting} waiting`}
-                                                className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
-                                            >
-                                                {waiting}
+                                    <Fragment key={item.href}>
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            onClick={() => setOpen(false)}
+                                            aria-current={
+                                                active && !childIsCurrent
+                                                    ? "page"
+                                                    : undefined
+                                            }
+                                            className={cn(
+                                                // `wk-nav` is the same leading-edge
+                                                // marker the rail carries
+                                                // (workspace.css). Below `lg` this
+                                                // drawer is the ONLY navigation, so
+                                                // without it the active page loses
+                                                // the one cue the desktop nav uses
+                                                // to say where you are — and the
+                                                // two navigations are meant to be
+                                                // the same mental model.
+                                                "wk-nav flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                                isPage
+                                                    ? "bg-accent font-semibold text-foreground"
+                                                    : isSection
+                                                      ? "font-semibold text-brand hover:bg-accent"
+                                                      : "font-medium text-foreground hover:bg-accent",
+                                            )}
+                                        >
+                                            <Icon className="h-4 w-4 shrink-0" />
+                                            <span className="flex-1">
+                                                {item.label}
                                             </span>
+                                            {waiting > 0 ? (
+                                                /* The waiting count, matching the rail. */
+                                                <span
+                                                    aria-label={`${waiting} waiting`}
+                                                    className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
+                                                >
+                                                    {waiting}
+                                                </span>
+                                            ) : null}
+                                        </Link>
+                                        {item.children?.length &&
+                                        isNavItemActive(pathname, item.href) ? (
+                                            <div
+                                                key={`${item.href}-children`}
+                                                className="ml-6 flex flex-col gap-1 border-l border-border pl-2.5"
+                                            >
+                                                {item.children.map((child) =>
+                                                    !child.href ? (
+                                                        <div
+                                                            key={child.label}
+                                                            className="flex flex-col gap-1"
+                                                        >
+                                                            <div className="truncate px-3 pt-2 text-sm font-medium text-foreground">
+                                                                {child.label}
+                                                            </div>
+                                                            <div className="ml-3 flex flex-col gap-1 border-l border-border pl-2.5">
+                                                                {(
+                                                                    child.children ??
+                                                                    []
+                                                                ).map(
+                                                                    (leaf) => (
+                                                                        <Link
+                                                                            key={
+                                                                                leaf.href
+                                                                            }
+                                                                            href={
+                                                                                leaf.href ??
+                                                                                "#"
+                                                                            }
+                                                                            onClick={() =>
+                                                                                setOpen(
+                                                                                    false,
+                                                                                )
+                                                                            }
+                                                                            aria-current={
+                                                                                isNavChildCurrent(
+                                                                                    pathname,
+                                                                                    leaf.href,
+                                                                                    child.children,
+                                                                                )
+                                                                                    ? "page"
+                                                                                    : undefined
+                                                                            }
+                                                                            className={cn(
+                                                                                "wk-nav wk-nav-child truncate rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                                                                                isNavChildCurrent(
+                                                                                    pathname,
+                                                                                    leaf.href,
+                                                                                    child.children,
+                                                                                )
+                                                                                    ? "bg-accent text-foreground"
+                                                                                    : "text-muted-foreground active:bg-accent-active",
+                                                                            )}
+                                                                        >
+                                                                            {
+                                                                                leaf.label
+                                                                            }
+                                                                        </Link>
+                                                                    ),
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <Link
+                                                            key={child.href}
+                                                            href={child.href}
+                                                            onClick={() =>
+                                                                setOpen(false)
+                                                            }
+                                                            aria-current={
+                                                                isNavChildCurrent(
+                                                                    pathname,
+                                                                    child.href,
+                                                                    item.children,
+                                                                )
+                                                                    ? "page"
+                                                                    : undefined
+                                                            }
+                                                            /*
+                                                             * Taller rows than the rail's,
+                                                             * as every row in this drawer
+                                                             * is: this one is driven by a
+                                                             * thumb, and a 26px site name
+                                                             * is a miss waiting to happen.
+                                                             */
+                                                            className={cn(
+                                                                "wk-nav wk-nav-child truncate rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                                                                isNavChildCurrent(
+                                                                    pathname,
+                                                                    child.href,
+                                                                    item.children,
+                                                                )
+                                                                    ? "bg-accent text-foreground"
+                                                                    : "text-muted-foreground active:bg-accent-active",
+                                                            )}
+                                                        >
+                                                            {child.create
+                                                                ? `+ ${child.label}`
+                                                                : child.label}
+                                                        </Link>
+                                                    ),
+                                                )}
+                                            </div>
                                         ) : null}
-                                    </Link>
+                                    </Fragment>
                                 );
                             })}
-                            {group.items.map((item) =>
-                                item.children?.length &&
-                                isNavItemActive(pathname, item.href) ? (
-                                    <div
-                                        key={`${item.href}-children`}
-                                        className="ml-6 flex flex-col gap-1 border-l border-border pl-2.5"
-                                    >
-                                        {item.children.map((child) =>
-                                            !child.href ? (
-                                                <div
-                                                    key={child.label}
-                                                    className="flex flex-col gap-1"
-                                                >
-                                                    <div className="truncate px-3 pt-2 text-sm font-medium text-foreground">
-                                                        {child.label}
-                                                    </div>
-                                                    <div className="ml-3 flex flex-col gap-1 border-l border-border pl-2.5">
-                                                        {(
-                                                            child.children ?? []
-                                                        ).map((leaf) => (
-                                                            <Link
-                                                                key={leaf.href}
-                                                                href={
-                                                                    leaf.href ??
-                                                                    "#"
-                                                                }
-                                                                onClick={() =>
-                                                                    setOpen(
-                                                                        false,
-                                                                    )
-                                                                }
-                                                                aria-current={
-                                                                    pathname ===
-                                                                    leaf.href
-                                                                        ? "page"
-                                                                        : undefined
-                                                                }
-                                                                className={cn(
-                                                                    "wk-nav wk-nav-child truncate rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                                                                    pathname ===
-                                                                        leaf.href
-                                                                        ? "bg-accent text-foreground"
-                                                                        : "text-muted-foreground active:bg-accent-active",
-                                                                )}
-                                                            >
-                                                                {leaf.label}
-                                                            </Link>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <Link
-                                                    key={child.href}
-                                                    href={child.href}
-                                                    onClick={() =>
-                                                        setOpen(false)
-                                                    }
-                                                    aria-current={
-                                                        pathname === child.href
-                                                            ? "page"
-                                                            : undefined
-                                                    }
-                                                    /*
-                                                     * Taller rows than the rail's,
-                                                     * as every row in this drawer
-                                                     * is: this one is driven by a
-                                                     * thumb, and a 26px site name
-                                                     * is a miss waiting to happen.
-                                                     */
-                                                    className={cn(
-                                                        "wk-nav wk-nav-child truncate rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                                                        pathname === child.href
-                                                            ? "bg-accent text-foreground"
-                                                            : "text-muted-foreground active:bg-accent-active",
-                                                    )}
-                                                >
-                                                    {child.create
-                                                        ? `+ ${child.label}`
-                                                        : child.label}
-                                                </Link>
-                                            ),
-                                        )}
-                                    </div>
-                                ) : null,
-                            )}
                         </div>
                     ))}
                 </nav>

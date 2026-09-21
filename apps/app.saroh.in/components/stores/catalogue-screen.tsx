@@ -54,6 +54,7 @@ import type { ProductRating } from "@/lib/product-reviews/service";
 import { deleteProduct, updateProduct } from "@/lib/products/actions";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { inStorefront, mergeCatalogue } from "@/lib/products/catalogue";
+import { newProductHref, productHref } from "@/lib/products/links";
 import type { ProductListItem, ProductStatus } from "@/lib/products/service";
 
 const STATUS_LABEL: Record<ProductStatus, string> = {
@@ -377,8 +378,6 @@ export function CatalogueScreen({
         },
     ];
 
-    const newProductHref = (id: string) => `/stores/${id}/products/new`;
-
     return (
         <div className="space-y-5">
             <PageHeader
@@ -700,9 +699,7 @@ function ProductPreview({
         row && storeId
             ? (row.places.find((p) => p.storeId === storeId) ?? home)
             : home;
-    const href = place
-        ? `/stores/${place.storeId}/products/${place.product.id}`
-        : "#";
+    const href = place ? productHref(place.storeId, place.product.id) : "#";
     const stock = row ? stockOf(row) : null;
 
     return (
