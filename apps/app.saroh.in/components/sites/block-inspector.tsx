@@ -3,10 +3,11 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { PanelBottom, PanelTop } from "lucide-react";
+import { Info, PanelBottom, PanelTop } from "lucide-react";
 import Link from "next/link";
 
 import { SECTION_ICONS } from "@/components/sites/block-icons";
+import { BOUND_BLOCKS } from "@/components/sites/block-kinds";
 import { SECTION_LABELS } from "@/components/sites/editor-constants";
 import { NoteComposer } from "@/components/sites/note-composer";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
@@ -81,6 +82,7 @@ export function BlockInspector({
 
     const { index, section } = active;
     const Icon = SECTION_ICONS[section.type];
+    const bound = BOUND_BLOCKS[section.type];
 
     return (
         <div className="space-y-4 p-4">
@@ -123,44 +125,30 @@ export function BlockInspector({
                     </Button>
                 </div>
 
-                <div className="flex items-center gap-1">
-                    {/*
-                     * The arrows survive the drag handle: a list you can only
-                     * reorder by dragging is a list some people cannot reorder.
-                     */}
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-label="Move block up"
-                        className="h-8 w-8 p-0"
-                        disabled={index === 0}
-                        onClick={() => onMove(-1)}
-                    >
-                        ↑
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-label="Move block down"
-                        className="h-8 w-8 p-0"
-                        disabled={index === count - 1}
-                        onClick={() => onMove(1)}
-                    >
-                        ↓
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="ml-auto h-8 px-3 text-xs text-destructive hover:text-destructive"
-                        onClick={onRemove}
-                    >
-                        Remove
-                    </Button>
-                </div>
+                <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
+                    {bound?.reads ??
+                        "Only on this page. Move it, change it, or take it off."}
+                </p>
             </div>
+
+            {/*
+             * Where the real value lives, with a way there — instead of a
+             * field that would fork it (#338).
+             */}
+            {bound ? (
+                <div className="flex gap-2.5 rounded-lg bg-brand-subtle p-3 text-[0.8125rem] leading-relaxed text-brand-subtle-foreground">
+                    <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+                    <div className="space-y-2">
+                        <p>{bound.notice}</p>
+                        <Link
+                            href={bound.href}
+                            className="font-medium underline underline-offset-2"
+                        >
+                            {bound.linkLabel}
+                        </Link>
+                    </div>
+                </div>
+            ) : null}
 
             <SectionFields
                 section={section}
@@ -219,6 +207,46 @@ export function BlockInspector({
                     {heldBack.message}
                 </p>
             ) : null}
+
+            {/*
+             * The actions taken ON the block close its panel, as the design
+             * places them: move it, or take it off. The arrows survive the
+             * drag handle — a list you can only reorder by dragging is a list
+             * some people cannot reorder.
+             */}
+            <div className="flex items-center gap-1 border-t pt-3">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label="Move block up"
+                    className="h-8 w-8 p-0"
+                    disabled={index === 0}
+                    onClick={() => onMove(-1)}
+                >
+                    ↑
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label="Move block down"
+                    className="h-8 w-8 p-0"
+                    disabled={index === count - 1}
+                    onClick={() => onMove(1)}
+                >
+                    ↓
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto h-8 px-3 text-xs text-destructive hover:text-destructive"
+                    onClick={onRemove}
+                >
+                    Remove
+                </Button>
+            </div>
 
             {/*
              * Leaving a note is an action taken ON this block (#277), so it

@@ -20,9 +20,12 @@
  * take the editor down with it.
  */
 
-/** Block-list width bounds, in px. */
+/**
+ * Block-list width bounds, in px. Generous at the top: a long page title or
+ * block name is worth room, and the canvas keeps a floor of its own.
+ */
 export const RAIL_MIN = 200;
-export const RAIL_MAX = 320;
+export const RAIL_MAX = 400;
 export const RAIL_DEFAULT = 232;
 
 /**
@@ -31,7 +34,8 @@ export const RAIL_DEFAULT = 232;
  * a note thread at 240px wraps every other word.
  */
 export const PANEL_MIN = 280;
-export const PANEL_MAX = 420;
+/** Wide enough for the rich-text toolbar on one row and a long note thread. */
+export const PANEL_MAX = 560;
 export const PANEL_DEFAULT = 320;
 
 const CHROME_KEY = "saroh.editor.chrome";

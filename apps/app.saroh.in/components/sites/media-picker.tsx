@@ -174,7 +174,9 @@ export function MediaPicker({
             <div
                 className={cn(
                     "flex items-center gap-2 rounded-md border border-dashed px-2.5 py-2 transition-colors",
-                    over ? "border-ring bg-accent" : "border-border",
+                    // The same border as the fields around it, dashed because
+                    // it is a place to drop something rather than type.
+                    over ? "border-ring bg-accent" : "border-input",
                 )}
             >
                 <Button
