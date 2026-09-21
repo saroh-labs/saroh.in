@@ -40,12 +40,12 @@ const siteKey = (siteId: string) => `saroh.editor.site.${siteId}`;
 export interface EditorChrome {
     railWidth: number;
     panelWidth: number;
-    device: "desktop" | "tablet" | "phone";
+    device: "desktop" | "phone";
 }
 
 export interface EditorPlace {
     selectedIndex: number | null;
-    rail: "sections" | "pages" | "style";
+    rail: "sections" | "style";
     /** The inspector's tab: the selected block's fields, or its feedback. */
     inspector: "block" | "feedback";
     /** Where the preview was scrolled to. In the spec's persisted list. */
@@ -134,11 +134,9 @@ function parseChrome(v: unknown): EditorChrome {
             typeof o.panelWidth === "number" ? o.panelWidth : PANEL_DEFAULT,
         ),
         // An unknown device string must not reach the preview, which switches
-        // on exactly these three.
-        device:
-            o.device === "tablet" || o.device === "phone"
-                ? o.device
-                : "desktop",
+        // on exactly these two. "tablet" was a third until #335 and falls
+        // back to desktop.
+        device: o.device === "phone" ? "phone" : "desktop",
     };
 }
 
@@ -206,8 +204,8 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
                 i < sectionCount
                     ? i
                     : fallback.selectedIndex,
-            rail:
-                o.rail === "style" || o.rail === "pages" ? o.rail : "sections",
+            // Pages was a rail tab until #335; it is the breadcrumb now.
+            rail: o.rail === "style" ? "style" : "sections",
             // Review was a rail tab before #340; someone who left it open
             // comes back to the same notes, now in the inspector.
             inspector:

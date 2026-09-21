@@ -169,8 +169,8 @@ export function DraftPreview({
                         onClick={() => onSelect(index)}
                         className={`cursor-pointer rounded-[2px] outline-offset-2 transition-[outline-color] ${
                             selectedIndex === index
-                                ? "outline outline-1 outline-[#8a5a3c]"
-                                : "outline outline-1 outline-transparent hover:outline-[#8a5a3c]/40"
+                                ? "outline outline-2 outline-highlight"
+                                : "outline outline-1 outline-transparent hover:outline-highlight/40"
                         }`}
                     >
                         <PageSections

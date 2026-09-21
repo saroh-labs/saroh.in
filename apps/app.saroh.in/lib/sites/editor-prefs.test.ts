@@ -114,8 +114,18 @@ describe("reading the chrome back", () => {
             }),
         );
         const prefs = await load();
-        // The preview switches on exactly three, so a fourth would render
+        // The preview switches on exactly two, so a third would render
         // nothing at all.
+        expect(prefs.getChrome().device).toBe("desktop");
+    });
+
+    it("opens desktop for someone who left the old tablet width on", async () => {
+        useStorage(
+            storage({
+                "saroh.editor.chrome": JSON.stringify({ device: "tablet" }),
+            }),
+        );
+        const prefs = await load();
         expect(prefs.getChrome().device).toBe("desktop");
     });
 

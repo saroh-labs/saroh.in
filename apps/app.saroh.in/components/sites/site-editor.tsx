@@ -1,8 +1,19 @@
 "use client";
 
+import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import {
+    ChevronDown,
+    ChevronLeft,
+    Eye,
+    Link2,
+    Monitor,
+    Palette,
+    Smartphone,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -18,14 +29,12 @@ import { AddSectionDialog } from "@/components/sites/add-section-dialog";
 import { SECTION_ICONS } from "@/components/sites/block-icons";
 import { BlockInspector } from "@/components/sites/block-inspector";
 import { EditorTabs, PanelDivider } from "@/components/sites/editor-chrome";
-import type { Device, Zoom } from "@/components/sites/editor-constants";
+import type { Device } from "@/components/sites/editor-constants";
 import {
-    DEVICE_PX,
     DEVICE_WIDTH,
     DEVICES,
     SECTION_LABELS,
     sectionTitle,
-    ZOOMS,
 } from "@/components/sites/editor-constants";
 import { emptySection } from "@/components/sites/empty-section";
 import {
@@ -39,18 +48,20 @@ import { syncEnquiryForms } from "@/components/sites/sync-enquiry-forms";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { useServicesForPicker } from "@/components/sites/use-services-for-picker";
 
-import { OptionSelect } from "@/components/shared/option-select";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
 import { ReviewPanel } from "@/components/sites/review-panel";
 import { DraftPreview } from "@/components/sites/section-preview";
 import { StylePanel } from "@/components/sites/style-panel";
+import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { ensureFormForSection } from "@/lib/forms/actions";
 import {
     getReviewState,
     getSiteFlags,
     listComments,
     publishSite,
+    requestReview,
     saveDraftSections,
     updateSiteStyle,
 } from "@/lib/sites/actions";
@@ -69,6 +80,8 @@ import {
     setPlace,
     subscribe,
 } from "@/lib/sites/editor-prefs";
+import type { EditorStatusTone } from "@/lib/sites/editor-status";
+import { editorStatus } from "@/lib/sites/editor-status";
 import { exactDate } from "@/lib/sites/format-date";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import { describePendingChanges } from "@/lib/sites/pending";
@@ -120,6 +133,17 @@ const APPROVAL_BADGE: Record<
         approved: () => false,
         text: (by) => `Published without approval by ${by}`,
     },
+};
+
+/** The status pill's colour, by what it means (#335). */
+const STATUS_BADGE: Record<
+    EditorStatusTone,
+    "error" | "draft" | "neutral" | "success"
+> = {
+    danger: "error",
+    attention: "draft",
+    quiet: "neutral",
+    done: "success",
 };
 
 /**
@@ -327,46 +351,20 @@ export function SiteEditor({
     };
     const setSelectedIndex = (next: number | null) =>
         setPlace(siteId, initialCount, { selectedIndex: next });
-    const setRail = (next: "sections" | "pages" | "style") =>
+    const setRail = (next: "sections" | "style") =>
         setPlace(siteId, initialCount, { rail: next });
     const setInspector = (next: "block" | "feedback") =>
         setPlace(siteId, initialCount, { inspector: next });
 
-    /*
-     * "Zoom is the readout dropdown only — 50 / 75 / 100 / Fit. No ⌘scroll, no
-     * pinch, no keyboard shortcuts." The spec resolved a contradiction by
-     * making the readout the control, so there is deliberately no gesture here.
-     */
-    const [zoom, setZoom] = useState<Zoom>(100);
     /** Briefly dimmed while a device switch animates — the cross-fade. */
     const [switching, setSwitching] = useState(false);
     /** Full-screen preview: everything else hides, Escape returns (spec §2). */
     const [fullScreen, setFullScreen] = useState(false);
+    /** The page switcher under the page name in the breadcrumb. */
+    const [pagesOpen, setPagesOpen] = useState(false);
+    const [asking, setAsking] = useState(false);
     const canvasRef = useRef<HTMLDivElement | null>(null);
     const scrollWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    /*
-     * "Fit" is the only value that is not a fixed percentage: it scales the
-     * frame down until it fits the canvas, and never scales it UP — a phone
-     * frame blown up to fill a desktop canvas would stop being a preview of a
-     * phone.
-     */
-    const [fitScale, setFitScale] = useState(1);
-    const zoomScale = zoom === "fit" ? Math.min(1, fitScale) : zoom / 100;
-    useEffect(() => {
-        const el = canvasRef.current;
-        if (el === null) return;
-        const measure = () => {
-            const frame = DEVICE_PX[device];
-            // The canvas padding (p-6 = 24px each side) is not usable width.
-            const usable = el.clientWidth - 48;
-            setFitScale(frame === null ? 1 : usable / frame);
-        };
-        measure();
-        const ro = new ResizeObserver(measure);
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, [device]);
 
     /*
      * Restore where the merchant was scrolled to. Mount-only: re-running it on
@@ -926,282 +924,239 @@ export function SiteEditor({
             .map((c) => c.sectionKey),
     );
 
+    const activePage = pages.find((page) => page.id === pageId);
+    const status = editorStatus({
+        saving,
+        saveError,
+        heldBackSummary: onlyHeldBack ? heldBackSummary(heldBack) : null,
+        dirty,
+        review: {
+            pending: review.pending,
+            outcome: review.latestApproval?.outcome ?? null,
+            approvalIsStale: review.approvalIsStale,
+        },
+        neverPublished,
+        hasPendingChanges: pendingSummary !== null,
+    });
+    /*
+     * What the pill leaves out, for anyone who hovers it: when it last saved,
+     * what publishing would change, and the reviewer's verdict in full.
+     */
+    const statusDetail = [
+        lastSavedAt && !dirty
+            ? `Saved at ${lastSavedAt.toLocaleTimeString(DISPLAY_LOCALE, { hour: "2-digit", minute: "2-digit" })}`
+            : null,
+        pendingSummary
+            ? `${pendingSummary} changed since the last publish`
+            : null,
+        review.latestApproval
+            ? `${APPROVAL_BADGE[review.latestApproval.outcome].text(
+                  review.latestApproval.by,
+                  review.approvalIsStale,
+              )} · ${exactDate(review.latestApproval.at)}`
+            : null,
+        openNotes > 0
+            ? `${openNotes} open ${openNotes === 1 ? "note" : "notes"}`
+            : null,
+    ]
+        .filter(Boolean)
+        .join("\n");
+
+    /**
+     * Share for review (#335): ask for a review, which is what reviewers
+     * are notified of and what puts the page In review (#278). It blocks
+     * nothing — publishing while it stands is recorded as a bypass.
+     */
+    async function askForReview() {
+        setAsking(true);
+        const res = await requestReview(siteId);
+        setAsking(false);
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        showSuccess(
+            "Asked for a review. Reviewers can comment on any block and cannot change the page.",
+        );
+        await refreshReview();
+    }
+
     return (
         /*
-         * Editor chrome, per the website spec §7 and its "dark on dark"
-         * resolution.
-         *
-         * `dark` is forced rather than inherited: the spec says the editor
-         * chrome is always dark regardless of theme, because entering the
-         * editor is meant to feel like changing mode — and because the rendered
-         * site must be the only bright object on screen. A light editor around
-         * a light site loses that entirely.
-         *
-         * Ground and card are the SAME value (#0b0b0b), which is what "flush
-         * panels — no floating cards" means: one flat plane divided by
-         * hairlines (#1c1c1c), not a card stack floating on black like the
-         * workspace shell.
+         * The editor follows the workspace's theme (#335), and the bar has a
+         * toggle for it. It used to force dark; the design gives the merchant
+         * the choice, and the page on the canvas is bright either way.
          */
-        <div
-            className="dark flex h-screen flex-col bg-background text-foreground"
-            style={
-                {
-                    // 4.31%, not 4% — 4% rounds to #0a0a0a and the spec names
-                    // #0b0b0b exactly.
-                    "--background": "0 0% 4.3%",
-                    "--card": "0 0% 4.3%",
-                    "--border": "0 0% 11%",
-                } as React.CSSProperties
-            }
-        >
+        <div className="flex h-screen flex-col bg-background text-foreground">
             {/*
-             * Top bar. The design puts the site's identity, its state and the
-             * one irreversible action on one line — a merchant should be able to
-             * tell what will happen when they press Publish without scrolling.
+             * ONE line, and it has to stay one line: the actions never
+             * shrink, the breadcrumb truncates instead. Losing the end of a
+             * page name is a smaller loss than losing Publish.
              */}
-            {/*
-             * ONE line, and it has to stay one line.
-             *
-             * This was `flex-wrap` inside a fixed `h-[52px]`, which is a
-             * contradiction: the moment the bar's contents were wider than the
-             * window — a site name, an address, an autosave time, what has
-             * changed, and a reviewer's verdict is not a rare amount — the
-             * actions wrapped onto a second row the bar has no height for, and
-             * overflowed 14px into the panes below. Publish ended up half
-             * underneath the canvas and could not be clicked at all: the
-             * browser flow in `e2e/tests/site-versions.spec.ts` failed on
-             * exactly that, at 1440×900, which is a common desk width.
-             *
-             * So the middle facts shrink and truncate instead, and the actions
-             * never do. Losing the end of an address is a smaller loss than
-             * losing the one action that puts a site in front of the public.
-             */}
-            <header className="flex h-[52px] shrink-0 items-center gap-3 overflow-hidden border-b px-3.5">
-                {/*
-                 * "Workspace", not "Sites" — the design's wording, and the
-                 * truer one: leaving the editor returns you to the whole
-                 * workspace, not to a list of sites.
-                 */}
-                <Link
-                    href="/sites"
-                    className="shrink-0 rounded-md border px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <header className="flex h-14 shrink-0 items-center gap-3 overflow-hidden border-b px-4">
+                <nav
+                    aria-label="Breadcrumb"
+                    className="flex min-w-0 items-center gap-2 text-sm"
                 >
-                    ← Workspace
-                </Link>
-                {/* The design separates the way out from the site's identity. */}
-                <span aria-hidden className="h-[18px] w-px bg-border" />
-                <span className="shrink-0 text-[0.8125rem] font-medium">
-                    {siteName}
-                </span>
-                {address ? (
-                    <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">
-                        {address}
-                    </span>
-                ) : null}
-
-                {/*
-                 * Autosave state as a PILL, as the design has it.
-                 *
-                 * Tinted by what it means rather than uniformly grey: a failed
-                 * save and a saved draft should not look alike at a glance, and
-                 * this line is the only place a merchant learns their work is
-                 * safe. Grey when everything is fine, so the colour is only
-                 * ever spent on something worth reading.
-                 */}
-                <span
-                    className={cn(
-                        "flex h-[22px] shrink-0 items-center rounded-[3px] px-2 text-[0.6875rem]",
-                        saveError
-                            ? "border border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
-                            : dirty || saving
-                              ? "border border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
-                              : "border border-[#2a2a2a] bg-[#1a1a1a] text-muted-foreground",
-                    )}
-                >
-                    {saving
-                        ? "Saving…"
-                        : saveError
-                          ? "Not saved"
-                          : onlyHeldBack
-                            ? heldBackSummary(heldBack)
-                            : dirty
-                              ? "Draft changes"
-                              : lastSavedAt
-                                ? `Draft changes · autosaved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                                : "Draft"}
-                </span>
-
-                {/*
-                 * What publishing would actually change, in the bar where the
-                 * design puts it. It used to be the badge on Publish, but the
-                 * spec gives that badge to the outstanding FLAG count — and the
-                 * two answer different questions: how much work is waiting, and
-                 * how much of it is worth a second look.
-                 *
-                 * "Changed" means since the last PUBLISH, not since the last
-                 * save — the same number the settings screen and the sites list
-                 * show. What is unsaved is the pill's job, two elements to the
-                 * left, and the two together say the whole truth: your work is
-                 * safe, and this much of it is not live yet.
-                 */}
-                {pendingSummary ? (
-                    <span className="min-w-0 truncate text-xs text-muted-foreground">
-                        {pendingSummary} changed
-                    </span>
-                ) : null}
-
-                {/*
-                 * The design's "Approved by Priya Raman" line. The note count
-                 * rides it rather than forming a second badge: the spec's
-                 * "approved with notes" is ONE badge carrying both, because
-                 * approval and outstanding notes answer the same question —
-                 * is this ready.
-                 */}
-                {review.latestApproval === null ? null : (
-                    <span
-                        className={cn(
-                            "flex h-[22px] min-w-0 shrink items-center gap-1.5 truncate rounded-[3px] border px-2 text-xs",
-                            APPROVAL_BADGE[
-                                review.latestApproval.outcome
-                            ].approved(review.approvalIsStale)
-                                ? "border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
-                                : "border-border text-muted-foreground",
-                        )}
-                        title={exactDate(review.latestApproval.at)}
+                    <Link
+                        href="/sites"
+                        title={address ?? undefined}
+                        className="flex min-w-0 shrink items-center gap-1 rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                        {APPROVAL_BADGE[review.latestApproval.outcome].text(
-                            review.latestApproval.by,
-                            review.approvalIsStale,
-                        )}
-                        {openNotes > 0 ? (
-                            <span className="tabular-nums opacity-80">
-                                · {openNotes}{" "}
-                                {openNotes === 1 ? "note" : "notes"}
-                            </span>
-                        ) : null}
+                        <ChevronLeft aria-hidden className="size-4 shrink-0" />
+                        <span className="truncate">{siteName}</span>
+                    </Link>
+                    <span aria-hidden className="text-muted-foreground">
+                        /
                     </span>
-                )}
+                    {/*
+                     * The page name is the page switcher: which page is open
+                     * is part of where you are, so it lives in the
+                     * breadcrumb rather than in a tab beside the blocks.
+                     */}
+                    <Popover open={pagesOpen} onOpenChange={setPagesOpen}>
+                        <PopoverTrigger asChild>
+                            <button
+                                type="button"
+                                aria-label={`Page: ${activePage?.title ?? "Page"}. Switch or manage pages`}
+                                className="flex min-w-0 items-center gap-1 rounded font-semibold transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <span className="truncate">
+                                    {activePage?.title ?? "Page"}
+                                </span>
+                                <ChevronDown
+                                    aria-hidden
+                                    className="size-4 shrink-0 text-muted-foreground"
+                                />
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                            align="start"
+                            className="max-h-[70vh] w-80 overflow-y-auto p-0"
+                        >
+                            <PagesPanel
+                                siteId={siteId}
+                                pages={pages}
+                                activePageId={pageId}
+                                dirty={dirty}
+                                unfinished={
+                                    onlyHeldBack
+                                        ? unfinishedPhrase(heldBack)
+                                        : undefined
+                                }
+                            />
+                        </PopoverContent>
+                    </Popover>
+                    <span aria-hidden className="text-muted-foreground">
+                        /
+                    </span>
+                    <Badge
+                        role="status"
+                        variant={STATUS_BADGE[status.tone]}
+                        title={statusDetail || undefined}
+                        className="shrink-0 whitespace-nowrap uppercase tracking-[0.06em]"
+                    >
+                        {status.label}
+                    </Badge>
+                </nav>
 
                 <div className="ml-auto flex shrink-0 items-center gap-2">
+                    <ThemeToggle />
                     {/*
-                     * Device preview. §18 makes the phone co-primary for the
-                     * merchant's CUSTOMERS as much as the merchant: without this
-                     * a headline that wraps badly is discovered by a visitor.
-                     * Width only — the preview is already local, and switching
-                     * must not become a re-fetch.
+                     * Width only — the preview is already local, and
+                     * switching must not become a re-fetch. Desktop and
+                     * phone: the widths a merchant's customers arrive at.
                      */}
                     <div
                         role="group"
                         aria-label="Preview width"
-                        className="flex h-7 overflow-hidden rounded border"
+                        className="flex h-8 items-center gap-0.5 rounded-md border p-0.5"
                     >
-                        {DEVICES.map((d) => (
-                            <button
-                                key={d.key}
-                                type="button"
-                                onClick={() => setDevice(d.key)}
-                                aria-pressed={device === d.key}
-                                className={cn(
-                                    "border-l px-2.5 text-[0.6875rem] transition-colors first:border-l-0",
-                                    device === d.key
-                                        ? "bg-[#242424] text-foreground"
-                                        : "text-muted-foreground hover:text-foreground active:bg-[#242424] active:text-foreground",
-                                )}
-                            >
-                                {d.label}
-                            </button>
-                        ))}
+                        {DEVICES.map((d) => {
+                            const Icon =
+                                d.key === "phone" ? Smartphone : Monitor;
+                            return (
+                                <button
+                                    key={d.key}
+                                    type="button"
+                                    onClick={() => setDevice(d.key)}
+                                    aria-pressed={device === d.key}
+                                    aria-label={`Show at ${d.label.toLowerCase()} width`}
+                                    title={d.label}
+                                    className={cn(
+                                        "flex h-full w-8 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                        device === d.key
+                                            ? "bg-secondary text-foreground"
+                                            : "text-muted-foreground hover:text-foreground",
+                                    )}
+                                >
+                                    <Icon aria-hidden className="size-4" />
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/*
-                     * Style opens from the BAR, not a rail tab. The design moved
-                     * it there because it belongs to the whole site while the
-                     * rail lists one page's sections — a tab would file a
-                     * site-wide setting under a page.
+                     * Preview removes the editing chrome; it does not switch
+                     * to another renderer. Escape returns.
                      */}
-                    {/*
-                     * The zoom readout IS the control (spec §2 resolved the
-                     * contradiction that way): no ⌘scroll, no pinch, no
-                     * shortcut. A select rather than a menu because it is a
-                     * value being chosen, and a native select is the one
-                     * control every keyboard and screen reader already knows.
-                     */}
-                    <OptionSelect
-                        aria-label="Zoom"
-                        size="sm"
-                        value={String(zoom)}
-                        onValueChange={(v) => {
-                            setZoom(v === "fit" ? "fit" : (Number(v) as Zoom));
-                        }}
-                        options={ZOOMS.map((z) => ({
-                            value: String(z),
-                            label: z === "fit" ? "Fit" : `${z}%`,
-                        }))}
-                        className="w-[4.75rem] tabular-nums text-muted-foreground"
-                    />
-
                     <Button
                         variant="outline"
                         size="sm"
-                        className="h-7 px-2 text-xs"
-                        aria-label="Full-screen preview"
-                        title="Full-screen preview — Escape returns"
+                        className="h-8 gap-1.5"
                         onClick={() => setFullScreen(true)}
                     >
-                        ⤢
+                        <Eye aria-hidden className="size-4" />
+                        Preview
                     </Button>
 
                     <Button
                         variant={rail === "style" ? "secondary" : "outline"}
                         size="sm"
-                        className="h-7 rounded px-3 text-xs"
+                        className="h-8 gap-1.5"
                         onClick={() =>
                             setRail(rail === "style" ? "sections" : "style")
                         }
                         aria-pressed={rail === "style"}
                     >
+                        <Palette aria-hidden className="size-4" />
                         Style
                     </Button>
 
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5"
+                        disabled={asking || review.pending}
+                        onClick={() => void askForReview()}
+                    >
+                        <Link2 aria-hidden className="size-4" />
+                        {review.pending ? "In review" : "Share for review"}
+                    </Button>
+
                     {/*
-                     * Publish carries the EDITOR's accent (#8a5a3c, spec §7),
-                     * not Saroh's brand blue. §1 is explicit that the shell
-                     * accent drops away on entering the editor: inside here the
-                     * only chromatic things should be the merchant's site and
-                     * the one action that puts it in front of the public.
+                     * The one action that puts the site in front of the
+                     * public. Not disabled while In review: publishing then
+                     * is allowed and recorded as a bypass (#278).
                      */}
                     <Button
-                        className="wk-press h-7 rounded bg-[#8a5a3c] px-3 text-xs font-medium text-white hover:bg-[#794e34]"
+                        size="sm"
+                        className="wk-press h-8"
+                        title="Make these changes live"
                         onClick={() => void openCheck()}
                         disabled={publishing || dirty || saving || styleDirty}
                     >
                         {publishing
                             ? "Publishing…"
-                            : /*
-                               * "Never-published sites say Publish site, not
-                               * Publish changes" (spec §2). Before anything is
-                               * live there are no changes to publish — there is
-                               * a site to put up.
-                               */
-                              neverPublished
+                            : neverPublished
                               ? "Publish site"
                               : "Publish"}
                         {/*
-                         * The count as a BADGE rather than in the label, as the
-                         * design has it: "Publish" stays the same width whatever
-                         * the number, so the button a merchant is about to press
-                         * does not move under the cursor as they edit.
-                         */}
-                        {/*
-                         * "Publish button carries the outstanding flag count"
-                         * (spec §2) — the flags, not the changed-section count
-                         * that used to sit here. A number next to Publish
-                         * should say what is worth looking at before going
-                         * live, and the changed count already has its own line
-                         * in the bar.
+                         * The outstanding flag count as a badge, so the
+                         * button keeps its width while the number moves.
                          */}
                         {!publishing && siteFlags.flags.length > 0 ? (
-                            <span className="ml-1.5 rounded bg-black/30 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
+                            <span className="ml-1.5 rounded bg-background/20 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
                                 {siteFlags.flags.length}
                             </span>
                         ) : null}
@@ -1241,26 +1196,11 @@ export function SiteEditor({
                         <>
                             <EditorTabs
                                 label="Page"
-                                tabs={[
-                                    { key: "sections", label: "This page" },
-                                    { key: "pages", label: "Pages" },
-                                ]}
+                                tabs={[{ key: "sections", label: "This page" }]}
                                 value={rail}
                                 onSelect={setRail}
                             />
-                            {rail === "pages" ? (
-                                <PagesPanel
-                                    siteId={siteId}
-                                    pages={pages}
-                                    activePageId={pageId}
-                                    dirty={dirty}
-                                    unfinished={
-                                        onlyHeldBack
-                                            ? unfinishedPhrase(heldBack)
-                                            : undefined
-                                    }
-                                />
-                            ) : (
+                            {
                                 <>
                                     <p className="px-4 pb-1 pt-4 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                                         {sections.length === 1
@@ -1494,7 +1434,7 @@ export function SiteEditor({
                                         />
                                     </div>
                                 </>
-                            )}
+                            }
                         </>
                     )}
                 </aside>
@@ -1612,8 +1552,6 @@ export function SiteEditor({
                         }`}
                         style={{
                             maxWidth: DEVICE_WIDTH[device],
-                            transform: `scale(${zoomScale})`,
-                            transformOrigin: "top center",
                         }}
                     >
                         {/*
@@ -1622,15 +1560,15 @@ export function SiteEditor({
                          * website, not a mock-up of one, and the bar says
                          * where a customer would find it.
                          */}
-                        <div className="overflow-hidden rounded-lg border border-white/10 shadow-2xl shadow-black/40">
-                            <div className="flex h-9 items-center gap-3 border-b border-white/10 bg-[#1c1c1a] px-3">
+                        <div className="overflow-hidden rounded-lg border shadow-xl shadow-black/10 dark:shadow-black/40">
+                            <div className="flex h-9 items-center gap-3 border-b bg-muted px-3">
                                 <span
                                     aria-hidden="true"
                                     className="flex gap-1.5"
                                 >
-                                    <span className="size-2 rounded-full bg-white/15" />
-                                    <span className="size-2 rounded-full bg-white/15" />
-                                    <span className="size-2 rounded-full bg-white/15" />
+                                    <span className="size-2 rounded-full bg-foreground/15" />
+                                    <span className="size-2 rounded-full bg-foreground/15" />
+                                    <span className="size-2 rounded-full bg-foreground/15" />
                                 </span>
                                 <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
                                     {address
