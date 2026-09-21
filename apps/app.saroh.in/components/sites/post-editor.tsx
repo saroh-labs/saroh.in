@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import {
@@ -398,21 +399,21 @@ export function PostEditor({
                         </Field>
 
                         <Field label="Category">
-                            <select
-                                value={categoryId}
-                                onChange={(e) =>
-                                    touched(setCategoryId)(e.target.value)
-                                }
+                            <OptionSelect
                                 aria-label="Post category"
-                                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                            >
-                                <option value="">None</option>
-                                {categories.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.name}
-                                    </option>
-                                ))}
-                            </select>
+                                value={categoryId}
+                                onValueChange={(v) => {
+                                    touched(setCategoryId)(v);
+                                }}
+                                options={[
+                                    { value: "", label: "None" },
+                                    ...categories.map((c) => ({
+                                        value: c.id,
+                                        label: c.name,
+                                    })),
+                                ]}
+                                className="w-full"
+                            />
                         </Field>
 
                         <Field

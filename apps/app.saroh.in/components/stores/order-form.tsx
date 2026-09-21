@@ -9,9 +9,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { FieldErrors } from "react-hook-form";
-import { useFieldArray, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import { createOrder } from "@/lib/orders/actions";
 
 interface ProductLite {
@@ -209,22 +210,30 @@ export function OrderForm({
         >
             <div className="grid gap-2">
                 <Label htmlFor="customer">Customer</Label>
-                <select
-                    id="customer"
-                    disabled={isSubmitting}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    {...form.register("customerId")}
-                >
-                    <option value="">Select a customer…</option>
-                    {customers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                            {[c.firstName, c.lastName]
-                                .filter(Boolean)
-                                .join(" ")}
-                            {c.firstName ? ` · ${c.email}` : c.email}
-                        </option>
-                    ))}
-                </select>
+                <Controller
+                    control={form.control}
+                    name="customerId"
+                    render={({ field }) => (
+                        <OptionSelect
+                            id="customer"
+                            placeholder="Select a customer…"
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            disabled={isSubmitting}
+                            options={customers.map((c) => {
+                                const name = [c.firstName, c.lastName]
+                                    .filter(Boolean)
+                                    .join(" ");
+                                return {
+                                    value: c.id,
+                                    label: name
+                                        ? `${name} · ${c.email}`
+                                        : c.email,
+                                };
+                            })}
+                        />
+                    )}
+                />
             </div>
 
             <div className="space-y-3">
@@ -239,18 +248,23 @@ export function OrderForm({
                     const watched = watchedLines.at(i);
                     return (
                         <div key={line.id} className="flex items-center gap-2">
-                            <select
-                                aria-label="Product"
-                                disabled={isSubmitting}
-                                className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-                                {...form.register(`lines.${i}.productId`)}
-                            >
-                                {products.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.name} — {p.price}
-                                    </option>
-                                ))}
-                            </select>
+                            <Controller
+                                control={form.control}
+                                name={`lines.${i}.productId`}
+                                render={({ field }) => (
+                                    <OptionSelect
+                                        aria-label="Product"
+                                        value={field.value}
+                                        onValueChange={field.onChange}
+                                        disabled={isSubmitting}
+                                        className="flex-1"
+                                        options={products.map((p) => ({
+                                            value: p.id,
+                                            label: `${p.name} — ${p.price}`,
+                                        }))}
+                                    />
+                                )}
+                            />
                             <Input
                                 aria-label="Quantity"
                                 type="number"

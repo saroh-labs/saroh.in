@@ -7,6 +7,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import { createCategory, deleteCategory } from "@/lib/products/actions";
 import type { Category } from "@/lib/products/service";
 
@@ -79,20 +80,20 @@ export function CategoriesManager({
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="cat-parent">Parent</Label>
-                    <select
+                    <OptionSelect
                         id="cat-parent"
                         value={parentId}
-                        onChange={(e) => setParentId(e.target.value)}
                         disabled={adding}
-                        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    >
-                        <option value="">None (top level)</option>
-                        {categories.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.name}
-                            </option>
-                        ))}
-                    </select>
+                        onValueChange={setParentId}
+                        options={[
+                            { value: "", label: "None (top level)" },
+                            ...categories.map((c) => ({
+                                value: c.id,
+                                label: c.name,
+                            })),
+                        ]}
+                        className="w-56"
+                    />
                 </div>
                 <Button type="submit" className="wk-press" disabled={adding}>
                     {adding ? "Adding…" : "Add category"}

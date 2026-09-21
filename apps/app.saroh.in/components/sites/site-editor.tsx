@@ -39,6 +39,7 @@ import { syncEnquiryForms } from "@/components/sites/sync-enquiry-forms";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { useServicesForPicker } from "@/components/sites/use-services-for-picker";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import { NoteComposer } from "@/components/sites/note-composer";
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
@@ -1102,24 +1103,19 @@ export function SiteEditor({
                      * value being chosen, and a native select is the one
                      * control every keyboard and screen reader already knows.
                      */}
-                    <select
+                    <OptionSelect
                         aria-label="Zoom"
+                        size="sm"
                         value={String(zoom)}
-                        onChange={(e) =>
-                            setZoom(
-                                e.target.value === "fit"
-                                    ? "fit"
-                                    : (Number(e.target.value) as Zoom),
-                            )
-                        }
-                        className="h-7 w-[4.25rem] rounded border bg-transparent px-1.5 text-xs tabular-nums text-muted-foreground"
-                    >
-                        {ZOOMS.map((z) => (
-                            <option key={String(z)} value={String(z)}>
-                                {z === "fit" ? "Fit" : `${z}%`}
-                            </option>
-                        ))}
-                    </select>
+                        onValueChange={(v) => {
+                            setZoom(v === "fit" ? "fit" : (Number(v) as Zoom));
+                        }}
+                        options={ZOOMS.map((z) => ({
+                            value: String(z),
+                            label: z === "fit" ? "Fit" : `${z}%`,
+                        }))}
+                        className="w-[4.75rem] tabular-nums text-muted-foreground"
+                    />
 
                     <Button
                         variant="outline"

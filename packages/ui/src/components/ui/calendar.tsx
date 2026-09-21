@@ -46,7 +46,10 @@ function Calendar({
                 day_today: "bg-accent text-accent-foreground",
                 day_outside:
                     "day-outside text-muted-foreground aria-selected:bg-accent aria-selected:text-muted-foreground",
-                day_disabled: "text-disabled-foreground",
+                // A day that cannot be picked is dimmed, not filled: the button's
+                // shared disabled fill made a run of past days read as a range.
+                day_disabled:
+                    "text-disabled-foreground opacity-50 disabled:bg-transparent",
                 day_range_middle:
                     "aria-selected:bg-accent aria-selected:text-accent-foreground",
                 day_hidden: "invisible",

@@ -4,6 +4,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import { updateOrder } from "@/lib/orders/actions";
 import type { OrderStatus, PaymentStatus } from "@/lib/orders/service";
 
@@ -61,41 +62,35 @@ export function OrderStatusControls({
                 <span className="text-xs text-muted-foreground">
                     Fulfilment
                 </span>
-                <select
+                <OptionSelect
                     aria-label="Order status"
                     value={status}
                     disabled={busy}
-                    onChange={(e) =>
-                        change({ status: e.target.value as OrderStatus })
-                    }
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                >
-                    {ORDER_STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                            {s}
-                        </option>
-                    ))}
-                </select>
+                    onValueChange={(v) => {
+                        void change({ status: v });
+                    }}
+                    options={ORDER_STATUSES.map((s) => ({
+                        value: s,
+                        label: s,
+                    }))}
+                    className="w-44"
+                />
             </div>
             <div className="grid gap-1">
                 <span className="text-xs text-muted-foreground">Payment</span>
-                <select
+                <OptionSelect
                     aria-label="Payment status"
                     value={paymentStatus}
                     disabled={busy}
-                    onChange={(e) =>
-                        change({
-                            paymentStatus: e.target.value as PaymentStatus,
-                        })
-                    }
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                >
-                    {PAYMENT_STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                            {s}
-                        </option>
-                    ))}
-                </select>
+                    onValueChange={(v) => {
+                        void change({ paymentStatus: v });
+                    }}
+                    options={PAYMENT_STATUSES.map((s) => ({
+                        value: s,
+                        label: s,
+                    }))}
+                    className="w-44"
+                />
             </div>
         </div>
     );
