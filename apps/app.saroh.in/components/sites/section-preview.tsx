@@ -16,6 +16,7 @@ import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { SECTION_LABELS } from "@/components/sites/editor-constants";
+import { merchantLinkUrl } from "@/lib/sites/merchant-link";
 
 import type { Section, SitePage } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
@@ -83,6 +84,7 @@ export function DraftPreview({
     onSelectChrome,
     notesByKey,
     onOpenNotes,
+    siteAddress,
 }: {
     sections: Section[];
     /**
@@ -119,6 +121,8 @@ export function DraftPreview({
     notesByKey?: ReadonlyMap<string, number>;
     /** A pin was pressed: select that block and show its feedback. */
     onOpenNotes?: (index: number) => void;
+    /** The merchant's site address, which the page's links open on. */
+    siteAddress?: string | null;
 }) {
     /*
      * The merchant's tokens, from the SAME component the live site uses.
@@ -223,17 +227,26 @@ export function DraftPreview({
         <div
             className={`${PREVIEW_SCOPE} bg-[hsl(var(--site-bg))] text-[hsl(var(--site-fg))]`}
             /*
-             * Nothing here navigates — on the canvas or in Preview. A link is
-             * the merchant's link to THEIR site, and its address (/about,
-             * /products) followed from inside Saroh lands on a Saroh page
-             * and leaves the editor without the unsaved-work check (review
-             * of #336). On the canvas a click selects instead; the live site
-             * and a shared preview link are where links are followed.
+             * A link on this page is the merchant's link to THEIR site:
+             * "/about" means their /about, not Saroh's. So it never navigates
+             * this tab — that would land on a Saroh page and leave the editor
+             * without the unsaved-work check — and instead opens the
+             * merchant's own page in a new tab (merchantLinkUrl).
+             *
+             * In Preview a click opens it. On the editing canvas a click
+             * selects the block, so a button can be edited without leaving;
+             * ⌘/Ctrl-click opens the link there.
              */
             onClickCapture={(e) => {
-                if ((e.target as HTMLElement).closest("a")) {
-                    e.preventDefault();
-                }
+                const anchor = (e.target as HTMLElement).closest("a");
+                if (!anchor) return;
+                e.preventDefault();
+                if (editing && !(e.metaKey || e.ctrlKey)) return;
+                const url = merchantLinkUrl(
+                    anchor.getAttribute("href"),
+                    siteAddress,
+                );
+                if (url) window.open(url, "_blank", "noopener");
             }}
         >
             <SiteTheme variables={vars} selector={`.${PREVIEW_SCOPE}`} />

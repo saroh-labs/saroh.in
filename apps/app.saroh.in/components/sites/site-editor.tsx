@@ -1784,8 +1784,14 @@ export function SiteEditor({
                                         ? `${address}/`
                                         : "Not published yet"}
                                 </span>
+                                {address ? (
+                                    <span className="ml-auto hidden shrink-0 text-[0.6875rem] text-muted-foreground xl:inline">
+                                        ⌘-click a link to open it on your site
+                                    </span>
+                                ) : null}
                             </div>
                             <DraftPreview
+                                siteAddress={address}
                                 sections={sections}
                                 pages={pages}
                                 style={style}
@@ -2028,6 +2034,7 @@ export function SiteEditor({
                         style={{ maxWidth: DEVICE_WIDTH[device] }}
                     >
                         <DraftPreview
+                            siteAddress={address}
                             sections={sections}
                             pages={pages}
                             style={style}
