@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -48,6 +49,8 @@ import type {
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
 import { StorefrontPartial } from "@/components/stores/storefront-partial";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { ratingLabel, rowRating } from "@/lib/product-reviews/describe";
+import type { ProductRating } from "@/lib/product-reviews/service";
 import { deleteProduct, updateProduct } from "@/lib/products/actions";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { inStorefront, mergeCatalogue } from "@/lib/products/catalogue";
@@ -162,10 +165,16 @@ export function CatalogueScreen({
     productsByStore,
     initialView,
     missing = [],
+    tabs,
+    ratings = [],
 }: {
     stores: { id: string; name: string }[];
     productsByStore: Record<string, ProductListItem[]>;
     initialView?: string;
+    /** Products | Reviews, under the header. */
+    tabs?: ReactNode;
+    /** Published review averages per product id. */
+    ratings?: ProductRating[];
     /** Storefronts whose list could not be read; see `StorefrontPartial`. */
     missing?: { id: string; name: string }[];
 }) {
@@ -196,6 +205,10 @@ export function CatalogueScreen({
     }, [catalogue, storeId, statusFilter]);
     const store = stores.find((s) => s.id === storeId) ?? null;
     const many = stores.length > 1;
+    const ratingById = useMemo(
+        () => new Map(ratings.map((r) => [r.productId, r])),
+        [ratings],
+    );
     const first = stores.at(0);
 
     /** Every place a set of rows lives, in the storefront being viewed. */
@@ -290,6 +303,22 @@ export function CatalogueScreen({
                             {!storeId && many
                                 ? ` · ${r.places.map((p) => p.storeName).join(" · ")}`
                                 : null}
+                            {(() => {
+                                const rating = rowRating(
+                                    r.places.map((p) => p.product.id),
+                                    ratingById,
+                                );
+                                return rating ? (
+                                    <>
+                                        {" · "}
+                                        <span
+                                            aria-label={`Rated ${rating.average} from ${rating.count} ${rating.count === 1 ? "review" : "reviews"}`}
+                                        >
+                                            ★ {ratingLabel(rating)}
+                                        </span>
+                                    </>
+                                ) : null;
+                            })()}
                         </span>
                     </span>
                 </span>
@@ -411,6 +440,8 @@ export function CatalogueScreen({
                     ) : undefined
                 }
             />
+
+            {tabs}
 
             <StorefrontPartial
                 missing={missing}

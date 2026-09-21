@@ -152,6 +152,17 @@ export function NotificationsInbox({
                                 >
                                     {row}
                                 </Link>
+                            ) : n.reviewId ? (
+                                // A review's notice is NOT read by opening it:
+                                // it clears when the review is replied to or
+                                // hidden, which is what "needs a reply" means.
+                                <Link
+                                    href={`/commerce/products?tab=reviews&review=${encodeURIComponent(n.reviewId)}`}
+                                    aria-label={label}
+                                    className={rowClass}
+                                >
+                                    {row}
+                                </Link>
                             ) : isUnread ? (
                                 <button
                                     type="button"
