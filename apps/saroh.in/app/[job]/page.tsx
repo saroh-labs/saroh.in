@@ -65,11 +65,11 @@ export default async function JobPage({ params }: Props) {
                     <h1 className="mb-4 font-display text-[30px] font-semibold leading-[1.03] tracking-[-0.04em] min-[421px]:text-[38px] md:text-[48px]">
                         {job.head}
                     </h1>
-                    <p className="mb-3.5 max-w-[52ch] text-pretty text-[18px] leading-[1.6] text-neutral-600 dark:text-neutral-400">
+                    <p className="mb-3.5 max-w-[52ch] text-pretty text-[18px] leading-[1.6] text-highlight-600 dark:text-highlight-400">
                         {job.lede}
                     </p>
                     <p className="mb-6 max-w-[52ch] text-pretty text-[16px] leading-[1.6] text-muted-foreground">
-                        <strong className="font-semibold text-neutral-600 dark:text-neutral-300">
+                        <strong className="font-semibold text-highlight-600 dark:text-highlight-300">
                             Who it is for:
                         </strong>{" "}
                         {job.who}
@@ -163,7 +163,7 @@ export default async function JobPage({ params }: Props) {
                                         <p className={body}>{item.body}</p>
                                         {item.meanwhile ? (
                                             <p className="mt-1 text-pretty text-[13px] leading-[1.55] text-muted-foreground">
-                                                <span className="font-semibold text-neutral-600 dark:text-neutral-300">
+                                                <span className="font-semibold text-highlight-600 dark:text-highlight-300">
                                                     Until then:
                                                 </span>{" "}
                                                 {item.meanwhile}
@@ -203,7 +203,7 @@ export default async function JobPage({ params }: Props) {
                                     {r.name}
                                 </span>
                             </span>
-                            <span className="block text-pretty text-[12px] leading-normal text-neutral-600 dark:text-neutral-400">
+                            <span className="block text-pretty text-[12px] leading-normal text-highlight-600 dark:text-highlight-400">
                                 {r.short}
                             </span>
                         </Link>

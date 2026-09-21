@@ -68,7 +68,7 @@ export function ShotRail({
                                 "font-normal",
                                 i === index
                                     ? "border-border bg-card text-foreground shadow-[0_1px_2px_rgba(28,28,26,0.06)]"
-                                    : "border-transparent text-neutral-600 hover:text-foreground dark:text-neutral-400",
+                                    : "border-transparent text-highlight-600 hover:text-foreground dark:text-highlight-400",
                             )}
                         >
                             {it.icon ? (
@@ -94,7 +94,7 @@ export function ShotRail({
                         type="button"
                         onClick={() => step(-1)}
                         aria-label={`Previous — ${prev.label}`}
-                        className="grid size-[30px] place-items-center rounded-full border border-border bg-card text-neutral-600 hover:bg-muted dark:text-neutral-400"
+                        className="grid size-[30px] place-items-center rounded-full border border-border bg-card text-highlight-600 hover:bg-muted dark:text-highlight-400"
                     >
                         <ChevronLeft aria-hidden className="size-[15px]" />
                     </button>
@@ -102,7 +102,7 @@ export function ShotRail({
                         type="button"
                         onClick={() => step(1)}
                         aria-label={`Next — ${next.label}`}
-                        className="grid size-[30px] place-items-center rounded-full border border-border bg-card text-neutral-600 hover:bg-muted dark:text-neutral-400"
+                        className="grid size-[30px] place-items-center rounded-full border border-border bg-card text-highlight-600 hover:bg-muted dark:text-highlight-400"
                     >
                         <ChevronRight aria-hidden className="size-[15px]" />
                     </button>
@@ -121,7 +121,7 @@ export function ShotRail({
                     <Link
                         href={item.href}
                         aria-label={`Open ${item.label}`}
-                        className="absolute right-3.5 top-3.5 z-10 grid size-[30px] place-items-center rounded-full border border-border bg-card text-neutral-600 hover:bg-muted dark:text-neutral-400"
+                        className="absolute right-3.5 top-3.5 z-10 grid size-[30px] place-items-center rounded-full border border-border bg-card text-highlight-600 hover:bg-muted dark:text-highlight-400"
                     >
                         <ArrowUpRight aria-hidden className="size-[13px]" />
                     </Link>
@@ -143,7 +143,7 @@ export function ShotRail({
                     <div className="font-display text-[19px] font-semibold tracking-[-0.025em]">
                         {item.title}
                     </div>
-                    <p className="mt-[5px] max-w-[62ch] text-pretty text-[15px] leading-[1.6] text-neutral-600 dark:text-neutral-400">
+                    <p className="mt-[5px] max-w-[62ch] text-pretty text-[15px] leading-[1.6] text-highlight-600 dark:text-highlight-400">
                         {item.body}
                     </p>
                     {item.href && item.more ? (

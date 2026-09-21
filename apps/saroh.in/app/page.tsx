@@ -39,7 +39,7 @@ export default function Home() {
                     <h1 className="sa-rise mb-[18px] font-display text-[30px] font-semibold leading-none tracking-[-0.045em] min-[421px]:text-[38px] md:text-[55px]">
                         One business, not four logins.
                     </h1>
-                    <p className="sa-rise mb-[26px] max-w-[42ch] text-pretty text-[18px] leading-[1.55] text-neutral-600 [animation-delay:120ms] dark:text-neutral-400">
+                    <p className="sa-rise mb-[26px] max-w-[42ch] text-pretty text-[18px] leading-[1.55] text-highlight-600 [animation-delay:120ms] dark:text-highlight-400">
                         Your website, your shop, your diary and the people who
                         get in touch — in one workspace, under one account.
                     </p>
@@ -89,7 +89,7 @@ export default function Home() {
                     >
                         Switch on what you do. The rest never appears.
                     </h2>
-                    <p className="mt-1 text-pretty text-[15px] leading-[1.65] text-neutral-600 dark:text-neutral-400">
+                    <p className="mt-1 text-pretty text-[15px] leading-[1.65] text-highlight-600 dark:text-highlight-400">
                         Five jobs, readable at once down the left. Nothing is
                         greyed out or behind an upgrade — a job you have not
                         switched on is simply absent.
@@ -110,29 +110,29 @@ export default function Home() {
                             >
                                 Coming soon
                             </h2>
-                            <p className="mb-4 max-w-[40ch] text-pretty text-[16px] leading-[1.6] text-neutral-200">
+                            <p className="mb-4 max-w-[40ch] text-pretty text-[16px] leading-[1.6] text-highlight-200">
                                 What we are building next, and how to manage
                                 until it arrives — so you know what to expect
                                 before you move your business across.
                             </p>
                             <Link
                                 href="/coming-soon"
-                                className="inline-flex h-[42px] items-center rounded-[9px] border border-neutral-600 px-[18px] text-[16px] font-semibold hover:bg-neutral-800"
+                                className="inline-flex h-[42px] items-center rounded-[9px] border border-highlight-600 px-[18px] text-[16px] font-semibold hover:bg-highlight-800"
                             >
                                 See everything that is coming
                             </Link>
                         </div>
-                        <ul className="overflow-hidden rounded-[13px] border border-neutral-600">
+                        <ul className="overflow-hidden rounded-[13px] border border-highlight-600">
                             {COMING.slice(0, 3).map((item) => (
                                 <li
                                     key={item.title}
-                                    className="flex items-start gap-3 border-t border-neutral-600 px-4 py-3.5 first:border-t-0"
+                                    className="flex items-start gap-3 border-t border-highlight-600 px-4 py-3.5 first:border-t-0"
                                 >
                                     <div className="min-w-0 flex-1">
                                         <div className="text-pretty text-[13px] font-semibold">
                                             {item.title}
                                         </div>
-                                        <p className="mt-1 text-pretty text-[16px] leading-[1.55] text-neutral-200">
+                                        <p className="mt-1 text-pretty text-[16px] leading-[1.55] text-highlight-200">
                                             {item.body}
                                         </p>
                                     </div>

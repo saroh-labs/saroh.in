@@ -20,7 +20,7 @@ export default function ComingSoon() {
                 <h1 className="mb-4 font-display text-[30px] font-semibold leading-[1.04] tracking-[-0.04em] min-[421px]:text-[38px] md:text-[48px]">
                     Coming soon
                 </h1>
-                <p className="mb-3 max-w-[60ch] text-pretty text-[18px] leading-[1.6] text-neutral-600 dark:text-neutral-400">
+                <p className="mb-3 max-w-[60ch] text-pretty text-[18px] leading-[1.6] text-highlight-600 dark:text-highlight-400">
                     What we are building next. Each one is here because it saves
                     a small business real time or real money — and each one says
                     how to manage until it arrives, so nothing on this page is a
@@ -40,12 +40,12 @@ export default function ComingSoon() {
                                 <h2 className="mb-[7px] text-pretty font-display text-[18px] font-semibold tracking-[-0.02em]">
                                     {item.title}
                                 </h2>
-                                <p className="text-pretty text-[16px] leading-[1.6] text-neutral-600 dark:text-neutral-400">
+                                <p className="text-pretty text-[16px] leading-[1.6] text-highlight-600 dark:text-highlight-400">
                                     {item.body}
                                 </p>
                                 {item.meanwhile ? (
                                     <p className="mt-[9px] text-pretty text-[13px] leading-[1.6] text-muted-foreground">
-                                        <strong className="font-semibold text-neutral-600 dark:text-neutral-300">
+                                        <strong className="font-semibold text-highlight-600 dark:text-highlight-300">
                                             Until then:
                                         </strong>{" "}
                                         {item.meanwhile}
@@ -63,14 +63,14 @@ export default function ComingSoon() {
                     <h2 className="mb-[11px] font-display text-[22px] font-semibold leading-[1.14] tracking-[-0.03em]">
                         What will not change as we build
                     </h2>
-                    <p className="mb-[18px] text-pretty text-[16px] leading-[1.6] text-neutral-200">
+                    <p className="mb-[18px] text-pretty text-[16px] leading-[1.6] text-highlight-200">
                         A figure Saroh cannot read is withheld and named, never
                         shown as nought. A silence and a zero are different
                         numbers, and planning a week on the wrong one costs real
                         money.
                     </p>
-                    <figure className="overflow-hidden rounded-[12px] border border-neutral-600">
-                        <div className="flex items-start gap-2.5 bg-neutral-800 px-[15px] py-[13px]">
+                    <figure className="overflow-hidden rounded-[12px] border border-highlight-600">
+                        <div className="flex items-start gap-2.5 bg-highlight-800 px-[15px] py-[13px]">
                             <svg
                                 viewBox="0 0 24 24"
                                 fill="none"
@@ -91,25 +91,25 @@ export default function ComingSoon() {
                             </p>
                         </div>
                         <div className="flex flex-wrap">
-                            <div className="min-w-[130px] flex-[1_1_140px] border-t border-neutral-600 px-4 py-3.5">
-                                <div className="min-h-[26px] text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-200">
+                            <div className="min-w-[130px] flex-[1_1_140px] border-t border-highlight-600 px-4 py-3.5">
+                                <div className="min-h-[26px] text-[11px] font-semibold uppercase tracking-[0.1em] text-highlight-200">
                                     Open orders
                                 </div>
-                                <div className="mt-[5px] font-display text-[22px] font-semibold tracking-[-0.03em] text-neutral-200">
+                                <div className="mt-[5px] font-display text-[22px] font-semibold tracking-[-0.03em] text-highlight-200">
                                     —
                                 </div>
-                                <div className="mt-[3px] text-[11px] text-neutral-200">
+                                <div className="mt-[3px] text-[11px] text-highlight-200">
                                     Withheld, not zero
                                 </div>
                             </div>
-                            <div className="min-w-[130px] flex-[1_1_140px] border-t border-neutral-600 px-4 py-3.5">
-                                <div className="min-h-[26px] text-[11px] font-semibold uppercase tracking-[0.1em] text-neutral-200">
+                            <div className="min-w-[130px] flex-[1_1_140px] border-t border-highlight-600 px-4 py-3.5">
+                                <div className="min-h-[26px] text-[11px] font-semibold uppercase tracking-[0.1em] text-highlight-200">
                                     Bookings coming up
                                 </div>
                                 <div className="mt-[5px] font-display text-[22px] font-semibold tabular-nums tracking-[-0.03em]">
                                     3
                                 </div>
-                                <div className="mt-[3px] text-[11px] text-neutral-200">
+                                <div className="mt-[3px] text-[11px] text-highlight-200">
                                     Read, correct
                                 </div>
                             </div>

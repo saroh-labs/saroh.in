@@ -89,7 +89,7 @@ export function ChainExplorer({ chains }: { chains: ChainData[] }) {
                                 "h-[34px] rounded-full border px-3.5 text-[13px] font-medium transition-colors",
                                 c.key === key
                                     ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card text-neutral-600 hover:bg-muted dark:text-neutral-400",
+                                    : "border-border bg-card text-highlight-600 hover:bg-muted dark:text-highlight-400",
                             )}
                         >
                             {c.label}

@@ -6,7 +6,7 @@ import { JOBS } from "@/lib/site-content";
 const heading =
     "mb-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground";
 const link =
-    "text-[13px] text-neutral-600 hover:text-foreground hover:underline hover:underline-offset-[3px] dark:text-neutral-400";
+    "text-[13px] text-highlight-600 hover:text-foreground hover:underline hover:underline-offset-[3px] dark:text-highlight-400";
 
 /**
  * Four columns after the design: the jobs, the site, getting in, and what is

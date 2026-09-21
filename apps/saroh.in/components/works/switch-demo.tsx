@@ -85,7 +85,7 @@ export function SwitchDemo() {
                     );
                 })}
             </ul>
-            <div className="border-t border-border bg-neutral-50 px-[19px] pb-[18px] pt-4 dark:bg-muted">
+            <div className="border-t border-border bg-highlight-50 px-[19px] pb-[18px] pt-4 dark:bg-muted">
                 <div className={cn(eyebrow, "mb-[9px]")}>
                     Your sidebar would be
                 </div>
