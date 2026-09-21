@@ -152,7 +152,7 @@ export function PrePublishCheck({
                         size="sm"
                         disabled={publishing}
                         onClick={onPublish}
-                        className="h-7 bg-[#8a5a3c] px-3 text-xs font-medium text-white hover:bg-[#794e34]"
+                        className="h-8 px-3"
                     >
                         {publishing
                             ? "Publishing…"
@@ -178,7 +178,7 @@ export function PrePublishCheck({
                             className={
                                 APPROVAL_LINE[review.latestApproval.outcome]
                                     .approved
-                                    ? "mb-6 rounded-md border border-[#3d3020] bg-[#241d14] px-3 py-2 text-sm text-[#c99f6f]"
+                                    ? "mb-6 rounded-md bg-brand-subtle px-3 py-2 text-sm text-brand-subtle-foreground"
                                     : "mb-6 rounded-md border px-3 py-2 text-sm text-muted-foreground"
                             }
                         >
@@ -322,7 +322,7 @@ function Row({
                 {/* The design's flag dot: 4px, amber #c99f6f (spec §7). */}
                 <span
                     aria-hidden="true"
-                    className="mt-1.5 size-1 shrink-0 rounded-full bg-[#c99f6f]"
+                    className="mt-1.5 size-1 shrink-0 rounded-full bg-highlight"
                 />
                 <span className="min-w-0 flex-1">
                     <span className="block text-sm">{flag.message}</span>

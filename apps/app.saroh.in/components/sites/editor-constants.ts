@@ -46,31 +46,19 @@ export const SECTION_HINTS: Record<SectionType, string> = {
     servicesList: "Your services with duration and price, always up to date.",
 };
 
-/** Preview widths. The phone value is a real handset, not a breakpoint. */
+/**
+ * Preview widths: the two the design offers (#335). Phone is a real handset,
+ * not a breakpoint. Tablet and zoom went with the redesign — the widths a
+ * merchant's customers mostly arrive at are these two.
+ */
 export const DEVICES = [
     { key: "desktop", label: "Desktop" },
-    { key: "tablet", label: "Tablet" },
     { key: "phone", label: "Phone" },
 ] as const;
 export type Device = (typeof DEVICES)[number]["key"];
-/** Zoom steps. "fit" is computed; the rest are literal percentages (spec §2). */
-export type Zoom = 50 | 75 | 100 | "fit";
-export const ZOOMS: Zoom[] = [50, 75, 100, "fit"];
-
-/**
- * The same widths in pixels, for the Fit calculation. Desktop is null because
- * it has no fixed width — it already takes whatever the canvas gives it, so
- * there is nothing to scale down to make it fit.
- */
-export const DEVICE_PX: Record<Device, number | null> = {
-    desktop: null,
-    tablet: 768,
-    phone: 375,
-};
 
 export const DEVICE_WIDTH: Record<Device, string> = {
     desktop: "100%",
-    tablet: "48rem",
     phone: "23.4375rem",
 };
 
