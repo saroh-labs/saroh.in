@@ -97,3 +97,23 @@ export function updateContact(
         "Could not update the contact",
     );
 }
+
+export interface CreateContactInput {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    company?: string;
+}
+
+/** Add someone by hand. A 409 means that email is already a contact. */
+export function createContact(
+    input: CreateContactInput,
+): Promise<CrmResult<Contact>> {
+    return mutate<Contact>(
+        "/contacts",
+        "POST",
+        input,
+        "Could not add the contact",
+    );
+}

@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+    ConflictException,
+    Injectable,
+    NotFoundException,
+} from "@nestjs/common";
 import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { allows, authorize } from "../organizations/organization-policy";
-import type { UpdateContactDto } from "./dto";
+import type { CreateContactDto, UpdateContactDto } from "./dto";
 
 /**
  * A contact as the list screen needs it: the record, plus the few facts that
@@ -345,6 +349,49 @@ export class ContactsService {
     }
 
     /**
+     * Add a contact by hand. Authorizes `contact:write`. The email is the
+     * org's dedupe key, so an address already in the CRM is refused with a
+     * 409 that names the existing contact — adding them again would fork one
+     * person into two, and the merchant most likely wants the one they have.
+     */
+    async create(
+        ctx: OrganizationContext,
+        dto: CreateContactDto,
+    ): Promise<Contact> {
+        authorize(ctx, "contact:write");
+
+        const existing = await prisma.contact.findUnique({
+            where: {
+                organizationId_email: {
+                    organizationId: ctx.organizationId,
+                    email: dto.email,
+                },
+            },
+            select: { id: true },
+        });
+        if (existing) {
+            throw new ConflictException({
+                message: "Someone with that email is already in your contacts.",
+                field: "email",
+                contactId: existing.id,
+            });
+        }
+
+        return prisma.contact.create({
+            data: {
+                organizationId: ctx.organizationId,
+                email: dto.email,
+                // An empty field is nothing known, stored as nothing.
+                firstName: blankToNull(dto.firstName),
+                lastName: blankToNull(dto.lastName),
+                phone: blankToNull(dto.phone),
+                company: blankToNull(dto.company),
+                source: "manual",
+            },
+        });
+    }
+
+    /**
      * Patch a contact's descriptive fields (never its email identity). Authorizes
      * `contact:write`; cross-tenant or missing ids 404 before any write. Only the
      * fields present in the DTO are applied — a sparse patch.
@@ -390,4 +437,8 @@ export class ContactsService {
         }
         return contact;
     }
+}
+
+function blankToNull(value: string | undefined): string | null {
+    return value?.trim() ? value : null;
 }
