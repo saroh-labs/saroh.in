@@ -205,8 +205,23 @@ test.describe("a shared preview link", () => {
         context,
     }) => {
         await signIn(page, demoUser);
+        // Website opens on a site; the picker chooses which, and the Pages
+        // tab's action opens it in the editor.
         await page.goto(`${urls.APP_URL}/sites`);
-        await page.getByRole("link", { name: REVIEWED_SITE }).first().click();
+        await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
+        await page
+            .getByRole("button", { name: /^Website: .*Change it\.$/ })
+            .click();
+        await page
+            .getByRole("menuitem", { name: new RegExp(REVIEWED_SITE) })
+            .click();
+        await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
+        await expect(
+            page.getByRole("button", {
+                name: new RegExp(`^Website: ${REVIEWED_SITE}`),
+            }),
+        ).toBeVisible({ timeout: 30_000 });
+        await page.getByRole("link", { name: "Open editor" }).click();
         await page.waitForURL(/\/sites\/[^/]+$/, { timeout: 30_000 });
 
         // Review lives in the inspector's Feedback tab since #340.
