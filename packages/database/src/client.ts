@@ -66,3 +66,31 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = baseClient;
 export const prisma = createRlsProxy(baseClient);
 
 export * from "@prisma/client";
+
+let ended = false;
+
+/**
+ * Close the client AND the pool it runs on.
+ *
+ * `prisma.$disconnect()` alone is not enough here: the adapter was handed a
+ * pool this module created, and Prisma does not end a pool it does not own.
+ * The pool's connections then stay open until their 30s idle timeout — which
+ * is invisible to a long-running server and fatal to a test run that loads
+ * this module fresh in every file: 99 files, up to 10 connections each, and
+ * Postgres refuses the rest with "too many clients" (measured: 5 connections
+ * open during a burst, still 5 open after `$disconnect()`).
+ *
+ * For a process that is finishing with the database — a test file's teardown,
+ * a script, a server shutting down. Safe to call twice.
+ */
+export async function disconnectDatabase(): Promise<void> {
+    if (ended) return;
+    ended = true;
+    await baseClient.$disconnect();
+    await pool.end();
+    // A later import in this process builds a fresh pool rather than reusing
+    // the one just ended.
+    if (globalForPrisma.pgPool === pool) globalForPrisma.pgPool = undefined;
+    if (globalForPrisma.prisma === baseClient)
+        globalForPrisma.prisma = undefined;
+}
