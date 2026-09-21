@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { createCustomer, updateCustomer } from "@/lib/customers/actions";
+import { customerHref } from "@/lib/customers/links";
 import type { Customer } from "@/lib/customers/service";
 import { trimmedOr } from "@/lib/forms/values";
 
@@ -79,16 +80,15 @@ export function CustomerForm({
             else showError(res.error);
             return;
         }
-        showSuccess(editing ? "Customer saved" : "Customer created");
-        router.push(`/stores/${storeId}/customers`);
+        showSuccess(editing ? "Saved" : `${input.email} added`);
+        // Editing stays on the customer; adding one opens them.
+        if (editing) router.refresh();
+        else router.push(customerHref(storeId, res.data.id));
     }
 
     return (
         <Form {...form}>
-            <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="grid max-w-lg gap-4"
-            >
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
                 <FormField
                     control={form.control}
                     name="email"
