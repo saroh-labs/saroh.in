@@ -15,7 +15,9 @@ import {
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { AddSectionDialog } from "@/components/sites/add-section-dialog";
-import { PanelDivider, RailTabs } from "@/components/sites/editor-chrome";
+import { SECTION_ICONS } from "@/components/sites/block-icons";
+import { BlockInspector } from "@/components/sites/block-inspector";
+import { EditorTabs, PanelDivider } from "@/components/sites/editor-chrome";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
 import {
     DEVICE_PX,
@@ -32,15 +34,12 @@ import {
 } from "@/components/sites/held-back-copy";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { saveableSections } from "@/components/sites/saveable-sections";
-import { SectionFields } from "@/components/sites/section-fields";
-import { SectionPadding } from "@/components/sites/section-fields/padding";
 import { withVariant } from "@/components/sites/section-fields/variant-field";
 import { syncEnquiryForms } from "@/components/sites/sync-enquiry-forms";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { useServicesForPicker } from "@/components/sites/use-services-for-picker";
 
 import { OptionSelect } from "@/components/shared/option-select";
-import { NoteComposer } from "@/components/sites/note-composer";
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
 import { ReviewPanel } from "@/components/sites/review-panel";
@@ -308,7 +307,7 @@ export function SiteEditor({
         () => getPlace(siteId, initialCount),
         () => serverPlace,
     );
-    const { selectedIndex, rail } = place;
+    const { selectedIndex, rail, inspector } = place;
 
     // Setters that keep every call site below unchanged. Writing through the
     // store is what makes the choice survive a reload; the re-render is the
@@ -328,8 +327,10 @@ export function SiteEditor({
     };
     const setSelectedIndex = (next: number | null) =>
         setPlace(siteId, initialCount, { selectedIndex: next });
-    const setRail = (next: "sections" | "pages" | "review" | "style") =>
+    const setRail = (next: "sections" | "pages" | "style") =>
         setPlace(siteId, initialCount, { rail: next });
+    const setInspector = (next: "block" | "feedback") =>
+        setPlace(siteId, initialCount, { inspector: next });
 
     /*
      * "Zoom is the readout dropdown only — 50 / 75 / 100 / Fit. No ⌘scroll, no
@@ -862,6 +863,28 @@ export function SiteEditor({
         await Promise.all([refreshFlags(), refreshReview()]);
     }
 
+    /**
+     * Open the block a note is about. A note names a block by KEY, and only
+     * the open page's blocks are loaded — so a note on another page is a
+     * navigation first and a selection after it.
+     */
+    function jumpToNote(jumpPageId: string, sectionKey: string) {
+        if (jumpPageId !== pageId) {
+            // The same guard the Pages tab puts on opening a page: leaving
+            // mid-flight loses whatever autosave has not sent yet.
+            if (dirty) {
+                showError("Save this page before opening another.");
+                return;
+            }
+            router.push(`/sites/${siteId}?page=${jumpPageId}`);
+            return;
+        }
+        const index = sections.findIndex((sec) => sec.key === sectionKey);
+        if (index === -1) return;
+        setRail("sections");
+        setSelectedIndex(index);
+    }
+
     /*
      * The selected section AND its index together, so nothing downstream has to
      * assert that the index is still valid. Removing a section can leave the
@@ -1190,91 +1213,22 @@ export function SiteEditor({
                 className="grid min-h-0 flex-1 lg:grid-cols-[var(--editor-cols)]"
                 style={
                     {
-                        // The two 1px tracks are the drag handles. Giving them
-                        // real grid tracks — rather than absolutely positioning
-                        // them over a border — is what keeps the hit area and
-                        // the line the merchant is aiming at the same object.
-                        /*
-                         * "Review tab auto-widens the rail to 300px; the other
-                         * tabs stay at 200." The merchant's own width is not
-                         * overwritten — it comes straight back when they leave
-                         * the tab, because this widens the LAYOUT, not the
-                         * stored preference.
-                         */
-                        "--editor-cols": `${rail === "review" ? Math.max(railWidth, 300) : railWidth}px 1px ${panelWidth}px 1px minmax(0,1fr)`,
+                        // Blocks, the page, the inspector (#340). The two 1px
+                        // tracks are the drag handles. Giving them real grid
+                        // tracks — rather than absolutely positioning them over
+                        // a border — is what keeps the hit area and the line
+                        // the merchant is aiming at the same object.
+                        "--editor-cols": `${railWidth}px 1px minmax(0,1fr) 1px ${panelWidth}px`,
                     } as React.CSSProperties
                 }
             >
-                {/* Rail — the page as a list of sections, not a wall of fields. */}
+                {/*
+                 * Left: this page's blocks, in order (#340). The fields are on
+                 * the right now, so this column is only ever a list — the
+                 * page as the merchant reads it, top to bottom.
+                 */}
                 <aside className="flex min-h-0 flex-col">
-                    {rail === "pages" ? (
-                        <>
-                            <RailTabs
-                                rail={rail}
-                                onSelect={setRail}
-                                openNotes={openNotes}
-                            />
-                            <PagesPanel
-                                siteId={siteId}
-                                pages={pages}
-                                activePageId={pageId}
-                                dirty={dirty}
-                                unfinished={
-                                    onlyHeldBack
-                                        ? unfinishedPhrase(heldBack)
-                                        : undefined
-                                }
-                            />
-                        </>
-                    ) : rail === "review" ? (
-                        <>
-                            <RailTabs
-                                rail={rail}
-                                onSelect={setRail}
-                                openNotes={openNotes}
-                            />
-                            <ReviewPanel
-                                siteId={siteId}
-                                pages={pages}
-                                comments={comments}
-                                review={review}
-                                onChanged={() => void refreshReview()}
-                                onJump={(jumpPageId, sectionKey) => {
-                                    /*
-                                     * A note names a section by KEY, and only
-                                     * the open page's sections are loaded — so
-                                     * a note on another page is a navigation
-                                     * first and a selection after it.
-                                     */
-                                    if (jumpPageId !== pageId) {
-                                        /*
-                                         * The same guard the Pages tab puts on
-                                         * opening a page, in its words: leaving
-                                         * mid-flight loses whatever autosave
-                                         * has not sent yet, and a note is no
-                                         * reason to lose work.
-                                         */
-                                        if (dirty) {
-                                            showError(
-                                                "Save this page before opening another.",
-                                            );
-                                            return;
-                                        }
-                                        router.push(
-                                            `/sites/${siteId}?page=${jumpPageId}`,
-                                        );
-                                        return;
-                                    }
-                                    const index = sections.findIndex(
-                                        (sec) => sec.key === sectionKey,
-                                    );
-                                    if (index === -1) return;
-                                    setRail("sections");
-                                    setSelectedIndex(index);
-                                }}
-                            />
-                        </>
-                    ) : rail === "style" ? (
+                    {rail === "style" ? (
                         <StylePanel
                             style={style}
                             options={styleOptions}
@@ -1285,494 +1239,274 @@ export function SiteEditor({
                         />
                     ) : (
                         <>
-                            {/*
-                             * The design's rail carries Sections / Pages /
-                             * Review. Review is still unbuilt, so it is absent
-                             * rather than dead — a tab leading nowhere is worse
-                             * than one that is not there. Style is not a tab at
-                             * all: it opens from the bar, because it applies to
-                             * the whole site while this rail lists one page.
-                             */}
-                            <RailTabs
-                                rail={rail}
+                            <EditorTabs
+                                label="Page"
+                                tabs={[
+                                    { key: "sections", label: "This page" },
+                                    { key: "pages", label: "Pages" },
+                                ]}
+                                value={rail}
                                 onSelect={setRail}
-                                openNotes={openNotes}
                             />
-                            <ul className="min-h-0 flex-1 overflow-y-auto p-2">
-                                {sections.map((section, index) => (
-                                    <li
-                                        key={index}
-                                        /*
-                                         * The row is the drop target, not the
-                                         * handle: aiming at a 32px row is far
-                                         * easier than aiming at the grip, and
-                                         * the grip is what starts the drag.
-                                         */
-                                        onDragOver={(e) => {
-                                            if (dragIndex === null) return;
-                                            e.preventDefault();
-                                            setDropIndex(index);
-                                        }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            if (dragIndex === null) return;
-                                            moveTo(dragIndex, index);
-                                            setSelectedIndex(index);
-                                            setDragIndex(null);
-                                            setDropIndex(null);
-                                        }}
-                                        className={cn(
-                                            "rounded",
-                                            dropIndex === index &&
-                                                dragIndex !== index &&
-                                                "ring-1 ring-inset ring-ring",
-                                        )}
-                                    >
-                                        <div
-                                            className={cn(
-                                                // A row is not a button and must not
-                                                // scale — at 32px tall a shrink reads
-                                                // as a jitter. It answers a press with
-                                                // the surface it would settle on, so
-                                                // the feedback is the outcome arriving
-                                                // early rather than a separate effect.
-                                                "group flex h-8 w-full items-center gap-1.5 rounded pr-1 text-left text-xs transition-colors",
-                                                selectedIndex === index
-                                                    ? "bg-secondary"
-                                                    : "hover:bg-muted active:bg-secondary",
-                                                (errorIndex === index ||
-                                                    heldBackAt(index)) &&
-                                                    "text-destructive",
-                                                dragIndex === index &&
-                                                    "opacity-40",
-                                            )}
-                                        >
-                                            {/*
-                                             * The grip is the drag surface. It
-                                             * carries no click of its own — a
-                                             * handle that also navigates makes
-                                             * every aborted drag a selection.
-                                             */}
-                                            <span
-                                                draggable
-                                                onDragStart={() => {
-                                                    setDragIndex(index);
+                            {rail === "pages" ? (
+                                <PagesPanel
+                                    siteId={siteId}
+                                    pages={pages}
+                                    activePageId={pageId}
+                                    dirty={dirty}
+                                    unfinished={
+                                        onlyHeldBack
+                                            ? unfinishedPhrase(heldBack)
+                                            : undefined
+                                    }
+                                />
+                            ) : (
+                                <>
+                                    <p className="px-4 pb-1 pt-4 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                        {sections.length === 1
+                                            ? "1 block"
+                                            : `${sections.length} blocks`}
+                                    </p>
+                                    <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pl-4">
+                                        {sections.map((section, index) => (
+                                            <li
+                                                key={index}
+                                                /*
+                                                 * The row is the drop target, not the
+                                                 * handle: aiming at a 32px row is far
+                                                 * easier than aiming at the grip, and
+                                                 * the grip is what starts the drag.
+                                                 */
+                                                onDragOver={(e) => {
+                                                    if (dragIndex === null)
+                                                        return;
+                                                    e.preventDefault();
                                                     setDropIndex(index);
                                                 }}
-                                                onDragEnd={() => {
+                                                onDrop={(e) => {
+                                                    e.preventDefault();
+                                                    if (dragIndex === null)
+                                                        return;
+                                                    moveTo(dragIndex, index);
+                                                    setSelectedIndex(index);
                                                     setDragIndex(null);
                                                     setDropIndex(null);
                                                 }}
-                                                aria-hidden="true"
-                                                className="cursor-grab select-none px-1 text-muted-foreground active:cursor-grabbing group-hover:text-muted-foreground"
+                                                className={cn(
+                                                    "rounded",
+                                                    dropIndex === index &&
+                                                        dragIndex !== index &&
+                                                        "ring-1 ring-inset ring-ring",
+                                                )}
                                             >
-                                                ⋮
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setSelectedIndex(index)
-                                                }
-                                                className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
-                                            >
-                                                <span
+                                                <div
                                                     className={cn(
-                                                        "truncate",
+                                                        // A row is not a button and must not
+                                                        // scale — at 32px tall a shrink reads
+                                                        // as a jitter. It answers a press with
+                                                        // the surface it would settle on, so
+                                                        // the feedback is the outcome arriving
+                                                        // early rather than a separate effect.
+                                                        "group relative flex h-10 w-full items-center gap-1 rounded-md pr-2 text-left text-[0.8125rem] transition-colors",
                                                         /*
-                                                         * A hidden section is
-                                                         * dimmed rather than
-                                                         * removed: it is still
-                                                         * part of the page the
-                                                         * merchant is building,
-                                                         * just not part of the
-                                                         * one visitors get.
+                                                         * The selected row carries a bar
+                                                         * on its edge as well as a fill,
+                                                         * as the design draws it: the
+                                                         * fill alone is too quiet on the
+                                                         * dark chrome.
                                                          */
-                                                        section.hidden &&
-                                                            "text-muted-foreground line-through",
+                                                        selectedIndex === index
+                                                            ? "bg-secondary font-medium before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:rounded-full before:bg-highlight"
+                                                            : "hover:bg-muted active:bg-secondary",
+                                                        (errorIndex === index ||
+                                                            heldBackAt(
+                                                                index,
+                                                            )) &&
+                                                            "text-destructive",
+                                                        dragIndex === index &&
+                                                            "opacity-40",
                                                     )}
                                                 >
-                                                    {sectionTitle(section)}
-                                                </span>
-                                                <span className="flex shrink-0 items-center gap-1.5">
-                                                    <span className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground">
-                                                        {
+                                                    {/*
+                                                     * The grip is the drag surface. It
+                                                     * carries no click of its own — a
+                                                     * handle that also navigates makes
+                                                     * every aborted drag a selection.
+                                                     */}
+                                                    <span
+                                                        draggable
+                                                        onDragStart={() => {
+                                                            setDragIndex(index);
+                                                            setDropIndex(index);
+                                                        }}
+                                                        onDragEnd={() => {
+                                                            setDragIndex(null);
+                                                            setDropIndex(null);
+                                                        }}
+                                                        aria-hidden="true"
+                                                        className="cursor-grab select-none px-1 text-muted-foreground active:cursor-grabbing group-hover:text-muted-foreground"
+                                                    >
+                                                        ⋮
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        aria-current={
+                                                            selectedIndex ===
+                                                            index
+                                                                ? "true"
+                                                                : undefined
+                                                        }
+                                                        title={
                                                             SECTION_LABELS[
                                                                 section.type
                                                             ]
                                                         }
-                                                    </span>
-                                                    {/*
-                                                     * The spec's flag dot: 4px,
-                                                     * amber #c99f6f (§7). It is
-                                                     * the ONLY thing flags draw
-                                                     * while editing — "quiet
-                                                     * until publish" — so it
-                                                     * carries a title rather
-                                                     * than expanding into the
-                                                     * row.
-                                                     */}
-                                                    {(flagsBySection.get(index)
-                                                        ?.length ?? 0) > 0 ||
-                                                    (section.key !==
-                                                        undefined &&
-                                                        notedKeys.has(
-                                                            section.key,
-                                                        )) ? (
-                                                        <span
-                                                            className="size-1 shrink-0 rounded-full bg-[#c99f6f]"
-                                                            title={[
-                                                                ...(flagsBySection
-                                                                    .get(index)
-                                                                    ?.map(
-                                                                        (f) =>
-                                                                            f.message,
-                                                                    ) ?? []),
-                                                                ...(section.key !==
-                                                                    undefined &&
+                                                        onClick={() =>
+                                                            setSelectedIndex(
+                                                                index,
+                                                            )
+                                                        }
+                                                        className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
+                                                    >
+                                                        <span className="flex min-w-0 items-center gap-2.5">
+                                                            {(() => {
+                                                                const Icon =
+                                                                    SECTION_ICONS[
+                                                                        section
+                                                                            .type
+                                                                    ];
+                                                                return (
+                                                                    <Icon
+                                                                        aria-hidden="true"
+                                                                        className="size-4 shrink-0 text-muted-foreground"
+                                                                    />
+                                                                );
+                                                            })()}
+                                                            <span
+                                                                className={cn(
+                                                                    "truncate",
+                                                                    /*
+                                                                     * A hidden block is
+                                                                     * dimmed rather than
+                                                                     * removed: it is still
+                                                                     * part of the page the
+                                                                     * merchant is building,
+                                                                     * just not part of the
+                                                                     * one visitors get.
+                                                                     */
+                                                                    section.hidden &&
+                                                                        "text-muted-foreground line-through",
+                                                                )}
+                                                            >
+                                                                {sectionTitle(
+                                                                    section,
+                                                                )}
+                                                            </span>
+                                                        </span>
+                                                        <span className="flex shrink-0 items-center gap-1.5">
+                                                            {/*
+                                                             * The spec's flag dot: 4px,
+                                                             * amber #c99f6f (§7). It is
+                                                             * the ONLY thing flags draw
+                                                             * while editing — "quiet
+                                                             * until publish" — so it
+                                                             * carries a title rather
+                                                             * than expanding into the
+                                                             * row.
+                                                             */}
+                                                            {(flagsBySection.get(
+                                                                index,
+                                                            )?.length ?? 0) >
+                                                                0 ||
+                                                            (section.key !==
+                                                                undefined &&
                                                                 notedKeys.has(
                                                                     section.key,
-                                                                )
-                                                                    ? [
-                                                                          "A reviewer has left a note on this section.",
-                                                                      ]
-                                                                    : []),
-                                                            ].join("\n")}
-                                                        />
-                                                    ) : null}
-                                                </span>
-                                            </button>
-                                        </div>
-                                    </li>
-                                ))}
-                                {sections.length === 0 ? (
-                                    <li className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                        No sections yet.
-                                    </li>
-                                ) : null}
-                            </ul>
-                            <div className="p-2">
-                                {/*
-                                 * The design draws this as a dashed outline
-                                 * spanning the rail — reading as a slot waiting
-                                 * to be filled rather than another row in the
-                                 * list, which is what it is. It opens the
-                                 * picker, which shows each block before it is
-                                 * added (#267).
-                                 */}
-                                <button
-                                    type="button"
-                                    onClick={() => setAddOpen(true)}
-                                    className="w-full rounded-md border border-dashed px-2 py-2 text-center text-sm text-muted-foreground transition-colors hover:border-solid hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                    + Add section
-                                </button>
-                                <AddSectionDialog
-                                    open={addOpen}
-                                    onOpenChange={setAddOpen}
-                                    variables={resolveStyleVariables(
-                                        style,
-                                        styleOptions,
-                                    )}
-                                    onAdd={(type, variant) => {
-                                        addSection(type, variant);
-                                        setSelectedIndex(sections.length);
-                                    }}
-                                />
-                            </div>
+                                                                )) ? (
+                                                                <span
+                                                                    className="size-1 shrink-0 rounded-full bg-highlight"
+                                                                    title={[
+                                                                        ...(flagsBySection
+                                                                            .get(
+                                                                                index,
+                                                                            )
+                                                                            ?.map(
+                                                                                (
+                                                                                    f,
+                                                                                ) =>
+                                                                                    f.message,
+                                                                            ) ??
+                                                                            []),
+                                                                        ...(section.key !==
+                                                                            undefined &&
+                                                                        notedKeys.has(
+                                                                            section.key,
+                                                                        )
+                                                                            ? [
+                                                                                  "A reviewer has left a note on this section.",
+                                                                              ]
+                                                                            : []),
+                                                                    ].join(
+                                                                        "\n",
+                                                                    )}
+                                                                />
+                                                            ) : null}
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            </li>
+                                        ))}
+                                        {sections.length === 0 ? (
+                                            <li className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                                No blocks yet.
+                                            </li>
+                                        ) : null}
+                                    </ul>
+                                    <div className="p-2">
+                                        {/*
+                                         * The design draws this as a dashed outline
+                                         * spanning the rail — reading as a slot waiting
+                                         * to be filled rather than another row in the
+                                         * list, which is what it is. It opens the
+                                         * picker, which shows each block before it is
+                                         * added (#267).
+                                         */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setAddOpen(true)}
+                                            className="w-full rounded-md border border-dashed px-2 py-2 text-center text-sm text-muted-foreground transition-colors hover:border-solid hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        >
+                                            + Add section
+                                        </button>
+                                        <AddSectionDialog
+                                            open={addOpen}
+                                            onOpenChange={setAddOpen}
+                                            variables={resolveStyleVariables(
+                                                style,
+                                                styleOptions,
+                                            )}
+                                            onAdd={(type, variant) => {
+                                                addSection(type, variant);
+                                                setSelectedIndex(
+                                                    sections.length,
+                                                );
+                                            }}
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </>
                     )}
                 </aside>
 
                 <PanelDivider
-                    label="Resize the section list"
+                    label="Resize the block list"
                     width={railWidth}
                     min={RAIL_MIN}
                     max={RAIL_MAX}
                     reset={RAIL_DEFAULT}
                     onResize={setRailWidth}
                     onNudge={nudgeRail}
-                />
-
-                {/* Field panel — one section at a time. */}
-                <div className="min-h-0 overflow-y-auto p-4">
-                    {active ? (
-                        <div className="space-y-4">
-                            {/*
-                             * Two rows, because 240px will not hold a section
-                             * name and four controls on one line — the header
-                             * clipped its own Remove button at the design's
-                             * own panel width.
-                             *
-                             * The split is not just fitting: the design's
-                             * header carries what the section IS and whether
-                             * it is on the live site. Moving it, and deleting
-                             * it, are actions taken ON it and belong under it.
-                             */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between gap-2">
-                                    <h2 className="min-w-0 truncate text-sm font-semibold">
-                                        {SECTION_LABELS[active.section.type]}
-                                    </h2>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        aria-pressed={
-                                            active.section.hidden === true
-                                        }
-                                        title={
-                                            active.section.hidden
-                                                ? "Hidden — this section is left out when you publish"
-                                                : "Visible — this section publishes with the page"
-                                        }
-                                        onClick={() =>
-                                            toggleHidden(active.index)
-                                        }
-                                        className={cn(
-                                            "h-7 shrink-0 gap-1.5 px-2 text-xs",
-                                            active.section.hidden &&
-                                                "text-muted-foreground",
-                                        )}
-                                    >
-                                        <span aria-hidden="true">
-                                            {active.section.hidden ? "○" : "●"}
-                                        </span>
-                                        {active.section.hidden
-                                            ? "Hidden"
-                                            : "Visible"}
-                                    </Button>
-                                </div>
-
-                                <div className="flex items-center gap-1">
-                                    {/*
-                                     * The arrows survive the drag handle: a
-                                     * list you can only reorder by dragging is
-                                     * a list some people cannot reorder.
-                                     */}
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        aria-label="Move section up"
-                                        className="h-7 w-7 p-0"
-                                        disabled={active.index === 0}
-                                        onClick={() => {
-                                            move(active.index, -1);
-                                            setSelectedIndex(active.index - 1);
-                                        }}
-                                    >
-                                        ↑
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        aria-label="Move section down"
-                                        className="h-7 w-7 p-0"
-                                        disabled={
-                                            active.index === sections.length - 1
-                                        }
-                                        onClick={() => {
-                                            move(active.index, 1);
-                                            setSelectedIndex(active.index + 1);
-                                        }}
-                                    >
-                                        ↓
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="ml-auto h-7 px-2 text-xs"
-                                        onClick={() => {
-                                            /*
-                                             * Ask first, and name the section.
-                                             *
-                                             * Removing one used to be the only
-                                             * destructive action in the editor
-                                             * with no guard at all, while
-                                             * deleting a PAGE — the rarer of
-                                             * the two — has always confirmed.
-                                             * The weaker guard sat on the more
-                                             * frequent action, next to the move
-                                             * arrows a merchant is reaching for
-                                             * while reordering.
-                                             *
-                                             * Autosave then commits it, and
-                                             * version history only covers what
-                                             * has been PUBLISHED, so copy
-                                             * written since the last publish is
-                                             * gone for good. The question says
-                                             * so rather than asking "are you
-                                             * sure" about a cost it does not
-                                             * name.
-                                             *
-                                             * It also names hiding. A merchant
-                                             * reaching for Remove usually wants
-                                             * the section off the site, not
-                                             * destroyed, and the control that
-                                             * does that is two inches away —
-                                             * an error is cheaper to prevent
-                                             * than to apologise for.
-                                             */
-                                            setPendingRemove({
-                                                index: active.index,
-                                                title: sectionTitle(
-                                                    active.section,
-                                                ),
-                                            });
-                                            setRemoveOpen(true);
-                                        }}
-                                    >
-                                        Remove
-                                    </Button>
-                                </div>
-                            </div>
-
-                            <SectionFields
-                                section={active.section}
-                                services={services}
-                                pages={pages}
-                                onChange={(next) =>
-                                    replaceAt(active.index, next)
-                                }
-                            />
-
-                            {/*
-                             * Leaving a note is an action taken ON this
-                             * section (#277), so it sits under its fields —
-                             * the same place the design puts it, which is why
-                             * the composer needs no section picker.
-                             */}
-                            <div className="border-t pt-3">
-                                <NoteComposer
-                                    siteId={siteId}
-                                    pageId={pageId}
-                                    sectionKey={active.section.key}
-                                    onAdded={refreshReview}
-                                />
-                            </div>
-
-                            {/*
-                             * Per-field markers, the other half of what flags
-                             * are allowed to show while editing. Listed under
-                             * the fields rather than inline beside each one:
-                             * the field components are shared with the section
-                             * types and threading a marker through all six for
-                             * a advisory note would cost more than it is worth
-                             * until the notes need to sit on the input itself.
-                             */}
-                            {active.section.key !== undefined &&
-                            unreadableSections.includes(active.section.key) ? (
-                                /*
-                                 * Said, not hidden (#275). This section's
-                                 * stored content does not match the shape its
-                                 * block promises, so the fields below may show
-                                 * blanks that are not what was written. The
-                                 * work is still here; saving over it is what
-                                 * would lose it.
-                                 */
-                                <p className="rounded-md border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
-                                    Saroh cannot read this section&apos;s saved
-                                    content. The fields may look empty even
-                                    though something is stored. Editing and
-                                    saving will replace whatever is there.
-                                </p>
-                            ) : null}
-
-                            {activeFlags.length > 0 ? (
-                                <ul className="grid gap-1.5 border-t pt-3">
-                                    {activeFlags.map((flag, i) => (
-                                        <li
-                                            key={i}
-                                            className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
-                                        >
-                                            <span
-                                                aria-hidden="true"
-                                                className="mt-1.5 size-1 shrink-0 rounded-full bg-[#c99f6f]"
-                                            />
-                                            <span>{flag.message}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : null}
-
-                            <SectionPadding
-                                section={active.section}
-                                siteDefault={style.scalars.sectionPadding}
-                                bounds={styleOptions.scalars.find(
-                                    (sc) => sc.key === "sectionPadding",
-                                )}
-                                onChange={(next) =>
-                                    replaceAt(active.index, next)
-                                }
-                            />
-
-                            {errorIndex === active.index && errorMessage ? (
-                                <p className="text-sm text-destructive">
-                                    {errorMessage}
-                                </p>
-                            ) : heldBackAt(active.index) ? (
-                                <p
-                                    role="status"
-                                    className="text-sm text-destructive"
-                                >
-                                    {heldBackAt(active.index)?.message}
-                                </p>
-                            ) : null}
-
-                            {/*
-                             * The design closes the field panel by saying where
-                             * editing does NOT happen. Worth keeping: a merchant
-                             * who expects to change a price here would otherwise
-                             * hunt for a field that is deliberately absent,
-                             * because those values belong to the modules that
-                             * own them.
-                             */}
-                            <p className="border-t pt-3 text-xs leading-relaxed text-muted-foreground">
-                                Written copy edits here and in the preview at
-                                the same time. Prices, dates and stock come from
-                                the workspace and change there.
-                            </p>
-                        </div>
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            Pick a section on the left to edit it. Changes
-                            appear in the preview as you type.
-                        </p>
-                    )}
-                    {/*
-                     * Rendered here, outside the `active` branch: confirming
-                     * removes the section, which sets `active` to null and
-                     * would otherwise unmount this dialog mid-close, losing
-                     * its exit animation. `pendingRemove` carries what it
-                     * needs (title, onConfirm) past that.
-                     */}
-                    <ConfirmDialog
-                        open={removeOpen}
-                        onOpenChange={setRemoveOpen}
-                        title={`Remove "${pendingRemove?.title ?? ""}"?`}
-                        description="Anything written here since your last publish cannot be brought back. To take it off the site and keep the work, hide it instead."
-                        confirmLabel="Remove section"
-                        cancelLabel="Keep section"
-                        onConfirm={() => {
-                            if (!pendingRemove) return;
-                            const { index, title } = pendingRemove;
-                            removeAt(index);
-                            setSelectedIndex(null);
-                            showSuccess(`Removed ${title}.`);
-                        }}
-                    />
-                </div>
-
-                <PanelDivider
-                    label="Resize the field panel"
-                    width={panelWidth}
-                    min={PANEL_MIN}
-                    max={PANEL_MAX}
-                    reset={PANEL_DEFAULT}
-                    onResize={setPanelWidth}
-                    onNudge={nudgePanel}
                 />
 
                 {/*
@@ -1882,19 +1616,165 @@ export function SiteEditor({
                             transformOrigin: "top center",
                         }}
                     >
-                        <DraftPreview
-                            sections={sections}
-                            pages={pages}
-                            style={style}
-                            styleOptions={styleOptions}
-                            selectedIndex={selectedIndex}
-                            onSelect={(index) => {
-                                setRail("sections");
-                                setSelectedIndex(index);
-                            }}
-                        />
+                        {/*
+                         * The page sits in a window whose bar names the
+                         * address it lives at (#340): this is the merchant's
+                         * website, not a mock-up of one, and the bar says
+                         * where a customer would find it.
+                         */}
+                        <div className="overflow-hidden rounded-lg border border-white/10 shadow-2xl shadow-black/40">
+                            <div className="flex h-9 items-center gap-3 border-b border-white/10 bg-[#1c1c1a] px-3">
+                                <span
+                                    aria-hidden="true"
+                                    className="flex gap-1.5"
+                                >
+                                    <span className="size-2 rounded-full bg-white/15" />
+                                    <span className="size-2 rounded-full bg-white/15" />
+                                    <span className="size-2 rounded-full bg-white/15" />
+                                </span>
+                                <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
+                                    {address
+                                        ? `${address}/`
+                                        : "Not published yet"}
+                                </span>
+                            </div>
+                            <DraftPreview
+                                sections={sections}
+                                pages={pages}
+                                style={style}
+                                styleOptions={styleOptions}
+                                selectedIndex={selectedIndex}
+                                onSelect={(index) => {
+                                    setRail("sections");
+                                    setSelectedIndex(index);
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
+
+                <PanelDivider
+                    label="Resize the inspector"
+                    width={panelWidth}
+                    min={PANEL_MIN}
+                    max={PANEL_MAX}
+                    reset={PANEL_DEFAULT}
+                    onResize={setPanelWidth}
+                    onNudge={nudgePanel}
+                    panelSide="right"
+                />
+
+                {/*
+                 * Right: the inspector (#340). Block is what can be changed
+                 * about the selected block; Feedback is what reviewers have
+                 * said. Both answer questions about the thing selected on the
+                 * page, which is why they sit beside it rather than under the
+                 * list.
+                 */}
+                <aside aria-label="Inspector" className="flex min-h-0 flex-col">
+                    <EditorTabs
+                        label="Inspector"
+                        tabs={[
+                            { key: "block", label: "Block" },
+                            {
+                                key: "feedback",
+                                label: "Feedback",
+                                count: openNotes,
+                            },
+                        ]}
+                        value={inspector}
+                        onSelect={setInspector}
+                    />
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                        {inspector === "feedback" ? (
+                            <ReviewPanel
+                                siteId={siteId}
+                                pages={pages}
+                                comments={comments}
+                                review={review}
+                                onChanged={() => void refreshReview()}
+                                onJump={jumpToNote}
+                            />
+                        ) : (
+                            <BlockInspector
+                                active={active}
+                                count={sections.length}
+                                siteId={siteId}
+                                pageId={pageId}
+                                pages={pages}
+                                services={services}
+                                style={style}
+                                styleOptions={styleOptions}
+                                flags={activeFlags}
+                                unreadable={
+                                    active?.section.key !== undefined &&
+                                    unreadableSections.includes(
+                                        active.section.key,
+                                    )
+                                }
+                                error={
+                                    active !== null &&
+                                    errorIndex === active.index
+                                        ? errorMessage
+                                        : null
+                                }
+                                heldBack={
+                                    active === null
+                                        ? undefined
+                                        : heldBackAt(active.index)
+                                }
+                                onChange={(next) => {
+                                    if (active) replaceAt(active.index, next);
+                                }}
+                                onToggleHidden={() => {
+                                    if (active) toggleHidden(active.index);
+                                }}
+                                onMove={(delta) => {
+                                    if (!active) return;
+                                    move(active.index, delta);
+                                    setSelectedIndex(active.index + delta);
+                                }}
+                                onRemove={() => {
+                                    if (!active) return;
+                                    /*
+                                     * Ask first, and name the block. Autosave
+                                     * commits a removal, and version history
+                                     * only covers what was PUBLISHED, so copy
+                                     * written since is gone for good. The
+                                     * question names hiding too — usually what
+                                     * a merchant reaching for Remove wants.
+                                     */
+                                    setPendingRemove({
+                                        index: active.index,
+                                        title: sectionTitle(active.section),
+                                    });
+                                    setRemoveOpen(true);
+                                }}
+                                onNoteAdded={refreshReview}
+                            />
+                        )}
+                    </div>
+                    {/*
+                     * Outside both branches: confirming removes the block,
+                     * which sets `active` to null and would otherwise unmount
+                     * this dialog mid-close.
+                     */}
+                    <ConfirmDialog
+                        open={removeOpen}
+                        onOpenChange={setRemoveOpen}
+                        title={`Remove "${pendingRemove?.title ?? ""}"?`}
+                        description="Anything written here since your last publish cannot be brought back. To take it off the site and keep the work, hide it instead."
+                        confirmLabel="Remove section"
+                        cancelLabel="Keep section"
+                        onConfirm={() => {
+                            if (!pendingRemove) return;
+                            const { index, title } = pendingRemove;
+                            removeAt(index);
+                            setSelectedIndex(null);
+                            showSuccess(`Removed ${title}.`);
+                        }}
+                    />
+                </aside>
             </div>
 
             {/*

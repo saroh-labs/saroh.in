@@ -210,7 +210,8 @@ test.describe("a shared preview link", () => {
         await page.getByRole("link", { name: REVIEWED_SITE }).first().click();
         await page.waitForURL(/\/sites\/[^/]+$/, { timeout: 30_000 });
 
-        await page.getByRole("tab", { name: "review" }).click();
+        // Review lives in the inspector's Feedback tab since #340.
+        await page.getByRole("tab", { name: /^Feedback/ }).click();
         await page
             .getByRole("button", { name: /^(Create link|New link)$/ })
             .click();

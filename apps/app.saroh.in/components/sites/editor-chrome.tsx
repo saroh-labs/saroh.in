@@ -4,7 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { useRef } from "react";
 
 /**
- * The editor's own furniture — the rail's tab strip and the draggable divider
+ * The editor's own furniture — the tab strips and the draggable divider
  * between panels.
  *
  * Split out of `site-editor.tsx` (#260). Neither knows anything about sections;
@@ -12,59 +12,53 @@ import { useRef } from "react";
  */
 
 /**
- * The rail's tabs. One definition, used by both panels it switches between —
- * two copies of a tablist is two chances for the selected state to disagree
- * with what is actually showing.
+ * A strip of underlined tabs — the rail's and the inspector's (#340).
  *
- * All three tabs lead somewhere. Review was absent while it was unbuilt — a tab
- * leading nowhere is worse than one that is not there — and it earned its place
- * when the notes and the approval landed behind it.
+ * One definition for both, so the two strips cannot drift apart in how a
+ * selected tab looks. Switching stays instant: it happens dozens of times a
+ * session, and anything staged would make the editor feel slower than it is.
  */
-export function RailTabs({
-    rail,
+export function EditorTabs<T extends string>({
+    label,
+    tabs,
+    value,
     onSelect,
-    openNotes,
 }: {
-    rail: "sections" | "pages" | "review" | "style";
-    onSelect: (tab: "sections" | "pages" | "review") => void;
-    /** Shown on the Review tab when notes are open. */
-    openNotes: number;
+    /** What the strip switches between, for assistive tech. */
+    label: string;
+    tabs: readonly { key: T; label: string; count?: number }[];
+    value: T;
+    onSelect: (tab: T) => void;
 }) {
     return (
         <div
             role="tablist"
-            aria-label="Editor panels"
-            className="flex items-center gap-1 border-b px-2 py-1.5"
+            aria-label={label}
+            className="flex shrink-0 items-end gap-4 border-b px-4"
         >
-            {(["sections", "pages", "review"] as const).map((tab) => (
+            {tabs.map((tab) => (
                 <button
-                    key={tab}
+                    key={tab.key}
                     type="button"
                     role="tab"
-                    aria-selected={rail === tab}
-                    onClick={() => onSelect(tab)}
+                    aria-selected={value === tab.key}
+                    onClick={() => onSelect(tab.key)}
                     className={cn(
-                        "rounded px-2 py-1 text-xs font-medium capitalize transition-colors",
-                        rail === tab
-                            ? "bg-secondary text-secondary-foreground"
-                            : // Pressing shows the surface the tab is about to
-                              // settle on. This is feedback on the PRESS, not an
-                              // animation of the switch — the switch itself stays
-                              // instant, because it happens dozens of times a
-                              // session and anything staged would make the rail
-                              // feel slower than it is.
-                              "text-muted-foreground hover:text-foreground active:bg-secondary/60 active:text-secondary-foreground",
+                        "relative -mb-px flex h-10 items-center gap-1.5 border-b-2 text-[0.8125rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                        value === tab.key
+                            ? "border-highlight text-foreground"
+                            : "border-transparent text-muted-foreground hover:text-foreground",
                     )}
                 >
-                    {tab}
+                    {tab.label}
                     {/*
                      * The count rides the tab rather than a separate badge:
                      * the number only means anything next to the word it
-                     * counts, and the rail has no room for both.
+                     * counts.
                      */}
-                    {tab === "review" && openNotes > 0 ? (
-                        <span className="ml-1 tabular-nums text-[#c99f6f]">
-                            {openNotes}
+                    {tab.count ? (
+                        <span className="rounded-full bg-secondary px-1.5 text-[0.6875rem] tabular-nums leading-4 text-highlight">
+                            {tab.count}
                         </span>
                     ) : null}
                 </button>
@@ -93,6 +87,7 @@ export function PanelDivider({
     reset,
     onResize,
     onNudge,
+    panelSide = "left",
 }: {
     label: string;
     width: number;
@@ -109,7 +104,14 @@ export function PanelDivider({
      * currently holds, so every press lands.
      */
     onNudge: (delta: number) => void;
+    /**
+     * Which side of the divider the panel it sizes is on. A panel to the RIGHT
+     * (the inspector, #340) grows as the divider moves left, so the drag and
+     * the arrow keys run the other way.
+     */
+    panelSide?: "left" | "right";
 }) {
+    const sign = panelSide === "left" ? 1 : -1;
     const start = useRef<{ x: number; width: number } | null>(null);
 
     return (
@@ -128,7 +130,7 @@ export function PanelDivider({
             onPointerMove={(e) => {
                 const from = start.current;
                 if (from === null) return;
-                onResize(from.width + (e.clientX - from.x));
+                onResize(from.width + sign * (e.clientX - from.x));
             }}
             onPointerUp={(e) => {
                 start.current = null;
@@ -138,8 +140,8 @@ export function PanelDivider({
             onKeyDown={(e) => {
                 // 16px a press is roughly a visible step without being so
                 // coarse that the useful widths fall between two presses.
-                if (e.key === "ArrowLeft") onNudge(-16);
-                else if (e.key === "ArrowRight") onNudge(16);
+                if (e.key === "ArrowLeft") onNudge(-16 * sign);
+                else if (e.key === "ArrowRight") onNudge(16 * sign);
                 else if (e.key === "Home") onResize(reset);
                 else return;
                 e.preventDefault();
