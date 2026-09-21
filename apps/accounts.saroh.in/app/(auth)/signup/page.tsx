@@ -1,6 +1,9 @@
+import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
+import type { Metadata } from "next";
+
+import { SIGNUP_PANEL } from "@/components/auth/panel-copy";
 import { SignupForm } from "@/components/auth/signup-form";
 import { safeDestination } from "@/lib/return-to";
-import type { Metadata } from "next";
 
 export const metadata: Metadata = {
     title: "Sign up | Saroh",
@@ -22,6 +25,13 @@ export default async function SignupPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const { redirect } = await searchParams;
-    return <SignupForm returnTo={safeDestination(redirect)} />;
+    const { redirect, email } = await searchParams;
+    return (
+        <SplitShell panel={<SplitPanel {...SIGNUP_PANEL} />}>
+            <SignupForm
+                returnTo={safeDestination(redirect)}
+                invitedEmail={typeof email === "string" ? email : undefined}
+            />
+        </SplitShell>
+    );
 }

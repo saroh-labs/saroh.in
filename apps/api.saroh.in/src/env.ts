@@ -48,6 +48,10 @@ const envSchema = z.object({
     // CORS + links.
     CORS_ORIGIN: z.string().optional(),
     APP_URL: z.string().url().optional(),
+    // The merchant-site renderer's own address (saroh.app), for links a
+    // customer opens there — product review invitations. Unset: the local
+    // renderer in development, the production one everywhere else.
+    RENDERER_URL: z.string().url().optional(),
 
     // Object storage (S2-008 — media uploads via @saroh/object-storage).
     // All optional: when the R2 credentials below are absent the media module

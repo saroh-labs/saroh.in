@@ -6,6 +6,7 @@ import { listCustomers } from "@/lib/customers/service";
 import { listProducts } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
 import { getStore } from "@/lib/stores/service";
+import { getStorefront } from "@/lib/stores/storefronts";
 
 export default async function NewOrderPage({
     params,
@@ -17,9 +18,11 @@ export default async function NewOrderPage({
     const store = await getStore(storeId);
     if (!store) notFound();
 
-    const [customers, products] = await Promise.all([
+    const [customers, products, checkout] = await Promise.all([
         listCustomers(storeId),
         listProducts(storeId),
+        // The storefront's tax and delivery, as the form's starting figures.
+        getStorefront(storeId).catch(() => null),
     ]);
 
     return (
@@ -36,6 +39,7 @@ export default async function NewOrderPage({
                     name: p.name,
                     price: p.price,
                 }))}
+                checkout={checkout}
             />
         </div>
     );

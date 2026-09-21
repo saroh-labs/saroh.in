@@ -1,5 +1,8 @@
-import { ResetPasswordForm } from "@/components/auth/reset-password-form";
+import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import type { Metadata } from "next";
+
+import { RESET_PANEL } from "@/components/auth/panel-copy";
+import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 
 export const metadata: Metadata = {
     title: "Reset password | Saroh",
@@ -7,5 +10,9 @@ export const metadata: Metadata = {
 };
 
 export default function ResetPasswordPage() {
-    return <ResetPasswordForm />;
+    return (
+        <SplitShell panel={<SplitPanel {...RESET_PANEL} />}>
+            <ResetPasswordForm />
+        </SplitShell>
+    );
 }

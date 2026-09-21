@@ -20,8 +20,28 @@ export function showSuccess(message: string, description?: string) {
     toast.success(message, { description });
 }
 
+/**
+ * Errors persist until dismissed (brand file §14): a message you missed is
+ * worse than none.
+ */
 export function showError(message: string, description?: string) {
-    toast.error(message, { description });
+    toast.error(message, {
+        description,
+        duration: Number.POSITIVE_INFINITY,
+        closeButton: true,
+    });
+}
+
+/**
+ * Something reversible just happened, with the way back beside it. Undo is the
+ * default for reversible actions; only the irreversible get a confirm. Eight
+ * seconds rather than five, because it carries an action.
+ */
+export function showUndo(message: string, onUndo: () => void) {
+    toast(message, {
+        duration: 8000,
+        action: { label: "Undo", onClick: onUndo },
+    });
 }
 
 /** Something completed, but not the way the user asked for. */

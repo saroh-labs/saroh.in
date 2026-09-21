@@ -19,10 +19,7 @@ export default async function ModulesSettingsPage() {
 
     return (
         <PageContainer>
-            <PageHeader
-                title="Modules"
-                description="Turn on the capabilities your business needs. Disabling a module stops new activity but never deletes your history."
-            />
+            <PageHeader breadcrumb={["Workspace", "Modules"]} title="Modules" />
             <ModuleCatalog modules={modules} />
         </PageContainer>
     );

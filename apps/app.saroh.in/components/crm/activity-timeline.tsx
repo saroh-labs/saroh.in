@@ -6,6 +6,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { completeTask } from "@/lib/leads/actions";
 import type { LeadActivity } from "@/lib/leads/service";
 
@@ -144,19 +145,24 @@ export function ActivityTimeline({
                             )}
                             {isTask && entry.dueAt && (
                                 <p className="text-xs text-muted-foreground">
-                                    Due {new Date(entry.dueAt).toLocaleString()}
+                                    Due{" "}
+                                    {new Date(entry.dueAt).toLocaleString(
+                                        DISPLAY_LOCALE,
+                                    )}
                                     {done && entry.completedAt && (
                                         <>
                                             {" · completed "}
                                             {new Date(
                                                 entry.completedAt,
-                                            ).toLocaleString()}
+                                            ).toLocaleString(DISPLAY_LOCALE)}
                                         </>
                                     )}
                                 </p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                                {new Date(entry.createdAt).toLocaleString()}
+                                {new Date(entry.createdAt).toLocaleString(
+                                    DISPLAY_LOCALE,
+                                )}
                             </p>
                         </div>
                         {isTask && !done && (

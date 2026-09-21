@@ -3,7 +3,7 @@ import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { authorize, can } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import type { UpdateContactDto } from "./dto";
 
 /**
@@ -121,7 +121,7 @@ export class ContactsService {
         contactIds: string[],
     ): Promise<Map<string, { value: number | null; count: number }>> {
         const out = new Map<string, { value: number | null; count: number }>();
-        if (!can(ctx.role, "lead:read")) return out;
+        if (!allows(ctx, "lead:read")) return out;
 
         const rows = await prisma.lead.groupBy({
             by: ["contactId"],
@@ -152,7 +152,7 @@ export class ContactsService {
         contactIds: string[],
     ): Promise<Map<string, Date>> {
         const out = new Map<string, Date>();
-        if (!can(ctx.role, "booking:read")) return out;
+        if (!allows(ctx, "booking:read")) return out;
 
         const rows = await prisma.booking.groupBy({
             by: ["contactId"],
@@ -200,7 +200,7 @@ export class ContactsService {
         contacts: Contact[],
     ): Promise<Map<string, LastOrder>> {
         const out = new Map<string, LastOrder>();
-        if (!can(ctx.role, "order:read")) return out;
+        if (!allows(ctx, "order:read")) return out;
 
         const contactIds = contacts.map((c) => c.id);
 

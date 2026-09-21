@@ -10,6 +10,11 @@ export interface PageHeaderProps extends Omit<
     description?: React.ReactNode;
     /** Trailing actions — keep to ONE primary (Button variant="brand") + optional secondary. */
     actions?: React.ReactNode;
+    /**
+     * Where this page sits, above the title: "Workspace › Team". The last
+     * crumb is the page itself and reads in Ink; the rest are muted.
+     */
+    breadcrumb?: React.ReactNode[];
 }
 
 /**
@@ -22,9 +27,43 @@ export function PageHeader({
     title,
     description,
     actions,
+    breadcrumb,
     className,
     ...props
 }: PageHeaderProps) {
+    const crumbs = breadcrumb?.length ? (
+        <nav
+            aria-label="Breadcrumb"
+            className="mb-[9px] flex items-center gap-2 text-[12px] text-muted-foreground"
+        >
+            {breadcrumb.map((crumb, i) => (
+                <React.Fragment key={i}>
+                    {i > 0 ? (
+                        <svg
+                            aria-hidden
+                            viewBox="0 0 24 24"
+                            className="size-3 shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <path d="M9 6 L15 12 L9 18" />
+                        </svg>
+                    ) : null}
+                    <span
+                        className={cn(
+                            i === breadcrumb.length - 1 && "text-foreground",
+                        )}
+                    >
+                        {crumb}
+                    </span>
+                </React.Fragment>
+            ))}
+        </nav>
+    ) : null;
+
     return (
         <div
             className={cn(
@@ -32,33 +71,44 @@ export function PageHeader({
                 // product, and the old value sat closer to the content than the
                 // description sat to its own title — the header read as part of
                 // the first row rather than as the page's own block.
-                "mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between",
+                "mb-8",
                 className,
             )}
             {...props}
         >
-            <div className="min-w-0">
-                {/* The display face is reserved for page-level titles. Component
-                    titles (CardTitle, DialogTitle) stay on the UI face — a
-                    display cut at 14px reads as noise in dense screens.
-
-                    Tracking tightens with size here to match the marketing
-                    surface's ramp, so a merchant moving from saroh.in into the
-                    workspace reads the same typographic voice. */}
-                <h1 className="truncate font-display text-[1.625rem] font-semibold leading-[1.15] tracking-[-0.025em]">
-                    {title}
-                </h1>
-                {description ? (
-                    <p className="mt-1.5 max-w-[68ch] text-[13.5px] leading-relaxed text-muted-foreground">
-                        {description}
-                    </p>
+            {/* The breadcrumb sits above the whole row, so the actions line
+                up with the title rather than with the crumbs. */}
+            {crumbs}
+            <div
+                className={cn(
+                    "flex flex-col gap-3 sm:flex-row sm:justify-between",
+                    // On the title's line when there is no description (the
+                    // applied screens); on the description's last line when
+                    // there is one.
+                    description ? "sm:items-end" : "sm:items-center",
+                )}
+            >
+                <div className="min-w-0">
+                    {/* Space Grotesk 600 at 30px, as on the brand file's
+                        applied screens. The display face runs from Display to
+                        H3 and stops there; component titles (CardTitle,
+                        DialogTitle) stay on Geist, because below H3 the brand
+                        is the UI face. */}
+                    <h1 className="truncate font-display text-[30px] font-semibold leading-[1.05] tracking-[-0.03em]">
+                        {title}
+                    </h1>
+                    {description ? (
+                        <p className="mt-1.5 max-w-[68ch] text-[13.5px] leading-relaxed text-muted-foreground">
+                            {description}
+                        </p>
+                    ) : null}
+                </div>
+                {actions ? (
+                    <div className="flex shrink-0 items-center gap-2">
+                        {actions}
+                    </div>
                 ) : null}
             </div>
-            {actions ? (
-                <div className="flex shrink-0 items-center gap-2">
-                    {actions}
-                </div>
-            ) : null}
         </div>
     );
 }

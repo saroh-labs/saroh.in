@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type {
     CheckoutIntent,
     CheckoutReceipt,
+    CheckoutStorefront,
     ReceiptPaymentStatus,
 } from "@/lib/checkout";
 import { createPaymentIntent, fetchReceipt } from "@/lib/checkout";
@@ -67,6 +68,42 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
         <div className="flex justify-between text-sm">
             <span className="text-site-muted">{label}</span>
             <span className="tabular-nums text-site-fg">{value}</span>
+        </div>
+    );
+}
+
+const DAY_LABEL: Record<string, string> = {
+    MON: "Mon",
+    TUE: "Tue",
+    WED: "Wed",
+    THU: "Thu",
+    FRI: "Fri",
+    SAT: "Sat",
+    SUN: "Sun",
+};
+
+/** Where the order was placed, as the shop describes itself. */
+function StorefrontCard({ storefront }: { storefront: CheckoutStorefront }) {
+    return (
+        <div className="mt-6 text-sm text-site-body">
+            <p className="font-medium text-site-fg">{storefront.name}</p>
+            {storefront.address ? (
+                <p className="mt-1 whitespace-pre-line text-site-muted">
+                    {storefront.address}
+                </p>
+            ) : null}
+            {storefront.openingHours ? (
+                <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs text-site-muted">
+                    {storefront.openingHours.map((d) => (
+                        <div key={d.day} className="contents">
+                            <dt>{DAY_LABEL[d.day] ?? d.day}</dt>
+                            <dd className="tabular-nums">
+                                {d.closed ? "Closed" : `${d.open}–${d.close}`}
+                            </dd>
+                        </div>
+                    ))}
+                </dl>
+            ) : null}
         </div>
     );
 }
@@ -163,6 +200,10 @@ export default function Checkout({ orderId }: { orderId: string }) {
 
     const { receipt } = state;
     const cur = receipt.currency;
+    const storefront = receipt.storefront;
+    // Paused: the API refuses the payment anyway; the page says so first
+    // rather than offering a button that can only fail.
+    const paused = storefront?.acceptingPayments === false;
     const settled =
         receipt.paymentStatus === "PAID" ||
         receipt.paymentStatus === "REFUNDED";
@@ -180,6 +221,8 @@ export default function Checkout({ orderId }: { orderId: string }) {
                 </div>
                 <StatusBadge status={receipt.paymentStatus} />
             </div>
+
+            {storefront ? <StorefrontCard storefront={storefront} /> : null}
 
             <div className="mt-8 rounded-xl border border-site-border p-5">
                 <div className="space-y-2">
@@ -205,7 +248,14 @@ export default function Checkout({ orderId }: { orderId: string }) {
                 </div>
             </div>
 
-            {settled ? (
+            {!settled && paused ? (
+                <div className="mt-6 rounded-xl border border-site-border bg-site-surface p-5 text-center">
+                    <p className="text-site-fg">
+                        {storefront.name} is not taking payments right now. Your
+                        order is kept — please try again later.
+                    </p>
+                </div>
+            ) : settled ? (
                 <div className="mt-6 rounded-xl border border-site-border bg-site-surface p-5 text-center">
                     <p className="text-site-fg">
                         {receipt.paymentStatus === "PAID"

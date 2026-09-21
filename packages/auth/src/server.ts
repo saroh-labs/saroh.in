@@ -237,6 +237,17 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
         emailAndPassword: {
             enabled: true,
             requireEmailVerification: true,
+            /*
+             * A reset ends every other session.
+             *
+             * Someone resetting a password is often doing it because something
+             * felt wrong, and leaving the other sessions alive means whoever
+             * they are worried about keeps their access. The screens say so
+             * before the save and again after it — the warning is on the form
+             * itself, not only in the panel beside it, because that panel is
+             * gone below 760px.
+             */
+            revokeSessionsOnPasswordReset: true,
             sendResetPassword: async ({ user, url, token }) => {
                 await opts.sendResetPassword?.({ to: user.email, url, token });
             },

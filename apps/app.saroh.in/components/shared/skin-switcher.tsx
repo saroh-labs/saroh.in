@@ -17,8 +17,8 @@ import {
     getSkinServerSnapshot,
     getSkinSnapshot,
     SKIN_STORAGE_KEY,
-    SKINS,
     subscribeToSkin,
+    VISIBLE_SKINS,
 } from "@/lib/skins";
 
 /**
@@ -78,7 +78,12 @@ export function SkinSwitcher() {
         // and the menu's tick cannot disagree with what is painted.
     };
 
-    const active = SKINS.find((s) => s.id === skin) ?? SKINS[0];
+    const active = VISIBLE_SKINS.find((s) => s.id === skin) ?? VISIBLE_SKINS[0];
+
+    // One visible skin is no choice at all; offering a picker with a single
+    // row would be a control that does nothing. The switcher returns when a
+    // second skin is un-hidden in `lib/skins.ts`.
+    if (VISIBLE_SKINS.length < 2) return null;
 
     return (
         <DropdownMenu>
@@ -103,7 +108,7 @@ export function SkinSwitcher() {
             <DropdownMenuContent align="end" className="w-72">
                 <DropdownMenuLabel>Workspace theme</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {SKINS.map((option) => {
+                {VISIBLE_SKINS.map((option) => {
                     const selected = option.id === skin;
                     return (
                         <DropdownMenuItem

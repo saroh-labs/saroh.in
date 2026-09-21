@@ -19,9 +19,16 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
 import type { InviteMemberDto, UpdateMemberRoleDto } from "./members.dto";
-import { authorize } from "./organization-policy";
+import type { OrgAction } from "./organization-actions";
+import {
+    allows,
+    authorize,
+    isBuiltInRole,
+    resolveCapabilities,
+} from "./organization-policy";
 
 /** A week. Long enough to survive a holiday, short enough to expire. */
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -30,7 +37,10 @@ export interface MemberView {
     userId: string;
     name: string | null;
     email: string;
+    /** The built-in this maps to; MEMBER for a role the business invented. */
     role: OrgRole;
+    /** The role as stored — a built-in name, or an invented role's key. */
+    roleKey: string;
     /** Sites this person may review. Empty for every role but REVIEWER. */
     siteIds: string[];
     /** Whether this row is the caller, so the UI can say "you". */
@@ -40,7 +50,10 @@ export interface MemberView {
 export interface InvitationView {
     id: string;
     email: string;
+    /** The built-in this maps to; MEMBER for a role the business invented. */
     role: OrgRole;
+    /** The role as stored — a built-in name, or an invented role's key. */
+    roleKey: string;
     siteIds: string[];
     status: string;
     expiresAt: Date;
@@ -105,6 +118,7 @@ export class OrganizationMembersService {
             name: m.user.name,
             email: m.user.email,
             role: toRole(m.role),
+            roleKey: m.role,
             siteIds: byUser.get(m.userId) ?? [],
             isSelf: m.userId === ctx.userId,
         }));
@@ -133,7 +147,11 @@ export class OrganizationMembersService {
         });
         // No token, hashed or otherwise. It is in the invitee's inbox and
         // nowhere else; a roster screen is not a place to re-read it from.
-        return invitations.map((i) => ({ ...i, role: toRole(i.role) }));
+        return invitations.map((i) => ({
+            ...i,
+            role: toRole(i.role),
+            roleKey: i.role,
+        }));
     }
 
     /**
@@ -143,6 +161,7 @@ export class OrganizationMembersService {
      */
     async invite(ctx: OrganizationContext, dto: InviteMemberDto) {
         authorize(ctx, "member:invite");
+        await this.assertWithinReach(ctx, dto.role, "invite someone as");
 
         const siteIds = await this.resolveSiteIds(ctx, dto.role, dto.siteIds);
 
@@ -212,7 +231,11 @@ export class OrganizationMembersService {
             metadata: { role: dto.role, siteCount: siteIds.length },
         });
 
-        return { ...invitation, role: toRole(invitation.role) };
+        return {
+            ...invitation,
+            role: toRole(invitation.role),
+            roleKey: invitation.role,
+        };
     }
 
     /** Withdraw an invitation that has not been accepted. */
@@ -243,6 +266,85 @@ export class OrganizationMembersService {
      * Accept an invitation. Session-scoped, not org-scoped: the whole point is
      * that the caller is not a member yet, so there is no context to resolve.
      */
+    /**
+     * What an invitation says, to whoever holds its link — before they have an
+     * account, and therefore before there is any session to authorize.
+     *
+     * The link IS the credential: the token is high-entropy and stored only as
+     * a hash, so a holder is the intended reader. What comes back is still the
+     * minimum that lets someone decide whether to join — the business, who
+     * asked, the role, and the address it was sent to. Not the organization
+     * id, not the sites a reviewer would get, nothing that would be useful to
+     * someone who stole the link rather than received it.
+     *
+     * The address is included deliberately. `accept` already refuses a
+     * mismatch by naming it ("That invitation was sent to …"), so a token
+     * holder can learn it anyway — and showing it up front turns a dead end at
+     * the last step into a prefilled field at the first.
+     *
+     * One answer for missing, revoked, used and expired. A stranger holding a
+     * token learns nothing from the difference.
+     */
+    async preview(token: string) {
+        const invitation = await prisma.organizationInvitation.findUnique({
+            where: { tokenHash: hashInviteToken(token) },
+            select: {
+                email: true,
+                role: true,
+                status: true,
+                expiresAt: true,
+                organizationId: true,
+                organization: { select: { name: true } },
+                invitedBy: { select: { name: true } },
+            },
+        });
+        if (
+            invitation?.status !== "PENDING" ||
+            invitation.expiresAt.getTime() < Date.now()
+        ) {
+            throw new NotFoundException(
+                "That invitation is no longer valid. Ask for a new one.",
+            );
+        }
+
+        /*
+         * An invented role is described by what it GRANTS, because that is
+         * the only true thing to say about it. Narrowing it to MEMBER here —
+         * which is what `toRole` does — told someone invited as "Stock clerk"
+         * that they were joining as a Member and listed a Member's powers:
+         * a false account of what they were agreeing to, on the one page
+         * they read before they have an account at all.
+         */
+        const invented = isBuiltInRole(invitation.role)
+            ? null
+            : await prisma.organizationRole.findUnique({
+                  where: {
+                      organizationId_key: {
+                          organizationId: invitation.organizationId,
+                          key: invitation.role,
+                      },
+                  },
+                  select: { label: true, actions: true },
+              });
+
+        return {
+            organizationName: invitation.organization.name,
+            invitedByName: invitation.invitedBy?.name ?? null,
+            role: toRole(invitation.role),
+            roleKey: invitation.role,
+            roleLabel: invented?.label ?? null,
+            // Null for a built-in, which the page already describes in words.
+            grants: invented
+                ? invented.actions.flatMap((a) => {
+                      const c = CAPABILITY_BY_ACTION.get(a as OrgAction);
+                      return c ? [c.label] : [];
+                  })
+                : null,
+            email: invitation.email,
+            expiresAt: invitation.expiresAt,
+        };
+    }
+
     async accept(user: { id: string; email: string }, token: string) {
         const invitation = await prisma.organizationInvitation.findUnique({
             where: { tokenHash: hashInviteToken(token) },
@@ -359,8 +461,15 @@ export class OrganizationMembersService {
     ) {
         authorize(ctx, "member:role:update");
 
-        const siteIds = await this.resolveSiteIds(ctx, dto.role, dto.siteIds);
         const membership = await this.requireMembership(ctx, userId);
+        // Both ends. Changing someone who can do more than you is how a role
+        // takes over the business from below; giving a role that can do more
+        // than you is how it promotes itself.
+        await this.assertWithinReach(ctx, membership.role, "change", {
+            mustExist: false,
+        });
+        await this.assertWithinReach(ctx, dto.role, "give someone");
+        const siteIds = await this.resolveSiteIds(ctx, dto.role, dto.siteIds);
         if (membership.role === "OWNER" && dto.role !== "OWNER") {
             await this.assertNotLastOwner(ctx.organizationId, userId, "demote");
         }
@@ -435,6 +544,9 @@ export class OrganizationMembersService {
         authorize(ctx, "member:remove");
 
         const membership = await this.requireMembership(ctx, userId);
+        await this.assertWithinReach(ctx, membership.role, "remove", {
+            mustExist: false,
+        });
         if (membership.role === "OWNER") {
             await this.assertNotLastOwner(ctx.organizationId, userId, "remove");
         }
@@ -527,7 +639,9 @@ export class OrganizationMembersService {
      */
     private async resolveSiteIds(
         ctx: OrganizationContext,
-        role: OrgRole,
+        // Any role key: only REVIEWER takes site grants, and an invented
+        // role never does — its site access is whatever it was granted.
+        role: string,
         siteIds: string[] | undefined,
     ): Promise<string[]> {
         const wanted = [...new Set(siteIds ?? [])];
@@ -556,6 +670,63 @@ export class OrganizationMembersService {
             throw new NotFoundException("One of those sites no longer exists.");
         }
         return found.map((s) => s.id);
+    }
+
+    /**
+     * Refuse to act on a role that can do more than the actor can.
+     *
+     * The rule roles need once a business can invent them. `member:role:update`
+     * can be granted to a role like "Stock clerk"; without this, whoever holds
+     * it could give themselves Owner, or demote the Owner, and the owner who
+     * granted it would have handed over the business by ticking one box. The
+     * catalogue WARNS about that permission; this is what makes the warning
+     * true rather than merely honest.
+     *
+     * It also changes one thing for the built-ins, deliberately: an Admin can
+     * no longer make someone an Owner, because Owner can close the business
+     * and Admin cannot. An Owner is still made by an Owner.
+     *
+     * `mustExist` is false for a person's CURRENT role, which may name a role
+     * that has since been removed — that resolves to the read-only floor
+     * rather than blocking anyone from ever changing them again.
+     */
+    private async assertWithinReach(
+        ctx: OrganizationContext,
+        roleKey: string,
+        verb: string,
+        { mustExist = true }: { mustExist?: boolean } = {},
+    ): Promise<void> {
+        const theirs = await this.actionsOf(
+            ctx.organizationId,
+            roleKey,
+            mustExist,
+        );
+        const beyond = [...theirs].filter((a) => !allows(ctx, a));
+        if (beyond.length > 0) {
+            throw new ForbiddenException(
+                `You cannot ${verb} a role that can do more than you can.`,
+            );
+        }
+    }
+
+    /** What a role in this business may do; 400 if it must exist and does not. */
+    private async actionsOf(
+        organizationId: string,
+        roleKey: string,
+        mustExist: boolean,
+    ): Promise<ReadonlySet<OrgAction>> {
+        if (isBuiltInRole(roleKey)) return resolveCapabilities(roleKey);
+        const row = await prisma.organizationRole.findUnique({
+            where: { organizationId_key: { organizationId, key: roleKey } },
+            select: { actions: true },
+        });
+        if (!row && mustExist) {
+            throw new BadRequestException({
+                message: "That role does not exist in this business.",
+                field: "role",
+            });
+        }
+        return resolveCapabilities(roleKey, row?.actions);
     }
 }
 

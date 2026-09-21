@@ -159,6 +159,14 @@ describe("Products catalog (dev DB)", () => {
         expect(detail.inventory?.quantity).toBe(42);
     });
 
+    it("lists a catalogue row with its variant count, SKU and stock", async () => {
+        const [row] = await products.list(storeId, ownerId);
+        expect(row.id).toBe(productId);
+        expect(row.variantCount).toBe(1);
+        expect(row.sku).toBe("TS-RED-L");
+        expect(row.inventory).toEqual({ quantity: 42, lowStockAlert: 5 });
+    });
+
     it("rejects a category cycle", async () => {
         const child = await categories.create(storeId, ownerId, {
             name: "Shirts",

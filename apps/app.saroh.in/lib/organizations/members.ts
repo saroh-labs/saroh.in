@@ -1,5 +1,12 @@
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, getList, mutate, orgBase, readError } from "@/lib/api/http";
+import {
+    apiFetch,
+    destroy,
+    getList,
+    mutate,
+    orgBase,
+    readError,
+} from "@/lib/api/http";
 
 import type { OrganizationRole } from "./service";
 
@@ -15,7 +22,10 @@ export interface OrganizationMember {
     userId: string;
     name: string | null;
     email: string;
+    /** The built-in this maps to; MEMBER for a role the business invented. */
     role: OrganizationRole;
+    /** The role as stored — a built-in name, or an invented role's key. */
+    roleKey?: string;
     /** Sites this person may review. Empty for every role but REVIEWER. */
     siteIds: string[];
     isSelf: boolean;
@@ -25,6 +35,8 @@ export interface OrganizationInvitation {
     id: string;
     email: string;
     role: OrganizationRole;
+    /** The role as stored — a built-in name, or an invented role's key. */
+    roleKey?: string;
     siteIds: string[];
     status: string;
     expiresAt: string;
@@ -33,7 +45,8 @@ export interface OrganizationInvitation {
 
 export interface InviteMemberInput {
     email: string;
-    role: OrganizationRole;
+    /** Any role this business has, built-in or invented. */
+    role: string;
     siteIds?: string[];
 }
 
@@ -70,8 +83,8 @@ export async function inviteMember(
 
 export async function updateMemberRole(
     userId: string,
-    input: { role: OrganizationRole; siteIds?: string[] },
-): Promise<CrmResult<{ userId: string; role: OrganizationRole }>> {
+    input: { role: string; siteIds?: string[] },
+): Promise<CrmResult<{ userId: string; role: string }>> {
     return mutate(
         `/members/${userId}`,
         "PATCH",
@@ -80,27 +93,16 @@ export async function updateMemberRole(
     );
 }
 
-/** DELETE has no `mutate` helper — these two are the only callers. */
-async function del<T>(path: string, fallback: string): Promise<CrmResult<T>> {
-    const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
-    const res = await apiFetch(`${base}${path}`, { method: "DELETE" });
-    const data = (await res.json().catch(() => null)) as
-        (T & { message?: string }) | null;
-    if (res.ok) return { ok: true, data: (data ?? {}) as T };
-    return { ok: false, error: readError(data, fallback) };
-}
-
 export async function removeMember(
     userId: string,
 ): Promise<CrmResult<{ removed: boolean; revokedLinks: number }>> {
-    return del(`/members/${userId}`, "Could not remove that person.");
+    return destroy(`/members/${userId}`, "Could not remove that person.");
 }
 
 export async function revokeInvitation(
     invitationId: string,
 ): Promise<CrmResult<{ revoked: boolean }>> {
-    return del(
+    return destroy(
         `/invitations/${invitationId}`,
         "Could not withdraw that invitation.",
     );

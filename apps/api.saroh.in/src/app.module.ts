@@ -16,6 +16,7 @@ import { ContactsModule } from "./modules/contacts/contacts.module";
 import { ContentModule } from "./modules/content/content.module";
 import { CustomerWorkspaceModule } from "./modules/customer-workspace/customer-workspace.module";
 import { CustomersModule } from "./modules/customers/customers.module";
+import { DiscountsModule } from "./modules/discounts/discounts.module";
 import { DomainsModule } from "./modules/domains/domains.module";
 import { EnquiryModule } from "./modules/enquiry/enquiry.module";
 import { FeatureFlagModule } from "./modules/feature-flags/feature-flags.module";
@@ -32,6 +33,7 @@ import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { PipelinesModule } from "./modules/pipelines/pipelines.module";
+import { ProductReviewsModule } from "./modules/product-reviews/product-reviews.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { ProviderHealthModule } from "./modules/provider-health/provider-health.module";
@@ -91,6 +93,8 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         DomainsModule,
         JobsModule,
         FormsModule,
+        DiscountsModule,
+        ProductReviewsModule,
         EnquiryModule,
         ContactsModule,
         SearchModule,

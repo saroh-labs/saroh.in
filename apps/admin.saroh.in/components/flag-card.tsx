@@ -77,9 +77,7 @@ export function FlagCard({
                         {flag.enabledByDefault === null ? (
                             <Badge variant="outline">Never configured</Badge>
                         ) : flag.enabledByDefault ? (
-                            <Badge className="bg-success/12 hover:bg-success/12 border border-success/30 text-success">
-                                On
-                            </Badge>
+                            <Badge variant="success">On</Badge>
                         ) : (
                             <Badge variant="secondary">Off</Badge>
                         )}

@@ -1,4 +1,4 @@
-import { REDACTED, redactHeaders, redactObject } from "./redact";
+import { REDACTED, redactHeaders, redactObject, redactUrl } from "./redact";
 
 describe("redactHeaders", () => {
     it("redacts auth/cookie headers but keeps the rest", () => {
@@ -56,5 +56,28 @@ describe("redactObject", () => {
         expect(redactObject("hello")).toBe("hello");
         expect(redactObject(42)).toBe(42);
         expect(redactObject(null)).toBeNull();
+    });
+});
+
+describe("redactUrl", () => {
+    it("hides a review link's token", () => {
+        expect(redactUrl("/public/product-reviews/abcDEF123_-x/reviews")).toBe(
+            "/public/product-reviews/[token]/reviews",
+        );
+        expect(redactUrl("/public/product-reviews/abc?x=1")).toBe(
+            "/public/product-reviews/[token]?x=1",
+        );
+    });
+
+    it("hides a preview link's token", () => {
+        expect(redactUrl("/public/sites/preview/tok123")).toBe(
+            "/public/sites/preview/[token]",
+        );
+    });
+
+    it("leaves every other path alone", () => {
+        expect(redactUrl("/organizations/org_1/orders")).toBe(
+            "/organizations/org_1/orders",
+        );
     });
 });

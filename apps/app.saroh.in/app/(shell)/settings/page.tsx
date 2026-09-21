@@ -20,14 +20,14 @@ export const metadata = { title: "Settings" };
 const SECTIONS = [
     {
         href: "/settings/organization",
-        label: "Organization",
+        label: "Business",
         description:
             "Workspace name and the business identity used across Saroh.",
         icon: Building2,
     },
     {
         href: "/settings/people",
-        label: "People",
+        label: "Team",
         description:
             "Who can reach this workspace, and what each of them may do.",
         icon: Users,
@@ -40,7 +40,7 @@ const SECTIONS = [
     },
     {
         href: "/settings/providers",
-        label: "Providers & health",
+        label: "Providers",
         description:
             "The external services your modules depend on, and whether each is ready.",
         icon: Plug,

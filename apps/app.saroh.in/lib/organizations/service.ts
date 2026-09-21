@@ -22,7 +22,19 @@ export interface Organization {
     id: string;
     name: string;
     slug: string;
+    /** The built-in this maps to; MEMBER for a role the business invented. */
     role: OrganizationRole;
+    /** The role as stored — a built-in name, or an invented role's key. */
+    roleKey?: string;
+    /** What it is called on screen. */
+    roleLabel?: string | null;
+    /**
+     * What this actor may do here, resolved by the API.
+     *
+     * Optional so a cached or older response still renders: the nav falls back
+     * to the built-in map when it is absent.
+     */
+    actions?: string[];
 }
 
 export interface OrganizationProfileInput {

@@ -18,6 +18,30 @@ const badgeVariants = cva(
                 destructive:
                     "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
                 outline: "text-foreground",
+                /*
+                 * Two label classes, told apart by shape before colour says
+                 * anything (brand file §7). STATE is a filled pill the code
+                 * owns: the status hue mixed into the page, with its 700 cut
+                 * as text, and the status always said in words — colour is
+                 * reinforcement, never the signal. KIND is `tag`: an outline
+                 * category a shop owner invents, which is exactly why it cannot
+                 * carry designed meaning and stays neutral.
+                 *
+                 * `draft` is Saffron: something unfinished that is yours.
+                 */
+                success:
+                    "border-transparent bg-success-subtle text-success-subtle-foreground",
+                warning:
+                    "border-transparent bg-warning-subtle text-warning-subtle-foreground",
+                error: "border-transparent bg-destructive-subtle text-destructive-subtle-foreground",
+                info: "border-transparent bg-info-subtle text-info-subtle-foreground",
+                draft: "border-transparent bg-brand-subtle text-brand-subtle-foreground",
+                tag: "rounded border-border-strong bg-transparent text-foreground",
+                // A state with no hue of its own: cancelled, archived, not
+                // connected. Present, but asking nothing of anyone.
+                // Filled Sunken with Ink 600, as the brand file draws
+                // "Refunded": present, and asking nothing of anyone.
+                neutral: "border-transparent bg-muted text-neutral-600",
             },
         },
         defaultVariants: {

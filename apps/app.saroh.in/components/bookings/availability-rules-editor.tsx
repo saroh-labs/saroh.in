@@ -1,12 +1,13 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import { replaceRules } from "@/lib/services/actions";
 import type { AvailabilityRule } from "@/lib/services/service";
 
@@ -136,49 +137,43 @@ export function AvailabilityRulesEditor({
                 >
                     <div className="grid gap-1.5">
                         <Label htmlFor={`day-${index}`}>Day</Label>
-                        <select
+                        <OptionSelect
                             id={`day-${index}`}
                             aria-label="Day of week"
-                            value={row.dayOfWeek}
+                            value={String(row.dayOfWeek)}
                             disabled={saving}
-                            onChange={(e) =>
-                                patchRow(index, {
-                                    dayOfWeek: Number(e.target.value),
-                                })
-                            }
-                            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                        >
-                            {DAY_NAMES.map((day, i) => (
-                                <option key={i} value={i}>
-                                    {day}
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={(v) => {
+                                patchRow(index, { dayOfWeek: Number(v) });
+                            }}
+                            options={DAY_NAMES.map((day, i) => ({
+                                value: String(i),
+                                label: day,
+                            }))}
+                            className="w-36"
+                        />
                     </div>
                     <div className="grid gap-1.5">
                         <Label htmlFor={`start-${index}`}>Start</Label>
-                        <Input
+                        <TimeSelect
                             id={`start-${index}`}
-                            type="time"
+                            stepMinutes={15}
                             value={row.start}
                             disabled={saving}
-                            onChange={(e) =>
-                                patchRow(index, { start: e.target.value })
-                            }
-                            className="w-32"
+                            onValueChange={(start) => {
+                                patchRow(index, { start });
+                            }}
                         />
                     </div>
                     <div className="grid gap-1.5">
                         <Label htmlFor={`end-${index}`}>End</Label>
-                        <Input
+                        <TimeSelect
                             id={`end-${index}`}
-                            type="time"
+                            stepMinutes={15}
                             value={row.end}
                             disabled={saving}
-                            onChange={(e) =>
-                                patchRow(index, { end: e.target.value })
-                            }
-                            className="w-32"
+                            onValueChange={(end) => {
+                                patchRow(index, { end });
+                            }}
                         />
                     </div>
                     <Button

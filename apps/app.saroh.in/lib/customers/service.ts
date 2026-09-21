@@ -18,6 +18,23 @@ export interface Customer {
     zipCode: string | null;
 }
 
+/**
+ * A row of the customers list: the customer, plus the three facts the API
+ * aggregates from their orders (see `customers/serialize.ts` there). They are
+ * not stored on a customer — they are facts about Orders — so they arrive only
+ * on the list, never on a single customer read.
+ */
+export interface CustomerListItem extends Customer {
+    orderCount: number;
+    /** What they have PAID, in `currency`; `null` when nothing has been. */
+    spent: string | null;
+    currency: string | null;
+    /** Their payments span more than one currency, so `spent` is a subset. */
+    mixedCurrency: boolean;
+    /** ISO date of their last order, paid or not; `null` if they never have. */
+    lastOrderAt: string | null;
+}
+
 export interface CustomerInput {
     email: string;
     firstName?: string | null;
@@ -33,8 +50,8 @@ export type CustomerResult =
     | { ok: true; data: { id: string } }
     | { ok: false; error: string; field?: "email" };
 
-export function listCustomers(storeId: string): Promise<Customer[]> {
-    return getList<Customer>(`/stores/${storeId}/customers`);
+export function listCustomers(storeId: string): Promise<CustomerListItem[]> {
+    return getList<CustomerListItem>(`/stores/${storeId}/customers`);
 }
 
 export function getCustomer(

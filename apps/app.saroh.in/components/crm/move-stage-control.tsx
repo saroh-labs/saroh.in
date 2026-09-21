@@ -4,6 +4,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import { moveLead } from "@/lib/leads/actions";
 import type { LeadStage } from "@/lib/leads/service";
 
@@ -12,7 +13,7 @@ import type { LeadStage } from "@/lib/leads/service";
  * `moveLead` server action (the api validates the target stage belongs to the
  * lead's pipeline and logs a STAGE_CHANGED activity atomically) and refreshes
  * the server-rendered view on success. Used on the lead detail page and the
- * pipeline board. A native `<select>` keeps it simple + accessible.
+ * pipeline board. A shadcn Select, like every other picker in the product.
  */
 export function MoveStageControl({
     leadId,
@@ -48,19 +49,17 @@ export function MoveStageControl({
             {!compact && (
                 <span className="text-xs text-muted-foreground">{label}</span>
             )}
-            <select
+            <OptionSelect
                 aria-label="Move to stage"
                 value={currentStageId}
                 disabled={busy || stages.length === 0}
-                onChange={(e) => onChange(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-                {stages.map((stage) => (
-                    <option key={stage.id} value={stage.id}>
-                        {stage.name}
-                    </option>
-                ))}
-            </select>
+                onValueChange={(v) => void onChange(v)}
+                options={stages.map((stage) => ({
+                    value: stage.id,
+                    label: stage.name,
+                }))}
+                className="w-48"
+            />
         </div>
     );
 }

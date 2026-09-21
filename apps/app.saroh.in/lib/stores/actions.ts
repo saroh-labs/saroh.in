@@ -1,10 +1,6 @@
 "use server";
 
-import type {
-    CreateStoreInput,
-    StoreResult,
-    UpdateStoreInput,
-} from "./schema";
+import type { CreateStoreInput, StoreResult, UpdateStoreInput } from "./schema";
 import {
     createStore as createStoreApi,
     updateStore as updateStoreApi,

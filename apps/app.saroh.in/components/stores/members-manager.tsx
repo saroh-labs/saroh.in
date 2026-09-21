@@ -8,6 +8,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import {
     inviteMember,
     removeMember,
@@ -108,21 +109,14 @@ export function MembersManager({
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="invite-role">Role</Label>
-                        <select
+                        <OptionSelect
                             id="invite-role"
                             value={role}
-                            onChange={(e) =>
-                                setRole(e.target.value as MemberRole)
-                            }
                             disabled={inviting}
-                            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                        >
-                            {ROLES.map((r) => (
-                                <option key={r} value={r}>
-                                    {r}
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={setRole}
+                            options={ROLES.map((r) => ({ value: r, label: r }))}
+                            className="w-40"
+                        />
                     </div>
                     <Button
                         type="submit"
@@ -160,25 +154,20 @@ export function MembersManager({
                                     </Badge>
                                 ) : canManage ? (
                                     <>
-                                        <select
+                                        <OptionSelect
                                             aria-label={`Role for ${m.email}`}
-                                            value={m.role}
+                                            size="sm"
+                                            value={m.role as MemberRole}
                                             disabled={busy === m.userId}
-                                            onChange={(e) =>
-                                                onChangeRole(
-                                                    m.userId,
-                                                    e.target
-                                                        .value as MemberRole,
-                                                )
+                                            onValueChange={(v) =>
+                                                onChangeRole(m.userId, v)
                                             }
-                                            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                                        >
-                                            {ROLES.map((r) => (
-                                                <option key={r} value={r}>
-                                                    {r}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            options={ROLES.map((r) => ({
+                                                value: r,
+                                                label: r,
+                                            }))}
+                                            className="w-36"
+                                        />
                                         <Button
                                             type="button"
                                             variant="ghost"

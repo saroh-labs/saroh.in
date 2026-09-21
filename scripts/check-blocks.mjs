@@ -146,6 +146,9 @@ const SITE_LAYER_ALLOWED = new Set([
     "apps/saroh.app/components/site-chrome.tsx",
     // Saroh surfaces on a merchant's page, in the merchant's palette.
     "apps/saroh.app/components/checkout.tsx",
+    // The review page a customer reaches from an invitation email.
+    "apps/saroh.app/components/review-form.tsx",
+    "apps/saroh.app/app/review/[token]/page.tsx",
     "apps/saroh.app/components/post-view.tsx",
     "apps/saroh.app/app/[domain]/[slug]/not-found.tsx",
     "apps/saroh.app/app/[domain]/layout.tsx",

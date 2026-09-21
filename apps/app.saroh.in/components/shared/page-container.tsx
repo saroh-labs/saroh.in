@@ -39,19 +39,28 @@ export function PageContainer({
     className,
     children,
 }: {
-    width?: "form" | "default" | "wide";
+    /**
+     * `full` is the applied screens' working area: the whole width, 26px in
+     * from its edges, for lists that need every column.
+     */
+    width?: "form" | "default" | "wide" | "full";
     className?: string;
     children: React.ReactNode;
 }) {
     return (
         <main
             className={cn(
-                "w-full space-y-6 p-6 sm:p-8",
-                width === "form"
-                    ? "max-w-2xl"
-                    : width === "wide"
-                      ? "max-w-7xl"
-                      : "max-w-5xl",
+                "w-full space-y-6",
+                width === "full"
+                    ? "px-4 pb-[26px] pt-5 sm:px-[26px]"
+                    : "p-6 sm:p-8",
+                width === "full"
+                    ? ""
+                    : width === "form"
+                      ? "max-w-2xl"
+                      : width === "wide"
+                        ? "max-w-7xl"
+                        : "max-w-5xl",
                 className,
             )}
         >

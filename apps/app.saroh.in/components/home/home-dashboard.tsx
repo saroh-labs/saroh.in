@@ -84,7 +84,7 @@ export function HomeDashboard({ home }: { home: HomeModel }) {
                     its content's min-content width and pushed the whole page
                     into a horizontal scroll at 320px (#178, §18). */}
                 <div className="min-w-0 space-y-3">
-                    <h2 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                         Needs you
                     </h2>
                     <NeedsYou actions={home.actions} now={now} />
@@ -92,7 +92,7 @@ export function HomeDashboard({ home }: { home: HomeModel }) {
 
                 {showSchedule ? (
                     <div className="min-w-0 space-y-3">
-                        <h2 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                             Schedule
                         </h2>
                         <Schedule bookings={home.upcoming} now={now} />
@@ -102,7 +102,7 @@ export function HomeDashboard({ home }: { home: HomeModel }) {
 
             {home.numbers.length > 0 ? (
                 <div className="space-y-3">
-                    <h2 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                         Your numbers
                     </h2>
                     <NumbersBand numbers={home.numbers} />

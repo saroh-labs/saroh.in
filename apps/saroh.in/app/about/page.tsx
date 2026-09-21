@@ -142,7 +142,7 @@ export default function AboutPage() {
                                         <Link
                                             key={m.key}
                                             href={`/modules/${m.slug}`}
-                                            className="inline-flex h-[26px] items-center rounded-md border border-border px-2.5 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                                            className="inline-flex h-[26px] items-center rounded-md border border-border px-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                                         >
                                             {m.label}
                                         </Link>
@@ -152,7 +152,7 @@ export default function AboutPage() {
                         ))}
                     </ol>
 
-                    <p className="mt-5 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                         {MODULES.length} modules · {VERBS.length} verbs · each
                         module counted once
                     </p>
@@ -172,7 +172,7 @@ export default function AboutPage() {
 
                     <div className="mt-11 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2">
                         <div className="bg-background p-6">
-                            <h3 className="font-mono text-[11px] uppercase tracking-[0.16em] text-brand">
+                            <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-brand">
                                 Built
                             </h3>
                             <ul className="mt-4 grid gap-2.5 text-[14px] leading-relaxed text-muted-foreground">
@@ -197,7 +197,7 @@ export default function AboutPage() {
                         </div>
 
                         <div className="bg-background p-6">
-                            <h3 className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                            <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                                 Not yet
                             </h3>
                             <ul className="mt-4 grid gap-2.5 text-[14px] leading-relaxed text-muted-foreground">
@@ -250,7 +250,7 @@ export default function AboutPage() {
                                         : ""
                                 }`}
                             >
-                                <span className="font-mono text-[11px] tracking-[0.14em] text-muted-foreground/70">
+                                <span className="text-[11px] font-semibold tracking-[0.1em] text-muted-foreground">
                                     {String(i + 1).padStart(2, "0")}
                                 </span>
                                 <h3 className="mt-3 text-[15.5px] font-semibold tracking-[-0.01em]">

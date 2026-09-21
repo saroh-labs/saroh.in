@@ -23,6 +23,11 @@ export interface OrganizationSettings {
         contactEmail: string | null;
         website: string | null;
     } | null;
+    /**
+     * When the business first sold something: the earliest order on record,
+     * ISO. Derived, never typed — `null` until the first order.
+     */
+    tradingSince: string | null;
 }
 
 const PROFILE_FIELDS = [
@@ -186,6 +191,7 @@ export class OrganizationSettingsService {
             name: settings.name,
             slug: settings.slug,
             profile: settings.businessProfile ?? null,
+            tradingSince: await this.firstOrderAt(ctx.organizationId),
         };
     }
 
@@ -216,7 +222,18 @@ export class OrganizationSettingsService {
             name: organization.name,
             slug: organization.slug,
             profile: organization.businessProfile ?? null,
+            tradingSince: await this.firstOrderAt(organizationId),
         };
+    }
+
+    /** The earliest order in the business, across every storefront. */
+    private async firstOrderAt(organizationId: string): Promise<string | null> {
+        const first = await prisma.order.findFirst({
+            where: { organizationId },
+            orderBy: { createdAt: "asc" },
+            select: { createdAt: true },
+        });
+        return first?.createdAt.toISOString() ?? null;
     }
 }
 

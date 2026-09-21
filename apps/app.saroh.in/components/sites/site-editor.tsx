@@ -39,6 +39,7 @@ import { syncEnquiryForms } from "@/components/sites/sync-enquiry-forms";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { useServicesForPicker } from "@/components/sites/use-services-for-picker";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import { NoteComposer } from "@/components/sites/note-composer";
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
@@ -988,7 +989,7 @@ export function SiteEditor({
                     className={cn(
                         "flex h-[22px] shrink-0 items-center rounded-[3px] px-2 text-[0.6875rem]",
                         saveError
-                            ? "border border-destructive/30 bg-destructive/10 text-destructive"
+                            ? "border border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
                             : dirty || saving
                               ? "border border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
                               : "border border-[#2a2a2a] bg-[#1a1a1a] text-muted-foreground",
@@ -1102,24 +1103,19 @@ export function SiteEditor({
                      * value being chosen, and a native select is the one
                      * control every keyboard and screen reader already knows.
                      */}
-                    <select
+                    <OptionSelect
                         aria-label="Zoom"
+                        size="sm"
                         value={String(zoom)}
-                        onChange={(e) =>
-                            setZoom(
-                                e.target.value === "fit"
-                                    ? "fit"
-                                    : (Number(e.target.value) as Zoom),
-                            )
-                        }
-                        className="h-7 w-[4.25rem] rounded border bg-transparent px-1.5 text-xs tabular-nums text-muted-foreground"
-                    >
-                        {ZOOMS.map((z) => (
-                            <option key={String(z)} value={String(z)}>
-                                {z === "fit" ? "Fit" : `${z}%`}
-                            </option>
-                        ))}
-                    </select>
+                        onValueChange={(v) => {
+                            setZoom(v === "fit" ? "fit" : (Number(v) as Zoom));
+                        }}
+                        options={ZOOMS.map((z) => ({
+                            value: String(z),
+                            label: z === "fit" ? "Fit" : `${z}%`,
+                        }))}
+                        className="w-[4.75rem] tabular-nums text-muted-foreground"
+                    />
 
                     <Button
                         variant="outline"
@@ -1368,7 +1364,7 @@ export function SiteEditor({
                                                     setDropIndex(null);
                                                 }}
                                                 aria-hidden="true"
-                                                className="cursor-grab select-none px-1 text-muted-foreground/50 active:cursor-grabbing group-hover:text-muted-foreground"
+                                                className="cursor-grab select-none px-1 text-muted-foreground active:cursor-grabbing group-hover:text-muted-foreground"
                                             >
                                                 ⋮
                                             </span>
@@ -1392,13 +1388,13 @@ export function SiteEditor({
                                                          * one visitors get.
                                                          */
                                                         section.hidden &&
-                                                            "text-muted-foreground/50 line-through",
+                                                            "text-muted-foreground line-through",
                                                     )}
                                                 >
                                                     {sectionTitle(section)}
                                                 </span>
                                                 <span className="flex shrink-0 items-center gap-1.5">
-                                                    <span className="text-[0.625rem] uppercase tracking-[0.06em] text-muted-foreground/70">
+                                                    <span className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground">
                                                         {
                                                             SECTION_LABELS[
                                                                 section.type
@@ -1817,7 +1813,7 @@ export function SiteEditor({
                     {conflict ? (
                         <div
                             role="alert"
-                            className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm"
+                            className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-sm"
                         >
                             <p className="font-medium">
                                 Someone else saved this page while you were
@@ -1877,7 +1873,7 @@ export function SiteEditor({
                          * rather than the 300 it was, because every frame here
                          * costs a layout pass over the whole rendered site.
                          */
-                        className={`mx-auto transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none ${
+                        className={`mx-auto transition-[max-width,opacity,transform] duration-slow ease-out motion-reduce:transition-none ${
                             switching ? "opacity-70" : "opacity-100"
                         }`}
                         style={{
@@ -1923,7 +1919,7 @@ export function SiteEditor({
                         Escape to return
                     </button>
                     <div
-                        className="mx-auto transition-[max-width] duration-200 ease-out motion-reduce:transition-none"
+                        className="mx-auto transition-[max-width] duration-slow ease-out motion-reduce:transition-none"
                         style={{ maxWidth: DEVICE_WIDTH[device] }}
                     >
                         <DraftPreview

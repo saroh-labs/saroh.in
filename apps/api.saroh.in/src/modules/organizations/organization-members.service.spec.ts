@@ -26,6 +26,7 @@ jest.mock("@saroh/database", () => ({
         site: { findMany: jest.fn() },
         sitePreviewLink: { updateMany: jest.fn() },
         organization: { findUnique: jest.fn() },
+        organizationRole: { findUnique: jest.fn() },
         $transaction: jest.fn(),
     },
 }));
@@ -52,6 +53,7 @@ const db = prisma as unknown as {
     site: Record<string, jest.Mock>;
     sitePreviewLink: Record<string, jest.Mock>;
     organization: Record<string, jest.Mock>;
+    organizationRole: Record<string, jest.Mock>;
     $transaction: jest.Mock;
 };
 
@@ -412,5 +414,199 @@ describe("removing someone", () => {
         await expect(service.remove(ctx(), "stranger")).rejects.toThrow(
             /not in this workspace/,
         );
+    });
+});
+
+/**
+ * Roles a business invents. Two jobs: a role key must name a role this
+ * business actually has, and nobody may act on a role that can do more than
+ * they can — otherwise ticking "change what a role can do" for a Stock clerk
+ * hands the business to whoever holds it.
+ */
+describe("invented roles on the roster", () => {
+    /** An actor holding an invented role, with exactly these permissions. */
+    const clerk = (actions: string[]): OrganizationContext => ({
+        organizationId: "org_1",
+        userId: "user_clerk",
+        role: "MEMBER",
+        roleKey: "stock-clerk",
+        actions: new Set(actions) as OrganizationContext["actions"],
+    });
+
+    beforeEach(() => {
+        db.organizationRole.findUnique.mockResolvedValue(null);
+    });
+
+    it("invites someone at a role this business invented", async () => {
+        db.organizationRole.findUnique.mockResolvedValue({
+            actions: ["order:read"],
+        });
+        await service.invite(ctx("OWNER"), {
+            email: "new@example.com",
+            role: "stock-clerk",
+        });
+        expect(db.organizationInvitation.upsert).toHaveBeenCalled();
+        expect(
+            db.organizationInvitation.upsert.mock.calls[0][0].create.role,
+        ).toBe("stock-clerk");
+    });
+
+    it("refuses a role key this business does not have", async () => {
+        // A typo must be a 400 — never a membership that quietly resolves to
+        // the read-only floor instead of the role that was meant.
+        await expect(
+            service.invite(ctx("OWNER"), {
+                email: "new@example.com",
+                role: "stok-clerk",
+            }),
+        ).rejects.toThrow(/does not exist in this business/);
+        expect(db.organizationInvitation.upsert).not.toHaveBeenCalled();
+    });
+
+    it("will not let an invented role invite someone as Owner", async () => {
+        const actor = clerk(["member:invite", "member:role:update"]);
+        await expect(
+            service.invite(actor, {
+                email: "friend@example.com",
+                role: "OWNER",
+            }),
+        ).rejects.toThrow(/can do more than you can/);
+    });
+
+    it("will not let an invented role promote anyone to Admin", async () => {
+        db.membership.findUnique.mockResolvedValue({ role: "stock-clerk" });
+        db.organizationRole.findUnique.mockResolvedValue({
+            actions: ["member:role:update"],
+        });
+        const actor = clerk(["member:role:update"]);
+        await expect(
+            service.updateRole(actor, "user_clerk", { role: "ADMIN" }),
+        ).rejects.toThrow(/can do more than you can/);
+        expect(db.membership.update).not.toHaveBeenCalled();
+    });
+
+    it("will not let an invented role change the Owner", async () => {
+        // Demoting from below is the other half of a takeover.
+        db.membership.findUnique.mockResolvedValue({ role: "OWNER" });
+        const actor = clerk(["member:role:update"]);
+        await expect(
+            service.updateRole(actor, "user_owner", { role: "MEMBER" }),
+        ).rejects.toThrow(/cannot change a role that can do more/);
+        expect(db.membership.update).not.toHaveBeenCalled();
+    });
+
+    it("will not let an invented role remove an Admin", async () => {
+        db.membership.findUnique.mockResolvedValue({ role: "ADMIN" });
+        const actor = clerk(["member:remove", "member:read"]);
+        await expect(service.remove(actor, "user_admin")).rejects.toThrow(
+            /cannot remove a role that can do more/,
+        );
+        expect(db.membership.delete).not.toHaveBeenCalled();
+    });
+
+    it("lets a role act on roles within its own reach", async () => {
+        // A shift lead with the roster and orders may move someone onto the
+        // Stock clerk role, which can do less than they can.
+        db.membership.findUnique.mockResolvedValue({ role: "MEMBER" });
+        db.organizationRole.findUnique.mockResolvedValue({
+            actions: ["order:read"],
+        });
+        const lead = clerk([
+            "member:role:update",
+            "order:read",
+            "order:write",
+            // The Member floor, so changing a current Member is in reach.
+            "org:read",
+            "member:read",
+            "store:read",
+            "product-review:read",
+            "site:read",
+            "media:read",
+            "module:read",
+        ]);
+        await service.updateRole(lead, "user_x", { role: "stock-clerk" });
+        expect(db.membership.update.mock.calls[0][0].data).toEqual({
+            role: "stock-clerk",
+        });
+    });
+
+    it("still lets someone be changed whose role was since removed", async () => {
+        // Their current key names nothing; it resolves to the floor instead of
+        // locking them into a role nobody can edit them out of.
+        db.membership.findUnique.mockResolvedValue({ role: "deleted-role" });
+        await service.updateRole(ctx("OWNER"), "user_x", { role: "MEMBER" });
+        expect(db.membership.update).toHaveBeenCalled();
+    });
+
+    describe("the built-ins", () => {
+        it("an Admin can no longer make someone an Owner", async () => {
+            // Deliberate: Owner can close the business and Admin cannot. An
+            // Owner is made by an Owner.
+            db.membership.findUnique.mockResolvedValue({ role: "MEMBER" });
+            await expect(
+                service.updateRole(ctx("ADMIN"), "user_x", { role: "OWNER" }),
+            ).rejects.toThrow(/can do more than you can/);
+        });
+
+        it("an Owner still can", async () => {
+            db.membership.findUnique.mockResolvedValue({ role: "MEMBER" });
+            await service.updateRole(ctx("OWNER"), "user_x", { role: "OWNER" });
+            expect(db.membership.update.mock.calls[0][0].data).toEqual({
+                role: "OWNER",
+            });
+        });
+
+        it("an Admin can still manage everyone below Owner", async () => {
+            db.membership.findUnique.mockResolvedValue({ role: "MEMBER" });
+            await service.updateRole(ctx("ADMIN"), "user_x", { role: "ADMIN" });
+            expect(db.membership.update).toHaveBeenCalled();
+        });
+    });
+});
+
+/**
+ * The public invitation preview — read before the person has an account.
+ * It has to describe the role they are actually being given.
+ */
+describe("preview — the role an invitation actually grants", () => {
+    const pending = {
+        email: "clerk@example.com",
+        status: "PENDING",
+        expiresAt: new Date(Date.now() + 86_400_000),
+        organizationId: "org_1",
+        organization: { name: "Northwind Supply" },
+        invitedBy: { name: "Demo Owner" },
+    };
+
+    it("names an invented role and says what it grants", async () => {
+        db.organizationInvitation.findUnique.mockResolvedValue({
+            ...pending,
+            role: "stock-clerk",
+        });
+        db.organizationRole.findUnique.mockResolvedValue({
+            label: "Stock clerk",
+            actions: ["order:read", "order:write", "order:teleport"],
+        });
+
+        const preview = await service.preview("a-token");
+
+        expect(preview.roleKey).toBe("stock-clerk");
+        expect(preview.roleLabel).toBe("Stock clerk");
+        // In the catalogue's words, and nothing that is not a real power.
+        expect(preview.grants).toEqual(["See orders", "Change orders"]);
+    });
+
+    it("leaves a built-in to the page's own description", async () => {
+        db.organizationInvitation.findUnique.mockResolvedValue({
+            ...pending,
+            role: "ADMIN",
+        });
+
+        const preview = await service.preview("a-token");
+
+        expect(preview.role).toBe("ADMIN");
+        expect(preview.roleLabel).toBeNull();
+        expect(preview.grants).toBeNull();
+        expect(db.organizationRole.findUnique).not.toHaveBeenCalled();
     });
 });

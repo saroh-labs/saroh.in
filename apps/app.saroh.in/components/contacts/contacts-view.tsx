@@ -30,7 +30,7 @@ import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
  */
 
 /** A known absence, drawn so it cannot be mistaken for a failed render. */
-const Missing = () => <span className="text-muted-foreground/60">—</span>;
+const Missing = () => <span className="text-muted-foreground">—</span>;
 
 const FILTERS: DataFilter<ContactListItem>[] = [
     { id: "all", label: "All" },
@@ -95,6 +95,7 @@ export function ContactsView({
             header: "Open pipeline",
             priority: "secondary",
             numeric: true,
+            money: true,
             // Sorted on VALUE, so "who owes us the most conversation" is one
             // click. Unvalued open leads sort as 0 but still render their count,
             // which is the honest ordering: we cannot rank an unknown amount.
@@ -201,7 +202,7 @@ export function ContactsView({
                 c.source ? (
                     <Badge
                         variant="secondary"
-                        className="text-[0.625rem] font-medium uppercase tracking-wider"
+                        className="text-[11px] font-medium uppercase tracking-wider"
                     >
                         {c.source.replace(/_/g, " ").toLowerCase()}
                     </Badge>

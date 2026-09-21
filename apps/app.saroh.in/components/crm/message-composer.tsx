@@ -7,6 +7,7 @@ import { showError, showSuccess, showWarning } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import { sendMessage } from "@/lib/messages/actions";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
 import { MESSAGE_CHANNELS } from "@/lib/messages/constants";
@@ -76,21 +77,17 @@ export function MessageComposer({
         <form onSubmit={onSubmit} className="grid gap-2">
             <div className="grid gap-1">
                 <span className="text-xs text-muted-foreground">Channel</span>
-                <select
+                <OptionSelect
                     aria-label="Message channel"
                     value={channel}
                     disabled={busy}
-                    onChange={(e) =>
-                        setChannel(e.target.value as MessageChannel)
-                    }
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                >
-                    {MESSAGE_CHANNELS.map((c) => (
-                        <option key={c} value={c}>
-                            {c}
-                        </option>
-                    ))}
-                </select>
+                    onValueChange={setChannel}
+                    options={MESSAGE_CHANNELS.map((c) => ({
+                        value: c,
+                        label: c,
+                    }))}
+                    className="w-40"
+                />
             </div>
 
             {channel === "EMAIL" && (

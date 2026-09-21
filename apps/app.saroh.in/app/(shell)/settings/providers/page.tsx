@@ -1,7 +1,7 @@
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { ProviderHealthCard } from "@/components/providers/provider-health-card";
+import { ProviderHealthList } from "@/components/providers/provider-health-list";
 import { PageContainer } from "@/components/shared/page-container";
 import { listProviderHealth } from "@/lib/provider-health/service";
 import { requireSession } from "@/lib/session";
@@ -21,8 +21,8 @@ export default async function ProvidersSettingsPage() {
     return (
         <PageContainer width="form">
             <PageHeader
-                title="Providers & health"
-                description="The external services your modules depend on, and whether each is ready."
+                breadcrumb={["Workspace", "Providers"]}
+                title="Providers"
             />
             {/* Three outcomes, three states. "Nothing to show" was previously
                 rendered for both a denial and an empty list, which are
@@ -38,11 +38,7 @@ export default async function ProvidersSettingsPage() {
                     description="Payments, messaging and domains appear here once a module that needs them is set up."
                 />
             ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                    {result.health.map((h) => (
-                        <ProviderHealthCard key={h.key} health={h} />
-                    ))}
-                </div>
+                <ProviderHealthList health={result.health} />
             )}
         </PageContainer>
     );

@@ -16,6 +16,7 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             count: jest.fn(),
         },
+        order: { findFirst: jest.fn() },
     };
     return {
         prisma: {
@@ -40,6 +41,7 @@ const orgUpdate = prisma.organization.update as jest.Mock;
 const profileUpsert = prisma.businessProfile.upsert as jest.Mock;
 const membershipFindMany = prisma.membership.findMany as jest.Mock;
 const membershipCount = prisma.membership.count as jest.Mock;
+const orderFindFirst = prisma.order.findFirst as jest.Mock;
 
 const ctx = (role: OrgRole = "OWNER") => ({
     organizationId: "org_1",
@@ -54,6 +56,7 @@ describe("OrganizationSettingsService", () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        orderFindFirst.mockResolvedValue(null);
         orgFindUnique.mockResolvedValue({
             id: "org_1",
             name: "Acme",
@@ -74,6 +77,23 @@ describe("OrganizationSettingsService", () => {
             const settings = await service.get(ctx("ADMIN"));
             expect(settings.name).toBe("Acme");
             expect(settings.profile?.legalName).toBe("Acme Inc");
+        });
+
+        it("derives trading-since from the first order in the business", async () => {
+            expect((await service.get(ctx())).tradingSince).toBeNull();
+
+            orderFindFirst.mockResolvedValue({
+                createdAt: new Date("2011-03-04T10:00:00Z"),
+            });
+            expect((await service.get(ctx())).tradingSince).toBe(
+                "2011-03-04T10:00:00.000Z",
+            );
+            // Across every storefront, and never another tenant's.
+            expect(orderFindFirst).toHaveBeenLastCalledWith({
+                where: { organizationId: "org_1" },
+                orderBy: { createdAt: "asc" },
+                select: { createdAt: true },
+            });
         });
 
         it("denies a MEMBER — legal/tax identity is not in the org:read floor", async () => {

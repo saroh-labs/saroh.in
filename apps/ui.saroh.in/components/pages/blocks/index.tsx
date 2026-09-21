@@ -19,7 +19,7 @@ export default function BlocksIndex() {
     return (
         <div className="px-6 py-14">
             <header className="max-w-[62ch]">
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                     Site blocks
                 </p>
                 <h1 className="mt-3 font-display text-[clamp(1.75rem,3vw,2.5rem)] font-semibold tracking-[-0.03em]">
@@ -46,7 +46,7 @@ export default function BlocksIndex() {
                                     {meta.label}
                                 </Link>
                             </h2>
-                            <span className="font-mono text-[11px] text-muted-foreground">
+                            <span className="text-[11px] tabular-nums text-muted-foreground">
                                 {meta.variants.length}{" "}
                                 {meta.variants.length === 1 ? "look" : "looks"}
                             </span>

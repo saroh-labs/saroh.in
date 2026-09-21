@@ -2,9 +2,12 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { OrderPayments } from "@/components/stores/order-payments";
+import { OrderReviews } from "@/components/stores/order-reviews";
 import { OrderStatusControls } from "@/components/stores/order-status-controls";
 import { getOrder } from "@/lib/orders/service";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrderPayments } from "@/lib/payments/service";
+import { invitationState } from "@/lib/product-reviews/service";
 import { requireSession } from "@/lib/session";
 import { getStore } from "@/lib/stores/service";
 
@@ -30,7 +33,16 @@ export default async function OrderDetailPage({
     const order = await getOrder(storeId, orderId);
     if (!order) notFound();
 
-    const payments = await getOrderPayments(order.id);
+    const [payments, reviewState, organization] = await Promise.all([
+        getOrderPayments(order.id),
+        // Unknown on failure: the section is left out rather than guessing.
+        invitationState(order.id).catch(() => null),
+        resolveActiveOrganization(),
+    ]);
+    const may = (action: string) =>
+        organization?.actions
+            ? organization.actions.includes(action)
+            : organization?.role === "OWNER" || organization?.role === "ADMIN";
 
     const cur = order.currency;
 
@@ -74,7 +86,11 @@ export default async function OrderDetailPage({
                     <Row label="Tax" value={`${cur} ${order.tax}`} />
                     <Row label="Shipping" value={`${cur} ${order.shipping}`} />
                     <Row
-                        label="Discount"
+                        label={
+                            order.discountCode
+                                ? `Discount · ${order.discountCode.code} (${order.discountCode.rule})`
+                                : "Discount"
+                        }
                         value={`− ${cur} ${order.discount}`}
                     />
                     <div className="flex justify-between border-t pt-1 text-sm font-semibold">
@@ -87,6 +103,14 @@ export default async function OrderDetailPage({
             </div>
 
             <OrderPayments orderId={order.id} summary={payments} />
+
+            {reviewState ? (
+                <OrderReviews
+                    orderId={order.id}
+                    state={reviewState}
+                    canWrite={may("product-review:write") && may("order:read")}
+                />
+            ) : null}
         </div>
     );
 }

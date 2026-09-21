@@ -2,13 +2,20 @@ import { Module } from "@nestjs/common";
 
 import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
+import { DiscountsModule } from "../discounts/discounts.module";
 import { StoresModule } from "../stores/stores.module";
 import { OrdersController } from "./orders.controller";
 import { OrdersService } from "./orders.service";
+import { OrganizationOrdersController } from "./organization-orders.controller";
 
 @Module({
-    imports: [StoresModule, CapabilitiesModule, AnalyticsCoreModule],
-    controllers: [OrdersController],
+    imports: [
+        StoresModule,
+        CapabilitiesModule,
+        AnalyticsCoreModule,
+        DiscountsModule,
+    ],
+    controllers: [OrdersController, OrganizationOrdersController],
     providers: [OrdersService],
     exports: [OrdersService],
 })

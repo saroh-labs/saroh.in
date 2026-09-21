@@ -25,18 +25,31 @@
 - **Current** — Every `siteColors` key has a default in `SiteTheme` (`muted` and
   `border` did not until `00cd219`).
 
-## Saroh tokens
+## Saroh tokens — Ink & Saffron
 
+- **Current** — **The brand is the "Saroh Brand System" page in the Claude
+  Design project** (22 sections, v1); every value there is decided. How it
+  landed, what is still to build and the one departure (`--input`) are in
+  `docs/architecture/adr/ADR-005-ink-and-saffron-brand.md`. Ink `#1C1C1A` is the primary;
+  Saffron `#D98A15` is the one accent; Paper `#F5F2EC` is the page, white the
+  raised surface.
+- **Current** — **Saffron is punctuation:** the cursor dot, one progress fill,
+  one active state per screen. Two visible accents means one is wrong. Saffron
+  500 is for fills; text in Saffron is 700 on light and 400 on dark.
 - **Current** — Semantic colours `primary`, `secondary`, `muted`, `accent`,
-  `destructive`, `success`, `warning` and `info`, each with `-foreground`, plus
-  `warning-subtle`; scales `brand-*`, `highlight-*`, `neutral-*`; shadows;
-  `--radius`; motion tokens `--duration-fast` (120ms), `--duration-base` (200ms),
-  `--duration-slow` (320ms), `--ease-out` and `--ease-in-out`. 06 §2's "no status
-  tokens" gap is closed.
-- **Current** — **`--primary` is the filled-button colour; `--brand` is the
-  interactive blue** for links, focus and emphasis. The `brand` and `highlight`
-  Button variants deliberately render the `--primary` fill (`button.tsx`); don't
-  turn CTAs blue without deciding to (06 §1).
+  `destructive`, `success`, `warning` and `info`, each with `-foreground`; a
+  `-subtle` pair for `success`, `warning`, `destructive`, `info`, `brand` and
+  `highlight`; `-hover`/`-active` steps on the filled actions; `border-strong`,
+  `field` and `disabled`. Scales: `brand-*` is Saffron, and `highlight-*` and
+  `neutral-*` are both Ink. Warning is red-orange, never amber, because amber
+  reads as Saffron.
+- **Current** — **`--primary` is the Ink button; `highlight` is the Saffron
+  one;** `--brand` is Saffron that sets text. The `brand` Button variant renders
+  Ink, like `default`. Only `highlight` is Saffron, and it goes on one action
+  per screen.
+- **Current** — **Hover moves one ramp step, pressed two**, never a new hue and
+  never an opacity. **De-emphasis is a colour, not an opacity:** Ink 500 on
+  light.
 - **Current** — **`--accent` is a shadcn neutral** with about 32 component
   usages, not a brand accent. Don't rename it.
 - **Adopted** — **Never an arbitrary value, a hex literal or a raw palette class
@@ -48,12 +61,16 @@
 
 ## Skins and dark mode
 
-- **Current** — **Four skins are token scopes, nothing more:** `mono` (the
-  default, with no block of its own), `panel`, `instrument` and `stockroom`,
-  selected by `data-skin` on `<html>` and composing with `.dark`. No component
-  knows a skin exists. A new skin is a CSS block in `globals.css` plus an entry
-  in `apps/app.saroh.in/lib/skins.ts`, which the switcher and the pre-paint
-  script share. Never branch on a skin in a component.
+- **Current** — **Skins are token scopes, nothing more.** The brand (`saroh`)
+  is the base `:root` / `.dark` register and the default, so it has no block of
+  its own. The four pre-brand skins (`mono`, `panel`, `instrument` and
+  `stockroom`) sit on a legacy block that holds the old base verbatim. They are
+  hidden in the switcher until the brand settles, and the switcher renders
+  nothing while only one skin is visible. `saroh.app` pins `data-skin="mono"`,
+  so merchant-facing Saroh surfaces keep the pre-brand register. A skin is
+  selected by `data-skin` on `<html>` and composes with `.dark`. A new skin is a
+  CSS block in `globals.css` plus an entry in `apps/app.saroh.in/lib/skins.ts`.
+  Never branch on a skin in a component.
 - **Current** — `--radius` differs by skin (0 to 0.5rem), so `rounded-sm` on a
   16px control is at most 4px and never turns a checkbox round. **Adopted** — a
   skin that raises `--radius` must re-check small fixed controls.
@@ -69,12 +86,18 @@
   `text-*` over a primitive; add a variant. `Button` has `default`, `brand`,
   `highlight`, `success`, `destructive`, `outline`, `secondary`, `ghost` and
   `link`.
-- **Adopted** — **Status reads through `Badge` variants on the status tokens** —
-  success, warning, info, destructive — never coloured text (06 §2, 07 §6). Gap:
-  `Badge` has only `default`, `secondary`, `destructive` and `outline`.
-- **Current** — **Border-first elevation.** `Card` is `rounded-xl` with no
-  shadow, and `Button` and `Input` carry none; shadows are for overlays that
-  float above content (06 §7).
+- **Current** — **Status reads through `Badge` variants,** never coloured text.
+  State is a filled pill (`success`, `warning`, `error`, `info`, `draft`): the
+  status tint with its 700 text, always saying the status in words. Kind is the
+  neutral outline `tag`, for categories a shop owner invents.
+- **Current** — **Border-first elevation.** `Card` is `rounded-xl` (14px) with
+  no shadow, and `Button` and `Input` carry none. Shadows are Ink at low alpha,
+  never black, and are for overlays that float above content: raised 8%, menu
+  10%, modal 14%. On dark, depth comes from a surface step instead.
+- **Current** — **Button sizes are 32 / 38 / 45px** (`sm`, `default`, `lg`),
+  set explicitly and weight 600. **Disabled is one treatment for every
+  variant:** the `disabled` surface with an Ink 500 label that still clears
+  4.5:1, never an opacity. Say why a control is disabled, nearby.
 - **Adopted** — **One primary action per screen;** button labels are verb plus
   noun; sentence case everywhere; the product is always "Saroh" (07 §2, §4).
 - **Adopted** — **Containers come from a small named set** (04 §1): narrow for
@@ -95,6 +118,8 @@
   (14, 18, 04 §4). Put `min-w-0` on grid and flex columns holding text.
 - **Adopted** — **No hover-only affordance, ever** (PRODUCT_STRATEGY §19): the
   phone and the shop floor have no hover.
+- **Current** — **The focus ring is Ink 900 with a Paper offset** (Saffron 400
+  on dark), so it reads on white, Paper, Ink and Saffron alike.
 - **Adopted** — **Contrast materially above 4.5:1** for body text, in light and
   dark and every skin (`PRODUCT.md`); never colour alone; the focus ring is never
   removed; `muted-foreground` is never set below 14px or given opacity
@@ -110,16 +135,33 @@
   is imported in `accounts.saroh.in` `components/auth/login-form.tsx` and
   `ui.saroh.in` `components/shared/header/index.tsx`.
 
+## Type and the mark
+
+- **Current** — **Three product faces, self-hosted in `packages/ui/fonts`:**
+  Geist (`font-sans`) for all UI, body copy, labels and eyebrows, with 600 for
+  buttons and emphasis. Space Grotesk (`font-display`) for display through H3,
+  money and large figures, never body copy. JetBrains Mono (`font-mono`) **only
+  where a value is measured**: a SKU, an order reference, a timestamp, a token
+  value, a route. A label or eyebrow is 11px Geist 600, uppercase at 0.1em —
+  never mono. Nothing is set below 11px. The wordmark's face (Plus Jakarta Sans 600) ships outlined inside `<Wordmark>` and is never loaded. `saroh.app`
+  keeps its old faces.
+- **Current** — **The mark is one SVG master** in `packages/ui/brand`, with
+  `<Wordmark>` / `<SarohSymbol>` from `@saroh/ui/wordmark`. Never re-draw it.
+  The stroke is never Saffron, and the dot drops below 20px. Every brand app
+  ships `favicon.ico`, `icon.svg` and `apple-icon.png` in `app/`, rendered from
+  that master.
+
 ## Motion
 
 - **Current** — **Reduced motion is honoured globally:** `globals.css` clamps
   every animation and transition under `prefers-reduced-motion`. 15 §4's gap is
   closed.
-- **Adopted** — **Durations come from the tokens,** and motion only explains a
-  change — no decorative, looping, parallax or bounce motion on product surfaces
-  (15 §2). The cap is unresolved: 06 §8 says nothing over 200ms in-app, 15 says
-  overlays up to 300ms, and `--duration-slow` is 320ms. Until one change settles
-  it, nothing longer than `--duration-slow`.
+- **Current** — **Durations come from the tokens:** 100ms (`fast`) under the
+  finger, 140ms (`base`) as the default, 200ms (`slow`) for drawers and sheets,
+  always ease-out and never overshooting. That settles the old cap: nothing is
+  longer than 200ms. Exit faster than entry, and never animate position and size
+  together. Motion only explains a change, so there is no decorative, looping,
+  parallax or bounce motion on product surfaces.
 - **Adopted** — **Motion comes from the primitives and the shared Tailwind
   config, not per-app `@keyframes`** (15 §3). Gap, and a contradiction to
   resolve rather than copy: `accounts.saroh.in/app/auth.css` defines 8 keyframes

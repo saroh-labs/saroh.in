@@ -25,6 +25,29 @@ export interface CheckoutReceipt {
         amountCents: number;
         currency: string;
     } | null;
+    /**
+     * Where the order was placed. Optional: a receipt from an API that
+     * predates storefront settings has none, and the page simply omits it.
+     */
+    storefront?: CheckoutStorefront;
+}
+
+/** One day of a shop's week; times are "HH:MM", local to the shop. */
+export interface OpeningHoursDay {
+    day: string;
+    open: string;
+    close: string;
+    closed: boolean;
+}
+
+export interface CheckoutStorefront {
+    name: string;
+    kind: string;
+    address: string | null;
+    /** `null` for an online store, or a shop that never saved its hours. */
+    openingHours: OpeningHoursDay[] | null;
+    /** A paused storefront takes no payments; the page offers no Pay. */
+    acceptingPayments: boolean;
 }
 
 /** The non-secret handoff returned by the public create-intent endpoint. */
@@ -66,6 +89,33 @@ function isLatestPayment(
     );
 }
 
+function isOpeningHours(value: unknown): value is OpeningHoursDay[] | null {
+    if (value === null) return true;
+    return (
+        Array.isArray(value) &&
+        value.every(
+            (d) =>
+                isRecord(d) &&
+                isString(d.day) &&
+                isString(d.open) &&
+                isString(d.close) &&
+                typeof d.closed === "boolean",
+        )
+    );
+}
+
+function isStorefront(value: unknown): value is CheckoutStorefront | undefined {
+    if (value === undefined) return true;
+    return (
+        isRecord(value) &&
+        isString(value.name) &&
+        isString(value.kind) &&
+        (value.address === null || isString(value.address)) &&
+        isOpeningHours(value.openingHours) &&
+        typeof value.acceptingPayments === "boolean"
+    );
+}
+
 export function isReceipt(value: unknown): value is CheckoutReceipt {
     return (
         isRecord(value) &&
@@ -80,7 +130,8 @@ export function isReceipt(value: unknown): value is CheckoutReceipt {
             value.paymentStatus,
         ) &&
         isString(value.fulfilmentStatus) &&
-        isLatestPayment(value.latestPayment)
+        isLatestPayment(value.latestPayment) &&
+        isStorefront(value.storefront)
     );
 }
 

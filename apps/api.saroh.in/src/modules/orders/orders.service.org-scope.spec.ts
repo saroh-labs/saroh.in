@@ -13,9 +13,11 @@ jest.mock("@saroh/database", () => {
     const customer = { findFirst: jest.fn() };
     const product = { findFirst: jest.fn() };
     const inventory = { findUnique: jest.fn(), update: jest.fn() };
+    const storeSettings = { findUnique: jest.fn() };
     return {
         prisma: {
             order,
+            storeSettings,
             customer,
             product,
             inventory,
@@ -38,6 +40,7 @@ const orderCount = prisma.order.count as jest.Mock;
 const customerFindFirst = prisma.customer.findFirst as jest.Mock;
 const productFindFirst = prisma.product.findFirst as jest.Mock;
 const inventoryFindUnique = prisma.inventory.findUnique as jest.Mock;
+const settingsFindUnique = prisma.storeSettings.findUnique as jest.Mock;
 
 const STORE = "store_1";
 const USER = "user_1";
@@ -70,6 +73,7 @@ beforeEach(() => {
     inventoryFindUnique.mockResolvedValue(null); // untracked — no stock plumbing
     orderCount.mockResolvedValue(0);
     orderCreate.mockResolvedValue({ id: "order_1" });
+    settingsFindUnique.mockResolvedValue(null);
 });
 
 describe("OrdersService.create — organization stamping (#173)", () => {
@@ -117,5 +121,31 @@ describe("OrdersService.create — organization stamping (#173)", () => {
         ).rejects.toBeInstanceOf(NotFoundException);
 
         expect(orderCreate).not.toHaveBeenCalled();
+    });
+});
+
+describe("OrdersService.create — the storefront's currency", () => {
+    const writable = { organizationId: ORG };
+
+    it("takes the order in the currency the storefront chose", async () => {
+        settingsFindUnique.mockResolvedValue({ currency: "INR" });
+        await makeService(writable).create(STORE, USER, DTO);
+        expect(orderCreate.mock.calls[0][0].data.currency).toBe("INR");
+    });
+
+    it("refuses an order in a different currency", async () => {
+        settingsFindUnique.mockResolvedValue({ currency: "INR" });
+        await expect(
+            makeService(writable).create(STORE, USER, {
+                ...DTO,
+                currency: "USD",
+            }),
+        ).rejects.toThrow(/takes orders in INR/);
+        expect(orderCreate).not.toHaveBeenCalled();
+    });
+
+    it("falls back as before when the storefront never chose one", async () => {
+        await makeService(writable).create(STORE, USER, DTO);
+        expect(orderCreate.mock.calls[0][0].data.currency).toBe("USD");
     });
 });

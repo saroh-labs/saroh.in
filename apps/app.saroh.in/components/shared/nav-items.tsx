@@ -54,7 +54,18 @@ export type NavAction =
     | "module:read"
     | "notification:read"
     | "org:settings:read"
-    | "provider:read";
+    | "provider:read"
+    // The business-wide Orders list: customer names, emails and totals across
+    // every storefront. Not in the read-only floor, so a Member or Reviewer
+    // is not offered a row the API would refuse them.
+    | "order:read"
+    // Sell → Discounts. Owner and Admin by default; money off is money.
+    | "discount:read"
+    // Products, Customers and Storefronts read storefront data. In the Member
+    // floor, so nothing changes for the built-ins; it matters for a role the
+    // business invented without it, which was offered three rows that each
+    // answered it with a refusal.
+    | "store:read";
 
 /**
  * Role → what it may reach here.
@@ -75,6 +86,9 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "notification:read",
         "org:settings:read",
         "provider:read",
+        "order:read",
+        "discount:read",
+        "store:read",
     ],
     ADMIN: [
         "site:read",
@@ -85,8 +99,11 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "notification:read",
         "org:settings:read",
         "provider:read",
+        "order:read",
+        "discount:read",
+        "store:read",
     ],
-    MEMBER: ["site:read", "member:read", "module:read"],
+    MEMBER: ["site:read", "member:read", "module:read", "store:read"],
     REVIEWER: ["site:read"],
 };
 
@@ -101,6 +118,32 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
 export function navRoleCan(role: NavRole | null, action: NavAction): boolean {
     if (role === null) return true;
     return REACHABLE[role].includes(action);
+}
+
+/**
+ * May this actor reach something that needs `action`?
+ *
+ * Prefers the permissions the API resolved for them, because a business can
+ * invent roles and `REACHABLE` above only knows the four that ship — an
+ * invented role would be judged by whichever built-in it happens to map to,
+ * which is the floor, and its rail would be wrong in both directions.
+ *
+ * Every `NavAction` is a real `OrgAction`, deliberately: the rail asks the
+ * same question the server answers, in the same words, so the two cannot mean
+ * different things by "may see the roster".
+ *
+ * Falls back to the role map when permissions have not been loaded, and fails
+ * OPEN on a null role — same convention as `filterNavGroups`. A chrome that
+ * empties itself on a failed read is worse than one offering a destination the
+ * server then refuses, because only one of those is recoverable by the person
+ * looking at it.
+ */
+export function navCan(
+    actor: { role: NavRole | null; actions?: readonly string[] | null },
+    action: NavAction,
+): boolean {
+    if (actor.actions) return actor.actions.includes(action);
+    return navRoleCan(actor.role, action);
 }
 
 /**
@@ -244,6 +287,41 @@ export const NAV_GROUPS: NavGroup[] = [
                 label: "Sell",
                 icon: Store,
                 moduleKey: "COMMERCE",
+                // Sell's screens are destinations, so they nest in the rail
+                // (brand file §13): Sell is the section, the child is the page.
+                //
+                // Orders leads, and Storefronts closes. The order is the
+                // design's and it is the order of a working day: the thing
+                // waiting for you first, the things you keep, and the places
+                // you sell from last — a merchant opens Storefronts to change
+                // a setting, not to find out what needs doing.
+                children: [
+                    {
+                        href: "/commerce/orders",
+                        label: "Orders",
+                        action: "order:read",
+                    },
+                    {
+                        href: "/commerce/products",
+                        label: "Products",
+                        action: "store:read",
+                    },
+                    {
+                        href: "/commerce/customers",
+                        label: "Customers",
+                        action: "store:read",
+                    },
+                    {
+                        href: "/commerce/discounts",
+                        label: "Discounts",
+                        action: "discount:read",
+                    },
+                    {
+                        href: "/commerce/storefronts",
+                        label: "Storefronts",
+                        action: "store:read",
+                    },
+                ],
             },
             // Two destinations, two questions: "what is booked?" and "what can
             // be booked?". They lost their own BOOKINGS heading in the regroup;
@@ -324,13 +402,13 @@ export const NAV_GROUPS: NavGroup[] = [
             },
             {
                 href: "/settings/organization",
-                label: "Organization",
+                label: "Business",
                 icon: Building2,
                 action: "org:settings:read",
             },
             {
                 href: "/settings/people",
-                label: "People",
+                label: "Team",
                 icon: Users,
                 action: "member:read",
             },
@@ -452,6 +530,33 @@ export function navGroupsWithSites(
     }));
 }
 
+/**
+ * Which rail rows a module owns.
+ *
+ * Modules is the screen where a merchant decides what their workspace
+ * contains, so it has to say what each switch actually does — and the honest
+ * answer is here, in the nav itself, rather than in a hand-written sentence
+ * per module that drifts the first time a row moves.
+ */
+export function navRowsForModule(moduleKey: string): string[] {
+    const rows: string[] = [];
+    for (const group of NAV_GROUPS) {
+        for (const item of group.items) {
+            if ((item.moduleKey ?? group.moduleKey) !== moduleKey) continue;
+            rows.push(item.label);
+            // A section's screens count as rows: turning Commerce off takes
+            // Storefronts, Products and Customers with it, and the merchant
+            // should be told the names they navigate by.
+            for (const child of item.children ?? []) {
+                // A child that repeats its parent's destination is the section
+                // landing page, not a second row.
+                if (child.href !== item.href) rows.push(child.label);
+            }
+        }
+    }
+    return rows;
+}
+
 export function filterNavGroups(
     groups: readonly NavGroup[],
     availableModuleKeys: readonly string[] | null,
@@ -484,13 +589,16 @@ export function filterNavGroups(
 export function filterNavGroupsByRole(
     groups: readonly NavGroup[],
     role: NavRole | null,
+    /** The API-resolved permissions; preferred over `role` when present. */
+    actions?: readonly string[] | null,
 ): NavGroup[] {
-    if (role === null) return [...groups];
+    if (role === null && !actions) return [...groups];
+    const actor = { role, actions };
     return groups
         .map((group) => ({
             ...group,
             items: group.items
-                .filter((item) => !item.action || navRoleCan(role, item.action))
+                .filter((item) => !item.action || navCan(actor, item.action))
                 .map((item) =>
                     item.children === undefined
                         ? item
@@ -499,7 +607,7 @@ export function filterNavGroupsByRole(
                               children: item.children.filter(
                                   (child) =>
                                       !child.action ||
-                                      navRoleCan(role, child.action),
+                                      navCan(actor, child.action),
                               ),
                           },
                 ),
@@ -517,11 +625,17 @@ export function filterNavGroupsByRole(
  */
 export function navFor({
     role,
+    actions,
     moduleKeys,
     sites,
 }: {
     /** `null` when it could not be resolved; the nav then fails open. */
     role: NavRole | null;
+    /**
+     * What the actor may do, as the API resolved it. Preferred over `role`,
+     * which cannot describe a role the business invented.
+     */
+    actions?: readonly string[] | null;
     /** `null` = availability unknown; see {@link filterNavGroups}. */
     moduleKeys: readonly string[] | null;
     sites: readonly { id: string; name: string }[];
@@ -532,6 +646,7 @@ export function navFor({
             moduleKeys,
         ),
         role,
+        actions,
     );
 }
 

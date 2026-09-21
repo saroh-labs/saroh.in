@@ -11,7 +11,7 @@ import { ActivationEvents } from "../analytics/activation-events";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
 import type { CreateProductDto, ProductStatus, UpdateProductDto } from "./dto";
-import { serializeProduct, serializeProductDetail } from "./serialize";
+import { serializeProductDetail, serializeProductListItem } from "./serialize";
 
 /**
  * Product catalog data layer. Authorization is delegated to StoresService so
@@ -38,9 +38,20 @@ export class ProductsService {
         const products = await prisma.product.findMany({
             where: { storeId, ...(status ? { status } : {}) },
             orderBy: { createdAt: "desc" },
-            include: { category: { select: { id: true, name: true } } },
+            include: {
+                category: { select: { id: true, name: true } },
+                // Enough to draw a catalogue row: the variant count, the SKU
+                // the product is known by, and its stock.
+                _count: { select: { variants: true } },
+                variants: {
+                    select: { sku: true },
+                    orderBy: { createdAt: "asc" },
+                    take: 1,
+                },
+                inventory: { select: { quantity: true, lowStockAlert: true } },
+            },
         });
-        return products.map(serializeProduct);
+        return products.map(serializeProductListItem);
     }
 
     /** A single product with variants + inventory; 404 if no store access. */
@@ -154,6 +165,15 @@ export class ProductsService {
         });
         if (!product) {
             throw new NotFoundException("Product not found");
+        }
+        // An order line keeps its product (the history of what was sold, and
+        // now of what was reviewed), so the database refuses the delete — which
+        // used to surface as a bare 500. Say it, and say what to do instead.
+        const sold = await prisma.orderItem.count({ where: { productId } });
+        if (sold > 0) {
+            throw new ConflictException(
+                "This product has been ordered, so it can't be deleted. Archive it instead — it leaves the storefront and its order history stays.",
+            );
         }
         await prisma.product.delete({ where: { id: productId } });
         return { id: productId };

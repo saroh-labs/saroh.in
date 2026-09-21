@@ -198,8 +198,13 @@ model Organization {
   // Stage 7 — SaaS billing (S7-005). One current subscription per org.
   subscription Subscription?
 
-  createdAt          DateTime            @default(now())
-  idempotencyRecords IdempotencyRecord[]
+  createdAt           DateTime             @default(now())
+  idempotencyRecords  IdempotencyRecord[]
+  roles               OrganizationRole[]
+  discounts           Discount[]
+  discountRedemptions DiscountRedemption[]
+  productReviews      ProductReview[]
+  reviewInvitations   ReviewInvitation[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -233,11 +238,58 @@ model Membership {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // OWNER, ADMIN, MEMBER, REVIEWER (#276). REVIEWER is website-only and sees
-  // just the sites it is granted through SiteReviewer — see organization-policy.ts.
+  // The role's `key`, resolved against OrganizationRole rows in the SAME
+  // organization. Not a foreign key: a membership must survive its role being
+  // renamed or removed, and a dangling key resolves to the read-only floor
+  // rather than to an error nobody can sign in past. Still OWNER, ADMIN,
+  // MEMBER or REVIEWER for every business that has invented nothing.
   role String @default("MEMBER")
 
   @@unique([organizationId, userId])
+  @@index([organizationId])
+}
+
+// OrganizationRole: a role, and the permissions it grants (custom roles).
+//
+// A business invents the roles it needs — "Stock clerk", "Bookkeeper" — and
+// the owner ticks what each may do from the catalogue in
+// `organization-policy.ts` / `capability-catalogue.ts`. The four built-ins are
+// seeded per organization as `system` rows so the screen can render every role
+// the same way; they cannot be renamed, re-permissioned or deleted.
+//
+// `actions` holds OrgAction strings. Not a join table: the set is small, read
+// on every authorized request, and never queried ACROSS organizations — the
+// question is always "what may this role, in this business, do", which is one
+// row. A join table would add a hop to the hottest path in the API to answer
+// a question nothing asks.
+model OrganizationRole {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Stable, referenced by Membership.role and OrganizationInvitation.role.
+  // Uppercase for the built-ins; a slug for invented ones.
+  key   String
+  label String
+
+  // OrgAction values (organization-policy.ts). Empty is legal and means a role
+  // that can reach nothing yet — a half-built role is not an invalid one.
+  actions String[] @default([])
+
+  // The ring the avatar wears on Team, so two people are never visually
+  // identical. Named, never a hex: the palette belongs to the token layer.
+  ringTone String @default("slate")
+
+  // Built-in. OWNER, ADMIN, MEMBER and REVIEWER are seeded for every
+  // organization and are read-only: their permissions are the shipped policy,
+  // and letting a business edit them would make role names mean different
+  // things in different businesses.
+  system Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, key])
   @@index([organizationId])
 }
 
@@ -395,6 +447,10 @@ model Store {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // Soft delete
 
+  discountReach DiscountStore[]
+
+  productReviews ProductReview[]
+
   @@index([slug])
   @@index([createdAt])
 }
@@ -489,6 +545,10 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  discountReach DiscountProduct[]
+
+  reviews ProductReview[]
+
   @@unique([storeId, slug])
   @@index([storeId])
   @@index([categoryId])
@@ -527,6 +587,8 @@ model Category {
   products Product[]
 
   createdAt DateTime @default(now())
+
+  discountReach DiscountCategory[]
 
   @@unique([storeId, slug])
   @@index([storeId])
@@ -588,6 +650,8 @@ model Customer {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  productReviews ProductReview[]
 
   @@unique([storeId, email])
   @@index([storeId])
@@ -655,6 +719,10 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  discountRedemption DiscountRedemption?
+
+  reviewInvitation ReviewInvitation?
+
   @@unique([storeId, orderId])
   @@index([storeId])
   @@index([customerId])
@@ -671,6 +739,8 @@ model OrderItem {
 
   quantity Int
   price    Decimal @db.Decimal(10, 2)
+
+  review ProductReview?
 
   @@index([orderId])
 }
@@ -891,6 +961,22 @@ model StoreSettings {
   // Shipping
   shippingEnabled       Boolean  @default(true)
   freeShippingThreshold Decimal? @db.Decimal(10, 2)
+
+  // What kind of place this is (Sell → Storefronts). A SHOP is somewhere a
+  // customer can walk into, so it has an address, hours and collection; an
+  // ONLINE store has none of them.
+  kind              String    @default("ONLINE") // SHOP | ONLINE
+  address           String?   @db.Text
+  // Seven entries, Monday first: { day, open: "09:00", close: "18:00", closed }
+  openingHours      Json?
+  collectionEnabled Boolean   @default(false)
+  tipsEnabled       Boolean   @default(false)
+  guestCheckout     Boolean   @default(true)
+  // Paused: customers cannot pay; everything is kept.
+  pausedAt          DateTime?
+  // Which of the business's connected providers this storefront's checkout
+  // uses (MerchantPaymentProvider.provider). Null: the business's only one.
+  checkoutProvider  String?
 
   // Theme
   theme        String  @default("light") // light, dark, custom
@@ -2256,7 +2342,10 @@ model Notification {
   body  String?
 
   // The subject this notice points at (a Lead, for enquiries).
-  leadId String?
+  leadId   String?
+  // Or a product review ("A review needs a reply"). Informational, no FK,
+  // like leadId — a notice outlives nothing it could dangle from.
+  reviewId String?
 
   readAt DateTime? // null = unread
 
@@ -2267,6 +2356,7 @@ model Notification {
   // (leadId, type). NULL leadId rows are distinct, so non-lead notices are
   // unconstrained.
   @@unique([leadId, type])
+  @@unique([reviewId, type])
   @@index([organizationId, userId, readAt])
   @@index([organizationId])
 }
@@ -2971,4 +3061,180 @@ model IdempotencyRecord {
   @@unique([scope, key, actorUserId])
   @@index([expiresAt])
   @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Discount codes (plan 2026-09-20-001). A code belongs to the BUSINESS; what
+// it reaches is the merchant's choice — the whole business, named
+// storefronts, collections or products. `appliesTo` decides reach, never the
+// number of rows in the reach tables: a STOREFRONT code whose storefronts
+// were all deleted reaches nothing, it does not widen to everything.
+// ---------------------------------------------------------------------------
+model Discount {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Stored normalised (trimmed, upper case), which is what makes the
+  // per-business uniqueness real without an expression index.
+  code        String
+  description String?
+
+  kind       String // PERCENTAGE | FIXED_AMOUNT
+  percentBps Int? // 15% = 1500
+  amount     Decimal? @db.Decimal(12, 2)
+  currency   String?
+
+  appliesTo String // BUSINESS | STOREFRONT | COLLECTION | PRODUCT
+
+  startsAt   DateTime?
+  endsAt     DateTime?
+  usageLimit Int?
+
+  stores      DiscountStore[]
+  categories  DiscountCategory[]
+  products    DiscountProduct[]
+  redemptions DiscountRedemption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+// Reach rows reach their organization through the discount (RLS EXISTS
+// policy), as PostCategory and OrderItem do — no organizationId of their own.
+model DiscountStore {
+  id         String   @id @default(cuid())
+  discountId String
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([discountId, storeId])
+  @@index([storeId])
+}
+
+model DiscountCategory {
+  id         String   @id @default(cuid())
+  discountId String
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([discountId, categoryId])
+  @@index([categoryId])
+}
+
+model DiscountProduct {
+  id         String   @id @default(cuid())
+  discountId String
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([discountId, productId])
+  @@index([productId])
+}
+
+// One use of a code, on one order. How often a code was used is a count of
+// these, not a counter. It snapshots what it applied, so re-rating or
+// renaming a code later cannot rewrite the history of the orders that used
+// it. NoAction from Discount and Order: a discount or an order with a
+// redemption cannot be deleted on its own, but an organization's cascade —
+// which removes both in the same statement — still can.
+model DiscountRedemption {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  discountId     String
+  discount       Discount     @relation(fields: [discountId], references: [id], onDelete: NoAction)
+  orderId        String       @unique
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: NoAction)
+
+  amount   Decimal @db.Decimal(12, 2)
+  currency String
+
+  code       String
+  kind       String
+  percentBps Int?
+  ruleAmount Decimal? @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  @@unique([discountId, orderId])
+  @@index([discountId])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Product reviews (plan 2026-09-21-001). A review comes only from a customer
+// the merchant invited, for an order that was paid and shipped: one link per
+// order, whose token is stored ONLY as its SHA-256 hash.
+// ---------------------------------------------------------------------------
+model ReviewInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // One live invitation per order; a resend rotates the hash in place.
+  orderId        String       @unique
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  tokenHash       String    @unique
+  // The address it was sent to — shown on reviews as "invited to …".
+  toAddress       String
+  expiresAt       DateTime
+  // Every line reviewed: the link has done its job.
+  completedAt     DateTime?
+  sendCount       Int       @default(1)
+  lastSentAt      DateTime  @default(now())
+  createdByUserId String?
+
+  reviews ProductReview[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model ProductReview {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  storeId        String
+  store          Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  invitationId   String
+  invitation     ReviewInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  // One review per order line. SetNull keeps the review if the line goes.
+  orderItemId String?    @unique
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  productId   String?
+  product     Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  customerId  String?
+  customer    Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  // Snapshots: what was reviewed and whom it was sent to, as they were.
+  productName String
+  invitedTo   String
+
+  rating      Int // 1–5, enforced in the API (a CHECK would drift the replay)
+  body        String? @db.Text
+  displayName String
+
+  status         String    @default("PUBLISHED") // PUBLISHED | HIDDEN
+  hiddenAt       DateTime?
+  hiddenByUserId String?
+
+  reply          String?   @db.Text
+  repliedAt      DateTime?
+  replyUpdatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, productId, status])
+  @@index([organizationId, createdAt])
 }

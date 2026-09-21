@@ -135,7 +135,7 @@ export default function JoinWaitlist() {
                     </form>
                 </Form>
 
-                <p className="mt-4 text-[12px] text-muted-foreground/70">
+                <p className="mt-4 text-[12px] text-muted-foreground">
                     One email when we open your batch. No newsletter.
                 </p>
             </div>

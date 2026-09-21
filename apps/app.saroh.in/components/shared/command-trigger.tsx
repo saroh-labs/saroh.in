@@ -19,14 +19,11 @@ export function CommandTrigger() {
         <button
             type="button"
             onClick={openCommandMenu}
-            aria-label="Search (Command K)"
-            className="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-0"
+            aria-label="Search Saroh (Command K)"
+            title="Search  ⌘K"
+            className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background coarse:size-11 dark:text-foreground"
         >
-            <Search className="h-4 w-4" />
-            <span className="hidden md:inline">Search…</span>
-            <kbd className="hidden rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium md:inline">
-                ⌘K
-            </kbd>
+            <Search className="size-4" />
         </button>
     );
 }

@@ -4,6 +4,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import { updateLead } from "@/lib/leads/actions";
 import type { LeadStatus } from "@/lib/leads/service";
 
@@ -12,7 +13,7 @@ const STATUSES: LeadStatus[] = ["OPEN", "WON", "LOST"];
 /**
  * Status picker for a single lead (S3-005). Changing the selection calls the
  * `updateLead` server action (`lead:write`) and refreshes on success. A native
- * `<select>` keeps it simple + accessible.
+ * shadcn Select, like every other picker in the product.
  */
 export function LeadStatusControl({
     leadId,
@@ -40,19 +41,14 @@ export function LeadStatusControl({
     return (
         <div className="grid gap-1">
             <span className="text-xs text-muted-foreground">Status</span>
-            <select
+            <OptionSelect
                 aria-label="Lead status"
                 value={status}
                 disabled={busy}
-                onChange={(e) => onChange(e.target.value as LeadStatus)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-                {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                        {s}
-                    </option>
-                ))}
-            </select>
+                onValueChange={(v) => void onChange(v)}
+                options={STATUSES.map((s) => ({ value: s, label: s }))}
+                className="w-40"
+            />
         </div>
     );
 }

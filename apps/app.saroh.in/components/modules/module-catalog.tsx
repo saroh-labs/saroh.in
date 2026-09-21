@@ -2,14 +2,16 @@ import { EmptyState } from "@saroh/ui/empty-state";
 
 import type { ModuleView } from "@/lib/modules/schema";
 
-import { ModuleCard } from "./module-card";
+import { ModuleList } from "./module-list";
 
 /**
- * Settings → Modules catalog. Groups modules by operational state so a manager
- * sees, in order: what needs attention, what's mid-setup, what's running,
- * what's available to turn on, and what's archived. Each group is omitted when
- * empty. Disabled modules stay discoverable here (never presented as broken
- * routes elsewhere).
+ * Settings → Modules: what this business runs on.
+ *
+ * One list rather than five groups of cards. The groups ("Needs attention",
+ * "Available", "Archived") said what a tag on the row says in less space, and
+ * they put the same control in five places — the merchant's question is "what
+ * is on?", and a column of switches answers it at a glance. What still needed
+ * a person rises to the top of the list.
  */
 export function ModuleCatalog({ modules }: { modules: ModuleView[] }) {
     if (modules.length === 0) {
@@ -21,66 +23,5 @@ export function ModuleCatalog({ modules }: { modules: ModuleView[] }) {
         );
     }
 
-    const enabled = modules.filter((m) => m.lifecycle === "ENABLED");
-    const groups: { title: string; hint: string; items: ModuleView[] }[] = [
-        {
-            title: "Needs attention",
-            hint: "A dependency is unhealthy.",
-            items: enabled.filter((m) => m.readiness === "ATTENTION_REQUIRED"),
-        },
-        {
-            title: "Finish setup",
-            hint: "Enabled, but a step remains before they're ready.",
-            items: enabled.filter((m) => m.readiness === "SETUP_REQUIRED"),
-        },
-        {
-            title: "Active",
-            hint: "Enabled and ready to use.",
-            items: enabled.filter((m) => m.readiness === "ACTIVE"),
-        },
-        {
-            title: "Available",
-            hint: "Turn these on when your business needs them.",
-            items: modules.filter((m) => m.lifecycle === "DISABLED"),
-        },
-        {
-            title: "Archived",
-            hint: "Retired modules. History is preserved.",
-            items: modules.filter((m) => m.lifecycle === "ARCHIVED"),
-        },
-    ];
-
-    return (
-        <div className="space-y-8">
-            {groups
-                .filter((group) => group.items.length > 0)
-                .map((group) => (
-                    <section key={group.title}>
-                        <div className="mb-3">
-                            <h2 className="text-sm font-semibold">
-                                {group.title}
-                            </h2>
-                            <p className="text-sm text-muted-foreground">
-                                {group.hint}
-                            </p>
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            {group.items.map((module, index) => (
-                                <div
-                                    key={module.key}
-                                    className="wk-item"
-                                    style={
-                                        {
-                                            "--wk-i": index,
-                                        } as React.CSSProperties
-                                    }
-                                >
-                                    <ModuleCard module={module} />
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                ))}
-        </div>
-    );
+    return <ModuleList modules={modules} />;
 }

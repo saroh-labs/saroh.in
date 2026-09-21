@@ -83,6 +83,7 @@ export class ModuleEnforcementGuard implements CanActivate {
         const availability = await this.availability.evaluate({
             organizationId: orgContext.organizationId,
             organizationRole: orgContext.role,
+            organizationActions: orgContext.actions,
             moduleKey,
             projectId,
         });

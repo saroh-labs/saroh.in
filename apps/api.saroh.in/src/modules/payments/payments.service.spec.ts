@@ -30,6 +30,7 @@ jest.mock("@saroh/database", () => {
         },
         paymentRefund: { create: jest.fn() },
         order: { findUnique: jest.fn() },
+        storeSettings: { findUnique: jest.fn() },
     };
     return {
         ...actual,
