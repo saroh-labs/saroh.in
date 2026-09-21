@@ -15,6 +15,7 @@ import {
 } from "@/components/site/bits";
 import { ClosingCta } from "@/components/site/closing-cta";
 import { JobIcon } from "@/components/site/job-icon";
+import { ShotRail } from "@/components/site/shot-rail";
 import { ThemedImage } from "@/components/site/themed-image";
 import { JOBS, jobByKey } from "@/lib/site-content";
 
@@ -64,11 +65,11 @@ export default async function JobPage({ params }: Props) {
                     <h1 className="mb-4 font-display text-[30px] font-semibold leading-[1.03] tracking-[-0.04em] min-[421px]:text-[38px] md:text-[48px]">
                         {job.head}
                     </h1>
-                    <p className="mb-3.5 max-w-[52ch] text-pretty text-[18px] leading-[1.6] text-neutral-600 dark:text-neutral-400">
+                    <p className="mb-3.5 max-w-[52ch] text-pretty text-[18px] leading-[1.6] text-highlight-600 dark:text-highlight-400">
                         {job.lede}
                     </p>
                     <p className="mb-6 max-w-[52ch] text-pretty text-[16px] leading-[1.6] text-muted-foreground">
-                        <strong className="font-semibold text-neutral-600 dark:text-neutral-300">
+                        <strong className="font-semibold text-highlight-600 dark:text-highlight-300">
                             Who it is for:
                         </strong>{" "}
                         {job.who}
@@ -117,19 +118,17 @@ export default async function JobPage({ params }: Props) {
                 <h2 className={cn(sectionHeading, "mb-[22px]")}>
                     What it does
                 </h2>
-                <div className="grid grid-cols-1 gap-[15px] md:grid-cols-[repeat(auto-fit,minmax(270px,1fr))]">
-                    {job.does.map((d) => (
-                        <div
-                            key={d.title}
-                            className="rounded-[13px] border border-border bg-card px-[21px] py-[19px]"
-                        >
-                            <h3 className="mb-[7px] text-pretty text-[16px] font-semibold">
-                                {d.title}
-                            </h3>
-                            <p className={body}>{d.body}</p>
-                        </div>
-                    ))}
-                </div>
+                <ShotRail
+                    label={`What ${job.name} does`}
+                    items={job.does.map((d, i) => ({
+                        key: String(i),
+                        label: d.title,
+                        title: d.title,
+                        body: d.body,
+                        image: d.image,
+                        alt: d.alt,
+                    }))}
+                />
             </section>
 
             <section className="mx-auto max-w-[1220px] px-4 pb-12 pt-[52px] sm:px-10">
@@ -148,29 +147,37 @@ export default async function JobPage({ params }: Props) {
                     </div>
                     <div className="rounded-[15px] border border-border bg-card px-6 py-[22px]">
                         <h2 className="mb-3 font-display text-[22px] font-semibold leading-[1.15] tracking-[-0.03em]">
-                            What it will not do
+                            Coming to {job.name}
                         </h2>
                         <ul className="flex flex-col gap-3">
-                            {job.limits.map((limit) => (
+                            {job.coming.map((item) => (
                                 <li
-                                    key={limit.title}
+                                    key={item.title}
                                     className="flex flex-col items-start gap-1.5 sm:flex-row sm:gap-[11px]"
                                 >
-                                    <Pill tone="off">{limit.tag}</Pill>
+                                    <Pill tone="warn">Coming soon</Pill>
                                     <div className="min-w-0 flex-1">
                                         <h3 className="mb-[3px] text-pretty text-[13px] font-semibold">
-                                            {limit.title}
+                                            {item.title}
                                         </h3>
-                                        <p className={body}>{limit.body}</p>
+                                        <p className={body}>{item.body}</p>
+                                        {item.meanwhile ? (
+                                            <p className="mt-1 text-pretty text-[13px] leading-[1.55] text-muted-foreground">
+                                                <span className="font-semibold text-highlight-600 dark:text-highlight-300">
+                                                    Until then:
+                                                </span>{" "}
+                                                {item.meanwhile}
+                                            </p>
+                                        ) : null}
                                     </div>
                                 </li>
                             ))}
                         </ul>
                         <Link
-                            href="/what-it-will-not-do"
+                            href="/coming-soon"
                             className="mt-4 inline-block text-[13px] font-medium text-brand underline underline-offset-[3px]"
                         >
-                            Everything Saroh will not do
+                            Everything that is coming
                         </Link>
                     </div>
                 </div>
@@ -196,7 +203,7 @@ export default async function JobPage({ params }: Props) {
                                     {r.name}
                                 </span>
                             </span>
-                            <span className="block text-pretty text-[12px] leading-normal text-neutral-600 dark:text-neutral-400">
+                            <span className="block text-pretty text-[12px] leading-normal text-highlight-600 dark:text-highlight-400">
                                 {r.short}
                             </span>
                         </Link>

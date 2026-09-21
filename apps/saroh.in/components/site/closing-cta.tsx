@@ -15,7 +15,7 @@ export function ClosingCta() {
                 <h2 className="mx-auto mb-3 max-w-[28ch] font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.035em]">
                     Be there when your batch opens.
                 </h2>
-                <p className="mx-auto mb-[22px] max-w-[54ch] text-pretty text-[16px] leading-[1.6] text-neutral-600 dark:text-neutral-400">
+                <p className="mx-auto mb-[22px] max-w-[54ch] text-pretty text-[16px] leading-[1.6] text-highlight-600 dark:text-highlight-400">
                     We are letting businesses in a few at a time, so each one is
                     set up properly. Leave your email and we will write once,
                     when it is your turn.

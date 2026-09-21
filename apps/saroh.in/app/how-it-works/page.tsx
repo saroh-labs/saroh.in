@@ -22,7 +22,7 @@ export default function HowItWorks() {
                 <h1 className="mb-4 font-display text-[30px] font-semibold leading-[1.04] tracking-[-0.04em] min-[421px]:text-[38px] md:text-[48px]">
                     Four steps, and one of them is naming it
                 </h1>
-                <p className="mb-[30px] max-w-[60ch] text-pretty text-[18px] leading-[1.6] text-neutral-600 dark:text-neutral-400">
+                <p className="mb-[30px] max-w-[60ch] text-pretty text-[18px] leading-[1.6] text-highlight-600 dark:text-highlight-400">
                     Saroh does not ask you to configure anything before you have
                     seen it. You make an account, name the business, and you are
                     in — then you decide what it does for you from inside.
@@ -69,23 +69,23 @@ export default function HowItWorks() {
                     <h2 className="mb-[11px] font-display text-[22px] font-semibold leading-[1.14] tracking-[-0.03em]">
                         Your role can differ in every business
                     </h2>
-                    <p className="mb-[18px] text-pretty text-[16px] leading-[1.6] text-neutral-200">
+                    <p className="mb-[18px] text-pretty text-[16px] leading-[1.6] text-highlight-200">
                         One account holds all of them. You might own the bakery
                         and merely read the books for a friend's studio — so
                         roles are set per business, not per person. A thing your
                         role cannot do says so and why, rather than quietly
                         disappearing.
                     </p>
-                    <div className="relative overflow-x-auto rounded-[12px] border border-neutral-600">
+                    <div className="relative overflow-x-auto rounded-[12px] border border-highlight-600">
                         <table className="w-full min-w-[520px] border-collapse">
                             <caption className="sr-only">
                                 What each built-in role can do
                             </caption>
                             <thead>
-                                <tr className="bg-neutral-800">
+                                <tr className="bg-highlight-800">
                                     <th
                                         scope="col"
-                                        className="px-[15px] py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-200"
+                                        className="px-[15px] py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-highlight-200"
                                     >
                                         Can they
                                     </th>
@@ -93,7 +93,7 @@ export default function HowItWorks() {
                                         <th
                                             key={role}
                                             scope="col"
-                                            className="w-[84px] px-1 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-200"
+                                            className="w-[84px] px-1 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-highlight-200"
                                         >
                                             {role}
                                         </th>
@@ -104,7 +104,7 @@ export default function HowItWorks() {
                                 {ROLE_ROWS.map((row) => (
                                     <tr
                                         key={row.label}
-                                        className="border-t border-neutral-600"
+                                        className="border-t border-highlight-600"
                                     >
                                         <th
                                             scope="row"
@@ -119,7 +119,7 @@ export default function HowItWorks() {
                                                     "text-center text-[16px]",
                                                     can
                                                         ? "text-brand-surface-foreground"
-                                                        : "text-neutral-400",
+                                                        : "text-highlight-400",
                                                 )}
                                             >
                                                 <span aria-hidden>
@@ -135,7 +135,7 @@ export default function HowItWorks() {
                             </tbody>
                         </table>
                     </div>
-                    <p className="mt-3 text-pretty text-[13px] leading-[1.55] text-neutral-200">
+                    <p className="mt-3 text-pretty text-[13px] leading-[1.55] text-highlight-200">
                         The four roles every business starts with. You can make
                         your own from Team.
                     </p>

@@ -44,7 +44,7 @@ function Marker() {
 }
 
 const navLink =
-    "group relative inline-flex h-[34px] shrink-0 items-center gap-[5px] whitespace-nowrap px-1 text-[13px] font-medium text-neutral-600 transition-colors hover:text-foreground aria-[current=page]:font-semibold aria-[current=page]:text-foreground dark:text-neutral-400";
+    "group relative inline-flex h-[34px] shrink-0 items-center gap-[5px] whitespace-nowrap px-1 text-[13px] font-medium text-highlight-600 transition-colors hover:text-foreground aria-[current=page]:font-semibold aria-[current=page]:text-foreground dark:text-highlight-400";
 
 export function SiteNav() {
     const { resolvedTheme, setTheme } = useTheme();
@@ -127,7 +127,7 @@ export function SiteNav() {
                                                 {job.name}
                                             </span>
                                         </span>
-                                        <span className="mt-[3px] block text-pretty pl-[25px] text-[13px] leading-normal text-neutral-600 dark:text-neutral-400">
+                                        <span className="mt-[3px] block text-pretty pl-[25px] text-[13px] leading-normal text-highlight-600 dark:text-highlight-400">
                                             {job.short}
                                         </span>
                                     </Link>
@@ -169,7 +169,7 @@ export function SiteNav() {
                     </button>
                     <a
                         href={SIGN_IN_URL}
-                        className="hidden text-[13px] text-neutral-600 hover:text-foreground dark:text-neutral-400 sm:inline"
+                        className="hidden text-[13px] text-highlight-600 hover:text-foreground dark:text-highlight-400 sm:inline"
                     >
                         Sign in
                     </a>

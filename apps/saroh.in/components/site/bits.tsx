@@ -13,14 +13,14 @@ export const sectionHeading =
     "font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.035em]";
 
 export const body =
-    "text-pretty text-[16px] leading-[1.6] text-neutral-600 dark:text-neutral-400";
+    "text-pretty text-[16px] leading-[1.6] text-highlight-600 dark:text-highlight-400";
 
 /**
  * A full-bleed band behind a section, as the design's `om-band`: lighter than
  * the canvas (#F7F6F3 on #E9E5DC), with a hairline above and below.
  */
 export const band =
-    "relative isolate before:absolute before:inset-y-0 before:left-1/2 before:-z-10 before:w-screen before:-translate-x-1/2 before:border-y before:border-border before:bg-neutral-50 dark:before:bg-card";
+    "relative isolate before:absolute before:inset-y-0 before:left-1/2 before:-z-10 before:w-screen before:-translate-x-1/2 before:border-y before:border-border before:bg-highlight-50 dark:before:bg-card";
 
 export function WaitlistButton({ className }: { className?: string }) {
     return (
@@ -76,8 +76,8 @@ export function Pill({
                 tone === "warn" &&
                     "bg-brand-subtle text-brand-subtle-foreground",
                 tone === "off" && "bg-muted text-muted-foreground",
-                tone === "ink" && "bg-neutral-700 text-neutral-100",
-                !tone && "bg-muted text-neutral-600 dark:text-neutral-300",
+                tone === "ink" && "bg-highlight-700 text-highlight-100",
+                !tone && "bg-muted text-highlight-600 dark:text-highlight-300",
                 className,
             )}
         >
@@ -123,7 +123,7 @@ export function Chain({
                     ) : null}
                     <div
                         className={cn(
-                            "min-w-0 flex-auto rounded-[12px] border border-border bg-neutral-50 dark:bg-muted",
+                            "min-w-0 flex-auto rounded-[12px] border border-border bg-highlight-50 dark:bg-muted",
                             detail
                                 ? "px-[15px] py-[13px]"
                                 : "px-[13px] py-[11px]",
@@ -138,7 +138,7 @@ export function Chain({
                             {s.step}
                         </div>
                         {detail && s.detail ? (
-                            <div className="mt-[5px] text-pretty text-[16px] leading-[1.5] text-neutral-600 dark:text-neutral-400">
+                            <div className="mt-[5px] text-pretty text-[16px] leading-[1.5] text-highlight-600 dark:text-highlight-400">
                                 {s.detail}
                             </div>
                         ) : null}
