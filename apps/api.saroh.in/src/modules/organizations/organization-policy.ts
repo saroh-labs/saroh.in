@@ -82,6 +82,9 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
     "org:read",
     "member:read",
     "store:read",
+    // Reviews are about products, which the floor already sees. Reading them
+    // is not replying to, hiding or inviting them (product-review:write).
+    "product-review:read",
     "site:read",
     "media:read",
     // Every role may read effective module availability (ADR-003); managing

@@ -519,6 +519,7 @@ describe("invented roles on the roster", () => {
             "org:read",
             "member:read",
             "store:read",
+            "product-review:read",
             "site:read",
             "media:read",
             "module:read",

@@ -139,6 +139,17 @@ export const CAPABILITIES: readonly Capability[] = [
     { action: "order:write", group: "sell", label: "Change orders" },
     { action: "discount:read", group: "sell", label: "See discount codes" },
     {
+        action: "product-review:read",
+        group: "sell",
+        label: "See product reviews",
+    },
+    {
+        action: "product-review:write",
+        group: "sell",
+        label: "Reply to, hide and invite product reviews",
+        note: "Inviting emails a customer a link to review what they bought.",
+    },
+    {
         action: "discount:write",
         group: "sell",
         label: "Make and change discount codes",

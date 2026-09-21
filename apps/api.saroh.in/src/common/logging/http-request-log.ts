@@ -1,6 +1,7 @@
 import type { Request } from "express";
 
 import type { CorrelatedRequest } from "./correlation-id.middleware";
+import { redactUrl } from "./redact";
 import { structuredLogger } from "./structured-logger";
 
 /**
@@ -42,7 +43,7 @@ export function logHttpRequestOnce(
     structuredLogger[level]("http_request", {
         correlationId: marked.correlationId ?? "unknown",
         method: req.method,
-        path: req.originalUrl,
+        path: redactUrl(req.originalUrl),
         statusCode,
         ...(marked.startTime !== undefined
             ? { durationMs: Date.now() - marked.startTime }

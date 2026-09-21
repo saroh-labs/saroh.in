@@ -4,7 +4,7 @@ import type { Request, Response } from "express";
 
 import type { CorrelatedRequest } from "../logging/correlation-id.middleware";
 import { logHttpRequestOnce } from "../logging/http-request-log";
-import { redactHeaders } from "../logging/redact";
+import { redactHeaders, redactUrl } from "../logging/redact";
 import { RESPONSE_ID_HEADER } from "../logging/request-context";
 import { structuredLogger } from "../logging/structured-logger";
 
@@ -106,7 +106,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
             structuredLogger.error("unhandled_exception", {
                 correlationId,
                 method: req.method,
-                path: req.originalUrl,
+                path: redactUrl(req.originalUrl),
                 statusCode,
                 errorName:
                     exception instanceof Error

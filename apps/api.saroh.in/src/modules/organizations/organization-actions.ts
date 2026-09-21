@@ -62,6 +62,10 @@ export type OrgAction =
     | "order:write"
     | "discount:read"
     | "discount:write"
+    // Product reviews. Named apart from "review", which is site review (the
+    // REVIEWER role, site:approve) — the two must never be confused.
+    | "product-review:read"
+    | "product-review:write"
     | "payment:read"
     | "payment:manage"
     | "message:read"
@@ -132,6 +136,8 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "order:write",
     "discount:read",
     "discount:write",
+    "product-review:read",
+    "product-review:write",
     "payment:read",
     "payment:manage",
     "message:read",

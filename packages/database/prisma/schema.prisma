@@ -203,6 +203,8 @@ model Organization {
   roles               OrganizationRole[]
   discounts           Discount[]
   discountRedemptions DiscountRedemption[]
+  productReviews      ProductReview[]
+  reviewInvitations   ReviewInvitation[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -447,6 +449,8 @@ model Store {
 
   discountReach DiscountStore[]
 
+  productReviews ProductReview[]
+
   @@index([slug])
   @@index([createdAt])
 }
@@ -542,6 +546,8 @@ model Product {
   updatedAt DateTime @updatedAt
 
   discountReach DiscountProduct[]
+
+  reviews ProductReview[]
 
   @@unique([storeId, slug])
   @@index([storeId])
@@ -645,6 +651,8 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  productReviews ProductReview[]
+
   @@unique([storeId, email])
   @@index([storeId])
   @@index([organizationId])
@@ -713,6 +721,8 @@ model Order {
 
   discountRedemption DiscountRedemption?
 
+  reviewInvitation ReviewInvitation?
+
   @@unique([storeId, orderId])
   @@index([storeId])
   @@index([customerId])
@@ -729,6 +739,8 @@ model OrderItem {
 
   quantity Int
   price    Decimal @db.Decimal(10, 2)
+
+  review ProductReview?
 
   @@index([orderId])
 }
@@ -2330,7 +2342,10 @@ model Notification {
   body  String?
 
   // The subject this notice points at (a Lead, for enquiries).
-  leadId String?
+  leadId   String?
+  // Or a product review ("A review needs a reply"). Informational, no FK,
+  // like leadId — a notice outlives nothing it could dangle from.
+  reviewId String?
 
   readAt DateTime? // null = unread
 
@@ -2341,6 +2356,7 @@ model Notification {
   // (leadId, type). NULL leadId rows are distinct, so non-lead notices are
   // unconstrained.
   @@unique([leadId, type])
+  @@unique([reviewId, type])
   @@index([organizationId, userId, readAt])
   @@index([organizationId])
 }
@@ -3150,4 +3166,75 @@ model DiscountRedemption {
   @@unique([discountId, orderId])
   @@index([discountId])
   @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Product reviews (plan 2026-09-21-001). A review comes only from a customer
+// the merchant invited, for an order that was paid and shipped: one link per
+// order, whose token is stored ONLY as its SHA-256 hash.
+// ---------------------------------------------------------------------------
+model ReviewInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // One live invitation per order; a resend rotates the hash in place.
+  orderId        String       @unique
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  tokenHash       String    @unique
+  // The address it was sent to — shown on reviews as "invited to …".
+  toAddress       String
+  expiresAt       DateTime
+  // Every line reviewed: the link has done its job.
+  completedAt     DateTime?
+  sendCount       Int       @default(1)
+  lastSentAt      DateTime  @default(now())
+  createdByUserId String?
+
+  reviews ProductReview[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model ProductReview {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  storeId        String
+  store          Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  invitationId   String
+  invitation     ReviewInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  // One review per order line. SetNull keeps the review if the line goes.
+  orderItemId String?    @unique
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  productId   String?
+  product     Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  customerId  String?
+  customer    Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  // Snapshots: what was reviewed and whom it was sent to, as they were.
+  productName String
+  invitedTo   String
+
+  rating      Int // 1–5, enforced in the API (a CHECK would drift the replay)
+  body        String? @db.Text
+  displayName String
+
+  status         String    @default("PUBLISHED") // PUBLISHED | HIDDEN
+  hiddenAt       DateTime?
+  hiddenByUserId String?
+
+  reply          String?   @db.Text
+  repliedAt      DateTime?
+  replyUpdatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, productId, status])
+  @@index([organizationId, createdAt])
 }

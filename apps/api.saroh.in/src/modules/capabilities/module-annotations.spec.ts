@@ -46,6 +46,7 @@ const CLASS_LEVEL: Record<string, string> = {
     "categories/categories.controller.ts": "COMMERCE",
     "customers/customers.controller.ts": "COMMERCE",
     "discounts/discounts.controller.ts": "COMMERCE",
+    "product-reviews/product-reviews.controller.ts": "COMMERCE",
     "orders/orders.controller.ts": "COMMERCE",
     "products/products.controller.ts": "COMMERCE",
     "products/product-details.controller.ts": "COMMERCE",
@@ -67,6 +68,8 @@ const METHOD_LEVEL: Record<string, string> = {
  * finishing the rollout and would in fact break the thing the runbook protects.
  */
 const NEVER: Record<string, string> = {
+    "product-reviews/public-product-reviews.controller.ts":
+        "the customer review page — no session, hangs on its token",
     "capabilities/capabilities.controller.ts":
         "gating this locks a merchant out of turning the module back on",
     "home/home.controller.ts":

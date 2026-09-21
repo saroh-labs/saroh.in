@@ -20,6 +20,7 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
         "org:read",
         "member:read",
         "store:read",
+        "product-review:read",
         "site:read",
         "media:read",
         // ADR-003: every role may read effective module availability.
@@ -161,4 +162,19 @@ describe("discount codes", () => {
             }
         },
     );
+});
+
+describe("product reviews", () => {
+    it.each([
+        ["OWNER", true, true],
+        ["ADMIN", true, true],
+        // Members see reviews — they are about products, which Members see —
+        // but reply to, hide and invite nothing.
+        ["MEMBER", true, false],
+        // "Review" in REVIEWER is site review; product reviews are not theirs.
+        ["REVIEWER", false, false],
+    ] as const)("%s: read %s, write %s", (role, read, write) => {
+        expect(can(role, "product-review:read")).toBe(read);
+        expect(can(role, "product-review:write")).toBe(write);
+    });
 });

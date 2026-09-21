@@ -33,6 +33,7 @@ import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { PipelinesModule } from "./modules/pipelines/pipelines.module";
+import { ProductReviewsModule } from "./modules/product-reviews/product-reviews.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { ProviderHealthModule } from "./modules/provider-health/provider-health.module";
@@ -93,6 +94,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         JobsModule,
         FormsModule,
         DiscountsModule,
+        ProductReviewsModule,
         EnquiryModule,
         ContactsModule,
         SearchModule,

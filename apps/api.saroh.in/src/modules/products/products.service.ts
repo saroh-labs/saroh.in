@@ -166,6 +166,15 @@ export class ProductsService {
         if (!product) {
             throw new NotFoundException("Product not found");
         }
+        // An order line keeps its product (the history of what was sold, and
+        // now of what was reviewed), so the database refuses the delete — which
+        // used to surface as a bare 500. Say it, and say what to do instead.
+        const sold = await prisma.orderItem.count({ where: { productId } });
+        if (sold > 0) {
+            throw new ConflictException(
+                "This product has been ordered, so it can't be deleted. Archive it instead — it leaves the storefront and its order history stays.",
+            );
+        }
         await prisma.product.delete({ where: { id: productId } });
         return { id: productId };
     }
