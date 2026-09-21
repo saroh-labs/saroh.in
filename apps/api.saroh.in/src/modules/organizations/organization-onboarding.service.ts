@@ -54,7 +54,12 @@ export class OrganizationOnboardingService {
          * was before). Stored as the slug, and it is what the business's
          * first website is served at (`<address>.saroh.app`).
          */
-        const chosen = dto.address ? dto.address : null;
+        // Blank counts as not chosen, like absent: `??` alone would keep ""
+        // and refuse it, where it should fall back to the name.
+        const chosen =
+            dto.address === undefined || dto.address === ""
+                ? null
+                : dto.address;
         const slug = chosen ?? slugify(dto.name).slice(0, 63);
         if (!slug) {
             throw new BadRequestException(
