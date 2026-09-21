@@ -2,58 +2,57 @@ import type { Metadata } from "next";
 
 import { Pill } from "@/components/site/bits";
 import { ClosingCta } from "@/components/site/closing-cta";
-import { LIMITS } from "@/lib/site-content";
+import { COMING } from "@/lib/site-content";
 
 export const metadata: Metadata = {
-    title: "What Saroh will not do — Saroh",
+    title: "Coming soon — Saroh",
     description:
-        "Everything Saroh has decided not to build, or has not built yet — so you find out here, not three weeks after moving your business across.",
+        "What Saroh is building next — online payments, reminders, one catalogue for every storefront and more — and how to manage until each arrives.",
 };
 
-export default function Limits() {
-    const notBuilt = LIMITS.filter((l) => l.tag === "Not built").length;
-
+export default function ComingSoon() {
     return (
         <>
             <section className="mx-auto max-w-[900px] px-4 pb-[34px] pt-[52px] sm:px-10">
                 <div className="mb-4 font-mono text-[11px] text-muted-foreground">
-                    /what-it-will-not-do
+                    /coming-soon
                 </div>
                 <h1 className="mb-4 font-display text-[30px] font-semibold leading-[1.04] tracking-[-0.04em] min-[421px]:text-[38px] md:text-[48px]">
-                    What Saroh will not do
+                    Coming soon
                 </h1>
                 <p className="mb-3 max-w-[60ch] text-pretty text-[18px] leading-[1.6] text-neutral-600 dark:text-neutral-400">
-                    Every one of these is something we decided not to build, or
-                    have not built yet. None of it is coming next week, and we
-                    would rather you found out on this page than three weeks
-                    after moving your business across.
+                    What we are building next. Each one is here because it saves
+                    a small business real time or real money — and each one says
+                    how to manage until it arrives, so nothing on this page is a
+                    surprise after you have moved your business across.
                 </p>
                 <p className="mb-[30px] max-w-[60ch] text-pretty text-[16px] leading-[1.6] text-muted-foreground">
-                    {LIMITS.length} of them: {notBuilt} we have not built,{" "}
-                    {LIMITS.length - notBuilt} that are limits of how Saroh
-                    works today.
+                    No dates: we would rather tell you when something ships than
+                    promise when it will.
                 </p>
                 <ul className="flex flex-col gap-[13px]">
-                    {LIMITS.map((limit) => (
+                    {COMING.map((item) => (
                         <li
-                            key={limit.title}
+                            key={item.title}
                             className="flex flex-wrap items-start gap-3 rounded-[14px] border border-border bg-card px-[22px] py-5"
                         >
                             <div className="min-w-0 flex-[1_1_260px]">
                                 <h2 className="mb-[7px] text-pretty font-display text-[18px] font-semibold tracking-[-0.02em]">
-                                    {limit.title}
+                                    {item.title}
                                 </h2>
                                 <p className="text-pretty text-[16px] leading-[1.6] text-neutral-600 dark:text-neutral-400">
-                                    {limit.body}
+                                    {item.body}
                                 </p>
-                                <p className="mt-[9px] text-pretty text-[13px] leading-[1.6] text-muted-foreground">
-                                    <strong className="font-semibold text-neutral-600 dark:text-neutral-300">
-                                        If this is your deal-breaker:
-                                    </strong>{" "}
-                                    {limit.instead}
-                                </p>
+                                {item.meanwhile ? (
+                                    <p className="mt-[9px] text-pretty text-[13px] leading-[1.6] text-muted-foreground">
+                                        <strong className="font-semibold text-neutral-600 dark:text-neutral-300">
+                                            Until then:
+                                        </strong>{" "}
+                                        {item.meanwhile}
+                                    </p>
+                                ) : null}
                             </div>
-                            <Pill tone="off">{limit.tag}</Pill>
+                            <Pill tone="warn">Coming soon</Pill>
                         </li>
                     ))}
                 </ul>
@@ -62,7 +61,7 @@ export default function Limits() {
             <section className="mx-auto max-w-[900px] px-4 pb-[54px] pt-[52px] sm:px-10">
                 <div className="rounded-[16px] bg-brand-surface px-5 py-7 text-brand-surface-foreground sm:px-[30px]">
                     <h2 className="mb-[11px] font-display text-[22px] font-semibold leading-[1.14] tracking-[-0.03em]">
-                        The one rule we will not trade
+                        What will not change as we build
                     </h2>
                     <p className="mb-[18px] text-pretty text-[16px] leading-[1.6] text-neutral-200">
                         A figure Saroh cannot read is withheld and named, never

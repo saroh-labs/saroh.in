@@ -23,7 +23,7 @@ const nextConfig = {
             insights: "/insights",
             payments: "/sell",
             communications: "/contacts",
-            automations: "/what-it-will-not-do",
+            automations: "/coming-soon",
         };
         return [
             { source: "/modules", destination: "/", permanent: true },
@@ -34,6 +34,11 @@ const nextConfig = {
             })),
             { source: "/modules/:slug", destination: "/", permanent: true },
             { source: "/about", destination: "/how-it-works", permanent: true },
+            {
+                source: "/what-it-will-not-do",
+                destination: "/coming-soon",
+                permanent: true,
+            },
         ];
     },
 

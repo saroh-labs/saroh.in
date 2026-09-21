@@ -2,7 +2,6 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { ChainExplorer } from "@/components/home/chain-explorer";
-import { JobRail } from "@/components/home/job-rail";
 import {
     Pill,
     SecondaryButton,
@@ -11,8 +10,9 @@ import {
     sectionHeading,
 } from "@/components/site/bits";
 import { ClosingCta } from "@/components/site/closing-cta";
+import { ShotRail } from "@/components/site/shot-rail";
 import { ThemedImage } from "@/components/site/themed-image";
-import { CHAINS, HOME_SHOT, JOBS, LIMITS } from "@/lib/site-content";
+import { CHAINS, COMING, HOME_SHOT, JOBS } from "@/lib/site-content";
 
 /**
  * Home, after "Saroh Marketing Site": the promise, what "in one place" buys a
@@ -22,13 +22,14 @@ import { CHAINS, HOME_SHOT, JOBS, LIMITS } from "@/lib/site-content";
 export default function Home() {
     const rail = JOBS.map((job) => ({
         key: job.key,
-        name: job.name,
+        label: job.name,
         icon: job.icon,
-        route: job.route,
-        head: job.head,
-        lede: job.lede,
+        title: job.head,
+        body: job.lede,
         image: job.shot.crop,
         alt: job.shot.alt,
+        href: job.route,
+        more: `What ${job.name} does →`,
     }));
 
     return (
@@ -94,7 +95,7 @@ export default function Home() {
                         switched on is simply absent.
                     </p>
                 </div>
-                <JobRail jobs={rail} />
+                <ShotRail items={rail} label="Jobs" />
             </section>
 
             <section className="mx-auto max-w-[1220px] px-4 pb-14 pt-2.5 sm:px-10">
@@ -107,34 +108,35 @@ export default function Home() {
                                     "mb-3 max-w-[26ch]",
                                 )}
                             >
-                                What Saroh will not do
+                                Coming soon
                             </h2>
                             <p className="mb-4 max-w-[40ch] text-pretty text-[16px] leading-[1.6] text-neutral-200">
-                                Better you find out here than three weeks after
-                                moving your business across.
+                                What we are building next, and how to manage
+                                until it arrives — so you know what to expect
+                                before you move your business across.
                             </p>
                             <Link
-                                href="/what-it-will-not-do"
+                                href="/coming-soon"
                                 className="inline-flex h-[42px] items-center rounded-[9px] border border-neutral-600 px-[18px] text-[16px] font-semibold hover:bg-neutral-800"
                             >
-                                Read all of them
+                                See everything that is coming
                             </Link>
                         </div>
                         <ul className="overflow-hidden rounded-[13px] border border-neutral-600">
-                            {LIMITS.slice(0, 3).map((limit) => (
+                            {COMING.slice(0, 3).map((item) => (
                                 <li
-                                    key={limit.title}
+                                    key={item.title}
                                     className="flex items-start gap-3 border-t border-neutral-600 px-4 py-3.5 first:border-t-0"
                                 >
                                     <div className="min-w-0 flex-1">
                                         <div className="text-pretty text-[13px] font-semibold">
-                                            {limit.title}
+                                            {item.title}
                                         </div>
                                         <p className="mt-1 text-pretty text-[16px] leading-[1.55] text-neutral-200">
-                                            {limit.body}
+                                            {item.body}
                                         </p>
                                     </div>
-                                    <Pill tone="ink">{limit.tag}</Pill>
+                                    <Pill tone="ink">Coming soon</Pill>
                                 </li>
                             ))}
                         </ul>

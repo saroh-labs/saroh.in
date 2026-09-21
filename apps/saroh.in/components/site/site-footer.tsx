@@ -42,8 +42,8 @@ export function SiteFooter() {
                             </Link>
                         </li>
                         <li>
-                            <Link href="/what-it-will-not-do" className={link}>
-                                What it will not do
+                            <Link href="/coming-soon" className={link}>
+                                Coming soon
                             </Link>
                         </li>
                     </ul>

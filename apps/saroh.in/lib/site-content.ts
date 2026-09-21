@@ -3,7 +3,8 @@
  *
  * The layout follows the Claude Design file "Saroh Marketing Site": five job
  * pages from ONE template and five data sets, a home page, How it works, and
- * What it will not do. The copy follows the design's voice, but each claim was
+ * Coming soon (the design's "What it will not do", reframed as what to expect:
+ * nearly all of it is work planned, not work refused). The copy follows the design's voice, but each claim was
  * checked against the code on 2026-09-21 and rewritten where the design said
  * something the product does not do yet — `saroh-product.md`: marketing
  * matches what ships. The notable corrections, so nobody "restores" them:
@@ -22,6 +23,12 @@
  *   named Contacts because that is what the sidebar calls it.
  * - The role table is read from `organization-policy.ts`: an Admin can
  *   invite, a Member is read-only, a Reviewer sees only the website.
+ * - Booking and enquiry blocks on a merchant's site are blocked by CORS
+ *   today (#363), so booking from your website and forms that fill your
+ *   contacts are listed as coming, not as features.
+ *
+ * Every feature on a job page has its own screenshot of the real screen that
+ * does it. A feature with no screen to show is not listed as a feature.
  */
 
 export type JobKey = "sell" | "website" | "bookings" | "contacts" | "insights";
@@ -37,12 +44,22 @@ export const ICON: Record<IconName, string> = {
     card: "M3.5 5.5 H20.5 A1 1 0 0 1 21.5 6.5 V17.5 A1 1 0 0 1 20.5 18.5 H3.5 A1 1 0 0 1 2.5 17.5 V6.5 A1 1 0 0 1 3.5 5.5 Z M9 11.4 A2 2 0 1 0 9 7.4 A2 2 0 0 0 9 11.4 Z M5.8 15.8 C5.8 13.8 7.3 12.9 9 12.9 C10.7 12.9 12.2 13.8 12.2 15.8 M15 9.6 H18.6 M15 13.2 H18.6",
 };
 
-export type LimitTag = "Not built" | "Limit";
-
-export interface Limit {
+/**
+ * Something being built. `body` is what it will let you do; `meanwhile` is
+ * what to do until it arrives, where there is an honest answer. No dates: a
+ * date on a marketing page is a promise nobody reviewed.
+ */
+export interface Coming {
     title: string;
-    tag: LimitTag;
     body: string;
+    meanwhile?: string;
+}
+
+export interface Feature {
+    title: string;
+    body: string;
+    image: ThemedImage;
+    alt: string;
 }
 
 /** One picture in both themes, so the site shows the one it is wearing. */
@@ -71,11 +88,12 @@ export interface Job {
     head: string;
     lede: string;
     who: string;
-    does: { title: string; body: string }[];
+    /** What it does, each with a detail of the screen that does it. */
+    does: Feature[];
     flow: { owner: string; step: string }[];
     flowNote: string;
     needs?: string;
-    limits: Limit[];
+    coming: Coming[];
     shot: Screenshot;
     caption: string;
     related: JobKey[];
@@ -133,6 +151,16 @@ export const HOME_SHOT = screen(
     "Home in Saroh: under Needs you, seven overdue leads with their value and how late each is, and four orders waiting to be sent.",
 );
 
+/** A 9:4 detail of the screen behind one feature, in both themes. */
+function detail(name: string): ThemedImage {
+    return {
+        light: `/shots/feat-${name}.png`,
+        dark: `/shots/feat-${name}-dark.png`,
+        w: 900,
+        h: 400,
+    };
+}
+
 export const JOBS: Job[] = [
     {
         key: "sell",
@@ -147,19 +175,27 @@ export const JOBS: Job[] = [
         does: [
             {
                 title: "Orders from every storefront, together",
-                body: "One list across the business. Filter to one storefront when you want to; never add them up yourself.",
+                body: "One list across the business. Filter to one storefront when you want to; you never add them up yourself.",
+                image: SHOT.orders.crop,
+                alt: "The Orders list: each order with who placed it, which storefront took it, its status and total.",
             },
             {
                 title: "Products with their own price and stock",
-                body: "Each product lives in a storefront, with a price and a count that goes down when someone buys one.",
+                body: "Each product carries its price and how many are left, and warns you when stock runs low.",
+                image: detail("sell-products"),
+                alt: "The Products list: twelve products with their status, how many are in stock and the price in rupees.",
             },
             {
-                title: "Customers per storefront",
-                body: "Everyone who has bought, with what and when — kept by the storefront they bought from.",
+                title: "Customers who come back, marked",
+                body: "Everyone who has bought, what they spent and when they last ordered, with returning customers picked out.",
+                image: detail("sell-customers"),
+                alt: "The Customers list: each customer with their email, how many orders, what they spent and their last order.",
             },
             {
-                title: "Discount codes",
-                body: "Made once for the business, and pointed at the storefronts they apply to.",
+                title: "Discount codes, aimed where you want",
+                body: "Take a percentage or an amount off everything, or only the storefronts, collections or products you choose.",
+                image: detail("sell-discounts"),
+                alt: "Making a discount code: a percentage or an amount off, applied to everything, storefronts, collections or products.",
             },
         ],
         flow: [
@@ -168,21 +204,23 @@ export const JOBS: Job[] = [
             { owner: "Insights", step: "Counted in orders" },
         ],
         flowNote: "Nobody retypes the buyer's name.",
-        limits: [
+        coming: [
             {
-                title: "No stock movements",
-                tag: "Not built",
-                body: "You can set how many of something you have. There is no goods-in, no transfer between storefronts and no audit trail.",
+                title: "Take payment online, from your own account",
+                body: "Connect Razorpay or Cashfree yourself, so customers pay by UPI, card or netbanking at checkout.",
+                meanwhile:
+                    "take payment the way you do today; every order still lands here.",
             },
             {
-                title: "One product list per storefront",
-                tag: "Limit",
-                body: "Two storefronts selling the same loaf means the loaf is added to each. One shared catalogue is designed, not built.",
+                title: "One catalogue for every storefront",
+                body: "Add a product once and sell it at the counter and online, with its own price and stock in each.",
+                meanwhile: "add the product to each storefront.",
             },
             {
-                title: "Online payments are not self-serve yet",
-                tag: "Not built",
-                body: "Razorpay and Cashfree are supported underneath, but there is no screen to connect your own account yet.",
+                title: "Stock that follows every unit",
+                body: "Goods in, transfers between storefronts, and a record of who changed what.",
+                meanwhile:
+                    "stock goes down as things sell; set counts by hand when a delivery arrives.",
             },
         ],
         shot: SHOT.orders,
@@ -203,37 +241,44 @@ export const JOBS: Job[] = [
         does: [
             {
                 title: "Pages and posts, kept apart",
-                body: "Pages are the structure of the site; posts are dated. Each is drafted, then published.",
+                body: "Pages are the structure of your site; posts are dated writing. Each is a draft until you publish it.",
+                image: detail("website-posts"),
+                alt: "A site's posts: one in draft, two published, each with its category and author.",
             },
             {
                 title: "Drafts nobody else can read",
-                body: "Nothing is public until you publish, and publishing keeps the version that went live.",
+                body: "Change what you like; visitors keep seeing the last version you published until you publish again.",
+                image: detail("website-drafts"),
+                alt: "A site's status: live, when it was last published, and one section changed and waiting to publish.",
             },
             {
                 title: "Your own address",
-                body: "A saroh.app address until you bring a domain. No Saroh branding on it — your shop, not our advert.",
+                body: "A saroh.app address from the first day, and your own domain when you are ready — with the exact record to add, and no Saroh branding on the site.",
+                image: detail("website-address"),
+                alt: "A site's address: its saroh.app subdomain, and its own domain waiting for the DNS record shown beneath it.",
             },
             {
-                title: "Someone else can check it first",
-                body: "Share a page for review. A reviewer reads and comments without ever opening the editor.",
+                title: "Someone else checks it first",
+                body: "Ask for a review before you publish. A reviewer can comment on any block and cannot change the page.",
+                image: detail("website-review"),
+                alt: "The page editor with the site marked In review, and the page's blocks listed on the left.",
             },
         ],
         flow: [
             { owner: "Website", step: "Page goes live" },
-            { owner: "Bookings / Contacts", step: "They book or enquire" },
+            { owner: "Visitors", step: "They read it" },
             { owner: "Insights", step: "You see the visit" },
         ],
         flowNote: "The site is where the other jobs meet a customer.",
-        limits: [
+        coming: [
             {
-                title: "No email campaigns",
-                tag: "Not built",
-                body: "A journal is not a newsletter. There are no bulk sends, no audiences and no open rates.",
+                title: "Visitors book and enquire from your site",
+                body: "A booking section where people pick a free slot, and forms that add them to your contacts as they arrive.",
             },
             {
-                title: "No A/B testing",
-                tag: "Not built",
-                body: "One version of a page, live. If you need to test two headlines against each other, this is not the tool.",
+                title: "Newsletters to the people who asked",
+                body: "Write to your contacts from Saroh — only to those who agreed to hear from you.",
+                meanwhile: "keep your mailing tool alongside Saroh.",
             },
         ],
         shot: SHOT.website,
@@ -247,50 +292,64 @@ export const JOBS: Job[] = [
         icon: "clock",
         route: "/bookings",
         crumb: "Bookings › Schedule",
-        short: "Services people book time in, inside the hours you work.",
-        head: "A diary people can book, without emailing you first.",
-        lede: "Your services, the hours you actually work, and who is coming next. No shop ever appears.",
+        short: "Your services, the hours you work, and every booking.",
+        head: "Your services, your hours and every booking, in one diary.",
+        lede: "What you offer, when you work, who is coming and how each one went. No shop ever appears.",
         who: "anyone selling time rather than things — coaching, lessons, treatments, consultations, classes.",
         does: [
             {
                 title: "Services with a length and a price",
-                body: "45 minutes at one price, 30 at another, with a gap before and after if you need one.",
+                body: "45 minutes at one price, 60 at another, with a gap before or after when you need to reset.",
+                image: detail("bookings-services"),
+                alt: "The Services list: three services with their length, price, how many can book each slot and their timezone.",
             },
             {
                 title: "The hours you actually work",
-                body: "Mark weekly windows and that is what people can book — in the timezone you work in.",
+                body: "Mark weekly windows for each service, in the timezone you work in. Nothing can be booked outside them.",
+                image: detail("bookings-hours"),
+                alt: "A service's availability: Monday to Wednesday, nine to five, each window editable.",
             },
             {
-                title: "Classes as well as one-to-ones",
-                body: "Give a slot room for more than one person and it books like a class.",
+                title: "Say how each one went",
+                body: "Once a booking is over, mark whether they came. Needs an outcome keeps every one nobody has answered yet.",
+                image: detail("bookings-outcome"),
+                alt: "The Bookings list on Needs an outcome: past bookings with the service, who booked and Not said yet.",
             },
             {
-                title: "Booked from your website",
-                body: "Put a booking section on a page and visitors pick a free slot themselves.",
+                title: "What still needs a yes",
+                body: "Unconfirmed gathers every booking that is pending or was cancelled, so nothing waits unnoticed.",
+                image: detail("bookings-unconfirmed"),
+                alt: "The Bookings list on Unconfirmed: one cancelled booking and two pending ones.",
             },
         ],
         flow: [
-            { owner: "Website", step: "They pick a slot" },
             { owner: "Bookings", step: "Booking made" },
             { owner: "Contacts", step: "Contact created" },
+            { owner: "Home", step: "On your day" },
         ],
         flowNote: "The person who booked is already in your contacts.",
         needs: "Bookings needs somewhere to keep the people who book, so switching it on switches Contacts on too — and says so, rather than failing later.",
-        limits: [
+        coming: [
             {
-                title: "One diary per business",
-                tag: "Not built",
-                body: "A gym with two branches cannot yet split its diary and staff between them.",
+                title: "Booked straight from your website",
+                body: "A booking section on any page, where visitors pick a free slot inside your hours themselves.",
             },
             {
-                title: "No reminder messages",
-                tag: "Not built",
-                body: "Saroh does not text or email your customers before their appointment. You see the booking; they are not nudged.",
+                title: "Reminders your customers actually get",
+                body: "A message before each appointment, sent for you — fewer no-shows, fewer phone calls.",
+                meanwhile:
+                    "every booking is here to see; the reminding is still yours.",
             },
             {
-                title: "Not paid for through Saroh",
-                tag: "Not built",
-                body: "A service can show a price, but a booking is not charged. Take payment the way you do today.",
+                title: "Paid when it is booked",
+                body: "A service's price taken at the moment someone books it.",
+                meanwhile: "take payment the way you do today.",
+            },
+            {
+                title: "A diary for every location",
+                body: "Separate diaries, staff and hours for each branch, under one business.",
+                meanwhile:
+                    "a second business gives you a separate diary, with separate figures.",
             },
         ],
         shot: SHOT.bookings,
@@ -304,44 +363,57 @@ export const JOBS: Job[] = [
         icon: "card",
         route: "/contacts",
         crumb: "Contacts",
-        short: "Everyone who enquired or booked, with leads in a pipeline.",
+        short: "Everyone you deal with, with leads in a pipeline.",
         head: "The people who got in touch, and where each one stands.",
-        lede: "A booking or a website enquiry creates a contact on its own. Enquiries become leads you move through a pipeline.",
+        lede: "Everyone you deal with in one list — a booking adds the person for you — and the leads worth chasing, moved through a pipeline.",
         who: "any business where the same person comes back. Which is most of them.",
         does: [
             {
-                title: "Created by the work, not by typing",
-                body: "A booking creates a contact; a form on your website creates a contact and a lead. No data entry after the fact.",
+                title: "Where each person came from",
+                body: "Everyone you deal with in one list, with their company, open pipeline, last order and how they found you.",
+                image: detail("contacts-source"),
+                alt: "The Contacts list: each person with their company, open pipeline value, email and source — website, referral, walk-in or Instagram.",
             },
             {
                 title: "Leads through a pipeline",
-                body: "Each enquiry is a lead with a stage, a value and how long it has waited.",
+                body: "Every enquiry worth chasing, by stage — new, qualified, proposal sent, negotiation — with what it is worth.",
+                image: detail("contacts-pipeline"),
+                alt: "The Pipeline board: leads in columns by stage, each with the person and its value.",
             },
             {
-                title: "What they did, in order",
-                body: "Bookings and enquiries against one contact, so you can see they came back.",
+                title: "Notes and follow-ups on every lead",
+                body: "Log the call, set the next follow-up with a date and time, and move the lead on a stage.",
+                image: detail("contacts-notes"),
+                alt: "A lead's page: its stage and status, a note box, and a follow-up with a date and time.",
             },
             {
-                title: "Customers, linked by hand",
-                body: "Someone who bought from a storefront can be linked to their contact. Saroh never merges two people on a guess.",
+                title: "The ones that have waited longest",
+                body: "Every open lead with its value and how long it has waited — and Home names the overdue ones first.",
+                image: detail("contacts-waiting"),
+                alt: "The Leads list: each lead with its contact, value, stage, status and how many days it has waited.",
             },
         ],
         flow: [
-            { owner: "Website / Bookings", step: "Enquiry or booking" },
+            { owner: "Bookings", step: "Booking made" },
             { owner: "Contacts", step: "Contact recorded" },
-            { owner: "Contacts", step: "Lead in the pipeline" },
+            { owner: "Contacts", step: "Lead followed up" },
         ],
-        flowNote: "The list fills itself as you work.",
-        limits: [
+        flowNote: "Nobody types in the person who booked.",
+        coming: [
             {
-                title: "No email campaigns",
-                tag: "Not built",
-                body: "You can see who your contacts are. You cannot send them a newsletter from here — no bulk sends, no audiences, no segments.",
+                title: "Contacts that add themselves",
+                body: "Bookings and enquiry forms on your website add each person to your contacts — and each enquiry to your pipeline — the moment it arrives.",
             },
             {
-                title: "Customers and contacts are linked by hand",
-                tag: "Limit",
-                body: "An order creates a customer on its storefront. Linking that customer to a contact is a step you take; it does not happen on its own yet.",
+                title: "Customers and contacts as one person",
+                body: "Someone who books, then buys, shows up once, with everything they have done.",
+                meanwhile:
+                    "link a customer to their contact by hand — reversible, and never guessed.",
+            },
+            {
+                title: "Newsletters to the people who asked",
+                body: "Write to your contacts from Saroh — only to those who agreed to hear from you.",
+                meanwhile: "keep your mailing tool alongside Saroh.",
             },
         ],
         shot: SHOT.contacts,
@@ -362,19 +434,27 @@ export const JOBS: Job[] = [
         does: [
             {
                 title: "Four figures, one period",
-                body: "Views, unique visitors, enquiries and orders over the period you pick.",
+                body: "Site views, unique visitors, enquiries and orders over 7, 30 or 90 days — you pick.",
+                image: detail("insights-figures"),
+                alt: "Insights for thirty days: site views, unique visitors, enquiries and orders, with the period picker above.",
             },
             {
                 title: "Views day by day",
-                body: "A bar for each day, with visitors in the detail.",
+                body: "A bar for each day, so a quiet week and a busy one look different at a glance.",
+                image: detail("insights-chart"),
+                alt: "A bar chart of site views for each day of the last thirty days.",
             },
             {
                 title: "Your most-read pages",
-                body: "Which paths people actually open, in order.",
+                body: "Which pages people actually open, most first — so you know what is doing the work.",
+                image: detail("insights-pages"),
+                alt: "Top pages: the paths people opened most in the last thirty days, with how many times each.",
             },
             {
-                title: "Withheld rather than wrong",
-                body: "A figure Saroh could not read is named on Home, not silently shown as nought.",
+                title: "Numbers that open what they count",
+                body: "On Home, each figure is a link to exactly the rows behind it. A figure Saroh could not read is named, never shown as nought.",
+                image: detail("insights-numbers"),
+                alt: "Home's Your numbers: open leads, contacts and open orders, each linking to the list it counts.",
             },
         ],
         flow: [
@@ -383,16 +463,11 @@ export const JOBS: Job[] = [
             { owner: "You", step: "Over 7, 30 or 90 days" },
         ],
         flowNote: "Site and shop in the same place.",
-        limits: [
+        coming: [
             {
-                title: "This business only",
-                tag: "Limit",
-                body: "Insights answers for one business at a time. A figure across every business you hold is not one this screen asks yet.",
-            },
-            {
-                title: "No custom reports",
-                tag: "Not built",
-                body: "There is no report builder, no saved queries and no export scheduler. What you see is what there is.",
+                title: "Figures across all your businesses",
+                body: "One view that adds up every business you run, or keep the books for.",
+                meanwhile: "switch between businesses to compare them.",
             },
         ],
         shot: SHOT.insights,
@@ -425,14 +500,9 @@ export const CHAINS: Chain[] = [
         whose: "the clinic's",
         steps: [
             {
-                owner: "Website",
-                step: "Someone finds you",
-                detail: "Your pages, at your address.",
-            },
-            {
                 owner: "Bookings",
-                step: "They book Thursday, 10:00",
-                detail: "From the hours you marked as free.",
+                step: "Thursday, 10:00 is booked",
+                detail: "Inside the hours you marked as free.",
             },
             {
                 owner: "Contacts",
@@ -445,14 +515,14 @@ export const CHAINS: Chain[] = [
                 detail: "Under what is coming up.",
             },
             {
-                owner: "Insights",
-                step: "The visit counts",
-                detail: "In the site's views for the week.",
+                owner: "Bookings",
+                step: "You say how it went",
+                detail: "Came, or did not — kept against the booking.",
             },
         ],
         means: "Nobody retypes a name. The person who booked is in your contacts with the booking against them, so next month you can see they came twice.",
         without:
-            "A booking page emails you. You type the name into a spreadsheet, and at month end you match the lists by hand and hope.",
+            "A booking arrives by email. You type the name into a spreadsheet, and at month end you match the lists by hand and hope.",
         shot: SHOT.contacts,
         notice: "Where it lands: the contact list, with where each person came from — nobody typed them in.",
     },
@@ -461,11 +531,6 @@ export const CHAINS: Chain[] = [
         label: "A bakery selling",
         whose: "the bakery's",
         steps: [
-            {
-                owner: "Website",
-                step: "Someone finds you",
-                detail: "Your pages, or the shop itself.",
-            },
             {
                 owner: "Sell",
                 step: "They order two loaves",
@@ -581,64 +646,55 @@ export const ROLE_ROWS: {
     { label: "Delete the business", can: [true, false, false, false] },
 ];
 
-export interface FullLimit extends Limit {
-    instead: string;
-}
-
-export const LIMITS: FullLimit[] = [
+/** Everything being built, for /coming-soon — the job panels draw from here. */
+export const COMING: Coming[] = [
     {
-        title: "No email campaigns",
-        tag: "Not built",
-        body: "No newsletters, no bulk sends, no audiences, no open rates. Saroh will tell you who your contacts are; it will not mail them for you.",
-        instead: "keep your existing mailing tool alongside it.",
+        title: "Take payment online, from your own account",
+        body: "Connect Razorpay or Cashfree yourself, so customers pay by UPI, card or netbanking at checkout — and pay for a booking when they make it.",
+        meanwhile:
+            "take payment the way you do today; orders and bookings still land in Saroh.",
     },
     {
-        title: "Online payments are not self-serve yet",
-        tag: "Not built",
-        body: "Razorpay and Cashfree are supported underneath, but there is no screen to connect your own account, and bookings are not charged through Saroh.",
-        instead:
-            "take payment the way you do today; orders and bookings still arrive here.",
+        title: "Visitors book and enquire from your site",
+        body: "A booking section where people pick a free slot inside your hours, and enquiry forms that add each person to your contacts and your pipeline as they arrive.",
     },
     {
-        title: "One diary per business",
-        tag: "Not built",
-        body: "Two storefronts under one business works today. Two locations with separate diaries, staff and opening hours does not.",
-        instead:
-            "a second business gets you separate diaries today, at the cost of separate figures.",
+        title: "Reminders your customers actually get",
+        body: "A message before each appointment and a note when an order is on its way, sent for you — fewer no-shows, fewer where-is-my-order calls.",
+        meanwhile:
+            "every booking and order is here to see; the reminding is still yours.",
     },
     {
-        title: "No stock movements",
-        tag: "Not built",
-        body: "You can set how many of something you have, and it goes down when somebody buys one. There is no goods-in, no transfer between storefronts and no audit trail of who changed what.",
-        instead:
-            "if you need to know where every unit went, you need stock software as well.",
+        title: "One catalogue for every storefront",
+        body: "Add a product once and sell it at the counter and online, with its own price and stock in each.",
+        meanwhile: "add the product to each storefront.",
     },
     {
-        title: "One product list per storefront",
-        tag: "Limit",
-        body: "A product belongs to one storefront. Selling the same thing in two means adding it to each, with its own price and stock.",
-        instead:
-            "one shared catalogue is designed; until it ships, the second copy is the cost.",
+        title: "Customers and contacts as one person",
+        body: "Someone who books, then buys, shows up once, with everything they have done.",
+        meanwhile:
+            "link a customer to their contact by hand — reversible, and never guessed.",
     },
     {
-        title: "No reminder messages",
-        tag: "Not built",
-        body: "Saroh does not text or email your customers before an appointment, after an order, or when something is ready. You see the work; they are not nudged.",
-        instead:
-            "this is the most commonly asked-for thing on this list, and still the honest answer is no.",
+        title: "Newsletters to the people who asked",
+        body: "Write to your contacts from Saroh — only to those who agreed to hear from you.",
+        meanwhile: "keep your mailing tool alongside Saroh.",
     },
     {
-        title: "Customers and contacts are linked by hand",
-        tag: "Limit",
-        body: "A booking or an enquiry creates a contact; an order creates a customer on its storefront. Saroh does not join the two on its own.",
-        instead:
-            "link them from the customer when it matters; it is reversible and never guessed.",
+        title: "Stock that follows every unit",
+        body: "Goods in, transfers between storefronts, and a record of who changed what.",
+        meanwhile:
+            "stock goes down as things sell; set counts by hand when a delivery arrives.",
     },
     {
-        title: "Insights answers for one business",
-        tag: "Limit",
-        body: "If you hold several businesses, you compare them by switching between them. There is no screen that adds them up.",
-        instead:
-            "for a bookkeeper holding a dozen, that is a real cost — and the one we would fix first.",
+        title: "A diary for every location",
+        body: "Separate diaries, staff and hours for each branch, under one business.",
+        meanwhile:
+            "a second business gives you a separate diary, with separate figures.",
+    },
+    {
+        title: "Figures across all your businesses",
+        body: "One view that adds up every business you run, or keep the books for.",
+        meanwhile: "switch between businesses to compare them.",
     },
 ];
