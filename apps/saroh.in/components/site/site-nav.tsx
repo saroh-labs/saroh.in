@@ -69,7 +69,7 @@ export function SiteNav() {
     }, [pathname]);
 
     return (
-        <header className="sticky top-0 z-50 border-b border-border bg-background px-4 py-[13px] sm:px-10">
+        <header className="sticky top-0 z-50 border-b border-border bg-[hsl(var(--site-canvas))] px-4 py-[13px] sm:px-10">
             <div className="mx-auto flex max-w-[1220px] items-center gap-3.5">
                 <Link
                     href="/"

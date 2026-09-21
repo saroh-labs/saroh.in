@@ -1,4 +1,17 @@
 /*
+ * The marketing site's canvas, from "Saroh Marketing Site": a shade darker
+ * than the product's Paper, so the lighter bands and white cards read as
+ * sections rather than as more of the same page. Dark mode keeps the
+ * product's own ground, where bands sit on the raised card colour instead.
+ */
+:root {
+    --site-canvas: 42 23% 89%; /* #E9E5DC */
+}
+.dark {
+    --site-canvas: var(--background);
+}
+
+/*
  * The marketing site's one entrance: the hero rises once per visit, which is
  * explanation rather than decoration ("Saroh Marketing Site", motion 1).
  * Everything else moves only where the movement says something, and nothing
