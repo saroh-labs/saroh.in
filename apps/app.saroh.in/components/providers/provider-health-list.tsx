@@ -72,7 +72,20 @@ const STATUS: Record<
  *
  * Never renders credentials — the API only ever returns status + safe copy.
  */
-export function ProviderHealthList({ health }: { health: ProviderHealth[] }) {
+export function ProviderHealthList({
+    health,
+    actionFor,
+}: {
+    health: ProviderHealth[];
+    /**
+     * The row's own control, where it has one — the payments and messaging
+     * setup dialogs. A row without one keeps its link.
+     */
+    actionFor?: (
+        h: ProviderHealth,
+        action: { label: string; urgent: boolean },
+    ) => React.ReactNode;
+}) {
     return (
         <ListCard
             main="Provider"
@@ -94,27 +107,34 @@ export function ProviderHealthList({ health }: { health: ProviderHealth[] }) {
                                     <Badge variant={status.variant}>
                                         {status.label}
                                     </Badge>
-                                    <Button
-                                        asChild
-                                        variant={
-                                            status.urgent ? "brand" : "outline"
-                                        }
-                                        size="sm"
-                                    >
-                                        {/*
-                                         * The visible label stays short, but
-                                         * the ACCESSIBLE name says which
-                                         * provider it acts on — three links
-                                         * all named "Fix" is what WCAG 2.4.4
-                                         * fails.
-                                         */}
-                                        <Link
-                                            href={h.actionHref}
-                                            aria-label={`${status.action} ${h.label}`}
+                                    {actionFor?.(h, {
+                                        label: status.action,
+                                        urgent: status.urgent,
+                                    }) ?? (
+                                        <Button
+                                            asChild
+                                            variant={
+                                                status.urgent
+                                                    ? "brand"
+                                                    : "outline"
+                                            }
+                                            size="sm"
                                         >
-                                            {status.action}
-                                        </Link>
-                                    </Button>
+                                            {/*
+                                             * The visible label stays short, but
+                                             * the ACCESSIBLE name says which
+                                             * provider it acts on — three links
+                                             * all named "Fix" is what WCAG 2.4.4
+                                             * fails.
+                                             */}
+                                            <Link
+                                                href={h.actionHref}
+                                                aria-label={`${status.action} ${h.label}`}
+                                            >
+                                                {status.action}
+                                            </Link>
+                                        </Button>
+                                    )}
                                 </>
                             }
                         />
