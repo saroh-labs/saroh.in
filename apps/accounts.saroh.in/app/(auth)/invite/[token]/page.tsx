@@ -86,15 +86,23 @@ export default async function InvitePage({
                 {invitation.organizationName}
             </h1>
             <p className="sa-rise dark:text-muted-foreground mt-[7px] text-pretty text-[13px] leading-[1.55] text-neutral-600">
-                as {ROLE_LABEL[invitation.role]}, at{" "}
+                as {invitation.roleLabel ?? ROLE_LABEL[invitation.role]}, at{" "}
                 <span className="font-mono text-[12.5px]">
                     {invitation.email}
                 </span>
             </p>
 
             <div className="sa-rise bg-muted mb-[22px] mt-4 rounded-[9px] px-[13px] py-[11px]">
+                {/* A role the business made is described by what it GRANTS —
+                    the only true thing to say about it. Describing it as the
+                    built-in it maps to would tell someone they are joining
+                    with powers they will not have. */}
                 <p className="dark:text-muted-foreground text-pretty text-[12.5px] leading-[1.5] text-neutral-600">
-                    {ROLE_MEANS[invitation.role]}
+                    {invitation.grants
+                        ? invitation.grants.length === 0
+                            ? `${invitation.roleLabel ?? "This role"} was made by ${invitation.organizationName}, and does not grant anything yet.`
+                            : `${invitation.roleLabel ?? "This role"} was made by ${invitation.organizationName}. It can: ${invitation.grants.join(", ").toLowerCase()}.`
+                        : ROLE_MEANS[invitation.role]}
                 </p>
             </div>
 

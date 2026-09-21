@@ -73,6 +73,7 @@ export default async function PeoplePage() {
                 canEditRoles={canEditRoles}
                 roles={roles}
                 catalogue={catalogue}
+                myActions={organization?.actions ?? null}
                 moduleKeys={moduleKeys}
             />
         </PageContainer>

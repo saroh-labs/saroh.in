@@ -27,7 +27,7 @@ export interface Organization {
     /** The role as stored — a built-in name, or an invented role's key. */
     roleKey?: string;
     /** What it is called on screen. */
-    roleLabel?: string;
+    roleLabel?: string | null;
     /**
      * What this actor may do here, resolved by the API.
      *

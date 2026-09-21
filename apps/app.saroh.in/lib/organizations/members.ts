@@ -22,7 +22,10 @@ export interface OrganizationMember {
     userId: string;
     name: string | null;
     email: string;
+    /** The built-in this maps to; MEMBER for a role the business invented. */
     role: OrganizationRole;
+    /** The role as stored — a built-in name, or an invented role's key. */
+    roleKey?: string;
     /** Sites this person may review. Empty for every role but REVIEWER. */
     siteIds: string[];
     isSelf: boolean;
@@ -32,6 +35,8 @@ export interface OrganizationInvitation {
     id: string;
     email: string;
     role: OrganizationRole;
+    /** The role as stored — a built-in name, or an invented role's key. */
+    roleKey?: string;
     siteIds: string[];
     status: string;
     expiresAt: string;
@@ -40,7 +45,8 @@ export interface OrganizationInvitation {
 
 export interface InviteMemberInput {
     email: string;
-    role: OrganizationRole;
+    /** Any role this business has, built-in or invented. */
+    role: string;
     siteIds?: string[];
 }
 
@@ -77,8 +83,8 @@ export async function inviteMember(
 
 export async function updateMemberRole(
     userId: string,
-    input: { role: OrganizationRole; siteIds?: string[] },
-): Promise<CrmResult<{ userId: string; role: OrganizationRole }>> {
+    input: { role: string; siteIds?: string[] },
+): Promise<CrmResult<{ userId: string; role: string }>> {
     return mutate(
         `/members/${userId}`,
         "PATCH",

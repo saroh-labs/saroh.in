@@ -13,6 +13,15 @@ export interface InvitationPreview {
     organizationName: string;
     invitedByName: string | null;
     role: "OWNER" | "ADMIN" | "MEMBER" | "REVIEWER";
+    /** The role as stored — a built-in name, or a role the business made. */
+    roleKey?: string;
+    /** Set only for a role the business made; its own name. */
+    roleLabel?: string | null;
+    /**
+     * What a role the business made lets them do, in the catalogue's words.
+     * Null for a built-in, which `ROLE_MEANS` already describes.
+     */
+    grants?: string[] | null;
     /** Who it was addressed to. The accept refuses any other address. */
     email: string;
 }

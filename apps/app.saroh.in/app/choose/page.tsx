@@ -143,7 +143,7 @@ function Group({
                                         {org.name}
                                     </span>
                                     <span className="block text-[11.5px] text-muted-foreground">
-                                        {ROLE_LABEL[org.role]}
+                                        {org.roleLabel ?? ROLE_LABEL[org.role]}
                                     </span>
                                 </span>
                             </button>

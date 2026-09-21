@@ -7,7 +7,6 @@ import {
     revokeInvitation as revokeInvitationApi,
     updateMemberRole as updateMemberRoleApi,
 } from "./members";
-import type { OrganizationRole } from "./service";
 
 /**
  * Server Actions for the organization roster (#276).
@@ -23,7 +22,7 @@ export async function inviteMember(input: InviteMemberInput) {
 
 export async function updateMemberRole(
     userId: string,
-    input: { role: OrganizationRole; siteIds?: string[] },
+    input: { role: string; siteIds?: string[] },
 ) {
     return updateMemberRoleApi(userId, input);
 }

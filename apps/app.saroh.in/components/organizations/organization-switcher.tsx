@@ -120,7 +120,7 @@ export function OrganizationSwitcher({
                         {org.name}
                     </span>
                     <span className="block text-[11px] text-muted-foreground">
-                        {ROLE_LABEL[org.role]}
+                        {org.roleLabel ?? ROLE_LABEL[org.role]}
                     </span>
                 </span>
                 {on ? <Check aria-hidden className="size-4 shrink-0" /> : null}
@@ -160,7 +160,7 @@ export function OrganizationSwitcher({
                             {active.name}
                         </span>
                         <span className="hidden whitespace-nowrap text-[11px] font-medium text-muted-foreground sm:inline">
-                            {ROLE_LABEL[active.role]}
+                            {active.roleLabel ?? ROLE_LABEL[active.role]}
                         </span>
                     </span>
                     <ChevronsUpDown

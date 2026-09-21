@@ -11,7 +11,7 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
-import { resolveCapabilities } from "./organization-policy";
+import { isBuiltInRole, resolveCapabilities } from "./organization-policy";
 
 /** A user's Organization membership as surfaced to the switcher/list UI. */
 export interface UserOrganization {
@@ -22,8 +22,8 @@ export interface UserOrganization {
     role: OrgRole;
     /** The role as stored — a built-in name, or an invented role's key. */
     roleKey: string;
-    /** What it is called on screen. Same as the key until roles carry labels. */
-    roleLabel: string;
+    /** An invented role's own name; null for a built-in. */
+    roleLabel: string | null;
     /**
      * What this actor may do here, so the rail can render what the API allows
      * rather than what a compiled-in map guesses.
@@ -146,10 +146,15 @@ export class OrganizationContextService {
                     key: m.role,
                 })),
             },
-            select: { organizationId: true, key: true, actions: true },
+            select: {
+                organizationId: true,
+                key: true,
+                label: true,
+                actions: true,
+            },
         });
         const byOrgAndKey = new Map(
-            stored.map((r) => [`${r.organizationId}:${r.key}`, r.actions]),
+            stored.map((r) => [`${r.organizationId}:${r.key}`, r]),
         );
 
         return memberships.map((membership) => {
@@ -161,8 +166,16 @@ export class OrganizationContextService {
                 slug: membership.organization.slug,
                 role: this.toOrgRole(membership.role, orgId, own !== undefined),
                 roleKey: membership.role,
-                roleLabel: membership.role,
-                actions: [...resolveCapabilities(membership.role, own)],
+                // An invented role's own name, or null for a built-in, which
+                // the app names in its own words. This was the raw key at
+                // first, as a placeholder — and the business switcher went on
+                // calling a Stock clerk "Member", by the built-in it maps to.
+                roleLabel: isBuiltInRole(membership.role)
+                    ? null
+                    : (own?.label ?? null),
+                actions: [
+                    ...resolveCapabilities(membership.role, own?.actions),
+                ],
             };
         });
     }

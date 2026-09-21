@@ -32,7 +32,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import type { NavRole } from "@/components/shared/nav-items";
 import { navFor } from "@/components/shared/nav-items";
 import {
     inviteMember,
@@ -78,6 +77,31 @@ export interface ReviewableSite {
 }
 
 /**
+ * Every role the business has, and the questions the roster asks of one.
+ *
+ * One object rather than four helpers passed separately, because all three
+ * places a person gets a role — the roster row, the edit drawer and the
+ * invite dialog — must answer these the same way. Two answers to "what is
+ * this role called" is how a Stock clerk shows as "Member" in one place.
+ */
+interface RoleBook {
+    all: Role[];
+    labelOf: (key: string) => string;
+    blurbOf: (key: string) => string;
+    /** How many destinations the rail offers this role here. */
+    reachOf: (key: string) => { reachable: number; total: number };
+    /**
+     * False when the role can do something the viewer cannot. The API refuses
+     * to hand out, change or remove such a role; the screen says so first.
+     */
+    withinReach: (key: string) => boolean;
+}
+
+function isBuiltIn(key: string): key is OrganizationRole {
+    return (ROLES as readonly string[]).includes(key);
+}
+
+/**
  * Team (Settings → People), after the "Saroh Team Roles" design.
  *
  * Two tabs over one business. ROLES explains the four roles — who holds each,
@@ -104,6 +128,7 @@ export function TeamScreen({
     canEditRoles,
     roles,
     catalogue,
+    myActions,
     moduleKeys,
 }: {
     organizationName: string;
@@ -117,6 +142,8 @@ export function TeamScreen({
     roles: Role[];
     /** What a role may be granted; `null` when it could not be read. */
     catalogue: RoleCatalogue | null;
+    /** What the viewer may do here; `null` when unknown, and nothing is held back. */
+    myActions: string[] | null;
     /** `null` = availability unknown; every capability then reads as on. */
     moduleKeys: string[] | null;
 }) {
@@ -124,15 +151,36 @@ export function TeamScreen({
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
 
-    // What each role reaches in THIS business: the rail's own filtering, so
-    // the number can never disagree with what the rail shows that role.
-    const reach = (role: NavRole) => {
-        const count = (r: NavRole) =>
-            navFor({ role: r, moduleKeys, sites: [] }).reduce(
-                (n, g) => n + g.items.length,
-                0,
-            );
-        return { reachable: count(role), total: count("OWNER") };
+    const byKey = new Map(roles.map((r) => [r.key, r]));
+    // What a role reaches in THIS business: the rail's own filtering, fed the
+    // role's own permissions, so the number can never disagree with what the
+    // rail shows the people who hold it.
+    const countNav = (key: string) =>
+        navFor({
+            role: isBuiltIn(key) ? key : "MEMBER",
+            actions: byKey.get(key)?.actions ?? null,
+            moduleKeys,
+            sites: [],
+        }).reduce((n, g) => n + g.items.length, 0);
+    const book: RoleBook = {
+        all: roles,
+        labelOf: (key) =>
+            byKey.get(key)?.label ?? (isBuiltIn(key) ? ROLE_LABEL[key] : key),
+        blurbOf: (key) => {
+            if (isBuiltIn(key)) return ROLE_BLURB[key];
+            const n = byKey.get(key)?.actions.length ?? 0;
+            return `Made for ${organizationName}. Whoever holds it can do exactly what was ticked for it — ${n === 1 ? "1 permission" : `${n} permissions`}.`;
+        },
+        reachOf: (key) => ({
+            reachable: countNav(key),
+            total: countNav("OWNER"),
+        }),
+        withinReach: (key) => {
+            const role = byKey.get(key);
+            // Unknown role or unknown viewer: let the API decide, it will.
+            if (!role || myActions === null) return true;
+            return role.actions.every((a) => myActions.includes(a));
+        },
     };
 
     const tabs = [
@@ -235,6 +283,7 @@ export function TeamScreen({
                     members={members}
                     invitations={invitations}
                     canManage={canManage}
+                    book={book}
                     onEdit={setEditing}
                 />
             )}
@@ -243,7 +292,7 @@ export function TeamScreen({
                 member={editing}
                 members={members}
                 organizationName={organizationName}
-                reach={reach}
+                book={book}
                 onClose={() => setEditing(null)}
             />
             {canManage ? (
@@ -252,6 +301,7 @@ export function TeamScreen({
                     onOpenChange={setInviteOpen}
                     organizationName={organizationName}
                     sites={sites}
+                    book={book}
                 />
             ) : null}
         </div>
@@ -265,12 +315,14 @@ function PeopleTab({
     members,
     invitations,
     canManage,
+    book,
     onEdit,
 }: {
     organizationName: string;
     members: OrganizationMember[];
     invitations: OrganizationInvitation[];
     canManage: boolean;
+    book: RoleBook;
     onEdit: (member: OrganizationMember) => void;
 }) {
     const router = useRouter();
@@ -316,7 +368,7 @@ function PeopleTab({
                             <div className="flex min-w-0 items-center gap-[11px]">
                                 <Avatar
                                     size="row"
-                                    ringTone={roleRingTone(m.role)}
+                                    ringTone={roleRingTone(m.roleKey ?? m.role)}
                                 >
                                     <AvatarFallback>
                                         {avatarInitials(m.name, m.email)}
@@ -343,9 +395,9 @@ function PeopleTab({
                                 </div>
                             </div>
                             <div className="flex min-w-0 items-center gap-2">
-                                <RoleDot role={m.role} size={9} />
+                                <RoleDot role={m.roleKey ?? m.role} size={9} />
                                 <span className="truncate text-[13px]">
-                                    {ROLE_LABEL[m.role]}
+                                    {book.labelOf(m.roleKey ?? m.role)}
                                 </span>
                             </div>
                             <div className="flex justify-end">
@@ -382,7 +434,10 @@ function PeopleTab({
                                 <div className="flex min-w-0 items-center gap-[11px]">
                                     <Avatar
                                         size="row"
-                                        ringTone={roleRingTone(invitation.role)}
+                                        ringTone={roleRingTone(
+                                            invitation.roleKey ??
+                                                invitation.role,
+                                        )}
                                     >
                                         <AvatarFallback>
                                             {avatarInitials(
@@ -406,9 +461,18 @@ function PeopleTab({
                                     </div>
                                 </div>
                                 <div className="flex min-w-0 items-center gap-2">
-                                    <RoleDot role={invitation.role} size={9} />
+                                    <RoleDot
+                                        role={
+                                            invitation.roleKey ??
+                                            invitation.role
+                                        }
+                                        size={9}
+                                    />
                                     <span className="truncate text-[13px]">
-                                        {ROLE_LABEL[invitation.role]}
+                                        {book.labelOf(
+                                            invitation.roleKey ??
+                                                invitation.role,
+                                        )}
                                     </span>
                                 </div>
                                 <div className="flex justify-end">
@@ -448,25 +512,32 @@ function MemberDrawer({
     member,
     members,
     organizationName,
-    reach,
+    book,
     onClose,
 }: {
     member: OrganizationMember | null;
     members: OrganizationMember[];
     organizationName: string;
-    reach: (role: NavRole) => { reachable: number; total: number };
+    book: RoleBook;
     onClose: () => void;
 }) {
     const router = useRouter();
-    const [draft, setDraft] = useState<OrganizationRole | null>(null);
+    const [draft, setDraft] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [confirmRemove, setConfirmRemove] = useState(false);
 
-    const role = draft ?? member?.role ?? "MEMBER";
-    const owners = members.filter((m) => m.role === "OWNER").length;
+    const current = member ? (member.roleKey ?? member.role) : "MEMBER";
+    const role = draft ?? current;
+    const owners = members.filter(
+        (m) => (m.roleKey ?? m.role) === "OWNER",
+    ).length;
     // The workspace keeps an owner: the last one cannot be changed or removed.
-    const lastOwner = member?.role === "OWNER" && owners === 1;
-    const changed = !!member && role !== member.role;
+    const lastOwner = current === "OWNER" && owners === 1;
+    // Someone who can do more than the viewer cannot be changed by them — the
+    // API refuses it, so the drawer says so instead of offering the attempt.
+    const outranks = !!member && !book.withinReach(current);
+    const locked = lastOwner || outranks;
+    const changed = !!member && role !== current;
 
     function close() {
         setDraft(null);
@@ -494,7 +565,7 @@ function MemberDrawer({
             return;
         }
         showSuccess(
-            `${nameOf(member)} is now ${ROLE_LABEL[role]} in ${organizationName}.`,
+            `${nameOf(member)} is now ${book.labelOf(role)} in ${organizationName}.`,
         );
         close();
         router.refresh();
@@ -564,16 +635,17 @@ function MemberDrawer({
                                     aria-label="Role"
                                     className="flex flex-col gap-[5px]"
                                 >
-                                    {ROLES.map((r) => {
+                                    {book.all.map(({ key: r }) => {
                                         const on = r === role;
-                                        const rr = reach(r);
+                                        const rr = book.reachOf(r);
+                                        const beyond = !book.withinReach(r);
                                         return (
                                             <button
                                                 key={r}
                                                 type="button"
                                                 role="radio"
                                                 aria-checked={on}
-                                                disabled={lastOwner}
+                                                disabled={locked || beyond}
                                                 onClick={() => setDraft(r)}
                                                 className={cn(
                                                     "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed",
@@ -592,12 +664,12 @@ function MemberDrawer({
                                                                 : "font-medium",
                                                         )}
                                                     >
-                                                        {ROLE_LABEL[r]}
+                                                        {book.labelOf(r)}
                                                     </span>
                                                     <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                                                        reaches {rr.reachable}{" "}
-                                                        of {rr.total}{" "}
-                                                        destinations here
+                                                        {beyond
+                                                            ? "Can do more than you can"
+                                                            : `reaches ${rr.reachable} of ${rr.total} destinations here`}
                                                     </span>
                                                 </span>
                                                 {on ? (
@@ -619,7 +691,9 @@ function MemberDrawer({
                                     <p className="text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
                                         {lastOwner
                                             ? `${organizationName} keeps at least one owner. Make someone else an owner before changing or removing this one.`
-                                            : `${ROLE_LABEL[role]}: ${ROLE_BLURB[role]}`}
+                                            : outranks
+                                              ? `${nameOf(member)} can do more than you can here, so you cannot change their role or remove them.`
+                                              : `${book.labelOf(role)}: ${book.blurbOf(role)}`}
                                     </p>
                                 </div>
                             </div>
@@ -627,14 +701,14 @@ function MemberDrawer({
                             <div className="flex flex-wrap items-center gap-[9px] border-t border-muted px-[18px] py-3.5">
                                 <Button
                                     onClick={save}
-                                    disabled={!changed || saving || lastOwner}
+                                    disabled={!changed || saving || locked}
                                 >
                                     {saving ? "Saving…" : "Save role"}
                                 </Button>
                                 <Button variant="outline" onClick={close}>
                                     Cancel
                                 </Button>
-                                {!lastOwner ? (
+                                {!locked ? (
                                     <button
                                         type="button"
                                         onClick={() => setConfirmRemove(true)}
@@ -672,15 +746,17 @@ function InviteDialog({
     onOpenChange,
     organizationName,
     sites,
+    book,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     organizationName: string;
     sites: ReviewableSite[];
+    book: RoleBook;
 }) {
     const router = useRouter();
     const [email, setEmail] = useState("");
-    const [role, setRole] = useState<OrganizationRole>("MEMBER");
+    const [role, setRole] = useState<string>("MEMBER");
     const [siteIds, setSiteIds] = useState<string[]>([]);
     const [sending, setSending] = useState(false);
 
@@ -739,16 +815,27 @@ function InviteDialog({
                             Role
                         </legend>
                         <div className="grid grid-cols-2 gap-[5px]">
-                            {ROLES.map((r) => {
+                            {book.all.map(({ key: r }) => {
                                 const on = r === role;
+                                // Not offered: the API refuses to invite
+                                // anyone at a role that can do more than the
+                                // person inviting.
+                                const beyond = !book.withinReach(r);
                                 return (
                                     <label
                                         key={r}
+                                        title={
+                                            beyond
+                                                ? "Can do more than you can"
+                                                : undefined
+                                        }
                                         className={cn(
-                                            "flex cursor-pointer items-center gap-2 rounded-[9px] border px-3 py-2 text-[13px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-                                            on
-                                                ? "border-border-strong bg-foreground/[0.03] font-semibold"
-                                                : "border-muted font-medium hover:border-border-strong",
+                                            "flex items-center gap-2 rounded-[9px] border px-3 py-2 text-[13px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
+                                            beyond
+                                                ? "cursor-not-allowed border-muted font-medium opacity-50"
+                                                : on
+                                                  ? "cursor-pointer border-border-strong bg-foreground/[0.03] font-semibold"
+                                                  : "cursor-pointer border-muted font-medium hover:border-border-strong",
                                         )}
                                     >
                                         <input
@@ -756,17 +843,20 @@ function InviteDialog({
                                             name="invite-role"
                                             value={r}
                                             checked={on}
+                                            disabled={beyond}
                                             onChange={() => setRole(r)}
                                             className="sr-only"
                                         />
                                         <RoleDot role={r} />
-                                        {ROLE_LABEL[r]}
+                                        <span className="truncate">
+                                            {book.labelOf(r)}
+                                        </span>
                                     </label>
                                 );
                             })}
                         </div>
                         <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
-                            {ROLE_BLURB[role]}
+                            {book.blurbOf(role)}
                         </p>
                     </fieldset>
 
