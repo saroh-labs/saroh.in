@@ -133,8 +133,14 @@ export function BlockInspector({
                     <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
                     <div className="space-y-2">
                         <p>{bound.notice}</p>
+                        {/*
+                         * A new tab: leaving the editor mid-edit would drop
+                         * work autosave has not sent yet.
+                         */}
                         <Link
                             href={bound.href}
+                            target="_blank"
+                            rel="noopener"
                             className="font-medium underline underline-offset-2"
                         >
                             {bound.linkLabel}
@@ -304,7 +310,12 @@ export function FixedBlockInspector({
                       : "Nothing is written at the foot of this site yet, so visitors see no footer. Write one in Website settings."}
             </p>
             <Button asChild variant="outline" size="sm">
-                <Link href={`/sites/${siteId}/settings`}>
+                {/* A new tab, for the same reason as the Services link. */}
+                <Link
+                    href={`/sites/${siteId}/settings`}
+                    target="_blank"
+                    rel="noopener"
+                >
                     Open Website settings
                 </Link>
             </Button>

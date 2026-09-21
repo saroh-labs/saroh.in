@@ -212,6 +212,9 @@ test.describe("a shared preview link", () => {
 
         // Review lives in the inspector's Feedback tab since #340.
         await page.getByRole("tab", { name: /^Feedback/ }).click();
+        // With a block selected, Feedback opens on that block; preview links
+        // are part of the whole site's review.
+        await page.getByRole("radio", { name: /^Whole site/ }).click();
         await page
             .getByRole("button", { name: /^(Create link|New link)$/ })
             .click();

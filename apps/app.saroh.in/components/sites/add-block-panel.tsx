@@ -1,9 +1,10 @@
 "use client";
 
 import { BLOCK_META } from "@saroh/block-contract";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import { PanelBottom, PanelTop } from "lucide-react";
+import { LayoutGrid, PanelBottom, PanelTop } from "lucide-react";
 
 import { SECTION_ICONS } from "@/components/sites/block-icons";
 import { addBlockGroups } from "@/components/sites/block-kinds";
@@ -28,14 +29,30 @@ import type { SectionType } from "@/lib/sites/service";
  */
 export function AddBlockPanel({
     onPick,
+    onBrowse,
 }: {
     /** A block was chosen. `looks` says whether a look still has to be picked. */
     onPick: (type: SectionType, looks: number) => void;
+    /**
+     * Open the picker that draws every block with example content in this
+     * site's colours — what "+ Add section" showed before the tab (#267).
+     */
+    onBrowse: () => void;
 }) {
     const { structure, business } = addBlockGroups(SECTION_ORDER);
 
     return (
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pb-4 pt-4">
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full gap-1.5"
+                onClick={onBrowse}
+            >
+                <LayoutGrid aria-hidden className="size-4" />
+                Browse with previews
+            </Button>
             <Group label="Structure">
                 {structure.map((t) => (
                     <Entry
@@ -43,6 +60,7 @@ export function AddBlockPanel({
                         icon={SECTION_ICONS[t]}
                         label={SECTION_LABELS[t]}
                         hint={SECTION_HINTS[t]}
+                        looks={BLOCK_META[t].variants.length}
                         onClick={() => onPick(t, BLOCK_META[t].variants.length)}
                     />
                 ))}
@@ -54,6 +72,7 @@ export function AddBlockPanel({
                         icon={SECTION_ICONS[t]}
                         label={SECTION_LABELS[t]}
                         hint={SECTION_HINTS[t]}
+                        looks={BLOCK_META[t].variants.length}
                         onClick={() => onPick(t, BLOCK_META[t].variants.length)}
                     />
                 ))}
@@ -96,11 +115,14 @@ function Entry({
     icon: Icon,
     label,
     hint,
+    looks = 1,
     onClick,
 }: {
     icon: LucideIcon;
     label: string;
     hint: string;
+    /** How many looks the block has; more than one is said, as it was. */
+    looks?: number;
     onClick?: () => void;
 }) {
     const disabled = onClick === undefined;
@@ -122,9 +144,14 @@ function Entry({
                     aria-hidden
                     className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                 />
-                <span className="min-w-0">
-                    <span className="block text-[0.8125rem] font-medium">
+                <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline justify-between gap-2 text-[0.8125rem] font-medium">
                         {label}
+                        {looks > 1 ? (
+                            <span className="shrink-0 text-xs font-normal text-muted-foreground">
+                                {looks} looks
+                            </span>
+                        ) : null}
                     </span>
                     <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
                         {hint}

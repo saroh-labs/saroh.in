@@ -57,23 +57,30 @@ export function BlockFeedback({
 }) {
     const [reply, setReply] = useState("");
     const [sending, setSending] = useState(false);
-    const [settling, setSettling] = useState<string | null>(null);
+    /** Notes with a settle/reopen in flight — one each, so one click never re-enables another's button. */
+    const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+    const [showSettled, setShowSettled] = useState(false);
 
     const mine = comments.filter(
         (c) => c.pageId === pageId && c.sectionKey === sectionKey,
     );
     const open = mine.filter((c) => c.resolvedAt === null);
-    const settled = mine.length - open.length;
+    const settledNotes = mine.filter((c) => c.resolvedAt !== null);
 
-    async function settle(comment: SiteCommentView) {
-        setSettling(comment.id);
-        const res = await setCommentResolved(siteId, comment.id, true);
-        setSettling(null);
+    /** Settle a note, or reopen a settled one. */
+    async function setSettled(comment: SiteCommentView, settled: boolean) {
+        setBusy((prev) => new Set(prev).add(comment.id));
+        const res = await setCommentResolved(siteId, comment.id, settled);
+        setBusy((prev) => {
+            const next = new Set(prev);
+            next.delete(comment.id);
+            return next;
+        });
         if (!res.ok) {
             showError(res.error);
             return;
         }
-        showSuccess("Marked settled.");
+        showSuccess(settled ? "Marked settled." : "Reopened.");
         await onChanged();
     }
 
@@ -88,6 +95,7 @@ export function BlockFeedback({
             return;
         }
         setReply("");
+        showSuccess("Note added.");
         await onChanged();
     }
 
@@ -142,8 +150,8 @@ export function BlockFeedback({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                disabled={settling === c.id}
-                                onClick={() => void settle(c)}
+                                disabled={busy.has(c.id)}
+                                onClick={() => void setSettled(c, true)}
                             >
                                 Mark settled
                             </Button>
@@ -152,12 +160,57 @@ export function BlockFeedback({
                 </ul>
             )}
 
-            {settled > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                    {settled === 1
-                        ? "1 settled note on this block."
-                        : `${settled} settled notes on this block.`}
-                </p>
+            {/*
+             * Settled notes are history, not work — hidden until asked for,
+             * and reopenable, as the site-wide review has always allowed.
+             */}
+            {settledNotes.length > 0 ? (
+                <div className="space-y-2">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-muted-foreground"
+                        aria-expanded={showSettled}
+                        onClick={() => setShowSettled((v) => !v)}
+                    >
+                        {showSettled ? "Hide" : "Show"}{" "}
+                        {settledNotes.length === 1
+                            ? "1 settled note"
+                            : `${settledNotes.length} settled notes`}
+                    </Button>
+                    {showSettled ? (
+                        <ul className="space-y-2">
+                            {settledNotes.map((c) => (
+                                <li
+                                    key={c.id}
+                                    className="space-y-1.5 rounded-lg border border-dashed p-3 text-muted-foreground"
+                                >
+                                    <p className="text-xs font-medium">
+                                        {c.author.name} ·{" "}
+                                        <span title={exactDate(c.createdAt)}>
+                                            {shortDate(c.createdAt)}
+                                        </span>
+                                    </p>
+                                    <p className="whitespace-pre-line text-[0.8125rem] leading-relaxed">
+                                        {c.body}
+                                    </p>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={busy.has(c.id)}
+                                        onClick={() =>
+                                            void setSettled(c, false)
+                                        }
+                                    >
+                                        Reopen
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
+                </div>
             ) : null}
 
             <form
@@ -171,7 +224,7 @@ export function BlockFeedback({
                     htmlFor="block-feedback-reply"
                     className="text-[0.8125rem] font-medium"
                 >
-                    Reply
+                    {open.length === 0 ? "Add a note" : "Reply"}
                 </label>
                 <Textarea
                     id="block-feedback-reply"
@@ -192,7 +245,11 @@ export function BlockFeedback({
                                 : undefined
                         }
                     >
-                        {sending ? "Sending…" : "Reply"}
+                        {sending
+                            ? "Sending…"
+                            : open.length === 0
+                              ? "Add note"
+                              : "Reply"}
                     </Button>
                 </div>
             </form>

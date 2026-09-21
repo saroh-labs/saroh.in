@@ -223,20 +223,18 @@ export function DraftPreview({
         <div
             className={`${PREVIEW_SCOPE} bg-[hsl(var(--site-bg))] text-[hsl(var(--site-fg))]`}
             /*
-             * Nothing on the canvas navigates while editing. A link here is
-             * the merchant's link to THEIR site; followed from the editor it
-             * lands somewhere in Saroh, which is never what the click meant.
-             * A click selects; Preview is where links are for following.
+             * Nothing here navigates — on the canvas or in Preview. A link is
+             * the merchant's link to THEIR site, and its address (/about,
+             * /products) followed from inside Saroh lands on a Saroh page
+             * and leaves the editor without the unsaved-work check (review
+             * of #336). On the canvas a click selects instead; the live site
+             * and a shared preview link are where links are followed.
              */
-            onClickCapture={
-                editing
-                    ? (e) => {
-                          if ((e.target as HTMLElement).closest("a")) {
-                              e.preventDefault();
-                          }
-                      }
-                    : undefined
-            }
+            onClickCapture={(e) => {
+                if ((e.target as HTMLElement).closest("a")) {
+                    e.preventDefault();
+                }
+            }}
         >
             <SiteTheme variables={vars} selector={`.${PREVIEW_SCOPE}`} />
             {header && editing && onSelectChrome ? (
@@ -338,6 +336,10 @@ function CanvasBlock({
                 {label}
             </button>
             {notes > 0 && onOpenNotes ? (
+                /*
+                 * A 44px target around a 24px badge: the pin is small on
+                 * purpose, a thumb is not (touch-target rule).
+                 */
                 <button
                     type="button"
                     aria-label={`${notes} open on this block — read the feedback`}
@@ -345,9 +347,11 @@ function CanvasBlock({
                         e.stopPropagation();
                         onOpenNotes();
                     }}
-                    className="absolute right-3 top-3 z-10 flex size-6 items-center justify-center rounded-full bg-highlight font-sans text-xs font-semibold tabular-nums text-highlight-foreground shadow-md ring-2 ring-background focus-visible:outline-none focus-visible:ring-ring"
+                    className="group/pin absolute right-1 top-1 z-10 flex size-11 items-center justify-center rounded-full focus-visible:outline-none"
                 >
-                    {notes}
+                    <span className="flex size-6 items-center justify-center rounded-full bg-highlight font-sans text-xs font-semibold tabular-nums text-highlight-foreground shadow-md ring-2 ring-background group-focus-visible/pin:ring-ring">
+                        {notes}
+                    </span>
                 </button>
             ) : null}
         </div>

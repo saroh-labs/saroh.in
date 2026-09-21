@@ -114,19 +114,19 @@ describe("reading the chrome back", () => {
             }),
         );
         const prefs = await load();
-        // The preview switches on exactly two, so a third would render
+        // The preview switches on exactly three, so a fourth would render
         // nothing at all.
         expect(prefs.getChrome().device).toBe("desktop");
     });
 
-    it("opens desktop for someone who left the old tablet width on", async () => {
+    it("remembers the tablet width", async () => {
         useStorage(
             storage({
                 "saroh.editor.chrome": JSON.stringify({ device: "tablet" }),
             }),
         );
         const prefs = await load();
-        expect(prefs.getChrome().device).toBe("desktop");
+        expect(prefs.getChrome().device).toBe("tablet");
     });
 
     it("merges a patch against the store, not against a caller's snapshot", async () => {
@@ -184,6 +184,21 @@ describe("where the merchant was in one site", () => {
         expect(place.inspector).toBe("feedback");
     });
 
+    it("comes back to a selected header rather than the first block", async () => {
+        useStorage(
+            storage({
+                [KEY]: JSON.stringify({
+                    selectedIndex: null,
+                    chrome: "header",
+                }),
+            }),
+        );
+        const prefs = await load();
+        const place = prefs.getPlace("site_1", 3);
+        expect(place.chrome).toBe("header");
+        expect(place.selectedIndex).toBeNull();
+    });
+
     it("refuses a scroll offset that would go nowhere useful", async () => {
         useStorage(
             storage({
@@ -216,6 +231,7 @@ describe("what the server renders", () => {
         expect(prefs.getChromeOnServer()).toEqual(prefs.CHROME_DEFAULT);
         expect(prefs.placeOnServer(3)).toEqual({
             selectedIndex: 0,
+            chrome: null,
             rail: "sections",
             inspector: "block",
             scrollTop: 0,

@@ -44,11 +44,17 @@ const siteKey = (siteId: string) => `saroh.editor.site.${siteId}`;
 export interface EditorChrome {
     railWidth: number;
     panelWidth: number;
-    device: "desktop" | "phone";
+    device: "desktop" | "tablet" | "phone";
 }
 
 export interface EditorPlace {
     selectedIndex: number | null;
+    /**
+     * The header or footer, when one of those is selected instead of a block
+     * (#336). Remembered like a block, so a reload comes back to it rather
+     * than to the first block.
+     */
+    chrome: "header" | "footer" | null;
     rail: "sections" | "style";
     /** The inspector's tab: the selected block's fields, or its feedback. */
     inspector: "block" | "feedback";
@@ -138,9 +144,11 @@ function parseChrome(v: unknown): EditorChrome {
             typeof o.panelWidth === "number" ? o.panelWidth : PANEL_DEFAULT,
         ),
         // An unknown device string must not reach the preview, which switches
-        // on exactly these two. "tablet" was a third until #335 and falls
-        // back to desktop.
-        device: o.device === "phone" ? "phone" : "desktop",
+        // on exactly these three.
+        device:
+            o.device === "tablet" || o.device === "phone"
+                ? o.device
+                : "desktop",
     };
 }
 
@@ -191,6 +199,7 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
 
     const fallback: EditorPlace = {
         selectedIndex: sectionCount > 0 ? 0 : null,
+        chrome: null,
         rail: "sections",
         inspector: "block",
         scrollTop: 0,
@@ -200,14 +209,19 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
     if (typeof v === "object" && v !== null) {
         const o = v as Partial<Record<keyof EditorPlace, unknown>>;
         const i = o.selectedIndex;
+        const chrome =
+            o.chrome === "header" || o.chrome === "footer" ? o.chrome : null;
         value = {
             selectedIndex:
-                typeof i === "number" &&
-                Number.isInteger(i) &&
-                i >= 0 &&
-                i < sectionCount
-                    ? i
-                    : fallback.selectedIndex,
+                chrome !== null
+                    ? null
+                    : typeof i === "number" &&
+                        Number.isInteger(i) &&
+                        i >= 0 &&
+                        i < sectionCount
+                      ? i
+                      : fallback.selectedIndex,
+            chrome,
             // Pages was a rail tab until #335; it is the breadcrumb now.
             rail: o.rail === "style" ? "style" : "sections",
             // Review was a rail tab before #340; someone who left it open
@@ -243,6 +257,7 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
 export function placeOnServer(sectionCount: number): EditorPlace {
     return {
         selectedIndex: sectionCount > 0 ? 0 : null,
+        chrome: null,
         rail: "sections",
         inspector: "block",
         scrollTop: 0,
