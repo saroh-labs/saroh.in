@@ -42,3 +42,18 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         linkLabel: "Open Services",
     },
 };
+
+/**
+ * The Add block tab's groups (#337), in the order the design lists them.
+ * Derived from `BOUND_BLOCKS`, so a block is "from your business" exactly when
+ * its inspector says it reads live data — the two cannot disagree.
+ */
+export function addBlockGroups(order: readonly SectionType[]): {
+    structure: SectionType[];
+    business: SectionType[];
+} {
+    return {
+        structure: order.filter((t) => BOUND_BLOCKS[t] === null),
+        business: order.filter((t) => BOUND_BLOCKS[t] !== null),
+    };
+}

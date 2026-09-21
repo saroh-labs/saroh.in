@@ -190,6 +190,7 @@ export function DraftPreview({
                 return (
                     <CanvasBlock
                         key={index}
+                        index={index}
                         label={label}
                         name={`${label} block, ${position + 1} of ${count}`}
                         selected={selectedIndex === index}
@@ -279,6 +280,7 @@ export function DraftPreview({
  * block, 2 of 7" so a screen reader hears where it is on the page.
  */
 function CanvasBlock({
+    index,
     label,
     name,
     selected,
@@ -288,6 +290,8 @@ function CanvasBlock({
     onOpenNotes,
     children,
 }: {
+    /** Position in the page's block list, so the editor can scroll to it. */
+    index?: number;
     label: string;
     /** The accessible name: what it is and where it sits. */
     name: string;
@@ -301,6 +305,7 @@ function CanvasBlock({
 }) {
     return (
         <div
+            data-block-index={index}
             onClick={onSelect}
             /*
              * Joined by hand, not through `cn`: tailwind-merge reads

@@ -37,6 +37,7 @@ export function AddSectionDialog({
     onOpenChange,
     variables,
     onAdd,
+    startType = null,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -44,8 +45,15 @@ export function AddSectionDialog({
     variables?: Record<string, string>;
     /** Insert a section of `type`; `variant` is set when a look was chosen. */
     onAdd: (type: SectionType, variant?: string) => void;
+    /**
+     * Open straight on this block's looks — the Add block tab has already
+     * chosen the block (#337). "Back" then closes rather than showing every
+     * block again, because the list of blocks is the tab.
+     */
+    startType?: SectionType | null;
 }) {
-    const [type, setType] = useState<SectionType | null>(null);
+    const [picked, setType] = useState<SectionType | null>(null);
+    const type = picked ?? startType;
 
     const close = (next: boolean) => {
         if (!next) setType(null);
@@ -94,9 +102,11 @@ export function AddSectionDialog({
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => setType(null)}
+                                onClick={() =>
+                                    startType ? close(false) : setType(null)
+                                }
                             >
-                                Back to all sections
+                                {startType ? "Back" : "Back to all sections"}
                             </Button>
                         </div>
                     </>
