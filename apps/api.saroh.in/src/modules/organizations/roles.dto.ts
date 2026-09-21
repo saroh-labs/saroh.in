@@ -15,21 +15,6 @@ const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
 /**
- * The rings a role may wear on Team. Named, never a hex: the palette belongs
- * to the token layer, and a stored colour would outlive the next palette.
- */
-export const RING_TONES = [
-    "ink",
-    "clay",
-    "saffron",
-    "slate",
-    "moss",
-    "plum",
-    "sky",
-    "rose",
-] as const;
-
-/**
  * Invent a role.
  *
  * `actions` is validated against the closed set here so a stale client gets a
@@ -48,10 +33,6 @@ export class CreateRoleDto {
     @ArrayMaxSize(ORG_ACTIONS.length)
     @IsIn(ORG_ACTIONS, { each: true, message: "Unknown permission" })
     actions!: string[];
-
-    @IsOptional()
-    @IsIn(RING_TONES, { message: "Unknown ring colour" })
-    ringTone?: string;
 }
 
 /** Change an invented role. Every field optional; built-ins are refused. */
@@ -68,8 +49,4 @@ export class UpdateRoleDto {
     @ArrayMaxSize(ORG_ACTIONS.length)
     @IsIn(ORG_ACTIONS, { each: true, message: "Unknown permission" })
     actions?: string[];
-
-    @IsOptional()
-    @IsIn(RING_TONES, { message: "Unknown ring colour" })
-    ringTone?: string;
 }

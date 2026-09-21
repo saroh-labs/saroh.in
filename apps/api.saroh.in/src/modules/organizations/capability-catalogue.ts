@@ -47,6 +47,10 @@ export interface Capability {
      * Present when the consequence is not obvious from the label — a power
      * that reaches further than it sounds, or one that is deliberately
      * narrower than its neighbour.
+     *
+     * SHOWN TO THE OWNER, verbatim. Merchant words only: an earlier note told
+     * a shop owner to "see the annotations spec". The catalogue spec now
+     * refuses code vocabulary here.
      */
     note?: string;
     /**
@@ -67,7 +71,7 @@ export const CAPABILITIES: readonly Capability[] = [
         action: "org:settings:read",
         group: "business",
         label: "See business details",
-        note: "Legal name, tax id and contact email — deliberately not part of simply seeing the business.",
+        note: "Legal name, tax ID and contact email. Seeing that the business exists does not include these.",
     },
     {
         action: "org:update",
@@ -144,7 +148,7 @@ export const CAPABILITIES: readonly Capability[] = [
         action: "site:comment",
         group: "website",
         label: "Leave notes on a website",
-        note: "Leaving a note is not reading and not editing — it is its own power.",
+        note: "For someone checking the wording: they can comment without being able to change anything.",
     },
     { action: "site:approve", group: "website", label: "Sign a website off" },
     { action: "section:write", group: "website", label: "Edit page sections" },
@@ -226,7 +230,7 @@ export const CAPABILITIES: readonly Capability[] = [
         action: "consent:write",
         group: "messaging",
         label: "Change marketing consent",
-        note: "Withdrawing consent is never gated behind a module — see the annotations spec.",
+        note: "Recording that a customer does or does not want marketing messages.",
     },
     {
         action: "notification:read",

@@ -32,8 +32,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import type { NavAction, NavRole } from "@/components/shared/nav-items";
-import { navFor, navRoleCan } from "@/components/shared/nav-items";
+import type { NavRole } from "@/components/shared/nav-items";
+import { navFor } from "@/components/shared/nav-items";
 import {
     inviteMember,
     removeMember,
@@ -44,7 +44,10 @@ import type {
     OrganizationInvitation,
     OrganizationMember,
 } from "@/lib/organizations/members";
+import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
 import type { OrganizationRole } from "@/lib/organizations/service";
+
+import { RolesTab } from "./roles-tab";
 
 const ROLES: OrganizationRole[] = ["OWNER", "ADMIN", "MEMBER", "REVIEWER"];
 
@@ -63,58 +66,6 @@ const ROLE_BLURB: Record<OrganizationRole, string> = {
     REVIEWER:
         "Narrower rather than beneath Member — the websites they are invited to, and nothing about the business around it.",
 };
-
-/** The ring each role wears today. Configurable rings need a server setting. */
-const ROLE_RING: Record<OrganizationRole, string> = {
-    OWNER: "ink",
-    ADMIN: "clay",
-    MEMBER: "saffron",
-    REVIEWER: "slate",
-};
-
-/**
- * The destinations the reach map decides, each named for what it opens. These
- * are the `NavAction` values the rail and the server policy share, so the
- * grid below can be checked against the source line by line.
- */
-const REACH_ROWS: {
-    action: NavAction;
-    label: string;
-    note: string;
-    needs?: string;
-}[] = [
-    {
-        action: "site:read",
-        label: "Website",
-        note: "read every site",
-        needs: "WEBSITE",
-    },
-    {
-        action: "site:create",
-        label: "New website",
-        note: "make one",
-        needs: "WEBSITE",
-    },
-    {
-        action: "section:write",
-        label: "Edit website pages",
-        note: "the page builder",
-        needs: "WEBSITE",
-    },
-    { action: "member:read", label: "Team", note: "this screen" },
-    { action: "module:read", label: "Modules", note: "what is turned on" },
-    { action: "notification:read", label: "Notifications", note: "" },
-    {
-        action: "org:settings:read",
-        label: "Organization settings",
-        note: "name, billing",
-    },
-    {
-        action: "provider:read",
-        label: "Providers",
-        note: "payments, messaging",
-    },
-];
 
 /** A person's name, or their email while they have not given one. */
 function nameOf(person: { name: string | null; email: string }): string {
@@ -139,9 +90,10 @@ export interface ReviewableSite {
  * role is held in a business and covers everything that business has, and an
  * invitation adds someone to this business only.
  *
- * Not built, because nothing yet backs them: custom roles, choosing a role's
- * ring colour, and per-person extra permissions. The four roles are an enum in
- * the API; their rings are the design's defaults.
+ * Roles a business invents live in `RolesTab`, backed by the API's own
+ * catalogue. Still not built, because nothing backs them yet: choosing a
+ * role's ring colour (the avatar has one token per built-in, so invented roles
+ * wear a neutral ring), and per-person extra permissions.
  */
 export function TeamScreen({
     organizationName,
@@ -149,6 +101,9 @@ export function TeamScreen({
     invitations,
     sites,
     canManage,
+    canEditRoles,
+    roles,
+    catalogue,
     moduleKeys,
 }: {
     organizationName: string;
@@ -156,11 +111,16 @@ export function TeamScreen({
     invitations: OrganizationInvitation[];
     sites: ReviewableSite[];
     canManage: boolean;
+    /** May invent and change roles — holds `member:role:update`. */
+    canEditRoles: boolean;
+    /** Every role the business has, built-in and invented, from the API. */
+    roles: Role[];
+    /** What a role may be granted; `null` when it could not be read. */
+    catalogue: RoleCatalogue | null;
     /** `null` = availability unknown; every capability then reads as on. */
     moduleKeys: string[] | null;
 }) {
     const [tab, setTab] = useState<"roles" | "people">("people");
-    const [activeRole, setActiveRole] = useState<OrganizationRole>("MEMBER");
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -174,11 +134,9 @@ export function TeamScreen({
             );
         return { reachable: count(role), total: count("OWNER") };
     };
-    const peopleWith = (role: OrganizationRole) =>
-        members.filter((m) => m.role === role).length;
 
     const tabs = [
-        { id: "roles" as const, label: "Roles", count: ROLES.length },
+        { id: "roles" as const, label: "Roles", count: roles.length },
         { id: "people" as const, label: "People", count: members.length },
     ];
 
@@ -242,12 +200,11 @@ export function TeamScreen({
 
             {tab === "roles" ? (
                 <RolesTab
-                    activeRole={activeRole}
-                    onPick={setActiveRole}
-                    reach={reach}
-                    peopleWith={peopleWith}
-                    moduleKeys={moduleKeys}
-                    members={members}
+                    roles={roles}
+                    catalogue={catalogue}
+                    canEdit={canEditRoles}
+                    organizationName={organizationName}
+                    builtInBlurb={ROLE_BLURB}
                 />
             ) : members.length <= 1 && invitations.length === 0 ? (
                 <div className="flex flex-col items-center gap-[9px] rounded-xl border border-dashed border-border-strong px-6 py-12 text-center">
@@ -297,234 +254,6 @@ export function TeamScreen({
                     sites={sites}
                 />
             ) : null}
-        </div>
-    );
-}
-
-/* ─── Roles ─────────────────────────────────────────────────────────────── */
-
-function RolesTab({
-    activeRole,
-    onPick,
-    reach,
-    peopleWith,
-    moduleKeys,
-    members,
-}: {
-    activeRole: OrganizationRole;
-    onPick: (role: OrganizationRole) => void;
-    reach: (role: NavRole) => { reachable: number; total: number };
-    peopleWith: (role: OrganizationRole) => number;
-    moduleKeys: string[] | null;
-    members: OrganizationMember[];
-}) {
-    const activeReach = reach(activeRole);
-    const capOn = (needs?: string) =>
-        !needs || moduleKeys === null || moduleKeys.includes(needs);
-
-    return (
-        <div className="flex flex-wrap items-start gap-5">
-            {/* The four roles. Selecting one is choosing what the panel explains,
-                so the chosen row takes Saffron 50 and the 2px marker. */}
-            <div className="min-w-0 max-w-[300px] flex-[0_1_262px] overflow-hidden rounded-xl border border-border">
-                <p className="border-b border-muted px-[15px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Roles
-                </p>
-                {ROLES.map((role) => {
-                    const on = role === activeRole;
-                    const n = peopleWith(role);
-                    const r = reach(role);
-                    return (
-                        <button
-                            key={role}
-                            type="button"
-                            aria-pressed={on}
-                            onClick={() => onPick(role)}
-                            className={cn(
-                                "flex w-full items-center gap-[11px] border-t border-border px-[15px] py-2.5 text-left transition-colors duration-fast first-of-type:border-t-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-                                on
-                                    ? "bg-brand-subtle shadow-[inset_2px_0_0_hsl(var(--highlight))]"
-                                    : "hover:bg-foreground/[0.035]",
-                            )}
-                        >
-                            <RoleDot role={role} />
-                            <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[13.5px] font-medium">
-                                    {ROLE_LABEL[role]}
-                                </span>
-                                <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                                    {n === 1 ? "1 person" : `${n} people`} ·
-                                    reaches {r.reachable} of {r.total}
-                                </span>
-                            </span>
-                            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                                {role}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
-
-            <div className="min-w-0 flex-[1_1_420px] overflow-hidden rounded-xl border border-border">
-                <div className="border-b border-muted px-4 py-3.5">
-                    <div className="flex flex-wrap items-center gap-[11px]">
-                        <RoleDot role={activeRole} size={13} />
-                        <h2 className="font-display text-[18px] font-semibold tracking-[-0.025em]">
-                            {ROLE_LABEL[activeRole]}
-                        </h2>
-                        <span className="rounded-full bg-muted px-2 py-[3px] font-mono text-[11px] text-neutral-700 dark:text-muted-foreground">
-                            {activeRole}
-                        </span>
-                        <span className="ml-auto rounded-full bg-muted px-[9px] py-[3px] text-[11px] font-medium text-neutral-600 dark:text-muted-foreground">
-                            Fixed today
-                        </span>
-                    </div>
-                    <p className="mt-[9px] text-[12.5px] leading-[1.55] text-neutral-600 dark:text-muted-foreground">
-                        {ROLE_BLURB[activeRole]}
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <span className="mr-[3px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Ring
-                        </span>
-                        <RoleDot role={activeRole} size={22} />
-                        <span className="text-[12px] text-neutral-600 dark:text-muted-foreground">
-                            {ROLE_LABEL[activeRole]} wears the{" "}
-                            {ROLE_RING[activeRole]} ring.
-                        </span>
-                    </div>
-                    <p className="mt-2 text-[11.5px] leading-[1.5] text-muted-foreground">
-                        A ring only reinforces — the role name is always beside
-                        it in words, so nothing depends on telling two colours
-                        apart.
-                    </p>
-                    {/* Every ring is a pair: on Ink the dark cut is used,
-                        because ink on ink is invisible. `dark` scopes the
-                        tokens, so this strip shows the real dark rings. */}
-                    <div className="dark mt-[11px] rounded-[10px] bg-[hsl(var(--background))] px-[13px] py-[11px] text-foreground">
-                        <p className="mb-[9px] text-[11.5px] leading-[1.5] text-muted-foreground">
-                            The same rings on a dark ground:
-                        </p>
-                        <div className="flex flex-wrap gap-[9px]">
-                            {ROLES.map((role) => {
-                                const person = members.find(
-                                    (m) => m.role === role,
-                                );
-                                const tone = roleRingTone(role);
-                                return (
-                                    <Avatar
-                                        key={role}
-                                        size="row"
-                                        ringTone={tone}
-                                        className="bg-[#33332E] text-[#F5F2EC] [--card:60_5%_7%]"
-                                        title={ROLE_LABEL[role]}
-                                    >
-                                        <AvatarFallback>
-                                            {person
-                                                ? avatarInitials(
-                                                      person.name,
-                                                      person.email,
-                                                  )
-                                                : ROLE_LABEL[role]
-                                                      .slice(0, 2)
-                                                      .toUpperCase()}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="px-4 pb-3.5 pt-1.5">
-                    <div className="grid grid-cols-[minmax(150px,1fr)_176px] items-center gap-3 pb-2 pt-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        <span>This role can reach</span>
-                        <span className="text-right">
-                            {activeReach.reachable} of {activeReach.total} here
-                        </span>
-                    </div>
-                    {REACH_ROWS.map((row) => {
-                        const on = navRoleCan(activeRole, row.action);
-                        const available = capOn(row.needs);
-                        return (
-                            <div
-                                key={row.action}
-                                className="grid grid-cols-[minmax(150px,1fr)_176px] items-center gap-3 border-t border-border py-[9px]"
-                            >
-                                <div className="min-w-0">
-                                    <p className="text-[13px]">{row.label}</p>
-                                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                        <span className="font-mono">
-                                            {row.action}
-                                        </span>
-                                        {row.note ? ` · ${row.note}` : null}
-                                    </p>
-                                </div>
-                                {available ? (
-                                    <LockedSwitch
-                                        on={on}
-                                        label={`${row.label}, ${on ? "allowed" : "not allowed"}, fixed today`}
-                                    />
-                                ) : (
-                                    <p className="flex h-8 items-center justify-end text-[12.5px] text-muted-foreground">
-                                        Capability off
-                                    </p>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-                <div className="flex items-start gap-[9px] border-t border-muted bg-foreground/[0.03] px-4 py-[13px]">
-                    <Info
-                        aria-hidden
-                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                    />
-                    <p className="text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
-                        A role&apos;s reach is fixed today. The rail offers what
-                        the role can open, and every destination still checks
-                        access itself — typing an address gets the same answer.
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-/**
- * A switch that shows a fixed state: on is Ink 400 rather than Ink, because it
- * cannot be flipped, and it announces itself as disabled rather than as a
- * control that does nothing.
- */
-function LockedSwitch({ on, label }: { on: boolean; label: string }) {
-    return (
-        <div
-            role="switch"
-            aria-checked={on}
-            aria-disabled
-            aria-label={label}
-            className="flex h-8 items-center justify-end gap-2.5"
-        >
-            <span
-                className={cn(
-                    "text-[12.5px]",
-                    on ? "text-foreground" : "text-muted-foreground",
-                )}
-            >
-                {on ? "Allowed" : "Not allowed"}
-            </span>
-            <span
-                aria-hidden
-                className={cn(
-                    "relative h-6 w-[42px] shrink-0 rounded-full",
-                    on ? "bg-input" : "bg-border",
-                )}
-            >
-                <span
-                    className={cn(
-                        "absolute top-[3px] size-[18px] rounded-full bg-white",
-                        on ? "left-[21px]" : "left-[3px]",
-                    )}
-                />
-            </span>
         </div>
     );
 }

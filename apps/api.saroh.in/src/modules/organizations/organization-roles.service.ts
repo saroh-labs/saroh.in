@@ -43,6 +43,19 @@ const BUILT_IN_RING: Record<OrgRole, string> = {
 const KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
+ * The ring every invented role wears — neutral, and not choosable yet.
+ *
+ * The avatar has exactly four ring colours, one token per built-in
+ * (`--role-owner`, `-admin`, `-member`, `-reviewer`). Offering those to an
+ * invented role would make it look like a built-in; offering names with no
+ * token behind them would draw no ring at all. Neutral is distinct from all
+ * four, and the design's own rule covers the rest: "a ring only reinforces —
+ * the role name is always beside it in words". Letting a business choose
+ * waits on the token layer growing role colours.
+ */
+const INVENTED_RING = "neutral";
+
+/**
  * The roles a business has, and the ones it invents.
  *
  * The four built-ins are always present whether or not a row exists for them:
@@ -101,7 +114,7 @@ export class OrganizationRolesService {
 
     async create(
         organizationId: string,
-        input: { label: string; actions: string[]; ringTone?: string },
+        input: { label: string; actions: string[] },
     ): Promise<RoleView> {
         const label = input.label.trim();
         if (label.length === 0) {
@@ -141,7 +154,7 @@ export class OrganizationRolesService {
                 key,
                 label,
                 actions: this.vetActions(input.actions),
-                ringTone: input.ringTone ?? "slate",
+                ringTone: INVENTED_RING,
             },
         });
 
@@ -158,7 +171,7 @@ export class OrganizationRolesService {
     async update(
         organizationId: string,
         key: string,
-        input: { label?: string; actions?: string[]; ringTone?: string },
+        input: { label?: string; actions?: string[] },
     ): Promise<RoleView> {
         const role = await this.requireInvented(organizationId, key);
 
@@ -170,9 +183,6 @@ export class OrganizationRolesService {
                     : {}),
                 ...(input.actions !== undefined
                     ? { actions: this.vetActions(input.actions) }
-                    : {}),
-                ...(input.ringTone !== undefined
-                    ? { ringTone: input.ringTone }
                     : {}),
             },
         });

@@ -2,6 +2,7 @@ import { TeamScreen } from "@/components/organizations/team-screen";
 import { PageContainer } from "@/components/shared/page-container";
 import { listModules } from "@/lib/modules/service";
 import { listInvitations, listMembers } from "@/lib/organizations/members";
+import { getRoleCatalogue, listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { listSites } from "@/lib/sites/service";
@@ -24,26 +25,42 @@ export default async function PeoplePage() {
     await requireSession();
 
     const organization = await resolveActiveOrganization();
-    const canManage =
-        organization?.role === "OWNER" || organization?.role === "ADMIN";
+    /*
+     * From what the API resolved the actor may do, not from the role's name:
+     * a role this business invented maps to MEMBER by name and may still have
+     * been granted the roster or the roles. The name is only the fallback for
+     * a response that predates permissions being sent.
+     */
+    const may = (action: string) =>
+        organization?.actions
+            ? organization.actions.includes(action)
+            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const canManage = may("member:invite");
+    const canEditRoles = may("member:role:update");
 
-    const [members, invitations, sites, moduleKeys] = await Promise.all([
-        listMembers(),
-        // Empty for anyone who may not see them, rather than an error: this is
-        // one page and a member should still get the roster.
-        canManage ? listInvitations() : Promise.resolve([]),
-        // Only to name the sites a reviewer can be invited to.
-        canManage ? listSites() : Promise.resolve([]),
-        // What each role reaches depends on what this business has turned on;
-        // unknown on failure, so every capability reads as on.
-        listModules()
-            .then((modules) =>
-                modules
-                    .filter((m) => m.readiness !== "DISABLED")
-                    .map((m) => m.key),
-            )
-            .catch(() => null),
-    ]);
+    const [members, invitations, sites, moduleKeys, roles, catalogue] =
+        await Promise.all([
+            listMembers(),
+            // Empty for anyone who may not see them, rather than an error: this is
+            // one page and a member should still get the roster.
+            canManage ? listInvitations() : Promise.resolve([]),
+            // Only to name the sites a reviewer can be invited to.
+            canManage ? listSites() : Promise.resolve([]),
+            // What each role reaches depends on what this business has turned on;
+            // unknown on failure, so every capability reads as on.
+            listModules()
+                .then((modules) =>
+                    modules
+                        .filter((m) => m.readiness !== "DISABLED")
+                        .map((m) => m.key),
+                )
+                .catch(() => null),
+            listRoles(),
+            // The permission list the owner ticks from; `null` renders as "could
+            // not be loaded" rather than as an empty list that looks like a role
+            // with no powers available to it.
+            getRoleCatalogue().catch(() => null),
+        ]);
 
     return (
         <PageContainer width="full">
@@ -53,6 +70,9 @@ export default async function PeoplePage() {
                 invitations={invitations}
                 sites={sites.map((s) => ({ id: s.id, name: s.name }))}
                 canManage={canManage}
+                canEditRoles={canEditRoles}
+                roles={roles}
+                catalogue={catalogue}
                 moduleKeys={moduleKeys}
             />
         </PageContainer>

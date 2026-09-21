@@ -20,7 +20,7 @@ import {
 } from "./capability-catalogue";
 import { authorize } from "./organization-policy";
 import { OrganizationRolesService } from "./organization-roles.service";
-import { CreateRoleDto, RING_TONES, UpdateRoleDto } from "./roles.dto";
+import { CreateRoleDto, UpdateRoleDto } from "./roles.dto";
 
 /**
  * The roles a business has, and the ones it invents.
@@ -56,7 +56,6 @@ export class OrganizationRolesController {
         return {
             groups: CAPABILITY_GROUPS,
             capabilities: grantableCapabilities(),
-            ringTones: RING_TONES,
         };
     }
 

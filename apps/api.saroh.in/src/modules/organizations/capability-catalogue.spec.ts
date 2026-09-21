@@ -49,6 +49,20 @@ describe("capability catalogue", () => {
         expect(bad).toEqual([]);
     });
 
+    it("speaks to the owner, not to a developer", () => {
+        // Labels and notes are rendered verbatim on Team. One note once told a
+        // shop owner to "see the annotations spec"; this is what stops the
+        // next one.
+        const code =
+            /\bspec\b|annotation|\bAPI\b|`|\bmodule[- ]gated\b|\bguard\b|\benum\b|\bDTO\b/i;
+        const leaks = CAPABILITIES.flatMap((c) =>
+            [c.label, c.note ?? ""]
+                .filter((text) => code.test(text))
+                .map((text) => `${c.action}: ${text}`),
+        );
+        expect(leaks).toEqual([]);
+    });
+
     it("keeps closing the business off the grantable list", () => {
         // A role that could be granted `org:delete` would make "every business
         // has exactly one person who can always get back in" untrue.
