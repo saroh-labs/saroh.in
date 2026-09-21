@@ -7,7 +7,12 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { createPostCategory, deletePostCategory } from "@/lib/content/actions";
+import { CategoryRow } from "@/components/shared/category-row";
+import {
+    createPostCategory,
+    deletePostCategory,
+    updatePostCategory,
+} from "@/lib/content/actions";
 import type { PostCategory } from "@/lib/content/service";
 
 /**
@@ -25,7 +30,6 @@ export function PostCategoriesManager({
     const router = useRouter();
     const [name, setName] = useState("");
     const [adding, setAdding] = useState(false);
-    const [busy, setBusy] = useState<string | null>(null);
 
     async function onAdd(e: React.FormEvent) {
         e.preventDefault();
@@ -41,15 +45,29 @@ export function PostCategoriesManager({
         router.refresh();
     }
 
-    async function onDelete(id: string) {
-        setBusy(id);
-        const res = await deletePostCategory(siteId, id);
-        setBusy(null);
+    async function onRename(c: PostCategory, next: string) {
+        // The slug is kept: renaming changes what people read, not the
+        // address links already point at.
+        const res = await updatePostCategory(siteId, c.id, {
+            name: next,
+            slug: c.slug,
+        });
+        if (!res.ok) {
+            showError(res.error);
+            return false;
+        }
+        showSuccess(`Renamed to ${next}`);
+        router.refresh();
+        return true;
+    }
+
+    async function onDelete(c: PostCategory) {
+        const res = await deletePostCategory(siteId, c.id);
         if (!res.ok) {
             showError(res.error);
             return;
         }
-        showSuccess("Category deleted");
+        showSuccess(`${c.name} deleted`);
         router.refresh();
     }
 
@@ -85,26 +103,24 @@ export function PostCategoriesManager({
                         <li
                             key={c.id}
                             style={{ "--wk-i": i } as React.CSSProperties}
-                            className="wk-item flex items-center justify-between gap-3 p-3"
+                            className="wk-item"
                         >
-                            <div className="min-w-0">
-                                <p className="truncate text-sm font-medium">
-                                    {c.name}
-                                </p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                    {c._count.posts} posts
-                                </p>
-                            </div>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="wk-press"
-                                disabled={busy === c.id}
-                                onClick={() => onDelete(c.id)}
-                            >
-                                Delete
-                            </Button>
+                            <CategoryRow
+                                name={c.name}
+                                meta={
+                                    c._count.posts === 1
+                                        ? "1 post"
+                                        : `${c._count.posts} posts`
+                                }
+                                deleteTitle={`Delete ${c.name}?`}
+                                deleteBody={
+                                    c._count.posts > 0
+                                        ? `Its ${c._count.posts === 1 ? "post becomes" : `${c._count.posts} posts become`} Uncategorized and stays where it is on the site. This cannot be undone.`
+                                        : "No posts are in it. This cannot be undone."
+                                }
+                                onRename={(next) => onRename(c, next)}
+                                onDelete={() => onDelete(c)}
+                            />
                         </li>
                     ))}
                 </ul>
