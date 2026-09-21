@@ -13,6 +13,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { addressProblem, addressTaken } from "../sites/site-address";
 import type { OnboardOrganizationDto } from "./dto";
 import { slugify } from "./slug";
 
@@ -47,24 +48,44 @@ export class OrganizationOnboardingService {
         userId: string,
         dto: OnboardOrganizationDto,
     ): Promise<OnboardedOrganization> {
-        const slug = slugify(dto.name);
+        /*
+         * The address the business reserves: the one the merchant chose, or
+         * the name's own form when they left it alone (which is all this ever
+         * was before). Stored as the slug, and it is what the business's
+         * first website is served at (`<address>.saroh.app`).
+         */
+        const chosen = dto.address ? dto.address : null;
+        const slug = chosen ?? slugify(dto.name).slice(0, 63);
         if (!slug) {
             throw new BadRequestException(
                 "Organization name must contain at least one alphanumeric character",
             );
         }
+        const problem = addressProblem(slug);
+        if (problem) {
+            // A chosen address is the merchant's to fix; a derived one is the
+            // name's, so the message lands on whichever field produced it.
+            throw new BadRequestException({
+                message:
+                    chosen !== null
+                        ? problem
+                        : `${problem} — choose an address below`,
+                details: { field: "address" },
+            });
+        }
 
         const onboarded = await prisma.$transaction(async (tx) => {
-            // Fail fast on a taken slug with a clear 409 rather than surfacing a
-            // raw unique-constraint error; the check + create share the txn.
-            const existing = await tx.organization.findUnique({
-                where: { slug },
-                select: { id: true },
-            });
-            if (existing) {
-                throw new ConflictException(
-                    `An organization with the slug "${slug}" already exists`,
-                );
+            /*
+             * Fail fast on a taken address with a clear 409 rather than a raw
+             * unique-constraint error. "Taken" means another business
+             * reserved it OR a website already lives there — a reservation
+             * that only checked businesses could not be kept.
+             */
+            if (await addressTaken(tx, slug)) {
+                throw new ConflictException({
+                    message: `${slug}.saroh.app is taken — try another address`,
+                    details: { field: "address" },
+                });
             }
 
             const organization = await tx.organization.create({
@@ -115,6 +136,28 @@ export class OrganizationOnboardingService {
         await this.activation?.organizationCreated(onboarded.id);
 
         return onboarded;
+    }
+
+    /**
+     * Whether an address can be reserved, and if not, why — for the setup
+     * form's live check. Read-only; the create re-checks inside its own
+     * transaction, so a race between this answer and the submit is caught
+     * there, not trusted here.
+     */
+    async checkAddress(
+        raw: string,
+    ): Promise<{ address: string; available: boolean; reason?: string }> {
+        const address = raw.trim().toLowerCase();
+        const problem = addressProblem(address);
+        if (problem) return { address, available: false, reason: problem };
+        if (await addressTaken(prisma, address)) {
+            return {
+                address,
+                available: false,
+                reason: "Another business already has this address",
+            };
+        }
+        return { address, available: true };
     }
 
     /**

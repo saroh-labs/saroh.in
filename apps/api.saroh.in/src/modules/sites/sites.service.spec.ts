@@ -110,6 +110,59 @@ describe("SitesService.createFromTemplate", () => {
         expect(siteCreate).not.toHaveBeenCalled();
     });
 
+    describe("where a new site is served", () => {
+        it("takes the address its business reserved at setup when none is asked for", async () => {
+            orgFindUnique.mockResolvedValue({
+                name: "Rye",
+                slug: "ryeandco",
+                businessProfile: null,
+            });
+            await service.createFromTemplate(ctx(), { name: "Rye" });
+            expect(siteCreate.mock.calls[0][0].data.subdomain).toBe("ryeandco");
+        });
+
+        it("leaves the address empty when a site already uses the reserved one", async () => {
+            orgFindUnique.mockResolvedValue({
+                name: "Rye",
+                slug: "ryeandco",
+                businessProfile: null,
+            });
+            siteFindUnique.mockResolvedValue({ id: "site_old" });
+            await service.createFromTemplate(ctx(), { name: "Rye 2" });
+            expect(siteCreate.mock.calls[0][0].data.subdomain).toBeUndefined();
+        });
+
+        it("refuses an address another business reserved", async () => {
+            orgFindUnique.mockImplementation(({ where }) =>
+                Promise.resolve(
+                    where.slug === "kiln"
+                        ? { id: "org_other" }
+                        : { name: "Rye", businessProfile: null },
+                ),
+            );
+            await expect(
+                service.createFromTemplate(ctx(), {
+                    name: "Rye",
+                    subdomain: "kiln",
+                }),
+            ).rejects.toMatchObject({
+                response: { details: { field: "subdomain" } },
+            });
+            expect(siteCreate).not.toHaveBeenCalled();
+        });
+
+        it("refuses an address kept for Saroh", async () => {
+            await expect(
+                service.createFromTemplate(ctx(), {
+                    name: "Rye",
+                    subdomain: "status",
+                }),
+            ).rejects.toMatchObject({
+                response: { message: "That address is kept for Saroh" },
+            });
+        });
+    });
+
     it("creates a Site + Pages + DRAFT PageVersions + Sections in one org-scoped transaction from the real starter template", async () => {
         const dto: CreateSiteFromTemplateDto = { name: "Acme" };
 
