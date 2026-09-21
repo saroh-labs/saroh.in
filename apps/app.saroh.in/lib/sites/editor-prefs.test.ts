@@ -166,6 +166,14 @@ describe("where the merchant was in one site", () => {
         expect(prefs.getPlace("site_1", 1).rail).toBe("sections");
     });
 
+    it("opens Feedback for someone who left the old Review tab open", async () => {
+        useStorage(storage({ [KEY]: JSON.stringify({ rail: "review" }) }));
+        const prefs = await load();
+        const place = prefs.getPlace("site_1", 1);
+        expect(place.rail).toBe("sections");
+        expect(place.inspector).toBe("feedback");
+    });
+
     it("refuses a scroll offset that would go nowhere useful", async () => {
         useStorage(
             storage({
@@ -199,6 +207,7 @@ describe("what the server renders", () => {
         expect(prefs.placeOnServer(3)).toEqual({
             selectedIndex: 0,
             rail: "sections",
+            inspector: "block",
             scrollTop: 0,
         });
     });
