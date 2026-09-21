@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 
 import { SiteTheme } from "@saroh/site-blocks";
 
-import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { getPublicationForHost, shareImages } from "@/lib/publication";
+import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 /**
  * Tenant site layout (S2-006).

@@ -1,13 +1,17 @@
 import Link from "next/link";
 
-import type { PublicationSite } from "@/lib/publication";
-
 /**
- * The parts of a site that are not its pages: header, footer, theme. Shared
- * by the live site (app/[domain]) and a draft preview (app/preview, #198),
- * which must look exactly like the live site would — that is the point of
- * showing it to a reviewer.
+ * The parts of a site that are not its pages: header and footer. Shared by
+ * the live site (saroh.app's app/[domain]), a draft preview (app/preview,
+ * #198) and the website editor's canvas (#336) — which must all look exactly
+ * like the live site, so there is one implementation of each, here (#252).
  */
+
+/** What the merchant wrote at the foot of their site. */
+export interface SiteFooterContent {
+    format: "html" | "markdown";
+    value: string;
+}
 
 /**
  * The merchant's own footer (#202).
@@ -24,16 +28,21 @@ import type { PublicationSite } from "@/lib/publication";
  * SAFETY. `value` is rendered with `dangerouslySetInnerHTML` when the format is
  * html, and that is safe for exactly one reason: publish sanitized it through
  * the same allowlist as `richText.value` before writing the immutable snapshot,
- * so what arrives here is already-cleaned markup. This app never receives raw
- * author input. Markdown renders as escaped pre-wrapped text, because there is
+ * so what arrives here is already-cleaned markup. The editor's canvas passes a
+ * draft footer the API sanitized the same way (`footerPreview`), so no caller
+ * hands this raw author input. Markdown renders as escaped pre-wrapped text, because there is
  * no markdown library in this app's dependencies and guessing at one would mean
  * emitting HTML nobody cleaned.
  */
-export function SiteFooter({ footer }: { footer: PublicationSite["footer"] }) {
+export function SiteFooter({
+    footer,
+}: {
+    footer: SiteFooterContent | null | undefined;
+}) {
     if (!footer || footer.value.trim() === "") return null;
 
     return (
-        <footer className="w-full bg-site-footer-bg px-5 py-[var(--site-section-padding)] text-site-footer-fg sm:px-[var(--site-page-margin)]">
+        <footer className="bg-site-footer-bg text-site-footer-fg w-full px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div className="mx-auto max-w-screen-xl text-sm">
                 {footer.format === "html" ? (
                     <div
@@ -41,7 +50,7 @@ export function SiteFooter({ footer }: { footer: PublicationSite["footer"] }) {
                            prose defaults — the same reason richText overrides
                            them: a chosen palette must not be repainted by a
                            typography plugin's greys. */
-                        className="prose prose-sm max-w-none prose-headings:text-site-footer-fg prose-p:text-site-footer-fg prose-a:text-site-footer-fg prose-strong:text-site-footer-fg prose-li:text-site-footer-fg"
+                        className="prose prose-sm prose-headings:text-site-footer-fg prose-p:text-site-footer-fg prose-a:text-site-footer-fg prose-strong:text-site-footer-fg prose-li:text-site-footer-fg max-w-none"
                         // Sanitized at publish — see the safety note above.
                         dangerouslySetInnerHTML={{ __html: footer.value }}
                     />
@@ -84,7 +93,7 @@ export function SiteHeader({
     const linkClass =
         "rounded-[var(--site-radius)] px-2 py-1 text-sm text-site-body transition-colors hover:text-site-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent";
     return (
-        <header className="left-0 right-0 top-0 z-30 border-b border-site-border bg-site-surface">
+        <header className="border-site-border bg-site-surface left-0 right-0 top-0 z-30 border-b">
             <div
                 className={
                     hasMenu
@@ -93,7 +102,7 @@ export function SiteHeader({
                 }
             >
                 <Link href={to("/")} className="flex items-center">
-                    <span className="inline-block truncate text-lg font-medium tracking-tight text-site-fg">
+                    <span className="text-site-fg inline-block truncate text-lg font-medium tracking-tight">
                         {name}
                     </span>
                 </Link>
@@ -114,12 +123,12 @@ export function SiteHeader({
                             ))}
                         </nav>
                         <details className="relative sm:hidden">
-                            <summary className="cursor-pointer list-none rounded-[var(--site-radius)] border border-site-border px-3 py-1.5 text-sm text-site-fg [&::-webkit-details-marker]:hidden">
+                            <summary className="border-site-border text-site-fg cursor-pointer list-none rounded-[var(--site-radius)] border px-3 py-1.5 text-sm [&::-webkit-details-marker]:hidden">
                                 Menu
                             </summary>
                             <nav
                                 aria-label="Site"
-                                className="absolute right-0 top-full z-40 mt-2 flex min-w-44 flex-col gap-1 rounded-[var(--site-radius)] border border-site-border bg-site-surface p-2"
+                                className="border-site-border bg-site-surface absolute right-0 top-full z-40 mt-2 flex min-w-44 flex-col gap-1 rounded-[var(--site-radius)] border p-2"
                             >
                                 {navigation.map((item) => (
                                     <Link
