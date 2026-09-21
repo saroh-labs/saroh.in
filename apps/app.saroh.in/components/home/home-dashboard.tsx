@@ -1,9 +1,13 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState, PartialNotice } from "@saroh/ui/data-state";
+import { Home } from "lucide-react";
 import Link from "next/link";
 
+import { firstRunJobs } from "@/lib/home/first-run";
 import type { HomeModel } from "@/lib/home/service";
+import type { ModuleView } from "@/lib/modules/schema";
 
+import { FirstRunJobs } from "./first-run-jobs";
 import { NeedsYou } from "./needs-you";
 import { NumbersBand } from "./numbers-band";
 import { Schedule } from "./schedule";
@@ -33,23 +37,20 @@ function formatList(labels: string[]): string {
     return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
-export function HomeDashboard({ home }: { home: HomeModel }) {
-    // Brand-new / no modules enabled → guide to need-based setup, not an empty
-    // dashboard whose every band says "nothing yet".
+export function HomeDashboard({
+    home,
+    modules,
+    businessName,
+}: {
+    home: HomeModel;
+    /** Read only for a business with nothing on — the first-run question. */
+    modules: ModuleView[] | null;
+    businessName: string;
+}) {
+    // Nothing on yet: ask what the business wants to do, on Home itself,
+    // rather than an empty dashboard whose every band says "nothing yet".
     if (!home.hasAnyModule) {
-        return (
-            <EmptyState
-                title="Let's set up your workspace"
-                description="Turn on the capabilities your business needs — a website, appointments, a store, or all of them. You can change this anytime."
-                action={
-                    <Button asChild variant="brand">
-                        <Link href="/onboarding/modules">
-                            Choose what you need
-                        </Link>
-                    </Button>
-                }
-            />
-        );
+        return <FirstRun modules={modules ?? []} businessName={businessName} />;
     }
 
     const now = new Date();
@@ -109,5 +110,49 @@ export function HomeDashboard({ home }: { home: HomeModel }) {
                 </div>
             ) : null}
         </div>
+    );
+}
+
+/**
+ * The first-run branch. Only someone who may turn capabilities on is asked
+ * which to turn on; offering a choice they cannot act on is the dead-end
+ * pattern in another costume. Everyone else is told who makes it, so an empty
+ * Home never reads as a broken one.
+ */
+function FirstRun({
+    modules,
+    businessName,
+}: {
+    modules: ModuleView[];
+    businessName: string;
+}) {
+    const jobs = firstRunJobs(modules);
+    if (jobs.length > 0) return <FirstRunJobs modules={modules} jobs={jobs} />;
+
+    // May turn things on, just none of the four starting jobs: the full list
+    // is still theirs, so point at it rather than saying nobody can.
+    if (modules.some((m) => m.canManage && m.lifecycle !== "ENABLED")) {
+        return (
+            <EmptyState
+                icon={<Home aria-hidden />}
+                title="Nothing is turned on yet"
+                description={`Pick what Saroh does for ${businessName}. Each one adds its own rows to the sidebar, and nothing is lost if you turn it off again.`}
+                action={
+                    <Button asChild variant="brand">
+                        <Link href="/onboarding/modules">
+                            Choose what it does
+                        </Link>
+                    </Button>
+                }
+            />
+        );
+    }
+
+    return (
+        <EmptyState
+            icon={<Home aria-hidden />}
+            title="Nothing is turned on yet"
+            description={`${businessName} has not picked what Saroh does for it. Once someone who manages it does, the work shows up here and in the sidebar.`}
+        />
     );
 }
