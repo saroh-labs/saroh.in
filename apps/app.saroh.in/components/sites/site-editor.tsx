@@ -1,5 +1,6 @@
 "use client";
 
+import { blockExample } from "@saroh/block-contract";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -565,7 +566,23 @@ export function SiteEditor({
 
     function addSection(type: SectionType, variant?: string) {
         const empty = emptySection(type);
-        const section = variant ? withVariant(empty, variant) : empty;
+        /*
+         * Start from the example the picker showed, so the block reads like
+         * the preview that was chosen rather than an empty box. The flag
+         * engine names any example text still there before it goes live.
+         * Blocks with no example (testimonials, contact, gallery, and those
+         * seeded with working defaults) start as they always have.
+         */
+        const example = blockExample(type, variant);
+        const section: Section = example
+            ? ({
+                  ...empty,
+                  contractVersion: example.contractVersion,
+                  content: structuredClone(example.content),
+              } as Section)
+            : variant
+              ? withVariant(empty, variant)
+              : empty;
         // Read at call time, not from this render: two quick adds must land
         // in the order they were clicked.
         const at = insertPosition(
