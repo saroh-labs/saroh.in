@@ -16,7 +16,7 @@ import {
 } from "@saroh/ui/select";
 import { Switch } from "@saroh/ui/switch";
 import { Textarea } from "@saroh/ui/textarea";
-import { TimeSelect } from "@saroh/ui/time-select";
+import { formatTime, TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { Lock } from "lucide-react";
@@ -423,18 +423,7 @@ function BasicsSection({
 /** Only a shop has a door: where it is and when it is open. */
 function PlaceSection({ store, canEdit, pending, save }: SectionProps) {
     const [address, setAddress] = useState(store.address ?? "");
-    const [week, setWeek] = useState<OpeningHoursDay[]>(
-        store.openingHours ?? DEFAULT_WEEK,
-    );
     const addressDirty = address.trim() !== (store.address ?? "");
-    const weekDirty =
-        JSON.stringify(week) !==
-        JSON.stringify(store.openingHours ?? DEFAULT_WEEK);
-    const backwards = week.some((d) => !d.closed && d.open >= d.close);
-
-    const setDay = (i: number, patch: Partial<OpeningHoursDay>) => {
-        setWeek((w) => w.map((d, j) => (j === i ? { ...d, ...patch } : d)));
-    };
 
     return (
         <Section title="Where customers find it">
@@ -472,18 +461,144 @@ function PlaceSection({ store, canEdit, pending, save }: SectionProps) {
                 ) : null}
             </form>
 
-            <form
-                className="grid gap-2"
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!backwards) {
-                        save({ openingHours: week }, "Opening hours saved");
-                    }
+            <OpeningHours
+                saved={store.openingHours}
+                canEdit={canEdit}
+                pending={pending}
+                onSave={(openingHours) => {
+                    save({ openingHours }, "Opening hours saved");
                 }}
-            >
+            />
+        </Section>
+    );
+}
+
+const SHORT: Record<Weekday, string> = {
+    MON: "Mon",
+    TUE: "Tue",
+    WED: "Wed",
+    THU: "Thu",
+    FRI: "Fri",
+    SAT: "Sat",
+    SUN: "Sun",
+};
+
+const PRESETS: { label: string; days: Weekday[] }[] = [
+    { label: "Mon–Fri", days: ["MON", "TUE", "WED", "THU", "FRI"] },
+    { label: "Mon–Sat", days: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] },
+    { label: "Every day", days: DAYS.map((d) => d.key) },
+];
+
+const sameHours = (a: OpeningHoursDay, b: OpeningHoursDay) =>
+    a.closed === b.closed &&
+    (a.closed || (a.open === b.open && a.close === b.close));
+
+/**
+ * "Mon–Sat 9:00 AM – 6:00 PM · Sun closed": runs of neighbouring days with
+ * the same hours, the way a shop writes them on its door.
+ */
+function summarise(week: OpeningHoursDay[]): string {
+    const runs: { from: number; to: number; day: OpeningHoursDay }[] = [];
+    week.forEach((day, i) => {
+        const last = runs.at(-1);
+        if (last?.to === i - 1 && sameHours(last.day, day)) {
+            last.to = i;
+        } else {
+            runs.push({ from: i, to: i, day });
+        }
+    });
+    return runs
+        .map(({ from, to, day }) => {
+            const a = SHORT[week[from]?.day ?? "MON"];
+            const b = SHORT[week[to]?.day ?? "MON"];
+            const days = from === to ? a : `${a}–${b}`;
+            return day.closed
+                ? `${days} closed`
+                : `${days} ${formatTime(day.open)} – ${formatTime(day.close)}`;
+        })
+        .join(" · ");
+}
+
+/** Every open day on the same hours — the case for almost every shop. */
+function isUniform(week: OpeningHoursDay[]): boolean {
+    const open = week.filter((d) => !d.closed);
+    return open.every(
+        (d) => d.open === open[0]?.open && d.close === open[0]?.close,
+    );
+}
+
+/**
+ * A shop's week, set the way a shop thinks about it: which days it opens and
+ * the hours it keeps, once. Only a shop whose Saturday (say) runs short opens
+ * the day-by-day list — and it starts there if its saved week already does.
+ * Either way what is saved is the full seven days, so the receipt reads the
+ * same.
+ */
+function OpeningHours({
+    saved,
+    canEdit,
+    pending,
+    onSave,
+}: {
+    saved: OpeningHoursDay[] | null;
+    canEdit: boolean;
+    pending: boolean;
+    onSave: (week: OpeningHoursDay[]) => void;
+}) {
+    const initial = saved ?? DEFAULT_WEEK;
+    const [week, setWeek] = useState<OpeningHoursDay[]>(initial);
+    const [eachDay, setEachDay] = useState(!isUniform(initial));
+    const dirty = JSON.stringify(week) !== JSON.stringify(initial);
+    const backwards = week.some((d) => !d.closed && d.open >= d.close);
+
+    const openDays = week.filter((d) => !d.closed).map((d) => d.day);
+    // The hours the "same" mode edits: the first open day's, or the default.
+    const shared = week.find((d) => !d.closed) ?? {
+        open: "09:00",
+        close: "18:00",
+    };
+
+    const setOpenDays = (days: string[]) => {
+        setWeek((w) =>
+            w.map((d) =>
+                days.includes(d.day)
+                    ? {
+                          ...d,
+                          closed: false,
+                          open: d.closed ? shared.open : d.open,
+                          close: d.closed ? shared.close : d.close,
+                      }
+                    : { ...d, closed: true },
+            ),
+        );
+    };
+    const setSharedHours = (patch: { open?: string; close?: string }) => {
+        setWeek((w) => w.map((d) => (d.closed ? d : { ...d, ...patch })));
+    };
+    const setDay = (i: number, patch: Partial<OpeningHoursDay>) => {
+        setWeek((w) => w.map((d, j) => (j === i ? { ...d, ...patch } : d)));
+    };
+
+    return (
+        <form
+            className="grid gap-3"
+            onSubmit={(e) => {
+                e.preventDefault();
+                if (!backwards) onSave(week);
+            }}
+        >
+            <div>
                 <p id="storefront-hours-label" className="text-sm font-medium">
                     Opening hours
                 </p>
+                <p className="mt-0.5 text-[12.5px] tabular-nums text-muted-foreground">
+                    {openDays.length === 0
+                        ? "Closed every day"
+                        : summarise(week)}
+                </p>
+            </div>
+
+            {eachDay ? (
                 <div
                     role="group"
                     aria-labelledby="storefront-hours-label"
@@ -545,24 +660,126 @@ function PlaceSection({ store, canEdit, pending, save }: SectionProps) {
                         );
                     })}
                 </div>
-                <Note>
-                    {backwards
-                        ? "A day has to close after it opens."
-                        : store.openingHours
-                          ? "Shown on the receipt, in the shop's own time."
-                          : "Not saved yet — this is a starting week. Save it to show it on receipts."}
-                </Note>
-                {canEdit && (weekDirty || !store.openingHours) ? (
-                    <Button
-                        type="submit"
-                        disabled={pending || backwards}
-                        className="w-fit"
-                    >
-                        Save hours
-                    </Button>
-                ) : null}
-            </form>
-        </Section>
+            ) : (
+                <div className="grid gap-3 rounded-lg border border-border p-3">
+                    <div className="grid gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span
+                                id="storefront-open-days"
+                                className="text-[12.5px] text-muted-foreground"
+                            >
+                                Open on
+                            </span>
+                            {PRESETS.map((p) => {
+                                const on =
+                                    openDays.length === p.days.length &&
+                                    p.days.every((d) => openDays.includes(d));
+                                return (
+                                    <Button
+                                        key={p.label}
+                                        type="button"
+                                        size="sm"
+                                        variant={on ? "secondary" : "ghost"}
+                                        aria-pressed={on}
+                                        disabled={!canEdit}
+                                        onClick={() => {
+                                            setOpenDays(p.days);
+                                        }}
+                                        className="h-7 px-2.5 text-[12px]"
+                                    >
+                                        {p.label}
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                        <ToggleGroup
+                            type="multiple"
+                            value={openDays}
+                            onValueChange={setOpenDays}
+                            disabled={!canEdit}
+                            aria-labelledby="storefront-open-days"
+                            className="w-fit justify-start gap-1"
+                        >
+                            {DAYS.map((d) => (
+                                <ToggleGroupItem
+                                    key={d.key}
+                                    value={d.key}
+                                    aria-label={d.label}
+                                    className="h-9 w-11 rounded-md border border-border text-[12.5px] data-[state=on]:border-foreground data-[state=on]:bg-foreground data-[state=on]:text-background coarse:h-11"
+                                >
+                                    {SHORT[d.key]}
+                                </ToggleGroupItem>
+                            ))}
+                        </ToggleGroup>
+                    </div>
+                    {openDays.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <TimeSelect
+                                value={shared.open}
+                                disabled={!canEdit}
+                                aria-label="Opens"
+                                aria-invalid={backwards || undefined}
+                                onValueChange={(open) => {
+                                    setSharedHours({ open });
+                                }}
+                            />
+                            <span aria-hidden className="text-muted-foreground">
+                                –
+                            </span>
+                            <TimeSelect
+                                value={shared.close}
+                                disabled={!canEdit}
+                                aria-label="Closes"
+                                aria-invalid={backwards || undefined}
+                                onValueChange={(close) => {
+                                    setSharedHours({ close });
+                                }}
+                            />
+                        </div>
+                    ) : null}
+                </div>
+            )}
+
+            {canEdit ? (
+                <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto w-fit p-0 text-[12.5px]"
+                    onClick={() => {
+                        if (eachDay) {
+                            // Back to one set of hours: every open day takes
+                            // the first open day's.
+                            setSharedHours({
+                                open: shared.open,
+                                close: shared.close,
+                            });
+                        }
+                        setEachDay(!eachDay);
+                    }}
+                >
+                    {eachDay
+                        ? "Use the same hours for every open day"
+                        : "Some days have different hours"}
+                </Button>
+            ) : null}
+
+            <Note>
+                {backwards
+                    ? "A day has to close after it opens."
+                    : saved
+                      ? "Shown on the receipt, in the shop's own time."
+                      : "Not saved yet — this is a starting week. Save it to show it on receipts."}
+            </Note>
+            {canEdit && (dirty || !saved) ? (
+                <Button
+                    type="submit"
+                    disabled={pending || backwards}
+                    className="w-fit"
+                >
+                    Save hours
+                </Button>
+            ) : null}
+        </form>
     );
 }
 
