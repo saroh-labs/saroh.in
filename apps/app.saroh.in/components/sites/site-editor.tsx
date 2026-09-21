@@ -28,6 +28,7 @@ import {
 } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { AddBlockPanel } from "@/components/sites/add-block-panel";
 import { AddSectionDialog } from "@/components/sites/add-section-dialog";
 import { SECTION_ICONS } from "@/components/sites/block-icons";
 import {
@@ -423,7 +424,10 @@ export function SiteEditor({
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
     const [style, setStyle] = useState<SiteStyle>(initialStyle);
-    const [addOpen, setAddOpen] = useState(false);
+    /** The rail shows the Add block tab instead of this page's blocks (#337). */
+    const [adding, setAdding] = useState(false);
+    /** The block whose look is being chosen before it is added (#267). */
+    const [lookFor, setLookFor] = useState<SectionType | null>(null);
     const [styleSaving, setStyleSaving] = useState(false);
     const [savedStyleJson, setSavedStyleJson] = useState(() =>
         JSON.stringify(initialStyle),
@@ -505,14 +509,29 @@ export function SiteEditor({
         setSections((prev) => prev.map((s, i) => (i === index ? next : s)));
     }
 
+    /**
+     * Add a block after the selected one (or at the end), select it, and
+     * bring it into view (#337). A look chosen in the picker is set the way
+     * the Look field sets it, so the two cannot disagree (#267, #254).
+     */
     function addSection(type: SectionType, variant?: string) {
-        const section = emptySection(type);
-        // A look chosen in the picker is set the way the Look field sets it,
-        // so the two cannot disagree (#267, #254).
+        const empty = emptySection(type);
+        const section = variant ? withVariant(empty, variant) : empty;
+        const at = active === null ? sections.length : active.index + 1;
         setSections((prev) => [
-            ...prev,
-            variant ? withVariant(section, variant) : section,
+            ...prev.slice(0, at),
+            section,
+            ...prev.slice(at),
         ]);
+        setSelectedIndex(at);
+        setAdding(false);
+        setInspector("block");
+        // After the render that draws it.
+        requestAnimationFrame(() => {
+            canvasRef.current
+                ?.querySelector(`[data-block-index="${at}"]`)
+                ?.scrollIntoView({ block: "center", behavior: "smooth" });
+        });
     }
 
     function removeAt(index: number) {
@@ -1251,11 +1270,21 @@ export function SiteEditor({
                         <>
                             <EditorTabs
                                 label="Page"
-                                tabs={[{ key: "sections", label: "This page" }]}
-                                value={rail}
-                                onSelect={setRail}
+                                tabs={[
+                                    { key: "sections", label: "This page" },
+                                    { key: "add", label: "Add block" },
+                                ]}
+                                value={adding ? "add" : "sections"}
+                                onSelect={(tab) => setAdding(tab === "add")}
                             />
-                            {
+                            {adding ? (
+                                <AddBlockPanel
+                                    onPick={(type, looks) => {
+                                        if (looks > 1) setLookFor(type);
+                                        else addSection(type);
+                                    }}
+                                />
+                            ) : (
                                 <>
                                     <p className="px-4 pb-1 pt-4 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                                         {`${sections.length + 2} blocks`}
@@ -1478,39 +1507,8 @@ export function SiteEditor({
                                         are on every page, so this page cannot
                                         remove them.
                                     </p>
-                                    <div className="p-2">
-                                        {/*
-                                         * The design draws this as a dashed outline
-                                         * spanning the rail — reading as a slot waiting
-                                         * to be filled rather than another row in the
-                                         * list, which is what it is. It opens the
-                                         * picker, which shows each block before it is
-                                         * added (#267).
-                                         */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setAddOpen(true)}
-                                            className="w-full rounded-md border border-dashed px-2 py-2 text-center text-sm text-muted-foreground transition-colors hover:border-solid hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                        >
-                                            + Add section
-                                        </button>
-                                        <AddSectionDialog
-                                            open={addOpen}
-                                            onOpenChange={setAddOpen}
-                                            variables={resolveStyleVariables(
-                                                style,
-                                                styleOptions,
-                                            )}
-                                            onAdd={(type, variant) => {
-                                                addSection(type, variant);
-                                                setSelectedIndex(
-                                                    sections.length,
-                                                );
-                                            }}
-                                        />
-                                    </div>
                                 </>
-                            }
+                            )}
                         </>
                     )}
                 </aside>
@@ -1840,6 +1838,21 @@ export function SiteEditor({
                     </div>
                 </div>
             ) : null}
+
+            {/*
+             * Choosing a look before the block goes in (#267). Keyed on the
+             * block so each opening starts on that block's looks.
+             */}
+            <AddSectionDialog
+                key={lookFor ?? "none"}
+                open={lookFor !== null}
+                startType={lookFor}
+                onOpenChange={(open) => {
+                    if (!open) setLookFor(null);
+                }}
+                variables={resolveStyleVariables(style, styleOptions)}
+                onAdd={(type, variant) => addSection(type, variant)}
+            />
 
             {checking ? (
                 <PrePublishCheck
