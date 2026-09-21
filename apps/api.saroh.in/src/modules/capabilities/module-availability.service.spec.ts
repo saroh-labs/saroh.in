@@ -41,6 +41,8 @@ function build(opts: {
                 .mockResolvedValue(
                     opts.installed === false ? null : { status: "ENABLED" },
                 ),
+            // `listViews` reads every installation at once.
+            findMany: jest.fn().mockResolvedValue([]),
         },
         projectModule: {
             count: jest
@@ -167,5 +169,58 @@ describe("ModuleAvailabilityService", () => {
             expect(r.authorized).toBe(false);
             expect(r.blockers[0].code).toBe("UNAUTHORIZED");
         });
+    });
+});
+
+/**
+ * A role the business invented is MEMBER by name. Judged by that name, one
+ * granted orders was told Commerce was off, and one NOT granted websites was
+ * offered Website. Availability now reads the resolved permissions, in both
+ * directions.
+ */
+describe("ModuleAvailabilityService — an invented role", () => {
+    const clerk = (actions: string[]) => ({
+        organizationId: "org_1",
+        organizationRole: "MEMBER" as OrgRole,
+        organizationActions: new Set(actions) as never,
+    });
+
+    it("opens Commerce to a role granted orders, though MEMBER would not", async () => {
+        const { service } = build({});
+        const r = await service.evaluate({
+            ...clerk(["order:read"]),
+            moduleKey: "COMMERCE",
+        });
+        expect(r.authorized).toBe(true);
+    });
+
+    it("keeps Website from a role NOT granted websites, though MEMBER would", async () => {
+        const { service } = build({});
+        const r = await service.evaluate({
+            ...clerk(["order:read"]),
+            moduleKey: "WEBSITE",
+        });
+        expect(r.authorized).toBe(false);
+        expect(r.blockers[0]?.code).toBe("UNAUTHORIZED");
+    });
+
+    it("judges module management by the resolved set too", async () => {
+        const { service } = build({});
+        const views = await service.listViews(clerk(["module:manage"]));
+        expect(views.every((v) => v.canManage)).toBe(true);
+
+        const noManage = await service.listViews(clerk(["order:read"]));
+        expect(noManage.every((v) => !v.canManage)).toBe(true);
+    });
+
+    it("falls back to the role name when nothing was resolved", async () => {
+        const { service } = build({});
+        const r = await service.evaluate({
+            organizationId: "org_1",
+            organizationRole: "MEMBER",
+            moduleKey: "WEBSITE",
+        });
+        // The shipped map: MEMBER holds site:read.
+        expect(r.authorized).toBe(true);
     });
 });

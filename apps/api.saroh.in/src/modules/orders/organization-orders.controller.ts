@@ -6,6 +6,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { authorize } from "../organizations/organization-policy";
 import { OrdersService } from "./orders.service";
 
 /**
@@ -33,6 +34,12 @@ export class OrganizationOrdersController {
         @OrgContext() ctx: OrganizationContext,
         @Query("storeId") storeId?: string,
     ) {
+        // The guards prove the caller belongs to this business and that
+        // Commerce is on. Neither says they may see its ORDERS — customer
+        // names, emails and totals across every storefront. This line was
+        // missing when the screen first shipped, and a Reviewer, brought in to
+        // look at one website, could list every order in the business.
+        authorize(ctx, "order:read");
         return this.orders.listForOrganization(ctx.organizationId, {
             // Narrows within the organization; it cannot widen past it.
             // `??` would keep an empty string, which would filter on a

@@ -47,6 +47,7 @@ export class CapabilitiesController {
         const data = await this.availability.listViews({
             organizationId: ctx.organizationId,
             organizationRole: ctx.role,
+            organizationActions: ctx.actions,
             projectId,
         });
         return {
@@ -127,6 +128,7 @@ export class CapabilitiesController {
         return this.availability.view({
             organizationId: ctx.organizationId,
             organizationRole: ctx.role,
+            organizationActions: ctx.actions,
             moduleKey,
             projectId,
         });

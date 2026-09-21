@@ -54,7 +54,16 @@ export type NavAction =
     | "module:read"
     | "notification:read"
     | "org:settings:read"
-    | "provider:read";
+    | "provider:read"
+    // The business-wide Orders list: customer names, emails and totals across
+    // every storefront. Not in the read-only floor, so a Member or Reviewer
+    // is not offered a row the API would refuse them.
+    | "order:read"
+    // Products, Customers and Storefronts read storefront data. In the Member
+    // floor, so nothing changes for the built-ins; it matters for a role the
+    // business invented without it, which was offered three rows that each
+    // answered it with a refusal.
+    | "store:read";
 
 /**
  * Role → what it may reach here.
@@ -75,6 +84,8 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "notification:read",
         "org:settings:read",
         "provider:read",
+        "order:read",
+        "store:read",
     ],
     ADMIN: [
         "site:read",
@@ -85,8 +96,10 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "notification:read",
         "org:settings:read",
         "provider:read",
+        "order:read",
+        "store:read",
     ],
-    MEMBER: ["site:read", "member:read", "module:read"],
+    MEMBER: ["site:read", "member:read", "module:read", "store:read"],
     REVIEWER: ["site:read"],
 };
 
@@ -279,10 +292,26 @@ export const NAV_GROUPS: NavGroup[] = [
                 // you sell from last — a merchant opens Storefronts to change
                 // a setting, not to find out what needs doing.
                 children: [
-                    { href: "/commerce/orders", label: "Orders" },
-                    { href: "/commerce/products", label: "Products" },
-                    { href: "/commerce/customers", label: "Customers" },
-                    { href: "/commerce", label: "Storefronts" },
+                    {
+                        href: "/commerce/orders",
+                        label: "Orders",
+                        action: "order:read",
+                    },
+                    {
+                        href: "/commerce/products",
+                        label: "Products",
+                        action: "store:read",
+                    },
+                    {
+                        href: "/commerce/customers",
+                        label: "Customers",
+                        action: "store:read",
+                    },
+                    {
+                        href: "/commerce",
+                        label: "Storefronts",
+                        action: "store:read",
+                    },
                 ],
             },
             // Two destinations, two questions: "what is booked?" and "what can

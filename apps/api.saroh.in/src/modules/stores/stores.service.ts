@@ -6,25 +6,19 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import type { OrgRole } from "../../common/types/organization-context";
-import { ORG_ROLES } from "../../common/types/organization-context";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import type { OrgAction } from "../organizations/organization-policy";
-import { can } from "../organizations/organization-policy";
+import {
+    isBuiltInRole,
+    resolveCapabilities,
+} from "../organizations/organization-policy";
 
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
 import { slugify } from "./slug";
 
 /** Staff roles allowed to mutate a store (VIEWER is read-only). */
 const WRITE_ROLES = new Set(["ADMIN", "MANAGER", "EDITOR"]);
-
-/** Narrow a raw DB role string to a known OrgRole (else null). */
-function toOrgRole(role: string): OrgRole | null {
-    return (ORG_ROLES as readonly string[]).includes(role)
-        ? (role as OrgRole)
-        : null;
-}
 
 /**
  * Store data layer — the single place the DB is touched for stores. Every
@@ -200,8 +194,24 @@ export class StoresService {
             select: { role: true },
         });
         if (!membership) return false;
-        const role = toOrgRole(membership.role);
-        return role !== null && can(role, action);
+        // Resolved from the business's own role, not from the role's name. A
+        // role the business invented maps to MEMBER by name, and MEMBER's floor
+        // includes `store:read` — so judging by name handed every invented role
+        // the storefronts whether or not the owner ticked them.
+        const stored = isBuiltInRole(membership.role)
+            ? null
+            : await prisma.organizationRole.findUnique({
+                  where: {
+                      organizationId_key: {
+                          organizationId,
+                          key: membership.role,
+                      },
+                  },
+                  select: { actions: true },
+              });
+        return resolveCapabilities(membership.role, stored?.actions).has(
+            action,
+        );
     }
 
     /** Original read authorization: owner OR member, else 404. */

@@ -139,6 +139,7 @@ module.exports = {
         "<rootDir>/src/modules/organizations/organization-roles.service.spec.ts",
         "<rootDir>/src/modules/orders/order-standing.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
+        "<rootDir>/src/modules/orders/organization-orders.controller.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
         // missing-key) and PaymentsService specs with a jest-mocked Prisma
         // (incl. $transaction) + a fake MerchantProvider — connect stores only

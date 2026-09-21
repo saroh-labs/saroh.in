@@ -314,3 +314,75 @@ describe("navFor — an invented role", () => {
         expect(withNull).toEqual(without);
     });
 });
+
+/**
+ * Orders across the business are gated on `order:read`. The rail has to agree
+ * with the API, or a Member clicks a row that answers them with a refusal.
+ */
+describe("Sell → Orders is offered only to roles that can read orders", () => {
+    const childHrefs = (groups: ReturnType<typeof navFor>) =>
+        groups.flatMap((g) =>
+            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
+        );
+    const sites: { id: string; name: string }[] = [];
+
+    it.each(["OWNER", "ADMIN"] as const)("offers it to %s", (role) => {
+        expect(childHrefs(navFor({ role, moduleKeys: null, sites }))).toContain(
+            "/commerce/orders",
+        );
+    });
+
+    it.each(["MEMBER", "REVIEWER"] as const)(
+        "does not offer it to %s",
+        (role) => {
+            expect(
+                childHrefs(navFor({ role, moduleKeys: null, sites })),
+            ).not.toContain("/commerce/orders");
+        },
+    );
+
+    it("offers it to an invented role that was granted it", () => {
+        const hrefs = childHrefs(
+            navFor({
+                role: "MEMBER",
+                actions: ["order:read", "store:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).toContain("/commerce/orders");
+    });
+});
+
+describe("the storefront rows follow store:read", () => {
+    const childHrefs = (groups: ReturnType<typeof navFor>) =>
+        groups.flatMap((g) =>
+            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
+        );
+    const sites: { id: string; name: string }[] = [];
+    const storefront = [
+        "/commerce/products",
+        "/commerce/customers",
+        "/commerce",
+    ];
+
+    it("still offers them to a Member, whose floor includes it", () => {
+        const hrefs = childHrefs(
+            navFor({ role: "MEMBER", moduleKeys: null, sites }),
+        );
+        for (const h of storefront) expect(hrefs).toContain(h);
+    });
+
+    it("hides them from an invented role granted orders but not storefronts", () => {
+        const hrefs = childHrefs(
+            navFor({
+                role: "MEMBER",
+                actions: ["order:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).toContain("/commerce/orders");
+        for (const h of storefront) expect(hrefs).not.toContain(h);
+    });
+});

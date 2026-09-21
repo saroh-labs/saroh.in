@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 import type { OrgRole } from "../../common/types/organization-context";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
+import type { OrgAction } from "../organizations/organization-actions";
 
 /**
  * Home read model (cross-product UX #119, Task 4).
@@ -153,6 +154,8 @@ export interface HomeModel {
 export interface HomeInput {
     organizationId: string;
     organizationRole: OrgRole;
+    /** Resolved permissions; see `AvailabilityInput.organizationActions`. */
+    organizationActions?: ReadonlySet<OrgAction>;
     projectId?: string;
 }
 

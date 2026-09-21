@@ -24,7 +24,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { parsePostsPrefix } from "../content/posts-prefix";
-import { authorize, can } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import type {
     CreateApprovalDto,
     CreateCommentDto,
@@ -854,14 +854,14 @@ export class SitesService {
         const pending = await this.pendingSectionChanges([site.id]);
         return {
             ...rest,
-            canEdit: can(ctx.role, "section:write"),
+            canEdit: allows(ctx, "section:write"),
             can: {
-                edit: can(ctx.role, "section:write"),
-                publish: can(ctx.role, "site:publish"),
-                comment: can(ctx.role, "site:comment"),
-                approve: can(ctx.role, "site:approve"),
-                manageSettings: can(ctx.role, "site:update"),
-                manageDomain: can(ctx.role, "domain:manage"),
+                edit: allows(ctx, "section:write"),
+                publish: allows(ctx, "site:publish"),
+                comment: allows(ctx, "site:comment"),
+                approve: allows(ctx, "site:approve"),
+                manageSettings: allows(ctx, "site:update"),
+                manageDomain: allows(ctx, "domain:manage"),
             },
             /*
              * What publishing would change (#190). The editor's top bar and the

@@ -161,6 +161,7 @@ export class CustomerWorkspaceService {
         const views = await this.availability.listViews({
             organizationId: ctx.organizationId,
             organizationRole: ctx.role,
+            organizationActions: ctx.actions,
         });
         const available = new Set(
             views.filter((v) => v.readiness !== "DISABLED").map((v) => v.key),
