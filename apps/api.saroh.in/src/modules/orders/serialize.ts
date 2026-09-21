@@ -42,6 +42,16 @@ export interface OrderDetailDto extends OrderSummaryDto {
     shipping: string;
     discount: string;
     items: OrderItemDto[];
+    /**
+     * The code this order used, as it was WHEN it was used — read from the
+     * redemption's snapshot, never the live code, so renaming or re-rating a
+     * code later cannot rewrite this order. `null` for no code.
+     */
+    discountCode: {
+        code: string;
+        /** "15% off" or "10.00 off" — the rule that produced `discount`. */
+        rule: string;
+    } | null;
 }
 
 interface RawCustomer {
@@ -76,6 +86,22 @@ interface RawDetail extends RawSummary {
     shipping: DecimalLike;
     discount: DecimalLike;
     items: RawItem[];
+    discountRedemption?: {
+        code: string;
+        kind: string;
+        percentBps: number | null;
+        ruleAmount: DecimalLike | null;
+        currency: string;
+    } | null;
+}
+
+function ruleOf(r: NonNullable<RawDetail["discountRedemption"]>): string {
+    if (r.kind === "PERCENTAGE" && r.percentBps !== null) {
+        return `${(r.percentBps / 100).toFixed(2).replace(/\.?0+$/, "")}% off`;
+    }
+    return r.ruleAmount
+        ? `${toMoneyString(r.ruleAmount)} ${r.currency} off`
+        : "Amount off";
 }
 
 export function serializeOrderSummary(order: RawSummary): OrderSummaryDto {
@@ -106,6 +132,12 @@ export function serializeOrderDetail(order: RawDetail): OrderDetailDto {
             price: toMoneyString(i.price),
             product: i.product ?? null,
         })),
+        discountCode: order.discountRedemption
+            ? {
+                  code: order.discountRedemption.code,
+                  rule: ruleOf(order.discountRedemption),
+              }
+            : null,
     };
 }
 

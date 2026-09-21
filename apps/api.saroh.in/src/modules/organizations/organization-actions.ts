@@ -60,6 +60,8 @@ export type OrgAction =
     | "booking:write"
     | "order:read"
     | "order:write"
+    | "discount:read"
+    | "discount:write"
     | "payment:read"
     | "payment:manage"
     | "message:read"
@@ -128,6 +130,8 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "booking:write",
     "order:read",
     "order:write",
+    "discount:read",
+    "discount:write",
     "payment:read",
     "payment:manage",
     "message:read",

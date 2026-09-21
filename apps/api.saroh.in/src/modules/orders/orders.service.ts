@@ -1,12 +1,15 @@
 import {
     BadRequestException,
+    ConflictException,
     Injectable,
     NotFoundException,
     Optional,
 } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import { Prisma, prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import type { AppliedDiscount } from "../discounts/discounts.service";
+import { DiscountsService } from "../discounts/discounts.service";
 import { StoresService } from "../stores/stores.service";
 import type {
     CreateOrderDto,
@@ -47,6 +50,9 @@ export class OrdersService {
         // throw on first write. `app.bootstrap.spec` asserts it IS resolved in
         // the real graph, so optional here cannot become silently inert (#176).
         @Optional() private readonly activation?: ActivationEvents,
+        // Optional for the same DB-backed specs. An order that names a code
+        // when this is missing is REFUSED below, never created at full price.
+        @Optional() private readonly discounts?: DiscountsService,
     ) {}
 
     async list(storeId: string, userId: string) {
@@ -102,6 +108,15 @@ export class OrdersService {
                 items: {
                     include: { product: { select: { name: true } } },
                 },
+                discountRedemption: {
+                    select: {
+                        code: true,
+                        kind: true,
+                        percentBps: true,
+                        ruleAmount: true,
+                        currency: true,
+                    },
+                },
             },
         });
         if (!order) {
@@ -125,11 +140,15 @@ export class OrdersService {
         }
 
         // Snapshot each line's price from its product (must be in this store).
-        const lines: (OrderLine & { priceCents: number })[] = [];
+        const lines: (OrderLine & {
+            priceCents: number;
+            categoryId: string | null;
+        })[] = [];
         for (const item of dto.items) {
             const product = await prisma.product.findFirst({
                 where: { id: item.productId, storeId },
-                select: { price: true },
+                // The category too: a collection code matches on it.
+                select: { price: true, categoryId: true },
             });
             if (!product) {
                 throw new BadRequestException({
@@ -141,6 +160,7 @@ export class OrdersService {
                 productId: item.productId,
                 quantity: item.quantity,
                 priceCents: toCents(product.price.toString()),
+                categoryId: product.categoryId,
             });
         }
 
@@ -170,7 +190,42 @@ export class OrdersService {
         );
         const taxCents = toCents(dto.tax ?? "0");
         const shippingCents = toCents(dto.shipping ?? "0");
-        const discountCents = toCents(dto.discount ?? "0");
+        // A code and a typed amount are mutually exclusive: two answers to
+        // "why did this come off" would leave no way to tell which was meant.
+        // The form sends "0" for an untouched amount, so zero is no amount.
+        let applied: AppliedDiscount | null = null;
+        if (dto.discountCode) {
+            if (toCents(dto.discount ?? "0") > 0) {
+                throw new BadRequestException({
+                    message:
+                        "Use a discount code or type an amount off, not both.",
+                    details: { field: "discountCode" },
+                });
+            }
+            if (!this.discounts) {
+                throw new BadRequestException({
+                    message: "Discount codes cannot be applied right now.",
+                    details: { field: "discountCode" },
+                });
+            }
+            applied = await this.discounts.redeemForOrder(
+                organizationId,
+                dto.discountCode,
+                {
+                    storeId,
+                    currency,
+                    lines: lines.map((l) => ({
+                        productId: l.productId,
+                        categoryId: l.categoryId,
+                        unitCents: l.priceCents,
+                        quantity: l.quantity,
+                    })),
+                },
+            );
+        }
+        const discountCents = applied
+            ? applied.amountCents
+            : toCents(dto.discount ?? "0");
         const totalCents = Math.max(
             0,
             subtotalCents + taxCents + shippingCents - discountCents,
@@ -201,19 +256,45 @@ export class OrdersService {
             const count = await prisma.order.count({ where: { storeId } });
             const orderNumber = `ORD-${String(count + 1 + attempt).padStart(3, "0")}`;
             try {
-                const created = await prisma.$transaction(async (tx) => {
-                    const order = await tx.order.create({
-                        data: { ...data, orderId: orderNumber },
-                        select: { id: true },
-                    });
-                    await applyInventoryTransition(
-                        tx,
-                        lines,
-                        "RELEASED",
-                        "RESERVED",
-                    );
-                    return order;
-                });
+                const created = await prisma.$transaction(
+                    async (tx) => {
+                        const order = await tx.order.create({
+                            data: { ...data, orderId: orderNumber },
+                            select: { id: true },
+                        });
+                        await applyInventoryTransition(
+                            tx,
+                            lines,
+                            "RELEASED",
+                            "RESERVED",
+                        );
+                        if (applied) {
+                            await this.recordRedemption(
+                                tx,
+                                applied,
+                                order.id,
+                                organizationId,
+                                currency,
+                            );
+                        }
+                        return order;
+                    },
+                    // Serializable ONLY for an order carrying a code: the
+                    // cap re-count inside must see a concurrent redemption.
+                    // Applied to every order it would make two ordinary
+                    // orders in one store abort each other.
+                    //
+                    // NB: the RLS proxy forwards these options only when no
+                    // org context is active. OrdersController has no
+                    // OrganizationGuard today, so this takes effect — adding
+                    // that guard would silently drop it.
+                    applied
+                        ? {
+                              isolationLevel:
+                                  Prisma.TransactionIsolationLevel.Serializable,
+                          }
+                        : undefined,
+                );
                 if (organizationId) {
                     // Safe on every order: the ledger keeps only the first
                     // (deterministic dedupeKey), so no "is this their first?"
@@ -226,6 +307,18 @@ export class OrdersService {
                 return { id: created.id };
             } catch (err) {
                 if (this.isUniqueOrderNumber(err) && attempt < 4) continue;
+                // A serialization failure only means something on the coded
+                // path: another order took the code's last use first.
+                if (
+                    applied &&
+                    err instanceof Prisma.PrismaClientKnownRequestError &&
+                    err.code === "P2034"
+                ) {
+                    throw new ConflictException({
+                        message: `${applied.code} was just used by another order. Try again, or remove it.`,
+                        details: { field: "discountCode" },
+                    });
+                }
                 throw err;
             }
         }
@@ -300,6 +393,51 @@ export class OrdersService {
      * here rather than looking it up at each call site makes the stamp hard to
      * forget: the guard you must call already hands you the value.
      */
+    /**
+     * The redemption, inside the order's own transaction: a failed order
+     * leaves none behind, and the unique order id keeps a retried create
+     * from counting twice. It snapshots the rule it applied, so re-rating
+     * the code later cannot rewrite this order's history.
+     */
+    private async recordRedemption(
+        tx: Prisma.TransactionClient,
+        applied: AppliedDiscount,
+        orderId: string,
+        organizationId: string | null,
+        currency: string,
+    ): Promise<void> {
+        if (!organizationId) {
+            // redeemForOrder already refused this; the type needs saying so.
+            throw new BadRequestException("A code needs a business");
+        }
+        if (applied.usageLimit !== null) {
+            // Re-counted INSIDE the serializable transaction, so two orders
+            // racing for the last use cannot both see room for it.
+            const used = await tx.discountRedemption.count({
+                where: { discountId: applied.discountId },
+            });
+            if (used >= applied.usageLimit) {
+                throw new ConflictException({
+                    message: `${applied.code} has been used as many times as it allows.`,
+                    details: { field: "discountCode" },
+                });
+            }
+        }
+        await tx.discountRedemption.create({
+            data: {
+                organizationId,
+                discountId: applied.discountId,
+                orderId,
+                amount: fromCents(applied.amountCents),
+                currency,
+                code: applied.code,
+                kind: applied.kind,
+                percentBps: applied.percentBps,
+                ruleAmount: applied.ruleAmount,
+            },
+        });
+    }
+
     private async requireWrite(
         storeId: string,
         userId: string,

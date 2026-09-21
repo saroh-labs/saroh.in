@@ -74,7 +74,11 @@ export default async function OrderDetailPage({
                     <Row label="Tax" value={`${cur} ${order.tax}`} />
                     <Row label="Shipping" value={`${cur} ${order.shipping}`} />
                     <Row
-                        label="Discount"
+                        label={
+                            order.discountCode
+                                ? `Discount · ${order.discountCode.code} (${order.discountCode.rule})`
+                                : "Discount"
+                        }
                         value={`− ${cur} ${order.discount}`}
                     />
                     <div className="flex justify-between border-t pt-1 text-sm font-semibold">

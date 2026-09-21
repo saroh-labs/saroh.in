@@ -45,6 +45,7 @@ const CLASS_LEVEL: Record<string, string> = {
     "automations/automations.controller.ts": "AUTOMATIONS",
     "categories/categories.controller.ts": "COMMERCE",
     "customers/customers.controller.ts": "COMMERCE",
+    "discounts/discounts.controller.ts": "COMMERCE",
     "orders/orders.controller.ts": "COMMERCE",
     "products/products.controller.ts": "COMMERCE",
     "products/product-details.controller.ts": "COMMERCE",

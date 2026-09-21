@@ -59,6 +59,8 @@ export type NavAction =
     // every storefront. Not in the read-only floor, so a Member or Reviewer
     // is not offered a row the API would refuse them.
     | "order:read"
+    // Sell → Discounts. Owner and Admin by default; money off is money.
+    | "discount:read"
     // Products, Customers and Storefronts read storefront data. In the Member
     // floor, so nothing changes for the built-ins; it matters for a role the
     // business invented without it, which was offered three rows that each
@@ -85,6 +87,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "org:settings:read",
         "provider:read",
         "order:read",
+        "discount:read",
         "store:read",
     ],
     ADMIN: [
@@ -97,6 +100,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "org:settings:read",
         "provider:read",
         "order:read",
+        "discount:read",
         "store:read",
     ],
     MEMBER: ["site:read", "member:read", "module:read", "store:read"],
@@ -306,6 +310,11 @@ export const NAV_GROUPS: NavGroup[] = [
                         href: "/commerce/customers",
                         label: "Customers",
                         action: "store:read",
+                    },
+                    {
+                        href: "/commerce/discounts",
+                        label: "Discounts",
+                        action: "discount:read",
                     },
                     {
                         href: "/commerce/storefronts",

@@ -138,3 +138,27 @@ describe("organization-policy: authorize()", () => {
         );
     });
 });
+
+describe("discount codes", () => {
+    it.each([
+        ["OWNER", true, true],
+        ["ADMIN", true, true],
+        ["MEMBER", false, false],
+        ["REVIEWER", false, false],
+    ] as const)("%s: read %s, write %s", (role, read, write) => {
+        expect(can(role, "discount:read")).toBe(read);
+        expect(can(role, "discount:write")).toBe(write);
+    });
+
+    // Creating an order with a code tells the caller whether that code works
+    // and why not. So order:write is, in effect, a way to read codes — and a
+    // built-in role that may create orders must be one that may read them.
+    it.each(ORG_ROLES)(
+        "%s never writes orders without reading discount codes",
+        (role) => {
+            if (can(role, "order:write")) {
+                expect(can(role, "discount:read")).toBe(true);
+            }
+        },
+    );
+});

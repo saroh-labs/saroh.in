@@ -69,6 +69,7 @@ const formSchema = z.object({
     tax: z.string(),
     shipping: z.string(),
     discount: z.string(),
+    discountCode: z.string(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -101,6 +102,7 @@ export function OrderForm({
             tax: "0",
             shipping: "0",
             discount: "0",
+            discountCode: "",
         },
     });
     const { fields, append, remove } = useFieldArray({
@@ -114,6 +116,10 @@ export function OrderForm({
     const tax = form.watch("tax");
     const shipping = form.watch("shipping");
     const discount = form.watch("discount");
+    const discountCode = form.watch("discountCode").trim();
+    // A code and a typed amount are one or the other, as the API insists:
+    // two answers to "why did this come off" would leave no way to tell.
+    const typedOff = toCents(discount) > 0;
 
     const priceOf = (id: string) =>
         toCents(products.find((p) => p.id === id)?.price ?? "0");
@@ -147,7 +153,10 @@ export function OrderForm({
 
     const totalCents = Math.max(
         0,
-        subtotalCents + toCents(tax) + toCents(shipping) - toCents(discount),
+        subtotalCents +
+            toCents(tax) +
+            toCents(shipping) -
+            (discountCode ? 0 : toCents(discount)),
     );
 
     async function onSubmit(values: FormValues) {
@@ -159,10 +168,16 @@ export function OrderForm({
             items,
             tax: values.tax,
             shipping: values.shipping,
-            discount: values.discount,
+            ...(values.discountCode.trim()
+                ? { discountCode: values.discountCode.trim().toUpperCase() }
+                : { discount: values.discount }),
         });
         if (!res.ok) {
-            showError(res.error);
+            if (res.field === "discountCode") {
+                form.setError("discountCode", { message: res.error });
+            } else {
+                showError(res.error);
+            }
             return;
         }
         showSuccess("Order created");
@@ -361,10 +376,45 @@ export function OrderForm({
                     <Input
                         id="discount"
                         inputMode="decimal"
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || Boolean(discountCode)}
                         {...form.register("discount")}
                     />
                 </div>
+            </div>
+
+            <div className="grid gap-2">
+                <Label htmlFor="discountCode">Discount code</Label>
+                <Input
+                    id="discountCode"
+                    placeholder="MARKETDAY"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    disabled={isSubmitting || typedOff}
+                    aria-describedby="discountCode-note"
+                    aria-invalid={
+                        form.formState.errors.discountCode ? true : undefined
+                    }
+                    className="w-56 font-mono uppercase"
+                    {...form.register("discountCode")}
+                />
+                <p
+                    id="discountCode-note"
+                    className={
+                        form.formState.errors.discountCode
+                            ? "text-[12px] font-medium text-destructive"
+                            : "text-[12px] text-muted-foreground"
+                    }
+                    role={
+                        form.formState.errors.discountCode ? "alert" : undefined
+                    }
+                >
+                    {form.formState.errors.discountCode?.message ??
+                        (typedOff
+                            ? "An amount is typed above — clear it to use a code instead."
+                            : discountCode
+                              ? "What it takes off is worked out when the order is placed."
+                              : "Instead of typing an amount off.")}
+                </p>
             </div>
 
             <div className="flex items-center justify-between border-t pt-4">
@@ -376,6 +426,14 @@ export function OrderForm({
                         Total {money(totalCents)}
                         {checkout ? ` ${checkout.currency}` : null}
                     </p>
+                    {discountCode ? (
+                        <p className="text-[12px] text-muted-foreground">
+                            Before{" "}
+                            <span className="font-mono">
+                                {discountCode.toUpperCase()}
+                            </span>
+                        </p>
+                    ) : null}
                 </div>
                 <Button
                     type="submit"

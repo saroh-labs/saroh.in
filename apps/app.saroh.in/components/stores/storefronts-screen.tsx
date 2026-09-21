@@ -26,6 +26,7 @@ import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import {
     closeStorefront,
     updateStorefront,
@@ -476,12 +477,6 @@ const SHORT: Record<Weekday, string> = {
     SAT: "Sat",
     SUN: "Sun",
 };
-
-/** The segmented control's track and items, shared with Shop / Online store. */
-const SEGMENTED =
-    "w-fit flex-wrap justify-start gap-0.5 rounded-lg border border-border bg-muted p-0.5";
-const SEGMENT =
-    "h-8 px-3 text-[13px] font-medium text-muted-foreground hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm coarse:h-11";
 
 const PRESETS: { label: string; days: Weekday[] }[] = [
     { label: "Mon–Fri", days: ["MON", "TUE", "WED", "THU", "FRI"] },

@@ -16,6 +16,7 @@ import { ContactsModule } from "./modules/contacts/contacts.module";
 import { ContentModule } from "./modules/content/content.module";
 import { CustomerWorkspaceModule } from "./modules/customer-workspace/customer-workspace.module";
 import { CustomersModule } from "./modules/customers/customers.module";
+import { DiscountsModule } from "./modules/discounts/discounts.module";
 import { DomainsModule } from "./modules/domains/domains.module";
 import { EnquiryModule } from "./modules/enquiry/enquiry.module";
 import { FeatureFlagModule } from "./modules/feature-flags/feature-flags.module";
@@ -91,6 +92,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         DomainsModule,
         JobsModule,
         FormsModule,
+        DiscountsModule,
         EnquiryModule,
         ContactsModule,
         SearchModule,

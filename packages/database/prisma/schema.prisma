@@ -198,9 +198,11 @@ model Organization {
   // Stage 7 — SaaS billing (S7-005). One current subscription per org.
   subscription Subscription?
 
-  createdAt          DateTime            @default(now())
-  idempotencyRecords IdempotencyRecord[]
-  roles              OrganizationRole[]
+  createdAt           DateTime             @default(now())
+  idempotencyRecords  IdempotencyRecord[]
+  roles               OrganizationRole[]
+  discounts           Discount[]
+  discountRedemptions DiscountRedemption[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -443,6 +445,8 @@ model Store {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // Soft delete
 
+  discountReach DiscountStore[]
+
   @@index([slug])
   @@index([createdAt])
 }
@@ -537,6 +541,8 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  discountReach DiscountProduct[]
+
   @@unique([storeId, slug])
   @@index([storeId])
   @@index([categoryId])
@@ -575,6 +581,8 @@ model Category {
   products Product[]
 
   createdAt DateTime @default(now())
+
+  discountReach DiscountCategory[]
 
   @@unique([storeId, slug])
   @@index([storeId])
@@ -702,6 +710,8 @@ model Order {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  discountRedemption DiscountRedemption?
 
   @@unique([storeId, orderId])
   @@index([storeId])
@@ -3034,5 +3044,110 @@ model IdempotencyRecord {
 
   @@unique([scope, key, actorUserId])
   @@index([expiresAt])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Discount codes (plan 2026-09-20-001). A code belongs to the BUSINESS; what
+// it reaches is the merchant's choice — the whole business, named
+// storefronts, collections or products. `appliesTo` decides reach, never the
+// number of rows in the reach tables: a STOREFRONT code whose storefronts
+// were all deleted reaches nothing, it does not widen to everything.
+// ---------------------------------------------------------------------------
+model Discount {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Stored normalised (trimmed, upper case), which is what makes the
+  // per-business uniqueness real without an expression index.
+  code        String
+  description String?
+
+  kind       String // PERCENTAGE | FIXED_AMOUNT
+  percentBps Int? // 15% = 1500
+  amount     Decimal? @db.Decimal(12, 2)
+  currency   String?
+
+  appliesTo String // BUSINESS | STOREFRONT | COLLECTION | PRODUCT
+
+  startsAt   DateTime?
+  endsAt     DateTime?
+  usageLimit Int?
+
+  stores      DiscountStore[]
+  categories  DiscountCategory[]
+  products    DiscountProduct[]
+  redemptions DiscountRedemption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+// Reach rows reach their organization through the discount (RLS EXISTS
+// policy), as PostCategory and OrderItem do — no organizationId of their own.
+model DiscountStore {
+  id         String   @id @default(cuid())
+  discountId String
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([discountId, storeId])
+  @@index([storeId])
+}
+
+model DiscountCategory {
+  id         String   @id @default(cuid())
+  discountId String
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([discountId, categoryId])
+  @@index([categoryId])
+}
+
+model DiscountProduct {
+  id         String   @id @default(cuid())
+  discountId String
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([discountId, productId])
+  @@index([productId])
+}
+
+// One use of a code, on one order. How often a code was used is a count of
+// these, not a counter. It snapshots what it applied, so re-rating or
+// renaming a code later cannot rewrite the history of the orders that used
+// it. NoAction from Discount and Order: a discount or an order with a
+// redemption cannot be deleted on its own, but an organization's cascade —
+// which removes both in the same statement — still can.
+model DiscountRedemption {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  discountId     String
+  discount       Discount     @relation(fields: [discountId], references: [id], onDelete: NoAction)
+  orderId        String       @unique
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: NoAction)
+
+  amount   Decimal @db.Decimal(12, 2)
+  currency String
+
+  code       String
+  kind       String
+  percentBps Int?
+  ruleAmount Decimal? @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  @@unique([discountId, orderId])
+  @@index([discountId])
   @@index([organizationId])
 }

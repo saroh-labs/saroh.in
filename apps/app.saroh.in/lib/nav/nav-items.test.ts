@@ -386,3 +386,35 @@ describe("the storefront rows follow store:read", () => {
         for (const h of storefront) expect(hrefs).not.toContain(h);
     });
 });
+
+describe("Sell → Discounts follows discount:read", () => {
+    const childHrefs = (groups: ReturnType<typeof navFor>) =>
+        groups.flatMap((g) =>
+            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
+        );
+    const sites: { id: string; name: string }[] = [];
+
+    it.each(["OWNER", "ADMIN"] as const)("offers it to %s", (role) => {
+        expect(childHrefs(navFor({ role, moduleKeys: null, sites }))).toContain(
+            "/commerce/discounts",
+        );
+    });
+
+    it("withholds it from a Member, who cannot read codes", () => {
+        expect(
+            childHrefs(navFor({ role: "MEMBER", moduleKeys: null, sites })),
+        ).not.toContain("/commerce/discounts");
+    });
+
+    it("follows an invented role's own permissions", () => {
+        const hrefs = childHrefs(
+            navFor({
+                role: "MEMBER",
+                actions: ["discount:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).toContain("/commerce/discounts");
+    });
+});

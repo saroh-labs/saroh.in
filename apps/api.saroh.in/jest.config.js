@@ -141,6 +141,11 @@ module.exports = {
         "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
         "<rootDir>/src/modules/orders/organization-orders.controller.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
+        "<rootDir>/src/modules/discounts/discount-state.spec.ts",
+        "<rootDir>/src/modules/discounts/redeem.spec.ts",
+        "<rootDir>/src/modules/discounts/discounts.service.spec.ts",
+        "<rootDir>/src/modules/discounts/discounts.controller.spec.ts",
+        "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
         // missing-key) and PaymentsService specs with a jest-mocked Prisma
         // (incl. $transaction) + a fake MerchantProvider — connect stores only

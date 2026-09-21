@@ -62,7 +62,9 @@ export function DatePicker({
                     aria-describedby={aria["aria-describedby"]}
                     aria-invalid={aria["aria-invalid"]}
                     className={cn(
-                        "w-[11rem] justify-start gap-2 bg-field font-normal",
+                        // `flex`, not the button's inline-flex, so it sits under its
+                        // label in a form row like every other field.
+                        "flex w-[11rem] justify-start gap-2 bg-field font-normal",
                         !value && "text-muted-foreground",
                         className,
                     )}
