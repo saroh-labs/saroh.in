@@ -30,3 +30,14 @@ export function formatValue(value: number | null | undefined): string | null {
         maximumFractionDigits: 2,
     });
 }
+
+/**
+ * A lead's status in words, and the pill it wears — "Open", not "OPEN"
+ * (brand file §7). Won is the good outcome; lost is neutral rather than red,
+ * because a lost lead is a fact to learn from, not an error.
+ */
+export const LEAD_STATUS = {
+    OPEN: { label: "Open", variant: "draft" },
+    WON: { label: "Won", variant: "success" },
+    LOST: { label: "Lost", variant: "neutral" },
+} as const;

@@ -10,3 +10,9 @@ export type ConsentStatus = "GRANTED" | "REVOKED";
 
 /** The channels an org can message a contact on (mirrors the API). */
 export const MESSAGE_CHANNELS: MessageChannel[] = ["EMAIL", "WHATSAPP"];
+
+/** A channel as a merchant says it: "Email", "WhatsApp". */
+export const CHANNEL_LABEL: Record<MessageChannel, string> = {
+    EMAIL: "Email",
+    WHATSAPP: "WhatsApp",
+};

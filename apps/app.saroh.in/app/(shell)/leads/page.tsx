@@ -2,8 +2,10 @@ import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
+import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { LeadsView } from "@/components/leads/leads-view";
 import { PageContainer } from "@/components/shared/page-container";
+import { loadAddLead } from "@/lib/leads/add-lead-data";
 import { listLeads } from "@/lib/leads/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
@@ -26,7 +28,11 @@ export default async function LeadsPage({
 }) {
     await requireSession();
 
-    const [leads, params] = await Promise.all([listLeads(), searchParams]);
+    const [leads, params, addLead] = await Promise.all([
+        listLeads(),
+        searchParams,
+        loadAddLead(),
+    ]);
 
     return (
         <PageContainer width="wide">
@@ -34,9 +40,12 @@ export default async function LeadsPage({
                 title="Leads"
                 description="Opportunities in your pipeline — what they're worth, and how long they've waited."
                 actions={
-                    <Button asChild variant="outline">
-                        <Link href="/pipeline">Pipeline board</Link>
-                    </Button>
+                    <>
+                        <Button asChild variant="outline">
+                            <Link href="/pipeline">Pipeline board</Link>
+                        </Button>
+                        <AddLeadDialog {...addLead} />
+                    </>
                 }
             />
             <div className="mt-6">

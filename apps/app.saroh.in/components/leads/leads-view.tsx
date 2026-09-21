@@ -62,14 +62,10 @@ export function LeadsView({
             header: "Lead",
             priority: "primary",
             sortValue: (l) => l.title.toLowerCase(),
-            cell: (l) => (
-                <Link
-                    href={`/leads/${l.id}`}
-                    className="font-medium underline-offset-4 hover:text-brand hover:underline"
-                >
-                    {l.title}
-                </Link>
-            ),
+            // Plain text: the table wraps the primary cell in the row's own
+            // link (`rowHref`), and a link inside a link is invalid HTML that
+            // broke hydration on every load of this screen.
+            cell: (l) => <span className="font-medium">{l.title}</span>,
         },
         {
             id: "contact",
@@ -162,7 +158,7 @@ export function LeadsView({
             filters={FILTERS}
             initialFilterId={initialView}
             searchableColumnIds={["title", "contact", "stage"]}
-            empty="Leads appear here as enquiries come in. You can also create one by hand from a contact."
+            empty="Leads appear here as enquiries come in, or when you add one."
             renderCard={(l) => (
                 <Link href={`/leads/${l.id}`} className="block">
                     {/* `wk-surface`, not a brand-tinted hover edge: the card is a

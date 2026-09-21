@@ -5,8 +5,10 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { MoveStageControl } from "@/components/crm/move-stage-control";
+import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { contactName, formatValue } from "@/lib/crm/format";
+import { loadAddLead } from "@/lib/leads/add-lead-data";
 import type { LeadListItem, LeadStage } from "@/lib/leads/service";
 import { listLeads } from "@/lib/leads/service";
 import { listPipelines } from "@/lib/pipelines/service";
@@ -50,7 +52,10 @@ export default async function PipelinePage() {
     const pipeline = pipelines.find((p) => p.isDefault) ?? pipelines[0];
 
     // Leads for this pipeline only; bucket them by stage id for the columns.
-    const leads = await listLeads({ pipelineId: pipeline.id });
+    const [leads, addLead] = await Promise.all([
+        listLeads({ pipelineId: pipeline.id }),
+        loadAddLead(pipelines),
+    ]);
     const byStage = new Map<string, LeadListItem[]>();
     for (const stage of pipeline.stages) byStage.set(stage.id, []);
     for (const lead of leads) {
@@ -66,7 +71,10 @@ export default async function PipelinePage() {
 
     return (
         <PageContainer width="wide" className="max-w-full">
-            <Header pipelineName={pipeline.name} />
+            <Header
+                pipelineName={pipeline.name}
+                action={<AddLeadDialog {...addLead} />}
+            />
 
             <div className="mt-6 flex gap-4 overflow-x-auto pb-4">
                 {pipeline.stages.map((stage) => {
@@ -81,9 +89,19 @@ export default async function PipelinePage() {
                                 <h2 className="text-sm font-semibold">
                                     {stage.name}
                                 </h2>
-                                <Badge variant="outline">
-                                    {stageLeads.length}
-                                </Badge>
+                                <span className="flex items-center gap-1">
+                                    <Badge variant="outline">
+                                        {stageLeads.length}
+                                    </Badge>
+                                    <AddLeadDialog
+                                        {...addLead}
+                                        stageId={stage.id}
+                                        label="Add"
+                                        ariaLabel={`Add a lead to ${stage.name}`}
+                                        variant="ghost"
+                                        size="sm"
+                                    />
+                                </span>
                             </div>
 
                             <div className="flex flex-col gap-3">
@@ -139,15 +157,24 @@ export default async function PipelinePage() {
 }
 
 /** The board header with a title + list-view link. */
-function Header({ pipelineName }: { pipelineName?: string }) {
+function Header({
+    pipelineName,
+    action,
+}: {
+    pipelineName?: string;
+    action?: React.ReactNode;
+}) {
     return (
         <PageHeader
             title="Pipeline"
             description={pipelineName}
             actions={
-                <Button asChild variant="outline">
-                    <Link href="/leads">List view</Link>
-                </Button>
+                <>
+                    <Button asChild variant="outline">
+                        <Link href="/leads">List view</Link>
+                    </Button>
+                    {action}
+                </>
             }
         />
     );
