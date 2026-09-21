@@ -71,7 +71,7 @@ export default function RootLayout({
         // this the page logs a hydration mismatch on every load.
         <html lang="en" suppressHydrationWarning>
             <body
-                className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} bg-[hsl(var(--site-canvas))] font-sans`}
+                className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} bg-[hsl(var(--marketing-canvas))] font-sans`}
             >
                 <Script
                     async

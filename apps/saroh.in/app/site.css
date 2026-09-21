@@ -5,10 +5,10 @@
  * product's own ground, where bands sit on the raised card colour instead.
  */
 :root {
-    --site-canvas: 42 23% 89%; /* #E9E5DC */
+    --marketing-canvas: 42 23% 89%; /* #E9E5DC */
 }
 .dark {
-    --site-canvas: var(--background);
+    --marketing-canvas: var(--background);
 }
 
 /*
