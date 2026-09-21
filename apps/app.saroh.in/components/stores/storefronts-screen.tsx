@@ -395,18 +395,12 @@ function BasicsSection({
                     disabled={!canEdit || pending}
                     aria-labelledby="storefront-kind-label"
                     aria-describedby="storefront-kind-note"
-                    className="w-fit justify-start rounded-lg border border-border bg-muted p-0.5"
+                    className={SEGMENTED}
                 >
-                    <ToggleGroupItem
-                        value="SHOP"
-                        className="h-8 px-3.5 text-[13px] data-[state=on]:bg-card data-[state=on]:shadow-sm coarse:h-11"
-                    >
+                    <ToggleGroupItem value="SHOP" className={SEGMENT}>
                         Shop
                     </ToggleGroupItem>
-                    <ToggleGroupItem
-                        value="ONLINE"
-                        className="h-8 px-3.5 text-[13px] data-[state=on]:bg-card data-[state=on]:shadow-sm coarse:h-11"
-                    >
+                    <ToggleGroupItem value="ONLINE" className={SEGMENT}>
                         Online store
                     </ToggleGroupItem>
                 </ToggleGroup>
@@ -483,6 +477,12 @@ const SHORT: Record<Weekday, string> = {
     SUN: "Sun",
 };
 
+/** The segmented control's track and items, shared with Shop / Online store. */
+const SEGMENTED =
+    "w-fit flex-wrap justify-start gap-0.5 rounded-lg border border-border bg-muted p-0.5";
+const SEGMENT =
+    "h-8 px-3 text-[13px] font-medium text-muted-foreground hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm coarse:h-11";
+
 const PRESETS: { label: string; days: Weekday[] }[] = [
     { label: "Mon–Fri", days: ["MON", "TUE", "WED", "THU", "FRI"] },
     { label: "Mon–Sat", days: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] },
@@ -552,6 +552,15 @@ function OpeningHours({
     const backwards = week.some((d) => !d.closed && d.open >= d.close);
 
     const openDays = week.filter((d) => !d.closed).map((d) => d.day);
+    const preset = PRESETS.find(
+        (p) =>
+            p.days.length === openDays.length &&
+            p.days.every((d) => openDays.includes(d)),
+    );
+    // Custom is a choice, not only a state: picking it keeps the day chips
+    // open even while the days happen to match a preset.
+    const [custom, setCustom] = useState(!preset);
+    const daysChoice = custom || !preset ? "CUSTOM" : preset.label;
     // The hours the "same" mode edits: the first open day's, or the default.
     const shared = week.find((d) => !d.closed) ?? {
         open: "09:00",
@@ -591,11 +600,16 @@ function OpeningHours({
                 <p id="storefront-hours-label" className="text-sm font-medium">
                     Opening hours
                 </p>
-                <p className="mt-0.5 text-[12.5px] tabular-nums text-muted-foreground">
-                    {openDays.length === 0
-                        ? "Closed every day"
-                        : summarise(week)}
-                </p>
+                {/* The controls already say it in the simple case; the line
+                    earns its place when the week is day-by-day, or when it
+                    is all a viewer who cannot edit gets to see. */}
+                {eachDay || !canEdit ? (
+                    <p className="mt-0.5 text-[12.5px] tabular-nums text-muted-foreground">
+                        {openDays.length === 0
+                            ? "Closed every day"
+                            : summarise(week)}
+                    </p>
+                ) : null}
             </div>
 
             {eachDay ? (
@@ -661,57 +675,76 @@ function OpeningHours({
                     })}
                 </div>
             ) : (
-                <div className="grid gap-3 rounded-lg border border-border p-3">
+                <div className="grid grid-cols-[3.5rem_1fr] items-start gap-x-4 gap-y-3">
+                    <span
+                        id="storefront-open-days"
+                        className="pt-1.5 text-[12.5px] text-muted-foreground"
+                    >
+                        Days
+                    </span>
                     <div className="grid gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span
-                                id="storefront-open-days"
-                                className="text-[12.5px] text-muted-foreground"
-                            >
-                                Open on
-                            </span>
-                            {PRESETS.map((p) => {
-                                const on =
-                                    openDays.length === p.days.length &&
-                                    p.days.every((d) => openDays.includes(d));
-                                return (
-                                    <Button
-                                        key={p.label}
-                                        type="button"
-                                        size="sm"
-                                        variant={on ? "secondary" : "ghost"}
-                                        aria-pressed={on}
-                                        disabled={!canEdit}
-                                        onClick={() => {
-                                            setOpenDays(p.days);
-                                        }}
-                                        className="h-7 px-2.5 text-[12px]"
-                                    >
-                                        {p.label}
-                                    </Button>
-                                );
-                            })}
-                        </div>
+                        {/* One control for "which days" — the same segmented
+                            style as Shop / Online store. The chips only
+                            appear for Custom, so the common answer is one
+                            click and the rare one is still there. */}
                         <ToggleGroup
-                            type="multiple"
-                            value={openDays}
-                            onValueChange={setOpenDays}
+                            type="single"
+                            value={daysChoice}
+                            onValueChange={(v) => {
+                                if (!v) return;
+                                if (v === "CUSTOM") {
+                                    setCustom(true);
+                                    return;
+                                }
+                                const next = PRESETS.find((p) => p.label === v);
+                                if (next) {
+                                    setCustom(false);
+                                    setOpenDays(next.days);
+                                }
+                            }}
                             disabled={!canEdit}
                             aria-labelledby="storefront-open-days"
-                            className="w-fit justify-start gap-1"
+                            className={SEGMENTED}
                         >
-                            {DAYS.map((d) => (
+                            {PRESETS.map((p) => (
                                 <ToggleGroupItem
-                                    key={d.key}
-                                    value={d.key}
-                                    aria-label={d.label}
-                                    className="h-9 w-11 rounded-md border border-border text-[12.5px] data-[state=on]:border-foreground data-[state=on]:bg-foreground data-[state=on]:text-background coarse:h-11"
+                                    key={p.label}
+                                    value={p.label}
+                                    className={SEGMENT}
                                 >
-                                    {SHORT[d.key]}
+                                    {p.label}
                                 </ToggleGroupItem>
                             ))}
+                            <ToggleGroupItem value="CUSTOM" className={SEGMENT}>
+                                Custom
+                            </ToggleGroupItem>
                         </ToggleGroup>
+                        {daysChoice === "CUSTOM" ? (
+                            <ToggleGroup
+                                type="multiple"
+                                value={openDays}
+                                onValueChange={setOpenDays}
+                                disabled={!canEdit}
+                                aria-label="Open days"
+                                className="w-fit flex-wrap justify-start gap-1"
+                            >
+                                {DAYS.map((d) => (
+                                    <ToggleGroupItem
+                                        key={d.key}
+                                        value={d.key}
+                                        aria-label={d.label}
+                                        className="h-8 w-11 rounded-md border border-border text-[12.5px] font-medium text-muted-foreground data-[state=on]:border-foreground/50 data-[state=on]:bg-muted data-[state=on]:text-foreground coarse:h-11"
+                                    >
+                                        {SHORT[d.key]}
+                                    </ToggleGroupItem>
+                                ))}
+                            </ToggleGroup>
+                        ) : null}
                     </div>
+
+                    <span className="pt-2.5 text-[12.5px] text-muted-foreground">
+                        Hours
+                    </span>
                     {openDays.length > 0 ? (
                         <div className="flex flex-wrap items-center gap-1.5">
                             <TimeSelect
@@ -736,7 +769,11 @@ function OpeningHours({
                                 }}
                             />
                         </div>
-                    ) : null}
+                    ) : (
+                        <p className="pt-2.5 text-[12.5px] text-muted-foreground">
+                            Closed every day — pick the days it opens.
+                        </p>
+                    )}
                 </div>
             )}
 
@@ -744,7 +781,7 @@ function OpeningHours({
                 <Button
                     type="button"
                     variant="link"
-                    className="h-auto w-fit p-0 text-[12.5px]"
+                    className="h-auto w-fit p-0 text-[12.5px] font-medium text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground"
                     onClick={() => {
                         if (eachDay) {
                             // Back to one set of hours: every open day takes
