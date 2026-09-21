@@ -1,10 +1,12 @@
 "use client";
 
+import { blockExample } from "@saroh/block-contract";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import {
     ChevronDown,
     ChevronLeft,
@@ -16,6 +18,7 @@ import {
     PanelBottom,
     PanelTop,
     Smartphone,
+    Tablet,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,18 +33,25 @@ import {
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { AddBlockPanel } from "@/components/sites/add-block-panel";
 import { AddSectionDialog } from "@/components/sites/add-section-dialog";
+import { BlockFeedback } from "@/components/sites/block-feedback";
 import { SECTION_ICONS } from "@/components/sites/block-icons";
 import {
     BlockInspector,
     FixedBlockInspector,
 } from "@/components/sites/block-inspector";
-import { EditorTabs, PanelDivider } from "@/components/sites/editor-chrome";
-import type { Device } from "@/components/sites/editor-constants";
 import {
+    EditorTabs,
+    PanelDivider,
+    railRowState,
+} from "@/components/sites/editor-chrome";
+import type { Device, Zoom } from "@/components/sites/editor-constants";
+import {
+    DEVICE_PX,
     DEVICE_WIDTH,
     DEVICES,
     SECTION_LABELS,
     sectionTitle,
+    ZOOMS,
 } from "@/components/sites/editor-constants";
 import { emptySection } from "@/components/sites/empty-section";
 import {
@@ -55,6 +65,8 @@ import { syncEnquiryForms } from "@/components/sites/sync-enquiry-forms";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { useServicesForPicker } from "@/components/sites/use-services-for-picker";
 
+import { OptionSelect } from "@/components/shared/option-select";
+import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
@@ -72,6 +84,10 @@ import {
     saveDraftSections,
     updateSiteStyle,
 } from "@/lib/sites/actions";
+import {
+    flagsByScreenPosition,
+    insertPosition,
+} from "@/lib/sites/editor-positions";
 import {
     getChrome,
     getChromeOnServer,
@@ -94,7 +110,6 @@ import type { SiteChangeKind } from "@/lib/sites/pending";
 import { describePendingChanges } from "@/lib/sites/pending";
 import type {
     ApprovalOutcome,
-    Flag,
     ReviewState,
     Section,
     SectionType,
@@ -366,19 +381,13 @@ export function SiteEditor({
     };
     /*
      * The header or footer, when one of those is selected instead of a block
-     * (#336). Not remembered between visits: they are the same on every page,
-     * and coming back to the site's header is rarely where anyone left off.
+     * (#336). Remembered with the place, so a reload comes back to it.
      */
-    const [selectedChrome, setSelectedChrome] = useState<
-        "header" | "footer" | null
-    >(null);
-    const setSelectedIndex = (next: number | null) => {
-        setSelectedChrome(null);
-        setPlace(siteId, initialCount, { selectedIndex: next });
-    };
+    const selectedChrome = place.chrome;
+    const setSelectedIndex = (next: number | null) =>
+        setPlace(siteId, initialCount, { selectedIndex: next, chrome: null });
     const selectChrome = (part: "header" | "footer") => {
-        setPlace(siteId, initialCount, { selectedIndex: null });
-        setSelectedChrome(part);
+        setPlace(siteId, initialCount, { selectedIndex: null, chrome: part });
         setInspector("block");
     };
     const setRail = (next: "sections" | "style") =>
@@ -386,6 +395,12 @@ export function SiteEditor({
     const setInspector = (next: "block" | "feedback") =>
         setPlace(siteId, initialCount, { inspector: next });
 
+    /*
+     * "Zoom is the readout dropdown only — 50 / 75 / 100 / Fit. No ⌘scroll, no
+     * pinch, no keyboard shortcuts." The spec resolved a contradiction by
+     * making the readout the control, so there is deliberately no gesture here.
+     */
+    const [zoom, setZoom] = useState<Zoom>(100);
     /** Briefly dimmed while a device switch animates — the cross-fade. */
     const [switching, setSwitching] = useState(false);
     /** Full-screen preview: everything else hides, Escape returns (spec §2). */
@@ -394,6 +409,29 @@ export function SiteEditor({
     const [pagesOpen, setPagesOpen] = useState(false);
     const [asking, setAsking] = useState(false);
     const canvasRef = useRef<HTMLDivElement | null>(null);
+
+    /*
+     * "Fit" is the only value that is not a fixed percentage: it scales the
+     * frame down until it fits the canvas, and never scales it UP — a phone
+     * frame blown up to fill a desktop canvas would stop being a preview of a
+     * phone.
+     */
+    const [fitScale, setFitScale] = useState(1);
+    const zoomScale = zoom === "fit" ? Math.min(1, fitScale) : zoom / 100;
+    useEffect(() => {
+        const el = canvasRef.current;
+        if (el === null) return;
+        const measure = () => {
+            const frame = DEVICE_PX[device];
+            // The canvas padding (p-6 = 24px each side) is not usable width.
+            const usable = el.clientWidth - 48;
+            setFitScale(frame === null ? 1 : usable / frame);
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [device]);
     const scrollWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     /*
@@ -424,10 +462,16 @@ export function SiteEditor({
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
     const [style, setStyle] = useState<SiteStyle>(initialStyle);
+    /** Feedback for the selected block, or the whole site's review. */
+    const [feedbackScope, setFeedbackScope] = useState<"block" | "site">(
+        "block",
+    );
     /** The rail shows the Add block tab instead of this page's blocks (#337). */
     const [adding, setAdding] = useState(false);
     /** The block whose look is being chosen before it is added (#267). */
     const [lookFor, setLookFor] = useState<SectionType | null>(null);
+    /** The full picker, every block drawn with previews (#267). */
+    const [browsing, setBrowsing] = useState(false);
     const [styleSaving, setStyleSaving] = useState(false);
     const [savedStyleJson, setSavedStyleJson] = useState(() =>
         JSON.stringify(initialStyle),
@@ -514,10 +558,38 @@ export function SiteEditor({
      * bring it into view (#337). A look chosen in the picker is set the way
      * the Look field sets it, so the two cannot disagree (#267, #254).
      */
+    /** The block count as of the last add, ahead of React's next render. */
+    const sectionCount = useRef(sections.length);
+    useEffect(() => {
+        sectionCount.current = sections.length;
+    }, [sections.length]);
+
     function addSection(type: SectionType, variant?: string) {
         const empty = emptySection(type);
-        const section = variant ? withVariant(empty, variant) : empty;
-        const at = active === null ? sections.length : active.index + 1;
+        /*
+         * Start from the example the picker showed, so the block reads like
+         * the preview that was chosen rather than an empty box. The flag
+         * engine names any example text still there before it goes live.
+         * Blocks with no example (testimonials, contact, gallery, and those
+         * seeded with working defaults) start as they always have.
+         */
+        const example = blockExample(type, variant);
+        const section: Section = example
+            ? ({
+                  ...empty,
+                  contractVersion: example.contractVersion,
+                  content: structuredClone(example.content),
+              } as Section)
+            : variant
+              ? withVariant(empty, variant)
+              : empty;
+        // Read at call time, not from this render: two quick adds must land
+        // in the order they were clicked.
+        const at = insertPosition(
+            getPlace(siteId, initialCount).selectedIndex,
+            sectionCount.current,
+        );
+        sectionCount.current += 1;
         setSections((prev) => [
             ...prev.slice(0, at),
             section,
@@ -641,9 +713,15 @@ export function SiteEditor({
                     if (section.type !== "enquiry" || section.content.formId) {
                         return section;
                     }
+                    // By position only while the list is the same length
+                    // as when the save began: a block added in the middle
+                    // since would shift every position after it, and hand
+                    // another block's Form to its neighbour (review).
                     const hit =
                         newFormIds.find((n) => n.before === section) ??
-                        newFormIds.find((n) => n.index === index);
+                        (current.length === sections.length
+                            ? newFormIds.find((n) => n.index === index)
+                            : undefined);
                     return hit
                         ? {
                               ...section,
@@ -816,6 +894,13 @@ export function SiteEditor({
                     if (res.ok) {
                         failedStyleJson.current = null;
                         setSavedStyleJson(payloadJson);
+                        // A saved style is a change publishing would make;
+                        // without this the pill read "Published" (review).
+                        setPendingSiteChanges((prev) =>
+                            prev === null || prev.includes("style")
+                                ? prev
+                                : [...prev, "style"],
+                        );
                     } else {
                         failedStyleJson.current = payloadJson;
                         showError(res.error);
@@ -903,6 +988,8 @@ export function SiteEditor({
          * than after a reload. Flags are re-read for the same reason.
          */
         setPendingChanges(0);
+        // The site-level settings went live too.
+        setPendingSiteChanges([]);
         // Something is live now, so the button stops offering to publish the
         // site and the "nothing's live yet" line goes (#288).
         setNeverPublished(false);
@@ -947,13 +1034,11 @@ export function SiteEditor({
      * flags for the whole site; the rail can only draw dots for the sections it
      * is showing.
      */
-    const flagsBySection = new Map<number, Flag[]>();
-    for (const flag of siteFlags.flags) {
-        if (flag.pageId !== pageId || flag.sectionIndex === null) continue;
-        const list = flagsBySection.get(flag.sectionIndex) ?? [];
-        list.push(flag);
-        flagsBySection.set(flag.sectionIndex, list);
-    }
+    const flagsBySection = flagsByScreenPosition(
+        siteFlags.flags,
+        pageId,
+        livePlan.sentFrom,
+    );
     const activeFlags =
         active === null ? [] : (flagsBySection.get(active.index) ?? []);
 
@@ -993,15 +1078,18 @@ export function SiteEditor({
                 ? [{ label: item.label ?? page.title, href: page.path }]
                 : [];
         }),
-        footer: footerPreview,
+        // Sanitizing can leave nothing; nothing is no footer.
+        footer: footerPreview?.value.trim() ? footerPreview : null,
     };
 
     const activePage = pages.find((page) => page.id === pageId);
     const status = editorStatus({
-        saving,
+        // The style is saved on its own clock; unsaved or saving style is
+        // unsaved work too, and the pill has to say so (#282).
+        saving: saving || styleSaving,
         saveError,
         heldBackSummary: onlyHeldBack ? heldBackSummary(heldBack) : null,
-        dirty,
+        dirty: dirty || styleDirty,
         review: {
             pending: review.pending,
             outcome: review.latestApproval?.outcome ?? null,
@@ -1034,6 +1122,22 @@ export function SiteEditor({
         .filter(Boolean)
         .join("\n");
 
+    /** The visible line beside the pill: the same facts, in one row. */
+    const statusLine = [
+        pendingSummary ? `${pendingSummary} changed` : null,
+        review.latestApproval
+            ? APPROVAL_BADGE[review.latestApproval.outcome].text(
+                  review.latestApproval.by,
+                  review.approvalIsStale,
+              )
+            : null,
+        openNotes > 0
+            ? `${openNotes} open ${openNotes === 1 ? "note" : "notes"}`
+            : null,
+    ]
+        .filter(Boolean)
+        .join(" · ");
+
     /**
      * Share for review (#335): ask for a review, which is what reviewers
      * are notified of and what puts the page In review (#278). It blocks
@@ -1041,16 +1145,21 @@ export function SiteEditor({
      */
     async function askForReview() {
         setAsking(true);
-        const res = await requestReview(siteId);
-        setAsking(false);
-        if (!res.ok) {
-            showError(res.error);
-            return;
+        try {
+            const res = await requestReview(siteId);
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            showSuccess(
+                "Asked for a review. Reviewers can comment on any block and cannot change the page.",
+            );
+            // Still disabled until the refreshed state reads In review, so a
+            // second click cannot send a second request in between.
+            await refreshReview();
+        } finally {
+            setAsking(false);
         }
-        showSuccess(
-            "Asked for a review. Reviewers can comment on any block and cannot change the page.",
-        );
-        await refreshReview();
     }
 
     return (
@@ -1130,14 +1239,27 @@ export function SiteEditor({
                     >
                         {status.label}
                     </Badge>
+                    {/*
+                     * What the pill sums up, said in the bar as it was
+                     * before the redesign: what publishing would change,
+                     * the reviewer's verdict and how many notes are open.
+                     * It truncates rather than wraps — Publish never moves.
+                     */}
+                    {statusLine ? (
+                        <span
+                            className="min-w-0 truncate text-xs text-muted-foreground"
+                            title={statusDetail}
+                        >
+                            {statusLine}
+                        </span>
+                    ) : null}
                 </nav>
 
                 <div className="ml-auto flex shrink-0 items-center gap-2">
                     <ThemeToggle />
                     {/*
                      * Width only — the preview is already local, and
-                     * switching must not become a re-fetch. Desktop and
-                     * phone: the widths a merchant's customers arrive at.
+                     * switching must not become a re-fetch.
                      */}
                     <div
                         role="group"
@@ -1146,7 +1268,11 @@ export function SiteEditor({
                     >
                         {DEVICES.map((d) => {
                             const Icon =
-                                d.key === "phone" ? Smartphone : Monitor;
+                                d.key === "phone"
+                                    ? Smartphone
+                                    : d.key === "tablet"
+                                      ? Tablet
+                                      : Monitor;
                             return (
                                 <button
                                     key={d.key}
@@ -1167,6 +1293,24 @@ export function SiteEditor({
                             );
                         })}
                     </div>
+
+                    {/*
+                     * The zoom readout IS the control (spec §2): no ⌘scroll,
+                     * no pinch, no shortcut.
+                     */}
+                    <OptionSelect
+                        aria-label="Zoom"
+                        size="sm"
+                        value={String(zoom)}
+                        onValueChange={(v) => {
+                            setZoom(v === "fit" ? "fit" : (Number(v) as Zoom));
+                        }}
+                        options={ZOOMS.map((z) => ({
+                            value: String(z),
+                            label: z === "fit" ? "Fit" : `${z}%`,
+                        }))}
+                        className="h-8 w-[4.75rem] tabular-nums text-muted-foreground"
+                    />
 
                     {/*
                      * Preview removes the editing chrome; it does not switch
@@ -1247,7 +1391,11 @@ export function SiteEditor({
                         // the merchant is aiming at the same object.
                         // The canvas keeps a floor, so widening a side column
                         // can never squeeze the page out of sight.
-                        "--editor-cols": `${railWidth}px 1px minmax(20rem,1fr) 1px ${panelWidth}px`,
+                        // Each side column is its chosen width, or its share of
+                        // what the window leaves after the canvas's floor —
+                        // so a width chosen on a wide screen never pushes the
+                        // inspector off a narrower one (review of #345).
+                        "--editor-cols": `min(${railWidth}px, calc((100vw - 20rem - 2px) * ${(railWidth / (railWidth + panelWidth)).toFixed(4)})) 1px minmax(20rem,1fr) 1px min(${panelWidth}px, calc((100vw - 20rem - 2px) * ${(panelWidth / (railWidth + panelWidth)).toFixed(4)}))`,
                     } as React.CSSProperties
                 }
             >
@@ -1279,6 +1427,7 @@ export function SiteEditor({
                             />
                             {adding ? (
                                 <AddBlockPanel
+                                    onBrowse={() => setBrowsing(true)}
                                     onPick={(type, looks) => {
                                         if (looks > 1) setLookFor(type);
                                         else addSection(type);
@@ -1346,9 +1495,10 @@ export function SiteEditor({
                                                          * fill alone is too quiet on the
                                                          * dark chrome.
                                                          */
-                                                        selectedIndex === index
-                                                            ? "bg-secondary font-medium before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:rounded-full before:bg-highlight"
-                                                            : "hover:bg-muted active:bg-secondary",
+                                                        railRowState(
+                                                            selectedIndex ===
+                                                                index,
+                                                        ),
                                                         (errorIndex === index ||
                                                             heldBackAt(
                                                                 index,
@@ -1626,6 +1776,8 @@ export function SiteEditor({
                         }`}
                         style={{
                             maxWidth: DEVICE_WIDTH[device],
+                            transform: `scale(${zoomScale})`,
+                            transformOrigin: "top center",
                         }}
                     >
                         {/*
@@ -1649,8 +1801,14 @@ export function SiteEditor({
                                         ? `${address}/`
                                         : "Not published yet"}
                                 </span>
+                                {address ? (
+                                    <span className="ml-auto hidden shrink-0 text-[0.6875rem] text-muted-foreground xl:inline">
+                                        ⌘-click a link to open it on your site
+                                    </span>
+                                ) : null}
                             </div>
                             <DraftPreview
+                                siteAddress={address}
                                 sections={sections}
                                 pages={pages}
                                 style={style}
@@ -1699,34 +1857,99 @@ export function SiteEditor({
                             {
                                 key: "feedback",
                                 label: "Feedback",
-                                count: openNotes,
+                                // The selected block's own count, as its pin
+                                // shows; the whole site's with none selected.
+                                count:
+                                    active === null
+                                        ? openNotes
+                                        : active.section.key === undefined
+                                          ? 0
+                                          : (notesByKey.get(
+                                                active.section.key,
+                                            ) ?? 0),
                             },
                         ]}
                         value={inspector}
                         onSelect={setInspector}
                     />
                     <div className="min-h-0 flex-1 overflow-y-auto">
-                        {inspector === "feedback" ? (
+                        {/*
+                         * Feedback reaches two things: what was said about
+                         * the selected block, and the whole site's review —
+                         * verdicts, preview links and every note, on every
+                         * page, settled ones included. The second must stay
+                         * reachable whatever is selected (review of #347).
+                         */}
+                        {inspector === "feedback" && active ? (
+                            <div className="px-4 pt-4">
+                                <ToggleGroup
+                                    type="single"
+                                    value={feedbackScope}
+                                    onValueChange={(v) => {
+                                        if (v === "block" || v === "site") {
+                                            setFeedbackScope(v);
+                                        }
+                                    }}
+                                    aria-label="Whose feedback"
+                                    className={SEGMENTED}
+                                >
+                                    <ToggleGroupItem
+                                        value="block"
+                                        className={SEGMENT}
+                                    >
+                                        This block
+                                    </ToggleGroupItem>
+                                    <ToggleGroupItem
+                                        value="site"
+                                        className={SEGMENT}
+                                    >
+                                        Whole site
+                                        {openNotes > 0 ? (
+                                            <span className="ml-1.5 tabular-nums text-highlight">
+                                                {openNotes}
+                                            </span>
+                                        ) : null}
+                                    </ToggleGroupItem>
+                                </ToggleGroup>
+                            </div>
+                        ) : null}
+                        {inspector === "feedback" &&
+                        active &&
+                        feedbackScope === "block" ? (
+                            <BlockFeedback
+                                // Remounted per block: a half-typed reply must
+                                // not follow the selection to another block.
+                                key={active.section.key ?? `i${active.index}`}
+                                siteId={siteId}
+                                pageId={pageId}
+                                sectionKey={active.section.key}
+                                label={SECTION_LABELS[active.section.type]}
+                                comments={comments}
+                                onChanged={refreshReview}
+                            />
+                        ) : inspector === "feedback" ? (
                             <ReviewPanel
                                 siteId={siteId}
                                 pages={pages}
                                 comments={comments}
                                 review={review}
                                 onChanged={() => void refreshReview()}
-                                onJump={jumpToNote}
+                                onJump={(jumpPageId, sectionKey) => {
+                                    jumpToNote(jumpPageId, sectionKey);
+                                    // Arrived at the block: show its notes.
+                                    setFeedbackScope("block");
+                                }}
                             />
                         ) : selectedChrome ? (
                             <FixedBlockInspector
                                 part={selectedChrome}
                                 siteId={siteId}
-                                hasFooter={footerPreview !== null}
+                                hasFooter={canvasChrome.footer !== null}
                             />
                         ) : (
                             <BlockInspector
                                 active={active}
                                 count={sections.length}
-                                siteId={siteId}
-                                pageId={pageId}
                                 pages={pages}
                                 services={services}
                                 style={style}
@@ -1776,7 +1999,6 @@ export function SiteEditor({
                                     });
                                     setRemoveOpen(true);
                                 }}
-                                onNoteAdded={refreshReview}
                             />
                         )}
                     </div>
@@ -1829,6 +2051,7 @@ export function SiteEditor({
                         style={{ maxWidth: DEVICE_WIDTH[device] }}
                     >
                         <DraftPreview
+                            siteAddress={address}
                             sections={sections}
                             pages={pages}
                             style={style}
@@ -1844,11 +2067,14 @@ export function SiteEditor({
              * block so each opening starts on that block's looks.
              */}
             <AddSectionDialog
-                key={lookFor ?? "none"}
-                open={lookFor !== null}
+                key={lookFor ?? (browsing ? "browse" : "none")}
+                open={lookFor !== null || browsing}
                 startType={lookFor}
                 onOpenChange={(open) => {
-                    if (!open) setLookFor(null);
+                    if (!open) {
+                        setLookFor(null);
+                        setBrowsing(false);
+                    }
                 }}
                 variables={resolveStyleVariables(style, styleOptions)}
                 onAdd={(type, variant) => addSection(type, variant)}
@@ -1880,6 +2106,8 @@ export function SiteEditor({
                         if (sectionIndex !== null) {
                             setRail("sections");
                             setSelectedIndex(sectionIndex);
+                            // The flag is about the block's fields.
+                            setInspector("block");
                         }
                     }}
                 />
@@ -1914,9 +2142,7 @@ function FixedBlockRow({
                 aria-current={selected ? "true" : undefined}
                 className={cn(
                     "relative flex h-10 w-full items-center gap-2.5 rounded-md pl-5 pr-2 text-left text-[0.8125rem] transition-colors",
-                    selected
-                        ? "bg-secondary font-medium before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:rounded-full before:bg-highlight"
-                        : "hover:bg-muted",
+                    railRowState(selected),
                 )}
             >
                 <Icon

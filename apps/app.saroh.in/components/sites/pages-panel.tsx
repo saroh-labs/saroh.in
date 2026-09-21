@@ -12,7 +12,8 @@ import { createPage, deletePage, updatePage } from "@/lib/sites/actions";
 import type { SitePage } from "@/lib/sites/service";
 
 /**
- * The rail's Pages tab: every page on this site, which one is open, and the
+ * The page switcher under the page name in the editor's breadcrumb (#335):
+ * every page on this site, which one is open, and the
  * three things you can do to the set.
  *
  * Switching pages is a NAVIGATION (`?page=<id>`), not local state. The open
@@ -209,11 +210,11 @@ export function PagesPanel({
                                             "truncate",
                                             /*
                                              * Dimmed and struck through, the
-                                             * same as a hidden SECTION in the
-                                             * rail next door. Two lists that
-                                             * look alike must mean alike — the
+                                             * same as a hidden block in the
+                                             * block list. Two lists that look
+                                             * alike must mean alike — the
                                              * merchant should not have to learn
-                                             * a second vocabulary one tab over.
+                                             * a second vocabulary.
                                              */
                                             page.hidden &&
                                                 "text-muted-foreground line-through",

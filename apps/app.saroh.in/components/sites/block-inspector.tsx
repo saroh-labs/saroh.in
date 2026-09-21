@@ -9,7 +9,6 @@ import Link from "next/link";
 import { SECTION_ICONS } from "@/components/sites/block-icons";
 import { BOUND_BLOCKS } from "@/components/sites/block-kinds";
 import { SECTION_LABELS } from "@/components/sites/editor-constants";
-import { NoteComposer } from "@/components/sites/note-composer";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { SectionFields } from "@/components/sites/section-fields";
 import { SectionPadding } from "@/components/sites/section-fields/padding";
@@ -28,8 +27,6 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 export function BlockInspector({
     active,
     count,
-    siteId,
-    pageId,
     pages,
     services,
     style,
@@ -42,14 +39,11 @@ export function BlockInspector({
     onToggleHidden,
     onMove,
     onRemove,
-    onNoteAdded,
 }: {
     /** The selected block and where it sits, or null when nothing is. */
     active: { index: number; section: Section } | null;
     /** How many blocks the page has, for the move arrows. */
     count: number;
-    siteId: string;
-    pageId: string;
     pages: SitePage[];
     services: ReturnType<typeof useServicesForPicker>;
     style: SiteStyle;
@@ -66,7 +60,6 @@ export function BlockInspector({
     onToggleHidden: () => void;
     onMove: (delta: -1 | 1) => void;
     onRemove: () => void;
-    onNoteAdded: () => Promise<void>;
 }) {
     if (active === null) {
         return (
@@ -140,8 +133,14 @@ export function BlockInspector({
                     <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
                     <div className="space-y-2">
                         <p>{bound.notice}</p>
+                        {/*
+                         * A new tab: leaving the editor mid-edit would drop
+                         * work autosave has not sent yet.
+                         */}
                         <Link
                             href={bound.href}
+                            target="_blank"
+                            rel="noopener"
                             className="font-medium underline underline-offset-2"
                         >
                             {bound.linkLabel}
@@ -249,19 +248,6 @@ export function BlockInspector({
             </div>
 
             {/*
-             * Leaving a note is an action taken ON this block (#277), so it
-             * sits with the block and needs no picker.
-             */}
-            <div className="border-t pt-3">
-                <NoteComposer
-                    siteId={siteId}
-                    pageId={pageId}
-                    sectionKey={section.key}
-                    onAdded={onNoteAdded}
-                />
-            </div>
-
-            {/*
              * Where editing does NOT happen. A merchant who expects to change
              * a price here would otherwise hunt for a field that is
              * deliberately absent.
@@ -324,7 +310,12 @@ export function FixedBlockInspector({
                       : "Nothing is written at the foot of this site yet, so visitors see no footer. Write one in Website settings."}
             </p>
             <Button asChild variant="outline" size="sm">
-                <Link href={`/sites/${siteId}/settings`}>
+                {/* A new tab, for the same reason as the Services link. */}
+                <Link
+                    href={`/sites/${siteId}/settings`}
+                    target="_blank"
+                    rel="noopener"
+                >
                     Open Website settings
                 </Link>
             </Button>

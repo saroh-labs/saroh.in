@@ -164,3 +164,14 @@ export function PanelDivider({
         </div>
     );
 }
+
+/**
+ * A row in the block list, selected or not. One definition for block rows and
+ * the header and footer rows, so the two cannot drift apart. The selected row
+ * carries a bar on its edge as well as a fill: the fill alone is too quiet.
+ */
+export function railRowState(selected: boolean): string {
+    return selected
+        ? "bg-secondary font-medium before:absolute before:-left-2 before:inset-y-1.5 before:w-0.5 before:rounded-full before:bg-highlight"
+        : "hover:bg-muted active:bg-secondary";
+}

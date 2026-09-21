@@ -16,6 +16,7 @@ import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { SECTION_LABELS } from "@/components/sites/editor-constants";
+import { merchantLinkUrl } from "@/lib/sites/merchant-link";
 
 import type { Section, SitePage } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
@@ -83,6 +84,7 @@ export function DraftPreview({
     onSelectChrome,
     notesByKey,
     onOpenNotes,
+    siteAddress,
 }: {
     sections: Section[];
     /**
@@ -119,6 +121,8 @@ export function DraftPreview({
     notesByKey?: ReadonlyMap<string, number>;
     /** A pin was pressed: select that block and show its feedback. */
     onOpenNotes?: (index: number) => void;
+    /** The merchant's site address, which the page's links open on. */
+    siteAddress?: string | null;
 }) {
     /*
      * The merchant's tokens, from the SAME component the live site uses.
@@ -223,20 +227,27 @@ export function DraftPreview({
         <div
             className={`${PREVIEW_SCOPE} bg-[hsl(var(--site-bg))] text-[hsl(var(--site-fg))]`}
             /*
-             * Nothing on the canvas navigates while editing. A link here is
-             * the merchant's link to THEIR site; followed from the editor it
-             * lands somewhere in Saroh, which is never what the click meant.
-             * A click selects; Preview is where links are for following.
+             * A link on this page is the merchant's link to THEIR site:
+             * "/about" means their /about, not Saroh's. So it never navigates
+             * this tab — that would land on a Saroh page and leave the editor
+             * without the unsaved-work check — and instead opens the
+             * merchant's own page in a new tab (merchantLinkUrl).
+             *
+             * In Preview a click opens it. On the editing canvas a click
+             * selects the block, so a button can be edited without leaving;
+             * ⌘/Ctrl-click opens the link there.
              */
-            onClickCapture={
-                editing
-                    ? (e) => {
-                          if ((e.target as HTMLElement).closest("a")) {
-                              e.preventDefault();
-                          }
-                      }
-                    : undefined
-            }
+            onClickCapture={(e) => {
+                const anchor = (e.target as HTMLElement).closest("a");
+                if (!anchor) return;
+                e.preventDefault();
+                if (editing && !(e.metaKey || e.ctrlKey)) return;
+                const url = merchantLinkUrl(
+                    anchor.getAttribute("href"),
+                    siteAddress,
+                );
+                if (url) window.open(url, "_blank", "noopener");
+            }}
         >
             <SiteTheme variables={vars} selector={`.${PREVIEW_SCOPE}`} />
             {header && editing && onSelectChrome ? (
@@ -338,6 +349,10 @@ function CanvasBlock({
                 {label}
             </button>
             {notes > 0 && onOpenNotes ? (
+                /*
+                 * A 44px target around a 24px badge: the pin is small on
+                 * purpose, a thumb is not (touch-target rule).
+                 */
                 <button
                     type="button"
                     aria-label={`${notes} open on this block — read the feedback`}
@@ -345,9 +360,11 @@ function CanvasBlock({
                         e.stopPropagation();
                         onOpenNotes();
                     }}
-                    className="absolute right-3 top-3 z-10 flex size-6 items-center justify-center rounded-full bg-highlight font-sans text-xs font-semibold tabular-nums text-highlight-foreground shadow-md ring-2 ring-background focus-visible:outline-none focus-visible:ring-ring"
+                    className="group/pin absolute right-1 top-1 z-10 flex size-11 items-center justify-center rounded-full focus-visible:outline-none"
                 >
-                    {notes}
+                    <span className="flex size-6 items-center justify-center rounded-full bg-highlight font-sans text-xs font-semibold tabular-nums text-highlight-foreground shadow-md ring-2 ring-background group-focus-visible/pin:ring-ring">
+                        {notes}
+                    </span>
                 </button>
             ) : null}
         </div>
