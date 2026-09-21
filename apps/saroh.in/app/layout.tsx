@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Script from "next/script";
 import { Toaster } from "sonner";
+import "./site.css";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
 // build never fetches fonts from a network: Geist for all UI, body copy,
@@ -37,26 +38,25 @@ const fontMono = localFont({
     variable: "--font-mono",
 });
 
-// The previous copy ("Create blogs, portfolios or storefronts") described the
-// product two rewrites ago — it is a modular business platform now, and the
-// title is what a search result shows.
+// From "Saroh Marketing Site": what the product is, in the words a search
+// result shows.
+const DESCRIPTION =
+    "Saroh runs the selling, bookings, website and contacts for one business in one place. Switch on what you do; the rest never appears.";
+
 export const metadata: Metadata = {
     metadataBase: new URL("https://saroh.in"),
-    title: "Saroh — run your whole business from one place",
-    description:
-        "Website, commerce, appointments and CRM in one system. Switch on only the modules your business needs and add the rest as you grow.",
+    title: "Saroh — one business, not four logins",
+    description: DESCRIPTION,
     openGraph: {
         type: "website",
         siteName: "Saroh",
-        title: "Saroh — run your whole business from one place",
-        description:
-            "Website, commerce, appointments and CRM in one system. Switch on only the modules your business needs.",
+        title: "Saroh — one business, not four logins",
+        description: DESCRIPTION,
     },
     twitter: {
         card: "summary_large_image",
-        title: "Saroh — run your whole business from one place",
-        description:
-            "Website, commerce, appointments and CRM in one system. Switch on only the modules your business needs.",
+        title: "Saroh — one business, not four logins",
+        description: DESCRIPTION,
     },
 };
 
@@ -71,7 +71,7 @@ export default function RootLayout({
         // this the page logs a hydration mismatch on every load.
         <html lang="en" suppressHydrationWarning>
             <body
-                className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} font-sans`}
+                className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} bg-[hsl(var(--marketing-canvas))] font-sans`}
             >
                 <Script
                     async
@@ -84,26 +84,6 @@ export default function RootLayout({
 
   gtag('config', 'G-L19ZLH2N5K');`}
                 </Script>
-                {/*
-                  THESIS: A modular business system shown as a registry, not a
-                  feature list. Refuses the category hero — no floating angled
-                  screenshot, no gradient confetti, no logo cloud.
-                  OWN-WORLD: Shared @saroh/ui mono tokens. Pure black / pure
-                  white ground, 1px hairlines doing all separation, one blue
-                  spent ~3 times, Geist + Bricolage, 6px controls / 12px cards.
-                  Identical system to the product itself.
-                  STORY: The visitor sees eight capabilities with real
-                  dependencies, sees the product actually running, and starts
-                  free — or joins the waitlist if not ready.
-                  FIRST VIEWPORT: Left-aligned tag, headline, lede, two
-                  buttons; the live Home screenshot seated in a bordered frame
-                  directly below, theme-matched to the site.
-                  FORM: "D · Precise" — Linear/Vercel register, user-selected
-                  after re-rolls; concept-seed.mjs was non-functional in this
-                  install (missing catalog), substituted CSPRNG, disclosed.
-                  FINISH: unreviewed and undocumented is unfinished; this build
-                  ends with the finish review, the verdict, and DESIGN.md.
-                */}
                 {/*
                  * Two toasters, swapped by CSS, is how app.saroh.in does it and
                  * this site copies it so a toast is the same object in both
@@ -141,8 +121,14 @@ export default function RootLayout({
                      */
                     storageKey="saroh-site-theme"
                 >
+                    <a
+                        href="#main"
+                        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-2 focus:z-[90] focus:rounded-lg focus:bg-foreground focus:px-[13px] focus:py-[9px] focus:text-[13px] focus:text-background"
+                    >
+                        Skip to content
+                    </a>
                     <SiteNav />
-                    <main>{children}</main>
+                    <main id="main">{children}</main>
                     <SiteFooter />
                 </ThemeProvider>
             </body>

@@ -59,13 +59,13 @@ and fall back to the production `*.saroh.in` URLs baked into the code.
 
 Common optional overrides (point a frontend at a local api instead of prod):
 
-| Variable                                                         | App(s)               | Absent →                                 |
-| ---------------------------------------------------------------- | -------------------- | ---------------------------------------- |
-| `API_URL` / `NEXT_PUBLIC_API_URL`                                | app, sites           | Defaults to `https://api.saroh.in`.      |
-| `NEXT_PUBLIC_ACCOUNTS_URL`                                       | app, accounts, admin | Defaults to `https://accounts.saroh.in`. |
-| `NEXT_PUBLIC_BETTER_AUTH_URL`                                    | app, accounts        | Defaults to the canonical auth host.     |
-| `ADMIN_ALLOWLIST`                                                | admin                | No extra admin allowlist applied.        |
-| `NEXT_PUBLIC_ROOT_DOMAIN`, `REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS` | sites                | Sensible built-in defaults.              |
+| Variable                                                         | App(s)                    | Absent →                                 |
+| ---------------------------------------------------------------- | ------------------------- | ---------------------------------------- |
+| `API_URL` / `NEXT_PUBLIC_API_URL`                                | app, sites                | Defaults to `https://api.saroh.in`.      |
+| `NEXT_PUBLIC_ACCOUNTS_URL`                                       | app, accounts, admin, web | Defaults to `https://accounts.saroh.in`. |
+| `NEXT_PUBLIC_BETTER_AUTH_URL`                                    | app, accounts             | Defaults to the canonical auth host.     |
+| `ADMIN_ALLOWLIST`                                                | admin                     | No extra admin allowlist applied.        |
+| `NEXT_PUBLIC_ROOT_DOMAIN`, `REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS` | sites                     | Sensible built-in defaults.              |
 
 ## Local URLs
 

@@ -1,201 +1,148 @@
+import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
-import JoinWaitlist from "@/components/home/join-waitlist";
-import { ModuleTable } from "@/components/site/module-table";
-import { ProductShot } from "@/components/site/product-shot";
+import { ChainExplorer } from "@/components/home/chain-explorer";
+import { JobRail } from "@/components/home/job-rail";
+import {
+    Pill,
+    SecondaryButton,
+    WaitlistButton,
+    band,
+    sectionHeading,
+} from "@/components/site/bits";
+import { ClosingCta } from "@/components/site/closing-cta";
+import { ThemedImage } from "@/components/site/themed-image";
+import { CHAINS, HOME_SHOT, JOBS, LIMITS } from "@/lib/site-content";
 
-const STEPS = [
-    {
-        n: "01",
-        h: "Say what your business does",
-        p: "You answer in outcomes — sell products, take appointments, show up online — not module names.",
-    },
-    {
-        n: "02",
-        h: "The workspace changes shape",
-        p: "Navigation shows only what you switched on. No half-lit features you cannot use yet.",
-    },
-    {
-        n: "03",
-        h: "Add the rest later",
-        p: "Switch a module on and its workspace is waiting. Switch it off and nothing is deleted.",
-    },
-];
+/**
+ * Home, after "Saroh Marketing Site": the promise, what "in one place" buys a
+ * clinic and a bakery, the five jobs, and what Saroh will not do — before
+ * anyone has to ask.
+ */
+export default function Home() {
+    const rail = JOBS.map((job) => ({
+        key: job.key,
+        name: job.name,
+        icon: job.icon,
+        route: job.route,
+        head: job.head,
+        lede: job.lede,
+        image: job.shot.crop,
+        alt: job.shot.alt,
+    }));
 
-export default function HomePage() {
     return (
         <>
-            {/* ---- hero ---- */}
-            <section className="relative overflow-hidden">
-                {/* One faint field, once. The register earns its depth from
-                    hairlines and type, not from stacked gradients.
-
-                    The colour is written literally rather than via `from-brand/12`:
-                    Tailwind's `from-*` sets `--tw-gradient-from` to a value with a
-                    POSITION appended, so interpolating it into a hand-written
-                    `radial-gradient()` produced an invalid colour stop and the whole
-                    layer rendered as nothing — the hero's only depth device silently
-                    absent, on pure black. */}
-                <div
-                    aria-hidden
-                    className="pointer-events-none absolute -top-72 left-1/2 h-[540px] w-[880px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,hsl(var(--brand)/0.14),transparent)]"
-                />
-                <div className="relative mx-auto max-w-6xl px-6 pb-0 pt-28">
-                    <span className="inline-flex h-[26px] items-center gap-2 rounded-full border border-border bg-card px-3 text-[12px] text-muted-foreground">
-                        <span className="block size-[5px] rounded-full bg-brand" />
-                        Modular business platform
-                    </span>
-
-                    <h1 className="mt-5 max-w-[16ch] font-display text-[clamp(2.5rem,5.6vw,3.875rem)] font-semibold leading-[1.04] tracking-[-0.038em]">
-                        Run your whole business from one place.
+            <section className="mx-auto max-w-[1220px] px-4 pb-[46px] pt-[60px] sm:px-10">
+                <div className="max-w-[60ch]">
+                    <h1 className="sa-rise mb-[18px] font-display text-[30px] font-semibold leading-none tracking-[-0.045em] min-[421px]:text-[38px] md:text-[55px]">
+                        One business, not four logins.
                     </h1>
-
-                    <p className="mt-5 max-w-[52ch] text-[17px] leading-relaxed text-muted-foreground">
-                        Website, commerce, appointments and CRM in one system.
-                        Switch on only the modules you need — and switch one off
-                        without losing anything behind it.
+                    <p className="sa-rise mb-[26px] max-w-[42ch] text-pretty text-[18px] leading-[1.55] text-neutral-600 [animation-delay:120ms] dark:text-neutral-400">
+                        Your website, your shop, your diary and the people who
+                        get in touch — in one workspace, under one account.
                     </p>
-
-                    {/* The waitlist is the ask (#261). "Start free" pointed at
-                        a signup PRODUCT.md calls gated, and the waitlist was the
-                        footnote under it — the primary action was the one that
-                        could not be completed. The footnote is gone with it: an
-                        escape hatch only reads as one when there is something to
-                        escape from. */}
-                    <div className="mt-7 flex flex-wrap items-center gap-2.5">
-                        <Link
-                            href="#waitlist"
-                            className="inline-flex h-[38px] items-center rounded-md bg-primary px-[18px] text-[13.5px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
-                        >
-                            Join the waitlist
-                        </Link>
-                        <Link
-                            href="/modules"
-                            className="inline-flex h-[38px] items-center rounded-md border border-border px-[18px] text-[13.5px] font-medium transition-colors hover:bg-accent"
-                        >
-                            See the modules
-                        </Link>
+                    <div className="sa-rise flex flex-wrap items-center gap-[11px] [animation-delay:200ms]">
+                        <WaitlistButton />
+                        <SecondaryButton href="/how-it-works">
+                            See how it fits together
+                        </SecondaryButton>
                     </div>
-                    <p className="mt-3.5 text-[12.5px] text-muted-foreground">
-                        Saroh is invite-only while we finish the onboarding
-                        work.
+                    <p className="mt-[15px] text-[12px] text-muted-foreground">
+                        We are letting businesses in a few at a time.
                     </p>
-
-                    <ProductShot
-                        name="home"
-                        alt="Saroh Home ranking what needs attention: overdue leads and open orders"
-                        caption="The workspace · seeded demo data"
-                        priority
-                    />
                 </div>
+                <figure className="mt-[38px]">
+                    <div className="sa-rise overflow-hidden rounded-[16px] border border-border bg-background shadow-[0_18px_44px_rgba(28,28,26,0.10)] [animation-delay:300ms]">
+                        <ThemedImage
+                            image={HOME_SHOT.full}
+                            alt={HOME_SHOT.alt}
+                            priority
+                            sizes="(min-width: 1220px) 1140px, 100vw"
+                            className="h-auto w-full"
+                        />
+                    </div>
+                    <figcaption className="mt-2.5 text-pretty text-[13px] leading-[1.55] text-muted-foreground">
+                        A real screen from Saroh, showing a demo supplier: the
+                        leads and orders waiting on you, oldest first. Work
+                        named as work, not counts on a dial.
+                    </figcaption>
+                </figure>
             </section>
 
-            {/* ---- modules ---- */}
+            <section className="mx-auto max-w-[1220px] px-4 pb-[54px] pt-2.5 sm:px-10">
+                <ChainExplorer chains={CHAINS} />
+            </section>
+
             <section
-                id="modules"
-                className="mt-28 border-t border-border py-28"
+                aria-labelledby="jobs-heading"
+                className={cn(
+                    band,
+                    "mx-auto mb-1 max-w-[1220px] px-4 pb-[58px] pt-[54px] sm:px-10",
+                )}
             >
-                <div className="mx-auto max-w-6xl px-6">
-                    <h2 className="mt-3.5 max-w-[24ch] font-display text-[clamp(1.625rem,3vw,2.25rem)] font-semibold leading-[1.14] tracking-[-0.03em]">
-                        Eight capabilities. Three of them need another one
-                        first.
+                <div className="mb-[26px] grid items-start gap-4 md:grid-cols-[1.1fr_1fr] md:gap-[38px]">
+                    <h2
+                        id="jobs-heading"
+                        className={cn(sectionHeading, "text-pretty")}
+                    >
+                        Switch on what you do. The rest never appears.
                     </h2>
-                    <p className="mt-3.5 max-w-[58ch] text-[16px] leading-relaxed text-muted-foreground">
-                        Not a feature list — a registry with real dependencies.
-                        Turn Appointments on and CRM comes with it, because a
-                        booking has to belong to somebody.
+                    <p className="mt-1 text-pretty text-[15px] leading-[1.65] text-neutral-600 dark:text-neutral-400">
+                        Five jobs, readable at once down the left. Nothing is
+                        greyed out or behind an upgrade — a job you have not
+                        switched on is simply absent.
                     </p>
-
-                    <ModuleTable />
-
-                    <ProductShot
-                        name="modules"
-                        alt="The Modules settings screen showing enabled and available modules"
-                        caption="Settings → Modules"
-                    />
                 </div>
+                <JobRail jobs={rail} />
             </section>
 
-            {/* ---- product ---- */}
-            <section id="product" className="border-t border-border py-28">
-                <div className="mx-auto max-w-6xl px-6">
-                    <h2 className="mt-3.5 max-w-[24ch] font-display text-[clamp(1.625rem,3vw,2.25rem)] font-semibold leading-[1.14] tracking-[-0.03em]">
-                        The first thing on screen is the most consequential
-                        thing.
-                    </h2>
-                    <p className="mt-3.5 max-w-[58ch] text-[16px] leading-relaxed text-muted-foreground">
-                        Home ranks work — attention, then overdue, then setup —
-                        instead of a dashboard of equal tiles. Each overdue
-                        enquiry carries its value and how long it has waited.
-                    </p>
-
-                    <div className="mt-2 grid gap-4 md:grid-cols-2">
-                        <ProductShot
-                            name="leads"
-                            alt="The Leads list"
-                            caption="CRM · Leads"
-                        />
-                        <ProductShot
-                            name="bookings"
-                            alt="The bookings schedule"
-                            caption="Appointments · Schedule"
-                        />
+            <section className="mx-auto max-w-[1220px] px-4 pb-14 pt-2.5 sm:px-10">
+                <div className="rounded-[18px] bg-brand-surface px-5 py-8 text-brand-surface-foreground sm:px-[34px]">
+                    <div className="grid items-start gap-8 min-[900px]:grid-cols-2">
+                        <div>
+                            <h2
+                                className={cn(
+                                    sectionHeading,
+                                    "mb-3 max-w-[26ch]",
+                                )}
+                            >
+                                What Saroh will not do
+                            </h2>
+                            <p className="mb-4 max-w-[40ch] text-pretty text-[16px] leading-[1.6] text-neutral-200">
+                                Better you find out here than three weeks after
+                                moving your business across.
+                            </p>
+                            <Link
+                                href="/what-it-will-not-do"
+                                className="inline-flex h-[42px] items-center rounded-[9px] border border-neutral-600 px-[18px] text-[16px] font-semibold hover:bg-neutral-800"
+                            >
+                                Read all of them
+                            </Link>
+                        </div>
+                        <ul className="overflow-hidden rounded-[13px] border border-neutral-600">
+                            {LIMITS.slice(0, 3).map((limit) => (
+                                <li
+                                    key={limit.title}
+                                    className="flex items-start gap-3 border-t border-neutral-600 px-4 py-3.5 first:border-t-0"
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-pretty text-[13px] font-semibold">
+                                            {limit.title}
+                                        </div>
+                                        <p className="mt-1 text-pretty text-[16px] leading-[1.55] text-neutral-200">
+                                            {limit.body}
+                                        </p>
+                                    </div>
+                                    <Pill tone="ink">{limit.tag}</Pill>
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 </div>
             </section>
 
-            {/* ---- how ---- */}
-            <section id="how" className="border-t border-border py-28">
-                <div className="mx-auto max-w-6xl px-6">
-                    <h2 className="mt-3.5 max-w-[24ch] font-display text-[clamp(1.625rem,3vw,2.25rem)] font-semibold leading-[1.14] tracking-[-0.03em]">
-                        Three steps, in the order you would take them.
-                    </h2>
-
-                    <ol className="mt-11 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
-                        {STEPS.map((s) => (
-                            <li key={s.n} className="bg-background p-6">
-                                <span className="text-[11px] font-semibold tracking-[0.1em] text-muted-foreground">
-                                    {s.n}
-                                </span>
-                                <h3 className="mt-3 text-[15.5px] font-semibold tracking-[-0.01em]">
-                                    {s.h}
-                                </h3>
-                                <p className="mt-2 text-[14px] leading-relaxed text-muted-foreground">
-                                    {s.p}
-                                </p>
-                            </li>
-                        ))}
-                    </ol>
-                </div>
-            </section>
-
-            {/* ---- close ---- */}
-            <section id="waitlist" className="border-t border-border py-28">
-                <div className="mx-auto max-w-6xl px-6">
-                    <div className="mx-auto max-w-[46ch] text-center">
-                        <h2 className="font-display text-[clamp(1.75rem,3.2vw,2.5rem)] font-semibold leading-[1.1] tracking-[-0.03em]">
-                            Start with what you need today.
-                        </h2>
-                        <p className="mt-4 text-[16px] leading-relaxed text-muted-foreground">
-                            Free to start when your invite lands.
-                            Source-available under the Elastic License 2.0 — you
-                            can read the code today.
-                        </p>
-                        {/* One ask (#261). This section used to pair "Start
-                            free" with the waitlist so the final CTA had a
-                            fallback; with signup gated there is nothing to fall
-                            back from, and the form is already directly below —
-                            a button that scrolls the reader a few hundred pixels
-                            to a form they can see is friction, not a choice. */}
-                    </div>
-
-                    {/* The waitlist is now the only ask on the page, so the
-                        form is the section rather than a fallback under it. */}
-                    <div className="mx-auto mt-10 max-w-xl">
-                        <JoinWaitlist />
-                    </div>
-                </div>
-            </section>
+            <ClosingCta />
         </>
     );
 }

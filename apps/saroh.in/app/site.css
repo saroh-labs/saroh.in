@@ -1,0 +1,50 @@
+/*
+ * The marketing site's canvas, from "Saroh Marketing Site": a shade darker
+ * than the product's Paper, so the lighter bands and white cards read as
+ * sections rather than as more of the same page. Dark mode keeps the
+ * product's own ground, where bands sit on the raised card colour instead.
+ */
+:root {
+    --marketing-canvas: 42 23% 89%; /* #E9E5DC */
+}
+.dark {
+    --marketing-canvas: var(--background);
+}
+
+/*
+ * The marketing site's one entrance: the hero rises once per visit, which is
+ * explanation rather than decoration ("Saroh Marketing Site", motion 1).
+ * Everything else moves only where the movement says something, and nothing
+ * moves for someone who asked it not to.
+ */
+@keyframes sa-rise {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.sa-rise {
+    animation: sa-rise 520ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sa-rise {
+        animation: none;
+    }
+}
+
+/* Links inside running prose stay underlined, as the design keeps them. */
+main p a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+}
+
+html {
+    overflow-x: clip;
+}

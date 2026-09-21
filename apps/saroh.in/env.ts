@@ -10,18 +10,20 @@ import { z } from "zod";
  * `API_URL` is server-only on purpose: only the /api/waitlist route handler
  * talks to api.saroh.in, and the browser has no reason to know that origin.
  *
- * There is deliberately no auth-app URL here. This site links to no
- * authenticated surface while signup is gated (#261); the five "Start free"
- * links it used to carry hardcoded the origin anyway, so the variable that was
- * meant to hold it had never been read.
+ * `NEXT_PUBLIC_ACCOUNTS_URL` is where "Sign in" goes — for people already
+ * invited into a business while signup is still gated behind the waitlist
+ * (#261). Unset, it is the production origin, as in every other app.
  */
 export const env = createEnv({
-    client: {},
+    client: {
+        NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
+    },
     server: {
         API_URL: z.string().url().optional(),
     },
     runtimeEnv: {
         API_URL: process.env.API_URL,
+        NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
     },
     emptyStringAsUndefined: true,
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,

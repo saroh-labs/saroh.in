@@ -7,6 +7,36 @@ const nextConfig = {
     // lives at api.saroh.in).
     reactStrictMode: false,
 
+    /*
+     * The site before "Saroh Marketing Site" had /modules, /modules/<slug>
+     * and /about. Their addresses may be bookmarked or indexed, so each lands
+     * on the page that now answers the same question. Payments, messages and
+     * automations have no page of their own: they belong to Sell and
+     * Contacts, and What it will not do says what is not built.
+     */
+    async redirects() {
+        const job = {
+            website: "/website",
+            commerce: "/sell",
+            appointments: "/bookings",
+            crm: "/contacts",
+            insights: "/insights",
+            payments: "/sell",
+            communications: "/contacts",
+            automations: "/what-it-will-not-do",
+        };
+        return [
+            { source: "/modules", destination: "/", permanent: true },
+            ...Object.entries(job).map(([slug, destination]) => ({
+                source: `/modules/${slug}`,
+                destination,
+                permanent: true,
+            })),
+            { source: "/modules/:slug", destination: "/", permanent: true },
+            { source: "/about", destination: "/how-it-works", permanent: true },
+        ];
+    },
+
     images: {
         domains: [
             "res.cloudinary.com",
