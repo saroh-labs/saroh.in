@@ -136,6 +136,7 @@ module.exports = {
         // same list the policy enforces.
         "<rootDir>/src/modules/organizations/capability-catalogue.spec.ts",
         "<rootDir>/src/modules/organizations/resolve-capabilities.spec.ts",
+        "<rootDir>/src/modules/organizations/organization-roles.service.spec.ts",
         "<rootDir>/src/modules/orders/order-standing.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,

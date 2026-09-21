@@ -80,6 +80,8 @@ const NEVER: Record<string, string> = {
     "notifications/notifications.controller.ts": "cross-cutting",
     "media/media.controller.ts": "shared by more than one module",
     "organizations/organizations.controller.ts": "tenancy, not a capability",
+    "organizations/organization-roles.controller.ts":
+        "roles decide who may switch modules; a module switch must never lock the owner out of roles",
     "projects/projects.controller.ts": "tenancy",
     "projects/teams.controller.ts": "tenancy",
     "members/members.controller.ts": "tenancy",

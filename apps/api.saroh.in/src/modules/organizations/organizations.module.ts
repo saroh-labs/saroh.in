@@ -6,6 +6,8 @@ import { OrganizationContextModule } from "./organization-context.module";
 import { OrganizationMembersController } from "./organization-members.controller";
 import { OrganizationMembersService } from "./organization-members.service";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
+import { OrganizationRolesController } from "./organization-roles.controller";
+import { OrganizationRolesService } from "./organization-roles.service";
 import { OrganizationSettingsService } from "./organization-settings.service";
 import { OrganizationsController } from "./organizations.controller";
 import { PublicInvitationsController } from "./public-invitations.controller";
@@ -29,11 +31,13 @@ import { PublicInvitationsController } from "./public-invitations.controller";
         OrganizationsController,
         OrganizationMembersController,
         PublicInvitationsController,
+        OrganizationRolesController,
     ],
     providers: [
         OrganizationOnboardingService,
         OrganizationSettingsService,
         OrganizationMembersService,
+        OrganizationRolesService,
     ],
     exports: [OrganizationContextModule],
 })
