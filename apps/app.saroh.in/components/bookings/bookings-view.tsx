@@ -10,15 +10,15 @@ import type {
     DataColumn,
     DataFilter,
 } from "@/components/shared/data-view/types";
-import {
-    daysUntil,
-    formatDayHeading,
-    formatTimeRange,
-} from "@/lib/format/datetime";
+import { formatDayHeading, formatTimeRange } from "@/lib/format/datetime";
 // From ./booking-state, NOT ./service: this is a client component, and the
 // service module reaches next/headers through the CRM HTTP plumbing.
 import { formatStatus } from "@/lib/format/status";
-import { hasEnded, needsOutcome } from "@/lib/services/booking-state";
+import {
+    hasEnded,
+    isInNextWeek,
+    needsOutcome,
+} from "@/lib/services/booking-state";
 import type { BookingWithService } from "@/lib/services/service";
 
 /**
@@ -34,8 +34,6 @@ import type { BookingWithService } from "@/lib/services/service";
  * the booker saw — not the viewer's. That is why `formatTimeRange` takes a zone
  * explicitly and why the zone travels on every row.
  */
-
-const WITHIN_A_WEEK = 7;
 
 const FILTERS: DataFilter<BookingWithService>[] = [
     // Upcoming leads, because the schedule is mostly read forwards. "Needs an
@@ -58,7 +56,7 @@ const FILTERS: DataFilter<BookingWithService>[] = [
     {
         id: "week",
         label: "Next 7 days",
-        predicate: (b) => daysUntil(b.startAt) <= WITHIN_A_WEEK,
+        predicate: (b) => isInNextWeek(b),
     },
     {
         id: "unconfirmed",
