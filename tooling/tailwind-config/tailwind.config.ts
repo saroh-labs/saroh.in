@@ -176,6 +176,25 @@ const config = {
                     900: "hsl(var(--highlight-900))",
                     950: "hsl(var(--highlight-950))",
                 },
+                // The neutral ramp, from the tokens. Unmapped, every
+                // `neutral-N` class fell back to Tailwind's built-in cold
+                // greys, so a band meant to be #F7F6F3 rendered #FAFAFA and
+                // grey copy sat cold beside warm borders. Through the
+                // variables it is the Ink ramp, and each skin's own ramp
+                // (`[data-skin]` in globals.css) finally applies too.
+                neutral: {
+                    50: "hsl(var(--neutral-50))",
+                    100: "hsl(var(--neutral-100))",
+                    200: "hsl(var(--neutral-200))",
+                    300: "hsl(var(--neutral-300))",
+                    400: "hsl(var(--neutral-400))",
+                    500: "hsl(var(--neutral-500))",
+                    600: "hsl(var(--neutral-600))",
+                    700: "hsl(var(--neutral-700))",
+                    800: "hsl(var(--neutral-800))",
+                    900: "hsl(var(--neutral-900))",
+                    950: "hsl(var(--neutral-950))",
+                },
                 success: {
                     DEFAULT: "hsl(var(--success))",
                     foreground: "hsl(var(--success-foreground))",
