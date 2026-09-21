@@ -15,7 +15,10 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 import { Switch } from "@saroh/ui/switch";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { Textarea } from "@saroh/ui/textarea";
+import { TimeSelect } from "@saroh/ui/time-select";
+import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
+import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { Lock } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -28,33 +31,64 @@ import {
     updateStorefront,
 } from "@/lib/stores/storefront-actions";
 import type {
+    OpeningHoursDay,
     StorefrontInput,
+    StorefrontKind,
     StorefrontSettings,
     StorefrontSummary,
+    Weekday,
 } from "@/lib/stores/storefronts";
 
 /**
- * The currencies offered before a storefront's first order. Short on purpose:
- * the ones Saroh's payment providers settle in. A storefront already on
- * another code keeps it — it is added to the list rather than hidden.
+ * The currencies offered before a storefront's first order: the ones Saroh's
+ * payment providers settle in. A storefront already on another code keeps it
+ * — it is added to the list rather than hidden.
  */
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AUD", "CAD", "SGD", "AED"];
 
 const MONEY_RE = /^\d+(\.\d{1,2})?$/;
 
+const DAYS: { key: Weekday; label: string }[] = [
+    { key: "MON", label: "Monday" },
+    { key: "TUE", label: "Tuesday" },
+    { key: "WED", label: "Wednesday" },
+    { key: "THU", label: "Thursday" },
+    { key: "FRI", label: "Friday" },
+    { key: "SAT", label: "Saturday" },
+    { key: "SUN", label: "Sunday" },
+];
+
+/** A week to start from when a shop has never saved one. */
+const DEFAULT_WEEK: OpeningHoursDay[] = DAYS.map(({ key }) => ({
+    day: key,
+    open: "09:00",
+    close: "18:00",
+    closed: key === "SUN",
+}));
+
+/** What each provider is called on screen. */
+const PROVIDER_NAME: Record<string, string> = {
+    STRIPE: "Stripe",
+    RAZORPAY: "Razorpay",
+    CASHFREE: "Cashfree",
+    DODO: "Dodo Payments",
+};
+const providerName = (p: string) => PROVIDER_NAME[p] ?? p;
+
 const ordersLabel = (n: number) =>
     n === 0 ? "no orders yet" : n === 1 ? "1 order" : `${n} orders`;
+
+type Saver = (
+    input: StorefrontInput,
+    said: string,
+    onFail?: () => void,
+) => void;
 
 /**
  * Sell → Storefronts, after the "Saroh Storefront Settings" design: every
  * storefront on the left, the chosen one's own settings on the right.
  *
- * Only what the storefront really has is drawn. The design also has a shop
- * or online kind, an address and hours, collection, tips, guest checkout,
- * payments per storefront and pausing. None of those exist yet, and a switch
- * that saves nothing tells a merchant their shop works in a way it does not.
- *
- * Every control saves on its own — a toggle when it is flipped, a field when
+ * Every control saves on its own — a switch when it is flipped, a field when
  * its Save is pressed — so there is no page-wide save to forget.
  */
 export function StorefrontsScreen({
@@ -178,6 +212,16 @@ function StorefrontList({
                                         {ordersLabel(s.orderCount)}
                                     </span>
                                 </span>
+                                <Badge
+                                    variant={s.paused ? "warning" : "neutral"}
+                                    className="shrink-0"
+                                >
+                                    {s.paused
+                                        ? "Paused"
+                                        : s.kind === "SHOP"
+                                          ? "Shop"
+                                          : "Online"}
+                                </Badge>
                             </Link>
                         </li>
                     );
@@ -212,6 +256,14 @@ function Note({ id, children }: { id?: string; children: ReactNode }) {
     );
 }
 
+interface SectionProps {
+    store: StorefrontSettings;
+    canEdit: boolean;
+    pending: boolean;
+    save: Saver;
+    setStore: (fn: (s: StorefrontSettings) => StorefrontSettings) => void;
+}
+
 function StorefrontDetail({
     store: initial,
     businessName,
@@ -228,15 +280,11 @@ function StorefrontDetail({
     const [pending, startTransition] = useTransition();
 
     /**
-     * One save path for every control. The screen shows what the API returned,
-     * not what was asked for — so a value the server normalised ("18" →
-     * "18.00") or refused is what the merchant sees afterwards.
+     * One save path for every control. The screen shows what the API
+     * returned, not what was asked for — so a value the server normalised
+     * ("18" → "18.00") or refused is what the merchant sees afterwards.
      */
-    function save(
-        input: StorefrontInput,
-        said: string,
-        onFail?: () => void,
-    ): void {
+    const save: Saver = (input, said, onFail) => {
         startTransition(async () => {
             const res = await updateStorefront(store.id, input);
             if (!res.ok) {
@@ -246,35 +294,31 @@ function StorefrontDetail({
             }
             setStore(res.data);
             showSuccess(said);
-            if (input.name !== undefined) router.refresh();
+            // The list on the left shows the name, the kind and the pause.
+            if (
+                input.name !== undefined ||
+                input.kind !== undefined ||
+                input.paused !== undefined
+            ) {
+                router.refresh();
+            }
         });
-    }
+    };
+
+    const shared = { store, canEdit, pending, save, setStore };
 
     return (
         <>
-            <BasicsSection
-                store={store}
-                businessName={businessName}
-                canEdit={canEdit}
-                pending={pending}
-                onSave={(name) => save({ name }, "Name saved")}
-            />
-            <CheckoutSection
-                store={store}
-                canEdit={canEdit}
-                pending={pending}
-                save={save}
-                setStore={setStore}
-            />
-            <BehaviourSection
-                store={store}
-                canEdit={canEdit}
-                pending={pending}
-                save={save}
-                setStore={setStore}
-            />
-            {canClose ? (
-                <ClosingSection store={store} businessName={businessName} />
+            <BasicsSection {...shared} businessName={businessName} />
+            {store.kind === "SHOP" ? <PlaceSection {...shared} /> : null}
+            <CheckoutSection {...shared} businessName={businessName} />
+            <BehaviourSection {...shared} />
+            {canClose || canEdit ? (
+                <ClosingSection
+                    {...shared}
+                    businessName={businessName}
+                    canClose={canClose}
+                />
             ) : null}
         </>
     );
@@ -285,17 +329,23 @@ function BasicsSection({
     businessName,
     canEdit,
     pending,
-    onSave,
-}: {
-    store: StorefrontSettings;
-    businessName: string;
-    canEdit: boolean;
-    pending: boolean;
-    onSave: (name: string) => void;
-}) {
+    save,
+    setStore,
+}: SectionProps & { businessName: string }) {
     const [name, setName] = useState(store.name);
     const trimmed = name.trim();
     const dirty = trimmed !== store.name;
+
+    const setKind = (kind: StorefrontKind) => {
+        if (kind === store.kind) return;
+        const before = store.kind;
+        setStore((s) => ({ ...s, kind }));
+        save(
+            { kind },
+            kind === "SHOP" ? "Now a shop" : "Now an online store",
+            () => setStore((s) => ({ ...s, kind: before })),
+        );
+    };
 
     return (
         <Section title="Basics">
@@ -303,7 +353,7 @@ function BasicsSection({
                 className="grid gap-2"
                 onSubmit={(e) => {
                     e.preventDefault();
-                    if (dirty && trimmed) onSave(trimmed);
+                    if (dirty && trimmed) save({ name: trimmed }, "Name saved");
                 }}
             >
                 <Label htmlFor="storefront-name">Storefront name</Label>
@@ -329,30 +379,201 @@ function BasicsSection({
                     of them.
                 </Note>
             </form>
+
+            <div className="grid gap-2">
+                <p id="storefront-kind-label" className="text-sm font-medium">
+                    What kind of storefront is this?
+                </p>
+                <ToggleGroup
+                    type="single"
+                    value={store.kind}
+                    // Radix clears a single group when the pressed item is
+                    // pressed again; a storefront is always one or the other.
+                    onValueChange={(v) => {
+                        if (v === "SHOP" || v === "ONLINE") setKind(v);
+                    }}
+                    disabled={!canEdit || pending}
+                    aria-labelledby="storefront-kind-label"
+                    aria-describedby="storefront-kind-note"
+                    className="w-fit justify-start rounded-lg border border-border bg-muted p-0.5"
+                >
+                    <ToggleGroupItem
+                        value="SHOP"
+                        className="h-8 px-3.5 text-[13px] data-[state=on]:bg-card data-[state=on]:shadow-sm coarse:h-11"
+                    >
+                        Shop
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                        value="ONLINE"
+                        className="h-8 px-3.5 text-[13px] data-[state=on]:bg-card data-[state=on]:shadow-sm coarse:h-11"
+                    >
+                        Online store
+                    </ToggleGroupItem>
+                </ToggleGroup>
+                <Note id="storefront-kind-note">
+                    A shop is a place, so it has an address, opening hours and
+                    collection. An online store is a channel and needs none of
+                    them.
+                </Note>
+            </div>
         </Section>
     );
 }
 
-type Saver = (
-    input: StorefrontInput,
-    said: string,
-    onFail?: () => void,
-) => void;
-type Setter = (fn: (s: StorefrontSettings) => StorefrontSettings) => void;
+/** Only a shop has a door: where it is and when it is open. */
+function PlaceSection({ store, canEdit, pending, save }: SectionProps) {
+    const [address, setAddress] = useState(store.address ?? "");
+    const [week, setWeek] = useState<OpeningHoursDay[]>(
+        store.openingHours ?? DEFAULT_WEEK,
+    );
+    const addressDirty = address.trim() !== (store.address ?? "");
+    const weekDirty =
+        JSON.stringify(week) !==
+        JSON.stringify(store.openingHours ?? DEFAULT_WEEK);
+    const backwards = week.some((d) => !d.closed && d.open >= d.close);
+
+    const setDay = (i: number, patch: Partial<OpeningHoursDay>) => {
+        setWeek((w) => w.map((d, j) => (j === i ? { ...d, ...patch } : d)));
+    };
+
+    return (
+        <Section title="Where customers find it">
+            <form
+                className="grid gap-2"
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    if (addressDirty) {
+                        save(
+                            { address: address.trim() || null },
+                            "Address saved",
+                        );
+                    }
+                }}
+            >
+                <Label htmlFor="storefront-address">Address</Label>
+                <Textarea
+                    id="storefront-address"
+                    value={address}
+                    rows={3}
+                    maxLength={500}
+                    readOnly={!canEdit}
+                    aria-describedby="storefront-address-note"
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="max-w-md"
+                />
+                <Note id="storefront-address-note">
+                    Printed on the receipt, so a customer knows where to come
+                    back to.
+                </Note>
+                {canEdit && addressDirty ? (
+                    <Button type="submit" disabled={pending} className="w-fit">
+                        Save address
+                    </Button>
+                ) : null}
+            </form>
+
+            <form
+                className="grid gap-2"
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!backwards) {
+                        save({ openingHours: week }, "Opening hours saved");
+                    }
+                }}
+            >
+                <p id="storefront-hours-label" className="text-sm font-medium">
+                    Opening hours
+                </p>
+                <div
+                    role="group"
+                    aria-labelledby="storefront-hours-label"
+                    className="overflow-hidden rounded-lg border border-border"
+                >
+                    {week.map((d, i) => {
+                        const label = DAYS[i]?.label ?? d.day;
+                        const wrong = !d.closed && d.open >= d.close;
+                        return (
+                            <div
+                                key={d.day}
+                                className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-3 py-2 last:border-b-0"
+                            >
+                                <span className="w-24 text-[13px] font-medium">
+                                    {label}
+                                </span>
+                                <span className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
+                                    <Switch
+                                        checked={!d.closed}
+                                        disabled={!canEdit}
+                                        onCheckedChange={(isOpen) => {
+                                            setDay(i, { closed: !isOpen });
+                                        }}
+                                        aria-label={`Open on ${label}`}
+                                    />
+                                    <span aria-hidden className="w-11">
+                                        {d.closed ? "Closed" : "Open"}
+                                    </span>
+                                </span>
+                                {d.closed ? null : (
+                                    <span className="flex items-center gap-1.5">
+                                        <TimeSelect
+                                            value={d.open}
+                                            disabled={!canEdit}
+                                            aria-label={`${label} opens`}
+                                            aria-invalid={wrong || undefined}
+                                            onValueChange={(open) => {
+                                                setDay(i, { open });
+                                            }}
+                                        />
+                                        <span
+                                            aria-hidden
+                                            className="text-muted-foreground"
+                                        >
+                                            –
+                                        </span>
+                                        <TimeSelect
+                                            value={d.close}
+                                            disabled={!canEdit}
+                                            aria-label={`${label} closes`}
+                                            aria-invalid={wrong || undefined}
+                                            onValueChange={(close) => {
+                                                setDay(i, { close });
+                                            }}
+                                        />
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+                <Note>
+                    {backwards
+                        ? "A day has to close after it opens."
+                        : store.openingHours
+                          ? "Shown on the receipt, in the shop's own time."
+                          : "Not saved yet — this is a starting week. Save it to show it on receipts."}
+                </Note>
+                {canEdit && (weekDirty || !store.openingHours) ? (
+                    <Button
+                        type="submit"
+                        disabled={pending || backwards}
+                        className="w-fit"
+                    >
+                        Save hours
+                    </Button>
+                ) : null}
+            </form>
+        </Section>
+    );
+}
 
 function CheckoutSection({
     store,
+    businessName,
     canEdit,
     pending,
     save,
     setStore,
-}: {
-    store: StorefrontSettings;
-    canEdit: boolean;
-    pending: boolean;
-    save: Saver;
-    setStore: Setter;
-}) {
+}: SectionProps & { businessName: string }) {
     const [rate, setRate] = useState(String(Number(store.taxRate)));
     const rateValid = /^\d{1,2}(\.\d{1,2})?$|^100$/.test(rate.trim());
     const rateDirty = rateValid && Number(rate) !== Number(store.taxRate);
@@ -366,52 +587,46 @@ function CheckoutSection({
             <div className="grid gap-2">
                 <Label htmlFor="storefront-currency">Currency</Label>
                 <div className="flex items-center gap-2.5">
-                    {store.currencyLocked || !canEdit ? (
-                        <Input
+                    {/* A select in every state: once orders lock it, it is the
+                        same control shown disabled, so the merchant sees what
+                        it is and why it will not move. */}
+                    <Select
+                        value={store.currency}
+                        disabled={store.currencyLocked || !canEdit || pending}
+                        onValueChange={(currency) => {
+                            const before = store.currency;
+                            setStore((s) => ({ ...s, currency }));
+                            save(
+                                { currency },
+                                `Currency set to ${currency}`,
+                                () => {
+                                    setStore((s) => ({
+                                        ...s,
+                                        currency: before,
+                                    }));
+                                },
+                            );
+                        }}
+                    >
+                        <SelectTrigger
                             id="storefront-currency"
-                            value={store.currency}
-                            readOnly
                             aria-describedby="storefront-currency-note"
                             className="w-32 font-mono"
-                        />
-                    ) : (
-                        <Select
-                            value={store.currency}
-                            disabled={pending}
-                            onValueChange={(currency) => {
-                                const before = store.currency;
-                                setStore((s) => ({ ...s, currency }));
-                                save(
-                                    { currency },
-                                    `Currency set to ${currency}`,
-                                    () =>
-                                        setStore((s) => ({
-                                            ...s,
-                                            currency: before,
-                                        })),
-                                );
-                            }}
                         >
-                            <SelectTrigger
-                                id="storefront-currency"
-                                aria-describedby="storefront-currency-note"
-                                className="w-32 font-mono"
-                            >
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {currencies.map((c) => (
-                                    <SelectItem
-                                        key={c}
-                                        value={c}
-                                        className="font-mono"
-                                    >
-                                        {c}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {currencies.map((c) => (
+                                <SelectItem
+                                    key={c}
+                                    value={c}
+                                    className="font-mono"
+                                >
+                                    {c}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Badge variant="outline" className="gap-1">
                         {store.currencyLocked ? (
                             <>
@@ -441,11 +656,12 @@ function CheckoutSection({
                     save(
                         { taxEnabled },
                         taxEnabled ? "Tax turned on" : "Tax turned off",
-                        () =>
+                        () => {
                             setStore((s) => ({
                                 ...s,
                                 taxEnabled: !taxEnabled,
-                            })),
+                            }));
+                        },
                     );
                 }}
             />
@@ -495,9 +711,106 @@ function CheckoutSection({
                     </Note>
                 </form>
             ) : null}
+
+            <Payments
+                store={store}
+                businessName={businessName}
+                canEdit={canEdit}
+                pending={pending}
+                save={save}
+            />
         </Section>
     );
 }
+
+/**
+ * Providers are connected once, for the business — the checks are on the
+ * business and the money lands in its account. Each storefront only picks
+ * which of them its checkout uses.
+ */
+function Payments({
+    store,
+    businessName,
+    canEdit,
+    pending,
+    save,
+}: Pick<SectionProps, "store" | "canEdit" | "pending" | "save"> & {
+    businessName: string;
+}) {
+    const connected = store.providers.filter((p) => p.status === "CONNECTED");
+    const summary =
+        connected.length === 0
+            ? `${businessName} has no payment provider connected, so this storefront cannot take payments yet.`
+            : store.effectiveProvider
+              ? `Checkout here charges through ${providerName(store.effectiveProvider)}. A provider is connected once for ${businessName}; each storefront picks which one its checkout uses.`
+              : store.checkoutProvider
+                ? `${providerName(store.checkoutProvider)} is no longer connected, so checkout here cannot take payments. Choose another.`
+                : "More than one provider is connected, so checkout cannot pick for itself. Choose which one this storefront uses.";
+
+    return (
+        <div className="grid gap-2">
+            <p className="text-sm font-medium">Payments</p>
+            <Note>{summary}</Note>
+            {store.providers.length > 0 ? (
+                <ul className="overflow-hidden rounded-lg border border-border">
+                    {store.providers.map((p) => {
+                        const inUse = store.effectiveProvider === p.provider;
+                        const usable = p.status === "CONNECTED";
+                        return (
+                            <li
+                                key={p.provider}
+                                className="flex min-h-12 items-center gap-3 border-b border-border px-3 py-2.5 last:border-b-0"
+                            >
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-[13.5px] font-medium">
+                                        {providerName(p.provider)}
+                                    </span>
+                                    <span className="block text-[11.5px] text-muted-foreground">
+                                        {usable
+                                            ? "Connected for the business"
+                                            : "Turned off for the business"}
+                                    </span>
+                                </span>
+                                {inUse ? (
+                                    <Badge variant="success">In use here</Badge>
+                                ) : canEdit && usable ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={pending}
+                                        onClick={() => {
+                                            save(
+                                                {
+                                                    checkoutProvider:
+                                                        p.provider,
+                                                },
+                                                `Checkout now uses ${providerName(p.provider)}`,
+                                            );
+                                        }}
+                                        aria-label={`Use ${providerName(p.provider)} for this storefront`}
+                                    >
+                                        Use here
+                                    </Button>
+                                ) : null}
+                            </li>
+                        );
+                    })}
+                </ul>
+            ) : null}
+            <Link
+                href="/settings/providers"
+                className="w-fit text-[12.5px] font-medium underline-offset-4 hover:underline"
+            >
+                {connected.length === 0
+                    ? "Connect a provider"
+                    : "Manage providers for the business"}
+            </Link>
+        </div>
+    );
+}
+
+type BehaviourKey =
+    "shippingEnabled" | "collectionEnabled" | "tipsEnabled" | "guestCheckout";
 
 function BehaviourSection({
     store,
@@ -505,13 +818,7 @@ function BehaviourSection({
     pending,
     save,
     setStore,
-}: {
-    store: StorefrontSettings;
-    canEdit: boolean;
-    pending: boolean;
-    save: Saver;
-    setStore: Setter;
-}) {
+}: SectionProps) {
     const [threshold, setThreshold] = useState(
         store.freeShippingThreshold ?? "",
     );
@@ -523,28 +830,43 @@ function BehaviourSection({
             ? store.freeShippingThreshold !== null
             : Number(next) !== Number(store.freeShippingThreshold ?? NaN));
 
+    /** A switch that saves itself, and springs back if the save fails. */
+    const flip =
+        (key: BehaviourKey, on: string, off: string) => (value: boolean) => {
+            setStore((s) => ({ ...s, [key]: value }));
+            save({ [key]: value }, value ? on : off, () => {
+                setStore((s) => ({ ...s, [key]: !value }));
+            });
+        };
+
     return (
         <Section title="Behaviour">
+            {store.kind === "SHOP" ? (
+                <ToggleRow
+                    id="storefront-collection"
+                    label="Collection from this storefront"
+                    note="Customers choose a slot and pick up in person."
+                    later
+                    checked={store.collectionEnabled}
+                    disabled={!canEdit || pending}
+                    onChange={flip(
+                        "collectionEnabled",
+                        "Collection turned on",
+                        "Collection turned off",
+                    )}
+                />
+            ) : null}
             <ToggleRow
                 id="storefront-delivery"
                 label="Delivery"
                 note="Orders from here can be sent to the customer. Off means nothing is sent, so there is no shipping to charge."
                 checked={store.shippingEnabled}
                 disabled={!canEdit || pending}
-                onChange={(shippingEnabled) => {
-                    setStore((s) => ({ ...s, shippingEnabled }));
-                    save(
-                        { shippingEnabled },
-                        shippingEnabled
-                            ? "Delivery turned on"
-                            : "Delivery turned off",
-                        () =>
-                            setStore((s) => ({
-                                ...s,
-                                shippingEnabled: !shippingEnabled,
-                            })),
-                    );
-                }}
+                onChange={flip(
+                    "shippingEnabled",
+                    "Delivery turned on",
+                    "Delivery turned off",
+                )}
             />
             {store.shippingEnabled ? (
                 <form
@@ -599,6 +921,37 @@ function BehaviourSection({
                     </Note>
                 </form>
             ) : null}
+            <ToggleRow
+                id="storefront-tips"
+                label="Ask for a tip at checkout"
+                note="A single optional line, never pre-selected."
+                later
+                checked={store.tipsEnabled}
+                disabled={!canEdit || pending}
+                onChange={flip(
+                    "tipsEnabled",
+                    "Tips turned on",
+                    "Tips turned off",
+                )}
+            />
+            <ToggleRow
+                id="storefront-guest"
+                label="Allow guest checkout"
+                note="Off means someone must make an account before they can pay."
+                later
+                checked={store.guestCheckout}
+                disabled={!canEdit || pending}
+                onChange={flip(
+                    "guestCheckout",
+                    "Guest checkout turned on",
+                    "Guest checkout turned off",
+                )}
+            />
+            <Note>
+                Settings marked “Not live yet” are saved now and take effect
+                when customers can check out on their own. Today an order is
+                keyed in here and paid by link.
+            </Note>
         </Section>
     );
 }
@@ -607,6 +960,7 @@ function ToggleRow({
     id,
     label,
     note,
+    later,
     checked,
     disabled,
     onChange,
@@ -614,6 +968,8 @@ function ToggleRow({
     id: string;
     label: string;
     note: string;
+    /** Saved, but nothing reads it until customers can check out alone. */
+    later?: boolean;
     checked: boolean;
     disabled: boolean;
     onChange: (checked: boolean) => void;
@@ -621,9 +977,14 @@ function ToggleRow({
     return (
         <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-                <Label htmlFor={id} className="text-[13.5px] font-medium">
-                    {label}
-                </Label>
+                <span className="flex flex-wrap items-center gap-2">
+                    <Label htmlFor={id} className="text-[13.5px] font-medium">
+                        {label}
+                    </Label>
+                    {later ? (
+                        <Badge variant="neutral">Not live yet</Badge>
+                    ) : null}
+                </span>
                 <p
                     id={`${id}-note`}
                     className="mt-0.5 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
@@ -644,42 +1005,76 @@ function ToggleRow({
 }
 
 /**
- * Closing is irreversible, so it is a confirm and not an Undo toast: the
- * design drew an Undo, but the API keeps no way back from a close, and an
- * Undo that only works for the next eight seconds is a promise the product
- * cannot keep if the tab is closed in between.
+ * Pausing is reversible, so it takes an Undo and no confirm — the repo's rule
+ * for reversible actions. Closing is not, so it takes a confirm: the design
+ * drew an Undo there too, but the API keeps no way back from a close.
  */
 function ClosingSection({
     store,
     businessName,
-}: {
-    store: StorefrontSettings;
-    businessName: string;
-}) {
+    canEdit,
+    canClose,
+    pending,
+    save,
+    setStore,
+}: SectionProps & { businessName: string; canClose: boolean }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
-    const [pending, startTransition] = useTransition();
+    const [closing, startClosing] = useTransition();
     const orders = store.orderCount;
     const kept = `${orders} past ${orders === 1 ? "order stays" : "orders stay"}`;
+    const paused = Boolean(store.pausedAt);
+    const resume = () => {
+        save({ paused: false }, `${store.name} is taking payments again`);
+    };
+
+    const pause = () => {
+        startClosing(async () => {
+            const res = await updateStorefront(store.id, { paused: true });
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            setStore(() => res.data);
+            router.refresh();
+            showUndo(
+                `${store.name} is paused — customers cannot pay until it is back on.`,
+                resume,
+            );
+        });
+    };
 
     return (
         <Section title="Closing up">
             <Note>
-                {store.unfulfilled > 0
-                    ? `${store.unfulfilled === 1 ? "One order here is" : `${store.unfulfilled} orders here are`} still waiting to go out. Fulfil or cancel ${store.unfulfilled === 1 ? "it" : "them"} before closing this storefront.`
-                    : orders > 0
-                      ? `Closing ${store.name} permanently cannot be undone, and its ${kept} on the business's record.`
-                      : "Nothing has been sold here yet, so closing it removes it cleanly."}
+                {paused
+                    ? `${store.name} is paused: customers cannot pay for orders here until it is turned back on. Everything is kept.`
+                    : store.unfulfilled > 0
+                      ? `Pausing stops ${store.name} taking payments and keeps everything. ${store.unfulfilled === 1 ? "One order here is" : `${store.unfulfilled} orders here are`} still waiting to go out, so it cannot be closed until ${store.unfulfilled === 1 ? "that one is" : "they are"} fulfilled or cancelled.`
+                      : orders > 0
+                        ? `Pausing stops ${store.name} taking payments and keeps everything. Closing it permanently cannot be undone, and its ${kept} on the business's record either way.`
+                        : `Pausing stops ${store.name} taking payments and keeps everything. Nothing has been sold here yet, so closing it removes it cleanly.`}
             </Note>
-            <div>
-                <Button
-                    variant="outline"
-                    className="border-destructive/40 text-destructive hover:border-destructive hover:text-destructive"
-                    disabled={pending || store.unfulfilled > 0}
-                    onClick={() => setOpen(true)}
-                >
-                    Close permanently
-                </Button>
+            <div className="flex flex-wrap gap-2">
+                {canEdit ? (
+                    <Button
+                        variant="outline"
+                        disabled={pending || closing}
+                        onClick={paused ? resume : pause}
+                    >
+                        {paused ? "Resume storefront" : "Pause storefront"}
+                    </Button>
+                ) : null}
+                {canClose ? (
+                    <Button
+                        variant="outline"
+                        className="border-destructive/40 text-destructive hover:border-destructive hover:text-destructive"
+                        disabled={closing || store.unfulfilled > 0}
+                        onClick={() => setOpen(true)}
+                    >
+                        Close permanently
+                    </Button>
+                ) : null}
             </div>
             <ConfirmDialog
                 open={open}
@@ -691,8 +1086,8 @@ function ClosingSection({
                         : "Nothing has been sold here, so there is nothing to keep."
                 } This cannot be undone.`}
                 confirmLabel="Close permanently"
-                onConfirm={() =>
-                    startTransition(async () => {
+                onConfirm={() => {
+                    startClosing(async () => {
                         const res = await closeStorefront(store.id);
                         if (!res.ok) {
                             showError(res.error);
@@ -700,8 +1095,8 @@ function ClosingSection({
                         }
                         showSuccess(`${store.name} is closed`);
                         router.replace("/commerce/storefronts");
-                    })
-                }
+                    });
+                }}
             />
         </Section>
     );

@@ -8,6 +8,7 @@ import { isIntent, isReceipt } from "./checkout-shape";
 export type {
     CheckoutIntent,
     CheckoutReceipt,
+    CheckoutStorefront,
     ReceiptPaymentStatus,
 } from "./checkout-shape";
 

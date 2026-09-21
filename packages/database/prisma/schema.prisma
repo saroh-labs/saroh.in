@@ -200,7 +200,7 @@ model Organization {
 
   createdAt          DateTime            @default(now())
   idempotencyRecords IdempotencyRecord[]
-  roles          OrganizationRole[]
+  roles              OrganizationRole[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -939,6 +939,22 @@ model StoreSettings {
   // Shipping
   shippingEnabled       Boolean  @default(true)
   freeShippingThreshold Decimal? @db.Decimal(10, 2)
+
+  // What kind of place this is (Sell → Storefronts). A SHOP is somewhere a
+  // customer can walk into, so it has an address, hours and collection; an
+  // ONLINE store has none of them.
+  kind              String    @default("ONLINE") // SHOP | ONLINE
+  address           String?   @db.Text
+  // Seven entries, Monday first: { day, open: "09:00", close: "18:00", closed }
+  openingHours      Json?
+  collectionEnabled Boolean   @default(false)
+  tipsEnabled       Boolean   @default(false)
+  guestCheckout     Boolean   @default(true)
+  // Paused: customers cannot pay; everything is kept.
+  pausedAt          DateTime?
+  // Which of the business's connected providers this storefront's checkout
+  // uses (MerchantPaymentProvider.provider). Null: the business's only one.
+  checkoutProvider  String?
 
   // Theme
   theme        String  @default("light") // light, dark, custom

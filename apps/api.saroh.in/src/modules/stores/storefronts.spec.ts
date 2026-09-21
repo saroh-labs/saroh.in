@@ -23,6 +23,10 @@ jest.mock("@saroh/database", () => {
             },
             storeSettings: { findUnique: jest.fn() },
             order: { count: jest.fn(), findFirst: jest.fn() },
+            merchantPaymentProvider: {
+                findMany: jest.fn(),
+                findUnique: jest.fn(),
+            },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
         },
@@ -46,6 +50,7 @@ const db = prisma as unknown as {
     store: Record<string, jest.Mock>;
     storeSettings: Record<string, jest.Mock>;
     order: Record<string, jest.Mock>;
+    merchantPaymentProvider: Record<string, jest.Mock>;
     $transaction: jest.Mock;
     __tx: {
         store: Record<string, jest.Mock>;
@@ -72,6 +77,8 @@ beforeEach(() => {
     db.storeSettings.findUnique!.mockResolvedValue(null);
     db.order.count!.mockResolvedValue(0);
     db.order.findFirst!.mockResolvedValue(null);
+    db.merchantPaymentProvider.findMany!.mockResolvedValue([]);
+    db.merchantPaymentProvider.findUnique!.mockResolvedValue(null);
 });
 
 describe("StorefrontsController authorization", () => {
@@ -244,5 +251,79 @@ describe("StorefrontsService", () => {
             where: { id: "st_1" },
             data: { deletedAt: expect.any(Date) },
         });
+    });
+});
+
+describe("StorefrontsService — checkout, pause and a shop's week", () => {
+    const service = new StorefrontsService();
+    const WEEK = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
+        (day) => ({ day, open: "09:00", close: "18:00", closed: false }),
+    ) as never;
+
+    it("will not point checkout at a provider the business has not connected", async () => {
+        db.merchantPaymentProvider.findUnique!.mockResolvedValue({
+            status: "DISABLED",
+        });
+        await expect(
+            service.update("org_1", "st_1", { checkoutProvider: "STRIPE" }),
+        ).rejects.toThrow(/Connect that provider/);
+        expect(db.merchantPaymentProvider.findUnique).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId_provider: {
+                        organizationId: "org_1",
+                        provider: "STRIPE",
+                    },
+                },
+            }),
+        );
+        expect(db.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("says which provider checkout will really use", async () => {
+        db.merchantPaymentProvider.findMany!.mockResolvedValue([
+            { provider: "RAZORPAY", status: "CONNECTED" },
+            { provider: "STRIPE", status: "CONNECTED" },
+        ]);
+        // Two connected and none named: checkout cannot choose.
+        expect((await service.get("org_1", "st_1")).effectiveProvider).toBe(
+            null,
+        );
+        db.storeSettings.findUnique!.mockResolvedValue({
+            checkoutProvider: "STRIPE",
+            taxRate: { toString: () => "0" },
+        });
+        expect((await service.get("org_1", "st_1")).effectiveProvider).toBe(
+            "STRIPE",
+        );
+    });
+
+    it("pauses with a timestamp and resumes by clearing it", async () => {
+        await service.update("org_1", "st_1", { paused: true });
+        const paused =
+            db.__tx.storeSettings.upsert!.mock.calls[0][0].update.pausedAt;
+        expect(paused).toBeInstanceOf(Date);
+
+        await service.update("org_1", "st_1", { paused: false });
+        expect(
+            db.__tx.storeSettings.upsert!.mock.calls[1][0].update.pausedAt,
+        ).toBeNull();
+    });
+
+    it("refuses a day that closes before it opens", async () => {
+        const week = (WEEK as { close: string }[]).map((d, i) =>
+            i === 2 ? { ...d, close: "08:00" } : d,
+        );
+        await expect(
+            service.update("org_1", "st_1", { openingHours: week as never }),
+        ).rejects.toThrow(/close after it opens/);
+    });
+
+    it("lets a closed day have any times", async () => {
+        const week = (WEEK as { close: string }[]).map((d, i) =>
+            i === 6 ? { ...d, close: "00:00", closed: true } : d,
+        );
+        await service.update("org_1", "st_1", { openingHours: week as never });
+        expect(db.__tx.storeSettings.upsert).toHaveBeenCalled();
     });
 });

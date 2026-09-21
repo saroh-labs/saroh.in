@@ -8,7 +8,7 @@ import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
-import type { UpdateStorefrontDto } from "./storefronts.dto";
+import type { OpeningHoursDay, UpdateStorefrontDto } from "./storefronts.dto";
 
 /** What the schema falls back to before a storefront ever saves settings. */
 const SCHEMA_CURRENCY = "USD";
@@ -17,6 +17,15 @@ export interface StorefrontSummary {
     id: string;
     name: string;
     orderCount: number;
+    kind: "SHOP" | "ONLINE";
+    paused: boolean;
+}
+
+/** A payment provider the business has connected, as a storefront sees it. */
+export interface StorefrontProvider {
+    provider: string;
+    /** CONNECTED, or DISABLED for one the business switched off. */
+    status: string;
 }
 
 export interface StorefrontSettings extends StorefrontSummary {
@@ -35,6 +44,24 @@ export interface StorefrontSettings extends StorefrontSummary {
     freeShippingThreshold: string | null;
     /** Orders still waiting to go out — closing is refused while any are. */
     unfulfilled: number;
+    /** Only a SHOP has these; an ONLINE store keeps them but shows none. */
+    address: string | null;
+    openingHours: OpeningHoursDay[] | null;
+    collectionEnabled: boolean;
+    tipsEnabled: boolean;
+    guestCheckout: boolean;
+    /** ISO, when paused; `null` while taking payments. */
+    pausedAt: string | null;
+    /** The provider this storefront's checkout names, if it names one. */
+    checkoutProvider: string | null;
+    /**
+     * What checkout will actually charge through: the named provider, else
+     * the business's only connected one, else `null` — which on screen is
+     * "cannot take payments", not a blank.
+     */
+    effectiveProvider: string | null;
+    /** Every provider the business has connected, for "Use here". */
+    providers: StorefrontProvider[];
 }
 
 /**
@@ -45,10 +72,10 @@ export interface StorefrontSettings extends StorefrontSummary {
  * storefront id from the path only picks WHICH of the business's own
  * storefronts, so another tenant's id is a 404, never a read.
  *
- * Only settings the schema already has are exposed. The design also draws a
- * shop-or-online kind, an address, opening hours, collection, tips, guest
- * checkout and pausing; none of those exist as columns yet, and a control
- * that saves nothing is worse than no control.
+ * What takes effect today: currency and tax (new orders), pausing and the
+ * checkout provider (the buyer's payment path), and a shop's address and
+ * hours (the buyer's receipt). Collection, tips and guest checkout are saved
+ * for the customer-facing checkout that will read them; the screen says so.
  */
 @Injectable()
 export class StorefrontsService {
@@ -60,12 +87,15 @@ export class StorefrontsService {
                 id: true,
                 name: true,
                 _count: { select: { orders: true } },
+                settings: { select: { kind: true, pausedAt: true } },
             },
         });
         return stores.map((s) => ({
             id: s.id,
             name: s.name,
             orderCount: s._count.orders,
+            kind: s.settings?.kind === "SHOP" ? "SHOP" : "ONLINE",
+            paused: Boolean(s.settings?.pausedAt),
         }));
     }
 
@@ -74,17 +104,28 @@ export class StorefrontsService {
         storeId: string,
     ): Promise<StorefrontSettings> {
         const store = await this.require(organizationId, storeId);
-        const [settings, unfulfilled, latestOrder] = await Promise.all([
-            prisma.storeSettings.findUnique({ where: { storeId } }),
-            prisma.order.count({
-                where: { storeId, status: { in: [...UNFULFILLED_STATUSES] } },
-            }),
-            prisma.order.findFirst({
-                where: { storeId },
-                orderBy: { createdAt: "desc" },
-                select: { currency: true },
-            }),
-        ]);
+        const [settings, unfulfilled, latestOrder, providers] =
+            await Promise.all([
+                prisma.storeSettings.findUnique({ where: { storeId } }),
+                prisma.order.count({
+                    where: {
+                        storeId,
+                        status: { in: [...UNFULFILLED_STATUSES] },
+                    },
+                }),
+                prisma.order.findFirst({
+                    where: { storeId },
+                    orderBy: { createdAt: "desc" },
+                    select: { currency: true },
+                }),
+                prisma.merchantPaymentProvider.findMany({
+                    where: { organizationId },
+                    orderBy: { createdAt: "asc" },
+                    select: { provider: true, status: true },
+                }),
+            ]);
+        const connected = providers.filter((p) => p.status === "CONNECTED");
+        const named = settings?.checkoutProvider ?? null;
 
         return {
             id: store.id,
@@ -103,6 +144,24 @@ export class StorefrontsService {
                 ? toMoneyString(settings.freeShippingThreshold)
                 : null,
             unfulfilled,
+            kind: settings?.kind === "SHOP" ? "SHOP" : "ONLINE",
+            address: settings?.address ?? null,
+            openingHours:
+                (settings?.openingHours as OpeningHoursDay[] | null) ?? null,
+            collectionEnabled: settings?.collectionEnabled ?? false,
+            tipsEnabled: settings?.tipsEnabled ?? false,
+            guestCheckout: settings?.guestCheckout ?? true,
+            pausedAt: settings?.pausedAt?.toISOString() ?? null,
+            paused: Boolean(settings?.pausedAt),
+            checkoutProvider: named,
+            effectiveProvider: named
+                ? connected.some((p) => p.provider === named)
+                    ? named
+                    : null
+                : connected.length === 1
+                  ? (connected[0]?.provider ?? null)
+                  : null,
+            providers,
         };
     }
 
@@ -127,8 +186,82 @@ export class StorefrontsService {
             });
         }
 
+        if (dto.checkoutProvider) {
+            // Only a provider this business has connected can take a
+            // storefront's payments; naming any other would leave checkout
+            // pointing at nothing.
+            const row = await prisma.merchantPaymentProvider.findUnique({
+                where: {
+                    organizationId_provider: {
+                        organizationId,
+                        provider: dto.checkoutProvider,
+                    },
+                },
+                select: { status: true },
+            });
+            if (row?.status !== "CONNECTED") {
+                throw new BadRequestException({
+                    message:
+                        "Connect that provider for the business before a storefront can use it.",
+                    field: "checkoutProvider",
+                });
+            }
+        }
+        if (dto.openingHours) {
+            const backwards = dto.openingHours.find(
+                (d) => !d.closed && d.open >= d.close,
+            );
+            if (backwards) {
+                throw new BadRequestException({
+                    message: "A day has to close after it opens.",
+                    field: "openingHours",
+                });
+            }
+        }
+
         const settings = {
             ...(dto.currency !== undefined ? { currency: dto.currency } : {}),
+            ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
+            ...(dto.address !== undefined
+                ? { address: dto.address === "" ? null : dto.address }
+                : {}),
+            ...(dto.openingHours !== undefined
+                ? {
+                      openingHours: dto.openingHours.map((d) => ({
+                          day: d.day,
+                          open: d.open,
+                          close: d.close,
+                          closed: d.closed,
+                      })),
+                  }
+                : {}),
+            ...(dto.collectionEnabled !== undefined
+                ? { collectionEnabled: dto.collectionEnabled }
+                : {}),
+            ...(dto.tipsEnabled !== undefined
+                ? { tipsEnabled: dto.tipsEnabled }
+                : {}),
+            ...(dto.guestCheckout !== undefined
+                ? { guestCheckout: dto.guestCheckout }
+                : {}),
+            // Pausing twice keeps the first time it was paused.
+            ...(dto.paused !== undefined
+                ? {
+                      pausedAt: dto.paused
+                          ? current.pausedAt
+                              ? new Date(current.pausedAt)
+                              : new Date()
+                          : null,
+                  }
+                : {}),
+            ...(dto.checkoutProvider !== undefined
+                ? {
+                      checkoutProvider:
+                          dto.checkoutProvider === ""
+                              ? null
+                              : dto.checkoutProvider,
+                  }
+                : {}),
             ...(dto.taxEnabled !== undefined
                 ? { taxEnabled: dto.taxEnabled }
                 : {}),

@@ -73,4 +73,48 @@ describe("checkout response shapes", () => {
     it("refuses an intent whose amount is not a number", () => {
         expect(isIntent({ ...intent, amountCents: "4800" })).toBe(false);
     });
+
+    it("accepts the storefront a receipt names, and a receipt without one", () => {
+        const storefront = {
+            name: "High Street",
+            kind: "SHOP",
+            address: "12 Hill Road",
+            openingHours: [
+                { day: "MON", open: "09:00", close: "18:00", closed: false },
+            ],
+            acceptingPayments: false,
+        };
+        expect(isReceipt({ ...receipt, storefront })).toBe(true);
+        expect(
+            isReceipt({
+                ...receipt,
+                storefront: {
+                    ...storefront,
+                    address: null,
+                    openingHours: null,
+                },
+            }),
+        ).toBe(true);
+    });
+
+    it("rejects a storefront in the wrong shape rather than drawing it", () => {
+        const storefront = {
+            name: "High Street",
+            kind: "SHOP",
+            address: null,
+            openingHours: [{ day: "MON", open: "09:00" }],
+            acceptingPayments: true,
+        };
+        expect(isReceipt({ ...receipt, storefront })).toBe(false);
+        expect(
+            isReceipt({
+                ...receipt,
+                storefront: {
+                    ...storefront,
+                    openingHours: null,
+                    acceptingPayments: "yes",
+                },
+            }),
+        ).toBe(false);
+    });
 });

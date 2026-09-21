@@ -12,10 +12,29 @@ import { destroy, getJson, mutate, orgBase } from "@/lib/api/http";
  * Server-only: `orgBase` reads the active-organization cookie.
  */
 
+export type StorefrontKind = "SHOP" | "ONLINE";
+
 export interface StorefrontSummary {
     id: string;
     name: string;
     orderCount: number;
+    kind: StorefrontKind;
+    paused: boolean;
+}
+
+export type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
+
+/** One day of a shop's week; times are "HH:MM", local to the shop. */
+export interface OpeningHoursDay {
+    day: Weekday;
+    open: string;
+    close: string;
+    closed: boolean;
+}
+
+export interface StorefrontProvider {
+    provider: string;
+    status: string;
 }
 
 export interface StorefrontSettings extends StorefrontSummary {
@@ -30,6 +49,16 @@ export interface StorefrontSettings extends StorefrontSummary {
     freeShippingThreshold: string | null;
     /** Orders still waiting to go out — closing is refused while any are. */
     unfulfilled: number;
+    address: string | null;
+    openingHours: OpeningHoursDay[] | null;
+    collectionEnabled: boolean;
+    tipsEnabled: boolean;
+    guestCheckout: boolean;
+    pausedAt: string | null;
+    checkoutProvider: string | null;
+    /** What checkout will really charge through; `null` means it cannot. */
+    effectiveProvider: string | null;
+    providers: StorefrontProvider[];
 }
 
 export type StorefrontInput = Partial<
@@ -41,7 +70,14 @@ export type StorefrontInput = Partial<
         | "taxRate"
         | "shippingEnabled"
         | "freeShippingThreshold"
-    >
+        | "kind"
+        | "address"
+        | "openingHours"
+        | "collectionEnabled"
+        | "tipsEnabled"
+        | "guestCheckout"
+        | "checkoutProvider"
+    > & { paused: boolean }
 >;
 
 export async function listStorefronts(): Promise<StorefrontSummary[]> {
