@@ -994,7 +994,8 @@ export function SiteEditor({
                 ? [{ label: item.label ?? page.title, href: page.path }]
                 : [];
         }),
-        footer: footerPreview,
+        // Sanitizing can leave nothing; nothing is no footer.
+        footer: footerPreview?.value.trim() ? footerPreview : null,
     };
 
     const activePage = pages.find((page) => page.id === pageId);
@@ -1042,16 +1043,21 @@ export function SiteEditor({
      */
     async function askForReview() {
         setAsking(true);
-        const res = await requestReview(siteId);
-        setAsking(false);
-        if (!res.ok) {
-            showError(res.error);
-            return;
+        try {
+            const res = await requestReview(siteId);
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            showSuccess(
+                "Asked for a review. Reviewers can comment on any block and cannot change the page.",
+            );
+            // Still disabled until the refreshed state reads In review, so a
+            // second click cannot send a second request in between.
+            await refreshReview();
+        } finally {
+            setAsking(false);
         }
-        showSuccess(
-            "Asked for a review. Reviewers can comment on any block and cannot change the page.",
-        );
-        await refreshReview();
     }
 
     return (
@@ -1703,10 +1709,13 @@ export function SiteEditor({
                                 // The selected block's own count, as its pin
                                 // shows; the whole site's with none selected.
                                 count:
-                                    active?.section.key !== undefined
-                                        ? (notesByKey.get(active.section.key) ??
-                                          0)
-                                        : openNotes,
+                                    active === null
+                                        ? openNotes
+                                        : active.section.key === undefined
+                                          ? 0
+                                          : (notesByKey.get(
+                                                active.section.key,
+                                            ) ?? 0),
                             },
                         ]}
                         value={inspector}
@@ -1715,6 +1724,9 @@ export function SiteEditor({
                     <div className="min-h-0 flex-1 overflow-y-auto">
                         {inspector === "feedback" && active ? (
                             <BlockFeedback
+                                // Remounted per block: a half-typed reply must
+                                // not follow the selection to another block.
+                                key={active.section.key ?? `i${active.index}`}
                                 siteId={siteId}
                                 pageId={pageId}
                                 sectionKey={active.section.key}
@@ -1735,7 +1747,7 @@ export function SiteEditor({
                             <FixedBlockInspector
                                 part={selectedChrome}
                                 siteId={siteId}
-                                hasFooter={footerPreview !== null}
+                                hasFooter={canvasChrome.footer !== null}
                             />
                         ) : (
                             <BlockInspector
@@ -1893,6 +1905,8 @@ export function SiteEditor({
                         if (sectionIndex !== null) {
                             setRail("sections");
                             setSelectedIndex(sectionIndex);
+                            // The flag is about the block's fields.
+                            setInspector("block");
                         }
                     }}
                 />

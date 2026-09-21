@@ -11,6 +11,8 @@
  * reviewer is waiting on, then whether the saved draft is live.
  */
 
+import type { ApprovalOutcome } from "./service";
+
 export type EditorStatusTone = "danger" | "attention" | "quiet" | "done";
 
 export interface EditorStatus {
@@ -27,8 +29,7 @@ export interface EditorStatusInput {
     review: {
         /** Asked for and not answered (#278). */
         pending: boolean;
-        outcome:
-            "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED" | null;
+        outcome: ApprovalOutcome | null;
         /** The approval was of an earlier draft (#278). */
         approvalIsStale: boolean;
     };
