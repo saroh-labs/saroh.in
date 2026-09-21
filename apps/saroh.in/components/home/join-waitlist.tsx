@@ -81,64 +81,41 @@ export default function JoinWaitlist() {
     const email = form.watch("email");
     const submitting = form.formState.isSubmitting;
 
+    // Just the form: the card around it is the page's closing section
+    // (components/site/closing-cta.tsx), which says what the list is for.
     return (
-        // No coloured panel. This is the page's SECONDARY ask, sitting under
-        // the primary one, so it is a bordered card in the same register as
-        // everything else — the old `bg-brand-surface` block with a lime blur
-        // belonged to a palette that no longer exists, and its hardcoded
-        // `text-white` was unreadable in the light theme.
-        <section
-            id="waitlist-form"
-            className="scroll-mt-16 rounded-xl border border-border bg-card px-6 py-10 sm:px-10"
-        >
-            <div className="mx-auto max-w-xl text-center">
-                <h2 className="font-display text-[22px] font-semibold tracking-[-0.02em]">
-                    Not ready yet? Be there when it opens.
-                </h2>
-                <p className="mx-auto mt-3 max-w-[46ch] text-[14.5px] leading-relaxed text-muted-foreground">
-                    We are onboarding businesses in small batches so each one
-                    gets set up properly. Leave your email and we will get in
-                    touch when it is your turn.
-                </p>
-
-                <Form {...form}>
-                    <form
-                        onSubmit={form.handleSubmit(onSubmit)}
-                        className="mx-auto mt-7 flex max-w-md flex-col gap-2.5 sm:flex-row"
-                    >
-                        <FormField
-                            control={form.control}
-                            name="email"
-                            render={({ field }) => (
-                                <FormItem className="flex-1 text-left">
-                                    <FormControl>
-                                        <Input
-                                            type="email"
-                                            autoComplete="email"
-                                            placeholder="you@yourbusiness.in"
-                                            aria-label="Email address"
-                                            className="h-10 w-full rounded-md border-input bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
-                                            {...field}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <Button
-                            type="submit"
-                            disabled={!email || submitting}
-                            className="h-10 shrink-0 rounded-md bg-primary px-5 text-[13.5px] font-medium text-primary-foreground hover:opacity-90"
-                        >
-                            {submitting ? "Joining…" : "Join the waitlist"}
-                        </Button>
-                    </form>
-                </Form>
-
-                <p className="mt-4 text-[12px] text-muted-foreground">
-                    One email when we open your batch. No newsletter.
-                </p>
-            </div>
-        </section>
+        <Form {...form}>
+            <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="mx-auto flex max-w-md flex-col gap-2.5 sm:flex-row"
+            >
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem className="flex-1 text-left">
+                            <FormControl>
+                                <Input
+                                    type="email"
+                                    autoComplete="email"
+                                    placeholder="you@yourbusiness.in"
+                                    aria-label="Email address"
+                                    className="h-12 w-full rounded-[10px] bg-background text-[16px]"
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <Button
+                    type="submit"
+                    disabled={!email || submitting}
+                    className="h-12 shrink-0 rounded-[10px] px-6 text-[16px] font-semibold"
+                >
+                    {submitting ? "Joining…" : "Join the waitlist"}
+                </Button>
+            </form>
+        </Form>
     );
 }

@@ -1,79 +1,86 @@
-import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
-import { MODULES } from "@/lib/modules";
+import { SIGN_IN_URL, WAITLIST_HREF } from "@/lib/links";
+import { JOBS } from "@/lib/site-content";
+
+const heading =
+    "mb-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground";
+const link =
+    "text-[13px] text-neutral-600 hover:text-foreground hover:underline hover:underline-offset-[3px] dark:text-neutral-400";
 
 /**
- * The close. Every module is linked here, which is the cheapest real
- * improvement to a marketing site's internal linking — and it means a visitor
- * who scrolled past the table still has one route into each page.
+ * Four columns after the design: the jobs, the site, getting in, and what is
+ * not written yet — said in the footer rather than linked to an empty page.
  */
 export function SiteFooter() {
     return (
-        <footer className="border-t border-border">
-            <div className="mx-auto max-w-6xl px-6 py-14">
-                <div className="grid gap-10 sm:grid-cols-[1.4fr_1fr_1fr]">
-                    <div>
-                        <Wordmark style={{ fontSize: "1.0625rem" }} />
-                        <p className="mt-3 max-w-[34ch] text-[13.5px] leading-relaxed text-muted-foreground">
-                            Website, commerce, appointments and CRM in one
-                            system. Switch on only what your business needs.
-                        </p>
-                        {/* The one non-module link down here. A visitor who
-                            reached the footer without clicking anything is
-                            exactly the one who wants to know what this is. */}
-                        <Link
-                            href="/about"
-                            className="mt-4 inline-block text-[13.5px] text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
-                        >
-                            Sell · Arrange · Reach · Organise · Host
-                        </Link>
-                    </div>
-
-                    <nav aria-label="Modules">
-                        <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Modules
-                        </h2>
-                        <ul className="mt-4 grid gap-2">
-                            {MODULES.slice(0, 4).map((m) => (
-                                <li key={m.slug}>
-                                    <Link
-                                        href={`/modules/${m.slug}`}
-                                        className="text-[13.5px] text-muted-foreground transition-colors hover:text-foreground"
-                                    >
-                                        {m.label}
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </nav>
-
-                    <nav aria-label="More modules">
-                        <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            &nbsp;
-                        </h2>
-                        <ul className="mt-4 grid gap-2">
-                            {MODULES.slice(4).map((m) => (
-                                <li key={m.slug}>
-                                    <Link
-                                        href={`/modules/${m.slug}`}
-                                        className="text-[13.5px] text-muted-foreground transition-colors hover:text-foreground"
-                                    >
-                                        {m.label}
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </nav>
+        <footer className="mx-auto max-w-[1220px] border-t border-border px-4 pb-10 pt-[30px] sm:px-10">
+            <div className="mb-[26px] grid grid-cols-1 gap-[26px] sm:grid-cols-2 lg:grid-cols-4">
+                <nav aria-label="The five jobs">
+                    <div className={heading}>The five jobs</div>
+                    <ul className="flex flex-col items-start gap-2">
+                        {JOBS.map((job) => (
+                            <li key={job.key}>
+                                <Link href={job.route} className={link}>
+                                    {job.name}
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </nav>
+                <nav aria-label="Saroh">
+                    <div className={heading}>Saroh</div>
+                    <ul className="flex flex-col items-start gap-2">
+                        <li>
+                            <Link href="/" className={link}>
+                                Home
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/how-it-works" className={link}>
+                                How it works
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/what-it-will-not-do" className={link}>
+                                What it will not do
+                            </Link>
+                        </li>
+                    </ul>
+                </nav>
+                <nav aria-label="Get started">
+                    <div className={heading}>Get started</div>
+                    <ul className="flex flex-col items-start gap-2">
+                        <li>
+                            <Link href={WAITLIST_HREF} className={link}>
+                                Join the waitlist
+                            </Link>
+                        </li>
+                        <li>
+                            <a href={SIGN_IN_URL} className={link}>
+                                Sign in
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                <div>
+                    <div className={heading}>Not written yet</div>
+                    <p className="text-pretty text-[13px] leading-[1.6] text-muted-foreground">
+                        Pricing, documentation and a changelog are not ready. We
+                        would rather leave the links out than send you to an
+                        empty page.
+                    </p>
                 </div>
-
-                <div className="mt-12 flex flex-wrap justify-between gap-4 border-t border-border pt-6 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    <span>Saroh — modular business platform</span>
-                    {/* Stated plainly wherever a screenshot appears: the data in
-                        every screen on this site is seeded demo data, not a
-                        customer's. */}
-                    <span>Screens show seeded demo data</span>
-                </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3.5 border-t border-border pt-[18px]">
+                <span className="text-[12px] text-muted-foreground">
+                    Saroh · <span className="font-mono">saroh.in</span>
+                </span>
+                <span className="ml-auto text-[12px] text-muted-foreground">
+                    Businesses live at their own{" "}
+                    <span className="font-mono text-[11px]">saroh.app</span>{" "}
+                    address
+                </span>
             </div>
         </footer>
     );
