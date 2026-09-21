@@ -62,9 +62,13 @@ export function ShotRail({
                             className={cn(
                                 "flex items-center gap-[9px] rounded-[9px] border px-[11px] py-2 text-left min-[1100px]:w-full",
                                 it.icon ? "text-[16px]" : "text-[15px]",
+                                // One weight in both states: the card and the
+                                // ink say which is chosen, so nothing reflows
+                                // as the selection moves.
+                                "font-normal",
                                 i === index
-                                    ? "border-border bg-card font-semibold text-foreground shadow-[0_1px_2px_rgba(28,28,26,0.06)]"
-                                    : "border-transparent font-medium text-neutral-600 hover:text-foreground dark:text-neutral-400",
+                                    ? "border-border bg-card text-foreground shadow-[0_1px_2px_rgba(28,28,26,0.06)]"
+                                    : "border-transparent text-neutral-600 hover:text-foreground dark:text-neutral-400",
                             )}
                         >
                             {it.icon ? (
