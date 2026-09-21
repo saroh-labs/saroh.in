@@ -363,7 +363,7 @@ describe("the storefront rows follow store:read", () => {
     const storefront = [
         "/commerce/products",
         "/commerce/customers",
-        "/commerce",
+        "/commerce/storefronts",
     ];
 
     it("still offers them to a Member, whose floor includes it", () => {

@@ -308,7 +308,7 @@ export const NAV_GROUPS: NavGroup[] = [
                         action: "store:read",
                     },
                     {
-                        href: "/commerce",
+                        href: "/commerce/storefronts",
                         label: "Storefronts",
                         action: "store:read",
                     },

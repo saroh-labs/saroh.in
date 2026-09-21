@@ -7,6 +7,7 @@ import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import type { FieldErrors } from "react-hook-form";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -18,6 +19,20 @@ interface ProductLite {
     name: string;
     price: string;
 }
+/**
+ * What the storefront says about checkout (Sell → Storefronts). Defaults, not
+ * rules: an order keyed in by hand is the merchant's own call, so every figure
+ * here can still be typed over.
+ */
+export interface CheckoutDefaults {
+    currency: string;
+    taxEnabled: boolean;
+    /** A percentage, "18.00". */
+    taxRate: string;
+    shippingEnabled: boolean;
+    freeShippingThreshold: string | null;
+}
+
 interface CustomerLite {
     id: string;
     email: string;
@@ -68,10 +83,13 @@ export function OrderForm({
     storeId,
     customers,
     products,
+    checkout = null,
 }: {
     storeId: string;
     customers: CustomerLite[];
     products: ProductLite[];
+    /** `null` when it could not be read: the form then assumes nothing. */
+    checkout?: CheckoutDefaults | null;
 }) {
     const router = useRouter();
     const form = useForm<FormValues>({
@@ -104,6 +122,28 @@ export function OrderForm({
         (sum, l) => sum + priceOf(l.productId) * quantityOf(l.quantity),
         0,
     );
+    // Tax follows the storefront's rate until the merchant types their own.
+    // Written into the field rather than computed beside it, so what is on
+    // screen is exactly what is sent.
+    const taxBasisPoints = checkout?.taxEnabled
+        ? Math.round(Number(checkout.taxRate) * 100)
+        : 0;
+    const suggestedTax = money(
+        Math.round((subtotalCents * taxBasisPoints) / 10_000),
+    );
+    const taxTouched = form.formState.dirtyFields.tax;
+    useEffect(() => {
+        if (taxBasisPoints > 0 && !taxTouched) {
+            form.setValue("tax", suggestedTax);
+        }
+    }, [form, suggestedTax, taxBasisPoints, taxTouched]);
+
+    const freeOver = checkout?.freeShippingThreshold
+        ? toCents(checkout.freeShippingThreshold)
+        : null;
+    const qualifiesForFree = freeOver !== null && subtotalCents >= freeOver;
+    const offersDelivery = checkout?.shippingEnabled ?? true;
+
     const totalCents = Math.max(
         0,
         subtotalCents + toCents(tax) + toCents(shipping) - toCents(discount),
@@ -255,9 +295,20 @@ export function OrderForm({
                 </Button>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div
+                className={
+                    offersDelivery
+                        ? "grid grid-cols-3 gap-4"
+                        : "grid grid-cols-2 gap-4"
+                }
+            >
                 <div className="grid gap-2">
-                    <Label htmlFor="tax">Tax</Label>
+                    <Label htmlFor="tax">
+                        Tax
+                        {taxBasisPoints > 0
+                            ? ` (${Number(checkout?.taxRate)}%)`
+                            : null}
+                    </Label>
                     <Input
                         id="tax"
                         inputMode="decimal"
@@ -265,15 +316,32 @@ export function OrderForm({
                         {...form.register("tax")}
                     />
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="shipping">Shipping</Label>
-                    <Input
-                        id="shipping"
-                        inputMode="decimal"
-                        disabled={isSubmitting}
-                        {...form.register("shipping")}
-                    />
-                </div>
+                {/* A storefront that does not deliver has no shipping to
+                    charge; the field stays at 0 rather than inviting one. */}
+                {offersDelivery ? (
+                    <div className="grid gap-2">
+                        <Label htmlFor="shipping">Shipping</Label>
+                        <Input
+                            id="shipping"
+                            inputMode="decimal"
+                            disabled={isSubmitting}
+                            aria-describedby={
+                                freeOver !== null ? "shipping-note" : undefined
+                            }
+                            {...form.register("shipping")}
+                        />
+                        {freeOver !== null ? (
+                            <p
+                                id="shipping-note"
+                                className="text-[12px] text-muted-foreground"
+                            >
+                                {qualifiesForFree
+                                    ? "Qualifies for free delivery."
+                                    : `Free over ${money(freeOver)}.`}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
                 <div className="grid gap-2">
                     <Label htmlFor="discount">Discount</Label>
                     <Input
@@ -292,6 +360,7 @@ export function OrderForm({
                     </p>
                     <p className="text-lg font-semibold tabular-nums">
                         Total {money(totalCents)}
+                        {checkout ? ` ${checkout.currency}` : null}
                     </p>
                 </div>
                 <Button

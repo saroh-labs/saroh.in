@@ -144,6 +144,26 @@ export class OrdersService {
             });
         }
 
+        // An order is taken in its storefront's currency. The form never sent
+        // one, so every order fell to the column's USD — a rupee shop's
+        // takings read as dollars. Once a storefront has chosen a currency,
+        // an order in any other is refused rather than silently mixed in.
+        const settings = await prisma.storeSettings.findUnique({
+            where: { storeId },
+            select: { currency: true },
+        });
+        if (
+            settings &&
+            dto.currency !== undefined &&
+            dto.currency !== settings.currency
+        ) {
+            throw new BadRequestException({
+                message: `This storefront takes orders in ${settings.currency}.`,
+                field: "currency",
+            });
+        }
+        const currency = settings?.currency ?? dto.currency ?? "USD";
+
         const subtotalCents = lines.reduce(
             (sum, l) => sum + l.priceCents * l.quantity,
             0,
@@ -160,7 +180,7 @@ export class OrdersService {
             storeId,
             organizationId,
             customerId: dto.customerId,
-            currency: dto.currency ?? "USD",
+            currency,
             subtotal: fromCents(subtotalCents),
             tax: fromCents(taxCents),
             shipping: fromCents(shippingCents),
