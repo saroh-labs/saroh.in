@@ -2,12 +2,12 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
 import { JobIcon } from "@/components/site/job-icon";
-import type { IconName } from "@/lib/site-content";
+import { ThemedImage } from "@/components/site/themed-image";
+import type { IconName, ThemedImage as Pair } from "@/lib/site-content";
 
 export interface RailJob {
     key: string;
@@ -16,8 +16,9 @@ export interface RailJob {
     route: string;
     head: string;
     lede: string;
-    /** The detail crop of this job's screen; absent where there is none. */
-    image?: { src: string; w: number; h: number; alt: string };
+    /** A detail of this job's screen. */
+    image: Pair;
+    alt: string;
 }
 
 /**
@@ -99,33 +100,19 @@ export function JobRail({ jobs }: { jobs: RailJob[] }) {
                 >
                     <ArrowUpRight aria-hidden className="size-[13px]" />
                 </Link>
-                {job.image ? (
-                    // The well is as tall as the crop, so no crop leaves dead
-                    // space; wider than the card, it scrolls sideways.
-                    <div
-                        className="overflow-x-auto overflow-y-hidden"
-                        style={{ maxWidth: job.image.w }}
-                    >
-                        <Image
-                            key={job.image.src}
-                            src={job.image.src}
-                            width={job.image.w}
-                            height={job.image.h}
-                            alt={job.image.alt}
-                            className="block max-w-none rounded-tl-[10px] shadow-[0_10px_30px_rgba(28,28,26,0.16)]"
-                        />
-                    </div>
-                ) : (
-                    <div className="mr-[22px] rounded-[10px] border border-dashed border-border bg-card px-[26px] py-10">
-                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
-                            No capture yet
-                        </div>
-                        <p className="max-w-[46ch] text-pretty text-[14px] leading-[1.6] text-neutral-600 dark:text-neutral-400">
-                            The website editor has no capture yet, so this panel
-                            says so rather than borrowing another job's screen.
-                        </p>
-                    </div>
-                )}
+                {/* The well is as tall as the detail, so none leaves dead
+                    space; wider than the card, it scrolls sideways. */}
+                <div
+                    className="overflow-x-auto overflow-y-hidden"
+                    style={{ maxWidth: job.image.w }}
+                >
+                    <ThemedImage
+                        key={job.key}
+                        image={job.image}
+                        alt={job.alt}
+                        className="max-w-none rounded-tl-[10px] shadow-[0_10px_30px_rgba(28,28,26,0.16)]"
+                    />
+                </div>
                 <div className="pr-[22px] pt-5">
                     <div className="font-display text-[19px] font-semibold tracking-[-0.025em]">
                         {job.head}

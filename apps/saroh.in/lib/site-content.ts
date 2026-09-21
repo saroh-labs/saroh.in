@@ -45,20 +45,19 @@ export interface Limit {
     body: string;
 }
 
-export interface ShotRow {
-    title: string;
-    sub: string;
-    side: string;
-    tag?: string;
-    tone?: "good" | "warn";
-    mono?: boolean;
+/** One picture in both themes, so the site shows the one it is wearing. */
+export interface ThemedImage {
+    light: string;
+    dark: string;
+    w: number;
+    h: number;
 }
 
 export interface Screenshot {
-    /** The full screen, when it has been exported into public/shots. */
-    full?: { src: string; w: number; h: number };
-    /** A detail crop of the same screen — always present. */
-    crop: { src: string; w: number; h: number };
+    /** The whole screen, 1440×900, captured at 2×. */
+    full: ThemedImage;
+    /** A 900×400 detail of the same screen, for the home page's rail. */
+    crop: ThemedImage;
     alt: string;
 }
 
@@ -77,48 +76,62 @@ export interface Job {
     flowNote: string;
     needs?: string;
     limits: Limit[];
-    /** Absent where the design has no capture; the page says so. */
-    shot?: Screenshot;
-    /** The drawn example table, for reading the screenshot's point at a glance. */
-    example: { colMain: string; colSide: string; rows: ShotRow[] };
+    shot: Screenshot;
     caption: string;
     related: JobKey[];
 }
 
 /*
- * The design's images are captures of its own Workspace prototype — a
- * bakery with two shops, a clinic's diary — not of the running product, so
- * every caption calls them an example. The full screens are listed so the
- * page uses them as soon as they are exported into public/shots; until then
- * the detail crops stand in.
+ * Real screens from app.saroh.in, captured from Northwind Supply — the demo
+ * business the dev database is seeded with — in both themes. The names,
+ * orders and figures are that demo business's, and every caption says so;
+ * the screens themselves are exactly what a merchant sees.
  */
-const SHOT = {
-    orders: {
-        full: { src: "/shots/orders.png", w: 1549, h: 802 },
-        crop: { src: "/shots/wide-orders.png", w: 900, h: 400 },
-        alt: "An example Orders screen: six orders across two shops, each with its status, total in rupees and when it was placed.",
-    },
-    bookings: {
-        full: { src: "/shots/bookings.png", w: 1549, h: 1096 },
-        crop: { src: "/shots/wide-day.png", w: 900, h: 420 },
-        alt: "An example day in the diary: an induction, a follow-up and a class, each at its time.",
-    },
-    contacts: {
-        full: { src: "/shots/people.png", w: 1549, h: 862 },
-        crop: { src: "/shots/wide-contacts.png", w: 900, h: 380 },
-        alt: "An example contact list: people tagged enquiry, trial and member, with what each last did.",
-    },
-    insights: {
-        full: { src: "/shots/insights.png", w: 1549, h: 1089 },
-        crop: { src: "/shots/wide-takings.png", w: 900, h: 400 },
-        alt: "An example chart of weekly figures with the best week marked.",
-    },
-} satisfies Record<string, Screenshot>;
+function screen(name: string, alt: string): Screenshot {
+    return {
+        full: {
+            light: `/shots/${name}.png`,
+            dark: `/shots/${name}-dark.png`,
+            w: 1440,
+            h: 900,
+        },
+        crop: {
+            light: `/shots/crop-${name}.png`,
+            dark: `/shots/crop-${name}-dark.png`,
+            w: 900,
+            h: 400,
+        },
+        alt,
+    };
+}
 
-export const HOME_SHOT = {
-    full: { src: "/shots/home.png", w: 1549, h: 862 },
-    alt: "An example Home screen for a bakery: a list headed Needs you, with orders to send and pages still in draft.",
+const SHOT = {
+    orders: screen(
+        "orders",
+        "The Orders screen in Saroh: ten orders across two storefronts, each with who placed it, its status, the date and the total in rupees.",
+    ),
+    bookings: screen(
+        "bookings",
+        "The Bookings screen in Saroh: each booking with its date and time, the service, who booked and whether it is confirmed.",
+    ),
+    contacts: screen(
+        "contacts",
+        "The Contacts screen in Saroh: twenty-four people with their company, open pipeline value, last order, email and where they came from.",
+    ),
+    insights: screen(
+        "insights",
+        "The Insights screen in Saroh: thirty days of site views, visitors, enquiries and orders, a bar for each day, and the most-viewed pages.",
+    ),
+    website: screen(
+        "website",
+        "The website editor in Saroh: the page's blocks on the left, the page itself in the middle with the hero selected, and the hero's settings on the right.",
+    ),
 };
+
+export const HOME_SHOT = screen(
+    "home",
+    "Home in Saroh: under Needs you, seven overdue leads with their value and how late each is, and four orders waiting to be sent.",
+);
 
 export const JOBS: Job[] = [
     {
@@ -173,46 +186,8 @@ export const JOBS: Job[] = [
             },
         ],
         shot: SHOT.orders,
-        example: {
-            colMain: "Order",
-            colSide: "Total",
-            rows: [
-                {
-                    title: "#1042",
-                    mono: true,
-                    sub: "Priya Raman · 2 items · Hill Road",
-                    side: "₹1,240",
-                    tag: "Unfulfilled",
-                    tone: "warn",
-                },
-                {
-                    title: "#1041",
-                    mono: true,
-                    sub: "Sam Whitfield · 2 items · Hill Road",
-                    side: "₹1,900",
-                    tag: "Fulfilled",
-                    tone: "good",
-                },
-                {
-                    title: "#1038",
-                    mono: true,
-                    sub: "Yuki Tanaka · 1 item · Online",
-                    side: "₹3,800",
-                    tag: "Fulfilled",
-                    tone: "good",
-                },
-                {
-                    title: "#1037",
-                    mono: true,
-                    sub: "Elena Rossi · 1 item · Online",
-                    side: "₹2,400",
-                    tag: "Unfulfilled",
-                    tone: "warn",
-                },
-            ],
-        },
         caption:
-            "An example: two storefronts in one list, or filtered to one. The count beside Orders in the sidebar is read from this same list, so the two cannot disagree.",
+            "Every storefront's orders in one list, or filtered to one. The count beside Orders in the sidebar is read from this same list, so the two cannot disagree.",
         related: ["contacts", "insights", "website"],
     },
     {
@@ -220,7 +195,7 @@ export const JOBS: Job[] = [
         name: "Website",
         icon: "globe",
         route: "/website",
-        crumb: "Website › Pages",
+        crumb: "Website › Editor",
         short: "Pages and a journal, at your own address when you want one.",
         head: "A website that is part of the business, not beside it.",
         lede: "Pages and a journal on your saroh.app address from the first day. Bring your own domain when you are ready.",
@@ -261,44 +236,9 @@ export const JOBS: Job[] = [
                 body: "One version of a page, live. If you need to test two headlines against each other, this is not the tool.",
             },
         ],
-        // No shot: the design has no capture of the editor, and the page
-        // shows its drawn example rather than borrowing another job's screen.
-        example: {
-            colMain: "Page",
-            colSide: "Updated",
-            rows: [
-                {
-                    title: "Home",
-                    sub: "/",
-                    side: "18 Sep",
-                    tag: "Published",
-                    tone: "good",
-                },
-                {
-                    title: "Our bread",
-                    sub: "/bread",
-                    side: "14 Sep",
-                    tag: "Published",
-                    tone: "good",
-                },
-                {
-                    title: "Find us",
-                    sub: "/find-us",
-                    side: "2 Sep",
-                    tag: "Published",
-                    tone: "good",
-                },
-                {
-                    title: "Wholesale enquiries",
-                    sub: "/wholesale",
-                    side: "Yesterday",
-                    tag: "Draft",
-                    tone: "warn",
-                },
-            ],
-        },
+        shot: SHOT.website,
         caption:
-            "An example: four pages, one still in draft. Drafts are visible to your team and to nobody else.",
+            "The page editor: blocks on the left, the page as visitors will see it, and the chosen block's settings on the right. Nothing is public until you publish.",
         related: ["sell", "bookings", "insights"],
     },
     {
@@ -354,42 +294,8 @@ export const JOBS: Job[] = [
             },
         ],
         shot: SHOT.bookings,
-        example: {
-            colMain: "This week",
-            colSide: "Length",
-            rows: [
-                {
-                    title: "Thursday, 10:00",
-                    sub: "Ananya Desai · First session",
-                    side: "45 min",
-                    tag: "Confirmed",
-                    tone: "good",
-                },
-                {
-                    title: "Thursday, 14:30",
-                    sub: "Rohan Mehta · Follow-up",
-                    side: "30 min",
-                    tag: "Confirmed",
-                    tone: "good",
-                },
-                {
-                    title: "Friday, 09:00",
-                    sub: "Group class · 6 of 8 places",
-                    side: "60 min",
-                    tag: "2 places",
-                    tone: "warn",
-                },
-                {
-                    title: "Friday, 16:00",
-                    sub: "Kavya Iyer · Follow-up",
-                    side: "30 min",
-                    tag: "Confirmed",
-                    tone: "good",
-                },
-            ],
-        },
         caption:
-            "An example week at a clinic. The class shows the places left.",
+            "Every booking with its service, who made it and where it stands — confirmed, pending or cancelled.",
         related: ["contacts", "website", "insights"],
     },
     {
@@ -439,41 +345,8 @@ export const JOBS: Job[] = [
             },
         ],
         shot: SHOT.contacts,
-        example: {
-            colMain: "Contact",
-            colSide: "Came from",
-            rows: [
-                {
-                    title: "Ananya Desai",
-                    sub: "2 bookings · last one Thursday",
-                    side: "Booking",
-                    tag: "Booked",
-                    tone: "good",
-                },
-                {
-                    title: "Tom Reilly",
-                    sub: "Enquired 2 Sep · nothing since",
-                    side: "Website",
-                    tag: "Enquiry",
-                    tone: "warn",
-                },
-                {
-                    title: "Marta Nowak",
-                    sub: "Lead · Proposal sent",
-                    side: "Website",
-                    tag: "Open",
-                },
-                {
-                    title: "Rohan Mehta",
-                    sub: "1 booking · follow-up next week",
-                    side: "Booking",
-                    tag: "Booked",
-                    tone: "good",
-                },
-            ],
-        },
         caption:
-            "An example list. Each contact shows where they came from, because nobody typed them in.",
+            "Each contact with their open pipeline, last order and where they came from — the website, a referral, a walk-in.",
         related: ["bookings", "website", "sell"],
     },
     {
@@ -523,18 +396,8 @@ export const JOBS: Job[] = [
             },
         ],
         shot: SHOT.insights,
-        example: {
-            colMain: "Most-read pages",
-            colSide: "Views",
-            rows: [
-                { title: "Home", sub: "/", side: "2,140" },
-                { title: "Our bread", sub: "/bread", side: "1,620" },
-                { title: "Find us", sub: "/find-us", side: "890" },
-                { title: "The journal", sub: "/journal", side: "570" },
-            ],
-        },
         caption:
-            "An example: the pages people opened most in the last 30 days.",
+            "Thirty days of views, visitors, enquiries and orders, a bar for each day, and the pages people opened most.",
         related: ["website", "sell", "bookings"],
     },
 ];
@@ -591,7 +454,7 @@ export const CHAINS: Chain[] = [
         without:
             "A booking page emails you. You type the name into a spreadsheet, and at month end you match the lists by hand and hope.",
         shot: SHOT.contacts,
-        notice: "Where it lands, in an example. The person who booked is already on this list — nobody typed them in.",
+        notice: "Where it lands: the contact list, with where each person came from — nobody typed them in.",
     },
     {
         key: "selling",
@@ -628,7 +491,7 @@ export const CHAINS: Chain[] = [
         without:
             "A till for the counter, a store for online, and no single answer to what the business took this week.",
         shot: SHOT.orders,
-        notice: "Where it lands, in an example. Both storefronts in one list, each order carrying which one took it.",
+        notice: "Where it lands: every storefront's orders in one list, each carrying which one took it.",
     },
 ];
 

@@ -3,7 +3,6 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 import { WAITLIST_HREF } from "@/lib/links";
-import type { ShotRow } from "@/lib/site-content";
 
 /** Small pieces every page uses, in the design's measurements. */
 
@@ -144,91 +143,5 @@ export function Chain({
                 </li>
             ))}
         </ol>
-    );
-}
-
-/** The design's drawn stand-in for a screen: a small table with a label. */
-export function ExampleTable({
-    crumb,
-    route,
-    colMain,
-    colSide,
-    rows,
-}: {
-    crumb: string;
-    route: string;
-    colMain: string;
-    colSide: string;
-    rows: ShotRow[];
-}) {
-    return (
-        <figure className="overflow-hidden rounded-[16px] border border-border bg-background shadow-[0_16px_40px_rgba(28,28,26,0.10)]">
-            <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-2.5">
-                <span className="text-[12px] text-muted-foreground">
-                    {crumb}
-                </span>
-                <span className="font-mono text-[11px] text-muted-foreground">
-                    {route}
-                </span>
-                <Pill tone="off" className="ml-auto">
-                    Example
-                </Pill>
-            </div>
-            <div className="relative bg-card px-[17px] py-4">
-                <div className="flex items-center gap-3 border-b border-border pb-2.5">
-                    <span
-                        className={cn(
-                            eyebrow,
-                            "min-w-0 flex-1 tracking-[0.08em]",
-                        )}
-                    >
-                        {colMain}
-                    </span>
-                    <span
-                        className={cn(
-                            eyebrow,
-                            "w-24 text-right tracking-[0.08em]",
-                        )}
-                    >
-                        {colSide}
-                    </span>
-                </div>
-                <table className="w-full">
-                    <caption className="sr-only">
-                        {colMain}, example rows
-                    </caption>
-                    <tbody>
-                        {rows.map((r) => (
-                            <tr
-                                key={r.title}
-                                className="border-b border-border/70 last:border-b-0"
-                            >
-                                <td className="py-[11px] pr-3 align-middle">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span
-                                            className={cn(
-                                                "text-[13px] font-medium",
-                                                r.mono && "font-mono",
-                                            )}
-                                        >
-                                            {r.title}
-                                        </span>
-                                        {r.tag ? (
-                                            <Pill tone={r.tone}>{r.tag}</Pill>
-                                        ) : null}
-                                    </div>
-                                    <div className="mt-0.5 text-[11px] text-muted-foreground">
-                                        {r.sub}
-                                    </div>
-                                </td>
-                                <td className="w-24 py-[11px] text-right align-middle font-display text-[13px] font-semibold tabular-nums tracking-[-0.02em]">
-                                    {r.side}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </figure>
     );
 }

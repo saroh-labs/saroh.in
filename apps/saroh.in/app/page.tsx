@@ -1,5 +1,4 @@
 import { cn } from "@saroh/ui/lib/utils";
-import Image from "next/image";
 import Link from "next/link";
 
 import { ChainExplorer } from "@/components/home/chain-explorer";
@@ -12,7 +11,7 @@ import {
     sectionHeading,
 } from "@/components/site/bits";
 import { ClosingCta } from "@/components/site/closing-cta";
-import { bestShot, inPublic } from "@/lib/shots";
+import { ThemedImage } from "@/components/site/themed-image";
 import { CHAINS, HOME_SHOT, JOBS, LIMITS } from "@/lib/site-content";
 
 /**
@@ -21,11 +20,6 @@ import { CHAINS, HOME_SHOT, JOBS, LIMITS } from "@/lib/site-content";
  * anyone has to ask.
  */
 export default function Home() {
-    const hero = inPublic(HOME_SHOT.full.src) ? HOME_SHOT.full : null;
-    const chains = CHAINS.map((chain) => ({
-        ...chain,
-        image: bestShot(chain.shot),
-    }));
     const rail = JOBS.map((job) => ({
         key: job.key,
         name: job.name,
@@ -33,7 +27,8 @@ export default function Home() {
         route: job.route,
         head: job.head,
         lede: job.lede,
-        image: job.shot ? { ...job.shot.crop, alt: job.shot.alt } : undefined,
+        image: job.shot.crop,
+        alt: job.shot.alt,
     }));
 
     return (
@@ -57,30 +52,26 @@ export default function Home() {
                         We are letting businesses in a few at a time.
                     </p>
                 </div>
-                {hero ? (
-                    <figure className="mt-[38px]">
-                        <div className="sa-rise overflow-hidden rounded-[16px] border border-border bg-background shadow-[0_18px_44px_rgba(28,28,26,0.10)] [animation-delay:300ms]">
-                            <Image
-                                src={hero.src}
-                                width={hero.w}
-                                height={hero.h}
-                                alt={HOME_SHOT.alt}
-                                priority
-                                sizes="(min-width: 1220px) 1140px, 100vw"
-                                className="block h-auto w-full"
-                            />
-                        </div>
-                        <figcaption className="mt-2.5 text-pretty text-[13px] leading-[1.55] text-muted-foreground">
-                            An example: the first screen of a bakery that sells
-                            at a counter and online. Work named as work, not
-                            counts on a dial.
-                        </figcaption>
-                    </figure>
-                ) : null}
+                <figure className="mt-[38px]">
+                    <div className="sa-rise overflow-hidden rounded-[16px] border border-border bg-background shadow-[0_18px_44px_rgba(28,28,26,0.10)] [animation-delay:300ms]">
+                        <ThemedImage
+                            image={HOME_SHOT.full}
+                            alt={HOME_SHOT.alt}
+                            priority
+                            sizes="(min-width: 1220px) 1140px, 100vw"
+                            className="h-auto w-full"
+                        />
+                    </div>
+                    <figcaption className="mt-2.5 text-pretty text-[13px] leading-[1.55] text-muted-foreground">
+                        A real screen from Saroh, showing a demo supplier: the
+                        leads and orders waiting on you, oldest first. Work
+                        named as work, not counts on a dial.
+                    </figcaption>
+                </figure>
             </section>
 
             <section className="mx-auto max-w-[1220px] px-4 pb-[54px] pt-2.5 sm:px-10">
-                <ChainExplorer chains={chains} />
+                <ChainExplorer chains={CHAINS} />
             </section>
 
             <section

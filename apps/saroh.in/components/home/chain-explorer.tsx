@@ -1,15 +1,11 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 import { Chain, body, eyebrow, sectionHeading } from "@/components/site/bits";
+import { ThemedImage } from "@/components/site/themed-image";
 import type { Chain as ChainData } from "@/lib/site-content";
-
-export interface ChainView extends ChainData {
-    image: { src: string; w: number; h: number };
-}
 
 /**
  * "What 'in one place' actually buys you": pick a business, and its path from
@@ -20,7 +16,7 @@ export interface ChainView extends ChainData {
  * for the section to scroll in, shows at once if it is already on screen, and
  * falls back to showing after 2.5s if the observation never happens.
  */
-export function ChainExplorer({ chains }: { chains: ChainView[] }) {
+export function ChainExplorer({ chains }: { chains: ChainData[] }) {
     const [key, setKey] = useState(chains[0].key);
     const [shown, setShown] = useState(false);
     const section = useRef<HTMLDivElement>(null);
@@ -124,14 +120,12 @@ export function ChainExplorer({ chains }: { chains: ChainView[] }) {
                         In {chain.whose} Saroh
                     </div>
                     <div className="overflow-hidden rounded-[14px] border border-border bg-background shadow-[0_14px_36px_rgba(28,28,26,0.10)]">
-                        <Image
-                            key={chain.image.src}
-                            src={chain.image.src}
-                            width={chain.image.w}
-                            height={chain.image.h}
+                        <ThemedImage
+                            key={chain.key}
+                            image={chain.shot.full}
                             alt={chain.shot.alt}
                             sizes="(min-width: 1220px) 1110px, 100vw"
-                            className="block h-auto w-full"
+                            className="h-auto w-full"
                         />
                     </div>
                     <p className="mt-2.5 max-w-[74ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">

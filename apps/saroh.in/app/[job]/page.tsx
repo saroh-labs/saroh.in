@@ -1,12 +1,10 @@
 import { cn } from "@saroh/ui/lib/utils";
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
     Chain,
-    ExampleTable,
     Pill,
     SecondaryButton,
     WaitlistButton,
@@ -17,7 +15,7 @@ import {
 } from "@/components/site/bits";
 import { ClosingCta } from "@/components/site/closing-cta";
 import { JobIcon } from "@/components/site/job-icon";
-import { bestShot } from "@/lib/shots";
+import { ThemedImage } from "@/components/site/themed-image";
 import { JOBS, jobByKey } from "@/lib/site-content";
 
 /**
@@ -49,7 +47,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function JobPage({ params }: Props) {
     const job = jobByKey((await params).job);
     if (!job) notFound();
-    const image = job.shot ? bestShot(job.shot) : null;
     const related = job.related
         .map((key) => jobByKey(key))
         .filter((r) => r !== undefined);
@@ -88,33 +85,23 @@ export default async function JobPage({ params }: Props) {
                 </div>
 
                 <div className="mt-9">
-                    {image && job.shot ? (
-                        <figure className="overflow-hidden rounded-[16px] border border-border bg-background shadow-[0_22px_50px_rgba(28,28,26,0.14)]">
-                            <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-2.5">
-                                <span className="text-[12px] text-muted-foreground">
-                                    {job.crumb}
-                                </span>
-                                <Pill tone="off" className="ml-auto">
-                                    Example
-                                </Pill>
-                            </div>
-                            <Image
-                                src={image.src}
-                                width={image.w}
-                                height={image.h}
-                                alt={job.shot.alt}
-                                priority
-                                sizes="(min-width: 1220px) 1140px, 100vw"
-                                className="block h-auto w-full"
-                            />
-                        </figure>
-                    ) : (
-                        <ExampleTable
-                            crumb={job.crumb}
-                            route={job.route}
-                            {...job.example}
+                    <figure className="overflow-hidden rounded-[16px] border border-border bg-background shadow-[0_22px_50px_rgba(28,28,26,0.14)]">
+                        <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-2.5">
+                            <span className="text-[12px] text-muted-foreground">
+                                A real screen from Saroh · {job.crumb}
+                            </span>
+                            <Pill tone="off" className="ml-auto">
+                                Demo business
+                            </Pill>
+                        </div>
+                        <ThemedImage
+                            image={job.shot.full}
+                            alt={job.shot.alt}
+                            priority
+                            sizes="(min-width: 1220px) 1140px, 100vw"
+                            className="h-auto w-full"
                         />
-                    )}
+                    </figure>
                     <p className="mt-2.5 text-pretty text-[13px] leading-[1.55] text-muted-foreground">
                         {job.caption}
                     </p>
