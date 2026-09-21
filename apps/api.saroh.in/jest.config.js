@@ -138,6 +138,8 @@ module.exports = {
         "<rootDir>/src/modules/organizations/resolve-capabilities.spec.ts",
         "<rootDir>/src/modules/organizations/organization-roles.service.spec.ts",
         "<rootDir>/src/modules/orders/order-standing.spec.ts",
+        // The order screen reads when an order last changed (#374).
+        "<rootDir>/src/modules/orders/serialize.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
         "<rootDir>/src/modules/orders/organization-orders.controller.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",

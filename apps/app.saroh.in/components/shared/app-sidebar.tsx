@@ -95,7 +95,7 @@ export function AppSidebar({
         <aside
             aria-label="Workspace"
             // Below the 61px top bar, which carries the mark now.
-            className="sticky top-[61px] hidden h-[calc(100vh-61px)] w-[238px] shrink-0 flex-col border-r max-[1100px]:w-16 min-[760px]:flex"
+            className="sticky top-[61px] hidden h-[calc(100vh-61px)] w-[238px] shrink-0 flex-col border-r max-[1100px]:w-16 min-[760px]:flex print:hidden"
         >
             {/*
              * `gap-0.5` on the nav, and space bought back only where it means

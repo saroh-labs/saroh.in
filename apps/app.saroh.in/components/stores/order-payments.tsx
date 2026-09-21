@@ -1,119 +1,104 @@
+import { formatMoney } from "@/lib/format/money";
+import { formatStatus } from "@/lib/format/status";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
-import { RefundButton } from "./refund-button";
-
 /**
- * Owner payments panel for the order detail view (S5-004). Renders the Order's
- * PaymentIntents with their provider, status, amount, attempts and any refunds,
- * plus a Refund control when there is a captured (SUCCEEDED) payment to refund.
- * Data comes from the authed org-scoped payments endpoint; a null summary (no
- * active org / not reachable) renders a quiet empty state.
+ * Whether the order's payment can be sent back through its provider: paid,
+ * with a charge that succeeded. A payment recorded by hand has no charge to
+ * reverse, so it is refunded by hand as well.
  */
-
-function money(amountCents: number, currency: string): string {
-    return `${currency} ${(amountCents / 100).toFixed(2)}`;
-}
-
-function StatusPill({ status }: { status: string }) {
+export function isRefundable(summary: OrderPaymentsSummary | null): boolean {
     return (
-        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-            {status}
-        </span>
+        summary?.paymentStatus === "PAID" &&
+        summary.intents.some((i) => i.status === "SUCCEEDED")
     );
 }
 
+/**
+ * Every attempt to take payment for an order, and every refund against it —
+ * the provider's side of the story, under the order's own payment state.
+ */
 export function OrderPayments({
-    orderId,
     summary,
+    paymentStatus,
 }: {
-    orderId: string;
     summary: OrderPaymentsSummary | null;
+    /** The order's own payment state — known even when the summary is not. */
+    paymentStatus: string;
 }) {
     const intents = summary?.intents ?? [];
-    const refundable =
-        summary?.paymentStatus === "PAID" &&
-        intents.some((i) => i.status === "SUCCEEDED");
+
+    if (intents.length === 0) {
+        return (
+            <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                {paymentStatus === "PAID" || paymentStatus === "REFUNDED"
+                    ? "Settled outside a card provider — in cash or by transfer — and recorded by hand."
+                    : "No card payment has been tried. A payment taken in cash or by transfer is recorded from the order's menu."}
+            </p>
+        );
+    }
 
     return (
-        <div className="rounded-xl border">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b p-3">
-                <h3 className="text-sm font-medium">Payments</h3>
-                {refundable ? <RefundButton orderId={orderId} /> : null}
-            </div>
-
-            {intents.length === 0 ? (
-                <p className="p-3 text-sm text-muted-foreground">
-                    No payment attempts recorded for this order yet.
-                </p>
-            ) : (
-                <ul className="divide-y">
-                    {intents.map((intent, i) => (
-                        <li
-                            key={intent.id}
-                            style={{ "--wk-i": i } as React.CSSProperties}
-                            className="wk-item space-y-2 p-3"
-                        >
-                            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                                <span className="font-medium">
-                                    {intent.provider}
-                                </span>
-                                <span className="flex items-center gap-2">
-                                    <StatusPill status={intent.status} />
-                                    <span className="tabular-nums">
-                                        {money(
-                                            intent.amountCents,
-                                            intent.currency,
-                                        )}
+        <ul className="flex flex-col gap-3">
+            {intents.map((intent) => (
+                <li key={intent.id} className="flex flex-col gap-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[12.5px]">
+                        <span className="font-medium capitalize">
+                            {intent.provider}
+                        </span>
+                        <span className="flex items-center gap-2">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:text-muted-foreground">
+                                {formatStatus(intent.status)}
+                            </span>
+                            <span className="font-display font-semibold tabular-nums">
+                                {formatMoney(
+                                    intent.amountCents,
+                                    intent.currency,
+                                )}
+                            </span>
+                        </span>
+                    </div>
+                    {intent.attempts.length > 0 ? (
+                        <ul className="flex flex-col gap-1 text-[11.5px] text-muted-foreground">
+                            {intent.attempts.map((a) => (
+                                <li
+                                    key={a.id}
+                                    className="flex justify-between gap-2"
+                                >
+                                    <span>
+                                        Attempt · {formatStatus(a.status)}
                                     </span>
-                                </span>
-                            </div>
-
-                            {intent.attempts.length > 0 ? (
-                                <ul className="space-y-1 text-xs text-muted-foreground">
-                                    {intent.attempts.map((a) => (
-                                        <li
-                                            key={a.id}
-                                            className="flex justify-between gap-2"
-                                        >
-                                            <span>Attempt · {a.status}</span>
-                                            {a.providerRef ? (
-                                                <span className="max-w-[55%] truncate tabular-nums">
-                                                    {a.providerRef}
-                                                </span>
-                                            ) : null}
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : null}
-
-                            {intent.refunds.length > 0 ? (
-                                <ul className="space-y-1 text-xs">
-                                    {intent.refunds.map((r) => (
-                                        // `warning-subtle-foreground`, not
-                                        // `warning`: --warning is a FILL sized to
-                                        // carry text ON it, and as text on the
-                                        // card it lands ~2.3:1. This is the pair
-                                        // that stays legible in both registers,
-                                        // which a literal amber could not.
-                                        <li
-                                            key={r.id}
-                                            className="flex justify-between gap-2 text-warning-subtle-foreground"
-                                        >
-                                            <span>Refund · {r.status}</span>
-                                            <span className="tabular-nums">
-                                                {money(
-                                                    r.amountCents,
-                                                    r.currency,
-                                                )}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : null}
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </div>
+                                    {a.providerRef ? (
+                                        <span className="max-w-[55%] truncate font-mono">
+                                            {a.providerRef}
+                                        </span>
+                                    ) : null}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
+                    {intent.refunds.length > 0 ? (
+                        <ul className="flex flex-col gap-1 text-[11.5px]">
+                            {intent.refunds.map((r) => (
+                                // `warning-subtle-foreground`, not `warning`:
+                                // --warning is a FILL, and as text on the card
+                                // it lands ~2.3:1.
+                                <li
+                                    key={r.id}
+                                    className="flex justify-between gap-2 text-warning-subtle-foreground"
+                                >
+                                    <span>
+                                        Refund · {formatStatus(r.status)}
+                                    </span>
+                                    <span className="tabular-nums">
+                                        {formatMoney(r.amountCents, r.currency)}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
+                </li>
+            ))}
+        </ul>
     );
 }

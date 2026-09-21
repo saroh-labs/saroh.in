@@ -492,7 +492,7 @@ export class HomeService {
                 // units, so it is converted once here rather than in each client.
                 amountMinor: Math.round(Number(row.total) * 100),
                 currency: row.currency,
-                href: `/stores/${row.storeId}/orders/${row.id}`,
+                href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
             })),
         };
     }
