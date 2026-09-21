@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -66,18 +65,18 @@ export function SiteReviewView({
 
     return (
         <div className="space-y-6">
-            <Button asChild variant="outline" className="wk-press">
-                <Link href="/sites">Back to sites</Link>
-            </Button>
-
-            <PageHeader
-                title={site.name}
-                description={
-                    site.can.comment
+            {/* Which site, and what this reader may do with it. The Website
+                header above is the screen; this is the thing being read. */}
+            <div>
+                <h2 className="font-display text-[19px] font-semibold tracking-[-0.025em]">
+                    {site.name}
+                </h2>
+                <p className="mt-1 max-w-[68ch] text-pretty text-[13.5px] leading-[1.55] text-muted-foreground">
+                    {site.can.comment
                         ? "Read the draft and leave notes on the sections you have something to say about. Editing and publishing stay with the owner."
-                        : "You can read this site. Editing and publishing are limited to owners and admins."
-                }
-            />
+                        : "You can read this site. Editing and publishing are limited to owners and admins."}
+                </p>
+            </div>
 
             {review.latestApproval ? (
                 <p

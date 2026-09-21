@@ -35,7 +35,6 @@ export function MobileNav({
     role = null,
     actions = null,
     counts,
-    sites = [],
     organizationName,
 }: {
     unread?: number;
@@ -50,14 +49,12 @@ export function MobileNav({
     actions?: readonly string[] | null;
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
-    /** The merchant's own sites, hung under Website — same tree as the rail. */
-    sites?: { id: string; name: string }[];
     /** The workspace this nav belongs to; see the header below. */
     organizationName?: string;
 }) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
-    const groups = navFor({ role, actions, moduleKeys, sites });
+    const groups = navFor({ role, actions, moduleKeys });
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>

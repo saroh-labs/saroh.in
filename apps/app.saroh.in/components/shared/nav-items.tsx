@@ -446,7 +446,12 @@ export const NAV_GROUPS: NavGroup[] = [
 const WEBSITE_HREF = "/sites";
 
 /**
- * Hang the merchant's own sites under Website.
+ * Hang the merchant's own sites under Website — for the command palette.
+ *
+ * The RAIL no longer draws this tree (the workspace design keeps Website to one
+ * row, and the Website screen's picker and tabs say which site and where in
+ * it). The palette still does: typing a site's name and landing on its posts
+ * is the one-step jump the tree used to be, without a tree to scroll past.
  *
  * Reaching a site used to cost four steps from anywhere else in the workspace —
  * rail, then the sites list, then a card, then the editor. A merchant works on
@@ -483,10 +488,12 @@ export function navGroupsWithSites(
     const rowsFor = (siteId: string): NavChild[] =>
         mayAuthor
             ? [
-                  // Pages is the editor — the route that has no rail of its
-                  // own — Posts is its writing (ADR-004), and Settings is
-                  // address, search, share card, menu and footer.
-                  { href: `${WEBSITE_HREF}/${siteId}`, label: "Pages" },
+                  // Pages lists them, the editor is where they are worked on
+                  // — the route that has no rail of its own — Posts is its
+                  // writing (ADR-004), and Settings is address, search, share
+                  // card, menu and footer.
+                  { href: `${WEBSITE_HREF}/${siteId}/pages`, label: "Pages" },
+                  { href: `${WEBSITE_HREF}/${siteId}`, label: "Editor" },
                   { href: `${WEBSITE_HREF}/${siteId}/posts`, label: "Posts" },
                   {
                       href: `${WEBSITE_HREF}/${siteId}/settings`,
@@ -638,11 +645,15 @@ export function navFor({
     actions?: readonly string[] | null;
     /** `null` = availability unknown; see {@link filterNavGroups}. */
     moduleKeys: readonly string[] | null;
-    sites: readonly { id: string; name: string }[];
+    /**
+     * The merchant's sites, hung under Website for the command palette. The
+     * rail and the drawer leave it out: Website is one row there.
+     */
+    sites?: readonly { id: string; name: string }[];
 }): NavGroup[] {
     return filterNavGroupsByRole(
         filterNavGroups(
-            navGroupsWithSites(NAV_GROUPS, sites, role),
+            sites ? navGroupsWithSites(NAV_GROUPS, sites, role) : NAV_GROUPS,
             moduleKeys,
         ),
         role,

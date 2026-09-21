@@ -42,9 +42,12 @@ for (const role of ["MEMBER", "REVIEWER"]) {
         context,
     }, testInfo) => {
         await scenario(context, role);
+        // Website from the rail lands on the site itself: its Pages tab, which
+        // sends a reader on to Review.
         await page.goto("/sites");
+        await expect(page).toHaveURL(/\/sites\/site_1\/review$/);
         await expect(
-            page.getByRole("heading", { name: "Your sites", exact: true }),
+            page.getByRole("heading", { name: "Website", exact: true }),
         ).toBeVisible();
         /*
          * The editor's own route, which redirects a caller without
@@ -106,7 +109,7 @@ test("production 403 uses the editor permission boundary", async ({
         }),
     ).toBeVisible();
     await expect(
-        page.getByRole("link", { name: "Back to sites", exact: true }),
+        page.getByRole("link", { name: "Back to Website", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(
         0,

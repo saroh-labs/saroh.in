@@ -35,10 +35,9 @@ async function signIn(page: Page, who: { email: string; password: string }) {
     });
 }
 
-/** The reviewer's one site, opened from their own list. */
+/** The reviewer's one site, opened from Website in the rail. */
 async function openTheReviewedSite(page: Page) {
     await page.goto(`${urls.APP_URL}/sites`);
-    await page.getByRole("link", { name: REVIEWED_SITE }).first().click();
     await page.waitForURL(/\/sites\/[^/]+\/review/, { timeout: 30_000 });
 }
 
@@ -48,19 +47,18 @@ test.describe("a reviewer", () => {
     });
 
     test("sees only the site they were invited to", async ({ page }) => {
-        await page.goto(`${urls.APP_URL}/sites`);
+        await openTheReviewedSite(page);
 
         // The seed builds three sites and grants this reviewer one. A reviewer
-        // who could see the other two would be a MEMBER with extra powers.
-        //
-        // Counted inside `main` only: the sidebar links to the site the
-        // workspace last had open, which is not the list and would make one
-        // card look like two.
-        const cards = page
-            .getByRole("main")
-            .locator('a[href^="/sites/"]:not([href$="/new"])');
-        await expect(cards.filter({ hasText: REVIEWED_SITE })).toHaveCount(1);
-        await expect(cards).toHaveCount(1);
+        // who could see the other two would be a MEMBER with extra powers — and
+        // the Website screen would offer a picker to move between them. With
+        // one site and no right to make another, there is nothing to pick.
+        await expect(
+            page.getByRole("heading", { name: REVIEWED_SITE, exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: /^Website: .*Change it\.$/ }),
+        ).toHaveCount(0);
     });
 
     test("is offered nothing in the rail that they cannot open", async ({
@@ -129,9 +127,10 @@ test.describe("a reviewer", () => {
             await expect(rail.locator(`a[href="${gone}"]`)).toHaveCount(0);
         }
 
-        // What is left is their site, by the name they were invited to.
+        // What is left is Website, one row: which site, and Review, are on
+        // the Website screen rather than hung under it.
         await expect(rail.getByRole("link", { name: "Website" })).toBeVisible();
-        await expect(rail.getByRole("link", { name: "Review" })).toBeVisible();
+        await expect(rail.locator('a[href^="/sites/"]')).toHaveCount(0);
     });
 
     test("is taken to Review, not to the editor, and is told why", async ({

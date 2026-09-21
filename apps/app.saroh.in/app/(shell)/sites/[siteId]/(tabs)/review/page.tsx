@@ -1,6 +1,7 @@
+import { EmptyState } from "@saroh/ui/data-state";
+import { FileText } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 
-import { PageContainer } from "@/components/shared/page-container";
 import { SiteReviewView } from "@/components/sites/site-review-view";
 import { requireSession } from "@/lib/session";
 import {
@@ -20,7 +21,7 @@ import {
  * `/sites/:siteId` redirects here for a caller without `section:write`, so the
  * link an owner shares works for whoever opens it.
  */
-export const metadata = { title: "Review" };
+export const metadata = { title: "Review · Website" };
 
 export default async function SiteReviewPage({
     params,
@@ -43,7 +44,15 @@ export default async function SiteReviewPage({
         site.pages.find((page) => page.id === requestedPageId) ??
         site.pages.find((page) => page.isHome) ??
         site.pages.at(0);
-    if (!activePage) notFound();
+    if (!activePage) {
+        return (
+            <EmptyState
+                icon={<FileText />}
+                title="Nothing to read yet"
+                description="This site has no pages yet. They appear here as soon as someone adds one."
+            />
+        );
+    }
 
     const [page, comments, review] = await Promise.all([
         getPageForReview(siteId, activePage.id),
@@ -52,14 +61,12 @@ export default async function SiteReviewPage({
     ]);
 
     return (
-        <PageContainer>
-            <SiteReviewView
-                site={site}
-                page={page}
-                activePageId={activePage.id}
-                comments={comments}
-                review={review}
-            />
-        </PageContainer>
+        <SiteReviewView
+            site={site}
+            page={page}
+            activePageId={activePage.id}
+            comments={comments}
+            review={review}
+        />
     );
 }

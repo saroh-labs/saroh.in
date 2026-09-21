@@ -1,115 +1,51 @@
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@saroh/ui/card";
-import { EmptyState } from "@saroh/ui/empty-state";
-import { cn } from "@saroh/ui/lib/utils";
+import { EmptyState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
+import { Globe, Plus } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { navRoleCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
-import { env } from "@/env";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import { pendingChangeCount } from "@/lib/sites/pending";
-import type { SiteSummary } from "@/lib/sites/service";
 import { listSites } from "@/lib/sites/service";
 
-/**
- * Where a merchant's subdomain lives. Falls back to the production host so a
- * developer without the variable set still sees a plausible address rather than
- * "northwind.undefined" — the renderer defaults the same way.
- */
-const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
-
-/**
- * The one most consequential true thing about a site (#191).
- *
- * Ranked, not concatenated: a name and an address look identical whether a site
- * is live, never published, or waiting on a DNS record, and those last two are
- * exactly the states that strand a site invisibly. Four tags on a card would
- * turn a list into a dashboard, so this says the thing that matters most and
- * stops.
- *
- * "Never published" outranks everything: that site does not exist to the public,
- * which no other state is as consequential as.
- */
-function siteState(site: SiteSummary): {
-    label: string;
-    tone: "live" | "draft" | "attention";
-} {
-    if (!site.currentPublicationId) {
-        return { label: "Never published", tone: "draft" };
-    }
-    if (site.pendingDomain) {
-        // Published, but the domain they think they connected routes nowhere.
-        return { label: "Live · domain pending", tone: "attention" };
-    }
-    /*
-     * "Live · 3 things to look at" — the design's line, and the count is the
-     * same one the editor's top bar and the settings screen show, computed
-     * once in the API (#190). Three surfaces quoting three numbers would be
-     * worse than none of them quoting any.
-     *
-     * The fallback without a number covers the case where something is waiting
-     * but no section differs: real, and not worth inventing a count for.
-     */
-    // Sections plus site-level settings (#282), the same things the editor bar
-    // and settings screen describe.
-    const pending = pendingChangeCount(
-        site.pendingSectionChanges,
-        site.pendingSiteChanges,
-    );
-    if (pending > 0) {
-        return {
-            label: `Live · ${pending} thing${pending === 1 ? "" : "s"} to look at`,
-            tone: "attention",
-        };
-    }
-    if (site.hasUnpublishedChanges) {
-        return { label: "Live · unpublished changes", tone: "attention" };
-    }
-    return { label: "Live", tone: "live" };
-}
-
-/**
- * Sites index for the active organization (S2-004). Lists the org's CMS sites
- * with a call-to-action to create the first one; each card links to the
- * site editor. Mirrors the dashboard home list-page shell (app/page.tsx).
- */
 /**
  * A page title is how a merchant with six tabs open finds this one.
  * Without it the tab reads the bare default, "Saroh", on every route.
  */
 export const metadata = { title: "Website" };
 
+/**
+ * Website, from the rail.
+ *
+ * The rail's Website row lands here, and a business with a site is sent
+ * straight to it: the workspace design has no list of sites to pass through,
+ * because the Website screen's own picker says which sites there are and what
+ * state each is in. A business with none is shown the way to make one.
+ *
+ * To the first site's Pages, which sends a reader on to Review — the one
+ * redirect decides for every role, rather than this screen guessing.
+ */
 export default async function SitesPage() {
     await requireSession();
 
-    // Concurrent: the list does not depend on the role, and the role is only
-    // needed to decide what this screen may CLAIM.
     const [sites, organization] = await Promise.all([
         listSites(),
         resolveActiveOrganization(),
     ]);
+    const first = sites.at(0);
+    if (first) redirect(`/sites/${first.id}/pages`);
+
     const role = organization?.role ?? null;
     const mayCreate = navRoleCan(role, "site:create");
 
     /*
-     * Three roles reach this list and it said the same thing to all of them.
-     *
-     * "Websites you publish for this organization", above a New site button, is
-     * true for an owner and an over-claim for everyone else: a MEMBER publishes
-     * nothing, and a REVIEWER is looking at one site they were invited to, not
-     * at a business's web presence (#313). The list itself is already narrowed
-     * for them — this is the sentence above it catching up.
+     * Three roles reach this screen with nothing on it, and it said the same
+     * thing to all of them. A REVIEWER is waiting to be asked to look at one;
+     * a MEMBER cannot make one (#313).
      */
-    const description = mayCreate
-        ? "Websites you publish for this organization."
-        : role === "REVIEWER"
-          ? "Websites you were asked to look at."
-          : "Websites this organization publishes.";
-
     const nothingHere =
         role === "REVIEWER"
             ? {
@@ -118,104 +54,32 @@ export default async function SitesPage() {
                       "A website appears here when someone asks you to look at it.",
               }
             : {
-                  title: "No sites yet",
+                  title: "No website yet",
                   description: mayCreate
-                      ? "Create your first site to start editing and previewing sections."
+                      ? "Pages, posts and an address — make one and it is yours to edit before anyone can see it."
                       : "An owner or admin creates the first one.",
               };
 
     return (
-        <PageContainer>
-            <PageHeader
-                title="Your sites"
-                description={description}
-                actions={
-                    sites.length > 0 && mayCreate ? (
-                        <Button asChild variant="brand">
-                            <Link href="/sites/new">New site</Link>
-                        </Button>
-                    ) : undefined
-                }
-            />
-
-            {sites.length === 0 ? (
+        <PageContainer width="full">
+            <div className="flex flex-col gap-6">
+                <PageHeader title="Website" className="mb-0" />
                 <EmptyState
+                    icon={<Globe />}
                     title={nothingHere.title}
                     description={nothingHere.description}
                     action={
                         mayCreate ? (
-                            <Button asChild variant="brand">
-                                <Link href="/sites/new">Create a site</Link>
+                            <Button asChild>
+                                <Link href="/sites/new">
+                                    <Plus className="mr-1.5 size-4" />
+                                    New site
+                                </Link>
                             </Button>
                         ) : undefined
                     }
                 />
-            ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                    {sites.map((site, index) => {
-                        const state = siteState(site);
-                        return (
-                            <Link key={site.id} href={`/sites/${site.id}`}>
-                                <Card
-                                    className="wk-surface h-full"
-                                    style={
-                                        {
-                                            "--wk-i": index,
-                                        } as React.CSSProperties
-                                    }
-                                >
-                                    <CardHeader>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <CardTitle className="min-w-0">
-                                                {site.name}
-                                            </CardTitle>
-                                            {/*
-                                             * Whether the public can reach this
-                                             * site is the first thing a
-                                             * merchant wants from a list of
-                                             * sites, and the card used to show
-                                             * only a name and an address —
-                                             * which a draft has too.
-                                             *
-                                             * The badge now carries the RANKED
-                                             * state (#191) rather than just
-                                             * live/draft: a published site
-                                             * whose domain never verified reads
-                                             * "Live" under the old rule, which
-                                             * is the exact over-claim this list
-                                             * exists to remove. Colour maps to
-                                             * tokens, not badge variants, for
-                                             * the same reason Home's severity
-                                             * does — `default` is the luminous
-                                             * action colour in two skins.
-                                             */}
-                                            <Badge
-                                                className={cn(
-                                                    "shrink-0",
-                                                    state.tone === "live" &&
-                                                        "bg-success text-success-foreground",
-                                                    state.tone ===
-                                                        "attention" &&
-                                                        "bg-highlight text-highlight-foreground",
-                                                    state.tone === "draft" &&
-                                                        "border border-border bg-transparent text-muted-foreground",
-                                                )}
-                                            >
-                                                {state.label}
-                                            </Badge>
-                                        </div>
-                                        <CardDescription>
-                                            {site.subdomain
-                                                ? `${site.subdomain}.${ROOT_DOMAIN}`
-                                                : `/${site.slug}`}
-                                        </CardDescription>
-                                    </CardHeader>
-                                </Card>
-                            </Link>
-                        );
-                    })}
-                </div>
-            )}
+            </div>
         </PageContainer>
     );
 }

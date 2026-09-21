@@ -204,9 +204,21 @@ describe("the site tree", () => {
                 sites: [SITES[0]],
             }),
         );
+        expect(offered).toContain("/sites/site_1/pages");
         expect(offered).toContain("/sites/site_1");
         expect(offered).toContain("/sites/site_1/posts");
         expect(offered).toContain("/sites/site_1/settings");
+    });
+
+    it("is left out of the rail, where Website is one row", () => {
+        // The rail and the drawer ask without sites; only the palette hangs
+        // them. A merchant who can create a site is offered it on the Website
+        // screen, not as a child row.
+        const website = navFor({ role: "OWNER", moduleKeys: ["WEBSITE"] })
+            .flatMap((g) => g.items)
+            .find((i) => i.href === "/sites");
+        expect(website).toBeDefined();
+        expect(website?.children ?? []).toHaveLength(0);
     });
 
     it("takes a reader to the screen built for reading", () => {
