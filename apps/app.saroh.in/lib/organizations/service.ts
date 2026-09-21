@@ -49,11 +49,24 @@ export interface OrganizationProfileInput {
 export interface CreateOrganizationInput {
     name: string;
     profile?: OrganizationProfileInput;
+    /**
+     * The `<address>.saroh.app` the business reserves — its first website is
+     * served there. Absent, the API derives it from the name.
+     */
+    address?: string;
 }
 
 /** Discriminated result so the UI can surface field errors inline. */
 export type OrganizationResult<T> =
-    { ok: true; data: T } | { ok: false; error: string; field?: "name" };
+    | { ok: true; data: T }
+    | { ok: false; error: string; field?: "name" | "address" };
+
+/** Whether an address can be reserved at setup, and why not. */
+export interface AddressAvailability {
+    address: string;
+    available: boolean;
+    reason?: string;
+}
 
 /**
  * The caller's organizations with their role. Empty on ANY failure — this
@@ -118,15 +131,36 @@ export async function createOrganization(
         id?: string;
         slug?: string;
         message?: string;
-        field?: "name";
+        details?: { field?: string };
     } | null;
 
     if (res.ok && data?.id && data.slug) {
         return { ok: true, data: { id: data.id, slug: data.slug } };
     }
+    /*
+     * The field arrives as `details.field` — the API's error filter forwards
+     * `message` and `details`, nothing else. This read `data.field`, which
+     * the API never sends, so a refused name was never shown on its field.
+     */
+    const field = data?.details?.field;
     return {
         ok: false,
         error: data?.message ?? "Something went wrong",
-        field: data?.field,
+        field: field === "name" || field === "address" ? field : undefined,
     };
+}
+
+/**
+ * Whether an address is free to reserve. Null when the API could not be asked
+ * — the form then says nothing rather than guessing, and the create checks it
+ * again anyway.
+ */
+export async function checkOrganizationAddress(
+    address: string,
+): Promise<AddressAvailability | null> {
+    const res = await apiFetch(
+        `/organizations/address-availability?address=${encodeURIComponent(address)}`,
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as AddressAvailability;
 }

@@ -52,8 +52,8 @@ export function ForgotPasswordForm() {
     return (
         <div>
             <AuthHeading
-                title="Forgot your password"
-                blurb="We will send a link to set a new one."
+                title="Forgot your password?"
+                blurb="Tell us the address and we will send a link."
             />
             <form onSubmit={handleSubmit} noValidate>
                 {error ? <AuthError>{error}</AuthError> : null}
@@ -63,13 +63,14 @@ export function ForgotPasswordForm() {
                     type="email"
                     autoComplete="email"
                     placeholder="you@example.com"
+                    note="We reply the same whether or not it has an account."
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={isLoading}
                 />
                 <AuthSubmit disabled={isLoading}>
-                    {isLoading ? "Sending…" : "Send reset link"}
+                    {isLoading ? "Sending…" : "Send the link"}
                 </AuthSubmit>
             </form>
             <AuthFooter>
