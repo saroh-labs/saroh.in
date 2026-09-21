@@ -1226,7 +1226,9 @@ export function SiteEditor({
                         // tracks — rather than absolutely positioning them over
                         // a border — is what keeps the hit area and the line
                         // the merchant is aiming at the same object.
-                        "--editor-cols": `${railWidth}px 1px minmax(0,1fr) 1px ${panelWidth}px`,
+                        // The canvas keeps a floor, so widening a side column
+                        // can never squeeze the page out of sight.
+                        "--editor-cols": `${railWidth}px 1px minmax(20rem,1fr) 1px ${panelWidth}px`,
                     } as React.CSSProperties
                 }
             >

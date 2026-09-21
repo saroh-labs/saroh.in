@@ -151,7 +151,16 @@ export function PanelDivider({
              * hit without widening what the eye sees — a hairline you have to
              * hit exactly is a hairline nobody moves twice.
              */
-            className="relative hidden cursor-col-resize bg-border after:absolute after:inset-y-0 after:-left-1 after:w-[9px] after:content-[''] hover:bg-ring focus-visible:bg-ring focus-visible:outline-none lg:block"
-        />
+            className="group relative z-10 hidden cursor-col-resize bg-border after:absolute after:inset-y-0 after:-left-1 after:w-[9px] after:content-[''] hover:bg-ring focus-visible:bg-ring focus-visible:outline-none lg:block"
+        >
+            {/*
+             * A grip in the middle of the line, so the divider says it can
+             * be dragged before anyone has to find it by hovering a 1px line.
+             */}
+            <span
+                aria-hidden
+                className="pointer-events-none absolute left-1/2 top-1/2 h-10 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background transition-colors group-hover:border-ring group-hover:bg-ring group-focus-visible:border-ring group-focus-visible:bg-ring"
+            />
+        </div>
     );
 }
