@@ -1,8 +1,21 @@
 "use client";
 
 import { pagePathResolver, toRendered } from "@saroh/block-contract";
-import type { Section as RenderedSection } from "@saroh/site-blocks";
-import { PageSections, SiteTheme } from "@saroh/site-blocks";
+import type {
+    Section as RenderedSection,
+    SiteFooterContent,
+} from "@saroh/site-blocks";
+import {
+    PageSections,
+    SiteFooter,
+    SiteHeader,
+    SiteTheme,
+} from "@saroh/site-blocks";
+import { cn } from "@saroh/ui/lib/utils";
+import { Lock } from "lucide-react";
+import type { ReactNode } from "react";
+
+import { SECTION_LABELS } from "@/components/sites/editor-constants";
 
 import type { Section, SitePage } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
@@ -65,6 +78,11 @@ export function DraftPreview({
     styleOptions,
     selectedIndex,
     onSelect,
+    chrome,
+    selectedChrome,
+    onSelectChrome,
+    notesByKey,
+    onOpenNotes,
 }: {
     sections: Section[];
     /**
@@ -84,6 +102,23 @@ export function DraftPreview({
      * follow" (spec §2). Omitted where the preview is not an editing surface.
      */
     onSelect?: (index: number) => void;
+    /**
+     * The site's header and footer (#336), drawn around the page by the same
+     * components the live site uses. Omitted, the page is drawn alone.
+     */
+    chrome?: {
+        name: string;
+        navigation: { label: string; href: string }[];
+        /** Already sanitized by the API (`footerPreview`). */
+        footer: SiteFooterContent | null;
+    };
+    /** Which of the header or footer is selected, if either. */
+    selectedChrome?: "header" | "footer" | null;
+    onSelectChrome?: (part: "header" | "footer") => void;
+    /** Open notes per section key, for the pins. */
+    notesByKey?: ReadonlyMap<string, number>;
+    /** A pin was pressed: select that block and show its feedback. */
+    onOpenNotes?: (index: number) => void;
 }) {
     /*
      * The merchant's tokens, from the SAME component the live site uses.
@@ -127,58 +162,189 @@ export function DraftPreview({
         .map((section, index) => ({ section, index }))
         .filter(({ section }) => section.hidden !== true);
 
-    if (visible.length === 0) {
-        return (
-            <div className={PREVIEW_SCOPE}>
-                <SiteTheme variables={vars} selector={`.${PREVIEW_SCOPE}`} />
-                <p className="rounded-[var(--site-radius)] border border-dashed p-8 text-center text-sm text-[hsl(var(--site-muted))]">
-                    {sections.length === 0
-                        ? "No sections yet. Add one to preview it here."
-                        : /*
-                           * Distinguishing the two empties matters: "you have not
-                           * built anything" and "you have hidden everything you
-                           * built" call for opposite next moves, and the second is
-                           * recoverable from the rail one click away.
-                           */
-                          "Every section on this page is hidden, so visitors would see an empty page."}
-                </p>
-            </div>
-        );
-    }
-    return (
-        <div
-            className={`${PREVIEW_SCOPE} space-y-4 rounded-[var(--site-radius)] bg-[hsl(var(--site-bg))] p-[var(--site-page-margin)] text-[hsl(var(--site-fg))]`}
-        >
-            <SiteTheme variables={vars} selector={`.${PREVIEW_SCOPE}`} />
-            {visible.map(({ section, index }) =>
-                onSelect === undefined ? (
+    const editing = onSelect !== undefined;
+    const count = visible.length;
+
+    const page =
+        visible.length === 0 ? (
+            <p className="rounded-[var(--site-radius)] border border-dashed p-8 text-center text-sm text-[hsl(var(--site-muted))]">
+                {sections.length === 0
+                    ? "No blocks yet. Add one to see it here."
+                    : /*
+                       * Distinguishing the two empties matters: "you have not
+                       * built anything" and "you have hidden everything you
+                       * built" call for opposite next moves, and the second is
+                       * recoverable from the list one click away.
+                       */
+                      "Every block on this page is hidden, so visitors would see an empty page."}
+            </p>
+        ) : (
+            visible.map(({ section, index }, position) => {
+                const rendered = (
                     <PageSections
-                        key={index}
                         sections={[toRenderedSection(section, resolvePage)]}
                     />
-                ) : (
-                    /*
-                     * A plain div with a click, not a <button>: a section holds
-                     * headings, links and form fields, and nesting those inside
-                     * a button is invalid and breaks the keyboard. The rail is
-                     * the keyboard-reachable way to select a section; this is
-                     * the pointer shortcut for what you can already see.
-                     */
-                    <div
+                );
+                if (!editing) return <div key={index}>{rendered}</div>;
+                const label = SECTION_LABELS[section.type];
+                return (
+                    <CanvasBlock
                         key={index}
-                        onClick={() => onSelect(index)}
-                        className={`cursor-pointer rounded-[2px] outline-offset-2 transition-[outline-color] ${
-                            selectedIndex === index
-                                ? "outline outline-2 outline-highlight"
-                                : "outline outline-1 outline-transparent hover:outline-highlight/40"
-                        }`}
+                        label={label}
+                        name={`${label} block, ${position + 1} of ${count}`}
+                        selected={selectedIndex === index}
+                        onSelect={() => onSelect(index)}
+                        notes={
+                            section.key === undefined
+                                ? 0
+                                : (notesByKey?.get(section.key) ?? 0)
+                        }
+                        onOpenNotes={() => onOpenNotes?.(index)}
                     >
-                        <PageSections
-                            sections={[toRenderedSection(section, resolvePage)]}
-                        />
-                    </div>
-                ),
+                        {rendered}
+                    </CanvasBlock>
+                );
+            })
+        );
+
+    /*
+     * The header and footer are selectable when editing, but carry a lock:
+     * they are on every page, so no one page moves or removes them.
+     */
+    const header = chrome ? (
+        <SiteHeader name={chrome.name} navigation={chrome.navigation} />
+    ) : null;
+    const footer = chrome?.footer ? (
+        <SiteFooter footer={chrome.footer} />
+    ) : null;
+
+    return (
+        <div
+            className={`${PREVIEW_SCOPE} bg-[hsl(var(--site-bg))] text-[hsl(var(--site-fg))]`}
+            /*
+             * Nothing on the canvas navigates while editing. A link here is
+             * the merchant's link to THEIR site; followed from the editor it
+             * lands somewhere in Saroh, which is never what the click meant.
+             * A click selects; Preview is where links are for following.
+             */
+            onClickCapture={
+                editing
+                    ? (e) => {
+                          if ((e.target as HTMLElement).closest("a")) {
+                              e.preventDefault();
+                          }
+                      }
+                    : undefined
+            }
+        >
+            <SiteTheme variables={vars} selector={`.${PREVIEW_SCOPE}`} />
+            {header && editing && onSelectChrome ? (
+                <CanvasBlock
+                    label="Header"
+                    name="Header, on every page"
+                    locked
+                    selected={selectedChrome === "header"}
+                    onSelect={() => onSelectChrome("header")}
+                >
+                    {header}
+                </CanvasBlock>
+            ) : (
+                header
             )}
+            <div className="space-y-4 p-[var(--site-page-margin)]">{page}</div>
+            {footer && editing && onSelectChrome ? (
+                <CanvasBlock
+                    label="Footer"
+                    name="Footer, on every page"
+                    locked
+                    selected={selectedChrome === "footer"}
+                    onSelect={() => onSelectChrome("footer")}
+                >
+                    {footer}
+                </CanvasBlock>
+            ) : (
+                footer
+            )}
+        </div>
+    );
+}
+
+/**
+ * One block on the canvas, as something that can be selected (#336).
+ *
+ * The frame is a plain div with a click, not a <button>: a block holds
+ * headings, links and form fields, and nesting those inside a button is
+ * invalid. The keyboard way in is the label chip, which IS a button — always
+ * in the tab order, shown on hover, focus and selection — named like "Hero
+ * block, 2 of 7" so a screen reader hears where it is on the page.
+ */
+function CanvasBlock({
+    label,
+    name,
+    selected,
+    locked = false,
+    notes = 0,
+    onSelect,
+    onOpenNotes,
+    children,
+}: {
+    label: string;
+    /** The accessible name: what it is and where it sits. */
+    name: string;
+    selected: boolean;
+    locked?: boolean;
+    /** Open notes on this block; a pin shows when there are any. */
+    notes?: number;
+    onSelect: () => void;
+    onOpenNotes?: () => void;
+    children: ReactNode;
+}) {
+    return (
+        <div
+            onClick={onSelect}
+            /*
+             * Joined by hand, not through `cn`: tailwind-merge reads
+             * `outline` and `outline-2` as the same property and drops the
+             * first, which leaves an outline with no style — invisible.
+             */
+            className={`group/block relative cursor-pointer outline outline-offset-[-2px] transition-[outline-color] duration-fast ${
+                selected
+                    ? "outline-2 outline-highlight"
+                    : "outline-1 outline-transparent hover:outline-highlight/50"
+            }`}
+        >
+            {children}
+            <button
+                type="button"
+                aria-label={selected ? `${name}, selected` : name}
+                aria-pressed={selected}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onSelect();
+                }}
+                className={cn(
+                    "absolute left-0 top-0 z-10 flex items-center gap-1 rounded-br-md bg-highlight px-2 py-0.5 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-highlight-foreground transition-opacity duration-fast focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    selected
+                        ? "opacity-100"
+                        : "opacity-0 group-hover/block:opacity-100",
+                )}
+            >
+                {locked ? <Lock aria-hidden className="size-3" /> : null}
+                {label}
+            </button>
+            {notes > 0 && onOpenNotes ? (
+                <button
+                    type="button"
+                    aria-label={`${notes} open on this block — read the feedback`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenNotes();
+                    }}
+                    className="absolute right-3 top-3 z-10 flex size-6 items-center justify-center rounded-full bg-highlight font-sans text-xs font-semibold tabular-nums text-highlight-foreground shadow-md ring-2 ring-background focus-visible:outline-none focus-visible:ring-ring"
+                >
+                    {notes}
+                </button>
+            ) : null}
         </div>
     );
 }

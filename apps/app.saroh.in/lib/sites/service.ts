@@ -396,6 +396,12 @@ export interface SiteDetail extends SiteSummary {
      * have written nothing, and nothing renders — see `parseSiteFooter`.
      */
     footer: SiteFooter | null;
+    /**
+     * The same footer, sanitized by the API the way publish does (#336) —
+     * the one the editor's canvas may render as markup. `footer` is for
+     * editing and is never rendered as HTML here.
+     */
+    footerPreview: SiteFooter | null;
     /** The site's menu (#206), by page id. Null until one is built. */
     navigation: SiteNavigation | null;
     /** When the site last went live; null if it has never been published. */

@@ -141,9 +141,6 @@ for await (const file of walk(BLOCKS)) {
  * live on a merchant's page. Adding to it should require saying why.
  */
 const SITE_LAYER_ALLOWED = new Set([
-    // The merchant's own header and footer. Chrome, not sections — #253 decides
-    // whether that changes.
-    "apps/saroh.app/components/site-chrome.tsx",
     // Saroh surfaces on a merchant's page, in the merchant's palette.
     "apps/saroh.app/components/checkout.tsx",
     // The review page a customer reaches from an invitation email.

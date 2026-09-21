@@ -33,4 +33,6 @@ export { default as TestimonialsSection } from "./blocks/testimonials";
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
+export { SiteFooter, SiteHeader } from "./site-chrome";
+export type { SiteFooterContent } from "./site-chrome";
 export { SiteTheme, SiteThemeScope } from "./site-theme";

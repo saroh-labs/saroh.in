@@ -10,8 +10,11 @@ import {
     ChevronLeft,
     Eye,
     Link2,
+    Lock,
     Monitor,
     Palette,
+    PanelBottom,
+    PanelTop,
     Smartphone,
 } from "lucide-react";
 import Link from "next/link";
@@ -27,7 +30,10 @@ import {
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { AddSectionDialog } from "@/components/sites/add-section-dialog";
 import { SECTION_ICONS } from "@/components/sites/block-icons";
-import { BlockInspector } from "@/components/sites/block-inspector";
+import {
+    BlockInspector,
+    FixedBlockInspector,
+} from "@/components/sites/block-inspector";
 import { EditorTabs, PanelDivider } from "@/components/sites/editor-chrome";
 import type { Device } from "@/components/sites/editor-constants";
 import {
@@ -93,6 +99,8 @@ import type {
     SectionType,
     SiteCommentView,
     SiteFlags,
+    SiteFooter,
+    SiteNavigation,
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
@@ -168,6 +176,8 @@ export function SiteEditor({
     initialSections,
     initialRevision,
     siteName,
+    navigation,
+    footerPreview,
     address,
     initialStyle,
     styleOptions,
@@ -205,6 +215,10 @@ export function SiteEditor({
     /** Which edit of the draft `initialSections` are (#285). */
     initialRevision: number;
     siteName: string;
+    /** The site's menu, by page id; resolved here for the canvas header. */
+    navigation: SiteNavigation | null;
+    /** The footer, sanitized by the API, for the canvas to draw (#336). */
+    footerPreview: SiteFooter | null;
     initialStyle: SiteStyle;
     styleOptions: SiteStyleOptions;
     /** Where this site lives, shown in the bar. Null before a subdomain exists. */
@@ -349,8 +363,23 @@ export function SiteEditor({
         setSwitching(true);
         setTimeout(() => setSwitching(false), 300);
     };
-    const setSelectedIndex = (next: number | null) =>
+    /*
+     * The header or footer, when one of those is selected instead of a block
+     * (#336). Not remembered between visits: they are the same on every page,
+     * and coming back to the site's header is rarely where anyone left off.
+     */
+    const [selectedChrome, setSelectedChrome] = useState<
+        "header" | "footer" | null
+    >(null);
+    const setSelectedIndex = (next: number | null) => {
+        setSelectedChrome(null);
         setPlace(siteId, initialCount, { selectedIndex: next });
+    };
+    const selectChrome = (part: "header" | "footer") => {
+        setPlace(siteId, initialCount, { selectedIndex: null });
+        setSelectedChrome(part);
+        setInspector("block");
+    };
     const setRail = (next: "sections" | "style") =>
         setPlace(siteId, initialCount, { rail: next });
     const setInspector = (next: "block" | "feedback") =>
@@ -924,6 +953,30 @@ export function SiteEditor({
             .map((c) => c.sectionKey),
     );
 
+    /** Open notes per block on this page — the canvas draws them as pins. */
+    const notesByKey = new Map<string, number>();
+    for (const c of comments) {
+        if (c.pageId !== pageId || c.resolvedAt !== null || c.orphaned)
+            continue;
+        notesByKey.set(c.sectionKey, (notesByKey.get(c.sectionKey) ?? 0) + 1);
+    }
+
+    /*
+     * The header the canvas draws, with the menu resolved the way publish
+     * resolves it: over the pages that will be written, so an entry for a
+     * hidden page is absent here exactly as it will be on the live site.
+     */
+    const canvasChrome = {
+        name: siteName,
+        navigation: (navigation?.items ?? []).flatMap((item) => {
+            const page = pages.find((p) => p.id === item.pageId && !p.hidden);
+            return page
+                ? [{ label: item.label ?? page.title, href: page.path }]
+                : [];
+        }),
+        footer: footerPreview,
+    };
+
     const activePage = pages.find((page) => page.id === pageId);
     const status = editorStatus({
         saving,
@@ -1203,11 +1256,18 @@ export function SiteEditor({
                             {
                                 <>
                                     <p className="px-4 pb-1 pt-4 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                                        {sections.length === 1
-                                            ? "1 block"
-                                            : `${sections.length} blocks`}
+                                        {`${sections.length + 2} blocks`}
                                     </p>
                                     <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pl-4">
+                                        <FixedBlockRow
+                                            part="header"
+                                            selected={
+                                                selectedChrome === "header"
+                                            }
+                                            onSelect={() =>
+                                                selectChrome("header")
+                                            }
+                                        />
                                         {sections.map((section, index) => (
                                             <li
                                                 key={index}
@@ -1401,7 +1461,21 @@ export function SiteEditor({
                                                 No blocks yet.
                                             </li>
                                         ) : null}
+                                        <FixedBlockRow
+                                            part="footer"
+                                            selected={
+                                                selectedChrome === "footer"
+                                            }
+                                            onSelect={() =>
+                                                selectChrome("footer")
+                                            }
+                                        />
                                     </ul>
+                                    <p className="px-4 pb-3 text-xs leading-relaxed text-muted-foreground">
+                                        Header and footer carry a lock — they
+                                        are on every page, so this page cannot
+                                        remove them.
+                                    </p>
                                     <div className="p-2">
                                         {/*
                                          * The design draws this as a dashed outline
@@ -1586,6 +1660,14 @@ export function SiteEditor({
                                     setRail("sections");
                                     setSelectedIndex(index);
                                 }}
+                                chrome={canvasChrome}
+                                selectedChrome={selectedChrome}
+                                onSelectChrome={selectChrome}
+                                notesByKey={notesByKey}
+                                onOpenNotes={(index) => {
+                                    setSelectedIndex(index);
+                                    setInspector("feedback");
+                                }}
                             />
                         </div>
                     </div>
@@ -1632,6 +1714,12 @@ export function SiteEditor({
                                 review={review}
                                 onChanged={() => void refreshReview()}
                                 onJump={jumpToNote}
+                            />
+                        ) : selectedChrome ? (
+                            <FixedBlockInspector
+                                part={selectedChrome}
+                                siteId={siteId}
+                                hasFooter={footerPreview !== null}
                             />
                         ) : (
                             <BlockInspector
@@ -1745,6 +1833,7 @@ export function SiteEditor({
                             pages={pages}
                             style={style}
                             styleOptions={styleOptions}
+                            chrome={canvasChrome}
                         />
                     </div>
                 </div>
@@ -1785,3 +1874,46 @@ export function SiteEditor({
 }
 
 /** Per-type field editor. Narrowing on `section.type` gives the exact shape. */
+
+/**
+ * The header or footer in the block list (#336): on every page, so it is
+ * listed where it sits — first and last — with a lock instead of a grip. It
+ * can be selected, never dragged.
+ */
+function FixedBlockRow({
+    part,
+    selected,
+    onSelect,
+}: {
+    part: "header" | "footer";
+    selected: boolean;
+    onSelect: () => void;
+}) {
+    const Icon = part === "header" ? PanelTop : PanelBottom;
+    const label = part === "header" ? "Header" : "Footer";
+    return (
+        <li>
+            <button
+                type="button"
+                onClick={onSelect}
+                aria-current={selected ? "true" : undefined}
+                className={cn(
+                    "relative flex h-10 w-full items-center gap-2.5 rounded-md pl-5 pr-2 text-left text-[0.8125rem] transition-colors",
+                    selected
+                        ? "bg-secondary font-medium before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:rounded-full before:bg-highlight"
+                        : "hover:bg-muted",
+                )}
+            >
+                <Icon
+                    aria-hidden
+                    className="size-4 shrink-0 text-muted-foreground"
+                />
+                <span className="flex-1 truncate">{label}</span>
+                <Lock
+                    aria-label="On every page"
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                />
+            </button>
+        </li>
+    );
+}

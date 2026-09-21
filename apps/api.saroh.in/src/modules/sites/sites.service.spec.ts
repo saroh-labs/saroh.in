@@ -281,6 +281,30 @@ describe("SitesService.getSite", () => {
         },
     );
 
+    it("hands the editor a sanitized footer to draw, and the written one to edit", async () => {
+        const written =
+            '<p>Hill Road</p><script>alert(1)</script><img src=x onerror="alert(2)">';
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            pages: [],
+            footer: { format: "html", value: written },
+        });
+        (prisma.site.findMany as jest.Mock).mockResolvedValue([]);
+        const site = await service.getSite(ctx(), "site_1");
+        // What the settings screen edits is left as the merchant wrote it.
+        expect(site.footer?.value).toBe(written);
+        // What the canvas renders as markup is what publish would write.
+        expect(site.footerPreview?.value).toContain("<p>Hill Road</p>");
+        expect(site.footerPreview?.value).not.toMatch(/script|onerror/i);
+    });
+
+    it("has no footer preview when there is no footer", async () => {
+        siteFindFirst.mockResolvedValue({ id: "site_1", pages: [] });
+        (prisma.site.findMany as jest.Mock).mockResolvedValue([]);
+        const site = await service.getSite(ctx(), "site_1");
+        expect(site.footerPreview).toBeNull();
+    });
+
     it("returns 404 for a site in another org (cross-tenant read)", async () => {
         siteFindFirst.mockResolvedValue(null);
 

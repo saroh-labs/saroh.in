@@ -373,6 +373,13 @@ export interface SiteDetailView {
      * the footer colour.
      */
     footer: SiteFooter | null;
+    /**
+     * The same footer, sanitized as publish sanitizes it (#336), for the
+     * editor's canvas to DRAW. `footer` is what the settings screen edits and
+     * stays as written; this one is what may be rendered as markup in someone
+     * else's browser. Null when there is no footer.
+     */
+    footerPreview: SiteFooter | null;
     /** The site's menu (#206), by page id. Null until one is built. */
     navigation: SiteNavigation | null;
     /**
@@ -508,6 +515,18 @@ async function storedDraftSectionsByKey(
         if (row.key) byKey.set(row.key, row);
     }
     return byKey;
+}
+
+/**
+ * A footer made safe to draw (#202, #336). Runs through the sanitizer whatever
+ * the format says, rather than making the safety of what is rendered depend
+ * on a string the client sent. Publish and the editor's canvas both use it,
+ * so what the editor draws is what publish would write.
+ */
+function sanitizedFooter(footer: SiteFooter | null): SiteFooter | null {
+    return footer
+        ? { format: footer.format, value: sanitizeRichHtml(footer.value) }
+        : null;
 }
 
 @Injectable()
@@ -875,6 +894,7 @@ export class SitesService {
             style: parseSiteStyle(style),
             styleOptions: siteStyleOptions(),
             footer: parseSiteFooter(footer),
+            footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
         };
     }
@@ -1644,12 +1664,7 @@ export class SitesService {
          * through the sanitizer whatever the format says, rather than making
          * the safety of a permanent write depend on a string the client sent.
          */
-        const publishedFooter: SiteFooter | null = draftFooter
-            ? {
-                  format: draftFooter.format,
-                  value: sanitizeRichHtml(draftFooter.value),
-              }
-            : null;
+        const publishedFooter = sanitizedFooter(draftFooter);
         const snapshot: SiteSnapshot = {
             site: {
                 name: site.name,
