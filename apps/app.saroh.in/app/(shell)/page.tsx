@@ -6,7 +6,11 @@ import { HomeDashboard } from "@/components/home/home-dashboard";
 import { PageContainer } from "@/components/shared/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import { getHome } from "@/lib/home/service";
-import { listOrganizations } from "@/lib/organizations/service";
+import { listModules } from "@/lib/modules/service";
+import {
+    listOrganizations,
+    resolveActiveOrganization,
+} from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
 /**
@@ -35,6 +39,15 @@ export default async function Home() {
     if (organizations.length > 1 && !chosen) redirect("/choose");
 
     const home = await getHome();
+    // A business with nothing on is asked what it wants to do first, and the
+    // question needs to know what may be turned on and by whom. Everyone
+    // else never pays for the read.
+    const [modules, business] = home.hasAnyModule
+        ? [null, null]
+        : await Promise.all([
+              listModules(),
+              resolveActiveOrganization(organizations),
+          ]);
 
     return (
         // A dashboard, so the width matches the other data screens rather than
@@ -46,7 +59,11 @@ export default async function Home() {
                 description="What needs you, what's coming up, and where everything stands."
             />
             <div className="mt-6">
-                <HomeDashboard home={home} />
+                <HomeDashboard
+                    home={home}
+                    modules={modules}
+                    businessName={business?.name ?? "This business"}
+                />
             </div>
         </PageContainer>
     );
