@@ -21,8 +21,8 @@ export default async function ProvidersSettingsPage() {
     return (
         <PageContainer width="form">
             <PageHeader
-                title="Providers & health"
-                description="The external services your modules depend on, and whether each is ready."
+                breadcrumb={["Workspace", "Providers"]}
+                title="Providers"
             />
             {/* Three outcomes, three states. "Nothing to show" was previously
                 rendered for both a denial and an empty list, which are

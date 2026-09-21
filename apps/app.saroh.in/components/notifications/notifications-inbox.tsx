@@ -1,13 +1,15 @@
 "use client";
 
+import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { BellOff } from "lucide-react";
+import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 
+import { ListCard, ListRow } from "@/components/shared/list-card";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import {
     markAllNotificationsRead,
@@ -36,131 +38,139 @@ function formatWhen(iso: string): string {
 }
 
 /**
- * The owner/admin notification inbox (S3-006). Unread items are emphasized and
- * carry a mark-read control; each links to its lead. A single mark-all-read
- * action clears the badge. Mutations post through server actions and refresh the
- * server component so the list + unread badge stay in sync.
+ * Workspace → Notifications, as the workspace design draws it: a list with
+ * "Notification" and "When" columns, an Unread tag, and opening a row marks it
+ * read. A row about an enquiry opens the lead; one with nowhere to go is its
+ * own mark-read control.
  */
 export function NotificationsInbox({
     notifications,
+    businessName,
 }: {
     notifications: Notification[];
+    businessName: string;
 }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
-    const [busyId, setBusyId] = useState<string | null>(null);
+    const unread = notifications.filter((n) => !n.readAt).length;
 
-    const hasUnread = notifications.some((n) => !n.readAt);
+    const markOne = (id: string, quiet = false) => {
+        startTransition(async () => {
+            const res = await markNotificationRead(id);
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            if (!quiet) showSuccess("Marked as read");
+            router.refresh();
+        });
+    };
 
-    async function markOne(id: string) {
-        setBusyId(id);
-        const res = await markNotificationRead(id);
-        setBusyId(null);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        startTransition(() => router.refresh());
-    }
-
-    async function markAll() {
-        const res = await markAllNotificationsRead();
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        showSuccess("All notifications marked read");
-        startTransition(() => router.refresh());
-    }
+    const markAll = () => {
+        startTransition(async () => {
+            const res = await markAllNotificationsRead();
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            showSuccess("All notifications marked as read");
+            router.refresh();
+        });
+    };
 
     if (notifications.length === 0) {
         return (
             <EmptyState
-                icon={<BellOff />}
-                title="No notifications yet"
-                description="When an enquiry comes in or something needs you, it lands here."
+                icon={<Bell />}
+                title="Nothing to catch up on"
+                description={`No notifications in ${businessName}. They arrive from the modules this business has on — turning one on gives it something to say here.`}
             />
         );
     }
 
     return (
-        <div className="space-y-4">
-            <div className="flex justify-end">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={markAll}
-                    disabled={!hasUnread || pending}
-                    className="wk-press"
-                >
-                    Mark all read
-                </Button>
-            </div>
+        <div className="grid gap-3">
+            {unread > 0 ? (
+                <div className="flex items-center justify-between gap-3">
+                    <p className="text-[12.5px] text-muted-foreground">
+                        {unread === 1 ? "1 unread" : `${unread} unread`}
+                    </p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={markAll}
+                        disabled={pending}
+                        className="wk-press"
+                    >
+                        Mark all as read
+                    </Button>
+                </div>
+            ) : null}
 
-            <ul className="divide-y rounded-xl border border-border">
+            <ListCard
+                main="Notification"
+                end="When"
+                note="Notifications belong to you within this business, and to the modules it has on — switching business changes the list, and marking one read does not mark it read for anyone else."
+            >
                 {notifications.map((n, index) => {
-                    const unread = !n.readAt;
-                    const body = (
-                        <div className="flex items-start gap-3">
-                            <span
-                                aria-hidden
-                                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                                    unread ? "bg-primary" : "bg-transparent"
-                                }`}
-                            />
-                            <div className="min-w-0 flex-1">
-                                <p
-                                    className={`truncate text-sm ${
-                                        unread
-                                            ? "font-semibold"
-                                            : "text-muted-foreground"
-                                    }`}
-                                >
-                                    {n.title}
-                                </p>
-                                {n.body && (
-                                    <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                                        {n.body}
-                                    </p>
-                                )}
-                                <p className="mt-1 text-xs text-muted-foreground">
+                    const isUnread = !n.readAt;
+                    const row = (
+                        <ListRow
+                            title={n.title}
+                            sub={n.body}
+                            muted={!isUnread}
+                            tag={
+                                isUnread ? (
+                                    <Badge variant="warning">Unread</Badge>
+                                ) : null
+                            }
+                            end={
+                                <span className="text-[12px] tabular-nums text-muted-foreground">
                                     {formatWhen(n.createdAt)}
-                                </p>
-                            </div>
-                        </div>
+                                </span>
+                            }
+                        />
                     );
-
+                    const rowClass =
+                        "block w-full text-left transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
+                    const label = `${n.title}${isUnread ? ", unread" : ", read"}${n.body ? ` — ${n.body}` : ""}`;
                     return (
                         <li
                             key={n.id}
                             style={{ "--wk-i": index } as React.CSSProperties}
-                            className="wk-item flex items-center justify-between gap-4 p-4"
+                            className="wk-item border-b border-border last:border-b-0"
                         >
                             {n.leadId ? (
                                 <Link
                                     href={`/leads/${n.leadId}`}
-                                    className="min-w-0 flex-1 hover:opacity-80"
+                                    aria-label={label}
+                                    className={rowClass}
+                                    onClick={() => {
+                                        // Opening it is reading it.
+                                        if (isUnread) markOne(n.id, true);
+                                    }}
                                 >
-                                    {body}
+                                    {row}
                                 </Link>
-                            ) : (
-                                <div className="min-w-0 flex-1">{body}</div>
-                            )}
-                            {unread && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => markOne(n.id)}
-                                    disabled={busyId === n.id || pending}
-                                    className="wk-press"
+                            ) : isUnread ? (
+                                <button
+                                    type="button"
+                                    aria-label={`${label}. Mark as read`}
+                                    disabled={pending}
+                                    className={rowClass}
+                                    onClick={() => {
+                                        markOne(n.id);
+                                    }}
                                 >
-                                    Mark read
-                                </Button>
+                                    {row}
+                                </button>
+                            ) : (
+                                row
                             )}
                         </li>
                     );
                 })}
-            </ul>
+            </ListCard>
         </div>
     );
 }

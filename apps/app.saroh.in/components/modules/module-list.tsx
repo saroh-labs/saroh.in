@@ -52,11 +52,34 @@ export function ModuleList({ modules }: { modules: ModuleView[] }) {
                     : // Shown disabled rather than hidden: knowing what this
                       // business runs on is part of working here, even for
                       // someone who cannot change it.
-                      "Your role can see what this business runs on but not change it."}
+                      "Your role can see what this business runs on but not change it. The switches are shown disabled rather than hidden, because knowing is part of working here."}
             </p>
         </>
     );
 }
+
+/**
+ * What each module is called here and what it is for, from the workspace
+ * design. The names are the rail's — the API says "Commerce" and "CRM", but a
+ * merchant turns on the Sell and Contacts they see in the sidebar. A module
+ * the design does not describe keeps the API's name and the rows it adds.
+ */
+const DISPLAY: Partial<Record<string, { label: string; note: string }>> = {
+    COMMERCE: {
+        label: "Sell",
+        note: "Orders, products, customers and storefronts.",
+    },
+    WEBSITE: { label: "Website", note: "Pages, posts and a domain." },
+    APPOINTMENTS: {
+        label: "Appointments",
+        note: "A calendar, services and bookings.",
+    },
+    CRM: { label: "Contacts", note: "People who are not customers yet." },
+    INSIGHTS: {
+        label: "Insights",
+        note: "Figures across whatever else is turned on.",
+    },
+};
 
 /** What needs a person first, then what is running, then what is not on. */
 function byAttentionFirst(a: ModuleView, b: ModuleView): number {
@@ -77,6 +100,8 @@ function ModuleRow({ module }: { module: ModuleView }) {
     const noteId = useId();
     const on = module.lifecycle === "ENABLED";
     const rows = navRowsForModule(module.key);
+    const display = DISPLAY[module.key];
+    const label = display?.label ?? module.label;
     const setupBlocker = on ? module.blockers[0] : undefined;
 
     const set = (next: "ENABLED" | "DISABLED", onDone: () => void) => {
@@ -98,14 +123,14 @@ function ModuleRow({ module }: { module: ModuleView }) {
         if (on) {
             set("DISABLED", () =>
                 showUndo(
-                    `${module.label} off — ${listRows(rows)} ${rows.length === 1 ? "has" : "have"} left the rail. Nothing is deleted.`,
+                    `${label} off — ${listRows(rows)} ${rows.length === 1 ? "has" : "have"} left the rail. Nothing is deleted.`,
                     () => set("ENABLED", () => undefined),
                 ),
             );
         } else {
             set("ENABLED", () =>
                 showSuccess(
-                    `${module.label} on — ${listRows(rows)} ${rows.length === 1 ? "is" : "are"} in the rail now.`,
+                    `${label} on — ${listRows(rows)} ${rows.length === 1 ? "is" : "are"} in the rail now.`,
                 ),
             );
         }
@@ -129,7 +154,7 @@ function ModuleRow({ module }: { module: ModuleView }) {
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                     <span id={labelId} className="text-[13.5px] font-medium">
-                        {module.label}
+                        {label}
                     </span>
                     <StateTag module={module} />
                 </div>
@@ -137,9 +162,11 @@ function ModuleRow({ module }: { module: ModuleView }) {
                     id={noteId}
                     className="mt-[3px] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground"
                 >
-                    {rows.length > 0
-                        ? `${listRows(rows)} in the rail.`
-                        : "Works behind the other rows rather than adding one of its own."}
+                    {display
+                        ? display.note
+                        : rows.length > 0
+                          ? `${listRows(rows)} in the rail.`
+                          : "Works behind the other rows rather than adding one of its own."}
                 </p>
                 {setupBlocker && module.blockers.length > 0 ? (
                     <div className="mt-2">

@@ -22,6 +22,8 @@ export interface OrganizationSettings {
     name: string;
     slug: string;
     profile: OrganizationProfile | null;
+    /** The earliest order in the business, ISO; `null` before the first. */
+    tradingSince: string | null;
 }
 
 export interface OrganizationSettingsInput {
@@ -30,8 +32,7 @@ export interface OrganizationSettingsInput {
 }
 
 export type SettingsResult<T> =
-    | { ok: true; data: T }
-    | { ok: false; error: string };
+    { ok: true; data: T } | { ok: false; error: string };
 
 /** The active org's editable identity. Null when no org is active. */
 export async function getOrganizationSettings(): Promise<OrganizationSettings | null> {
@@ -56,8 +57,7 @@ export async function updateOrganizationSettings(
         body: JSON.stringify(input),
     });
     const data = (await res.json().catch(() => null)) as
-        | (OrganizationSettings & { message?: string; error?: string })
-        | null;
+        (OrganizationSettings & { message?: string; error?: string }) | null;
 
     if (!res.ok || !data) {
         return {

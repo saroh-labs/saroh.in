@@ -40,7 +40,7 @@ const SECTIONS = [
     },
     {
         href: "/settings/providers",
-        label: "Providers & health",
+        label: "Providers",
         description:
             "The external services your modules depend on, and whether each is ready.",
         icon: Plug,

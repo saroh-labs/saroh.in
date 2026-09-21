@@ -3,6 +3,8 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 
+import { ListCard, ListRow } from "@/components/shared/list-card";
+
 import type {
     HealthStatus,
     ProviderHealth,
@@ -64,71 +66,61 @@ const STATUS: Record<
 };
 
 /**
- * Providers, as the workspace design draws a list: one bordered card, a row
- * each, the state on the right.
- *
- * It was a grid of cards, and three cards is where that stops working — each
- * one repeated the same two controls at card size for a single line of text,
- * and a merchant scanning for "is anything wrong?" had to read three headings
- * to find three pills. In a column the pills line up and the answer is one
- * glance down the right-hand edge.
+ * Providers, as the workspace design draws the list: column headings, one row
+ * each, and the state on the right where the eye can run down it. In a column
+ * the pills line up, so "is anything wrong?" is one glance down the edge.
  *
  * Never renders credentials — the API only ever returns status + safe copy.
  */
 export function ProviderHealthList({ health }: { health: ProviderHealth[] }) {
     return (
-        <>
-            <div className="overflow-hidden rounded-[12px] border border-border">
-                {health.map((h) => {
-                    const status = STATUS[h.status];
-                    return (
-                        <div
-                            key={h.key}
-                            className="flex flex-wrap items-center gap-3 border-b border-foreground/10 px-4 py-3 last:border-b-0"
-                        >
-                            <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-[13.5px] font-medium">
-                                        {h.label}
-                                    </span>
+        <ListCard
+            main="Provider"
+            end="Status"
+            note="Providers are set up per business. A storefront can point its checkout at a different payment provider, and that choice lives under Sell rather than here."
+        >
+            {health.map((h) => {
+                const status = STATUS[h.status];
+                return (
+                    <li
+                        key={h.key}
+                        className="border-b border-border last:border-b-0"
+                    >
+                        <ListRow
+                            title={h.label}
+                            sub={h.message}
+                            end={
+                                <>
                                     <Badge variant={status.variant}>
                                         {status.label}
                                     </Badge>
-                                </div>
-                                <p className="mt-[2px] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
-                                    {h.message}
-                                </p>
-                            </div>
-                            <Button
-                                asChild
-                                variant={status.urgent ? "brand" : "outline"}
-                                size="sm"
-                            >
-                                {/*
-                                 * The visible label stays short, but the
-                                 * ACCESSIBLE name says which provider it acts
-                                 * on. Three rows offering three links whose
-                                 * entire accessible name is "Fix" is exactly
-                                 * what WCAG 2.4.4 fails: a screen-reader user
-                                 * listing the page's links hears the same word
-                                 * three times with nothing to choose between.
-                                 */}
-                                <Link
-                                    href={h.actionHref}
-                                    aria-label={`${status.action} ${h.label}`}
-                                >
-                                    {status.action}
-                                </Link>
-                            </Button>
-                        </div>
-                    );
-                })}
-            </div>
-            <p className="mt-2.5 max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
-                Providers are set up per business. A storefront can point its
-                checkout at a different payment provider, and that choice lives
-                under Sell rather than here.
-            </p>
-        </>
+                                    <Button
+                                        asChild
+                                        variant={
+                                            status.urgent ? "brand" : "outline"
+                                        }
+                                        size="sm"
+                                    >
+                                        {/*
+                                         * The visible label stays short, but
+                                         * the ACCESSIBLE name says which
+                                         * provider it acts on — three links
+                                         * all named "Fix" is what WCAG 2.4.4
+                                         * fails.
+                                         */}
+                                        <Link
+                                            href={h.actionHref}
+                                            aria-label={`${status.action} ${h.label}`}
+                                        >
+                                            {status.action}
+                                        </Link>
+                                    </Button>
+                                </>
+                            }
+                        />
+                    </li>
+                );
+            })}
+        </ListCard>
     );
 }

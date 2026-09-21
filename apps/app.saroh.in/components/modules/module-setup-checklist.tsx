@@ -15,15 +15,15 @@ export function ModuleSetupChecklist({
 }) {
     if (blockers.length === 0) return null;
     return (
-        <ul className="mt-3 space-y-2" aria-label="Setup steps">
+        <ul className="mt-1.5 space-y-1" aria-label="Setup steps">
             {blockers.map((blocker) => (
                 <li
                     key={blocker.code}
-                    className="flex items-start gap-2 text-sm text-muted-foreground"
+                    className="flex items-start gap-2 text-[11.5px] leading-[1.45] text-muted-foreground"
                 >
                     <span
                         aria-hidden
-                        className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50"
+                        className="mt-[5px] size-1.5 shrink-0 rounded-full bg-muted-foreground/50"
                     />
                     <span>
                         {blocker.message ?? blocker.code}
