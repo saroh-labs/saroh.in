@@ -9,7 +9,6 @@ import Link from "next/link";
 import { SECTION_ICONS } from "@/components/sites/block-icons";
 import { BOUND_BLOCKS } from "@/components/sites/block-kinds";
 import { SECTION_LABELS } from "@/components/sites/editor-constants";
-import { NoteComposer } from "@/components/sites/note-composer";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { SectionFields } from "@/components/sites/section-fields";
 import { SectionPadding } from "@/components/sites/section-fields/padding";
@@ -28,8 +27,6 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 export function BlockInspector({
     active,
     count,
-    siteId,
-    pageId,
     pages,
     services,
     style,
@@ -42,14 +39,11 @@ export function BlockInspector({
     onToggleHidden,
     onMove,
     onRemove,
-    onNoteAdded,
 }: {
     /** The selected block and where it sits, or null when nothing is. */
     active: { index: number; section: Section } | null;
     /** How many blocks the page has, for the move arrows. */
     count: number;
-    siteId: string;
-    pageId: string;
     pages: SitePage[];
     services: ReturnType<typeof useServicesForPicker>;
     style: SiteStyle;
@@ -66,7 +60,6 @@ export function BlockInspector({
     onToggleHidden: () => void;
     onMove: (delta: -1 | 1) => void;
     onRemove: () => void;
-    onNoteAdded: () => Promise<void>;
 }) {
     if (active === null) {
         return (
@@ -246,19 +239,6 @@ export function BlockInspector({
                 >
                     Remove
                 </Button>
-            </div>
-
-            {/*
-             * Leaving a note is an action taken ON this block (#277), so it
-             * sits with the block and needs no picker.
-             */}
-            <div className="border-t pt-3">
-                <NoteComposer
-                    siteId={siteId}
-                    pageId={pageId}
-                    sectionKey={section.key}
-                    onAdded={onNoteAdded}
-                />
             </div>
 
             {/*

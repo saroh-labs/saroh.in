@@ -30,6 +30,7 @@ import {
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { AddBlockPanel } from "@/components/sites/add-block-panel";
 import { AddSectionDialog } from "@/components/sites/add-section-dialog";
+import { BlockFeedback } from "@/components/sites/block-feedback";
 import { SECTION_ICONS } from "@/components/sites/block-icons";
 import {
     BlockInspector,
@@ -1699,14 +1700,29 @@ export function SiteEditor({
                             {
                                 key: "feedback",
                                 label: "Feedback",
-                                count: openNotes,
+                                // The selected block's own count, as its pin
+                                // shows; the whole site's with none selected.
+                                count:
+                                    active?.section.key !== undefined
+                                        ? (notesByKey.get(active.section.key) ??
+                                          0)
+                                        : openNotes,
                             },
                         ]}
                         value={inspector}
                         onSelect={setInspector}
                     />
                     <div className="min-h-0 flex-1 overflow-y-auto">
-                        {inspector === "feedback" ? (
+                        {inspector === "feedback" && active ? (
+                            <BlockFeedback
+                                siteId={siteId}
+                                pageId={pageId}
+                                sectionKey={active.section.key}
+                                label={SECTION_LABELS[active.section.type]}
+                                comments={comments}
+                                onChanged={refreshReview}
+                            />
+                        ) : inspector === "feedback" ? (
                             <ReviewPanel
                                 siteId={siteId}
                                 pages={pages}
@@ -1725,8 +1741,6 @@ export function SiteEditor({
                             <BlockInspector
                                 active={active}
                                 count={sections.length}
-                                siteId={siteId}
-                                pageId={pageId}
                                 pages={pages}
                                 services={services}
                                 style={style}
@@ -1776,7 +1790,6 @@ export function SiteEditor({
                                     });
                                     setRemoveOpen(true);
                                 }}
-                                onNoteAdded={refreshReview}
                             />
                         )}
                     </div>
