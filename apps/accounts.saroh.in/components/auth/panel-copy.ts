@@ -31,50 +31,50 @@ export interface PanelCopy {
 }
 
 export const LOGIN_PANEL: PanelCopy = {
-    eyebrow: "Welcome back",
-    heading: "One account, every business you belong to.",
-    body: "Switch between them from the top of the workspace — your role can differ in each, and the sidebar changes with it.",
+    eyebrow: "Log in",
+    heading: "One login, every business you belong to.",
+    body: "Your account is yours. The businesses you can reach — your own, and any you have been invited to — all sit behind this one password.",
     points: [
-        "A bookkeeper can hold read-only access in a dozen businesses",
-        "Nothing is shared between them except you",
-        "GitHub and Google work too, if that is how you signed up",
+        "Your role can differ in each business",
+        // True: log in answers a wrong email and a wrong password alike, and
+        // forgot-password replies the same whether or not the address exists.
+        "We never say whether an email is registered",
+        "Nothing is shared between businesses except you",
     ],
 };
 
 export const SIGNUP_PANEL: PanelCopy = {
-    eyebrow: "New to Saroh",
-    heading: "A shop, a site, a diary — whichever of those you are.",
-    body: "You choose what the business needs after the account exists. Nothing is switched on that you did not ask for.",
+    eyebrow: "Sign up",
+    heading: "An account, not a business.",
+    body: "This is you. What you do with Saroh comes after — and if you are here from an invitation, there is no business to create at all.",
     points: [
-        "One account can hold as many businesses as you need",
-        "Capabilities go on and off later without losing anything",
-        // Was "Your name is what your team sees when you invite them", which
-        // the Name field's own note now says a few centimetres away. Setting
-        // the expectation of the next screen is worth more than saying one
-        // thing twice.
-        "A code comes by email before you are signed in",
+        "Eight characters or more, and nothing else demanded of the password",
+        // True: `requireEmailVerification` issues no session until the code
+        // is accepted.
+        "Signing up issues no session until the email is verified",
+        "Leaving before the code costs nothing — you cannot be signed in yet",
     ],
 };
 
 export const VERIFY_PANEL: PanelCopy = {
-    eyebrow: "One step left",
-    heading: "The account exists. The session does not.",
-    body: "Saroh will not sign anyone in on an address nobody has confirmed — so this is a step rather than a reminder you can dismiss.",
+    eyebrow: "Verify",
+    heading: "The code comes before the session.",
+    body: "Saroh wants a verified email before anyone is signed in, and has already sent the code — so this is the next step, not a wall in front of a half-made account.",
     points: [
         `The code lasts ${CODE_MINUTES} minutes`,
-        "Asking for a new one retires the old",
-        "If you were invited, you land on that business, not your own setup",
+        "Asking for a new one retires the one before it",
+        "Paste all six at once — it spreads across the boxes",
     ],
 };
 
 export const FORGOT_PANEL: PanelCopy = {
-    eyebrow: "Locked out",
-    heading: "This page will not tell anyone whether an account exists.",
-    body: "The confirmation reads the same either way, deliberately, so nobody can use it to find out who is registered with Saroh.",
+    eyebrow: "Forgot password",
+    heading: "We answer the same either way.",
+    body: "Whether or not that address has an account, this page says the same thing. Confirming it would turn the form into a way of checking who has an account here.",
     points: [
-        "Your current password keeps working until a new one is saved",
-        "Asking twice is harmless",
-        "Check spam before asking again",
+        "The link lasts an hour and works once",
+        "Using it signs you out on every other device",
+        "Your old password keeps working until the new one is set",
     ],
 };
 
@@ -124,5 +124,29 @@ export const INVITE_PANEL: PanelCopy = {
         "The role decides what you see and can change",
         "Whoever invited you can change or withdraw it later",
         "You can be in as many businesses as you like",
+    ],
+};
+
+/** A reset link past its hour, or already used. */
+export const EXPIRED_PANEL: PanelCopy = {
+    eyebrow: "Reset password",
+    heading: "That link has run out.",
+    body: "Reset links last an hour and work once. This one is past that, or has already been used — either way nothing has changed and your old password still works.",
+    points: [
+        "Asking for a new one takes a moment",
+        "The old password is untouched until a new one is set",
+        "If you did not ask for this, nobody got in — ignore it",
+    ],
+};
+
+/** The reset page opened with no link at all. */
+export const MISSING_PANEL: PanelCopy = {
+    eyebrow: "Reset password",
+    heading: "This page needs a link.",
+    body: "Resetting a password only works from the link in the email, because that link is what proves the request came from the account's owner.",
+    points: [
+        "Opening the page directly cannot work, by design",
+        "Ask for a link and it arrives in a moment",
+        "Already have one? Open it from the email rather than typing the address",
     ],
 };

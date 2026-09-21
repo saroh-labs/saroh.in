@@ -20,6 +20,7 @@ import {
 } from "@saroh/templates";
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { addressProblem } from "./site-address";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
@@ -606,19 +607,62 @@ export class SitesService {
                 );
             }
 
-            // Subdomain is globally unique when set; reject a clash up front
-            // rather than surfacing a raw constraint error. (Full claim /
-            // verification is S2-007.)
-            if (dto.subdomain) {
-                const taken = await tx.site.findUnique({
-                    where: { subdomain: dto.subdomain },
+            /*
+             * Where the site is served (`<subdomain>.saroh.app`).
+             *
+             * Asked for: it must be a usable address, free of other sites,
+             * and not the address ANOTHER business reserved at setup — that
+             * reservation is a promise (see site-address.ts), and a site
+             * taking it would break it.
+             *
+             * Not asked for: the site takes the address its own business
+             * reserved, while no site of theirs uses it yet — so the address
+             * a merchant chose at setup is where their first website appears.
+             */
+            let subdomain = dto.subdomain;
+            if (subdomain) {
+                const problem = addressProblem(subdomain);
+                if (problem) {
+                    throw new BadRequestException({
+                        message: problem,
+                        details: { field: "subdomain" },
+                    });
+                }
+                const reserved = await tx.organization.findUnique({
+                    where: { slug: subdomain },
                     select: { id: true },
                 });
-                if (taken) {
-                    throw new ConflictException(
-                        `The subdomain "${dto.subdomain}" is already taken`,
-                    );
+                if (reserved && reserved.id !== ctx.organizationId) {
+                    throw new ConflictException({
+                        message: `${subdomain}.saroh.app belongs to another business`,
+                        details: { field: "subdomain" },
+                    });
                 }
+            } else {
+                const business = await tx.organization.findUnique({
+                    where: { id: ctx.organizationId },
+                    select: { slug: true },
+                });
+                if (business?.slug && !addressProblem(business.slug)) {
+                    subdomain = business.slug;
+                }
+            }
+
+            // Subdomain is globally unique when set; reject a clash up front
+            // rather than surfacing a raw constraint error. A default that
+            // turns out to be in use is simply not taken, not an error.
+            if (subdomain) {
+                const taken = await tx.site.findUnique({
+                    where: { subdomain },
+                    select: { id: true },
+                });
+                if (taken && dto.subdomain) {
+                    throw new ConflictException({
+                        message: `The subdomain "${subdomain}" is already taken`,
+                        details: { field: "subdomain" },
+                    });
+                }
+                if (taken) subdomain = undefined;
             }
 
             const site = await tx.site.create({
@@ -626,7 +670,7 @@ export class SitesService {
                     organizationId: ctx.organizationId,
                     name: dto.name,
                     slug,
-                    subdomain: dto.subdomain,
+                    subdomain,
                 },
                 select: { id: true, slug: true },
             });

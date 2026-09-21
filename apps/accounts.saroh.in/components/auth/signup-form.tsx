@@ -68,13 +68,13 @@ export function SignupForm({
     return (
         <div>
             <AuthHeading
-                title="Create your account"
-                blurb="One account for every Saroh app."
+                title="Make your account"
+                blurb="Your details, not the business's — that comes in a moment."
             />
             <form onSubmit={handleSubmit} noValidate>
                 {error ? <AuthError>{error}</AuthError> : null}
                 <AuthField
-                    label="Name"
+                    label="Your name"
                     name="name"
                     type="text"
                     autoComplete="name"
@@ -94,7 +94,7 @@ export function SignupForm({
                     note={
                         invitedEmail
                             ? "The invitation was sent to this address, so the account has to use it."
-                            : undefined
+                            : "The verification code goes here, so use one you can open now."
                     }
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -106,7 +106,7 @@ export function SignupForm({
                     name="password"
                     type="password"
                     autoComplete="new-password"
-                    note="At least 8 characters."
+                    note="Eight characters or more."
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -114,7 +114,7 @@ export function SignupForm({
                     disabled={isLoading}
                 />
                 <AuthSubmit disabled={isLoading}>
-                    {isLoading ? "Creating account…" : "Create account"}
+                    {isLoading ? "Sending the code…" : "Send the code"}
                 </AuthSubmit>
             </form>
 

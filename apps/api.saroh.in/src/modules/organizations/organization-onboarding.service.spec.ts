@@ -12,6 +12,11 @@ jest.mock("@saroh/database", () => {
         businessProfile: {
             create: jest.fn(),
         },
+        // Read by the address check: a website already served at an
+        // address makes it taken, as much as a business reserving it.
+        site: {
+            findUnique: jest.fn(),
+        },
         membership: {
             create: jest.fn(),
         },
@@ -35,6 +40,9 @@ import { OrganizationOnboardingService } from "./organization-onboarding.service
 
 const orgFindUnique = prisma.organization.findUnique as jest.Mock;
 const orgCreate = prisma.organization.create as jest.Mock;
+const siteFindUnique = (
+    prisma as unknown as { site: { findUnique: jest.Mock } }
+).site.findUnique;
 const profileCreate = prisma.businessProfile.create as jest.Mock;
 const membershipCreate = prisma.membership.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
@@ -50,6 +58,7 @@ describe("OrganizationOnboardingService.onboard", () => {
         jest.clearAllMocks();
         // Default happy-path stubs; individual tests override as needed.
         orgFindUnique.mockResolvedValue(null);
+        siteFindUnique.mockResolvedValue(null);
         orgCreate.mockResolvedValue({ id: "org_1", slug: "acme" });
         profileCreate.mockResolvedValue({ id: "bp_1" });
         membershipCreate.mockResolvedValue({ id: "mem_1" });
@@ -170,6 +179,81 @@ describe("OrganizationOnboardingService.onboard", () => {
         expect(orgCreate).toHaveBeenCalledWith({
             data: { name: "  My Shop!  ", slug: "my-shop" },
             select: { id: true, slug: true },
+        });
+    });
+
+    describe("the address the business reserves", () => {
+        it("uses the address the merchant chose, not the name's", async () => {
+            await service.onboard("user_1", {
+                name: "Rye & Co. Bakery",
+                address: "ryeandco",
+            });
+            expect(orgCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: { name: "Rye & Co. Bakery", slug: "ryeandco" },
+                }),
+            );
+        });
+
+        it("refuses a reserved address on the address field, creating nothing", async () => {
+            const err = await service
+                .onboard("user_1", { name: "Rye", address: "api" })
+                .catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(BadRequestException);
+            expect((err as BadRequestException).getResponse()).toMatchObject({
+                details: { field: "address" },
+            });
+            expect(transaction).not.toHaveBeenCalled();
+        });
+
+        it("counts an address as taken when another business's website lives there", async () => {
+            siteFindUnique.mockResolvedValue({ organizationId: "org_other" });
+            const err = await service
+                .onboard("user_1", { name: "Rye", address: "ryeandco" })
+                .catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(ConflictException);
+            expect((err as ConflictException).getResponse()).toMatchObject({
+                details: { field: "address" },
+            });
+            expect(orgCreate).not.toHaveBeenCalled();
+        });
+    });
+});
+
+describe("OrganizationOnboardingService.checkAddress", () => {
+    const service = new OrganizationOnboardingService({
+        record: jest.fn(),
+    } as unknown as AuditService);
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        orgFindUnique.mockResolvedValue(null);
+        siteFindUnique.mockResolvedValue(null);
+    });
+
+    it("says a free address is available, normalised", async () => {
+        expect(await service.checkAddress("  RyeAndCo ")).toEqual({
+            address: "ryeandco",
+            available: true,
+        });
+    });
+
+    it.each([
+        ["ab", /at least 3/],
+        ["-rye", /hyphen/],
+        ["rye co", /lowercase/],
+        ["support", /kept for Saroh/],
+    ])("says why %s cannot be used", async (address, reason) => {
+        const answer = await service.checkAddress(address);
+        expect(answer.available).toBe(false);
+        expect(answer.reason).toMatch(reason);
+    });
+
+    it("says an address another business reserved is taken", async () => {
+        orgFindUnique.mockResolvedValue({ id: "org_other" });
+        expect(await service.checkAddress("ryeandco")).toMatchObject({
+            available: false,
+            reason: "Another business already has this address",
         });
     });
 });

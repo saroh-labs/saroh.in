@@ -124,7 +124,7 @@ export function OtpInput({
                     aria-invalid={invalid ? true : undefined}
                     aria-describedby={describedBy}
                     className={cn(
-                        "sa-otp border-input bg-field h-14 w-full rounded-md border text-center font-mono text-xl font-medium tabular-nums",
+                        "sa-otp border-input bg-field h-[46px] w-full rounded-[9px] border text-center text-[18px] font-semibold tabular-nums",
                         "disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground disabled:cursor-not-allowed",
                         invalid && "border-destructive bg-destructive-subtle",
                     )}

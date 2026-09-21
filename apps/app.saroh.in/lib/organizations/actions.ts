@@ -6,8 +6,13 @@ import { redirect } from "next/navigation";
 import { env } from "@/env";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 
-import type { CreateOrganizationInput, OrganizationResult } from "./service";
+import type {
+    AddressAvailability,
+    CreateOrganizationInput,
+    OrganizationResult,
+} from "./service";
 import {
+    checkOrganizationAddress,
     createOrganization as createOrganizationApi,
     listOrganizations,
 } from "./service";
@@ -72,6 +77,13 @@ export async function chooseOrganization(formData: FormData): Promise<void> {
     // re-read there, so a membership that ended while they looked at it simply
     // is not on the page the second time.
     redirect(result.ok ? "/" : "/choose");
+}
+
+/** Setup's live address check. Read-only; the create re-checks. */
+export async function checkAddress(
+    address: string,
+): Promise<AddressAvailability | null> {
+    return checkOrganizationAddress(address);
 }
 
 /**

@@ -1,11 +1,24 @@
-import { FormSkeleton } from "@/components/shared/form-skeleton";
+import { Skeleton } from "@saroh/ui/skeleton";
+import { SplitShell } from "@saroh/ui/split-shell";
 
 /**
- * Segment loading state. Without a `loading.tsx` this route has no Suspense
- * boundary, so the App Router holds the PREVIOUS page on screen until the
- * server render resolves — the click registers and nothing moves. Shape and
- * width match the page below so nothing jumps when the real content lands.
+ * The business step's shape while it loads: the split, a heading and four
+ * fields — so the page does not arrive as a different layout from the one it
+ * was waiting as.
  */
 export default function Loading() {
-    return <FormSkeleton fields={6} maxWidth="max-w-lg" />;
+    return (
+        <SplitShell panel={<div aria-hidden className="h-48" />}>
+            <div aria-busy="true" aria-label="Loading" className="grid gap-5">
+                <Skeleton className="h-7 w-56" />
+                <Skeleton className="h-4 w-72" />
+                {Array.from({ length: 4 }, (_, i) => (
+                    <div key={i} className="grid gap-2">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="h-[38px] w-full" />
+                    </div>
+                ))}
+            </div>
+        </SplitShell>
+    );
 }

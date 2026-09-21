@@ -81,9 +81,9 @@ export function LoginForm({
 
     return (
         <div>
-            {/* "Welcome back" belongs to the panel beside this form; the
-                heading names the act, as the design does on all five pages. */}
-            <AuthHeading title="Log in" blurb="Continue to your workspace." />
+            {/* The heading names the act, as the design does on every page;
+                the panel beside it says what logging in reaches. */}
+            <AuthHeading title="Log in" blurb="Welcome back." />
             <form onSubmit={handleSubmit} noValidate>
                 {error ? <AuthError>{error}</AuthError> : null}
                 <AuthField
@@ -92,6 +92,7 @@ export function LoginForm({
                     type="email"
                     autoComplete="email"
                     placeholder="you@example.com"
+                    note="The address you signed up with."
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -103,6 +104,10 @@ export function LoginForm({
                     type="password"
                     autoComplete="current-password"
                     side={{ href: "/forgot-password", label: "Forgot it?" }}
+                    // True: a wrong email and a wrong password get the same
+                    // answer, so the form cannot be used to check who has an
+                    // account here.
+                    note="We never say which of the two was wrong."
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required

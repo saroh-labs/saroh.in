@@ -183,3 +183,25 @@ export function AuthFooter({ children }: { children: React.ReactNode }) {
         </p>
     );
 }
+
+/**
+ * A plain fact set apart from the form: a titled note on the quiet surface,
+ * as the design draws the states that have nothing to type (an expired link,
+ * a page opened without one).
+ */
+export function AuthNote({
+    title,
+    children,
+}: {
+    title: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="sa-rise bg-muted mb-4 rounded-[10px] px-3.5 py-3">
+            <p className="text-[12.5px] font-semibold">{title}</p>
+            <p className="text-muted-foreground mt-1 text-pretty text-[12.5px] leading-[1.55]">
+                {children}
+            </p>
+        </div>
+    );
+}
