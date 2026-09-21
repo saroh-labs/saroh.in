@@ -1,3 +1,4 @@
+/// <reference types="@testing-library/jest-dom/vitest" />
 /*
  * jest-dom's matchers, added to THIS package's `expect`.
  *
@@ -9,6 +10,8 @@
  * "snapshot state … not found". Extending the `expect` imported here keeps one
  * vitest in the process whatever the lockfile does.
  */
+// The line above is types only — erased at runtime — and gives `expect` the
+// matchers' signatures; the extend below is what adds them.
 import * as matchers from "@testing-library/jest-dom/matchers";
 import { expect } from "vitest";
 
