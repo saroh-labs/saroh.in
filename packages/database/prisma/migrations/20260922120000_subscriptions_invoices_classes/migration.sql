@@ -287,6 +287,18 @@ CREATE INDEX "PackRedemption_organizationId_idx" ON "PackRedemption"("organizati
 -- CreateIndex
 CREATE INDEX "PackRedemption_purchaseId_idx" ON "PackRedemption"("purchaseId");
 
+-- An API that ran the renewal job before this index existed (a dev machine
+-- that started the new code first) can have queued the same pending run
+-- more than once. Keep the earliest and drop the rest, or the index below
+-- cannot be built. Anywhere the migration runs first, this deletes nothing.
+DELETE FROM "Job" AS j
+USING "Job" AS keep
+WHERE j.type = 'subscription.renew'
+  AND j.status = 'PENDING'
+  AND keep.type = 'subscription.renew'
+  AND keep.status = 'PENDING'
+  AND (keep."runAt", keep.id) < (j."runAt", j.id);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Job_one_pending_subscription_renew" ON "Job"("type") WHERE (type = 'subscription.renew' AND status = 'PENDING');
 
