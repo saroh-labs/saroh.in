@@ -1,213 +1,157 @@
-# Saroh.in
+# Saroh
 
-**Source-available** business platform: one place a small business sells, takes
-bookings, follows up on enquiries, and keeps a website in step.
+**One place a small business sells, takes bookings, follows up on enquiries,
+bills its regulars and keeps a website in step.**
 
-Free to use, modify and self-host — including to run your own business. The one
-thing you may not do is offer it to other people as a hosted service. See
-[Licence](#licence) below.
+Saroh is built for businesses like a gym, a yoga studio, a clinic, a design
+studio or a shop: one login instead of four tools. It is **source-available**,
+so you can use, modify and self-host it, including to run your own business
+([licence](#licence)).
 
-A pnpm + Turborepo monorepo: a set of Next.js apps and a single NestJS API, all
-built on one Better Auth identity system and one PostgreSQL database.
+> **Where it stands:** early, and built in the open. The hosted service is not
+> open yet — [join the waitlist at saroh.in](https://saroh.in). The whole
+> product runs on your machine today; running your own copy for real use works
+> but has no step-by-step guide yet
+> ([what it takes](setup-instructions.md#running-your-own-copy)).
 
-> **What's built today:** an Organization-scoped workspace with Website
-> (pages, posts, publishing, custom domains, draft previews), Appointments
-> (services, availability, bookings, reschedule, outcomes), Commerce (catalog,
-> orders, customers, CSV import), CRM (contacts, leads, pipeline) and a public
-> renderer for merchant sites. Admin, Sales and Social are specified but not
-> built. What remains is tracked in the issues and audited in
-> [`docs/architecture/`](docs/architecture/) — start with
-> [`PRODUCT_ROADMAP.md`](docs/architecture/PRODUCT_ROADMAP.md).
+## Watch it
 
-## Tech stack
+[![The Saroh workspace, filmed](docs/demos/tour/poster.jpg)](docs/demos/tour/saroh-tour.mp4)
 
-- **Frontend:** Next.js 16, React 19, TypeScript 5, TailwindCSS 3, shadcn / Radix UI
-- **Backend:** NestJS 11 modular monolith (`apps/api.saroh.in`)
-- **Database:** PostgreSQL (AWS RDS) via **Prisma 7** with `@prisma/adapter-pg`
-- **Auth:** **Better Auth 1.6.x** — the only identity system, hosted by `api.saroh.in` (_not NextAuth_)
-- **Email:** React Email + Nodemailer (`@saroh/emails`)
-- **Storage:** S3-compatible object storage (Cloudflare R2 is the accepted target — see DEC-009; not yet fully wired)
-- **Hosting:** Vercel (frontends)
-- **Tooling:** pnpm 9.9, Turborepo 2.9
+**[A four-minute tour](docs/demos/tour/saroh-tour.mp4)** of the workspace, with
+voice-over: a shop's products and orders, a gym's members, memberships and
+invoices, a yoga studio's courses and class packs, a team and its roles, and
+the same person seeing less as a member of staff. Filmed from the running
+product against the showcase seed, so every screen is real.
 
-## Architecture
+## What it does
 
-`api.saroh.in` is the single business + authorization boundary. It **hosts the
-Better Auth server** and owns all database access; frontends never import Prisma
-and act only as thin, session-authenticated API clients. `accounts.saroh.in`
-provides the auth **UI** (sign-in, signup, verification, password reset) but is
-not a separate auth server. In production the session cookie is scoped to
-`.saroh.in` so it works across every subdomain.
+A business turns on the parts it needs; each is a module it can switch on or
+off. One login can hold several businesses, and the workspace changes shape
+with the one you are in.
 
-**Tenancy:** **Organization** is the single mandatory tenant boundary
-(DEC-005), with optional **Projects** grouping resources beneath it, and
-Organization-owned Sites and Stores. This is implemented, not planned:
-`organizationId` is carried by 58 models, `OrganizationGuard` resolves a proven
-`OrganizationContext` on every authenticated route, and PostgreSQL row-level
-security enforces `org_isolation` on 66 tables — so a query that forgets to
-scope is refused by the database rather than silently crossing tenants. See
-[`TARGET_ARCHITECTURE.md`](docs/architecture/TARGET_ARCHITECTURE.md) and
-[`DECISIONS.md`](docs/architecture/DECISIONS.md).
+### Website
 
-### Apps (`apps/*`) — 10 total
+Pages built from blocks — hero, services, booking, enquiry form, gallery, FAQ,
+testimonials, rich text — plus posts, and publishing when it is ready. A site
+can take a custom domain and verify it, and a draft can be shared as a private
+preview link. Someone can be invited purely to review a site: they comment and
+approve, and see nothing else of the business. Merchant sites carry the
+business's own brand, never Saroh's.
 
-Every app answers locally at its production hostname with `.localhost`
-appended, served over HTTPS by portless — no ports, and the same shape as
-production, so a cookie scoped to `.saroh.in` behaves the same on
-`.saroh.localhost`. Set it up once (step 4 below); the names come from each
-app's `portless` field in its `package.json`.
+### Schedule
 
-| App                  | Production                               | Local (portless)                  | Role                                                                                         |
-| -------------------- | ---------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------- |
-| `accounts.saroh.in`  | accounts.saroh.in                        | https://accounts.saroh.localhost  | **Auth UI** — login, signup, verification, password reset, OAuth (auth server runs in `api`) |
-| `api.saroh.in`       | api.saroh.in                             | https://api.saroh.localhost       | NestJS backend; **hosts Better Auth** and owns all business logic + DB access                |
-| `app.saroh.in`       | app.saroh.in                             | https://app.saroh.localhost       | The merchant workspace — website, schedule, services, sell, contacts, leads, insights        |
-| `admin.saroh.in`     | admin.saroh.in                           | https://admin.saroh.localhost     | Platform admin — staff RBAC, permission guards, platform audit, feature flags (#128)         |
-| `saroh.app`          | saroh.app, `*.saroh.app`, custom domains | https://saroh.app.localhost       | Public renderer for merchant sites — pages, posts, checkout, draft previews                  |
-| `templates.saroh.in` | templates.saroh.in                       | https://templates.saroh.localhost | Public template catalogue, read from the API                                                 |
-| `ui.saroh.in`        | ui.saroh.in                              | https://ui.saroh.localhost        | Design-system / component showcase                                                           |
-| `docs.saroh.in`      | docs.saroh.in                            | https://docs.saroh.localhost      | Developer documentation (Nextra)                                                             |
-| `help.saroh.in`      | help.saroh.in                            | https://help.saroh.localhost      | End-user help guides (Nextra)                                                                |
-| `saroh.in`           | saroh.in                                 | https://saroh.localhost           | Marketing site + waitlist                                                                    |
+Services carry their price, length, capacity and the hours they are open.
+People book from the business's own site; a class can be in person or online
+with a meeting link sent to whoever books. Bookings can be moved, cancelled, or
+marked with how they went, and the business is told when one arrives.
 
-A **tenant site** is reached by its subdomain under the renderer, so the seeded
-`northwind` site is https://northwind.saroh.app.localhost — the wildcard is why
-`portless service install` takes `--wildcard`. A **draft preview** lives on the
-renderer's own apex: `https://saroh.app.localhost/preview/<token>`.
+### Courses and class packs
 
-### Shared packages (`packages/*`)
+A course is a fixed set of sessions sold as one thing: enrolling someone books
+them into every session still to come and invoices them once. Adding a session
+later books everyone already on it, and an open course holds its unsold seats
+so a walk-in cannot take them.
 
-- `@saroh/auth` — shared Better Auth config: server instance + browser client + Next.js middleware/session helpers
-- `@saroh/database` — Prisma schema + client (`@prisma/adapter-pg`)
-- `@saroh/ui` — shared UI components / design system
-- `@saroh/emails` — React Email templates (verification, password reset, …)
-- `@saroh/charts` — chart components
-- `@saroh/utils` — shared utilities
+A class pack is classes bought ahead — ten classes to use within ninety days,
+say. Selling one issues its invoice; booking spends a class; cancelling gives
+it back; the balance is counted, never stored.
 
-Tooling lives in `tooling/*` (eslint config, tailwind config, tsconfig).
+### Sell
 
-## Implemented features
+A catalogue with variants, SKUs and categories, and stock that knows what is
+already promised to an order and warns before it runs low. Products and
+customers can be brought in by CSV. Orders move forward only, one confirmed
+step at a time, and can be printed. Payment is recorded by hand or taken
+online through the business's own provider. Discount codes take a percentage
+or an amount off, across the shop or limited to one storefront, collection or
+product. After delivery a customer can be invited to review what they bought.
 
-Store dashboard, all backed by the NestJS API with per-store ownership/membership
-authorization:
+### Billing
 
-- **Team members & invitations** — organization members with roles (owner, admin, member, reviewer), email invitations and an accept flow; per-store members alongside them
-- **Products catalog** — products, categories, variants and inventory
-- **Orders & customers** — order lifecycle with reserve / commit / release inventory transitions
-- **Content (blog)** — posts and post categories
-- **Auth** — Better Auth email/password + OAuth, verification, password reset; session-gated dashboard
+Plans and the memberships on them: subscriptions renew on their own, can be
+paused, resumed, ended at the period's end or cancelled, and each renewal
+writes its invoice. Invoices run from INV-0001 with no gaps, carry tax and due
+dates, and are paid by hand or through a pay link on the business's own
+provider. Overdue is worked out, never stored, and the money a person owes
+shows on their contact page.
 
-Placeholder / not yet implemented: public site rendering, page builder,
-Organization/business-profile onboarding, forms/CRM, bookings, payments,
-communications, analytics and subscriptions. AI work is intentionally deferred
-(DEC-015). See [`CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md) for the
-full audited status and [`RISKS_AND_TECH_DEBT.md`](docs/architecture/RISKS_AND_TECH_DEBT.md).
+### Contacts and leads
 
-## Local setup
+Everyone the business knows, and where they came from. Leads carry their value
+and stage, with a pipeline board to move them along and follow-up tasks so
+nothing waits on an enquiry nobody opened. A contact's page gathers their
+leads, membership, packs, courses and invoices in one place.
 
-**Toolchain:** Node **>=24** (developed on 24.14.0) and pnpm **>=9.9** (9.9.0).
-Corepack or a matching pnpm install is recommended; Turborepo drives the tasks.
+### Team and access
+
+Owner, admin, member and reviewer, and a business can invent its own role and
+tick exactly what it reaches. People are invited by email to one business only.
+A role that cannot reach a page is refused it by address, not merely shown a
+shorter menu.
+
+### Insights and the rest
+
+Site visits, enquiries and sales over the last 7, 30 or 90 days. Home says what
+needs doing today across everything at once. Alongside: notifications, payment
+and messaging providers, and the modules themselves.
+
+Messaging (with each contact's consent, over the business's own providers) and
+automations exist in the API but have no workspace screens yet. Platform staff
+have an admin app for feature flags and the audit log. The
+[roadmap](docs/architecture/PRODUCT_ROADMAP.md) tracks what is next.
+
+## Try it
 
 ```bash
-# 1. Install
-pnpm install
-
-# 2. Configure env — copy the template and fill in real values
-cp .env.example .env
-# (each app may also read its own apps/<app>/.env)
-
-# 3. Generate the Prisma client + sync the schema to your dev database
-pnpm --filter @saroh/database build
-pnpm --filter @saroh/database db:push
-
-# 4. Once per machine, in a real terminal: the local HTTPS proxy that gives
-#    every app its production hostname with `.localhost` appended
-#    (prompts for sudo once; see docs/architecture/ENVIRONMENT.md)
-npm install -g portless && portless service install --wildcard
-
-# 5. Run apps. Every app answers at its own hostname over HTTPS — the table
-#    above lists them all; details in docs/architecture/ENVIRONMENT.md
-pnpm dev                 # everything
-pnpm dev:api-auth        # api + accounts
-pnpm dev:apps            # api + accounts + workspace + admin + sites
-pnpm dev:app             # api + accounts + workspace
-pnpm dev:admin           # api + accounts + admin
-pnpm dev:sites           # api + merchant site renderer
-pnpm dev:emails          # email preview at https://emails.saroh.localhost
-pnpm portless:status     # check the shared HTTPS proxy
-pnpm portless:doctor     # diagnose routing, DNS, and certificate issues
+pnpm install && cp .env.example .env        # fill in DATABASE_URL and BETTER_AUTH_SECRET
+npm install -g portless && portless service install --wildcard   # once per machine
+pnpm --filter @saroh/database build && pnpm --filter @saroh/database db:migrate:deploy
+pnpm --filter @saroh/database db:seed:showcase && pnpm dev:app
 ```
 
-Other focused shortcuts: `dev:api`, `dev:accounts`, `dev:web`, `dev:docs`,
-`dev:help`, `dev:templates`, and `dev:ui`. You can also run `pnpm dev` inside
-any app. Each app declares its hostname in `portless` and invokes
-`portless <name> <server command>` directly.
-Shared package `tsup --watch` scripts remain build watchers; only HTTP servers
-need Portless. Set `BETTER_AUTH_TRUSTED_ORIGINS` to the local origins in
-`.env.example` when starting the API.
+Open https://app.saroh.localhost and sign in as `demo@saroh.dev` /
+`demo-password-123`. The showcase gives that login a gym, a yoga studio, a
+clinic and a shop to look around — the same businesses as the film above. Every
+step is explained in [setup-instructions.md](setup-instructions.md).
 
-To have something on every screen, seed a demo business and sign in as
-`demo@saroh.dev` / `demo-password-123`:
+## How it is built
 
-```bash
-pnpm --filter @saroh/database db:seed
-```
+A pnpm + Turborepo monorepo:
 
-- [`LOCAL_DEV.md`](docs/architecture/LOCAL_DEV.md) — why apps must run under
-  portless, the seeded data, throwaway databases, and checking a change in a
-  browser
-- [`ENVIRONMENT.md`](docs/architecture/ENVIRONMENT.md) — every app's URL and
-  every environment variable, with what happens when one is unset
+- **Nine Next.js apps** (Next.js 16, React 19). The main ones are the merchant
+  workspace, sign-in, platform admin, the public renderer for merchant sites
+  and the marketing site.
+- **One NestJS API** (`apps/api.saroh.in`). It hosts **Better Auth**, and it is
+  the only service that reads or writes the database.
+- **PostgreSQL through Prisma 7.** The **Organization** is the tenant root. Every
+  query is scoped to it, and PostgreSQL row-level security backs that up.
 
-## Environment & secrets
+## Find your way around
 
-- All `.env*` files are gitignored; only `.env.example` is committed. **Never
-  commit a real `.env`.**
-- If a real credential is ever exposed (e.g. a `DATABASE_URL` pasted somewhere
-  shared), **rotate it immediately** in the provider dashboard — do not just
-  delete the file.
-- `BETTER_AUTH_SECRET` must be **identical** across `api` and any app that
-  validates sessions, or cross-app login silently fails.
+| You want to…                                 | Go to                                                                                                                       |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Run it on your machine                       | [setup-instructions.md](setup-instructions.md)                                                                              |
+| Understand what it is for and who it serves  | [PRODUCT.md](PRODUCT.md)                                                                                                    |
+| See how the code is meant to be written      | [docs/patterns/](docs/patterns/README.md)                                                                                   |
+| Read the decisions behind the architecture   | [DECISIONS.md](docs/architecture/DECISIONS.md) · [ADRs](docs/architecture/adr/)                                             |
+| Check what is built and what is risky        | [CURRENT_STATE.md](docs/architecture/CURRENT_STATE.md) · [RISKS_AND_TECH_DEBT.md](docs/architecture/RISKS_AND_TECH_DEBT.md) |
+| Look up an app's URL or an environment value | [ENVIRONMENT.md](docs/architecture/ENVIRONMENT.md)                                                                          |
+| Debug something odd                          | [DEV_LEARNINGS.md](docs/architecture/DEV_LEARNINGS.md)                                                                      |
+| Work on it with an AI coding agent           | [AGENTS.md](AGENTS.md)                                                                                                      |
+| Contribute                                   | [CONTRIBUTING.md](CONTRIBUTING.md) · [CLA.md](CLA.md)                                                                       |
 
-## Architecture & roadmap
-
-The full audit, accepted architecture decisions, phased roadmap and
-implementation backlog live in [`docs/architecture/`](docs/architecture/):
-
-| Doc                                                                        | Contents                                           |
-| -------------------------------------------------------------------------- | -------------------------------------------------- |
-| [`CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md)                   | Audited current state of the monorepo              |
-| [`DECISIONS.md`](docs/architecture/DECISIONS.md)                           | Accepted architecture decisions (DEC-001…015)      |
-| [`TARGET_ARCHITECTURE.md`](docs/architecture/TARGET_ARCHITECTURE.md)       | Target modular-monolith design and ownership model |
-| [`PRODUCT_ROADMAP.md`](docs/architecture/PRODUCT_ROADMAP.md)               | Stages 0–9 delivery plan                           |
-| [`IMPLEMENTATION_BACKLOG.md`](docs/architecture/IMPLEMENTATION_BACKLOG.md) | Sized tickets (S0-001…S9-003)                      |
-| [`RISKS_AND_TECH_DEBT.md`](docs/architecture/RISKS_AND_TECH_DEBT.md)       | Risk register (R-01…R-18)                          |
-| [`adr/`](docs/architecture/adr/)                                           | Architecture decision records (ADR-001…)           |
-| [`DEV_LEARNINGS.md`](docs/architecture/DEV_LEARNINGS.md)                   | Non-obvious bugs, their root causes and fixes      |
-
-## How the codebase is built
-
-- [`docs/patterns/`](docs/patterns/README.md) — the conventions this repository
-  follows, by area (frontend, backend, devops, product), each opening with when
-  to read it
-- [`AGENTS.md`](AGENTS.md) — the entry point for AI coding agents: the rules
-  that fail silently, and which pattern or skill to read before a given change.
-  The API has its own [`apps/api.saroh.in/AGENTS.md`](apps/api.saroh.in/AGENTS.md)
-
-## Auth
-
-**Better Auth is the only authentication system**, hosted by `api.saroh.in`; the
-NextAuth migration is complete and no NextAuth code remains in source.
-`accounts.saroh.in` provides the sign-in UI only — it is not a separate auth
-server (see [DEC-001/002/003](docs/architecture/DECISIONS.md)). Documentation
-was reconciled to this canonical host in S0-008; the only remaining
-`next-auth` mentions are in local, gitignored `.env` files and in historical
-migration plans under `docs/plans/` (kept as an accurate record). Advanced
-Better Auth plugins (org, 2FA, OTP, API keys, admin roles) are a later milestone.
+| Folder      | Holds                                                               |
+| ----------- | ------------------------------------------------------------------- |
+| `apps/`     | The API and the Next.js apps                                        |
+| `packages/` | Shared code: auth, database, UI, site blocks, emails and utilities  |
+| `tooling/`  | ESLint, Tailwind and TypeScript configuration                       |
+| `e2e/`      | Playwright tests against the running stack                          |
+| `docs/`     | Architecture, patterns and product docs, plus plans kept as history |
 
 ## Licence
 
-Saroh is licensed under the **[Elastic License 2.0](LICENSE.md)** (ELv2).
+Saroh is licensed under the **[Elastic License 2.0](LICENSE.md)**.
 
 | What you want to do                                      | Allowed?              |
 | -------------------------------------------------------- | --------------------- |
@@ -216,51 +160,19 @@ Saroh is licensed under the **[Elastic License 2.0](LICENSE.md)** (ELv2).
 | Build client work on it, run it inside a company         | Yes                   |
 | Offer it to third parties as a hosted or managed service | Not without asking us |
 
-No fee, no registration, nothing to tell us. The single restriction exists so
-that the hosted Saroh service — which funds the time that goes into this — is
-not simply resold by someone else. If that is what you want to build,
-[get in touch](mailto:mohit@saroh.in); it is a conversation, not a refusal.
+There is no fee and no registration. Keep the licence and copyright notices in
+the source, and mark any copy you modify. That is all the licence asks. Sites
+built with Saroh carry no Saroh branding, and the licence doesn't change that.
+The one restriction, on offering Saroh as a hosted service, keeps the hosted
+service from simply being resold. If that is what you want to build,
+[get in touch](mailto:mohit@saroh.in).
 
-**Two clauses that need context.** ELv2 forbids circumventing "license key
-functionality" — Saroh has none, so that limitation is inert. And it requires
-you to keep licensing and copyright notices intact in the source, and to mark
-modified copies as modified.
+The [Open Source Definition](https://opensource.org/osd) doesn't allow limits on
+how software is used, so Saroh is source-available rather than open source.
 
-### Credit
-
-Keep the licence and copyright notices in the source. That is the only
-requirement.
-
-A "Built with Saroh" line in your README, or a link from your project page, is
-genuinely appreciated and entirely optional.
-
-**Nothing is required on your customers' websites.** Sites built with Saroh
-carry no Saroh branding by design — your customers should see your business, not
-the tool behind it — and the licence does not ask you to change that.
-
-### Source-available, not open source
-
-The [Open Source Definition](https://opensource.org/osd) does not allow
-restrictions on field of use, and the hosted-service limitation is one. So this
-is source-available. Said plainly here rather than left for someone to discover.
-
-### Contributing
-
-Contributions are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
-
-One thing to know before you start: a first pull request needs the one-line
-agreement in **[CLA.md](CLA.md)**. You keep your copyright; it grants permission
-to include your work in the commercial licences sold to anyone running Saroh as
-a hosted service. Without it, a single contributed file can block a commercial
-licence covering the whole codebase — and that is much harder to unpick later
-than to agree at the start.
-
-### A note on pace
-
-This is built part-time, mostly to learn in the open and to be useful to people
-running small businesses. Issues and pull requests may sit a while before they
-get proper attention — that is not disinterest, and a nudge after a week or two
-is entirely fair.
+Saroh is built part-time. Issues and pull requests may wait a while, and a
+nudge after a week or two is fair. Your first pull request needs the one-line
+agreement in [CLA.md](CLA.md).
 
 ## Contact
 

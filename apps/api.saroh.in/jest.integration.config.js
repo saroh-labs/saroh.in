@@ -55,6 +55,21 @@ module.exports = {
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/product-reviews/",
+        // ADR-007 invoices: DB-free specs run in the unit project; only
+        // invoices.db.spec.ts runs here.
+        "<rootDir>/src/modules/invoices/totals.spec.ts",
+        "<rootDir>/src/modules/invoices/numbering.spec.ts",
+        "<rootDir>/src/modules/invoices/invoice-state.spec.ts",
+        "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
+        // U13 pay link: mocked-DB specs; invoice-pay-link.db.spec.ts runs here.
+        "<rootDir>/src/modules/invoices/pay-link.spec.ts",
+        "<rootDir>/src/modules/payments/public-invoices.service.spec.ts",
+        "<rootDir>/src/modules/webhooks/webhooks.invoice.spec.ts",
+        "<rootDir>/src/modules/subscriptions/periods.spec.ts",
+        "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
+        "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
+        "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
+        "<rootDir>/src/modules/courses/courses.service.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
     globalSetup: "<rootDir>/test/global-setup.ts",

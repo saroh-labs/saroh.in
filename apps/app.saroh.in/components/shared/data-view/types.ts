@@ -113,6 +113,13 @@ export interface DataViewProps<TRow> {
      * boundary, and the value is only ever needed once.
      */
     initialFilterId?: string;
+    /**
+     * How the filters are drawn. `tabs` (default) is an underlined row above
+     * the toolbar. `segmented` puts them in the toolbar as one control beside
+     * search — for a page whose own tabs already sit above the list, so two
+     * underlined rows do not read as two levels of navigation.
+     */
+    filterStyle?: "tabs" | "segmented";
     isLoading?: boolean;
     error?: string | null;
     /** What a row is, for counts and states: "3 products", "No products match…". */

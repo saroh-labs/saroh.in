@@ -11,9 +11,11 @@ import { BillingModule } from "./modules/billing/billing.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CapabilitiesModule } from "./modules/capabilities/capabilities.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
+import { ClassPacksModule } from "./modules/class-packs/class-packs.module";
 import { CommunicationsModule } from "./modules/communications/communications.module";
 import { ContactsModule } from "./modules/contacts/contacts.module";
 import { ContentModule } from "./modules/content/content.module";
+import { CoursesModule } from "./modules/courses/courses.module";
 import { CustomerWorkspaceModule } from "./modules/customer-workspace/customer-workspace.module";
 import { CustomersModule } from "./modules/customers/customers.module";
 import { DiscountsModule } from "./modules/discounts/discounts.module";
@@ -24,6 +26,7 @@ import { FormsModule } from "./modules/forms/forms.module";
 import { HealthModule } from "./modules/health/health.module";
 import { HomeModule } from "./modules/home/home.module";
 import { ImportsModule } from "./modules/imports/imports.module";
+import { InvoicesModule } from "./modules/invoices/invoices.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { LeadsModule } from "./modules/leads/leads.module";
 import { MediaModule } from "./modules/media/media.module";
@@ -42,6 +45,7 @@ import { SearchModule } from "./modules/search/search.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
 import { SitesModule } from "./modules/sites/sites.module";
 import { StoresModule } from "./modules/stores/stores.module";
+import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
 import { WaitlistModule } from "./modules/waitlist/waitlist.module";
 import { WebhooksModule } from "./modules/webhooks/webhooks.module";
 
@@ -94,6 +98,10 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         JobsModule,
         FormsModule,
         DiscountsModule,
+        InvoicesModule,
+        SubscriptionsModule,
+        ClassPacksModule,
+        CoursesModule,
         ProductReviewsModule,
         EnquiryModule,
         ContactsModule,

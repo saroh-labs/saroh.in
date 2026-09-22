@@ -25,6 +25,11 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
         "media:read",
         // ADR-003: every role may read effective module availability.
         "module:read",
+        // The diary: a Member sees appointments, services and who is booked,
+        // never leads, the pipeline or money.
+        "booking:read",
+        "service:read",
+        "contact:read",
     ],
     /*
      * REVIEWER is website-only (#193) and is NOT a narrower MEMBER: it holds
@@ -176,5 +181,27 @@ describe("product reviews", () => {
     ] as const)("%s: read %s, write %s", (role, read, write) => {
         expect(can(role, "product-review:read")).toBe(read);
         expect(can(role, "product-review:write")).toBe(write);
+    });
+});
+
+describe("subscriptions, invoices, courses and class packs (ADR-007)", () => {
+    const ACTIONS = [
+        "subscription:read",
+        "subscription:write",
+        "invoice:read",
+        "invoice:write",
+        "course:read",
+        "course:write",
+        "pack:read",
+        "pack:write",
+    ] as const;
+
+    it.each(ACTIONS)("%s is OWNER/ADMIN-only", (action) => {
+        // Who owes what, and what a person has paid for, is not a roster
+        // fact: Members and Reviewers see none of it.
+        expect(can("OWNER", action)).toBe(true);
+        expect(can("ADMIN", action)).toBe(true);
+        expect(can("MEMBER", action)).toBe(false);
+        expect(can("REVIEWER", action)).toBe(false);
     });
 });

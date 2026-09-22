@@ -11,6 +11,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContextService } from "../organizations/organization-context.service";
 import type { ModuleAvailabilityService } from "./module-availability.service";
 import { ModuleEnforcementGuard } from "./module-enforcement.guard";
+import { IGNORE_MODULE_READINESS_KEY } from "./require-module.decorator";
 
 const storeFindFirst = prisma.store.findFirst as jest.Mock;
 
@@ -25,6 +26,7 @@ function execContext(request: unknown): ExecutionContext {
 function build(opts: {
     moduleKey?: string;
     blockers?: { code: string }[];
+    gatesPassed?: boolean;
     /** Org context resolved from a store, or an error the resolver throws. */
     resolved?: unknown;
     resolveError?: Error;
@@ -32,9 +34,10 @@ function build(opts: {
     const reflector = {
         getAllAndOverride: jest.fn().mockReturnValue(opts.moduleKey),
     } as unknown as Reflector;
-    const evaluate = jest
-        .fn()
-        .mockResolvedValue({ blockers: opts.blockers ?? [] });
+    const evaluate = jest.fn().mockResolvedValue({
+        blockers: opts.blockers ?? [],
+        gatesPassed: opts.gatesPassed ?? false,
+    });
     const availability = { evaluate } as unknown as ModuleAvailabilityService;
     const resolve = opts.resolveError
         ? jest.fn().mockRejectedValue(opts.resolveError)
@@ -126,6 +129,86 @@ describe("ModuleEnforcementGuard", () => {
         await expect(
             guard.canActivate(execContext(REQUEST)),
         ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    describe("a route that works before setup is finished", () => {
+        // Payments with no provider connected is "not ready", and invoices
+        // recorded by hand need no provider (ADR-007). The readiness opt-out
+        // passes once every gate has — and only then.
+        function optedOut(blockers: { code: string }[], gatesPassed = false) {
+            const built = build({
+                moduleKey: "PAYMENTS",
+                blockers,
+                gatesPassed,
+            });
+            const reflector = {
+                getAllAndOverride: jest.fn((key: string) =>
+                    key === IGNORE_MODULE_READINESS_KEY ? true : "PAYMENTS",
+                ),
+            } as unknown as Reflector;
+            return new ModuleEnforcementGuard(
+                reflector,
+                {
+                    evaluate: built.evaluate,
+                } as unknown as ModuleAvailabilityService,
+                {} as OrganizationContextService,
+            );
+        }
+
+        it("allows a module whose only blocker is unfinished setup", async () => {
+            process.env.MODULE_ENFORCEMENT = "1";
+            const guard = optedOut([{ code: "PAYMENTS_NO_PROVIDER" }], true);
+            await expect(guard.canActivate(execContext(REQUEST))).resolves.toBe(
+                true,
+            );
+        });
+
+        it("refuses a gate it has never heard of, rather than failing open", async () => {
+            process.env.MODULE_ENFORCEMENT = "1";
+            const guard = optedOut([{ code: "SOME_NEW_GATE" }], false);
+            await expect(
+                guard.canActivate(execContext(REQUEST)),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+
+        it("still refuses a module that is switched off", async () => {
+            process.env.MODULE_ENFORCEMENT = "1";
+            const guard = optedOut([{ code: "ORG_MODULE_DISABLED" }]);
+            await expect(
+                guard.canActivate(execContext(REQUEST)),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+
+        it("still 404s an actor who may not use the module", async () => {
+            process.env.MODULE_ENFORCEMENT = "1";
+            const guard = optedOut([{ code: "UNAUTHORIZED" }]);
+            await expect(
+                guard.canActivate(execContext(REQUEST)),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it("refuses unfinished setup on a route that did not opt out", async () => {
+            process.env.MODULE_ENFORCEMENT = "1";
+            const reflector = {
+                getAllAndOverride: jest.fn((key: string) =>
+                    key === IGNORE_MODULE_READINESS_KEY
+                        ? undefined
+                        : "PAYMENTS",
+                ),
+            } as unknown as Reflector;
+            const guard = new ModuleEnforcementGuard(
+                reflector,
+                {
+                    evaluate: jest.fn().mockResolvedValue({
+                        blockers: [{ code: "PAYMENTS_NO_PROVIDER" }],
+                    }),
+                } as unknown as ModuleAvailabilityService,
+                {} as OrganizationContextService,
+            );
+            await expect(
+                guard.canActivate(execContext(REQUEST)),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        });
     });
 
     it("skips public/webhook requests with no Organization context", async () => {

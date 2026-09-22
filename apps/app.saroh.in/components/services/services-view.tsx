@@ -54,14 +54,9 @@ export function ServicesView({
             header: "Service",
             priority: "primary",
             sortValue: (s) => s.name.toLowerCase(),
-            cell: (s) => (
-                <Link
-                    href={`/services/${s.id}`}
-                    className="font-medium underline-offset-4 hover:text-brand hover:underline"
-                >
-                    {s.name}
-                </Link>
-            ),
+            // Text, not a link: DataView makes the first cell the row's link
+            // (`rowHref`), and a link inside it would nest one <a> in another.
+            cell: (s) => <span className="font-medium">{s.name}</span>,
         },
         {
             id: "duration",

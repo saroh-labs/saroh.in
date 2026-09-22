@@ -13,6 +13,7 @@ import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
+import { redeemPackInTx, reversePackInTx } from "../class-packs/redeem-pack";
 import { authorize } from "../organizations/organization-policy";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type {
@@ -22,10 +23,12 @@ import type {
     Slot,
 } from "./availability";
 import { availableSlots, isValidSlotStart } from "./availability";
+import { courseSeatIntervals, courseSeatsHeld } from "./course-seats";
 import type {
     AvailabilityRuleDto,
     BookingOutcome,
     CreateServiceDto,
+    LocationType,
     UpdateServiceDto,
 } from "./dto";
 import { FixedWindowRateLimiter } from "./rate-limiter";
@@ -71,6 +74,17 @@ const bookingDetailInclude = {
         orderBy: { createdAt: "asc" },
         include: { actor: { select: { name: true } } },
     },
+    // How it is paid, when a class pack pays for it (ADR-007). A pack taken
+    // back off leaves its row with `reversedAt` set: that booking is no
+    // longer paid with it. Only the pack's name — what the screen says.
+    packRedemption: {
+        select: {
+            reversedAt: true,
+            purchase: {
+                select: { id: true, pack: { select: { name: true } } },
+            },
+        },
+    },
 } satisfies Prisma.BookingInclude;
 
 export type BookingDetail = Prisma.BookingGetPayload<{
@@ -95,6 +109,14 @@ export type BookingDetail = Prisma.BookingGetPayload<{
  * SERIALIZABLE transaction that re-counts CONFIRMED overlaps INSIDE the tx (see
  * {@link book} for the full race argument).
  */
+/** Who a reservation is made by. */
+export interface ReserveBy {
+    /** `Contact.source` for someone new. */
+    source: string;
+    /** Who made it; `null` when the booker did it themselves. */
+    actorUserId: string | null;
+}
+
 /** A service as a website visitor sees it (#255). No internal fields. */
 export interface PublicService {
     id: string;
@@ -136,6 +158,10 @@ export class BookingsService {
         if (dto.siteId) {
             await this.requireOwnedSite(ctx, dto.siteId);
         }
+        const location = resolveLocation(
+            dto.locationType ?? "IN_PERSON",
+            dto.meetingUrl ?? null,
+        );
 
         return prisma.service.create({
             data: {
@@ -150,6 +176,7 @@ export class BookingsService {
                 priceCents: dto.priceCents ?? null,
                 currency: dto.currency ?? null,
                 timezone: dto.timezone,
+                ...location,
                 status: "ACTIVE",
             },
         });
@@ -202,11 +229,41 @@ export class BookingsService {
         if (dto.bufferAfterMinutes !== undefined) {
             data.bufferAfterMinutes = dto.bufferAfterMinutes;
         }
-        if (dto.capacity !== undefined) data.capacity = dto.capacity;
+        if (dto.capacity !== undefined) {
+            // A course promises its seats on this service (ADR-007).
+            if (dto.capacity < service.capacity) {
+                const widest = await prisma.course.findFirst({
+                    where: {
+                        serviceId: service.id,
+                        status: { not: "ARCHIVED" },
+                        seats: { gt: dto.capacity },
+                    },
+                    orderBy: { seats: "desc" },
+                    select: { name: true, seats: true },
+                });
+                if (widest) {
+                    throw new ConflictException(
+                        `${widest.name} has ${widest.seats} seats on this service. Lower its seats first, or keep the capacity at ${widest.seats} or more.`,
+                    );
+                }
+            }
+            data.capacity = dto.capacity;
+        }
         if (dto.priceCents !== undefined) data.priceCents = dto.priceCents;
         if (dto.currency !== undefined) data.currency = dto.currency;
         if (dto.timezone !== undefined) data.timezone = dto.timezone;
         if (dto.status !== undefined) data.status = dto.status;
+        if (dto.locationType !== undefined || dto.meetingUrl !== undefined) {
+            Object.assign(
+                data,
+                resolveLocation(
+                    dto.locationType ?? (service.locationType as LocationType),
+                    dto.meetingUrl !== undefined
+                        ? dto.meetingUrl
+                        : service.meetingUrl,
+                ),
+            );
+        }
 
         return prisma.service.update({ where: { id: service.id }, data });
     }
@@ -337,13 +394,13 @@ export class BookingsService {
         const rules = await prisma.availabilityRule.findMany({
             where: { serviceId },
         });
-        const confirmed = await this.confirmedOverlapping(serviceId, from, to);
+        const busy = await this.busyOverlapping(serviceId, from, to);
         return availableSlots(
             this.toAvailabilityService(service),
             rules,
             from,
             to,
-            confirmed,
+            busy,
         );
     }
 
@@ -360,13 +417,13 @@ export class BookingsService {
     ): Promise<Slot[]> {
         const { service, rules } = await this.loadBookableService(serviceId);
         const { from, to } = this.parseRange(fromISO, toISO);
-        const confirmed = await this.confirmedOverlapping(serviceId, from, to);
+        const busy = await this.busyOverlapping(serviceId, from, to);
         return availableSlots(
             this.toAvailabilityService(service),
             rules,
             from,
             to,
-            confirmed,
+            busy,
         );
     }
 
@@ -475,6 +532,8 @@ export class BookingsService {
                 where: { id: booking.id },
                 data: { status: "CANCELLED", cancelledAt: new Date() },
             });
+            // A class paid for with a pack goes back to it (ADR-007).
+            await reversePackInTx(tx, booking.id);
             // The slot it was cancelled OUT of, so the history reads as a
             // sequence rather than a list of states with the times missing.
             await tx.bookingEvent.create({
@@ -622,6 +681,12 @@ export class BookingsService {
                 "This booking was cancelled. Book a new time instead of moving it.",
             );
         }
+        if (booking.courseEnrollmentId) {
+            // A course's sessions move together, for everyone on it.
+            throw new ConflictException(
+                "This is a course session. Change the course's sessions instead of moving one booking.",
+            );
+        }
 
         const startAt = new Date(input.startAt);
         if (Number.isNaN(startAt.getTime())) {
@@ -673,9 +738,26 @@ export class BookingsService {
                             id: { not: booking.id },
                         },
                     });
-                    if (taken >= service.capacity) {
+                    const held = await courseSeatsHeld(
+                        tx,
+                        service.id,
+                        startAt,
+                        endAt,
+                    );
+                    if (taken + held >= service.capacity) {
                         throw new ConflictException(
                             "That slot is fully booked",
+                        );
+                    }
+                    // A class paid with a pack is only paid while the pack
+                    // is good on the day (ADR-007): the same rule as spending.
+                    const paid = await tx.packRedemption.findFirst({
+                        where: { bookingId: booking.id, reversedAt: null },
+                        select: { purchase: { select: { expiresAt: true } } },
+                    });
+                    if (paid && paid.purchase.expiresAt <= startAt) {
+                        throw new ConflictException(
+                            "The class pack that paid for this booking expires before that time. Pick an earlier time, or take the pack off the booking first.",
                         );
                     }
 
@@ -781,7 +863,21 @@ export class BookingsService {
             startAt.getTime() + service.durationMinutes * 60_000,
         );
 
-        // 3. Idempotency pre-check — replay an existing booking unchanged.
+        // 3. Rate-limit per (service, hashed IP). Cheap abuse guard. Before
+        //    the replay too, so replays cannot be used to probe for keys.
+        if (ipHash) {
+            const allowed = this.rateLimiter.take(`${serviceId}:${ipHash}`);
+            if (!allowed) {
+                throw new HttpException(
+                    "Too many booking attempts — please slow down and try again shortly",
+                    429,
+                );
+            }
+        }
+
+        // 4. Idempotency pre-check — replay an existing booking unchanged, but
+        //    only to the same booker: a key alone does not hand over someone
+        //    else's booking (or its meeting link).
         if (input.idempotencyKey) {
             const existing = await prisma.booking.findUnique({
                 where: {
@@ -791,17 +887,16 @@ export class BookingsService {
                     },
                 },
             });
-            if (existing) return existing;
-        }
-
-        // 4. Rate-limit per (service, hashed IP). Cheap abuse guard.
-        if (ipHash) {
-            const allowed = this.rateLimiter.take(`${serviceId}:${ipHash}`);
-            if (!allowed) {
-                throw new HttpException(
-                    "Too many booking attempts — please slow down and try again shortly",
-                    429,
-                );
+            if (existing) {
+                if (
+                    (existing.bookerEmail ?? "").toLowerCase() !==
+                    input.bookerEmail.trim().toLowerCase()
+                ) {
+                    throw new ConflictException(
+                        "That booking was already made. Refresh the page and book again.",
+                    );
+                }
+                return existing;
             }
         }
 
@@ -838,9 +933,14 @@ export class BookingsService {
             bookerEmail?: string;
             bookerPhone?: string;
             idempotencyKey?: string;
+            useClassPack?: boolean;
+            packPurchaseId?: string;
         },
     ): Promise<Booking> {
         authorize(ctx, "booking:write");
+        const withPack = dto.useClassPack === true || !!dto.packPurchaseId;
+        // Spending someone's prepaid classes is its own power (ADR-007).
+        if (withPack) authorize(ctx, "pack:write");
 
         const { service, rules } = await this.loadBookableService(serviceId);
         if (service.organizationId !== ctx.organizationId) {
@@ -914,10 +1014,32 @@ export class BookingsService {
             booker.idempotencyKey = dto.idempotencyKey;
         }
 
-        return this.reserve(service, startAt, endAt, booker, {
-            source: "manual",
-            actorUserId: ctx.userId,
-        });
+        return this.reserve(
+            service,
+            startAt,
+            endAt,
+            booker,
+            { source: "manual", actorUserId: ctx.userId },
+            withPack
+                ? {
+                      inTx: async (tx, booking) => {
+                          await redeemPackInTx(tx, {
+                              organizationId: ctx.organizationId,
+                              bookingId: booking.id,
+                              // The contact the booking resolved to — a pack
+                              // is only ever spent by the person who holds it.
+                              contactId: booking.contactId ?? "",
+                              serviceId: service.id,
+                              startAt,
+                              purchaseId: dto.packPurchaseId,
+                          });
+                      },
+                      // It may have been the pack's last class rather than
+                      // the slot, so this says only that something changed.
+                      onRace: "That changed while you were booking. Try again.",
+                  }
+                : undefined,
+        );
     }
 
     /**
@@ -925,109 +1047,43 @@ export class BookingsService {
      * by hand: re-count inside a Serializable transaction, upsert the contact,
      * write the CONFIRMED booking, its first history event and the notify job.
      * See {@link book} for why the in-transaction re-count is the guarantee.
+     *
+     * `also.inTx` runs on the same transaction after the booking is written —
+     * spending a class pack on it, for one — so a refusal there takes the
+     * booking back with it, and a booking never exists half-paid. Losing a
+     * race then may be about what it touched rather than the slot, so the
+     * caller says what to tell the booker (`also.onRace`).
      */
     private async reserve(
         service: Service,
         startAt: Date,
         endAt: Date,
         input: BookInput,
-        by: {
-            /** `Contact.source` for someone new. */
-            source: string;
-            /** Who made it; `null` when the booker did it themselves. */
-            actorUserId: string | null;
+        by: ReserveBy,
+        also?: {
+            inTx: (
+                tx: Prisma.TransactionClient,
+                booking: Booking,
+            ) => Promise<void>;
+            onRace: string;
         },
     ): Promise<Booking> {
         const serviceId = service.id;
         const organizationId = service.organizationId;
-        const email = input.bookerEmail.trim().toLowerCase();
-        const snapshot = this.buildSnapshot(service, input, startAt, endAt);
 
         let booked: Booking;
         try {
             booked = await prisma.$transaction(
                 async (tx) => {
-                    // Authoritative capacity gate — re-counted INSIDE the tx.
-                    const confirmed = await tx.booking.count({
-                        where: {
-                            serviceId,
-                            status: "CONFIRMED",
-                            startAt: { lt: endAt },
-                            endAt: { gt: startAt },
-                        },
-                    });
-                    if (confirmed >= service.capacity) {
-                        throw new ConflictException(
-                            "This slot is fully booked",
-                        );
-                    }
-
-                    const contact = await tx.contact.upsert({
-                        where: {
-                            organizationId_email: { organizationId, email },
-                        },
-                        update: this.contactUpdate(input),
-                        create: {
-                            organizationId,
-                            email,
-                            firstName:
-                                this.splitName(input.bookerName).first ?? null,
-                            lastName:
-                                this.splitName(input.bookerName).last ?? null,
-                            phone: input.bookerPhone ?? null,
-                            source: by.source,
-                        },
-                    });
-
-                    const booking = await tx.booking.create({
-                        data: {
-                            organizationId,
-                            serviceId,
-                            contactId: contact.id,
-                            startAt,
-                            endAt,
-                            timezone: service.timezone,
-                            status: "CONFIRMED",
-                            snapshot: snapshot as Prisma.InputJsonValue,
-                            bookerName: input.bookerName ?? null,
-                            bookerEmail: email,
-                            bookerPhone: input.bookerPhone ?? null,
-                            idempotencyKey: input.idempotencyKey ?? null,
-                        },
-                    });
-
-                    // Where the history starts. No `fromStartAt`: there was
-                    // no before. The actor is whoever made it by hand; a
-                    // booker who did it themselves leaves it empty.
-                    await tx.bookingEvent.create({
-                        data: {
-                            bookingId: booking.id,
-                            organizationId,
-                            type: BookingEventType.Booked,
-                            toStartAt: startAt,
-                            ...(by.actorUserId
-                                ? { actorUserId: by.actorUserId }
-                                : {}),
-                        },
-                        select: { id: true },
-                    });
-
-                    // Transactional outbox: a committed booking always has a
-                    // queued notification job. The handler never landed: the
-                    // worker dead-letters booking.notify until one is
-                    // registered (see jobs/job-consumers.spec.ts).
-                    await tx.job.create({
-                        data: {
-                            organizationId,
-                            type: "booking.notify",
-                            payload: {
-                                bookingId: booking.id,
-                                serviceId,
-                                contactId: contact.id,
-                            },
-                        },
-                    });
-
+                    const booking = await this.reserveInTx(
+                        tx,
+                        service,
+                        startAt,
+                        endAt,
+                        input,
+                        by,
+                    );
+                    if (also) await also.inTx(tx, booking);
                     return booking;
                 },
                 {
@@ -1051,11 +1107,12 @@ export class BookingsService {
                 });
                 if (existing) return existing;
             }
-            // Serialization failure (two books racing for the same capacity-one
-            // slot, both saw 0 and inserted) — Postgres aborted the loser. Map
-            // it to the same 409 as a lost race: the slot is taken.
+            // Serialization failure — Postgres aborted the loser of a race.
+            // On its own, the only thing two bookings contend for is the slot.
             if (code === "P2034") {
-                throw new ConflictException("This slot is fully booked");
+                throw new ConflictException(
+                    also?.onRace ?? "This slot is fully booked",
+                );
             }
             throw err;
         }
@@ -1071,6 +1128,121 @@ export class BookingsService {
         // query and no race between two concurrent bookings.
         await this.activation?.firstBookingCreated(organizationId, booked.id);
         return booked;
+    }
+
+    /**
+     * Write one booking on the caller's transaction: re-count capacity,
+     * upsert the contact, create the CONFIRMED booking and its first history
+     * event, and queue its notification.
+     *
+     * Public so a course can book every session in one transaction (ADR-007).
+     * The caller owns the transaction and its isolation, and maps its errors.
+     */
+    async reserveInTx(
+        tx: Prisma.TransactionClient,
+        service: Service,
+        startAt: Date,
+        endAt: Date,
+        input: BookInput,
+        by: ReserveBy,
+        course?: { courseId: string; enrollmentId: string },
+    ): Promise<Booking> {
+        const serviceId = service.id;
+        const organizationId = service.organizationId;
+        const email = input.bookerEmail.trim().toLowerCase();
+        const snapshot = this.buildSnapshot(service, input, startAt, endAt);
+
+        // Authoritative capacity gate — re-counted INSIDE the tx.
+        const confirmed = await tx.booking.count({
+            where: {
+                serviceId,
+                status: "CONFIRMED",
+                startAt: { lt: endAt },
+                endAt: { gt: startAt },
+            },
+        });
+        // Seats an open course still holds count as taken (ADR-007) — other
+        // courses' seats, for a course's own booking: its unsold seats are
+        // the ones it is filling.
+        const held = await courseSeatsHeld(
+            tx,
+            serviceId,
+            startAt,
+            endAt,
+            course?.courseId,
+        );
+        if (confirmed + held >= service.capacity) {
+            throw new ConflictException("This slot is fully booked");
+        }
+
+        const contact = await tx.contact.upsert({
+            where: {
+                organizationId_email: { organizationId, email },
+            },
+            update: this.contactUpdate(input),
+            create: {
+                organizationId,
+                email,
+                firstName: this.splitName(input.bookerName).first ?? null,
+                lastName: this.splitName(input.bookerName).last ?? null,
+                phone: input.bookerPhone ?? null,
+                source: by.source,
+            },
+        });
+
+        const booking = await tx.booking.create({
+            data: {
+                organizationId,
+                serviceId,
+                contactId: contact.id,
+                startAt,
+                endAt,
+                timezone: service.timezone,
+                status: "CONFIRMED",
+                snapshot: snapshot as Prisma.InputJsonValue,
+                bookerName: input.bookerName ?? null,
+                bookerEmail: email,
+                bookerPhone: input.bookerPhone ?? null,
+                idempotencyKey: input.idempotencyKey ?? null,
+                courseEnrollmentId: course?.enrollmentId ?? null,
+            },
+        });
+
+        // Where the history starts. No `fromStartAt`: there was no before.
+        // The actor is whoever made it by hand; a booker who did it
+        // themselves leaves it empty.
+        await tx.bookingEvent.create({
+            data: {
+                bookingId: booking.id,
+                organizationId,
+                type: BookingEventType.Booked,
+                toStartAt: startAt,
+                ...(by.actorUserId ? { actorUserId: by.actorUserId } : {}),
+            },
+            select: { id: true },
+        });
+
+        // A course session's booking is not notified: nothing sends these yet,
+        // and one enrolment would queue a dead letter per session (ADR-007).
+        if (course) return booking;
+
+        // Transactional outbox: a committed booking always has a queued
+        // notification job. The handler never landed: the worker dead-letters
+        // booking.notify until one is registered (see
+        // jobs/job-consumers.spec.ts).
+        await tx.job.create({
+            data: {
+                organizationId,
+                type: "booking.notify",
+                payload: {
+                    bookingId: booking.id,
+                    serviceId,
+                    contactId: contact.id,
+                },
+            },
+        });
+
+        return booking;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -1101,6 +1273,22 @@ export class BookingsService {
         }
         const { availabilityRules, ...rest } = service;
         return { service: rest, rules: availabilityRules };
+    }
+
+    /**
+     * What fills a service's time over `[from, to)`: its confirmed bookings,
+     * and the seats open courses still hold on their sessions (ADR-007).
+     */
+    private async busyOverlapping(
+        serviceId: string,
+        from: Date,
+        to: Date,
+    ): Promise<Interval[]> {
+        const [confirmed, held] = await Promise.all([
+            this.confirmedOverlapping(serviceId, from, to),
+            courseSeatIntervals(prisma, serviceId, from, to),
+        ]);
+        return [...confirmed, ...held];
     }
 
     /** Confirmed bookings overlapping `[from, to)` for a service (for capacity checks). */
@@ -1149,6 +1337,10 @@ export class BookingsService {
                 timezone: service.timezone,
                 priceCents: service.priceCents,
                 currency: service.currency,
+                // Frozen like the rest: a link changed later reaches new
+                // bookings, never the ones already made (ADR-007).
+                locationType: service.locationType,
+                meetingUrl: service.meetingUrl,
             },
             slot: {
                 startAt: startAt.toISOString(),
@@ -1260,4 +1452,90 @@ export class BookingsService {
             throw new NotFoundException("Site not found");
         }
     }
+}
+
+/**
+ * Where a service happens, checked as a pair. An online service needs an
+ * https link — it is shown to everyone who books, so nothing that could run
+ * script or send them somewhere unencrypted. Going back to in person drops
+ * the link rather than leaving a credential lying in the row.
+ */
+export function resolveLocation(
+    locationType: LocationType,
+    meetingUrl: string | null,
+): { locationType: LocationType; meetingUrl: string | null } {
+    if (locationType === "IN_PERSON") {
+        return { locationType, meetingUrl: null };
+    }
+    if (!meetingUrl) {
+        throw new BadRequestException({
+            message: "An online service needs a meeting link",
+            details: { field: "meetingUrl" },
+        });
+    }
+    let parsed: URL;
+    try {
+        parsed = new URL(meetingUrl);
+    } catch {
+        throw new BadRequestException({
+            message: "That meeting link is not a web address",
+            details: { field: "meetingUrl" },
+        });
+    }
+    if (parsed.protocol !== "https:") {
+        throw new BadRequestException({
+            message: "A meeting link must start with https://",
+            details: { field: "meetingUrl" },
+        });
+    }
+    return { locationType, meetingUrl: parsed.toString() };
+}
+
+/**
+ * What a public booking answers with (ADR-007): the booker's own booking and
+ * nothing else — never the row, which carries the organization, the contact
+ * and the IP hash. Read from the booking's frozen snapshot, so the first
+ * answer and an idempotent replay are the same shape and the same link.
+ */
+export interface PublicBooking {
+    reference: string;
+    startAt: string;
+    endAt: string;
+    serviceName: string;
+    online: boolean;
+    meetingUrl: string | null;
+}
+
+export function toPublicBooking(booking: {
+    id: string;
+    startAt: Date;
+    endAt: Date;
+    snapshot: unknown;
+    status?: string;
+}): PublicBooking {
+    const service = (
+        booking.snapshot as {
+            service?: {
+                name?: unknown;
+                locationType?: unknown;
+                meetingUrl?: unknown;
+            };
+        } | null
+    )?.service;
+    const online = service?.locationType === "ONLINE";
+    return {
+        reference: booking.id,
+        startAt: booking.startAt.toISOString(),
+        endAt: booking.endAt.toISOString(),
+        serviceName: typeof service?.name === "string" ? service.name : "",
+        online,
+        // A cancelled booking no longer holds a place in the class, so it no
+        // longer carries the way in.
+        meetingUrl:
+            online &&
+            booking.status !== "CANCELLED" &&
+            typeof service.meetingUrl === "string"
+                ? service.meetingUrl
+                : null,
+    };
 }

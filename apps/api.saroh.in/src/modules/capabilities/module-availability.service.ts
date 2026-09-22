@@ -47,6 +47,12 @@ export interface ModuleAvailability {
     authorized: boolean;
     readiness: ModuleReadiness;
     blockers: AvailabilityBlocker[];
+    /**
+     * Every gate passed (who, rollout, installed, project, plan), so any
+     * blockers are readiness ones — setup still to do, not a door that is
+     * shut. What `@IgnoreModuleReadiness()` routes check.
+     */
+    gatesPassed: boolean;
 }
 
 /** Inputs to an availability evaluation. */
@@ -176,7 +182,12 @@ export class ModuleAvailabilityService {
         if (!entitled) blockers.push({ code: "ENTITLEMENT_REQUIRED" });
 
         if (blockers.length > 0) {
-            return { ...gates, readiness: "DISABLED", blockers };
+            return {
+                ...gates,
+                readiness: "DISABLED",
+                blockers,
+                gatesPassed: false,
+            };
         }
 
         // All gates pass — derive readiness.
@@ -192,6 +203,7 @@ export class ModuleAvailabilityService {
                 actionHref: b.actionHref,
                 message: b.message,
             })),
+            gatesPassed: true,
         };
     }
 

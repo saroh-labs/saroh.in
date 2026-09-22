@@ -19,7 +19,8 @@
  * nothing a developer added by hand.
  *
  *   pnpm --filter @saroh/database db:seed
- *   pnpm --filter @saroh/database db:seed:reset
+ *   pnpm --filter @saroh/database db:seed:showcase   # + five businesses for the film
+ *   pnpm --filter @saroh/database db:seed:reset      # removes both
  *
  * The target database is checked before any write — see `database-target.ts`.
  */
@@ -45,6 +46,11 @@ async function main() {
         return;
     }
     await seed();
+    // The showcase is layered on the base seed, never instead of it.
+    if (process.argv.includes("--showcase")) {
+        const { seedShowcase } = await import("./seed/showcase/run");
+        await seedShowcase();
+    }
 }
 
 main()

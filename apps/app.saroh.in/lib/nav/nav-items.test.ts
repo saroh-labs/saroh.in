@@ -6,6 +6,7 @@ import {
     filterNavGroups,
     filterNavGroupsByRole,
     isNavChildCurrent,
+    isNavItemActive,
     navFor,
     navRoleCan,
 } from "@/components/shared/nav-items";
@@ -84,7 +85,9 @@ const AVAILABLE_TO = {
         "INSIGHTS",
     ],
     ADMIN: ["WEBSITE", "CRM", "APPOINTMENTS", "COMMERCE", "INSIGHTS"],
-    MEMBER: ["WEBSITE"],
+    // The diary and the people on it (DEC-020): a Member holds booking:read
+    // and contact:read, what APPOINTMENTS and CRM ask for.
+    MEMBER: ["WEBSITE", "APPOINTMENTS", "CRM"],
     REVIEWER: ["WEBSITE"],
 } as const;
 
@@ -120,6 +123,22 @@ describe("navRoleCan", () => {
         expect(navRoleCan("REVIEWER", "module:read")).toBe(false);
         expect(navRoleCan("REVIEWER", "org:settings:read")).toBe(false);
         expect(navRoleCan("REVIEWER", "section:write")).toBe(false);
+    });
+
+    it("offers memberships, invoices, courses and packs to owners and admins only", () => {
+        // ADR-007: who owes what is not in the Member floor, and a Reviewer
+        // checks a website, not the books.
+        for (const action of [
+            "subscription:read",
+            "invoice:read",
+            "course:read",
+            "pack:read",
+        ] as const) {
+            expect(navRoleCan("OWNER", action)).toBe(true);
+            expect(navRoleCan("ADMIN", action)).toBe(true);
+            expect(navRoleCan("MEMBER", action)).toBe(false);
+            expect(navRoleCan("REVIEWER", action)).toBe(false);
+        }
     });
 
     it("fails open when the role is not known", () => {
@@ -179,6 +198,21 @@ describe("what each role is offered", () => {
         expect(offered).not.toContain("/sites/new");
         expect(offered).not.toContain("/sites/site_1");
         expect(offered).toContain("/sites/site_1/review");
+    });
+
+    it("offers a member the diary and its people, not leads or money", () => {
+        const offered = hrefs(
+            navFor({
+                role: "MEMBER",
+                moduleKeys: AVAILABLE_TO.MEMBER,
+                sites: SITES,
+            }),
+        );
+        expect(offered).toContain("/bookings");
+        expect(offered).toContain("/contacts");
+        expect(offered).not.toContain("/leads");
+        expect(offered).not.toContain("/pipeline");
+        expect(offered).not.toContain("/billing/invoices");
     });
 
     it("offers a reviewer their site and nothing about the business", () => {
@@ -476,5 +510,180 @@ describe("isNavChildCurrent", () => {
 
     it("never lights a label row", () => {
         expect(isNavChildCurrent("/sites", undefined)).toBe(false);
+    });
+});
+
+describe("Billing (ADR-007)", () => {
+    it("offers an owner with Payments on Billing › Invoices", () => {
+        const offered = hrefs(
+            navFor({ role: "OWNER", moduleKeys: AVAILABLE_TO.OWNER }),
+        );
+        expect(offered).toContain("/billing/invoices");
+    });
+
+    it("puts Subscriptions and Plans beside Invoices, and only the page you are on lights", () => {
+        const offered = hrefs(
+            navFor({ role: "OWNER", moduleKeys: AVAILABLE_TO.OWNER }),
+        );
+        expect(offered).toContain("/billing/subscriptions");
+        expect(offered).toContain("/billing/plans");
+        const siblings = [
+            { href: "/billing/subscriptions" },
+            { href: "/billing/plans" },
+            { href: "/billing/invoices" },
+        ];
+        expect(
+            isNavChildCurrent(
+                "/billing/plans",
+                "/billing/subscriptions",
+                siblings,
+            ),
+        ).toBe(false);
+        expect(
+            isNavChildCurrent("/billing/plans", "/billing/plans", siblings),
+        ).toBe(true);
+    });
+
+    it("marks Billing on every Billing page, Invoices included", () => {
+        const billing = navFor({
+            role: "OWNER",
+            moduleKeys: AVAILABLE_TO.OWNER,
+        })
+            .flatMap((g) => g.items)
+            .find((i) => i.label === "Billing");
+        const href = billing?.href ?? "";
+        expect(href).toBe("/billing");
+        for (const page of [
+            "/billing/subscriptions",
+            "/billing/plans",
+            "/billing/invoices/inv_1",
+        ]) {
+            expect(isNavItemActive(page, href)).toBe(true);
+        }
+    });
+
+    it("offers it to no one without Payments", () => {
+        const offered = hrefs(
+            navFor({ role: "OWNER", moduleKeys: ["COMMERCE", "CRM"] }),
+        );
+        expect(offered).not.toContain("/billing/invoices");
+    });
+
+    it("does not offer a member invoices, even where Payments is on", () => {
+        const offered = hrefs(
+            navFor({ role: "MEMBER", moduleKeys: ["PAYMENTS", "WEBSITE"] }),
+        );
+        expect(offered).not.toContain("/billing/invoices");
+    });
+
+    it("drops the section when every page in it is refused, rather than an empty heading", () => {
+        // An invented role in a business with Payments on, granted payments
+        // but no invoices: Billing would be a row that opens onto nothing.
+        const groups = navFor({
+            role: "MEMBER",
+            actions: ["payment:read"],
+            moduleKeys: ["PAYMENTS"],
+        });
+        const labels = groups.flatMap((g) => g.items.map((i) => i.label));
+        expect(labels).not.toContain("Billing");
+    });
+
+    it("keeps Website when a business has no sites yet", () => {
+        const groups = navFor({
+            role: "OWNER",
+            moduleKeys: ["WEBSITE"],
+            sites: [],
+        });
+        expect(hrefs(groups)).toContain("/sites");
+    });
+
+    it("lets owners and admins make an invoice from the command menu", () => {
+        expect(navRoleCan("OWNER", "invoice:write")).toBe(true);
+        expect(navRoleCan("ADMIN", "invoice:write")).toBe(true);
+        expect(navRoleCan("MEMBER", "invoice:write")).toBe(false);
+    });
+});
+
+describe("Courses (ADR-007), its own module", () => {
+    it("offers an owner Courses once the Courses module is on", () => {
+        expect(
+            hrefs(
+                navFor({
+                    role: "OWNER",
+                    moduleKeys: ["APPOINTMENTS", "COURSES"],
+                }),
+            ),
+        ).toContain("/courses");
+    });
+
+    it("leaves it out where only Appointments is on", () => {
+        expect(
+            hrefs(navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS"] })),
+        ).not.toContain("/courses");
+    });
+
+    it("does not offer it to a member, who may not read courses", () => {
+        expect(
+            hrefs(
+                navFor({
+                    role: "MEMBER",
+                    moduleKeys: ["APPOINTMENTS", "COURSES"],
+                }),
+            ),
+        ).not.toContain("/courses");
+    });
+});
+
+describe("Class packs (ADR-007), its own row under Appointments", () => {
+    it("offers an owner Class packs where Appointments is on, after Courses", () => {
+        const offered = hrefs(
+            navFor({
+                role: "OWNER",
+                moduleKeys: ["APPOINTMENTS", "COURSES"],
+            }),
+        );
+        expect(offered).toContain("/class-packs");
+        expect(offered.indexOf("/class-packs")).toBe(
+            offered.indexOf("/courses") + 1,
+        );
+    });
+
+    it("keeps Schedule and Services as rows of their own beside it", () => {
+        const items = navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS"] })
+            .flatMap((g) => g.items)
+            .map((i) => i.href);
+        expect(items).toEqual(
+            expect.arrayContaining(["/bookings", "/services", "/class-packs"]),
+        );
+    });
+
+    it("marks Class packs on its purchases and editor pages", () => {
+        for (const page of [
+            "/class-packs",
+            "/class-packs/purchases",
+            "/class-packs/pk_1/edit",
+        ]) {
+            expect(isNavItemActive(page, "/class-packs")).toBe(true);
+        }
+        expect(isNavItemActive("/class-packs", "/bookings")).toBe(false);
+    });
+
+    it("leaves it out without Appointments", () => {
+        expect(
+            hrefs(navFor({ role: "OWNER", moduleKeys: ["COMMERCE"] })),
+        ).not.toContain("/class-packs");
+    });
+
+    it("does not offer it to a member, who may not read packs", () => {
+        expect(
+            hrefs(navFor({ role: "MEMBER", moduleKeys: ["APPOINTMENTS"] })),
+        ).not.toContain("/class-packs");
+    });
+
+    it("lets owners and admins make and sell a pack from the command menu", () => {
+        expect(navRoleCan("OWNER", "pack:write")).toBe(true);
+        expect(navRoleCan("ADMIN", "pack:write")).toBe(true);
+        expect(navRoleCan("MEMBER", "pack:write")).toBe(false);
+        expect(navRoleCan("REVIEWER", "pack:write")).toBe(false);
     });
 });

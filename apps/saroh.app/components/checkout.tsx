@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { ProviderHandoff } from "@/components/provider-handoff";
 import type {
     CheckoutIntent,
     CheckoutReceipt,
@@ -272,49 +273,10 @@ export default function Checkout({ orderId }: { orderId: string }) {
                     ) : null}
 
                     {intent ? (
-                        <div className="rounded-xl border border-dashed border-site-border bg-site-surface p-5">
-                            <p className="text-sm font-medium text-site-fg">
-                                Provider payment widget mounts here
-                            </p>
-                            <p className="mt-1 text-xs text-site-muted">
-                                The {intent.provider} checkout widget would open
-                                with the handoff parameters below. It requires
-                                the provider JS SDK and live keys, which aren’t
-                                wired in this environment — so no payment is
-                                simulated here.
-                            </p>
-                            <dl className="mt-4 space-y-1 text-xs text-site-body">
-                                <div className="flex justify-between gap-4">
-                                    <dt>Amount</dt>
-                                    <dd className="tabular-nums">
-                                        {intent.currency}{" "}
-                                        {(intent.amountCents / 100).toFixed(2)}
-                                    </dd>
-                                </div>
-                                <div className="flex justify-between gap-4">
-                                    <dt>Provider order id</dt>
-                                    <dd className="max-w-[60%] truncate">
-                                        {intent.providerIntentId}
-                                    </dd>
-                                </div>
-                                {intent.publicKey ? (
-                                    <div className="flex justify-between gap-4">
-                                        <dt>Public key</dt>
-                                        <dd className="max-w-[60%] truncate">
-                                            {intent.publicKey}
-                                        </dd>
-                                    </div>
-                                ) : null}
-                            </dl>
-                            <pre className="mt-4 max-w-full overflow-x-auto rounded-lg bg-site-accent p-3 text-[11px] leading-relaxed text-site-fg">
-                                {JSON.stringify(intent.clientParams, null, 2)}
-                            </pre>
-                            <p className="mt-3 text-xs text-site-muted">
-                                Once the buyer completes payment, the provider
-                                webhook reconciles this order. Use “Refresh
-                                status” to see it move to PAID.
-                            </p>
-                        </div>
+                        <ProviderHandoff
+                            intent={intent}
+                            after="Once the buyer completes payment, the provider webhook reconciles this order. Use “Refresh status” to see it move to PAID."
+                        />
                     ) : (
                         <button
                             type="button"

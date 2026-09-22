@@ -1,4 +1,4 @@
-import { ForbiddenException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 
 // Mock the database package so the service never touches a real Postgres. The
 // `$transaction` mock invokes its callback with the same mocked client, so we
@@ -171,6 +171,26 @@ describe("OrganizationSettingsService", () => {
 
             expect(profileUpsert).toHaveBeenCalledWith(
                 expect.objectContaining({ update: { taxId: "" } }),
+            );
+        });
+
+        it("refuses a timezone the tz database does not know, and writes nothing", async () => {
+            await expect(
+                service.update(ctx(), {
+                    profile: { timezone: "Mars/Olympus" },
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(prisma.$transaction).not.toHaveBeenCalled();
+        });
+
+        it("keeps a real timezone", async () => {
+            await service.update(ctx(), {
+                profile: { timezone: "Asia/Kolkata" },
+            });
+            expect(profileUpsert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    update: { timezone: "Asia/Kolkata" },
+                }),
             );
         });
 

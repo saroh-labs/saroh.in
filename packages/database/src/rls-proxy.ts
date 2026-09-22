@@ -35,6 +35,9 @@ import type { TransactionClient } from "./transaction";
  *    nothing until an operator enables it AND deploys the non-BYPASSRLS role.
  */
 
+/** What an interactive `$transaction` takes as its second argument. */
+type TransactionOptions = Parameters<PrismaClient["$transaction"]>[1];
+
 /** The request's active organization id (set by the api interceptor). */
 const orgContextStore = new AsyncLocalStorage<string>();
 
@@ -74,17 +77,23 @@ function activeOrgId(): string | null {
     return orgContextStore.getStore() ?? null;
 }
 
-/** Set the GUC as the first statement of an interactive tx, then run `body`. */
+/**
+ * Set the GUC as the first statement of an interactive tx, then run `body`.
+ * `options` are the caller's own — above all `isolationLevel`: a Serializable
+ * booking must stay Serializable under enforcement, or the races it exists to
+ * catch (a slot's last seat, a pack's last class) quietly get through.
+ */
 async function withGuc<T>(
     base: PrismaClient,
     orgId: string,
     body: (tx: TransactionClient) => Promise<T>,
+    options?: TransactionOptions,
 ): Promise<T> {
     return base.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT set_config('app.current_organization_id', ${orgId}, true)`;
         // Publish the tx so any ambient prisma.* call inside `body` reuses it.
         return activeTxStore.run(tx, () => body(tx));
-    });
+    }, options);
 }
 
 /** Wrap one model delegate (e.g. `prisma.lead`) so each op carries the GUC. */
@@ -176,7 +185,7 @@ function wrapTransaction(base: PrismaClient) {
         if (typeof arg === "function") {
             const fn = arg as (tx: TransactionClient) => Promise<unknown>;
             if (orgId === null) return runTx(fn, options);
-            return withGuc(base, orgId, fn);
+            return withGuc(base, orgId, fn, options as TransactionOptions);
         }
         // Array form: `$transaction([...])`.
         const ops = arg as Promise<unknown>[];

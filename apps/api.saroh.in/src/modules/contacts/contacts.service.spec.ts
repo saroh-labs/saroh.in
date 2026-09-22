@@ -12,11 +12,25 @@ jest.mock("@saroh/database", () => {
                 delete: jest.fn(),
             },
             lead: { groupBy: jest.fn(), count: jest.fn() },
-            // The batch form: resolve each queued call in order.
-            $transaction: jest.fn((calls: Promise<unknown>[]) =>
-                Promise.all(calls),
+            // Either form: a batch resolves each queued call in order, and a
+            // callback runs against the same mocked client.
+            $transaction: jest.fn((arg: unknown) =>
+                typeof arg === "function"
+                    ? (arg as (tx: unknown) => unknown)(
+                          jest.requireMock("@saroh/database").prisma,
+                      )
+                    : Promise.all(arg as Promise<unknown>[]),
             ),
-            booking: { groupBy: jest.fn() },
+            booking: {
+                groupBy: jest.fn(),
+                findMany: jest.fn(),
+                updateMany: jest.fn(),
+            },
+            bookingEvent: { createMany: jest.fn() },
+            customerSubscription: { count: jest.fn() },
+            packPurchase: { count: jest.fn() },
+            courseEnrollment: { count: jest.fn(), deleteMany: jest.fn() },
+            invoice: { updateMany: jest.fn() },
             customerIdentityLink: { findMany: jest.fn() },
             customer: { findMany: jest.fn() },
             order: { groupBy: jest.fn(), findMany: jest.fn() },
@@ -46,6 +60,13 @@ const orderGroupBy = prisma.order.groupBy as jest.Mock;
 const orderFindMany = prisma.order.findMany as jest.Mock;
 const contactDelete = prisma.contact.delete as jest.Mock;
 const leadCount = prisma.lead.count as jest.Mock;
+const subCount = prisma.customerSubscription.count as jest.Mock;
+const packCount = prisma.packPurchase.count as jest.Mock;
+const courseCount = prisma.courseEnrollment.count as jest.Mock;
+const bookingFindMany = prisma.booking.findMany as jest.Mock;
+const bookingUpdateMany = prisma.booking.updateMany as jest.Mock;
+const eventCreateMany = prisma.bookingEvent.createMany as jest.Mock;
+const invoiceUpdateMany = prisma.invoice.updateMany as jest.Mock;
 
 /** A Prisma Decimal serialises via `toString`; the mock must do the same. */
 const decimal = (v: string) => ({ toString: () => v });
@@ -90,10 +111,10 @@ describe("ContactsService.list", () => {
         });
     });
 
-    it("denies a MEMBER (contact:read is OWNER/ADMIN-only) before any I/O", async () => {
+    it("denies a REVIEWER (website only) before any I/O", async () => {
         const service = new ContactsService();
         await expect(
-            service.list(ctx({ role: "MEMBER" })),
+            service.list(ctx({ role: "REVIEWER" })),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(findMany).not.toHaveBeenCalled();
     });
@@ -477,6 +498,13 @@ describe("ContactsService.create", () => {
 describe("ContactsService.remove", () => {
     beforeEach(() => jest.clearAllMocks());
 
+    beforeEach(() => {
+        subCount.mockResolvedValue(0);
+        packCount.mockResolvedValue(0);
+        courseCount.mockResolvedValue(0);
+        bookingFindMany.mockResolvedValue([]);
+    });
+
     it("deletes an owned contact and says how many leads went with them", async () => {
         findUnique.mockResolvedValue({ id: "c_1", organizationId: "org_1" });
         leadCount.mockResolvedValue(2);
@@ -484,9 +512,95 @@ describe("ContactsService.remove", () => {
 
         await expect(
             new ContactsService().remove(ctx(), "c_1"),
-        ).resolves.toEqual({ id: "c_1", deleted: true, leads: 2 });
+        ).resolves.toEqual({
+            id: "c_1",
+            deleted: true,
+            leads: 2,
+            subscriptions: 0,
+            packs: 0,
+            courses: 0,
+            bookingsCancelled: 0,
+        });
         expect(leadCount).toHaveBeenCalledWith({ where: { contactId: "c_1" } });
         expect(contactDelete).toHaveBeenCalledWith({ where: { id: "c_1" } });
+        expect(bookingUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("revokes the pay links on their invoices before the contact goes (U13)", async () => {
+        findUnique.mockResolvedValue({ id: "c_1", organizationId: "org_1" });
+        leadCount.mockResolvedValue(0);
+        contactDelete.mockResolvedValue({ id: "c_1" });
+
+        await new ContactsService().remove(ctx(), "c_1");
+
+        expect(invoiceUpdateMany).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                contactId: "c_1",
+                payTokenHash: { not: null },
+            },
+            data: { payTokenHash: null },
+        });
+        const [revoked] = invoiceUpdateMany.mock.invocationCallOrder;
+        const [deleted] = contactDelete.mock.invocationCallOrder;
+        expect(revoked).toBeLessThan(deleted ?? 0);
+    });
+
+    it("says what they held, and cancels their pack-paid bookings and course sessions to come", async () => {
+        findUnique.mockResolvedValue({ id: "c_1", organizationId: "org_1" });
+        leadCount.mockResolvedValue(0);
+        subCount.mockResolvedValue(1);
+        packCount.mockResolvedValue(2);
+        courseCount.mockResolvedValue(1);
+        const startAt = new Date("2099-01-01T09:00:00Z");
+        bookingFindMany.mockResolvedValue([{ id: "bk_1", startAt }]);
+
+        await expect(
+            new ContactsService().remove(ctx(), "c_1"),
+        ).resolves.toMatchObject({
+            subscriptions: 1,
+            packs: 2,
+            courses: 1,
+            bookingsCancelled: 1,
+        });
+        expect(bookingFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    organizationId: "org_1",
+                    status: "CONFIRMED",
+                    OR: [
+                        {
+                            packRedemption: {
+                                reversedAt: null,
+                                purchase: { contactId: "c_1" },
+                            },
+                        },
+                        {
+                            courseEnrollment: {
+                                contactId: "c_1",
+                                status: "ACTIVE",
+                            },
+                        },
+                    ],
+                }),
+            }),
+        );
+        expect(bookingUpdateMany).toHaveBeenCalledWith({
+            where: { id: { in: ["bk_1"] } },
+            data: { status: "CANCELLED", cancelledAt: expect.any(Date) },
+        });
+        expect(eventCreateMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    bookingId: "bk_1",
+                    type: "CANCELLED",
+                    fromStartAt: startAt,
+                }),
+            ],
+        });
+        expect(bookingUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(
+            contactDelete.mock.invocationCallOrder[0]!,
+        );
     });
 
     it("404s a cross-tenant contact and deletes nothing", async () => {

@@ -11,6 +11,16 @@ function dbWith(counts: Record<string, number>) {
         pipeline: model("pipeline"),
         service: model("service"),
         availabilityRule: model("availabilityRule"),
+        // Courses asks twice: all of them, then the open ones.
+        course: {
+            count: jest.fn((args?: { where?: { status?: string } }) =>
+                Promise.resolve(
+                    args?.where?.status === "OPEN"
+                        ? (counts.openCourse ?? 0)
+                        : (counts.course ?? 0),
+                ),
+            ),
+        },
         store: model("store"),
         product: model("product"),
         order: model("order"),
@@ -49,6 +59,24 @@ describe("ModuleReadinessRegistry", () => {
         );
         expect(
             (await registry({ pipeline: 1 }).evaluate("CRM", input)).readiness,
+        ).toBe("ACTIVE");
+    });
+
+    it("Courses: needs a course, then an open one", async () => {
+        expect(
+            (await registry({}).evaluate("COURSES", input)).blockers[0]?.code,
+        ).toBe("COURSES_NO_COURSE");
+        expect(
+            (await registry({ course: 2 }).evaluate("COURSES", input))
+                .blockers[0]?.code,
+        ).toBe("COURSES_NONE_OPEN");
+        expect(
+            (
+                await registry({ course: 2, openCourse: 1 }).evaluate(
+                    "COURSES",
+                    input,
+                )
+            ).readiness,
         ).toBe("ACTIVE");
     });
 

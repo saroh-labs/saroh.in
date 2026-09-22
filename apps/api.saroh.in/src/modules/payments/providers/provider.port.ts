@@ -31,6 +31,10 @@ export interface CreateOrderIntentInput {
     /** Server-calculated minor units (e.g. paise/cents). Never client-supplied. */
     amountCents: number;
     currency: string;
+    /**
+     * The merchant reference the provider records and echoes back in its
+     * webhooks: the Order's id, or the Invoice's id for a pay link (U13).
+     */
     orderId: string;
     credentials: ProviderCredentials;
 }

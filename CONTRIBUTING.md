@@ -21,9 +21,8 @@ permission first.
 
 ## Setting up
 
-Full instructions are at
-[docs.saroh.in/getting-started](https://docs.saroh.in/getting-started). The short
-version:
+Full instructions are in [setup-instructions.md](setup-instructions.md). The
+short version:
 
 ```bash
 pnpm install

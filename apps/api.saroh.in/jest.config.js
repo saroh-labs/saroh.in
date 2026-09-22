@@ -23,6 +23,8 @@ module.exports = {
     ],
     testEnvironment: "node",
     rootDir: ".",
+    // `*.db.spec.ts` needs Postgres and runs only in the integration project.
+    testPathIgnorePatterns: ["/node_modules/", "\\.db\\.spec\\.ts$"],
     testMatch: [
         "<rootDir>/src/common/**/*.spec.ts",
         "<rootDir>/src/modules/organizations/**/*.spec.ts",
@@ -150,6 +152,26 @@ module.exports = {
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
         "<rootDir>/src/modules/discounts/discounts.service.spec.ts",
         "<rootDir>/src/modules/discounts/discounts.controller.spec.ts",
+        // ADR-007 invoices: pure totals, numbering and standing, and the
+        // service with a jest-mocked Prisma. Never touch a DB. (The numbering
+        // races in invoices.db.spec.ts need Postgres and run in integration.)
+        "<rootDir>/src/modules/invoices/totals.spec.ts",
+        "<rootDir>/src/modules/invoices/numbering.spec.ts",
+        "<rootDir>/src/modules/invoices/invoice-state.spec.ts",
+        "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
+        // U13: the invoice pay link (make, replace, revoke, read).
+        "<rootDir>/src/modules/invoices/pay-link.spec.ts",
+        // ADR-007 subscriptions: the period calendar, the service and the
+        // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
+        // Postgres and runs in integration.
+        "<rootDir>/src/modules/subscriptions/periods.spec.ts",
+        "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
+        "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
+        "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
+        "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
+        "<rootDir>/src/modules/class-packs/dto.spec.ts",
+        "<rootDir>/src/modules/courses/courses.service.spec.ts",
+        "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/product-reviews/**/*.spec.ts",

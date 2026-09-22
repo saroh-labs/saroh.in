@@ -7,7 +7,7 @@ description: Use when adding or changing a capability module, a capability-gated
 
 ## Overview
 
-Eight customer-owned capability modules (ADR-003 / DEC-016), selected per
+Nine customer-owned capability modules (ADR-003 / DEC-016; Courses joined in ADR-007), selected per
 Organization and optionally per Project. **Separate from feature flags and
 entitlements**: a flag is ours, an entitlement is billing, a module is the
 merchant's answer to "what does your business need to do?".

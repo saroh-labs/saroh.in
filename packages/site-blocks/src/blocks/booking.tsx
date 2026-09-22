@@ -75,8 +75,20 @@ function parseSlots(value: unknown): Slot[] | null {
 type SubmitState =
     | { kind: "idle" }
     | { kind: "submitting" }
-    | { kind: "success" }
+    /** `meetingUrl` is the booker's link to join, when the service is online. */
+    | { kind: "success"; meetingUrl: string | null }
     | { kind: "error"; message: string };
+
+/**
+ * The join link from a booking response, if it is one we would open. The API
+ * only stores https links; this re-checks so a block never renders a
+ * `javascript:` href whatever the response said.
+ */
+function meetingUrlFrom(body: unknown): string | null {
+    if (typeof body !== "object" || body === null) return null;
+    const url = (body as { meetingUrl?: unknown }).meetingUrl;
+    return typeof url === "string" && url.startsWith("https://") ? url : null;
+}
 
 type SlotsState =
     | { kind: "loading" }
@@ -291,7 +303,11 @@ export default function BookingSection({
             );
 
             if (res.ok) {
-                setSubmit({ kind: "success" });
+                const body: unknown = await res.json().catch(() => null);
+                setSubmit({
+                    kind: "success",
+                    meetingUrl: meetingUrlFrom(body),
+                });
                 return;
             }
 
@@ -362,6 +378,22 @@ export default function BookingSection({
                     <p className="text-site-fg text-lg font-medium">
                         {content.successMessage ?? "You're booked!"}
                     </p>
+                    {submit.meetingUrl ? (
+                        <>
+                            <p className="text-site-body mt-3">
+                                This one is online. Keep this link to join at
+                                the time you booked.
+                            </p>
+                            <a
+                                href={submit.meetingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={cn(ctaClasses("primary"), "mt-5")}
+                            >
+                                Join online
+                            </a>
+                        </>
+                    ) : null}
                 </div>
             </section>
         );

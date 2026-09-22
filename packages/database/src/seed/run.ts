@@ -1,9 +1,4 @@
-import type { Prisma } from "@prisma/client";
-import { hashPassword as hashPasswordUntyped } from "better-auth/crypto";
-
-import { parseSectionContentOrThrow } from "@saroh/block-contract";
 import { assertDatabaseTarget } from "../database-target";
-import type { SeedSection } from "./data";
 import {
     ANALYTICS_DAYS,
     ANALYTICS_PATHS,
@@ -29,13 +24,22 @@ import {
     REVIEWER_PASSWORD,
     SEED_PREFIX,
     SEEDED_FOOTER,
-    SEEDED_STYLE_VARIABLES,
     SERVICES,
     SIDE_BUSINESSES,
     SITES,
     STORE_SLUG,
     SUBMISSIONS,
 } from "./data";
+import type { Db } from "./helpers";
+import {
+    at,
+    buildAnalyticsRows,
+    emailFor,
+    hashPassword,
+    id,
+    publishSeedPost,
+    writeSite,
+} from "./helpers";
 
 /**
  * Build a believable Northwind Supply, or remove it.
@@ -48,50 +52,6 @@ import {
  * Dates are relative to the moment it runs, so bookings stay genuinely past and
  * upcoming however long the fixture sits in the database.
  */
-
-/**
- * better-auth's declarations do not give this a resolvable signature from this
- * package, so the contract we depend on is stated once here rather than letting
- * an unknown type spread through every call site.
- */
-const hashPassword = hashPasswordUntyped as (
-    password: string,
-) => Promise<string>;
-
-const id = (...parts: (string | number)[]) =>
-    `${SEED_PREFIX}${parts.join("_")}`;
-
-const DAY_MS = 86_400_000;
-const at = (now: Date, dayOffset: number, hour = 9) => {
-    const d = new Date(now.getTime() + dayOffset * DAY_MS);
-    d.setHours(hour, 0, 0, 0);
-    return d;
-};
-
-/** The UTC midnight of `when` — the day bucket the aggregate job keys on. */
-const utcDay = (when: Date) =>
-    new Date(
-        Date.UTC(when.getUTCFullYear(), when.getUTCMonth(), when.getUTCDate()),
-    );
-
-/**
- * A deterministic 0..1 from an integer.
- *
- * The analytics series needs day-to-day variation — a flat line is not what a
- * real site's traffic looks like — but `Math.random` would make every re-run
- * rewrite every count, so a fixture that is supposed to be idempotent would
- * churn the database on each invocation. Hashing the day index gives the same
- * jagged series every time.
- */
-const noise = (n: number): number => {
-    const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
-    return x - Math.floor(x);
-};
-
-const emailFor = (first: string, last: string) =>
-    `${first}.${last}`.toLowerCase().replace(/[^a-z.]/g, "") + "@example.com";
-
-type Db = typeof import("../client").prisma;
 
 export async function seed(): Promise<void> {
     const target = assertDatabaseTarget();
@@ -136,6 +96,18 @@ export async function seed(): Promise<void> {
         where: { slug: ORG_SLUG },
         update: { name: ORG_NAME },
         create: { id: id("org"), name: ORG_NAME, slug: ORG_SLUG },
+    });
+
+    // The zone the business keeps time in (ADR-007): renewal dates and
+    // "today" are counted in it.
+    await prisma.businessProfile.upsert({
+        where: { organizationId: org.id },
+        update: { timezone: "Asia/Kolkata" },
+        create: {
+            id: id("profile"),
+            organizationId: org.id,
+            timezone: "Asia/Kolkata",
+        },
     });
 
     await prisma.membership.upsert({
@@ -723,41 +695,12 @@ async function seedContent(
 
         // A post whose status says PUBLISHED must actually be live (#232),
         // or the dev data shows a state the product itself cannot produce.
-        if (p.status === "PUBLISHED" && !seeded.currentPublicationId) {
-            const publishedAt = seeded.publishedAt ?? new Date();
-            const publication = await prisma.publication.create({
-                data: {
-                    id: id("postpub", i),
-                    siteId,
-                    organizationId: orgId,
-                    postId: seeded.id,
-                    path: `/blog/${seeded.slug}`,
-                    snapshot: {
-                        post: {
-                            title: seeded.title,
-                            slug: seeded.slug,
-                            excerpt: seeded.excerpt,
-                            content: seeded.content,
-                            image: seeded.image,
-                            featured: seeded.featured,
-                            category: null,
-                            author: null,
-                            publishedAt: publishedAt.toISOString(),
-                        },
-                        path: `/blog/${seeded.slug}`,
-                        publishedAt: publishedAt.toISOString(),
-                    },
-                    templateId: "post",
-                    templateVersion: 1,
-                    publishedAt,
-                },
-            });
-            await prisma.post.update({
-                where: { id: seeded.id },
-                data: {
-                    currentPublicationId: publication.id,
-                    publishedAt,
-                },
+        if (p.status === "PUBLISHED") {
+            await publishSeedPost(prisma, {
+                post: seeded,
+                orgId,
+                siteId,
+                publicationId: id("postpub", i),
             });
         }
     }
@@ -1009,19 +952,8 @@ async function seedReviewer(
 }
 
 /**
- * Build the org's sites, pages, drafts and publications.
- *
- * Two things here mirror the product rather than inventing a shape. Publishing
- * snapshots FROM a page's DRAFT version and never flips that version's status,
- * so every seeded PageVersion stays DRAFT; and the Publication snapshot is
- * assembled exactly as `SitesService.publishSite` assembles it — pages sorted
- * by path, sections in order, content already contract-normalized — because the
- * public renderer reads only that JSON and would render whatever shape we put
- * there, correct or not.
- *
- * Section content goes through `parseSectionContentOrThrow`, the same contract
- * the editor and publish enforce, so a fixture can never persist a section the
- * product itself would reject.
+ * Build the org's sites, pages, drafts and publications — each written by
+ * `writeSite` (helpers.ts), which says how it mirrors a real publish.
  *
  * @returns the site ids, in fixture order.
  */
@@ -1036,7 +968,6 @@ async function seedWebsite(
 
     for (let s = 0; s < SITES.length; s++) {
         const fixture = SITES[s];
-        const createdAt = at(now, -fixture.createdDaysAgo, 11);
         // One website per business (ADR-006): Northwind's own, or the side
         // business the fixture names.
         const siteOrgId = fixture.business
@@ -1066,274 +997,29 @@ async function seedWebsite(
             await prisma.site.delete({ where: { id: stale.id } });
         }
 
-        const site = await prisma.site.upsert({
-            where: {
-                organizationId_slug: {
-                    organizationId: siteOrgId,
-                    slug: fixture.slug,
+        siteIds.push(
+            await writeSite(prisma, {
+                fixture,
+                orgId: siteOrgId,
+                userId,
+                now,
+                ids: {
+                    site: id("site", s),
+                    page: (p) => id("page", s, p),
+                    pageVersion: (p) => id("pageversion", s, p),
+                    section: (p, n) => id("section", s, p, n),
+                    sectionKey: (p, n) => id("sectionkey", s, p, n),
+                    form: (p, n) => id("form", s, p, n),
+                    publication: id("publication", s),
                 },
-            },
-            update: { name: fixture.name, subdomain: fixture.subdomain },
-            create: {
-                id: id("site", s),
-                organizationId: siteOrgId,
-                name: fixture.name,
-                slug: fixture.slug,
-                subdomain: fixture.subdomain,
-                createdAt,
-            },
-        });
-        siteIds.push(site.id);
-
-        const snapshotPages: {
-            path: string;
-            title: string;
-            isHome: boolean;
-            sections: {
-                type: string;
-                contractVersion: number;
-                content: unknown;
-            }[];
-        }[] = [];
-
-        for (let p = 0; p < fixture.pages.length; p++) {
-            const pageFixture = fixture.pages[p];
-
-            const page = await prisma.page.upsert({
-                where: {
-                    siteId_path: { siteId: site.id, path: pageFixture.path },
-                },
-                update: { title: pageFixture.title },
-                create: {
-                    id: id("page", s, p),
-                    siteId: site.id,
-                    organizationId: siteOrgId,
-                    path: pageFixture.path,
-                    title: pageFixture.title,
-                    isHome: pageFixture.isHome ?? false,
-                    createdAt,
-                },
-            });
-
-            const version = await prisma.pageVersion.upsert({
-                where: { id: id("pageversion", s, p) },
-                update: { status: "DRAFT" },
-                create: {
-                    id: id("pageversion", s, p),
-                    pageId: page.id,
-                    organizationId: siteOrgId,
-                    status: "DRAFT",
-                    createdByUserId: userId,
-                    createdAt,
-                },
-            });
-
-            /*
-             * Clear whatever an editor left on this draft before rewriting it.
-             *
-             * Saving a draft REPLACES its sections — `replaceDraftSections`
-             * deletes the rows and writes new ones with fresh ids — so the
-             * moment anybody opened the seeded site in the editor, this page
-             * version held sections the seed does not own. The upserts below
-             * are keyed by seeded id, so they tried to INSERT, and the
-             * `(pageVersionId, key)` unique constraint refused it: re-seeding
-             * failed for any developer who had used the product, which is
-             * everyone the fixture is for.
-             *
-             * Scoped to this seeded version and to rows without the seed
-             * prefix. Restoring the fixture is exactly what re-running the
-             * seed means; nothing outside a seeded page version is touched.
-             */
-            await prisma.section.deleteMany({
-                where: {
-                    pageVersionId: version.id,
-                    id: { not: { startsWith: SEED_PREFIX } },
-                },
-            });
-
-            const snapshotSections: {
-                type: string;
-                contractVersion: number;
-                content: unknown;
-            }[] = [];
-
-            for (let n = 0; n < pageFixture.sections.length; n++) {
-                const seedSection = pageFixture.sections[n];
-                const content = await resolveSectionContent(
-                    prisma,
-                    siteOrgId,
-                    site.id,
-                    [s, p, n],
-                    seedSection,
-                    createdAt,
-                );
-                const normalized = parseSectionContentOrThrow(
-                    seedSection.type,
-                    1,
-                    content,
-                ) as Prisma.InputJsonValue;
-
-                await prisma.section.upsert({
-                    where: { id: id("section", s, p, n) },
-                    update: { order: n, content: normalized },
-                    create: {
-                        id: id("section", s, p, n),
-                        pageVersionId: version.id,
-                        organizationId: siteOrgId,
-                        type: seedSection.type,
-                        contractVersion: 1,
-                        order: n,
-                        content: normalized,
-                        // Deterministic, like every other seeded id: re-running
-                        // the seed must not re-key the sections, or the notes
-                        // pinned to them would all come back orphaned.
-                        key: id("sectionkey", s, p, n),
-                        createdAt,
-                    },
-                });
-
-                snapshotSections.push({
-                    type: seedSection.type,
-                    contractVersion: 1,
-                    content: normalized,
-                });
-            }
-
-            snapshotPages.push({
-                path: pageFixture.path,
-                title: pageFixture.title,
-                isHome: pageFixture.isHome ?? false,
-                sections: snapshotSections,
-            });
-        }
-
-        if (!fixture.published) continue;
-
-        // Published a while after the site was created — a merchant writes the
-        // pages first. The draft site skips this block entirely, which is the
-        // whole of what "draft" means here: no Publication, no live pointer.
-        const publishedAt = at(
-            now,
-            -Math.max(1, Math.round(fixture.createdDaysAgo / 6)),
-            16,
+                pipelineId: id("pipeline"),
+                serviceId: (index) => id("service", index),
+                footer: SEEDED_FOOTER,
+            }),
         );
-        const publication = await prisma.publication.upsert({
-            where: { id: id("publication", s) },
-            // A Publication is immutable and append-only — republishing inserts
-            // a new row. So a re-run must not rewrite this one.
-            update: {},
-            create: {
-                id: id("publication", s),
-                siteId: site.id,
-                organizationId: siteOrgId,
-                snapshot: {
-                    /*
-                     * SHAPED LIKE A REAL PUBLISH (#265).
-                     *
-                     * This used to carry `name` and `slug` and nothing else,
-                     * which is a snapshot `buildSnapshot` would never write. A
-                     * publication is self-contained by design — the renderer
-                     * reads it and resolves nothing — so the missing fields did
-                     * not degrade, they fell through to a different set of
-                     * defaults inside the renderer. The seeded site rendered on
-                     * SiteTheme's hardcoded stone palette, or a black ground on
-                     * a machine whose OS prefers dark, while the editor showed
-                     * the resolved defaults. Anyone comparing the two locally
-                     * was comparing against something publish could not produce.
-                     */
-                    site: {
-                        name: fixture.name,
-                        slug: fixture.slug,
-                        styleVariables: { ...SEEDED_STYLE_VARIABLES },
-                        footer: { ...SEEDED_FOOTER },
-                        /*
-                         * A menu over this site's own published pages, in the
-                         * order the fixture lists them. Publish resolves page
-                         * ids to paths and drops hidden pages; the fixture has
-                         * the paths already, so it writes the resolved shape.
-                         *
-                         * A single-page site gets no menu, which is what
-                         * `resolveSiteNavigation` produces for a merchant who
-                         * has not built one — and what `SiteHeader` is designed
-                         * around: with no menu it centres the site name.
-                         */
-                        navigation:
-                            snapshotPages.length > 1
-                                ? snapshotPages.map((page) => ({
-                                      label: page.title,
-                                      href: page.path,
-                                  }))
-                                : [],
-                    },
-                    pages: [...snapshotPages].sort((a, b) =>
-                        a.path.localeCompare(b.path),
-                    ),
-                    publishedAt: publishedAt.toISOString(),
-                } as Prisma.InputJsonValue,
-                // The Site does not record which template produced it; publish
-                // stamps the starter template's identity, so the fixture does too.
-                templateId: "starter",
-                templateVersion: 1,
-                publishedByUserId: userId,
-                publishedAt,
-            },
-        });
-
-        await prisma.site.update({
-            where: { id: site.id },
-            data: { currentPublicationId: publication.id },
-        });
     }
 
     return siteIds;
-}
-
-/**
- * Turn a fixture section into the content the contract expects.
- *
- * `enquiry` and `booking` are the only two that need work: both point at
- * another row by id, and the editor is what normally creates that link. The
- * enquiry's backing Form is written here (the public submit endpoint validates
- * against it, so a section without one is a form nobody can send), and the
- * booking resolves to a Service the appointments fixture already seeded.
- */
-async function resolveSectionContent(
-    prisma: Db,
-    orgId: string,
-    siteId: string,
-    [s, p, n]: [number, number, number],
-    section: SeedSection,
-    createdAt: Date,
-): Promise<unknown> {
-    if (section.type === "enquiry") {
-        const form = await prisma.form.upsert({
-            where: { id: id("form", s, p, n) },
-            update: { name: section.form.name },
-            create: {
-                id: id("form", s, p, n),
-                organizationId: orgId,
-                siteId,
-                name: section.form.name,
-                fields: section.form.fields as unknown as Prisma.InputJsonValue,
-                pipelineId: id("pipeline"),
-                createdAt,
-            },
-        });
-        return {
-            ...section.content,
-            formId: form.id,
-            fields: section.form.fields,
-        };
-    }
-
-    if (section.type === "booking") {
-        return {
-            ...section.content,
-            serviceId: id("service", section.service),
-        };
-    }
-
-    return section.content;
 }
 
 // --- Providers ----------------------------------------------------------
@@ -1429,91 +1115,17 @@ async function seedProviders(
  * total more than the headline it sits under.
  */
 async function seedAnalytics(prisma: Db, orgId: string, now: Date) {
-    const today = utcDay(now);
-
-    interface Row {
-        id: string;
-        date: Date;
-        type: string;
-        dimension: string;
-        dimensionValue: string;
-        count: number;
-        uniqueCount: number;
-    }
-    const rows: Row[] = [];
-
-    for (let i = 0; i < ANALYTICS_DAYS; i++) {
-        // i = 0 is the oldest day, so the slow upward trend below runs forwards.
-        const date = new Date(
-            today.getTime() - (ANALYTICS_DAYS - 1 - i) * DAY_MS,
-        );
-        const iso = date.toISOString().slice(0, 10);
-        const weekday = date.getUTCDay();
-        const weekend = weekday === 0 || weekday === 6;
-
-        const trend = 74 + Math.round(i * 0.3);
-        const views = Math.max(
-            11,
-            Math.round(trend * (weekend ? 0.45 : 1) * (0.82 + noise(i) * 0.36)),
-        );
-        const uniques = Math.round(views * (0.62 + noise(i + 500) * 0.1));
-        const enquiries = Math.floor(
-            views * 0.014 * (0.4 + noise(i + 901) * 1.6),
-        );
-        const orders = Math.floor(
-            views * 0.007 * (0.3 + noise(i + 1301) * 1.8),
-        );
-
-        const row = (
-            key: string,
-            type: string,
-            dimension: string,
-            dimensionValue: string,
-            count: number,
-            uniqueCount: number,
-        ) => {
-            // The job writes a bucket only for events that happened; a quiet day
-            // leaves no row at all rather than a row of zeroes.
-            if (count > 0) {
-                rows.push({
-                    id: id("agg", iso, key),
-                    date,
-                    type,
-                    dimension,
-                    dimensionValue,
-                    count,
-                    uniqueCount,
-                });
-            }
-        };
-
-        row("views", "site.view", "", "", views, uniques);
-        // Enquiries and paid orders are produced server-side, with no visitor
-        // hash to count distinct — so their `uniqueCount` is 0, as it is in
-        // production. The dashboard reads only `count` for these two.
-        row("enquiries", "enquiry.submitted", "", "", enquiries, 0);
-        row("orders", "order.paid", "", "", orders, 0);
-
-        let assigned = 0;
-        const perPath = ANALYTICS_PATHS.map((p) => {
-            const count = Math.floor(views * p.weight);
-            assigned += count;
-            return { path: p.path, count };
-        });
-        // "/" absorbs the rounding remainder, so the paths add up to `views`.
-        perPath[0].count += views - assigned;
-
-        for (const p of perPath) {
-            row(
-                `path${p.path.replace(/\W+/g, "-")}`,
-                "site.view",
-                "path",
-                p.path,
-                p.count,
-                Math.min(p.count, Math.max(1, Math.round(p.count * 0.72))),
-            );
-        }
-    }
+    const rows = buildAnalyticsRows({
+        now,
+        days: ANALYTICS_DAYS,
+        paths: ANALYTICS_PATHS,
+        idFor: (iso, key) => id("agg", iso, key),
+        trendBase: 74,
+        trendSlope: 0.3,
+        weekendFactor: 0.45,
+        enquiryRate: 0.014,
+        orderRate: 0.007,
+    });
 
     // ~1,100 rows, and against a hosted Postgres one-at-a-time is a minute of
     // latency. Run them in small concurrent batches instead of a
@@ -1568,10 +1180,29 @@ export async function reset(): Promise<void> {
     console.log(`[seed] resetting ${target.database} on ${target.host}`);
 
     const { prisma } = await import("../client");
-    const where = { id: { startsWith: SEED_PREFIX } };
+    const removed = await deleteSeeded(prisma, SEED_PREFIX);
+    console.log(`[seed] removed ${removed} seeded rows.`);
+}
+
+/**
+ * Delete every row whose id starts with `prefix`, children first. The reset
+ * passes the whole seed's prefix; the showcase passes one retired business's
+ * (`seed_sc_<key>_`). Returns how many rows went.
+ */
+export async function deleteSeeded(
+    prisma: Db,
+    prefix: string,
+): Promise<number> {
+    const where = { id: { startsWith: prefix } };
     let removed = 0;
 
     const inOrder = [
+        // What a business sells beyond a booking (ADR-007). Invoices and the
+        // classes spent from packs first; plans and packs are `Restrict` from
+        // what was sold on them, so they go after the sales.
+        () => prisma.invoiceLine.deleteMany({ where }),
+        () => prisma.invoice.deleteMany({ where }),
+        () => prisma.packRedemption.deleteMany({ where }),
         () => prisma.orderItem.deleteMany({ where }),
         () => prisma.order.deleteMany({ where }),
         () => prisma.inventory.deleteMany({ where }),
@@ -1594,7 +1225,22 @@ export async function reset(): Promise<void> {
         () => prisma.storeSettings.deleteMany({ where }),
         () => prisma.storeOwner.deleteMany({ where }),
         () => prisma.store.deleteMany({ where }),
+        // Both cascade from their parent, but the showcase writes them with
+        // seeded ids, so they are removed explicitly and counted.
+        () => prisma.bookingEvent.deleteMany({ where }),
         () => prisma.booking.deleteMany({ where }),
+        () => prisma.courseEnrollment.deleteMany({ where }),
+        () => prisma.courseSession.deleteMany({ where }),
+        () => prisma.course.deleteMany({ where }),
+        () => prisma.packPurchase.deleteMany({ where }),
+        () =>
+            prisma.classPackService.deleteMany({
+                where: { packId: { startsWith: prefix } },
+            }),
+        () => prisma.classPack.deleteMany({ where }),
+        () => prisma.customerSubscription.deleteMany({ where }),
+        () => prisma.subscriptionPlan.deleteMany({ where }),
+        () => prisma.availabilityRule.deleteMany({ where }),
         () => prisma.service.deleteMany({ where }),
         () => prisma.activity.deleteMany({ where }),
         () => prisma.lead.deleteMany({ where }),
@@ -1626,6 +1272,12 @@ export async function reset(): Promise<void> {
         () => prisma.featureFlagOverride.deleteMany({ where }),
         () => prisma.organizationModule.deleteMany({ where }),
         () => prisma.membership.deleteMany({ where }),
+        () => prisma.businessProfile.deleteMany({ where }),
+        // Keyed by its organization, so matched on that.
+        () =>
+            prisma.invoiceSequence.deleteMany({
+                where: { organizationId: { startsWith: prefix } },
+            }),
         () => prisma.organization.deleteMany({ where }),
         () => prisma.account.deleteMany({ where }),
         () => prisma.user.deleteMany({ where }),
@@ -1635,8 +1287,7 @@ export async function reset(): Promise<void> {
         const { count } = await step();
         removed += count;
     }
-
-    console.log(`[seed] removed ${removed} seeded rows.`);
+    return removed;
 }
 
 async function report(prisma: Db, organizationId: string) {

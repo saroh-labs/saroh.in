@@ -27,6 +27,7 @@
         "typecheck": "tsc --noEmit",
         "db:guard": "tsx src/database-target.cli.ts",
         "db:seed:reset": "tsx src/seed.ts --reset",
+        "db:seed:showcase": "tsx src/seed.ts --showcase",
         "db:verify:replay": "tsx src/verify-migration-replay.cli.ts"
     },
     "dependencies": {

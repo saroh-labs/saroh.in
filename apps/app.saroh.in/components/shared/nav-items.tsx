@@ -7,11 +7,14 @@ import {
     Building2,
     CalendarClock,
     Globe,
+    GraduationCap,
     Home,
     KanbanSquare,
     Plug,
+    ReceiptText,
     Store,
     Target,
+    Ticket,
     Users,
 } from "lucide-react";
 
@@ -61,13 +64,35 @@ export type NavAction =
     // every storefront. Not in the read-only floor, so a Member or Reviewer
     // is not offered a row the API would refuse them.
     | "order:read"
+    // Leads and the pipeline (Owner and Admin by default; a Member reads
+    // contacts, not the sales funnel).
+    | "lead:read"
+    | "pipeline:read"
+    // The diary and the people on it: a Member holds these (DEC-020).
+    | "contact:read"
+    | "booking:read"
+    | "service:read"
     // Sell → Discounts. Owner and Admin by default; money off is money.
     | "discount:read"
     // Products, Customers and Storefronts read storefront data. In the Member
     // floor, so nothing changes for the built-ins; it matters for a role the
     // business invented without it, which was offered three rows that each
     // answered it with a refusal.
-    | "store:read";
+    | "store:read"
+    // Billing (Subscriptions, Invoices) and Schedule's Courses and Class
+    // packs (ADR-007). Owner and Admin by default: who owes what is not in
+    // the Member floor. Listed ahead of their rows so each unit that ships a
+    // page only has to add the row.
+    | "subscription:read"
+    | "invoice:read"
+    // "New invoice", "Subscribe someone", "New course", "New class pack"
+    // and "Sell a pack" in the command menu make one.
+    | "invoice:write"
+    | "subscription:write"
+    | "course:write"
+    | "course:read"
+    | "pack:read"
+    | "pack:write";
 
 /**
  * Role → what it may reach here.
@@ -91,6 +116,16 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "order:read",
         "discount:read",
         "store:read",
+        "subscription:read",
+        "invoice:read",
+        "course:read",
+        "pack:read",
+        "invoice:write",
+        "subscription:write",
+        "course:write",
+        "pack:write",
+        "lead:read",
+        "pipeline:read",
     ],
     ADMIN: [
         "site:read",
@@ -104,8 +139,26 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "order:read",
         "discount:read",
         "store:read",
+        "subscription:read",
+        "invoice:read",
+        "course:read",
+        "pack:read",
+        "invoice:write",
+        "subscription:write",
+        "course:write",
+        "pack:write",
+        "lead:read",
+        "pipeline:read",
     ],
-    MEMBER: ["site:read", "member:read", "module:read", "store:read"],
+    MEMBER: [
+        "site:read",
+        "member:read",
+        "module:read",
+        "store:read",
+        "contact:read",
+        "booking:read",
+        "service:read",
+    ],
     REVIEWER: ["site:read"],
 };
 
@@ -326,6 +379,35 @@ export const NAV_GROUPS: NavGroup[] = [
                     },
                 ],
             },
+            // Billing (ADR-007): money a business is owed by a person —
+            // memberships and the invoices for them — under Payments, after
+            // the "Saroh Billing and Classes" design. Its pages nest like
+            // Sell's; each unit adds its row once its page exists.
+            {
+                // The section, like Sell's `/commerce`: every Billing page is
+                // under it, so the rail opens and marks Billing on any of them.
+                href: "/billing",
+                label: "Billing",
+                icon: ReceiptText,
+                moduleKey: "PAYMENTS",
+                children: [
+                    {
+                        href: "/billing/subscriptions",
+                        label: "Subscriptions",
+                        action: "subscription:read",
+                    },
+                    {
+                        href: "/billing/plans",
+                        label: "Plans",
+                        action: "subscription:read",
+                    },
+                    {
+                        href: "/billing/invoices",
+                        label: "Invoices",
+                        action: "invoice:read",
+                    },
+                ],
+            },
             // Two destinations, two questions: "what is booked?" and "what can
             // be booked?". They lost their own BOOKINGS heading in the regroup;
             // the ordering keeps them adjacent so the pair still reads as one
@@ -342,23 +424,47 @@ export const NAV_GROUPS: NavGroup[] = [
                 icon: Briefcase,
                 moduleKey: "APPOINTMENTS",
             },
+            // Courses is its own module (ADR-007): a business that takes
+            // bookings need not run courses, so it has its own switch and row.
+            {
+                href: "/courses",
+                label: "Courses",
+                icon: GraduationCap,
+                moduleKey: "COURSES",
+                action: "course:read",
+            },
+            // Class packs: booked time sold ahead, so under Appointments —
+            // but its own row, not nested under Schedule (ADR-007, 2026-09-22):
+            // Schedule and Services stay where merchants already find them.
+            {
+                href: "/class-packs",
+                label: "Class packs",
+                icon: Ticket,
+                moduleKey: "APPOINTMENTS",
+                action: "pack:read",
+            },
             {
                 href: "/contacts",
                 label: "Contacts",
                 icon: Users,
                 moduleKey: "CRM",
             },
+            // Contacts is reached with the CRM module (`contact:read`, which a
+            // Member holds); leads and the pipeline need `lead:read` and
+            // `pipeline:read`, which a Member does not.
             {
                 href: "/leads",
                 label: "Leads",
                 icon: Target,
                 moduleKey: "CRM",
+                action: "lead:read",
             },
             {
                 href: "/pipeline",
                 label: "Pipeline",
                 icon: KanbanSquare,
                 moduleKey: "CRM",
+                action: "pipeline:read",
             },
         ],
     },
@@ -609,20 +715,20 @@ export function filterNavGroupsByRole(
     return groups
         .map((group) => ({
             ...group,
-            items: group.items
-                .filter((item) => !item.action || navCan(actor, item.action))
-                .map((item) =>
-                    item.children === undefined
-                        ? item
-                        : {
-                              ...item,
-                              children: item.children.filter(
-                                  (child) =>
-                                      !child.action ||
-                                      navCan(actor, child.action),
-                              ),
-                          },
-                ),
+            items: group.items.flatMap((item) => {
+                if (item.action && !navCan(actor, item.action)) return [];
+                if (item.children === undefined) return [item];
+                const children = item.children.filter(
+                    (child) => !child.action || navCan(actor, child.action),
+                );
+                // A section whose every page is refused is not offered as an
+                // empty heading. Only a section that HAD pages: Website with
+                // no sites yet is still a destination in its own right.
+                if (item.children.length > 0 && children.length === 0) {
+                    return [];
+                }
+                return [{ ...item, children }];
+            }),
         }))
         .filter((group) => group.items.length > 0);
 }

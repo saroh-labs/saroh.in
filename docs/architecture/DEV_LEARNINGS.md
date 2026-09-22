@@ -133,6 +133,23 @@ type to a registered handler and lists the gaps still open. The handler itself
 is still unwritten.
 **Category**: jobs
 
+## Jobs — scheduled jobs run at once on a Postgres not set to UTC
+
+**Problem**: A job queued to run an hour later ran two seconds later, over and
+over — a self-rescheduling job ran some 11,000 times in an hour on a dev
+database, and a failed job's retry backoff was never waited out.
+**Root cause**: Prisma stores `DateTime` as `timestamp without time zone`
+holding UTC. The claim query compared `"runAt" <= now()`, and `now()` carries
+a zone, so Postgres read `runAt` in the SESSION's zone. A developer's Postgres
+in India runs in `Asia/Kolkata`, where every UTC time looks 5½ hours older than
+it is — anything due within 5½ hours was due already. A database running in
+UTC hides it, which is why it was never seen.
+**Fix**: Compare with `now() AT TIME ZONE 'UTC'` (and write `lockedAt` the same
+way) in `prisma-job-queue.ts`. `prisma-job-queue.db.spec.ts` claims against a
+connection set to Asia/Kolkata. Any raw SQL that compares a Prisma `DateTime`
+column with `now()` has the same bug — use the UTC form.
+**Category**: jobs
+
 ## App — a role denial reads "turned off" in the gate, and "try again" in production (#274)
 
 **Problem**: A MEMBER opening a website page was told "Website is not switched
@@ -382,3 +399,37 @@ blocks never hit this, because they load in an effect after mount.
 `LIVE_DATA_PREVIEWS`. Anything formatted for the viewer's zone or locale
 waits for the browser.
 **Category**: site blocks · `packages/site-blocks/src/block-fixture-preview.tsx`
+
+## Database — row-level security quietly dropped Serializable (ADR-007 review)
+
+**Problem**: A booking's last-seat check and a class pack's last-class check
+were only safe because they run as Serializable transactions. Under
+`RLS_ENFORCEMENT`, they would have run at Read Committed, and two races each
+taking the last one could both have committed.
+**Root cause**: The RLS proxy turns a service's `prisma.$transaction(fn,
+options)` into its own transaction that sets the organization first, and
+dropped `options`, so `isolationLevel` never reached Postgres. Enforcement is
+off by default, so no test or environment ever showed it.
+**Fix**: `withGuc` passes the caller's options through (`rls-proxy.ts`), and
+`rls-proxy.test.ts` checks that the isolation level arrives. When wrapping a
+Prisma call, carry every argument through, not just the one you are adding
+to. The course and pack writes also take a
+row lock on the course, the purchase or the booking before counting, so they
+stay correct even if the isolation level is ever lost again.
+**Category**: database · `packages/database/src/rls-proxy.ts`
+
+## Database — deleting a contact on a course was refused (ADR-007, U7)
+
+**Problem**: Deleting a contact enrolled on a course failed with a foreign key
+error on `Booking_courseEnrollmentId_fkey`, though that key is
+`ON DELETE SET NULL`.
+**Root cause**: A booking points at both the contact (SET NULL) and the
+enrolment (SET NULL), and the enrolment cascades from the contact. In one
+delete, Postgres cleared the booking's `contactId` while the enrolment was
+already gone but the booking's own `courseEnrollmentId` had not been cleared
+yet. That update re-checked the enrolment key and failed the whole delete.
+**Fix**: `ContactsService.remove` deletes the person's enrolments on their
+own first, which clears the bookings' link, then deletes the contact. When
+a row references two parents that cascade from each other, clear the inner
+one first.
+**Category**: database · `apps/api.saroh.in/src/modules/contacts/contacts.service.ts`

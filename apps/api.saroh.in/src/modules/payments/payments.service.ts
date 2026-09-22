@@ -451,41 +451,131 @@ export class PaymentsService {
         },
         options: { idempotencyKey?: string; provider?: string },
     ): Promise<CreateIntentResult> {
-        const orderId = order.id;
-
+        // Resolve the provider row: the one the caller pinned, else the one
+        // the order's storefront chose (Sell → Storefronts), else the single
+        // CONNECTED one. A business with two providers connected could not be
+        // paid at all before a storefront could say which it uses. Looked up
+        // lazily, after the idempotent replay, as it always was.
+        const resolveProvider = async () => {
+            const storefrontProvider = options.provider
+                ? undefined
+                : ((
+                      await prisma.storeSettings.findUnique({
+                          where: { storeId: order.storeId },
+                          select: { checkoutProvider: true },
+                      })
+                  )?.checkoutProvider ?? undefined);
+            return this.resolveConnectedProvider(
+                organizationId,
+                options.provider ?? storefrontProvider,
+            );
+        };
         // Server-authoritative money: derived ONLY from the Order.
-        const amountCents = totalToCents(order.total);
-        const currency = order.currency;
+        return this.createIntentFor(
+            organizationId,
+            {
+                kind: "order",
+                id: order.id,
+                amountCents: totalToCents(order.total),
+                currency: order.currency,
+            },
+            options.idempotencyKey,
+            resolveProvider,
+        );
+    }
+
+    /**
+     * PUBLIC pay-link create-intent (ADR-007, U13) — the write behind
+     * `POST /public/invoices/:token/payment-intent`. The caller has already
+     * found the invoice by its token and checked it is ISSUED; the owning
+     * organization comes from that row, never from the request.
+     *
+     * SECURITY: the amount and currency are the stored invoice's — the
+     * request carries only a provider and an idempotency key — and the
+     * provider must be one the business itself connected.
+     */
+    async createIntentForInvoicePublic(
+        invoice: {
+            id: string;
+            organizationId: string;
+            total: Prisma.Decimal | string;
+            currency: string;
+        },
+        options: { idempotencyKey?: string; provider?: string } = {},
+    ): Promise<CreateIntentResult> {
+        return this.createIntentFor(
+            invoice.organizationId,
+            {
+                kind: "invoice",
+                id: invoice.id,
+                amountCents: totalToCents(invoice.total),
+                currency: invoice.currency,
+            },
+            options.idempotencyKey,
+            // A pinned provider must be connected; otherwise the business's
+            // first connected one. An invoice has no storefront to say which,
+            // and two connected providers must not leave it unpayable.
+            () =>
+                this.resolveConnectedProvider(
+                    invoice.organizationId,
+                    options.provider,
+                    { firstWhenSeveral: true },
+                ),
+        );
+    }
+
+    /**
+     * The shared server-authoritative core behind every intent, for an Order
+     * or an Invoice. The target's id is the merchant reference handed to the
+     * provider (and echoed back by its webhooks); the amount was derived by
+     * the caller from the stored row.
+     */
+    private async createIntentFor(
+        organizationId: string,
+        target: {
+            kind: "order" | "invoice";
+            id: string;
+            amountCents: number;
+            currency: string;
+        },
+        rawIdempotencyKey: string | undefined,
+        resolveProvider: () => Promise<MerchantPaymentProvider>,
+    ): Promise<CreateIntentResult> {
+        const { amountCents, currency } = target;
+        const link =
+            target.kind === "order"
+                ? { orderId: target.id }
+                : { invoiceId: target.id };
+        const findByKey = (idempotencyKey: string) =>
+            prisma.paymentIntent.findUnique({
+                where:
+                    target.kind === "order"
+                        ? {
+                              orderId_idempotencyKey: {
+                                  orderId: target.id,
+                                  idempotencyKey,
+                              },
+                          }
+                        : {
+                              invoiceId_idempotencyKey: {
+                                  invoiceId: target.id,
+                                  idempotencyKey,
+                              },
+                          },
+            });
 
         // Idempotency: a prior create with the same key returns the first intent.
         // Treat an empty/blank key as "no key" (no idempotency dedupe).
-        const rawKey = options.idempotencyKey?.trim();
+        const rawKey = rawIdempotencyKey?.trim();
         const idempotencyKey = rawKey && rawKey.length > 0 ? rawKey : undefined;
         if (idempotencyKey) {
-            const existing = await prisma.paymentIntent.findUnique({
-                where: { orderId_idempotencyKey: { orderId, idempotencyKey } },
-            });
+            const existing = await findByKey(idempotencyKey);
             if (existing) {
                 return this.replay(organizationId, existing);
             }
         }
 
-        // Resolve the provider row: the one the caller pinned, else the one
-        // the order's storefront chose (Sell → Storefronts), else the single
-        // CONNECTED one. A business with two providers connected could not be
-        // paid at all before a storefront could say which it uses.
-        const storefrontProvider = options.provider
-            ? undefined
-            : ((
-                  await prisma.storeSettings.findUnique({
-                      where: { storeId: order.storeId },
-                      select: { checkoutProvider: true },
-                  })
-              )?.checkoutProvider ?? undefined);
-        const providerRow = await this.resolveConnectedProvider(
-            organizationId,
-            options.provider ?? storefrontProvider,
-        );
+        const providerRow = await resolveProvider();
 
         // Decrypt in-memory ONLY here, at the moment of the provider call.
         const credentials = this.openCredentials(providerRow);
@@ -493,7 +583,7 @@ export class PaymentsService {
         const intent = await provider.createOrderIntent({
             amountCents,
             currency,
-            orderId,
+            orderId: target.id,
             credentials,
         });
 
@@ -504,7 +594,7 @@ export class PaymentsService {
                 const paymentIntent = await tx.paymentIntent.create({
                     data: {
                         organizationId,
-                        orderId,
+                        ...link,
                         provider: providerRow.provider,
                         providerIntentId: intent.providerIntentId,
                         amountCents,
@@ -539,14 +629,11 @@ export class PaymentsService {
                 clientParams: intent.clientParams,
             };
         } catch (err) {
-            // Lost an idempotency race (unique [orderId, idempotencyKey]) — the
-            // other request created it first; return that one.
+            // Lost an idempotency race (unique [orderId|invoiceId,
+            // idempotencyKey]) — the other request created it first; return
+            // that one.
             if (idempotencyKey && (err as { code?: string }).code === "P2002") {
-                const winner = await prisma.paymentIntent.findUnique({
-                    where: {
-                        orderId_idempotencyKey: { orderId, idempotencyKey },
-                    },
-                });
+                const winner = await findByKey(idempotencyKey);
                 if (winner) return this.replay(organizationId, winner);
             }
             throw err;
@@ -763,6 +850,7 @@ export class PaymentsService {
     private async resolveConnectedProvider(
         organizationId: string,
         pinned?: string,
+        { firstWhenSeveral = false }: { firstWhenSeveral?: boolean } = {},
     ): Promise<MerchantPaymentProvider> {
         if (pinned) {
             const name = pinned.toUpperCase();
@@ -796,7 +884,7 @@ export class PaymentsService {
                 "No connected payment provider for this organization",
             );
         }
-        if (connected.length > 1) {
+        if (connected.length > 1 && !firstWhenSeveral) {
             throw new ConflictException(
                 "Multiple providers connected — specify which provider to use",
             );

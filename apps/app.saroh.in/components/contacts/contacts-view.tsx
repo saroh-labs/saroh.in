@@ -64,16 +64,18 @@ export function ContactsView({
             header: "Name",
             priority: "primary",
             sortValue: (c) => contactName(c).toLowerCase(),
+            // Text, not a link: DataView makes the first cell the row's link
+            // (`rowHref`), and a link inside it would nest one <a> in another
+            // — invalid HTML that breaks hydration.
             cell: (c) => (
-                <Link
-                    href={`/contacts/${c.id}`}
+                <span
                     // A person's name is the row's handle; breaking it across
                     // two lines to save horizontal space costs a whole extra
                     // row of height on EVERY row to buy a few pixels on one.
-                    className="whitespace-nowrap font-medium underline-offset-4 hover:text-brand hover:underline"
+                    className="whitespace-nowrap font-medium"
                 >
                     {contactName(c)}
-                </Link>
+                </span>
             ),
         },
         {

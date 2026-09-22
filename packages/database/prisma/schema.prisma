@@ -6,7 +6,11 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Partial unique indexes (ADR-007): one live invoice per subscription
+  // period, one active enrolment per person per course, one pending renewal
+  // run. Declaring them here keeps migration replay free of drift.
+  previewFeatures = ["partialIndexes"]
 }
 
 // ============================================================================
@@ -205,6 +209,20 @@ model Organization {
   discountRedemptions DiscountRedemption[]
   productReviews      ProductReview[]
   reviewInvitations   ReviewInvitation[]
+
+  // Subscriptions, invoices, courses and class packs (ADR-007).
+  subscriptionPlans     SubscriptionPlan[]
+  customerSubscriptions CustomerSubscription[]
+  invoices              Invoice[]
+  invoiceLines          InvoiceLine[]
+  invoiceSequence       InvoiceSequence?
+  courses               Course[]
+  courseSessions        CourseSession[]
+  courseEnrollments     CourseEnrollment[]
+  classPacks            ClassPack[]
+  classPackServices     ClassPackService[]
+  packPurchases         PackPurchase[]
+  packRedemptions       PackRedemption[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -222,6 +240,11 @@ model BusinessProfile {
   taxId        String?
   contactEmail String?
   website      String?
+
+  // IANA zone the business keeps time in (ADR-007): the default a new
+  // subscription snapshots for its renewal dates. Null until the business
+  // sets it; the subscribe flow asks when it is missing.
+  timezone String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2088,6 +2111,13 @@ model Contact {
   // Explicit links to commerce Customer records (#120).
   identityLinks CustomerIdentityLink[]
 
+  // What this person holds (ADR-007). Holdings go with the person; invoices
+  // keep a bill-to snapshot and only lose the link.
+  subscriptions     CustomerSubscription[]
+  invoices          Invoice[]
+  packPurchases     PackPurchase[]
+  courseEnrollments CourseEnrollment[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2315,6 +2345,10 @@ model Job {
   updatedAt   DateTime  @updatedAt
   processedAt DateTime? // set when DONE or FAILED (terminal)
 
+  // At most one pending run of the self-rescheduling renewal job (ADR-007):
+  // the next run is enqueued with insert-on-conflict-do-nothing, so a retried
+  // or reclaimed run can never fork a second chain.
+  @@unique([type], map: "Job_one_pending_subscription_renew", where: raw("type = 'subscription.renew' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -2402,8 +2436,16 @@ model Service {
 
   status String @default("ACTIVE") // ACTIVE → ARCHIVED
 
+  // Online classes (ADR-007): IN_PERSON | ONLINE. An ONLINE service carries
+  // an https meeting link, frozen into each booking's snapshot. The link is a
+  // shared credential: every public booker receives it.
+  locationType String  @default("IN_PERSON")
+  meetingUrl   String?
+
   availabilityRules AvailabilityRule[]
   bookings          Booking[]
+  courses           Course[]
+  classPackServices ClassPackService[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -2481,6 +2523,12 @@ model Booking {
   // What has happened to this booking, in order (#121).
   events BookingEvent[]
 
+  // A course session booking belongs to its enrolment (ADR-007); a booking
+  // paid with a class pack has one redemption.
+  courseEnrollmentId String?
+  courseEnrollment   CourseEnrollment? @relation(fields: [courseEnrollmentId], references: [id], onDelete: SetNull)
+  packRedemption     PackRedemption?
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])
@@ -2492,6 +2540,7 @@ model Booking {
   // an index that exists in the database but not in the datamodel reads to
   // `migrate dev` as drift, and the migration it generates DROPS it.
   @@index([organizationId, outcome, endAt])
+  @@index([courseEnrollmentId])
 }
 
 /// What has happened to a Booking, in order (#121).
@@ -2568,19 +2617,25 @@ model MerchantPaymentProvider {
   @@index([organizationId])
 }
 
-// PaymentIntent — an intent to collect a SERVER-CALCULATED amount for an Order.
+// PaymentIntent — an intent to collect a SERVER-CALCULATED amount for an Order
+// or, through its pay link, an Invoice (ADR-007, U13). Exactly one of
+// `orderId` / `invoiceId` is set: the migration adds a CHECK constraint
+// ("PaymentIntent_one_target") that Prisma cannot express here.
 model PaymentIntent {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   provider         String // which MerchantPaymentProvider
   providerIntentId String? // the provider's order/intent id, set after create
 
-  amountCents Int // server-calculated from the Order; minor units
+  amountCents Int // server-calculated from the Order or Invoice; minor units
   currency    String
 
   // CREATED → REQUIRES_PAYMENT → PROCESSING → SUCCEEDED | FAILED | CANCELLED
@@ -2595,8 +2650,10 @@ model PaymentIntent {
   updatedAt DateTime @updatedAt
 
   @@unique([orderId, idempotencyKey])
+  @@unique([invoiceId, idempotencyKey])
   @@index([organizationId])
   @@index([orderId])
+  @@index([invoiceId])
   @@index([provider, providerIntentId])
 }
 
@@ -2611,7 +2668,9 @@ model PaymentAttempt {
 
   provider    String
   providerRef String? // provider payment id
-  status      String // CREATED | AUTHORIZED | CAPTURED | FAILED
+  // CREATED | AUTHORIZED | CAPTURED | FAILED, or CAPTURED_NEEDS_REFUND: money
+  // taken on an invoice that was already paid or void when it arrived.
+  status      String
   rawResponse Json? // provider response (sanitized), for audit
 
   createdAt DateTime @default(now())
@@ -3237,4 +3296,331 @@ model ProductReview {
 
   @@index([organizationId, productId, status])
   @@index([organizationId, createdAt])
+}
+
+// ============================================================================
+// SUBSCRIPTIONS, INVOICES, COURSES AND CLASS PACKS (ADR-007)
+// ============================================================================
+//
+// What a service business sells beyond products and single bookings. The
+// Organization owns every row, and the person is a CRM Contact — a gym or a
+// clinic usually has no storefront, so none of this hangs off Store/Customer.
+// Saroh's own plan billing is Plan/Subscription above; these names are kept
+// apart on purpose.
+//
+// Money is Decimal(12,2) like Order, computed by the API in integer minor
+// units. Anything sold copies its price (and terms) at the moment of sale, so
+// editing a plan or a pack never rewrites what someone already bought.
+
+// What a business sells on repeat: a membership, a monthly plan.
+model SubscriptionPlan {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  price       Decimal @db.Decimal(12, 2)
+  currency    String
+  interval    String // WEEK | MONTH | QUARTER | YEAR
+  status      String  @default("ACTIVE") // ACTIVE | ARCHIVED — archived plans take no new subscribers
+
+  subscriptions CustomerSubscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+// A person on a plan. Invoiced forward, one invoice per period; "overdue" is
+// derived from its invoices, never stored.
+model CustomerSubscription {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId         String
+  // Plans are archived, never deleted, while anyone holds one.
+  plan           SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  contactId      String
+  contact        Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  status String @default("ACTIVE") // ACTIVE | PAUSED | CANCELLED
+
+  // Terms at the moment of sale.
+  price    Decimal @db.Decimal(12, 2)
+  currency String
+  interval String // WEEK | MONTH | QUARTER | YEAR
+  timezone String // IANA; renewal boundaries are computed in this zone
+
+  anchorAt           DateTime // the start date renewal days are counted from
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  pausedAt           DateTime?
+  cancelAtPeriodEnd  Boolean   @default(false)
+  cancelledAt        DateTime?
+  createdByUserId    String?
+
+  invoices Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One live subscription per person per plan: a second is a double-click,
+  // and it would bill them twice every period.
+  @@unique([planId, contactId], map: "CustomerSubscription_one_live_per_person", where: raw("status <> 'CANCELLED'"))
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([status, currentPeriodEnd])
+}
+
+// A bill. DRAFT → ISSUED → PAID, or VOID. An issued invoice never changes: a
+// mistake is voided (keeping its number) and reissued as a new draft.
+model Invoice {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  number String? // INV-0001…, assigned on issue; null while DRAFT
+  status String  @default("DRAFT") // DRAFT | ISSUED | PAID | VOID
+
+  // Who it is billed to. The name and email are copied on issue, so an
+  // invoice reads the same after the contact is edited or deleted.
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  billToName  String?
+  billToEmail String?
+
+  currency String
+  subtotal Decimal @db.Decimal(12, 2)
+  tax      Decimal @default(0) @db.Decimal(12, 2)
+  total    Decimal @db.Decimal(12, 2)
+
+  issuedAt   DateTime?
+  dueAt      DateTime?
+  paidAt     DateTime?
+  voidedAt   DateTime?
+  voidReason String?
+
+  // A payment taken outside Saroh, recorded by hand: CASH | UPI |
+  // BANK_TRANSFER | CARD | OTHER. Nothing is charged.
+  paymentMethod    String?
+  paymentReference String?
+  paymentNote      String?
+
+  // What it is for: MANUAL | SUBSCRIPTION | COURSE | PACK.
+  source             String                @default("MANUAL")
+  subscriptionId     String?
+  subscription       CustomerSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  periodStart        DateTime?
+  periodEnd          DateTime?
+  courseEnrollmentId String?
+  courseEnrollment   CourseEnrollment?     @relation(fields: [courseEnrollmentId], references: [id], onDelete: SetNull)
+  packPurchaseId     String?
+  packPurchase       PackPurchase?         @relation(fields: [packPurchaseId], references: [id], onDelete: SetNull)
+
+  // "Void and reissue": the draft that replaced a voided invoice.
+  reissuedFromId String?
+  reissuedFrom   Invoice?  @relation("InvoiceReissue", fields: [reissuedFromId], references: [id], onDelete: SetNull)
+  reissues       Invoice[] @relation("InvoiceReissue")
+
+  createdByUserId String?
+
+  // The pay link (U13): the SHA-256 of a random token, never the token.
+  // Minted when a link is first asked for, replaced by a new one, cleared on
+  // void and when the contact is deleted. Null means no link works.
+  payTokenHash String? @unique
+
+  lines          InvoiceLine[]
+  paymentIntents PaymentIntent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, number])
+  // One live invoice per subscription period: the renewal job's idempotency
+  // key. Voided invoices are left out, so a voided period can be reissued.
+  @@unique([subscriptionId, periodStart], map: "Invoice_one_live_per_period", where: raw("status <> 'VOID'"))
+  @@index([organizationId, status])
+  @@index([contactId])
+  @@index([subscriptionId])
+}
+
+model InvoiceLine {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  position    Int
+  description String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(12, 2)
+  amount      Decimal @db.Decimal(12, 2)
+
+  @@index([invoiceId])
+  @@index([organizationId])
+}
+
+// The last invoice number a business issued. Allocated with one
+// insert-or-increment statement on the issuing transaction, so numbers never
+// repeat and the first invoice needs no row to exist beforehand.
+model InvoiceSequence {
+  organizationId String       @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lastNumber     Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+}
+
+// A fixed series of dated sessions on one service, sold once.
+model Course {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  serviceId      String
+  service        Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  price       Decimal @db.Decimal(12, 2)
+  currency    String
+  seats       Int // never more than the service's capacity
+  status      String  @default("DRAFT") // DRAFT | OPEN | CLOSED | ARCHIVED
+
+  sessions    CourseSession[]
+  enrollments CourseEnrollment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([serviceId])
+}
+
+model CourseSession {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  courseId       String
+  course         Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  startAt DateTime
+  endAt   DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([courseId, startAt])
+  @@index([organizationId])
+}
+
+// A person's seat on a course: one booking per remaining session.
+model CourseEnrollment {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  courseId       String
+  course         Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  status          String    @default("ACTIVE") // ACTIVE | CANCELLED
+  price           Decimal   @db.Decimal(12, 2) // what was charged, which may differ for a late start
+  currency        String
+  cancelledAt     DateTime?
+  createdByUserId String?
+
+  bookings Booking[]
+  invoices Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One active seat per person per course; cancelling frees it to re-enrol.
+  @@unique([courseId, contactId], map: "CourseEnrollment_one_active_per_person", where: raw("status = 'ACTIVE'"))
+  @@index([organizationId])
+  @@index([contactId])
+}
+
+// Prepaid classes: N credits for a price, valid for D days, on named services.
+model ClassPack {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name         String
+  description  String?
+  credits      Int
+  validityDays Int
+  price        Decimal @db.Decimal(12, 2)
+  currency     String
+  status       String  @default("ACTIVE") // ACTIVE | ARCHIVED
+
+  services  ClassPackService[]
+  purchases PackPurchase[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model ClassPackService {
+  packId         String
+  pack           ClassPack    @relation(fields: [packId], references: [id], onDelete: Cascade)
+  serviceId      String
+  service        Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([packId, serviceId])
+  @@index([serviceId])
+  @@index([organizationId])
+}
+
+// A pack sold to a person. The balance is derived: credits minus redemptions
+// that have not been reversed.
+model PackPurchase {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  packId         String
+  // Packs are archived, never deleted, while anyone holds one.
+  pack           ClassPack    @relation(fields: [packId], references: [id], onDelete: Restrict)
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  // Terms at the moment of sale.
+  credits   Int
+  price     Decimal  @db.Decimal(12, 2)
+  currency  String
+  expiresAt DateTime
+
+  createdByUserId String?
+
+  redemptions PackRedemption[]
+  invoices    Invoice[]
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([packId])
+}
+
+// One credit spent on one booking. Cancelling the booking reverses it.
+model PackRedemption {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  purchaseId     String
+  purchase       PackPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  bookingId      String       @unique
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  reversedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([organizationId])
+  @@index([purchaseId])
 }

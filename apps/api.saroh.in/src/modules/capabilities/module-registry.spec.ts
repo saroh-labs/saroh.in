@@ -33,11 +33,12 @@ describe("module registry", () => {
         expect(MODULES.some((m) => (m.key as string) === "AI")).toBe(false);
     });
 
-    it("exposes exactly the eight initial keys", () => {
+    it("exposes exactly the nine keys", () => {
         expect([...MODULE_KEYS]).toEqual([
             "WEBSITE",
             "CRM",
             "APPOINTMENTS",
+            "COURSES",
             "COMMERCE",
             "PAYMENTS",
             "COMMUNICATIONS",
@@ -151,6 +152,18 @@ describe("module registry", () => {
                 }),
             ];
             expect(() => validateModuleRegistry(reg)).toThrow(/non-selectable/);
+        });
+    });
+});
+
+describe("Courses (ADR-007)", () => {
+    it("is its own module, reached by course:read, riding on Appointments", () => {
+        const courses = MODULES.find((m) => m.key === "COURSES");
+        expect(courses).toMatchObject({
+            label: "Courses",
+            rootRoutes: ["/courses"],
+            requiredAction: "course:read",
+            dependencies: ["APPOINTMENTS"],
         });
     });
 });

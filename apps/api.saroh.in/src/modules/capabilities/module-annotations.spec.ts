@@ -51,6 +51,10 @@ const CLASS_LEVEL: Record<string, string> = {
     "products/products.controller.ts": "COMMERCE",
     "products/product-details.controller.ts": "COMMERCE",
     "imports/imports.controller.ts": "COMMERCE",
+    "invoices/invoices.controller.ts": "PAYMENTS",
+    "subscriptions/subscriptions.controller.ts": "PAYMENTS",
+    "class-packs/class-packs.controller.ts": "APPOINTMENTS",
+    "courses/courses.controller.ts": "COURSES",
 };
 
 /**
@@ -136,6 +140,22 @@ describe("module enforcement rollout (#117)", () => {
 
     // The half that matters most: these are the routes that must keep working
     // when a merchant switches a capability off.
+    /*
+     * Invoices sit under Payments but need no provider: an invoice paid in
+     * cash is recorded by hand (ADR-007). Without the opt-out, switching
+     * enforcement on would refuse every business that never connected one.
+     */
+    it.each([
+        "invoices/invoices.controller.ts",
+        "subscriptions/subscriptions.controller.ts",
+    ])("%s works while Payments has no provider connected", (file) => {
+        const text = source(file);
+        const gated = text.match(/@RequireModule\("PAYMENTS"\)/g) ?? [];
+        const optedOut = text.match(/@IgnoreModuleReadiness\(\)/g) ?? [];
+        // Every controller in the file that is gated also opts out.
+        expect(optedOut.length).toBe(gated.length);
+    });
+
     it.each(Object.entries(NEVER))("%s is never gated — %s", (file) => {
         expect(source(file)).not.toContain("@RequireModule(");
     });

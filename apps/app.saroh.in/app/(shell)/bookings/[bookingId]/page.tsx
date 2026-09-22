@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 
 import { BookingDetailView } from "@/components/bookings/booking-detail";
+import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
+import { packOffer, usablePacks } from "@/lib/class-packs/balance";
+import { readPurchasesFor } from "@/lib/class-packs/service";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { hasEnded } from "@/lib/services/booking-state";
+import type { BookingDetail } from "@/lib/services/service";
 import { getBooking } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 
@@ -41,5 +46,44 @@ export default async function BookingPage({
     // Read through the data layer, which is where this codebase keeps clock
     // reads. A past appointment offers different controls (#241), but nothing
     // about its OUTCOME is decided by the clock — only a person sets that.
-    return <BookingDetailView booking={booking} past={hasEnded(booking)} />;
+    return (
+        <BookingDetailView
+            booking={booking}
+            past={hasEnded(booking)}
+            packs={await packsFor(booking)}
+        />
+    );
+}
+
+/**
+ * What the booking says about class packs (ADR-007): the pack paying for it,
+ * and — when none is, it is still on, and this person may spend packs — the
+ * booker's packs that cover this session. A failed read offers nothing
+ * rather than failing the booking.
+ */
+async function packsFor(booking: BookingDetail) {
+    const organization = await resolveActiveOrganization();
+    if (!canReadPacks(organization)) return undefined;
+    const canWrite = canWritePacks(organization);
+    const live = booking.packRedemption?.reversedAt
+        ? null
+        : (booking.packRedemption?.purchase ?? null);
+    const paidWith = live ? { name: live.pack.name } : null;
+    if (
+        paidWith ||
+        !canWrite ||
+        booking.status !== "CONFIRMED" ||
+        !booking.contact
+    ) {
+        return { paidWith, usable: [], canWrite };
+    }
+    const held = await readPurchasesFor(booking.contact.id, booking.serviceId);
+    return {
+        paidWith,
+        usable: usablePacks(held ?? [], booking.startAt).map((p) => ({
+            id: p.id,
+            label: packOffer(p, booking.timezone),
+        })),
+        canWrite,
+    };
 }

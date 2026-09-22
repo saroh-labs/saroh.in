@@ -174,3 +174,38 @@
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
 }
+
+/* =============================================================================
+   PRINTING AN INVOICE (ADR-007)
+   =============================================================================
+
+   The invoice page prints only the invoice: every other part of it carries
+   `print:hidden`, and so do the rail and the header. What is left must read
+   as dark ink on white paper whatever the screen was showing — printed from
+   the evening theme or a dark skin, the tokens would otherwise hand the
+   printer a black page. So the paper pins its own colours instead of reading
+   the theme's. */
+@media print {
+    html,
+    body {
+        background: #ffffff !important;
+    }
+    /* The shell's own surfaces keep the theme's fill even with the rail and
+       header gone; on a page that holds an invoice, none of them prints. */
+    body:has(.invoice-print) * {
+        background-color: transparent !important;
+    }
+    .invoice-print,
+    .invoice-print * {
+        color: #1c1c1a !important;
+        background: transparent !important;
+        border-color: #d9d6cc !important;
+        box-shadow: none !important;
+    }
+    .invoice-print .text-muted-foreground {
+        color: #5c5850 !important;
+    }
+    @page {
+        margin: 18mm;
+    }
+}

@@ -225,3 +225,51 @@ describe("booking block — submit failures", () => {
         );
     });
 });
+
+describe("booking block — the confirmation", () => {
+    const startAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const endAt = new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString();
+
+    async function book(response: Response) {
+        stubFetch(json([{ startAt, endAt }], 200), response);
+        render(<BookingSection content={CONTENT} apiUrl="https://api" />);
+        fireEvent.click(await screen.findByRole("radio"));
+        fireEvent.change(screen.getByLabelText(/Email/), {
+            target: { value: "jane@example.com" },
+        });
+        fireEvent.click(
+            screen.getByRole("button", { name: "Confirm booking" }),
+        );
+        await screen.findByText("You're booked!");
+    }
+
+    it("gives an online booking its link to join", async () => {
+        await book(
+            json(
+                {
+                    reference: "bk_1",
+                    online: true,
+                    meetingUrl: "https://meet.example.com/yoga",
+                },
+                201,
+            ),
+        );
+        const link = screen.getByRole("link", { name: "Join online" });
+        expect(link).toHaveAttribute("href", "https://meet.example.com/yoga");
+        expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
+
+    it("says only that they are booked when there is no link", async () => {
+        await book(
+            json({ reference: "bk_1", online: false, meetingUrl: null }, 201),
+        );
+        expect(screen.queryByRole("link", { name: "Join online" })).toBeNull();
+    });
+
+    it("never renders a link that is not https", async () => {
+        await book(
+            json({ reference: "bk_1", meetingUrl: "javascript:alert(1)" }, 201),
+        );
+        expect(screen.queryByRole("link", { name: "Join online" })).toBeNull();
+    });
+});

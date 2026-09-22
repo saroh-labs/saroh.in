@@ -8,12 +8,11 @@ import {
     Post,
     Query,
 } from "@nestjs/common";
-import type { Booking } from "@saroh/database";
 import { createHash } from "node:crypto";
 
 import type { Slot } from "./availability";
-import type { PublicService } from "./bookings.service";
-import { BookingsService } from "./bookings.service";
+import type { PublicBooking, PublicService } from "./bookings.service";
+import { BookingsService, toPublicBooking } from "./bookings.service";
 import { BookServiceDto } from "./dto";
 
 /** The section contract's cap on a services list (#255). */
@@ -75,18 +74,21 @@ export class PublicBookingsController {
      * Reserve a slot on `:serviceId`. The source IP (from `@Ip()`) is immediately
      * hashed (sha256) and only the hash is ever passed on — the raw IP never
      * leaves this handler.
+     *
+     * Answers with the booker's own booking only — time, service, and the
+     * link to join if it is online — never the stored row (ADR-007).
      */
     @Post(":serviceId/book")
-    book(
+    async book(
         @Param("serviceId") serviceId: string,
         @Body() dto: BookServiceDto,
         @Ip() ip: string,
-    ): Promise<Booking> {
+    ): Promise<PublicBooking> {
         const ipHash = ip
             ? createHash("sha256").update(ip).digest("hex")
             : undefined;
 
-        return this.bookings.book(
+        const booking = await this.bookings.book(
             serviceId,
             {
                 startAt: dto.startAt,
@@ -97,5 +99,6 @@ export class PublicBookingsController {
             },
             ipHash,
         );
+        return toPublicBooking(booking);
     }
 }

@@ -17,7 +17,12 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
-import type { DataColumn, DataViewMode, DataViewProps } from "./types";
+import type {
+    DataColumn,
+    DataFilter,
+    DataViewMode,
+    DataViewProps,
+} from "./types";
 import { useViewMode } from "./use-view-mode";
 
 /**
@@ -64,6 +69,7 @@ export function DataView<TRow>({
     searchableColumnIds,
     filters,
     initialFilterId,
+    filterStyle = "tabs",
     isLoading = false,
     error = null,
     noun = { one: "row", other: "rows" },
@@ -217,6 +223,9 @@ export function DataView<TRow>({
     // One filter is not a filter — a lone chip nobody can switch away from is
     // chrome that costs a row of height and answers nothing.
     const hasFilters = (filters?.length ?? 0) > 1;
+    const segmented = hasFilters && filterStyle === "segmented";
+    const countOf = (f: DataFilter<TRow>) =>
+        f.predicate ? rows.filter(f.predicate).length : rows.length;
     const listColumns = columns.filter((c) => c.priority !== "detail");
     const tableColumns = columns.filter((c) => !c.tableHidden);
 
@@ -230,7 +239,7 @@ export function DataView<TRow>({
              * `aria-pressed`, not `aria-current`; the page marker belongs to
              * the rail and appears once per screen.
              */}
-            {hasFilters ? (
+            {hasFilters && !segmented ? (
                 <div
                     role="group"
                     aria-label="Filter"
@@ -238,9 +247,7 @@ export function DataView<TRow>({
                 >
                     {filters?.map((f) => {
                         const on = f.id === filterId;
-                        const n = f.predicate
-                            ? rows.filter(f.predicate).length
-                            : rows.length;
+                        const n = countOf(f);
                         return (
                             <button
                                 key={f.id}
@@ -272,8 +279,53 @@ export function DataView<TRow>({
             ) : null}
 
             {/* The toolbar: search, density, and how many rows are showing. */}
-            {searchable.length > 0 || showModes || toolbarExtra ? (
+            {searchable.length > 0 || showModes || toolbarExtra || segmented ? (
                 <div className="flex flex-wrap items-center gap-2.5">
+                    {/*
+                     * Segmented filters: the same sub-views, drawn as one
+                     * control in the toolbar — the page's own tabs keep the
+                     * underline, so there is one row that navigates and one
+                     * that narrows the list. Each count is visible before the
+                     * choice, so nobody clicks into an empty view.
+                     */}
+                    {segmented ? (
+                        <div
+                            role="group"
+                            aria-label="Filter"
+                            className="flex max-w-full items-center overflow-x-auto rounded-md border border-border p-0.5"
+                        >
+                            {filters?.map((f) => {
+                                const on = f.id === filterId;
+                                return (
+                                    <button
+                                        key={f.id}
+                                        type="button"
+                                        aria-pressed={on}
+                                        onClick={() => chooseFilter(f.id)}
+                                        className={cn(
+                                            "flex h-[32px] shrink-0 items-center gap-1.5 rounded-sm px-2.5 text-[13px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:h-11 coarse:px-3.5",
+                                            on
+                                                ? "bg-accent font-semibold text-accent-foreground"
+                                                : "font-medium text-muted-foreground hover:text-foreground",
+                                        )}
+                                    >
+                                        {f.label}
+                                        <span
+                                            className={cn(
+                                                "text-[11.5px] tabular-nums",
+                                                on
+                                                    ? "text-accent-foreground/70"
+                                                    : "text-muted-foreground/80",
+                                            )}
+                                        >
+                                            {countOf(f)}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : null}
+
                     {searchable.length > 0 ? (
                         <div className="relative min-w-[200px] max-w-[320px] flex-1">
                             <Search
@@ -412,7 +464,7 @@ export function DataView<TRow>({
             ) : mode === "table" ? (
                 // Horizontal scroll is on the wrapper, never the page: a table
                 // that widens the document breaks every other element on it.
-                <div className="overflow-x-auto rounded-[11px] border border-border">
+                <div className="overflow-x-auto rounded-[11px] border border-border bg-card">
                     <table className="w-full border-collapse text-[13.5px]">
                         <thead>
                             {/* A faint head fill and a stronger rule, as the
@@ -660,7 +712,7 @@ export function DataView<TRow>({
                 // List: the whole row is the target, which is what one-handed
                 // and gloved use needs. Detail columns are dropped, not hidden
                 // behind a disclosure nobody taps.
-                <ul className="divide-y rounded-xl border border-border">
+                <ul className="divide-y rounded-xl border border-border bg-card">
                     {visible.map((row, rowIndex) => {
                         // `.at()` rather than a destructure: a caller could
                         // declare only `detail` columns, leaving this empty,

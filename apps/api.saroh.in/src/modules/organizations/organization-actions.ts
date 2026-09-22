@@ -68,6 +68,17 @@ export type OrgAction =
     | "product-review:write"
     | "payment:read"
     | "payment:manage"
+    // What a business sells a person on repeat, and the bills for it
+    // (ADR-007). OWNER/ADMIN-only: money owed by a named person.
+    | "subscription:read"
+    | "subscription:write"
+    | "invoice:read"
+    | "invoice:write"
+    // Courses and class packs (ADR-007) — booked time, sold ahead.
+    | "course:read"
+    | "course:write"
+    | "pack:read"
+    | "pack:write"
     | "message:read"
     | "message:write"
     | "comms:manage"
@@ -140,6 +151,16 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "product-review:write",
     "payment:read",
     "payment:manage",
+    // ADR-007. OWNER/ADMIN-only — none are in READ_ONLY_ACTIONS: who owes
+    // what, and what a person has paid for, is not a roster-level fact.
+    "subscription:read",
+    "subscription:write",
+    "invoice:read",
+    "invoice:write",
+    "course:read",
+    "course:write",
+    "pack:read",
+    "pack:write",
     "message:read",
     "message:write",
     "comms:manage",

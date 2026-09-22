@@ -52,3 +52,51 @@ describe("PublicBookingsController.services (#255)", () => {
         expect(bookings.publicServices).not.toHaveBeenCalled();
     });
 });
+
+describe("PublicBookingsController.book (ADR-007)", () => {
+    const row = {
+        id: "bk_1",
+        organizationId: "org_1",
+        contactId: "contact_1",
+        ipHash: "hash",
+        idempotencyKey: "key_1",
+        status: "CONFIRMED",
+        startAt: new Date("2026-07-20T09:00:00.000Z"),
+        endAt: new Date("2026-07-20T10:00:00.000Z"),
+        snapshot: {
+            service: {
+                name: "Evening yoga",
+                locationType: "ONLINE",
+                meetingUrl: "https://meet.example.com/yoga",
+            },
+            booker: { email: "jane@example.com" },
+        },
+    };
+    const dto = {
+        startAt: "2026-07-20T09:00:00.000Z",
+        bookerEmail: "jane@example.com",
+        idempotencyKey: "key_1",
+    };
+
+    it("answers with the booker-safe shape, and a replay answers the same", async () => {
+        const book = jest.fn().mockResolvedValue(row);
+        const controller = new PublicBookingsController({
+            book,
+        } as unknown as BookingsService);
+
+        const first = await controller.book("svc_1", dto, "1.2.3.4");
+        // The service replays an existing booking for the same key.
+        const replay = await controller.book("svc_1", dto, "1.2.3.4");
+
+        expect(first).toEqual(replay);
+        expect(Object.keys(first).sort()).toEqual([
+            "endAt",
+            "meetingUrl",
+            "online",
+            "reference",
+            "serviceName",
+            "startAt",
+        ]);
+        expect(JSON.stringify(first)).not.toMatch(/org_1|contact_1|hash/);
+    });
+});

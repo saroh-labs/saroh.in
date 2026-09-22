@@ -157,6 +157,8 @@ export function LeadsView({
             defaultMode="table"
             filters={FILTERS}
             initialFilterId={initialView}
+            // Leads | Follow-ups is the page's tab row; status narrows the list.
+            filterStyle="segmented"
             searchableColumnIds={["title", "contact", "stage"]}
             empty="Leads appear here as enquiries come in, or when you add one."
             renderCard={(l) => (

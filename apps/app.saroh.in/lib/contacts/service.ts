@@ -118,12 +118,24 @@ export function createContact(
     );
 }
 
+/** What deleting a contact took with it (the API's `ContactRemoval`). */
+export interface ContactRemoval {
+    id: string;
+    deleted: true;
+    leads: number;
+    subscriptions: number;
+    packs: number;
+    courses: number;
+    bookingsCancelled: number;
+}
+
 /**
- * Delete a person from the contacts for good. Their leads go with them; the
- * result says how many, so the toast can.
+ * Delete a person from the contacts for good. Their leads, subscriptions and
+ * class packs go with them, and future bookings paid with those packs are
+ * cancelled; the result says how many of each, so the toast can.
  */
 export function deleteContact(
     contactId: string,
-): Promise<CrmResult<{ id: string; deleted: true; leads: number }>> {
+): Promise<CrmResult<ContactRemoval>> {
     return destroy(`/contacts/${contactId}`, "Could not delete the contact");
 }

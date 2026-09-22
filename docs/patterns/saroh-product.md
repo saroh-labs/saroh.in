@@ -33,8 +33,10 @@ pattern files refer back here.
 
 ## Capabilities (modules)
 
-- **Current** — Eight capability modules (ADR-003): Website, CRM,
-  Appointments, Commerce, Payments, Communications, Automations, Insights.
+- **Current** — Nine capability modules (ADR-003): Website, CRM,
+  Appointments, Courses, Commerce, Payments, Communications, Automations,
+  Insights. Courses (ADR-007) depends on Appointments: a course's sessions are
+  bookings, but a business that takes bookings need not run courses.
   `apps/api.saroh.in/src/modules/capabilities/module-registry.ts` is the source
   of truth; never hard-code a module key.
 - **Current** — A module is available only when four gates hold: its rollout
@@ -92,6 +94,27 @@ pattern files refer back here.
 - **Current** — A booking made by hand follows the booking page's rules: a
   real open slot, the same serializable capacity check, and its history names
   who on the team made it (#384).
+
+## Money a person owes, and classes sold ahead (ADR-007)
+
+- **Current** — Invoices, subscriptions and plans live under **Billing**
+  (`/billing/…`) with Payments; courses under **Courses** (its own module);
+  class packs beside the schedule, under Appointments.
+- **Current** — Saroh records and invoices; it does not charge a card on file
+  and does not send the invoice. Copy says so: "Nothing is charged and nobody is
+  contacted", "Saroh doesn't send this. Print it and hand it over."
+- **Current** — **Mention an invoice only when Payments is on.** With Payments
+  off, subscribing is refused, and a pack or course is recorded with the price
+  paid and no invoice — so no copy may promise one. The API says which
+  (`invoicesOnEnrol`); the workspace never guesses.
+- **Current** — Overdue, seats left, classes left and "next renewal" are
+  derived and said in words, never stored and never shown as colour alone.
+- **Current** — A dialog says what an action books and charges before it
+  happens ("Books the 6 sessions left of 8 · invoice ₹4,800.00"). Full is a
+  constraint, not a warning: the button is off and says what would free a seat.
+- **Current** — Cancelling keeps money decisions separate: ending a
+  subscription or an enrolment leaves its invoice, with an unticked "Void it
+  too" when one is open.
 
 ## Websites
 

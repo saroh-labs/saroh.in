@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+    BadRequestException,
+    Injectable,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import {
@@ -37,6 +42,7 @@ const PROFILE_FIELDS = [
     "taxId",
     "contactEmail",
     "website",
+    "timezone",
 ] as const;
 
 type ProfileField = (typeof PROFILE_FIELDS)[number];
@@ -120,6 +126,16 @@ export class OrganizationSettingsService {
         authorize(ctx, "org:update");
 
         const profileData = reduceProfile(dto.profile);
+        if (
+            // "" clears it, the way the form clears any field.
+            profileData.timezone &&
+            !IANAZone.isValidZone(profileData.timezone)
+        ) {
+            throw new BadRequestException({
+                message: "That timezone is not one we know",
+                details: { field: "timezone" },
+            });
+        }
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
             ...Object.keys(profileData),
@@ -164,6 +180,7 @@ export class OrganizationSettingsService {
                             taxId: true,
                             contactEmail: true,
                             website: true,
+                            timezone: true,
                         },
                     },
                 },
@@ -210,6 +227,7 @@ export class OrganizationSettingsService {
                         taxId: true,
                         contactEmail: true,
                         website: true,
+                        timezone: true,
                     },
                 },
             },
