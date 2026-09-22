@@ -6,6 +6,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { WebsiteHeader } from "@/components/sites/website-header";
 import { env } from "@/env";
 import { listPosts } from "@/lib/content/service";
+import { listForms } from "@/lib/forms/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { getSite, listSites } from "@/lib/sites/service";
@@ -48,6 +49,23 @@ export default async function WebsiteTabsLayout({
     ]);
     if (!site) notFound();
 
+    // Forms follow `form:read`, which not everyone who can open the site has
+    // (#385). The count is this site's entries; a failed read leaves the tab
+    // with no count rather than taking it away.
+    const mayReadForms = organization?.actions
+        ? organization.actions.includes("form:read")
+        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    // Asked only of someone who may read them: for anyone else the API's 403
+    // would be the whole page's answer.
+    const forms = mayReadForms ? await listForms().catch(() => null) : null;
+    const formEntries = mayReadForms
+        ? forms === null
+            ? null
+            : forms
+                  .filter((f) => f.siteId === site.id)
+                  .reduce((n, f) => n + f.submissionCount, 0)
+        : undefined;
+
     const summaries = (
         sites.some((s) => s.id === site.id) ? sites : [site]
     ).map((s) => ({
@@ -83,6 +101,7 @@ export default async function WebsiteTabsLayout({
                     )}
                     pageCount={site.pages.length}
                     postCount={posts?.length ?? null}
+                    formEntries={formEntries}
                 />
                 {children}
             </div>
