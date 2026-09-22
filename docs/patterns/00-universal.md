@@ -88,12 +88,29 @@ claimed delivery were corrected in `fb778b9`.
 
 **Current** — `docs/architecture/DEV_LEARNINGS.md` for anything non-obvious you
 fixed; the pattern file and its AGENTS.md trigger for any convention you change;
-a row in AGENTS.md → Triggers for a new skill or pattern file.
+a row in AGENTS.md → Triggers for a new skill or pattern file. A product or
+architecture decision — made with the user in a conversation, not only in an
+issue — is written down in the repo the same day: an ADR in
+`docs/architecture/adr/` for anything with context and trade-offs, a `DEC-`
+entry in `DECISIONS.md` pointing at it, and a line in the pattern file whose
+readers must obey it. An agent's private memory is not a trail; nobody else can
+read it.
 
 ## 14. Git
 
 **Current** — don't commit or push unless asked. Never `--no-verify`: the
 pre-commit hook runs lint-staged, so fix what it reports.
+
+## 15. A redesign keeps every capability
+
+**Current** — Matching a Claude Design file is a change of look, not of what the
+screen can do. List every control and state readout the screen has before you
+start, and give each one a place in the new layout; anything the design leaves
+out is kept — behind a toggle or a secondary control, never a hover-only tooltip
+— not cut. A deliberate change in behaviour is named to the user before it
+ships. The site editor redesign (#334) dropped Tablet and zoom, the whole-site
+review panel, status details, block previews and settled notes, and #347 had to
+put every one back.
 
 ## Before calling anything done
 
