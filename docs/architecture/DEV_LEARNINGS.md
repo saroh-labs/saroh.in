@@ -133,6 +133,23 @@ type to a registered handler and lists the gaps still open. The handler itself
 is still unwritten.
 **Category**: jobs
 
+## Jobs — scheduled jobs run at once on a Postgres not set to UTC
+
+**Problem**: A job queued to run an hour later ran two seconds later, over and
+over — a self-rescheduling job ran some 11,000 times in an hour on a dev
+database, and a failed job's retry backoff was never waited out.
+**Root cause**: Prisma stores `DateTime` as `timestamp without time zone`
+holding UTC. The claim query compared `"runAt" <= now()`, and `now()` carries
+a zone, so Postgres read `runAt` in the SESSION's zone. A developer's Postgres
+in India runs in `Asia/Kolkata`, where every UTC time looks 5½ hours older than
+it is — anything due within 5½ hours was due already. A database running in
+UTC hides it, which is why it was never seen.
+**Fix**: Compare with `now() AT TIME ZONE 'UTC'` (and write `lockedAt` the same
+way) in `prisma-job-queue.ts`. `prisma-job-queue.db.spec.ts` claims against a
+connection set to Asia/Kolkata. Any raw SQL that compares a Prisma `DateTime`
+column with `now()` has the same bug — use the UTC form.
+**Category**: jobs
+
 ## App — a role denial reads "turned off" in the gate, and "try again" in production (#274)
 
 **Problem**: A MEMBER opening a website page was told "Website is not switched

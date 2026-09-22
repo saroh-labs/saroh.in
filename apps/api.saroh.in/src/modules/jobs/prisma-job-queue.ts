@@ -58,17 +58,23 @@ export class PrismaJobQueue implements JobQueue {
      */
     async claimDue(workerId: string, limit: number): Promise<Job[]> {
         const visibilitySecs = this.visibilityMs / 1000;
+        // `now() AT TIME ZONE 'UTC'`, never bare `now()`: Prisma stores these
+        // columns as `timestamp without time zone` holding UTC, and comparing
+        // one with `now()` reads it in the SESSION's zone. On a database set
+        // to Asia/Kolkata every job due within 5½ hours looked due at once —
+        // retry backoff and scheduled runs were ignored
+        // (prisma-job-queue.db.spec.ts).
         return prisma.$transaction((tx) =>
             tx.$queryRaw<Job[]>(Prisma.sql`
                 UPDATE "Job" AS j
                 SET status = 'PROCESSING',
-                    "lockedAt" = now(),
+                    "lockedAt" = (now() AT TIME ZONE 'UTC'),
                     "lockedBy" = ${workerId}
                 WHERE j.id IN (
                     SELECT id FROM "Job"
-                    WHERE (status = 'PENDING' AND "runAt" <= now())
+                    WHERE (status = 'PENDING' AND "runAt" <= (now() AT TIME ZONE 'UTC'))
                        OR (status = 'PROCESSING'
-                           AND "lockedAt" < now() - make_interval(secs => ${visibilitySecs}))
+                           AND "lockedAt" < (now() AT TIME ZONE 'UTC') - make_interval(secs => ${visibilitySecs}))
                     ORDER BY "runAt" ASC
                     FOR UPDATE SKIP LOCKED
                     LIMIT ${limit}
