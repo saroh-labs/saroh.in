@@ -46,6 +46,7 @@ export function SellPackDialog({
     contacts,
     packs,
     initialPackId,
+    initialContactId,
     invoicesOnSale,
 }: {
     open: boolean;
@@ -53,12 +54,14 @@ export function SellPackDialog({
     contacts: readonly ContactOption[];
     packs: readonly ClassPack[];
     initialPackId?: string;
+    /** Who, already chosen — the contact page sells to its own person. */
+    initialContactId?: string;
     invoicesOnSale: boolean;
 }) {
     const router = useRouter();
     const ids = { who: useId(), pack: useId(), until: useId() };
     const onSale = packs.filter((p) => p.status === "ACTIVE");
-    const [contactId, setContactId] = useState("");
+    const [contactId, setContactId] = useState(initialContactId ?? "");
     const [packId, setPackId] = useState(
         initialPackId ?? onSale.at(0)?.id ?? "",
     );
@@ -90,7 +93,7 @@ export function SellPackDialog({
                 : `${who} has ${pack.name}, ${pack.credits} ${pack.credits === 1 ? "class" : "classes"}`,
         );
         onOpenChange(false);
-        setContactId("");
+        setContactId(initialContactId ?? "");
         router.refresh();
     }
 

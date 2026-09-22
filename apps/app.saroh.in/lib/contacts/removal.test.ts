@@ -1,6 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import { deletedLine } from "./removal";
+import { deletedLine, holdingsSentence } from "./removal";
+
+describe("holdingsSentence", () => {
+    it("names the counts when all three are known", () => {
+        expect(
+            holdingsSentence({ subscriptions: 2, packs: 1, courses: 0 }),
+        ).toBe(
+            "Their 2 subscriptions and 1 class pack go too, and their bookings paid with a pack or for a course are cancelled. ",
+        );
+        expect(
+            holdingsSentence({ subscriptions: 1, packs: 0, courses: 0 }),
+        ).toBe("Their subscription goes too. ");
+        expect(
+            holdingsSentence({ subscriptions: 0, packs: 0, courses: 2 }),
+        ).toBe(
+            "Their 2 course seats go too, and their bookings paid with a pack or for a course are cancelled. ",
+        );
+    });
+
+    it("says nothing when they hold nothing", () => {
+        expect(
+            holdingsSentence({ subscriptions: 0, packs: 0, courses: 0 }),
+        ).toBe("");
+    });
+
+    it("stays general when a count is not known", () => {
+        expect(holdingsSentence({ subscriptions: 2, packs: 1 })).toMatch(
+            /^Any subscription, class pack or course seat they hold ends/,
+        );
+    });
+});
 
 const base = {
     id: "c_1",

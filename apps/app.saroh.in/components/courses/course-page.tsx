@@ -12,7 +12,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@saroh/ui/dialog";
-import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { PageHeader } from "@saroh/ui/page-header";
 import { TimeSelect } from "@saroh/ui/time-select";
@@ -23,16 +22,13 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
-import { ContactPicker } from "@/components/shared/contact-picker";
 import {
     addSession,
     cancelEnrollment,
-    enrol,
     removeSession,
     updateCourse,
 } from "@/lib/courses/actions";
 import {
-    booksLine,
     courseTab,
     seatsLeftLine,
     STATUS_LABEL,
@@ -43,6 +39,8 @@ import { wallClockToIso, ymd } from "@/lib/courses/sessions";
 import { formatTimeRange } from "@/lib/format/datetime";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { invoiceMoney } from "@/lib/invoices/money";
+
+import { EnrolDialog } from "./enrol-dialog";
 
 const STANDING_WORD = {
     DRAFT: "Draft",
@@ -198,7 +196,8 @@ export function CoursePage({
                 <EnrolDialog
                     open={enrolling}
                     onOpenChange={setEnrolling}
-                    course={course}
+                    courses={[course]}
+                    invoicesOnEnrol={course.invoicesOnEnrol}
                     contacts={contacts.filter(
                         (c) =>
                             !course.enrollments.some(
@@ -557,119 +556,6 @@ function RosterRow({
 }
 
 // — Dialogs ———————————————————————————————————————————————————————
-
-/**
- * Enrol someone: who, and what they pay. The dialog says what it books and
- * charges before anything happens — and says nothing about an invoice when
- * Payments is off, because none is issued.
- */
-function EnrolDialog({
-    open,
-    onOpenChange,
-    course,
-    contacts,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    course: CourseDetail;
-    contacts: ContactOption[];
-}) {
-    const router = useRouter();
-    const ids = { who: useId(), price: useId() };
-    const [contactId, setContactId] = useState("");
-    const [price, setPrice] = useState(course.price);
-    const [busy, setBusy] = useState(false);
-    const person = contacts.find((c) => c.id === contactId);
-    const priceOk = /^\d{1,9}(\.\d{1,2})?$/.test(price.trim());
-
-    // Each opening starts fresh.
-    const [wasOpen, setWasOpen] = useState(open);
-    if (open !== wasOpen) {
-        setWasOpen(open);
-        if (open) {
-            setContactId("");
-            setPrice(course.price);
-        }
-    }
-
-    const books = booksLine(course);
-    const n = course.sessionsLeft;
-
-    async function save() {
-        if (!contactId) return showError("Choose who is enrolling.");
-        if (!priceOk) return showError("Give a price like 240 or 240.50.");
-        setBusy(true);
-        const res = await enrol(course.id, {
-            contactId,
-            ...(price.trim() !== course.price ? { price: price.trim() } : {}),
-        });
-        setBusy(false);
-        if (!res.ok) return showError(res.error);
-        showSuccess(
-            `${person?.name ?? "They"} enrolled — ${n} ${n === 1 ? "session" : "sessions"} booked`,
-        );
-        onOpenChange(false);
-        router.refresh();
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[460px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
-                        Enrol someone
-                    </DialogTitle>
-                    <DialogDescription>
-                        {course.name} · {seatsLeftLine(course)}
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4">
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.who}>Who</Label>
-                        <ContactPicker
-                            id={ids.who}
-                            contacts={contacts}
-                            value={contactId}
-                            onValueChange={setContactId}
-                        />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.price}>
-                            What they pay ({course.currency})
-                        </Label>
-                        <Input
-                            id={ids.price}
-                            value={price}
-                            onChange={(e) => setPrice(e.target.value)}
-                            inputMode="decimal"
-                            aria-invalid={!priceOk}
-                        />
-                    </div>
-                    <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
-                        {books}
-                        {course.invoicesOnEnrol
-                            ? ` · invoice ${priceOk ? invoiceMoney(price.trim(), course.currency) : "—"}. Nothing is charged and nobody is contacted.`
-                            : ". Payments is off, so no invoice is issued."}
-                    </p>
-                </div>
-                <DialogFooter>
-                    <Button
-                        variant="outline"
-                        onClick={() => onOpenChange(false)}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        disabled={busy || !contactId}
-                        onClick={() => void save()}
-                    >
-                        {busy ? "Enrolling…" : "Enrol and book"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 /**
  * Take someone off a course. Their sessions still to come are cancelled —

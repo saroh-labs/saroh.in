@@ -164,6 +164,17 @@ credit. The balance is **derived** from purchases minus live redemptions.
   The first paths (`/subscriptions`, `/invoices`) redirect. (2026-09-22.)
 - A person's contact page shows their subscriptions, packs, courses and
   invoices together — the one place a merchant looks when that person calls.
+  A panel is not requested at all unless the viewer has its read action and
+  its module is on by the rail's rule (readiness, failing open when the
+  module list cannot be read) — `lib/contacts/panels.ts`; a failed read shows
+  a notice in that panel only. Each panel's action opens the existing dialog
+  with the person chosen (Subscribe, Sell a pack, Enrol, New invoice via
+  `/billing/invoices/new?contactId=`). Enrol from a contact asks which open
+  course with a seat left; the course page's enrol dialog is the same
+  component (`components/courses/enrol-dialog.tsx`). Packs and courses
+  mention an invoice only when the invoices panel is shown. The delete
+  confirmation names the counts when all three holdings were read, and
+  stays general otherwise. (U12, 2026-09-22.)
 
 ## 3. What this is not
 

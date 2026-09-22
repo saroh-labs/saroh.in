@@ -45,17 +45,20 @@ export function SubscribeDialog({
     contacts,
     plans,
     initialPlanId,
+    initialContactId,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     contacts: readonly ContactOption[];
     plans: readonly Plan[];
     initialPlanId?: string;
+    /** Who, already chosen — the contact page subscribes its own person. */
+    initialContactId?: string;
 }) {
     const router = useRouter();
     const ids = { who: useId(), plan: useId(), start: useId() };
     const active = plans.filter((p) => p.status === "ACTIVE");
-    const [contactId, setContactId] = useState("");
+    const [contactId, setContactId] = useState(initialContactId ?? "");
     const [planId, setPlanId] = useState(
         initialPlanId ?? active.at(0)?.id ?? "",
     );
@@ -88,7 +91,7 @@ export function SubscribeDialog({
                 : `${person?.name ?? "They"} subscribed to ${plan.name} — the first invoice is issued`,
         );
         onOpenChange(false);
-        setContactId("");
+        setContactId(initialContactId ?? "");
         setStart(new Date());
         router.refresh();
     }
