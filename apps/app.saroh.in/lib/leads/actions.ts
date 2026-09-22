@@ -5,6 +5,7 @@ import {
     completeTask as completeTaskApi,
     createLead as createLeadApi,
     createTask as createTaskApi,
+    deleteLead as deleteLeadApi,
     logActivity as logActivityApi,
     moveLead as moveLeadApi,
     updateLead as updateLeadApi,
@@ -25,6 +26,10 @@ export async function createLead(input: CreateLeadInput) {
 
 export async function updateLead(leadId: string, input: UpdateLeadInput) {
     return updateLeadApi(leadId, input);
+}
+
+export async function deleteLead(leadId: string) {
+    return deleteLeadApi(leadId);
 }
 
 export async function moveLead(leadId: string, stageId: string) {

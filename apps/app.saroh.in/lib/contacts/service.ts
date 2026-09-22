@@ -1,5 +1,5 @@
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, mutate, orgBase } from "@/lib/api/http";
+import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * CRM Contacts data access for app.saroh.in (S3-005). Org-scoped reads +
@@ -116,4 +116,14 @@ export function createContact(
         input,
         "Could not add the contact",
     );
+}
+
+/**
+ * Delete a person from the contacts for good. Their leads go with them; the
+ * result says how many, so the toast can.
+ */
+export function deleteContact(
+    contactId: string,
+): Promise<CrmResult<{ id: string; deleted: true; leads: number }>> {
+    return destroy(`/contacts/${contactId}`, "Could not delete the contact");
 }

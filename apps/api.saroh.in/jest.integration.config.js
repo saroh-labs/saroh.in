@@ -33,6 +33,8 @@ module.exports = {
         "<rootDir>/src/modules/organizations/",
         "<rootDir>/src/modules/admin/",
         "\\.authorization\\.spec\\.ts$",
+        // #384 customer delete: mocked Prisma, runs in the unit project.
+        "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
         // ADR-006 store creation cap: mocked Prisma, runs in the unit project.
         "<rootDir>/src/modules/stores/stores.service.create-cap.spec.ts",
         // S5-001: the pure order-state machine and the mocked-Prisma

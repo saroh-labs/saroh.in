@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     Param,
@@ -69,6 +70,14 @@ export class LeadsController {
         @Body() dto: UpdateLeadDto,
     ) {
         return this.leads.update(ctx, leadId, dto);
+    }
+
+    @Delete(":leadId")
+    remove(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("leadId") leadId: string,
+    ): Promise<{ id: string; deleted: true }> {
+        return this.leads.remove(ctx, leadId);
     }
 
     @Post(":leadId/move")

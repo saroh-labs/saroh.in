@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { DeleteCustomerMenu } from "@/components/customers/delete-customer-menu";
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { CustomerForm } from "@/components/stores/customer-form";
@@ -83,6 +84,15 @@ export default async function CustomerPage({
                     ]}
                     title={name}
                     description={`${customer.email} · at ${store.name}`}
+                    actions={
+                        <DeleteCustomerMenu
+                            storeId={store.id}
+                            customerId={customer.id}
+                            name={name}
+                            storeName={store.name}
+                            orderCount={orders === null ? null : theirs.length}
+                        />
+                    }
                 />
                 <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
                     <Card title="Details">

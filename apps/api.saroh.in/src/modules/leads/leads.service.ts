@@ -186,6 +186,26 @@ export class LeadsService {
     }
 
     /**
+     * Delete a lead for good. Authorizes `lead:write`; a missing or
+     * cross-tenant id 404s before any write.
+     *
+     * Its timeline (activities and tasks) goes with it — they describe this
+     * lead and nothing else. The contact stays, and so does anything the lead
+     * merely points at: a form submission or a message keeps its raw record
+     * and loses only the link (SetNull in the schema). There is no undo, which
+     * is why the workspace asks first.
+     */
+    async remove(
+        ctx: OrganizationContext,
+        leadId: string,
+    ): Promise<{ id: string; deleted: true }> {
+        authorize(ctx, "lead:write");
+        await this.requireOwned(ctx, leadId);
+        await prisma.lead.delete({ where: { id: leadId } });
+        return { id: leadId, deleted: true };
+    }
+
+    /**
      * Move a lead to another Stage of its OWN pipeline. Authorizes `lead:write`.
      * Validates the target stage belongs to the same org AND the lead's pipeline
      * (else 400 — never silently accept a foreign stage). Updates `stageId` and

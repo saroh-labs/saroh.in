@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     Param,
@@ -63,5 +64,13 @@ export class ContactsController {
         @Body() dto: UpdateContactDto,
     ) {
         return this.contacts.update(ctx, contactId, dto);
+    }
+
+    @Delete(":contactId")
+    remove(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ): Promise<{ id: string; deleted: true; leads: number }> {
+        return this.contacts.remove(ctx, contactId);
     }
 }

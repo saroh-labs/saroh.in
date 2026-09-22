@@ -1,7 +1,10 @@
 "use server";
 
 import type { UpdateContactInput } from "./service";
-import { updateContact as updateContactApi } from "./service";
+import {
+    deleteContact as deleteContactApi,
+    updateContact as updateContactApi,
+} from "./service";
 
 /**
  * Server Actions for contacts. A thin wrapper that forwards the session and
@@ -12,4 +15,8 @@ export async function updateContact(
     input: UpdateContactInput,
 ) {
     return updateContactApi(contactId, input);
+}
+
+export async function deleteContact(contactId: string) {
+    return deleteContactApi(contactId);
 }

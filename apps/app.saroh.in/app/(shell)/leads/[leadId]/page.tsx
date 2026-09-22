@@ -11,6 +11,7 @@ import { MessageComposer } from "@/components/crm/message-composer";
 import { MessageHistory } from "@/components/crm/message-history";
 import { MoveStageControl } from "@/components/crm/move-stage-control";
 import { TaskForm } from "@/components/crm/task-form";
+import { DeleteLeadMenu } from "@/components/leads/delete-lead-menu";
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { contactName, formatValue, LEAD_STATUS } from "@/lib/crm/format";
@@ -97,6 +98,13 @@ export default async function LeadDetailPage({
                             leadId={lead.id}
                             title={lead.title}
                             value={lead.value}
+                        />
+                        <DeleteLeadMenu
+                            leadId={lead.id}
+                            title={lead.title}
+                            contactName={
+                                lead.contact ? contactName(lead.contact) : null
+                            }
                         />
                     </>
                 }

@@ -118,6 +118,35 @@ export class CustomersService {
         }
     }
 
+    /**
+     * Delete a customer who has never ordered. Store write access, as for an
+     * edit; a missing id or another store's customer 404s.
+     *
+     * A customer with orders is refused with a 409 rather than taken apart:
+     * an order is the business's record of a sale and names who bought, so
+     * it is never orphaned (the schema restricts it too). Their carts go with
+     * them; a product review stays, unattributed.
+     */
+    async remove(storeId: string, customerId: string, userId: string) {
+        await this.requireWrite(storeId, userId);
+        const existing = await prisma.customer.findFirst({
+            where: { id: customerId, storeId },
+            select: { id: true, _count: { select: { orders: true } } },
+        });
+        if (!existing) {
+            throw new NotFoundException("Customer not found");
+        }
+        const orders = existing._count.orders;
+        if (orders > 0) {
+            throw new ConflictException({
+                message: `This customer has ${orders === 1 ? "an order" : `${orders} orders`}, and an order keeps who bought it — so they stay.`,
+                orders,
+            });
+        }
+        await prisma.customer.delete({ where: { id: customerId } });
+        return { id: customerId, deleted: true as const };
+    }
+
     private fields(dto: CreateCustomerDto) {
         return {
             email: dto.email,
