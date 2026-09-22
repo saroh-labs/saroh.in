@@ -125,7 +125,9 @@ export const MODULES: readonly ModuleDescriptor[] = [
         description:
             "Contacts, leads, pipelines, and activity — the customer relationship core.",
         rootRoutes: ["/crm"],
-        requiredAction: "lead:read",
+        // Who may REACH contacts: a Member reads the people on the diary.
+        // Leads and the pipeline stay OWNER/ADMIN, refused per route.
+        requiredAction: "contact:read",
         dependencies: [],
         projectSelectable: true,
         rolloutFlag: FlagKey.MODULE_CRM,

@@ -4,6 +4,7 @@ import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { ContactsView } from "@/components/contacts/contacts-view";
 import { PageContainer } from "@/components/shared/page-container";
 import { listContacts } from "@/lib/contacts/service";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
 
@@ -24,10 +25,15 @@ export default async function ContactsPage({
 }) {
     await requireSession();
 
-    const [contacts, params] = await Promise.all([
+    const [contacts, params, organization] = await Promise.all([
         listContacts(),
         searchParams,
+        resolveActiveOrganization(),
     ]);
+    // A Member reads contacts but adds none (DEC-020).
+    const canAdd = organization?.actions
+        ? organization.actions.includes("contact:write")
+        : organization?.role === "OWNER" || organization?.role === "ADMIN";
 
     return (
         // Wider than the old `max-w-7xl`: this is a table now, and a dashboard
@@ -37,7 +43,7 @@ export default async function ContactsPage({
             <PageHeader
                 title="Contacts"
                 description="Everyone who has enquired, booked or bought — and anyone you add."
-                actions={<AddContactDialog />}
+                actions={canAdd ? <AddContactDialog /> : undefined}
             />
             <div className="mt-6">
                 <ContactsView

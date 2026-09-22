@@ -81,6 +81,9 @@ export function SectionError({
             <AccessDenied
                 title="Your session has ended"
                 description="Sign in again to pick up where you left off."
+                // Nothing about roles: an expired session is not a denial
+                // an owner or admin can lift.
+                note={null}
                 backHref={backHref}
                 backLabel={backLabel}
             />

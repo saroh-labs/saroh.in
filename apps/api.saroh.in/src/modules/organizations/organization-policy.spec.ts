@@ -25,6 +25,11 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
         "media:read",
         // ADR-003: every role may read effective module availability.
         "module:read",
+        // The diary: a Member sees appointments, services and who is booked,
+        // never leads, the pipeline or money.
+        "booking:read",
+        "service:read",
+        "contact:read",
     ],
     /*
      * REVIEWER is website-only (#193) and is NOT a narrower MEMBER: it holds

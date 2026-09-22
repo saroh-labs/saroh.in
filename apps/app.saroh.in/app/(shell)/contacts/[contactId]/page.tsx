@@ -47,6 +47,7 @@ export default async function ContactDetailPage({
 
     const [contact, addLead, organization, modules] = await Promise.all([
         getContact(contactId),
+        // Stages for "Add a lead"; empty for a viewer who may not see them.
         loadAddLead(),
         resolveActiveOrganization(),
         modulesOrUnknown(),
@@ -54,6 +55,14 @@ export default async function ContactDetailPage({
     if (!contact) notFound();
     const name = contactName(contact);
     const plan = contactPanels(organization, modules);
+    // A Member reads the people on the diary but changes nothing and sees no
+    // leads (DEC-020); without resolved actions, the built-in roles decide.
+    const can = (action: string) =>
+        organization?.actions
+            ? organization.actions.includes(action)
+            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const canEdit = can("contact:write");
+    const seesLeads = can("lead:read");
     const holdings = await loadContactHoldings(contact.id, plan);
     const person = { id: contact.id, name, email: contact.email };
     // The clock is read once, here, for the pack balances.
@@ -89,28 +98,30 @@ export default async function ContactDetailPage({
                             : contact.email
                     }
                     actions={
-                        <>
-                            <EditContactDialog
-                                contactId={contact.id}
-                                initial={{
-                                    firstName: contact.firstName ?? "",
-                                    lastName: contact.lastName ?? "",
-                                    phone: contact.phone ?? "",
-                                    company: contact.company ?? "",
-                                }}
-                            />
-                            <AddLeadDialog
-                                // Only this person: the lead is theirs.
-                                contacts={[person]}
-                                stages={addLead.stages}
-                            />
-                            <DeleteContactMenu
-                                contactId={contact.id}
-                                name={name}
-                                leadCount={contact.leads.length}
-                                holdings={heldCounts(holdings)}
-                            />
-                        </>
+                        canEdit ? (
+                            <>
+                                <EditContactDialog
+                                    contactId={contact.id}
+                                    initial={{
+                                        firstName: contact.firstName ?? "",
+                                        lastName: contact.lastName ?? "",
+                                        phone: contact.phone ?? "",
+                                        company: contact.company ?? "",
+                                    }}
+                                />
+                                <AddLeadDialog
+                                    // Only this person: the lead is theirs.
+                                    contacts={[person]}
+                                    stages={addLead.stages}
+                                />
+                                <DeleteContactMenu
+                                    contactId={contact.id}
+                                    name={name}
+                                    leadCount={contact.leads.length}
+                                    holdings={heldCounts(holdings)}
+                                />
+                            </>
+                        ) : undefined
                     }
                 />
 
@@ -136,59 +147,63 @@ export default async function ContactDetailPage({
                     </dl>
                 </section>
 
-                <section className="overflow-hidden rounded-[12px] border border-border bg-card">
-                    <h2 className="border-b border-muted px-4 py-[13px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Leads · {contact.leads.length}
-                    </h2>
-                    {contact.leads.length === 0 ? (
-                        <p className="text-pretty px-4 py-3.5 text-[12.5px] leading-[1.5] text-muted-foreground">
-                            No leads for {name} yet. An enquiry from them lands
-                            here, or add one above.
-                        </p>
-                    ) : (
-                        <ul>
-                            {contact.leads.map((lead) => {
-                                const amount = formatValue(lead.value);
-                                const status =
-                                    lead.status in LEAD_STATUS
-                                        ? LEAD_STATUS[lead.status as LeadStatus]
-                                        : LEAD_STATUS.OPEN;
-                                return (
-                                    <li
-                                        key={lead.id}
-                                        className="border-b border-foreground/10 last:border-b-0"
-                                    >
-                                        <Link
-                                            href={`/leads/${lead.id}`}
-                                            className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                {seesLeads ? (
+                    <section className="overflow-hidden rounded-[12px] border border-border bg-card">
+                        <h2 className="border-b border-muted px-4 py-[13px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                            Leads · {contact.leads.length}
+                        </h2>
+                        {contact.leads.length === 0 ? (
+                            <p className="text-pretty px-4 py-3.5 text-[12.5px] leading-[1.5] text-muted-foreground">
+                                No leads for {name} yet. An enquiry from them
+                                lands here, or add one above.
+                            </p>
+                        ) : (
+                            <ul>
+                                {contact.leads.map((lead) => {
+                                    const amount = formatValue(lead.value);
+                                    const status =
+                                        lead.status in LEAD_STATUS
+                                            ? LEAD_STATUS[
+                                                  lead.status as LeadStatus
+                                              ]
+                                            : LEAD_STATUS.OPEN;
+                                    return (
+                                        <li
+                                            key={lead.id}
+                                            className="border-b border-foreground/10 last:border-b-0"
                                         >
-                                            <span className="min-w-0 flex-1">
-                                                <span className="block truncate text-[13.5px] font-medium">
-                                                    {lead.title}
+                                            <Link
+                                                href={`/leads/${lead.id}`}
+                                                className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                                            >
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate text-[13.5px] font-medium">
+                                                        {lead.title}
+                                                    </span>
+                                                    <span className="block text-[11.5px] text-muted-foreground">
+                                                        {lead.pipeline?.name ??
+                                                            "Pipeline"}
+                                                        {amount
+                                                            ? ` · worth ${amount}`
+                                                            : ""}
+                                                    </span>
                                                 </span>
-                                                <span className="block text-[11.5px] text-muted-foreground">
-                                                    {lead.pipeline?.name ??
-                                                        "Pipeline"}
-                                                    {amount
-                                                        ? ` · worth ${amount}`
-                                                        : ""}
-                                                </span>
-                                            </span>
-                                            {lead.stage ? (
-                                                <Badge variant="neutral">
-                                                    {lead.stage.name}
+                                                {lead.stage ? (
+                                                    <Badge variant="neutral">
+                                                        {lead.stage.name}
+                                                    </Badge>
+                                                ) : null}
+                                                <Badge variant={status.variant}>
+                                                    {status.label}
                                                 </Badge>
-                                            ) : null}
-                                            <Badge variant={status.variant}>
-                                                {status.label}
-                                            </Badge>
-                                        </Link>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    )}
-                </section>
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </section>
+                ) : null}
 
                 {plan.panels.includes("subscriptions") ? (
                     <SubscriptionsPanel

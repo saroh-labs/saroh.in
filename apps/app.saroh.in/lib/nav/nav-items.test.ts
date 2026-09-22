@@ -85,7 +85,9 @@ const AVAILABLE_TO = {
         "INSIGHTS",
     ],
     ADMIN: ["WEBSITE", "CRM", "APPOINTMENTS", "COMMERCE", "INSIGHTS"],
-    MEMBER: ["WEBSITE"],
+    // The diary and the people on it (DEC-020): a Member holds booking:read
+    // and contact:read, what APPOINTMENTS and CRM ask for.
+    MEMBER: ["WEBSITE", "APPOINTMENTS", "CRM"],
     REVIEWER: ["WEBSITE"],
 } as const;
 
@@ -196,6 +198,21 @@ describe("what each role is offered", () => {
         expect(offered).not.toContain("/sites/new");
         expect(offered).not.toContain("/sites/site_1");
         expect(offered).toContain("/sites/site_1/review");
+    });
+
+    it("offers a member the diary and its people, not leads or money", () => {
+        const offered = hrefs(
+            navFor({
+                role: "MEMBER",
+                moduleKeys: AVAILABLE_TO.MEMBER,
+                sites: SITES,
+            }),
+        );
+        expect(offered).toContain("/bookings");
+        expect(offered).toContain("/contacts");
+        expect(offered).not.toContain("/leads");
+        expect(offered).not.toContain("/pipeline");
+        expect(offered).not.toContain("/billing/invoices");
     });
 
     it("offers a reviewer their site and nothing about the business", () => {
