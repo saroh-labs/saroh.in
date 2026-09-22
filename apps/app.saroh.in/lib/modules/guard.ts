@@ -24,6 +24,15 @@ const modulesForRequest = cache(async (): Promise<ModuleView[]> =>
     listModules(),
 );
 
+/**
+ * Every module's state for an optional part of a page, or null when the
+ * list could not be read — "we don't know", which the caller fails open on,
+ * as the rail does. Shares the per-request read with `moduleAccess`.
+ */
+export async function modulesOrUnknown(): Promise<ModuleView[] | null> {
+    return modulesForRequest().catch(() => null);
+}
+
 export type ModuleAccess =
     | { state: "available" }
     | { state: "unavailable"; module: ModuleView }

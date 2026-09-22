@@ -96,11 +96,14 @@ export function InvoiceForm({
     contacts,
     defaultCurrency,
     draft,
+    initialContactId,
 }: {
     contacts: { id: string; name: string; email: string }[];
     defaultCurrency: string;
     /** The draft being changed; absent for a new invoice. */
     draft?: Invoice;
+    /** Who a new invoice is for, already chosen — from a contact's page. */
+    initialContactId?: string;
 }) {
     const router = useRouter();
     const ids = { contact: useId(), due: useId(), tax: useId(), cur: useId() };
@@ -109,7 +112,7 @@ export function InvoiceForm({
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            contactId: draft?.contact?.id ?? "",
+            contactId: draft?.contact?.id ?? initialContactId ?? "",
             dueAt: draft?.dueAt ? new Date(draft.dueAt) : undefined,
             currency: draft?.currency ?? defaultCurrency,
             tax: draft ? draft.tax : "0",

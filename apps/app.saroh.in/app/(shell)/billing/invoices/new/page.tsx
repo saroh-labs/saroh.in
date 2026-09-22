@@ -10,13 +10,23 @@ import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "New invoice" };
 
-/** Billing → Invoices → New: an invoice for anything that did not bill itself. */
-export default async function NewInvoicePage() {
+/**
+ * Billing → Invoices → New: an invoice for anything that did not bill itself.
+ * `?contactId=` — from a contact's page — starts it for that person, when
+ * they are among the contacts this person can pick.
+ */
+export default async function NewInvoicePage({
+    searchParams,
+}: {
+    searchParams: Promise<{ contactId?: string | string[] }>;
+}) {
     await requireSession();
-    const [contacts, invoices] = await Promise.all([
+    const [contacts, invoices, { contactId }] = await Promise.all([
         contactPickerOptions(),
         listInvoices(),
+        searchParams,
     ]);
+    const forContact = contacts.find((c) => c.id === contactId);
 
     return (
         <PageContainer width="full">
@@ -46,6 +56,7 @@ export default async function NewInvoicePage() {
                     contacts={contacts}
                     // The currency the business last invoiced in.
                     defaultCurrency={invoices.rows.at(0)?.currency ?? "INR"}
+                    initialContactId={forContact?.id}
                 />
             </div>
         </PageContainer>

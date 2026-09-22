@@ -176,7 +176,7 @@ export function InvoiceHeaderActions({
  * The design's dialog: how it was paid, a reference, the day. Nothing is
  * charged and nobody is contacted, and the dialog says so.
  */
-function RecordPaymentDialog({
+export function RecordPaymentDialog({
     open,
     onOpenChange,
     invoice,
