@@ -57,6 +57,37 @@ for a throwaway database, from `packages/database/src/seed/data.ts`. The seed la
 contacts, 16 leads, 3 services, 10 bookings, 12 products, 10 orders and 3 sites
 — enough for every operational surface to have something on it.
 
+### Showcase (the product film's world)
+
+```bash
+pnpm --filter @saroh/database db:seed:showcase   # base seed, then five businesses on top
+pnpm --filter @saroh/database db:seed:reset      # removes both
+```
+
+This runs the base seed first, then adds more to Northwind (about 50 products,
+500 customers, 500 orders, 120 contacts and 40 leads) and adds four more
+businesses: **Pulse Fitness** (a gym: 4 services and about 250 bookings),
+**Mirror & Co.** (a salon: about 200 bookings), **Rye & Co. Bakery**
+(15 products and 150 orders) and **Lumen Studio** (a design studio: 30 leads
+and 3 posts). Each has one published site at `<slug>.saroh.app.localhost`.
+The showcase code is in `packages/database/src/seed/showcase/`. It uses a
+seeded random generator and dates relative to today. Running it again on the
+same day writes the same rows. On a later day it moves the diary forward with
+the calendar.
+
+#### Demo accounts
+
+Every account's password is `demo-password-123`, and every email is verified.
+
+| Email                | Business and role                                                                                                                                                                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demo@saroh.dev`     | Northwind OWNER · Pulse Fitness OWNER · Mirror & Co. ADMIN · Rye & Co. MEMBER · Lumen Studio REVIEWER (its site only) — plus the base seed's Monsoon and Whitefield sites, OWNER                                                                                                      |
+| `admin@saroh.dev`    | Northwind ADMIN · Pulse Fitness ADMIN                                                                                                                                                                                                                                                 |
+| `member@saroh.dev`   | Northwind MEMBER · Mirror & Co. MEMBER                                                                                                                                                                                                                                                |
+| `reviewer@saroh.dev` | Northwind REVIEWER (base seed)                                                                                                                                                                                                                                                        |
+| Business owners      | `nandini.kapoor@` (Mirror) · `tanvi.desai@` (Rye) · `aditi.rao@` (Lumen), all `@saroh.dev`                                                                                                                                                                                            |
+| Staff                | Northwind: `suresh.gowda@`, `anita.fernandes@` · Pulse: `kabir.sethi@`, `ritika.nair@`, `imran.shaikh@`, `deepa.hegde@` · Mirror: `aarav.menon@`, `zoya.qadri@`, `lalitha.raman@` · Rye: `joseph.dsouza@`, `meenal.joshi@` · Lumen: `vikram.iyer@`, `sana.merchant@`, `rohan.pillai@` |
+
 ## Databases
 
 `packages/database/src/database-target.ts` refuses to migrate or seed a
