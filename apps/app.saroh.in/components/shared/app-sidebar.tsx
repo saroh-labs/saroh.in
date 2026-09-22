@@ -4,7 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverAnchor, PopoverContent } from "@saroh/ui/popover";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { Fragment, useCallback, useState, useSyncExternalStore } from "react";
 
 import type {
     NavChild,
@@ -13,6 +13,7 @@ import type {
 } from "@/components/shared/nav-items";
 import {
     NOTIFICATIONS_HREF,
+    isNavChildCurrent,
     isNavItemActive,
     navFor,
     showsGroupLabel,
@@ -143,9 +144,17 @@ export function AppSidebar({
                             const childIsCurrent = Boolean(
                                 item.children?.some(
                                     (child) =>
-                                        child.href === pathname ||
-                                        (child.children ?? []).some(
-                                            (leaf) => leaf.href === pathname,
+                                        isNavChildCurrent(
+                                            pathname,
+                                            child.href,
+                                            item.children,
+                                        ) ||
+                                        (child.children ?? []).some((leaf) =>
+                                            isNavChildCurrent(
+                                                pathname,
+                                                leaf.href,
+                                                child.children,
+                                            ),
                                         ),
                                 ),
                             );
@@ -169,126 +178,128 @@ export function AppSidebar({
                             const hasChildren = Boolean(item.children?.length);
                             const flyoutOpen = openFlyout === item.href;
                             return (
-                                <Popover
-                                    key={item.href}
-                                    open={flyoutOpen}
-                                    onOpenChange={(open) => {
-                                        if (!open) setFlyoutFor(null);
-                                    }}
-                                >
-                                    <PopoverAnchor asChild>
-                                        <Link
-                                            href={item.href}
-                                            // On the icon rail a section opens its
-                                            // flyout instead of navigating: its
-                                            // children have no other path there.
-                                            onClick={(e) => {
-                                                if (!iconRail || !hasChildren)
-                                                    return;
-                                                e.preventDefault();
-                                                setFlyoutFor(
-                                                    flyoutOpen
-                                                        ? null
-                                                        : item.href,
-                                                );
-                                            }}
-                                            aria-expanded={
-                                                iconRail && hasChildren
-                                                    ? flyoutOpen
-                                                    : undefined
-                                            }
-                                            title={item.label}
-                                            aria-current={
-                                                active && !childIsCurrent
-                                                    ? "page"
-                                                    : undefined
-                                            }
-                                            className={cn(
-                                                // Tighter rows than the drawer's: this
-                                                // rail is `lg`-and-up only, so it is
-                                                // always driven by a pointer, and the
-                                                // 44px touch target that MobileNav needs
-                                                // would only spread twelve items over a
-                                                // screen's worth of height here.
-                                                // `wk-nav` grows a brand bar on the
-                                                // leading edge when this row is the
-                                                // current page (workspace.css). It
-                                                // scales from the centre rather than
-                                                // fading, so changing page reads as the
-                                                // marker travelling down the rail.
-                                                "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast",
-                                                // The icon rail centres the glyph and
-                                                // drops the marker's gutter.
-                                                "max-[1100px]:justify-center max-[1100px]:px-0 max-[1100px]:before:hidden",
-                                                // The design system's ring, not
-                                                // Chrome's default blue: the focus ring
-                                                // is a keyboard user's cursor, and it
-                                                // was inconsistent in exactly the place
-                                                // navigation happens most.
-                                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                                                isPage
-                                                    ? "bg-card font-semibold text-foreground shadow-xs"
-                                                    : isSection
-                                                      ? "font-semibold text-brand hover:bg-accent"
-                                                      : // Idle rows sit a step back
-                                                        // from Ink, so the section and
-                                                        // the page read louder.
-                                                        "font-medium text-neutral-700 hover:bg-accent dark:text-muted-foreground",
-                                            )}
-                                        >
-                                            <Icon
-                                                className="size-[19px] shrink-0"
-                                                strokeWidth={1.9}
-                                            />
-                                            <span className="flex-1 max-[1100px]:sr-only">
-                                                {item.label}
-                                            </span>
-                                            {waiting > 0 ? (
-                                                /* The brand file's waiting count: a
+                                <Fragment key={item.href}>
+                                    <Popover
+                                        open={flyoutOpen}
+                                        onOpenChange={(open) => {
+                                            if (!open) setFlyoutFor(null);
+                                        }}
+                                    >
+                                        <PopoverAnchor asChild>
+                                            <Link
+                                                href={item.href}
+                                                // On the icon rail a section opens its
+                                                // flyout instead of navigating: its
+                                                // children have no other path there.
+                                                onClick={(e) => {
+                                                    if (
+                                                        !iconRail ||
+                                                        !hasChildren
+                                                    )
+                                                        return;
+                                                    e.preventDefault();
+                                                    setFlyoutFor(
+                                                        flyoutOpen
+                                                            ? null
+                                                            : item.href,
+                                                    );
+                                                }}
+                                                aria-expanded={
+                                                    iconRail && hasChildren
+                                                        ? flyoutOpen
+                                                        : undefined
+                                                }
+                                                title={item.label}
+                                                aria-current={
+                                                    active && !childIsCurrent
+                                                        ? "page"
+                                                        : undefined
+                                                }
+                                                className={cn(
+                                                    // Tighter rows than the drawer's: this
+                                                    // rail is `lg`-and-up only, so it is
+                                                    // always driven by a pointer, and the
+                                                    // 44px touch target that MobileNav needs
+                                                    // would only spread twelve items over a
+                                                    // screen's worth of height here.
+                                                    // `wk-nav` grows a brand bar on the
+                                                    // leading edge when this row is the
+                                                    // current page (workspace.css). It
+                                                    // scales from the centre rather than
+                                                    // fading, so changing page reads as the
+                                                    // marker travelling down the rail.
+                                                    "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast",
+                                                    // The icon rail centres the glyph and
+                                                    // drops the marker's gutter.
+                                                    "max-[1100px]:justify-center max-[1100px]:px-0 max-[1100px]:before:hidden",
+                                                    // The design system's ring, not
+                                                    // Chrome's default blue: the focus ring
+                                                    // is a keyboard user's cursor, and it
+                                                    // was inconsistent in exactly the place
+                                                    // navigation happens most.
+                                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                                    isPage
+                                                        ? "bg-card font-semibold text-foreground shadow-xs"
+                                                        : isSection
+                                                          ? "font-semibold text-brand hover:bg-accent"
+                                                          : // Idle rows sit a step back
+                                                            // from Ink, so the section and
+                                                            // the page read louder.
+                                                            "font-medium text-neutral-700 hover:bg-accent dark:text-muted-foreground",
+                                                )}
+                                            >
+                                                <Icon
+                                                    className="size-[19px] shrink-0"
+                                                    strokeWidth={1.9}
+                                                />
+                                                <span className="flex-1 max-[1100px]:sr-only">
+                                                    {item.label}
+                                                </span>
+                                                {waiting > 0 ? (
+                                                    /* The brand file's waiting count: a
                                            Saffron-tinted pill with 700 text.
                                            It is a count, not a status, so it
                                            does not borrow Warning's hue. */
-                                                <span
-                                                    aria-label={`${waiting} waiting`}
-                                                    className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground max-[1100px]:sr-only"
-                                                >
-                                                    {waiting}
-                                                </span>
-                                            ) : null}
-                                        </Link>
-                                    </PopoverAnchor>
-                                    {item.children?.length ? (
-                                        <NavFlyout
-                                            label={item.label}
-                                            children={item.children}
+                                                    <span
+                                                        aria-label={`${waiting} waiting`}
+                                                        className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground max-[1100px]:sr-only"
+                                                    >
+                                                        {waiting}
+                                                    </span>
+                                                ) : null}
+                                            </Link>
+                                        </PopoverAnchor>
+                                        {item.children?.length ? (
+                                            <NavFlyout
+                                                label={item.label}
+                                                children={item.children}
+                                                pathname={pathname}
+                                                onLeave={() =>
+                                                    setFlyoutFor(null)
+                                                }
+                                                counts={counts}
+                                            />
+                                        ) : null}
+                                    </Popover>
+                                    {/* A section expands because you are in
+                                    it, not because you toggled it (brand
+                                    file §13) — so its screens render right
+                                    under it, only for the section you are
+                                    in, with no chevron. Removed outright on
+                                    the icon rail, never hidden: invisible
+                                    rows left in the tab order are the worse
+                                    outcome. The flyout is their path at
+                                    that width. */}
+                                    {!iconRail && hasChildren && active ? (
+                                        <SiteTree
+                                            children={item.children ?? []}
                                             pathname={pathname}
-                                            onLeave={() => setFlyoutFor(null)}
                                             counts={counts}
                                         />
                                     ) : null}
-                                </Popover>
+                                </Fragment>
                             );
                         })}
-                        {/* A section expands because you are in it, not
-                            because you toggled it (brand file §13) — so the
-                            children render only for the section you are in,
-                            and there is no chevron. */}
-                        {/* Removed outright on the icon rail, never hidden:
-                            invisible rows left in the tab order are the worse
-                            outcome (brand file §13). The flyout is their path
-                            at that width. */}
-                        {group.items.map((item) =>
-                            !iconRail &&
-                            item.children?.length &&
-                            isNavItemActive(pathname, item.href) ? (
-                                <SiteTree
-                                    key={`${item.href}-children`}
-                                    children={item.children}
-                                    pathname={pathname}
-                                    counts={counts}
-                                />
-                            ) : null,
-                        )}
                     </div>
                 ))}
             </nav>
@@ -351,7 +362,7 @@ function NavFlyout({
                 {label}
             </p>
             {rows.map((child) => {
-                const on = pathname === child.href;
+                const on = isNavChildCurrent(pathname, child.href, rows);
                 return (
                     <Link
                         key={child.href}
@@ -443,7 +454,11 @@ function SiteTree({
                 // Exact match, not prefix: `/sites/new` must not light up the
                 // row for a site whose id happens to start the same way, and
                 // the site rows are siblings of each other rather than nested.
-                const active = pathname === child.href;
+                const active = isNavChildCurrent(
+                    pathname,
+                    child.href,
+                    children,
+                );
                 const waiting = counts?.[child.href] ?? 0;
                 return (
                     <Link

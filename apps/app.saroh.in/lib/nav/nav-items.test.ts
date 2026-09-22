@@ -5,6 +5,7 @@ import {
     NAV_GROUPS,
     filterNavGroups,
     filterNavGroupsByRole,
+    isNavChildCurrent,
     navFor,
     navRoleCan,
 } from "@/components/shared/nav-items";
@@ -428,5 +429,37 @@ describe("Sell → Discounts follows discount:read", () => {
             }),
         );
         expect(hrefs).toContain("/commerce/discounts");
+    });
+});
+
+describe("isNavChildCurrent", () => {
+    it("keeps a row lit on the pages beneath it", () => {
+        expect(
+            isNavChildCurrent("/commerce/products/p_1", "/commerce/products"),
+        ).toBe(true);
+    });
+
+    it("does not light a row whose address only starts the same", () => {
+        expect(
+            isNavChildCurrent("/commerce/productsx", "/commerce/products"),
+        ).toBe(false);
+    });
+
+    it("lets the deepest sibling win, so only one row is current", () => {
+        const siblings = [{ href: "/sites/s1" }, { href: "/sites/s1/posts" }];
+        expect(
+            isNavChildCurrent("/sites/s1/posts/new", "/sites/s1", siblings),
+        ).toBe(false);
+        expect(
+            isNavChildCurrent(
+                "/sites/s1/posts/new",
+                "/sites/s1/posts",
+                siblings,
+            ),
+        ).toBe(true);
+    });
+
+    it("never lights a label row", () => {
+        expect(isNavChildCurrent("/sites", undefined)).toBe(false);
     });
 });
