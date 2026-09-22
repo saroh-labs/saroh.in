@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { setConsent } from "@/lib/messages/actions";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
-import { MESSAGE_CHANNELS } from "@/lib/messages/constants";
+import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
 
 /**
  * Consent / unsubscribe control for a lead's contact (S6-002). One row per
@@ -39,8 +39,8 @@ export function ConsentToggle({
         }
         showSuccess(
             next === "GRANTED"
-                ? `${channel} consent granted`
-                : `${channel} consent revoked`,
+                ? `${CHANNEL_LABEL[channel]} consent granted`
+                : `${CHANNEL_LABEL[channel]} consent revoked`,
         );
         router.refresh();
     }
@@ -59,7 +59,7 @@ export function ConsentToggle({
                     >
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">
-                                {channel}
+                                {CHANNEL_LABEL[channel]}
                             </span>
                             <Badge
                                 variant={revoked ? "destructive" : "secondary"}
