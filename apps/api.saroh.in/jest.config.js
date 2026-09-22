@@ -157,6 +157,12 @@ module.exports = {
         "<rootDir>/src/modules/invoices/numbering.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-state.spec.ts",
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
+        // ADR-007 subscriptions: the period calendar, the service and the
+        // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
+        // Postgres and runs in integration.
+        "<rootDir>/src/modules/subscriptions/periods.spec.ts",
+        "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
+        "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/product-reviews/**/*.spec.ts",

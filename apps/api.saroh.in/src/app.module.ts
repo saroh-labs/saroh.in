@@ -43,6 +43,7 @@ import { SearchModule } from "./modules/search/search.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
 import { SitesModule } from "./modules/sites/sites.module";
 import { StoresModule } from "./modules/stores/stores.module";
+import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
 import { WaitlistModule } from "./modules/waitlist/waitlist.module";
 import { WebhooksModule } from "./modules/webhooks/webhooks.module";
 
@@ -96,6 +97,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         FormsModule,
         DiscountsModule,
         InvoicesModule,
+        SubscriptionsModule,
         ProductReviewsModule,
         EnquiryModule,
         ContactsModule,

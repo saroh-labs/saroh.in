@@ -58,6 +58,17 @@ export class BusinessProfileDto {
     @Transform(trim)
     @IsUrl({}, { message: "A valid website URL is required" })
     website?: string;
+
+    /**
+     * IANA zone the business keeps time in, e.g. "Asia/Kolkata". New
+     * subscriptions renew on its midnight (ADR-007). Checked against the tz
+     * database in the service.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(64)
+    timezone?: string;
 }
 
 /**
