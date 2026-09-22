@@ -32,6 +32,9 @@ jest.mock("@saroh/database", () => {
         job: { create: jest.fn() },
         site: { findUnique: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
+        packRedemption: {
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
     };
     return {
         ...actual,
@@ -1355,5 +1358,45 @@ describe("toPublicBooking — what a booker is answered with", () => {
                 snapshot: { service: { name: "Consult" } },
             }),
         ).toMatchObject({ online: false, meetingUrl: null });
+    });
+});
+
+describe("class packs on bookings (ADR-007)", () => {
+    const redemptionUpdateMany = (
+        prisma as unknown as { packRedemption: { updateMany: jest.Mock } }
+    ).packRedemption.updateMany;
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it("gives the class back when a pack-paid booking is cancelled, in the same transaction", async () => {
+        bookingFindUnique.mockResolvedValue({
+            id: "bk_1",
+            organizationId: "org_SVC",
+            status: "CONFIRMED",
+        });
+        bookingUpdate.mockResolvedValue({ id: "bk_1", status: "CANCELLED" });
+        await new BookingsService().cancelBooking(ctx(), "bk_1");
+        expect(redemptionUpdateMany).toHaveBeenCalledWith({
+            where: { bookingId: "bk_1", reversedAt: null },
+            data: { reversedAt: expect.any(Date) },
+        });
+        expect(transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("needs the pack power as well as the booking power to book with a pack", async () => {
+        // A role the business invented: it may book people in, not spend
+        // their prepaid classes.
+        const deskOnly = ctx({
+            role: "MEMBER",
+            actions: new Set(["booking:write", "booking:read"]),
+        });
+        await expect(
+            new BookingsService().bookByHand(deskOnly, "svc_1", {
+                startAt: START,
+                contactId: "contact_1",
+                useClassPack: true,
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(serviceFindUnique).not.toHaveBeenCalled();
     });
 });

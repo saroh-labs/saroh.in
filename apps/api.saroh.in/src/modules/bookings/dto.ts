@@ -1,6 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
     IsArray,
+    IsBoolean,
     IsEmail,
     IsIn,
     IsInt,
@@ -290,6 +291,19 @@ export class BookByHandDto {
     @IsString()
     @MaxLength(128)
     idempotencyKey?: string;
+
+    /**
+     * Pay with a class pack (ADR-007): `true` spends the booker's pack that
+     * expires soonest, or `packPurchaseId` names one. Needs `pack:write`.
+     */
+    @IsOptional()
+    @IsBoolean()
+    useClassPack?: boolean;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    packPurchaseId?: string;
 }
 
 /**
