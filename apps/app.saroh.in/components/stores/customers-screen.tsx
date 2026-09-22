@@ -4,7 +4,7 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Plus, Store, Users } from "lucide-react";
+import { Plus, Store, Upload, Users } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -15,6 +15,11 @@ import { StorefrontFilter } from "@/components/stores/storefront-filter";
 import { StorefrontPartial } from "@/components/stores/storefront-partial";
 import type { DirectoryRow } from "@/lib/customers/directory";
 import { inStorefront, mergeCustomers } from "@/lib/customers/directory";
+import {
+    customerHref,
+    importCustomersHref,
+    newCustomerHref,
+} from "@/lib/customers/links";
 import type { CustomerListItem } from "@/lib/customers/service";
 import { formatMoneyMajor } from "@/lib/format/money";
 
@@ -153,7 +158,9 @@ export function CustomersScreen({
         },
     ];
 
-    const newHref = (id: string) => `/stores/${id}/customers/new`;
+    // The storefront in view, or the only one. With several and none chosen,
+    // the link leads to a page that asks — never quietly to the first.
+    const target = store?.id ?? (many ? undefined : first?.id);
 
     return (
         <>
@@ -163,12 +170,20 @@ export function CustomersScreen({
                 className="mb-0"
                 actions={
                     first ? (
-                        <Button asChild>
-                            <Link href={newHref((store ?? first).id)}>
-                                <Plus className="mr-1.5 size-4" />
-                                Add customer
-                            </Link>
-                        </Button>
+                        <>
+                            <Button variant="outline" asChild>
+                                <Link href={importCustomersHref(target)}>
+                                    <Upload className="mr-1.5 size-4" />
+                                    Import
+                                </Link>
+                            </Button>
+                            <Button asChild>
+                                <Link href={newCustomerHref(target)}>
+                                    <Plus className="mr-1.5 size-4" />
+                                    Add customer
+                                </Link>
+                            </Button>
+                        </>
                     ) : undefined
                 }
             />
@@ -201,6 +216,14 @@ export function CustomersScreen({
                     rows={rows}
                     columns={columns}
                     rowKey={(r) => r.key}
+                    // Their record at the storefront in view, or their first;
+                    // the customer's page links the others.
+                    rowHref={(r) => {
+                        const place =
+                            r.places.find((p) => p.storeId === storeId) ??
+                            r.places[0];
+                        return customerHref(place.storeId, place.customer.id);
+                    }}
                     modes={["table", "list"]}
                     hideModeToggle
                     noun={{ one: "customer", other: "customers" }}
@@ -241,8 +264,8 @@ export function CustomersScreen({
                         note: `Nobody has bought from ${store?.name ?? (many ? "these storefronts" : (first?.name ?? "your storefront"))} yet. A customer appears here the first time an order is paid for — or add one now.`,
                         action: first ? (
                             <Button asChild>
-                                <Link href={newHref((store ?? first).id)}>
-                                    New customer
+                                <Link href={newCustomerHref(target)}>
+                                    Add customer
                                 </Link>
                             </Button>
                         ) : undefined,
