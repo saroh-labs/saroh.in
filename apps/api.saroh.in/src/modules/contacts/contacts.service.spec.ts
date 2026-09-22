@@ -8,6 +8,7 @@ jest.mock("@saroh/database", () => {
                 findMany: jest.fn(),
                 findUnique: jest.fn(),
                 update: jest.fn(),
+                create: jest.fn(),
             },
             lead: { groupBy: jest.fn() },
             booking: { groupBy: jest.fn() },
@@ -18,7 +19,11 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -27,6 +32,7 @@ import { ContactsService } from "./contacts.service";
 const findMany = prisma.contact.findMany as jest.Mock;
 const findUnique = prisma.contact.findUnique as jest.Mock;
 const update = prisma.contact.update as jest.Mock;
+const create = prisma.contact.create as jest.Mock;
 const leadGroupBy = prisma.lead.groupBy as jest.Mock;
 const bookingGroupBy = prisma.booking.groupBy as jest.Mock;
 const linkFindMany = prisma.customerIdentityLink.findMany as jest.Mock;
@@ -414,5 +420,49 @@ describe("ContactsService.update", () => {
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(findUnique).not.toHaveBeenCalled();
         expect(update).not.toHaveBeenCalled();
+    });
+});
+
+describe("ContactsService.create", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("adds someone by hand, in the caller's org, marked as manual", async () => {
+        findUnique.mockResolvedValue(null);
+        create.mockResolvedValue({ id: "c_new" });
+        await new ContactsService().create(ctx(), {
+            email: "meera@example.com",
+            firstName: "Meera",
+            phone: "  ",
+        });
+        expect(create).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                email: "meera@example.com",
+                firstName: "Meera",
+                lastName: null,
+                phone: null,
+                company: null,
+                source: "manual",
+            },
+        });
+    });
+
+    it("refuses an email already in the org, naming who has it", async () => {
+        findUnique.mockResolvedValue({ id: "c_1" });
+        await expect(
+            new ContactsService().create(ctx(), {
+                email: "ananya@example.com",
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it("refuses a role that may not write contacts", async () => {
+        await expect(
+            new ContactsService().create(ctx({ role: "REVIEWER" }), {
+                email: "x@example.com",
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(create).not.toHaveBeenCalled();
     });
 });

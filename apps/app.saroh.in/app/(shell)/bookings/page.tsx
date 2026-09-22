@@ -3,8 +3,11 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { BookingsView } from "@/components/bookings/bookings-view";
+import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
-import { listBookingsWithPast } from "@/lib/services/service";
+import { listContacts } from "@/lib/contacts/service";
+import { contactName } from "@/lib/crm/format";
+import { listBookingsWithPast, listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
 
@@ -33,9 +36,13 @@ export default async function BookingsPage({
 }) {
     await requireSession();
 
-    const [upcoming, params] = await Promise.all([
+    const [upcoming, params, services, contacts] = await Promise.all([
         listBookingsWithPast(),
         searchParams,
+        listServices().catch(() => []),
+        // Contacts belong to CRM, which may be off: then the dialog asks for
+        // a name and email instead of offering people you know.
+        listContacts().catch(() => []),
     ]);
 
     return (
@@ -44,9 +51,26 @@ export default async function BookingsPage({
                 title="Bookings"
                 description="Reservations across your services, in the timezone each was booked in."
                 actions={
-                    <Button asChild variant="outline">
-                        <Link href="/services">Services</Link>
-                    </Button>
+                    <>
+                        <Button asChild variant="outline">
+                            <Link href="/services">Services</Link>
+                        </Button>
+                        <NewBookingDialog
+                            services={services
+                                .filter((s) => s.status === "ACTIVE")
+                                .map((s) => ({
+                                    id: s.id,
+                                    name: s.name,
+                                    timezone: s.timezone,
+                                    minutes: s.durationMinutes,
+                                }))}
+                            contacts={contacts.map((c) => ({
+                                id: c.id,
+                                name: contactName(c),
+                                email: c.email,
+                            }))}
+                        />
+                    </>
                 }
             />
             <div className="mt-6">

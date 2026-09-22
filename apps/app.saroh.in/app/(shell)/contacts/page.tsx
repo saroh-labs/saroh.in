@@ -1,5 +1,6 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
+import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { ContactsView } from "@/components/contacts/contacts-view";
 import { PageContainer } from "@/components/shared/page-container";
 import { listContacts } from "@/lib/contacts/service";
@@ -35,7 +36,8 @@ export default async function ContactsPage({
         <PageContainer width="wide">
             <PageHeader
                 title="Contacts"
-                description="Everyone who has enquired, booked or bought."
+                description="Everyone who has enquired, booked or bought — and anyone you add."
+                actions={<AddContactDialog />}
             />
             <div className="mt-6">
                 <ContactsView
