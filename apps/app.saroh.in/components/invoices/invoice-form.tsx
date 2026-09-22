@@ -14,6 +14,7 @@ import type { FieldErrors } from "react-hook-form";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
     createInvoice,
@@ -209,22 +210,13 @@ export function InvoiceForm({
                             control={form.control}
                             name="contactId"
                             render={({ field }) => (
-                                <OptionSelect
+                                <ContactPicker
                                     id={ids.contact}
-                                    placeholder="Choose someone…"
+                                    contacts={contacts}
                                     value={field.value}
                                     onValueChange={field.onChange}
                                     disabled={isSubmitting}
                                     aria-invalid={Boolean(errors.contactId)}
-                                    // OptionSelect shows "" as its None row rather
-                                    // than the placeholder, so the prompt is that row.
-                                    options={[
-                                        { value: "", label: "Choose someone…" },
-                                        ...contacts.map((c) => ({
-                                            value: c.id,
-                                            label: `${c.name} · ${c.email}`,
-                                        })),
-                                    ]}
                                 />
                             )}
                         />

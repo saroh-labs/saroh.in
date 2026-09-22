@@ -18,6 +18,7 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
+import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
 import { bookByHand, listAvailability } from "@/lib/services/actions";
 import type { Slot } from "@/lib/services/service";
@@ -214,18 +215,12 @@ export function NewBookingDialog({
                             </div>
                         ) : null}
                         {who === "known" ? (
-                            <OptionSelect
+                            <ContactPicker
                                 id={ids.contact}
                                 aria-label="Contact"
+                                contacts={contacts}
                                 value={contactId}
                                 onValueChange={setContactId}
-                                options={contacts.map((c) => ({
-                                    value: c.id,
-                                    label:
-                                        c.name === c.email
-                                            ? c.email
-                                            : `${c.name} · ${c.email}`,
-                                }))}
                             />
                         ) : (
                             <div className="grid grid-cols-2 gap-3">
