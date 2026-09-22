@@ -75,6 +75,15 @@ describe("redactUrl", () => {
         );
     });
 
+    it("hides an invoice pay link's token", () => {
+        expect(redactUrl("/public/invoices/tok_ABC-123/payment-intent")).toBe(
+            "/public/invoices/[token]/payment-intent",
+        );
+        expect(redactUrl("/public/invoices/tok_ABC-123")).toBe(
+            "/public/invoices/[token]",
+        );
+    });
+
     it("leaves every other path alone", () => {
         expect(redactUrl("/organizations/org_1/orders")).toBe(
             "/organizations/org_1/orders",

@@ -511,6 +511,16 @@ export class ContactsService {
             // the booking's contact while its enrolment is already gone,
             // re-checks that key, and refuses the whole delete.
             await tx.courseEnrollment.deleteMany({ where: { contactId } });
+            // Their invoices stay, under the bill-to snapshot, but no pay
+            // link keeps working for a person the business has deleted.
+            await tx.invoice.updateMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    contactId,
+                    payTokenHash: { not: null },
+                },
+                data: { payTokenHash: null },
+            });
             await tx.contact.delete({ where: { id: contactId } });
             return {
                 id: contactId,

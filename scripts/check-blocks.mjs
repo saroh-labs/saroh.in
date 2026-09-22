@@ -146,6 +146,12 @@ const SITE_LAYER_ALLOWED = new Set([
     // The review page a customer reaches from an invitation email.
     "apps/saroh.app/components/review-form.tsx",
     "apps/saroh.app/app/review/[token]/page.tsx",
+    // The invoice pay page a customer reaches from a pay link (ADR-007, U13),
+    // and the provider handoff it shares with checkout. Same category as the
+    // review page: a Saroh surface in the business's palette, drawing no block.
+    "apps/saroh.app/app/pay/[token]/page.tsx",
+    "apps/saroh.app/components/invoice-pay.tsx",
+    "apps/saroh.app/components/provider-handoff.tsx",
     "apps/saroh.app/components/post-view.tsx",
     "apps/saroh.app/app/[domain]/[slug]/not-found.tsx",
     "apps/saroh.app/app/[domain]/layout.tsx",

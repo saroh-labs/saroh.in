@@ -30,6 +30,7 @@ jest.mock("@saroh/database", () => {
             customerSubscription: { count: jest.fn() },
             packPurchase: { count: jest.fn() },
             courseEnrollment: { count: jest.fn(), deleteMany: jest.fn() },
+            invoice: { updateMany: jest.fn() },
             customerIdentityLink: { findMany: jest.fn() },
             customer: { findMany: jest.fn() },
             order: { groupBy: jest.fn(), findMany: jest.fn() },
@@ -65,6 +66,7 @@ const courseCount = prisma.courseEnrollment.count as jest.Mock;
 const bookingFindMany = prisma.booking.findMany as jest.Mock;
 const bookingUpdateMany = prisma.booking.updateMany as jest.Mock;
 const eventCreateMany = prisma.bookingEvent.createMany as jest.Mock;
+const invoiceUpdateMany = prisma.invoice.updateMany as jest.Mock;
 
 /** A Prisma Decimal serialises via `toString`; the mock must do the same. */
 const decimal = (v: string) => ({ toString: () => v });
@@ -522,6 +524,26 @@ describe("ContactsService.remove", () => {
         expect(leadCount).toHaveBeenCalledWith({ where: { contactId: "c_1" } });
         expect(contactDelete).toHaveBeenCalledWith({ where: { id: "c_1" } });
         expect(bookingUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("revokes the pay links on their invoices before the contact goes (U13)", async () => {
+        findUnique.mockResolvedValue({ id: "c_1", organizationId: "org_1" });
+        leadCount.mockResolvedValue(0);
+        contactDelete.mockResolvedValue({ id: "c_1" });
+
+        await new ContactsService().remove(ctx(), "c_1");
+
+        expect(invoiceUpdateMany).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                contactId: "c_1",
+                payTokenHash: { not: null },
+            },
+            data: { payTokenHash: null },
+        });
+        const [revoked] = invoiceUpdateMany.mock.invocationCallOrder;
+        const [deleted] = contactDelete.mock.invocationCallOrder;
+        expect(revoked).toBeLessThan(deleted ?? 0);
     });
 
     it("says what they held, and cancels their pack-paid bookings and course sessions to come", async () => {

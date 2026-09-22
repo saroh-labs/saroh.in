@@ -3,6 +3,7 @@ import {
     Controller,
     Delete,
     Get,
+    Header,
     HttpCode,
     Param,
     Patch,
@@ -28,6 +29,7 @@ import {
     VoidInvoiceDto,
 } from "./dto";
 import { InvoicesService } from "./invoices.service";
+import { payLinkUrl } from "./pay-link-url";
 
 /**
  * Billing → Invoices (ADR-007). Under Payments, which a business can switch
@@ -121,6 +123,21 @@ export class InvoicesController {
         @Body() dto: VoidInvoiceDto,
     ) {
         return this.invoices.reissue(ctx, id, dto);
+    }
+
+    /**
+     * Make the invoice's pay link and answer with it — once: only its hash
+     * is kept, so asking again makes a new link and retires the old one.
+     */
+    @Post(":invoiceId/pay-link")
+    @HttpCode(201)
+    @Header("Cache-Control", "no-store")
+    async payLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ): Promise<{ url: string }> {
+        const { token } = await this.invoices.createPayLink(ctx, id);
+        return { url: payLinkUrl(token) };
     }
 
     @Post(":invoiceId/payments")

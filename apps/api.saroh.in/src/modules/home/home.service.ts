@@ -3,8 +3,10 @@ import { prisma } from "@saroh/database";
 
 import type { OrgRole } from "../../common/types/organization-context";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import type { OrgAction } from "../organizations/organization-actions";
+import { can } from "../organizations/organization-policy";
 
 /**
  * Home read model (cross-product UX #119, Task 4).
@@ -394,6 +396,41 @@ export class HomeService {
             }
         }
 
+        // Money taken through an invoice's pay link after the invoice was
+        // already paid or voided (U13). The customer is owed it back, so it
+        // is ATTENTION: already wrong, and only the merchant can put it right.
+        // Shown wherever Payments is available — a business that has since
+        // disconnected its provider still owes the refund — and only to
+        // people who can read invoices.
+        const canReadInvoices = input.organizationActions
+            ? input.organizationActions.has("invoice:read")
+            : can(input.organizationRole, "invoice:read");
+        if (available.has("PAYMENTS") && canReadInvoices) {
+            const owed = await this.attempt(
+                { moduleKey: "PAYMENTS", label: "Payments to refund" },
+                () => this.refundsOwed(input.organizationId),
+                { count: 0, evidence: [] },
+                unavailable,
+            );
+            if (owed.count > 0) {
+                actions.push({
+                    code: "PAYMENTS_REFUNDS_OWED",
+                    title:
+                        owed.count === 1
+                            ? "Refund a payment taken on a settled invoice"
+                            : `Refund ${owed.count} payments taken on settled invoices`,
+                    href:
+                        owed.count === 1 && owed.evidence[0]
+                            ? owed.evidence[0].href
+                            : "/billing/invoices",
+                    severity: "ATTENTION",
+                    moduleKey: "PAYMENTS",
+                    count: owed.count,
+                    evidence: owed.evidence,
+                });
+            }
+        }
+
         if (active.has("INSIGHTS")) {
             actions.push({
                 code: "INSIGHTS_VIEW",
@@ -495,6 +532,66 @@ export class HomeService {
                 href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
             })),
         };
+    }
+
+    /**
+     * Invoice payments captured but not applied — the invoice was already
+     * paid or void when the money arrived — and not yet refunded, oldest
+     * first. A refund the provider has reported (or one Saroh started)
+     * takes the row off the list.
+     */
+    private async refundsOwed(
+        organizationId: string,
+    ): Promise<{ count: number; evidence: HomeEvidence[] }> {
+        const where = {
+            organizationId,
+            invoiceId: { not: null },
+            status: "SUCCEEDED",
+            attempts: { some: { status: CAPTURED_NEEDS_REFUND } },
+            refunds: { none: { status: { in: ["PENDING", "SUCCEEDED"] } } },
+        };
+        const [count, rows] = await Promise.all([
+            this.db.paymentIntent.count({ where }),
+            this.db.paymentIntent.findMany({
+                where,
+                orderBy: { updatedAt: "asc" },
+                take: EVIDENCE_LIMIT,
+                select: {
+                    id: true,
+                    amountCents: true,
+                    currency: true,
+                    updatedAt: true,
+                    invoice: {
+                        select: {
+                            id: true,
+                            number: true,
+                            status: true,
+                            billToName: true,
+                        },
+                    },
+                },
+            }),
+        ]);
+        const evidence: HomeEvidence[] = [];
+        for (const row of rows) {
+            if (!row.invoice) continue;
+            const after =
+                row.invoice.status === "VOID"
+                    ? "Paid online after it was voided"
+                    : "Paid online after it was already paid";
+            evidence.push({
+                id: row.id,
+                title: row.invoice.number ?? "Invoice",
+                subtitle: row.invoice.billToName
+                    ? `${row.invoice.billToName} · ${after}`
+                    : after,
+                at: row.updatedAt.toISOString(),
+                amountMinor: row.amountCents,
+                currency: row.currency,
+                href: `/billing/invoices/${row.invoice.id}`,
+            });
+        }
+        return { count, evidence };
     }
 
     /** The next confirmed bookings from now, each in the zone it was made in. */

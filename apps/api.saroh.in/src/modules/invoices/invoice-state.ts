@@ -29,6 +29,19 @@ export const PAYMENT_METHODS = [
 ] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
+/**
+ * How an invoice paid through its pay link (U13) is recorded. Written only by
+ * the payment webhook — never offered when a payment is recorded by hand, so
+ * it is not one of {@link PAYMENT_METHODS}.
+ */
+export const ONLINE_PAYMENT_METHOD = "ONLINE";
+
+/**
+ * The attempt the webhook writes when money arrives for an invoice that was
+ * already paid or void: captured, not applied, owed back (U13).
+ */
+export const CAPTURED_NEEDS_REFUND = "CAPTURED_NEEDS_REFUND";
+
 export const INVOICE_SOURCES = [
     "MANUAL",
     "SUBSCRIPTION",

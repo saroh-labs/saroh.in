@@ -99,6 +99,45 @@ business pays Saroh). To keep the two apart in code and in conversation:
   link) extends `PaymentIntent`, which today requires an order, to take an
   invoice instead — a payments change reviewed on its own, as a later step.
 - Printable. No PDF service; the browser prints it.
+
+### Invoice pay link (U13, decided 2026-09-23)
+
+- `PaymentIntent` pays an Order **or** an Invoice: `invoiceId` beside a
+  now-nullable `orderId`, a CHECK that exactly one is set (in the migration
+  only — Prisma cannot declare it), unique `(invoiceId, idempotencyKey)`. The
+  invoice's id is the merchant reference the provider records and echoes back,
+  so webhooks find the intent by provider intent id or by that reference.
+- The link is a token of 256 random bits, base64url, stored only as its
+  SHA-256 (`Invoice.payTokenHash`) and never logged (the request log redacts
+  `/public/invoices/<token>`). As with preview links, its address is shown
+  **once**: "Copy pay link" makes and copies it; after that the workspace says
+  a link is out and offers **New link**, which replaces it — the old one stops
+  working. Voiding the invoice or deleting its contact clears it. Only an
+  issued invoice gets one, and only when a provider is connected.
+- The pay page is `saroh.app/pay/<token>` on the renderer's own apex (an
+  invoice belongs to a business, not a Site), in the business's site theme. It
+  reads and posts server-to-server. It shows an explicit allow-list — business
+  name, number, issue and due dates, lines, tax, total, currency, status,
+  billed-to name — and sends no referrer and noindex. Reads and payment starts
+  are rate-limited per link.
+- The payment request carries only a provider and an idempotency key; any
+  other field, an amount above all, is ignored. The amount and currency are
+  the stored invoice's. The provider is the named one if the business
+  connected it, otherwise the business's first connected provider — an
+  invoice has no storefront to choose one.
+- A success moves an ISSUED invoice to PAID under its row lock, recorded as
+  paid `ONLINE` (a stored method never offered in Record a payment) with the
+  provider's payment id as reference and "Paid online through Razorpay" as the
+  note. Success on an invoice already PAID or VOID leaves it as it is, marks
+  the intent SUCCEEDED and records the capture as `CAPTURED_NEEDS_REFUND`.
+  That money is owed back: Home raises it as an ATTENTION action and the
+  invoice page says so. Saroh does not refund invoice payments itself yet —
+  the merchant refunds in the provider's dashboard, and the provider's refund
+  webhook records the `PaymentRefund`, which clears it.
+- A refund does not change an invoice's status (there is no REFUNDED invoice
+  status); the refund is recorded against the intent and shown on the invoice.
+  A failure touches only the intent, so the customer can try again from the
+  same link.
 - What it is for: a subscription period, a course enrollment, a class pack
   purchase, or entered by hand. Store orders keep their own receipt and are
   not invoiced in this ADR.

@@ -11,10 +11,11 @@ import {
     VoidInvoice,
 } from "@/components/invoices/invoice-actions";
 import { InvoicePaper } from "@/components/invoices/invoice-paper";
+import { PayLink, PaymentsToRefund } from "@/components/invoices/pay-link";
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { invoiceMoney } from "@/lib/invoices/money";
-import type { Invoice, PaymentMethod } from "@/lib/invoices/service";
+import type { Invoice, StoredPaymentMethod } from "@/lib/invoices/service";
 import { getInvoice } from "@/lib/invoices/service";
 import { billedTo, invoiceStatus, sourceLabel } from "@/lib/invoices/status";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -22,7 +23,8 @@ import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Invoice" };
 
-const METHOD: Record<PaymentMethod, string> = {
+const METHOD: Record<StoredPaymentMethod, string> = {
+    ONLINE: "Paid online",
     CASH: "Cash",
     UPI: "UPI",
     BANK_TRANSFER: "Bank transfer",
@@ -247,6 +249,26 @@ export default async function InvoicePage({
 
                         <StatusNote invoice={invoice} />
 
+                        {invoice.online ? (
+                            <PaymentsToRefund
+                                payments={invoice.online.payments}
+                                invoiceStatus={invoice.status}
+                            />
+                        ) : null}
+
+                        {open && invoice.online ? (
+                            <PayLink
+                                invoiceId={invoice.id}
+                                who={who.name}
+                                total={money(invoice.total)}
+                                providerConnected={
+                                    invoice.online.providerConnected
+                                }
+                                payLinkActive={invoice.online.payLinkActive}
+                                canWrite={canWrite}
+                            />
+                        ) : null}
+
                         {canWrite && open ? (
                             <VoidInvoice
                                 invoice={{
@@ -372,6 +394,8 @@ function StatusNote({ invoice }: { invoice: Invoice }) {
                 ) : null}
             </>
         );
+    } else if (invoice.payment?.method === "ONLINE") {
+        text = `${invoice.payment.note ?? "Paid online"} with the invoice's pay link. Saroh recorded it when the payment was confirmed.`;
     } else if (invoice.status === "PAID") {
         text = invoice.payment?.note
             ? `Recorded by hand: ${invoice.payment.note}`

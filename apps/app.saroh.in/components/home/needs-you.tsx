@@ -46,6 +46,7 @@ const ACTION_VERB: Record<string, string> = {
     COMMERCE_OPEN_ORDERS: "Fulfil orders",
     COMMERCE_SUGGEST_PRODUCT: "Add a product",
     INSIGHTS_VIEW: "View insights",
+    PAYMENTS_REFUNDS_OWED: "Refund",
 };
 
 function verbFor(action: HomeAction): string {

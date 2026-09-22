@@ -55,3 +55,9 @@ export async function recordPayment(id: string, input: PaymentInput) {
     if (res.ok) refresh(id);
     return res;
 }
+
+export async function createPayLink(id: string) {
+    const res = await api.createPayLink(id);
+    if (res.ok) refresh(id);
+    return res;
+}
