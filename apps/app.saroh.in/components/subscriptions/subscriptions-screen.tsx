@@ -18,6 +18,7 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { Label } from "@saroh/ui/label";
+import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
@@ -42,10 +43,10 @@ import {
 import {
     checkedLine,
     intervalWords,
-    latestInvoiceNote,
     nextLine,
-    owedLine,
     periodEndDay,
+    renewalsLate,
+    rowInvoice,
     standing,
 } from "@/lib/subscriptions/renewal";
 import type { Plan, Renewals, Subscription } from "@/lib/subscriptions/service";
@@ -122,7 +123,17 @@ export function SubscriptionsScreen({
     /** `?subscribe=1`, from the command menu. */
     openSubscribe?: boolean;
 }) {
+    const router = useRouter();
     const [subscribing, setSubscribing] = useState(Boolean(openSubscribe));
+
+    /** Drop `?subscribe=1` on close, so a refresh or Back doesn't reopen it. */
+    function onSubscribeOpenChange(open: boolean) {
+        setSubscribing(open);
+        if (open || !openSubscribe) return;
+        const url = new URL(window.location.href);
+        url.searchParams.delete("subscribe");
+        router.replace(url.pathname + url.search, { scroll: false });
+    }
     const [cancelling, setCancelling] = useState<Subscription | null>(null);
 
     const columns: DataColumn<Subscription>[] = [
@@ -173,28 +184,25 @@ export function SubscriptionsScreen({
         },
         {
             id: "invoice",
-            header: "Latest invoice",
+            header: "Invoice",
             priority: "detail",
             width: "210px",
             cell: (s) => {
-                const note = latestInvoiceNote(s);
-                const owed = owedLine(s);
-                return s.latestInvoice ? (
+                const inv = rowInvoice(s);
+                return inv ? (
                     <span className="min-w-0">
                         <Link
-                            href={`/invoices/${s.latestInvoice.id}`}
+                            href={`/invoices/${inv.id}`}
                             className={
                                 s.overdue
                                     ? "block font-mono text-[12.5px] text-destructive-subtle-foreground underline-offset-4 hover:underline"
                                     : "block font-mono text-[12.5px] underline-offset-4 hover:underline"
                             }
                         >
-                            {s.latestInvoice.number}
+                            {inv.number}
                         </Link>
                         <span className="block text-[11.5px] text-muted-foreground">
-                            {s.overdueCount >= 2 && owed
-                                ? `${owed} — pause or cancel?`
-                                : note}
+                            {inv.note}
                         </span>
                     </span>
                 ) : (
@@ -238,7 +246,12 @@ export function SubscriptionsScreen({
                 <p className="flex items-start gap-2 text-[12.5px] text-muted-foreground">
                     <span
                         aria-hidden
-                        className="mt-[7px] size-1.5 shrink-0 rounded-full bg-success"
+                        className={cn(
+                            "mt-[7px] size-1.5 shrink-0 rounded-full",
+                            renewalsLate(renewals)
+                                ? "bg-warning"
+                                : "bg-success",
+                        )}
                     />
                     {checkedLine(renewals)}
                 </p>
@@ -280,7 +293,7 @@ export function SubscriptionsScreen({
             {canWrite ? (
                 <SubscribeDialog
                     open={subscribing}
-                    onOpenChange={setSubscribing}
+                    onOpenChange={onSubscribeOpenChange}
                     contacts={contacts}
                     plans={plans}
                 />

@@ -34,6 +34,7 @@ jest.mock("@saroh/database", () => {
         organizationModule: { findFirst: jest.fn() },
         packRedemption: {
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+            findFirst: jest.fn().mockResolvedValue(null),
         },
     };
     return {
@@ -637,6 +638,29 @@ describe("BookingsService.rescheduleBooking", () => {
         expect(transaction.mock.calls[0][1]).toMatchObject({
             isolationLevel: "Serializable",
         });
+    });
+
+    it("refuses to move a pack-paid class past the pack's expiry", async () => {
+        wireReschedule();
+        const findPaid = (
+            prisma as unknown as {
+                packRedemption: { findFirst: jest.Mock };
+            }
+        ).packRedemption.findFirst;
+        findPaid.mockResolvedValueOnce({
+            purchase: { expiresAt: new Date(AT_10) },
+        });
+        await expect(
+            new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                startAt: AT_10,
+            }),
+        ).rejects.toThrow("expires before that time");
+        expect(findPaid).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { bookingId: "bk_1", reversedAt: null },
+            }),
+        );
+        expect(bookingUpdate).not.toHaveBeenCalled();
     });
 
     it("never rewrites the snapshot — it is the terms that were agreed", async () => {

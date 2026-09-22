@@ -706,6 +706,17 @@ export class BookingsService {
                             "That slot is fully booked",
                         );
                     }
+                    // A class paid with a pack is only paid while the pack
+                    // is good on the day (ADR-007): the same rule as spending.
+                    const paid = await tx.packRedemption.findFirst({
+                        where: { bookingId: booking.id, reversedAt: null },
+                        select: { purchase: { select: { expiresAt: true } } },
+                    });
+                    if (paid && paid.purchase.expiresAt <= startAt) {
+                        throw new ConflictException(
+                            "The class pack that paid for this booking expires before that time. Pick an earlier time, or take the pack off the booking first.",
+                        );
+                    }
 
                     const moved = await tx.booking.update({
                         where: { id: booking.id },

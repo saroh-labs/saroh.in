@@ -333,6 +333,25 @@ describe("the bill-to", () => {
     });
 });
 
+describe("who issued it", () => {
+    it("says a renewal was issued automatically, and a person's was not", () => {
+        const auto = serializeInvoice(
+            row({
+                status: "ISSUED",
+                source: "SUBSCRIPTION",
+                createdByUserId: null,
+            }) as never,
+            new Date(),
+        );
+        expect(auto.issuedAutomatically).toBe(true);
+        const byHand = serializeInvoice(
+            row({ status: "ISSUED", createdByUserId: "user_1" }) as never,
+            new Date(),
+        );
+        expect(byHand.issuedAutomatically).toBe(false);
+    });
+});
+
 describe("payments recorded by hand", () => {
     it("marks an issued invoice paid with the method and date", async () => {
         db.invoice.findFirst!.mockResolvedValue(row({ status: "ISSUED" }));

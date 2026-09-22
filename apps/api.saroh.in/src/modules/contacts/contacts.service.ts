@@ -7,6 +7,7 @@ import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { BookingEventType } from "../bookings/bookings.service";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { CreateContactDto, UpdateContactDto } from "./dto";
 
@@ -74,6 +75,19 @@ interface LastOrder {
  * 403) so a caller can't probe which contacts exist in another org, mirroring
  * `DomainsService.requireOwned`.
  */
+/** What deleting a contact took with it. */
+export interface ContactRemoval {
+    id: string;
+    deleted: true;
+    leads: number;
+    /** Active or paused subscriptions that stopped. */
+    subscriptions: number;
+    /** Unexpired class packs that went. */
+    packs: number;
+    /** Future bookings paid with those packs, now cancelled. */
+    bookingsCancelled: number;
+}
+
 @Injectable()
 export class ContactsService {
     /**
@@ -431,19 +445,66 @@ export class ContactsService {
      * each only loses the link (SetNull in the schema). A shop customer with
      * the same email is a separate record and is untouched.
      *
-     * Returns how many leads went, so the workspace can say so.
+     * What they hold goes too (ADR-007): their subscriptions stop and their
+     * class packs go with their balances. A future booking paid for with one
+     * of those packs is cancelled in the same transaction — it was paid with
+     * credit that no longer exists. Invoices stay, under the name and email
+     * they were issued to.
+     *
+     * Returns how much went, so the workspace can say so.
      */
     async remove(
         ctx: OrganizationContext,
         contactId: string,
-    ): Promise<{ id: string; deleted: true; leads: number }> {
+    ): Promise<ContactRemoval> {
         authorize(ctx, "contact:write");
         await this.requireOwned(ctx, contactId);
-        const [leads] = await prisma.$transaction([
-            prisma.lead.count({ where: { contactId } }),
-            prisma.contact.delete({ where: { id: contactId } }),
-        ]);
-        return { id: contactId, deleted: true, leads };
+        const now = new Date();
+        return prisma.$transaction(async (tx) => {
+            const leads = await tx.lead.count({ where: { contactId } });
+            const subscriptions = await tx.customerSubscription.count({
+                where: { contactId, status: { in: ["ACTIVE", "PAUSED"] } },
+            });
+            const packs = await tx.packPurchase.count({
+                where: { contactId, expiresAt: { gt: now } },
+            });
+            const paidWithPack = await tx.booking.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    status: "CONFIRMED",
+                    startAt: { gt: now },
+                    packRedemption: {
+                        reversedAt: null,
+                        purchase: { contactId },
+                    },
+                },
+                select: { id: true, startAt: true },
+            });
+            if (paidWithPack.length > 0) {
+                await tx.booking.updateMany({
+                    where: { id: { in: paidWithPack.map((b) => b.id) } },
+                    data: { status: "CANCELLED", cancelledAt: now },
+                });
+                await tx.bookingEvent.createMany({
+                    data: paidWithPack.map((b) => ({
+                        bookingId: b.id,
+                        organizationId: ctx.organizationId,
+                        type: BookingEventType.Cancelled,
+                        actorUserId: ctx.userId,
+                        fromStartAt: b.startAt,
+                    })),
+                });
+            }
+            await tx.contact.delete({ where: { id: contactId } });
+            return {
+                id: contactId,
+                deleted: true as const,
+                leads,
+                subscriptions,
+                packs,
+                bookingsCancelled: paidWithPack.length,
+            };
+        });
     }
 
     /**

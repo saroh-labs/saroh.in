@@ -7,6 +7,8 @@ import {
     latestInvoiceNote,
     nextLine,
     owedLine,
+    renewalsLate,
+    rowInvoice,
     standing,
 } from "./renewal";
 
@@ -24,6 +26,7 @@ const base = {
     unpaidTotal: "0.00",
     currency: "INR",
     latestInvoice: null,
+    oldestUnpaid: null,
 };
 
 describe("nextLine", () => {
@@ -214,6 +217,21 @@ describe("checkedLine", () => {
         );
     });
 
+    it("warns when no next check is scheduled long after the last", () => {
+        expect(
+            checkedLine(
+                {
+                    lastCheckedAt: "2026-09-24T05:00:00.000Z",
+                    nextCheckAt: null,
+                    issuedToday: 0,
+                },
+                NOW,
+            ),
+        ).toBe(
+            "Renewals last checked 5 hours ago. None went out today; the next check is late.",
+        );
+    });
+
     it("warns when the next check is overdue", () => {
         expect(
             checkedLine(
@@ -240,5 +258,106 @@ describe("intervalWords", () => {
             adj: "Quarterly",
             per: "a quarter",
         });
+    });
+});
+
+describe("renewalsLate", () => {
+    it("is on time while the next check is due", () => {
+        expect(
+            renewalsLate(
+                {
+                    lastCheckedAt: "2026-09-24T09:46:00.000Z",
+                    nextCheckAt: "2026-09-24T10:46:00.000Z",
+                    issuedToday: 0,
+                },
+                NOW,
+            ),
+        ).toBe(false);
+    });
+
+    it("is on time with no pending run just after a check, while one runs", () => {
+        expect(
+            renewalsLate(
+                {
+                    lastCheckedAt: new Date(
+                        NOW.getTime() - 60_000,
+                    ).toISOString(),
+                    nextCheckAt: null,
+                    issuedToday: 0,
+                },
+                NOW,
+            ),
+        ).toBe(false);
+    });
+
+    it("is late when never checked", () => {
+        expect(
+            renewalsLate(
+                { lastCheckedAt: null, nextCheckAt: null, issuedToday: 0 },
+                NOW,
+            ),
+        ).toBe(true);
+    });
+});
+
+describe("rowInvoice", () => {
+    const latest = {
+        id: "i_latest",
+        number: "INV-0050",
+        status: "ISSUED" as const,
+        dueAt: "2026-09-30T00:00:00.000Z",
+        paidAt: null,
+    };
+    const oldest = {
+        id: "i_old",
+        number: "INV-0042",
+        dueAt: "2026-09-08T00:00:00.000Z",
+    };
+
+    it("points at the oldest unpaid invoice while one is overdue", () => {
+        expect(
+            rowInvoice(
+                {
+                    ...base,
+                    overdue: true,
+                    overdueCount: 1,
+                    unpaidCount: 2,
+                    unpaidTotal: "2400.00",
+                    oldestUnpaid: oldest,
+                    latestInvoice: latest,
+                },
+                NOW,
+            ),
+        ).toEqual({
+            id: "i_old",
+            number: "INV-0042",
+            note: "16 days past due",
+        });
+    });
+
+    it("asks about pausing once two are overdue", () => {
+        expect(
+            rowInvoice(
+                {
+                    ...base,
+                    overdue: true,
+                    overdueCount: 2,
+                    unpaidCount: 2,
+                    unpaidTotal: "2400.00",
+                    oldestUnpaid: oldest,
+                    latestInvoice: latest,
+                },
+                NOW,
+            )?.note,
+        ).toBe("2 invoices overdue · ₹2,400.00 — pause or cancel?");
+    });
+
+    it("points at the latest when nothing is overdue", () => {
+        expect(
+            rowInvoice(
+                { ...base, oldestUnpaid: oldest, latestInvoice: latest },
+                NOW,
+            ),
+        ).toEqual({ id: "i_latest", number: "INV-0050", note: "Due 30 Sept" });
     });
 });

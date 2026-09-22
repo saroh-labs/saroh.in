@@ -268,6 +268,50 @@ describe("using a pack on a booking already made", () => {
         ]);
         tx.packRedemption!.count!.mockResolvedValue(3);
         tx.packRedemption!.findUnique!.mockResolvedValue(null);
+        // The booking lock, then each pack lock.
+        tx.$queryRaw.mockResolvedValue([{ status: "CONFIRMED" }]);
+    });
+
+    it("spends in a serializable transaction, under a lock on the booking", async () => {
+        await service.useOnBooking(owner, "bk_1", {});
+        expect(db.$transaction.mock.calls[0]![1]).toMatchObject({
+            isolationLevel: "Serializable",
+        });
+        expect(String(tx.$queryRaw.mock.calls[0]![0])).toContain(
+            'FROM "Booking"',
+        );
+    });
+
+    it("refuses a booking cancelled while it was being paid", async () => {
+        tx.$queryRaw.mockResolvedValueOnce([{ status: "CANCELLED" }]);
+        await expect(service.useOnBooking(owner, "bk_1", {})).rejects.toThrow(
+            "Only a confirmed booking can be paid with a class pack.",
+        );
+        expect(tx.packRedemption!.create).not.toHaveBeenCalled();
+    });
+
+    it("tries a lost race once more, so the answer is what is true now", async () => {
+        db.$transaction!.mockRejectedValueOnce(
+            Object.assign(new Error("race"), { code: "P2034" }),
+        );
+        await expect(
+            service.useOnBooking(owner, "bk_1", {}),
+        ).resolves.toBeDefined();
+        expect(db.$transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+        ["lost the race twice", ["P2034", "P2034"]],
+        ["another pack went on at once", ["P2002"]],
+    ])("answers %s with a 409, not a 500", async (_label, codes) => {
+        for (const code of codes) {
+            db.$transaction!.mockRejectedValueOnce(
+                Object.assign(new Error("race"), { code }),
+            );
+        }
+        await expect(
+            service.useOnBooking(owner, "bk_1", {}),
+        ).rejects.toBeInstanceOf(ConflictException);
     });
 
     it("spends a class of the booker's own pack for that service and date", async () => {
@@ -348,6 +392,43 @@ describe("using a pack on a booking already made", () => {
     });
 });
 
+describe("taking a pack off a booking", () => {
+    beforeEach(() => {
+        db.booking!.findFirst!.mockResolvedValue({ id: "bk_1" });
+    });
+
+    it("gives the class back, looking the booking up in this business only", async () => {
+        tx.packRedemption!.updateMany!.mockResolvedValue({ count: 1 });
+        await expect(service.removeFromBooking(owner, "bk_1")).resolves.toEqual(
+            { bookingId: "bk_1", returned: true },
+        );
+        expect(db.booking!.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: "bk_1", organizationId: "org_1" },
+            }),
+        );
+        expect(tx.packRedemption!.updateMany).toHaveBeenCalledWith({
+            where: { bookingId: "bk_1", reversedAt: null },
+            data: { reversedAt: expect.any(Date) },
+        });
+    });
+
+    it("says nothing came back when no pack paid for it", async () => {
+        tx.packRedemption!.updateMany!.mockResolvedValue({ count: 0 });
+        await expect(service.removeFromBooking(owner, "bk_1")).resolves.toEqual(
+            { bookingId: "bk_1", returned: false },
+        );
+    });
+
+    it("is a 404 for another business's booking", async () => {
+        db.booking!.findFirst!.mockResolvedValue(null);
+        await expect(
+            service.removeFromBooking(owner, "bk_other"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(db.$transaction).not.toHaveBeenCalled();
+    });
+});
+
 describe("who may", () => {
     it("refuses a Member every read and write", async () => {
         await expect(service.listPacks(member, {})).rejects.toBeInstanceOf(
@@ -361,6 +442,9 @@ describe("who may", () => {
         ).rejects.toBeInstanceOf(ForbiddenException);
         await expect(
             service.useOnBooking(member, "bk_1", {}),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(
+            service.removeFromBooking(member, "bk_1"),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(db.$transaction).not.toHaveBeenCalled();
     });

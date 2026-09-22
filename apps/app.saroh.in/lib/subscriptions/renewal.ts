@@ -24,6 +24,7 @@ type Sub = Pick<
     | "unpaidTotal"
     | "currency"
     | "latestInvoice"
+    | "oldestUnpaid"
 >;
 
 export type Standing = "ACTIVE" | "OVERDUE" | "PAUSED" | "CANCELLED";
@@ -100,6 +101,43 @@ export function latestInvoiceNote(
     const late = Math.floor((now.getTime() - Date.parse(inv.dueAt)) / DAY);
     if (late > 0) return `${late} ${late === 1 ? "day" : "days"} past due`;
     return `Due ${day(inv.dueAt, sub.timezone)}`;
+}
+
+/**
+ * The invoice a row points at: the oldest unpaid one while anything is
+ * overdue — the one to chase first — and otherwise the latest.
+ */
+export function rowInvoice(
+    sub: Sub,
+    now: Date = new Date(),
+): { id: string; number: string | null; note: string | null } | null {
+    const chase = sub.overdue ? sub.oldestUnpaid : null;
+    if (chase) {
+        const owed = owedLine(sub);
+        const { id, number } = chase;
+        if (sub.overdueCount >= 2 && owed) {
+            return { id, number, note: `${owed} — pause or cancel?` };
+        }
+        const late = chase.dueAt
+            ? Math.floor((now.getTime() - Date.parse(chase.dueAt)) / DAY)
+            : 0;
+        return {
+            id,
+            number,
+            note:
+                late > 0
+                    ? `${late} ${late === 1 ? "day" : "days"} past due`
+                    : "Past due",
+        };
+    }
+    const latest = sub.latestInvoice;
+    return latest
+        ? {
+              id: latest.id,
+              number: latest.number,
+              note: latestInvoiceNote(sub, now),
+          }
+        : null;
 }
 
 // — What a start date means ——————————————————————————————————————
@@ -192,6 +230,17 @@ function ago(ms: number): string {
 }
 
 /**
+ * Whether renewals are behind: never checked, or the next check is more than
+ * five minutes overdue. No pending run is only normal while one is running,
+ * just after the last check; any later it means the chain has stopped.
+ */
+export function renewalsLate(r: Renewals, now: Date = new Date()): boolean {
+    if (!r.lastCheckedAt) return true;
+    const dueBy = Date.parse(r.nextCheckAt ?? r.lastCheckedAt);
+    return dueBy + 5 * 60_000 < now.getTime();
+}
+
+/**
  * The line over the list. There is no scheduler behind renewals, so the
  * screen says when they were last checked — silence would read the same as
  * a stopped job.
@@ -205,9 +254,8 @@ export function checkedLine(r: Renewals, now: Date = new Date()): string {
         r.issuedToday === 0
             ? "None went out today"
             : `${r.issuedToday} ${r.issuedToday === 1 ? "invoice" : "invoices"} went out today`;
-    const next =
-        r.nextCheckAt && Date.parse(r.nextCheckAt) + 5 * 60_000 < now.getTime()
-            ? "the next check is late"
-            : "the next check is within the hour";
+    const next = renewalsLate(r, now)
+        ? "the next check is late"
+        : "the next check is within the hour";
     return `${last} ${went}; ${next}.`;
 }

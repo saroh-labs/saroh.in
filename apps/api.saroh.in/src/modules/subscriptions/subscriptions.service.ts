@@ -11,6 +11,7 @@ import { DateTime, IANAZone } from "luxon";
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoicesService } from "../invoices/invoices.service";
+import { assertPaymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { authorize } from "../organizations/organization-policy";
@@ -351,6 +352,7 @@ export class SubscriptionsService {
         const price = toMoneyString(plan.price);
 
         const id = await prisma.$transaction(async (tx) => {
+            await assertPaymentsOn(tx, organizationId, "subscribe people");
             const created = await tx.customerSubscription.create({
                 data: {
                     organizationId,
@@ -454,6 +456,26 @@ export class SubscriptionsService {
                 return;
             }
 
+            // Set to end with that period: it has ended, and nothing more
+            // is billed.
+            if (sub.cancelAtPeriodEnd) {
+                await tx.customerSubscription.update({
+                    where: { id },
+                    data: {
+                        status: "CANCELLED",
+                        pausedAt: null,
+                        cancelledAt: sub.currentPeriodEnd,
+                        cancelAtPeriodEnd: false,
+                    },
+                });
+                return;
+            }
+
+            await assertPaymentsOn(
+                tx,
+                ctx.organizationId,
+                "restart a subscription past its paid period",
+            );
             const anchor = DateTime.fromJSDate(now, { zone: sub.timezone })
                 .startOf("day")
                 .toJSDate();
@@ -599,7 +621,13 @@ export class SubscriptionsService {
                 where: { id },
                 select: SUBSCRIPTION_SELECT,
             });
-            if (sub?.status !== "ACTIVE" || sub.currentPeriodEnd > now) {
+            // A paused subscription only ends — when it was set to.
+            const ends = sub?.status === "PAUSED" && sub.cancelAtPeriodEnd;
+            if (
+                !sub ||
+                (sub.status !== "ACTIVE" && !ends) ||
+                sub.currentPeriodEnd > now
+            ) {
                 return "skipped";
             }
             if (sub.cancelAtPeriodEnd) {
@@ -607,6 +635,7 @@ export class SubscriptionsService {
                     where: { id },
                     data: {
                         status: "CANCELLED",
+                        pausedAt: null,
                         cancelledAt: sub.currentPeriodEnd,
                         cancelAtPeriodEnd: false,
                     },
