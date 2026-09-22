@@ -1407,6 +1407,45 @@ describe("class packs on bookings (ADR-007)", () => {
         expect(transaction).toHaveBeenCalledTimes(1);
     });
 
+    it("says only that something changed when a race is lost while paying with a pack", async () => {
+        wireBookHappyPath();
+        contactFindUnique.mockResolvedValue({
+            id: "contact_9",
+            organizationId: "org_SVC",
+            email: "priya@example.com",
+            firstName: "Priya",
+            lastName: "Raman",
+            phone: null,
+        });
+        transaction.mockRejectedValueOnce({ code: "P2034" });
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                contactId: "contact_9",
+                useClassPack: true,
+            }),
+        ).rejects.toThrow("That changed while you were booking. Try again.");
+    });
+
+    it("says the slot is full when a race is lost without a pack", async () => {
+        wireBookHappyPath();
+        contactFindUnique.mockResolvedValue({
+            id: "contact_9",
+            organizationId: "org_SVC",
+            email: "priya@example.com",
+            firstName: "Priya",
+            lastName: "Raman",
+            phone: null,
+        });
+        transaction.mockRejectedValueOnce({ code: "P2034" });
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                contactId: "contact_9",
+            }),
+        ).rejects.toThrow("This slot is fully booked");
+    });
+
     it("needs the pack power as well as the booking power to book with a pack", async () => {
         // A role the business invented: it may book people in, not spend
         // their prepaid classes.

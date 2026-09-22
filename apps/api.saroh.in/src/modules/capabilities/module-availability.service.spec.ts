@@ -85,6 +85,7 @@ describe("ModuleAvailabilityService", () => {
         const r = await service.evaluate(base);
         expect(r.readiness).toBe("SETUP_REQUIRED");
         expect(r.blockers.map((b) => b.code)).toEqual(["CRM_NO_PIPELINE"]);
+        expect(r.gatesPassed).toBe(true);
     });
 
     it("blocks UNAUTHORIZED first and never queries readiness", async () => {
@@ -97,6 +98,7 @@ describe("ModuleAvailabilityService", () => {
         expect(r.authorized).toBe(false);
         expect(r.readiness).toBe("DISABLED");
         expect(r.blockers[0].code).toBe("UNAUTHORIZED");
+        expect(r.gatesPassed).toBe(false);
         expect(readiness.evaluate).not.toHaveBeenCalled();
     });
 

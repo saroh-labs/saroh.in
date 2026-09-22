@@ -18,19 +18,6 @@ import {
 } from "./require-module.decorator";
 
 /**
- * The blockers that say the actor may not use the module at all — as opposed
- * to readiness blockers, which say its setup is unfinished. The order and the
- * codes are `ModuleAvailabilityService.evaluate`'s.
- */
-const GATE_BLOCKER_CODES: ReadonlySet<string> = new Set([
-    "UNAUTHORIZED",
-    "ROLLOUT_DISABLED",
-    "ORG_MODULE_DISABLED",
-    "PROJECT_MODULE_UNSELECTED",
-    "ENTITLEMENT_REQUIRED",
-]);
-
-/**
  * True when API module enforcement is switched on for this environment. Read
  * live from the environment (not the frozen typed `env`) so it is a genuine
  * runtime kill-switch — the same pattern as `RLS_ENFORCEMENT` — togglable
@@ -109,11 +96,11 @@ export class ModuleEnforcementGuard implements CanActivate {
                 IGNORE_MODULE_READINESS_KEY,
                 [context.getHandler(), context.getClass()],
             ) === true;
-        const blockers = ignoreReadiness
-            ? availability.blockers.filter((b) =>
-                  GATE_BLOCKER_CODES.has(b.code),
-              )
-            : availability.blockers;
+        // A route that works before setup is finished passes once every gate
+        // has — decided by availability, so a gate added there later still
+        // shuts it rather than being mistaken for readiness.
+        if (ignoreReadiness && availability.gatesPassed) return true;
+        const blockers = availability.blockers;
         if (blockers.length === 0) return true;
 
         // Preserve the no-existence-leak policy: an unauthorized actor gets 404,

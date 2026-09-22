@@ -531,6 +531,21 @@ describe("who may", () => {
         expect(db.invoice.findFirst).not.toHaveBeenCalled();
     });
 
+    it("refuses a Member every change to an invoice already made", async () => {
+        const attempts = [
+            service.updateDraft(member, "inv_1", {} as InvoiceInputDto),
+            service.deleteDraft(member, "inv_1"),
+            service.voidInvoice(member, "inv_1", { reason: "Wrong amount" }),
+            service.reissue(member, "inv_1", { reason: "Wrong amount" }),
+            service.recordPayment(member, "inv_1", { method: "CASH" }),
+        ];
+        for (const attempt of attempts) {
+            await expect(attempt).rejects.toBeInstanceOf(ForbiddenException);
+        }
+        expect(db.invoice.findFirst).not.toHaveBeenCalled();
+        expect(db.$transaction).not.toHaveBeenCalled();
+    });
+
     it("answers another business's invoice with a 404", async () => {
         db.invoice.findFirst!.mockResolvedValue(null);
         await expect(service.get(owner, "inv_other")).rejects.toBeInstanceOf(
