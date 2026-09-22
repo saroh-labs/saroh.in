@@ -2,157 +2,102 @@
    WORKSPACE MOTION — app.saroh.in
    =============================================================================
 
-   Deliberately quieter than accounts.saroh.in.
+   The brand's motion rules (brand file §16, 2026-09-19), applied to the
+   classes the workspace already uses: quick, and never bouncy. A shop owner
+   performs these actions dozens of times a day and anything springy grates by
+   the fortieth repeat.
 
-   accounts is chrome a merchant passes through once or twice: it can afford a
-   drifting aurora and a 620ms entrance because nobody sees it twice in a
-   minute. This app is where the same person spends their working day, opening
-   Leads for the fortieth time. Motion that delights on visit one is a tax by
-   visit forty, so everything here is SHORTER (220–320ms vs 620–760ms), moves
-   LESS (6–8px vs 14–20px), and never loops. Nothing on this page breathes,
-   drifts, or glows continuously.
+   - One curve: `--ease-out`. Nothing overshoots, so both springs are gone.
+   - Durations from the tokens: 100ms under the finger (`--duration-fast`),
+     140ms by default (`--duration-base`), 200ms only for drawers and sheets.
+   - Travel is 6–8px and never more than 24px.
+   - Never position and size at once. Hover and press are colour steps now,
+     not lifts and shrinks — hover moves one ramp step and pressed two.
+   - Nothing loops.
 
-   Three constraints this file has that the auth sheet does not:
-
-   1. LIGHT AND DARK. accounts pins `dark`; this app defaults to light with
-      `enableSystem`. Every value below is a token or an alpha of one — no
-      literal colours, or the light register breaks.
-   2. THREE SKINS. `data-skin` (panel / instrument / stockroom) re-points the
-      same tokens, so styling against tokens is what keeps all three working
-      without a per-skin branch.
-   3. `--highlight` IS BUDGETED at one element per view (see the skin notes in
-      @saroh/ui/globals.css). Nothing here spends it. Selection and active
-      states use `--brand`, which is the interactive token.
-
-   Reduced motion is already clamped suite-wide in @saroh/ui/globals.css, and
-   every rule below is written so its RESTING state is the correct one.
+   Every value is a token, so light, dark and the (hidden) legacy skins all
+   work without a branch. Reduced motion is clamped suite-wide in
+   @saroh/ui/globals.css, and every rule below is written so its RESTING state
+   is the correct one.
    ========================================================================== */
 
-:root {
-    --wk-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --wk-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-}
-
 /* ─── Route entrance ─────────────────────────────────────────────────────────
-   Driven by `(shell)/template.tsx`, which Next remounts on every navigation.
-   Short and small on purpose: this fires on EVERY page change, so anything
-   longer than ~300ms turns routine navigation into waiting.
-   ─── */
+   Driven by `(shell)/template.tsx`, which Next remounts on every navigation,
+   so it is the shortest entrance in the product: routine navigation must never
+   turn into waiting. */
 
 .wk-route {
-    animation: wk-route 260ms var(--wk-out);
+    animation: wk-rise var(--duration-base) var(--ease-out);
 }
 
-@keyframes wk-route {
+@keyframes wk-rise {
     from {
         opacity: 0;
         transform: translate3d(0, 6px, 0);
     }
-    to {
-        opacity: 1;
-        transform: translate3d(0, 0, 0);
-    }
 }
 
-/* ─── Staggered lists ────────────────────────────────────────────────────────
-   For collections that arrive together — action cards, module options, stat
-   tiles. `--wk-i` is the item index; the cap keeps a 40-row list from making
-   the last row wait two seconds.
-   ─── */
+/* ─── Lists that arrive together ─────────────────────────────────────────────
+   Action cards, module options, stat tiles. `--wk-i` is the item index. The
+   step is 20ms and the cap six items, so the last one lands 120ms behind the
+   first — the list reads as arriving together, and no row waits. */
 
 .wk-item {
-    animation: wk-item 280ms var(--wk-out) backwards;
-    animation-delay: calc(min(var(--wk-i, 0), 12) * 40ms);
-}
-
-@keyframes wk-item {
-    from {
-        opacity: 0;
-        transform: translate3d(0, 8px, 0);
-    }
-    to {
-        opacity: 1;
-        transform: translate3d(0, 0, 0);
-    }
+    animation: wk-rise var(--duration-base) var(--ease-out) backwards;
+    animation-delay: calc(min(var(--wk-i, 0), 6) * 20ms);
 }
 
 /* ─── Interactive surfaces ───────────────────────────────────────────────────
-   A card that can be clicked should say so before it is hovered, and lift when
-   it is. Shadow uses --shadow-color, which each skin sets to its own near-black
-   rather than a generic grey.
-   ─── */
+   A card that can be clicked says so on hover with one step of its edge, from
+   `--border` to `--border-strong`. It no longer lifts: a card that rises and
+   gains a shadow is animating position and depth at once, which the motion
+   rules forbid, and a surface people open forty times a day should not move. */
 
 .wk-surface {
-    transition:
-        transform 200ms var(--wk-out),
-        box-shadow 200ms var(--wk-out),
-        border-color 200ms ease;
+    transition-property: border-color, background-color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
 }
 
 .wk-surface:hover {
-    transform: translateY(-2px);
-    /* Hover darkens the LINE rather than tinting it. A blue edge on hover would
-       put the link colour on something that is a surface, not a link. */
-    border-color: hsl(var(--foreground) / 0.24);
-    box-shadow: 0 10px 24px -14px hsl(var(--shadow-color) / 0.28);
+    border-color: hsl(var(--border-strong));
 }
 
-/* Press feedback for buttons and any control that commits something. */
+/* Press feedback for controls that commit something. The Button primitive
+   already steps its colour on press; this keeps any other control on the same
+   timing, and no longer shrinks it. */
 .wk-press {
-    transition:
-        transform 130ms var(--wk-spring),
-        background-color 160ms ease,
-        border-color 160ms ease;
-}
-
-.wk-press:active:not(:disabled) {
-    transform: scale(0.98);
+    transition-property: color, background-color, border-color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
 }
 
 /* ─── Selection ──────────────────────────────────────────────────────────────
-   The onboarding capability cards. Selecting one is the single most consequential
-   click in the funnel, so it gets a visible commit: the card settles with a
-   small overshoot and its border takes the brand colour.
-   ─── */
+   The onboarding capability cards. Chosen reads as a doubled edge in Ink —
+   the border plus a 1px ring. Several can be chosen at once, and Saffron is
+   one active state per screen, so the accent stays out of it. */
 
 .wk-choice {
-    transition:
-        border-color 180ms ease,
-        background-color 180ms ease,
-        box-shadow 200ms ease,
-        transform 180ms var(--wk-spring);
+    transition-property: border-color, background-color, box-shadow;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
 }
 
 .wk-choice:hover {
-    transform: translateY(-1px);
+    border-color: hsl(var(--border-strong));
 }
 
-/* Selection reads as a doubled edge — the border plus a 1px ring in the page's
-   own ink. In a monochrome register that is what "chosen" looks like; a tinted
-   fill would be the only colour on the page and would shout. */
 .wk-choice[data-selected="true"] {
-    box-shadow: 0 0 0 1px hsl(var(--foreground) / 0.55);
-    animation: wk-choose 260ms var(--wk-spring);
-}
-
-@keyframes wk-choose {
-    0% {
-        transform: scale(1);
-    }
-    40% {
-        transform: scale(1.012);
-    }
-    100% {
-        transform: scale(1);
-    }
+    border-color: hsl(var(--foreground));
+    box-shadow: 0 0 0 1px hsl(var(--foreground));
 }
 
 /* ─── Navigation ─────────────────────────────────────────────────────────────
-   The active rail item grows a brand bar on its leading edge. It scales from
-   the centre out rather than fading, so moving between pages reads as the
-   marker TRAVELLING down the rail instead of one row blinking off and another
-   blinking on.
-   ─── */
+   The current page carries the 2px Saffron marker (brand file §13): a short
+   bar standing in the rail's gutter, detached from the row, vertically centred
+   and shorter than it. It is the invariant — it marks the current page in
+   every sidebar state, whatever surface sits behind the row. It grows from
+   the centre, so moving between pages reads as the marker travelling. */
 
 .wk-nav {
     position: relative;
@@ -161,21 +106,25 @@
 .wk-nav::before {
     content: "";
     position: absolute;
-    left: -0.375rem;
+    left: -6px;
     top: 50%;
-    height: 1.125rem;
+    height: 17px;
     width: 2px;
     border-radius: 1px;
-    /* `--foreground`, not `--brand`: in the monochrome register the blue is
-       reserved for things you click THROUGH (links), and the active-page marker
-       is a statement about where you are, not a link. */
-    background: hsl(var(--foreground));
+    background: hsl(var(--highlight));
     transform: translateY(-50%) scaleY(0);
-    transition: transform 220ms var(--wk-spring);
+    transition: transform var(--duration-base) var(--ease-out);
 }
 
 .wk-nav[aria-current="page"]::before {
     transform: translateY(-50%) scaleY(1);
+}
+
+/* A nested row's marker stands ON the rail's guide line (the children's
+   `border-left`), one step further out and a little shorter. */
+.wk-nav-child::before {
+    left: -11px;
+    height: 15px;
 }
 
 /* ---------------------------------------------------------------------------

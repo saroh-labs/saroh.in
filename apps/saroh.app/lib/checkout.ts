@@ -1,5 +1,17 @@
 import { env } from "@/env";
 
+import type { CheckoutIntent, CheckoutReceipt } from "./checkout-shape";
+import { isIntent, isReceipt } from "./checkout-shape";
+
+// Re-exported for the checkout view. Imported first so the names are bound
+// here too: `export type { X } from` alone would not bind them locally.
+export type {
+    CheckoutIntent,
+    CheckoutReceipt,
+    CheckoutStorefront,
+    ReceiptPaymentStatus,
+} from "./checkout-shape";
+
 /**
  * PUBLIC checkout client helpers (S5-004). These hit the guardless checkout
  * surface on api.saroh.in from the buyer's browser:
@@ -19,49 +31,20 @@ import { env } from "@/env";
 
 const API_URL = env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
 
-export type ReceiptPaymentStatus = "UNPAID" | "PAID" | "FAILED" | "REFUNDED";
-
-/** The buyer-safe receipt returned by the public receipt endpoint. */
-export interface CheckoutReceipt {
-    orderNumber: string;
-    currency: string;
-    subtotal: string;
-    tax: string;
-    shipping: string;
-    discount: string;
-    total: string;
-    paymentStatus: ReceiptPaymentStatus;
-    fulfilmentStatus: string;
-    latestPayment: {
-        provider: string;
-        status: string;
-        amountCents: number;
-        currency: string;
-    } | null;
-}
-
-/** The non-secret handoff returned by the public create-intent endpoint. */
-export interface CheckoutIntent {
-    paymentIntentId: string;
-    provider: string;
-    providerIntentId: string;
-    amountCents: number;
-    currency: string;
-    publicKey: string | null;
-    clientParams: Record<string, unknown>;
-}
-
 /** Discriminated result so the UI can surface a message inline. */
 export type CheckoutResult<T> =
-    | { ok: true; data: T }
-    | { ok: false; error: string };
+    { ok: true; data: T } | { ok: false; error: string };
 
-async function readError(res: Response, fallback: string): Promise<string> {
-    const body = (await res.json().catch(() => null)) as {
-        message?: string;
-    } | null;
-    return body?.message ?? fallback;
-}
+/*
+ * No API error text reaches the buyer, on purpose. The public checkout
+ * endpoints' messages are written for the MERCHANT and can describe their
+ * setup ("Stored provider credentials are malformed", "Multiple providers
+ * connected — specify which provider to use"). A `readError` here used to
+ * try to show them and only failed because it read `body.message` while the
+ * API sends `{ error: { message } }` (review of #322). Reading the right
+ * field would have leaked those lines to buyers, so each failure gets the
+ * page's own sentence instead.
+ */
 
 /** Fetch the buyer-safe receipt for `orderId`. */
 export async function fetchReceipt(
@@ -73,14 +56,17 @@ export async function fetchReceipt(
             { headers: { "content-type": "application/json" } },
         );
         if (res.ok) {
-            return { ok: true, data: (await res.json()) as CheckoutReceipt };
+            const body: unknown = await res.json().catch(() => null);
+            return isReceipt(body)
+                ? { ok: true, data: body }
+                : { ok: false, error: "Couldn't load this order." };
         }
         if (res.status === 404) {
             return { ok: false, error: "We couldn't find this order." };
         }
         return {
             ok: false,
-            error: await readError(res, "Couldn't load this order."),
+            error: "Couldn't load this order.",
         };
     } catch {
         return {
@@ -112,14 +98,17 @@ export async function createPaymentIntent(
             },
         );
         if (res.ok) {
-            return { ok: true, data: (await res.json()) as CheckoutIntent };
+            const body: unknown = await res.json().catch(() => null);
+            return isIntent(body)
+                ? { ok: true, data: body }
+                : {
+                      ok: false,
+                      error: "We couldn't start the payment — please try again.",
+                  };
         }
         return {
             ok: false,
-            error: await readError(
-                res,
-                "We couldn't start the payment — please try again.",
-            ),
+            error: "We couldn't start the payment — please try again.",
         };
     } catch {
         return {

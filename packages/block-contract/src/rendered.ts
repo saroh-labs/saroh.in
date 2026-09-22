@@ -207,6 +207,64 @@ const renderedFeatures = z.object({
 });
 
 /**
+ * `faq`, `testimonials` and `contact`, as published (#255). Text only — nothing
+ * resolves at publish. Looser than the authoring schemas for the same reason
+ * `features` is: a snapshot is immutable and may outlive today's bounds.
+ */
+const renderedFaq = z.object({
+    variant,
+    padding,
+    heading: z.string().optional(),
+    intro: z.string().optional(),
+    items: z
+        .array(z.object({ question: z.string(), answer: z.string() }))
+        .min(1),
+});
+
+const renderedTestimonials = z.object({
+    variant,
+    padding,
+    heading: z.string().optional(),
+    items: z
+        .array(
+            z.object({
+                quote: z.string(),
+                name: z.string(),
+                role: z.string().optional(),
+            }),
+        )
+        .min(1),
+});
+
+/**
+ * The renderer builds contact links itself, and re-checks `mapUrl` rather than
+ * trusting that the snapshot was written by today's contract.
+ */
+const renderedContact = z.object({
+    variant,
+    padding,
+    heading: z.string().optional(),
+    intro: z.string().optional(),
+    address: z.string().optional(),
+    hours: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().optional(),
+    whatsapp: z.string().optional(),
+    mapUrl: z.string().optional(),
+});
+
+/** `servicesList`, as published: the button's href resolved, nothing else. */
+const renderedServicesList = z.object({
+    variant,
+    padding,
+    heading: z.string().optional(),
+    intro: z.string().optional(),
+    serviceIds: z.array(z.string()),
+    showPrices: z.boolean().optional(),
+    cta: renderedCtaSchema.optional(),
+});
+
+/**
  * The rendered schema for every block type.
  *
  * `Record<SectionType, …>` on purpose: a block type added to `SECTION_TYPES`
@@ -228,6 +286,10 @@ export const RENDERED_SCHEMAS = {
     enquiry: renderedEnquiry,
     booking: renderedBooking,
     features: renderedFeatures,
+    faq: renderedFaq,
+    testimonials: renderedTestimonials,
+    contact: renderedContact,
+    servicesList: renderedServicesList,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -241,6 +303,10 @@ export type RenderedGallery = RenderedContent<"gallery">;
 export type RenderedEnquiry = RenderedContent<"enquiry">;
 export type RenderedBooking = RenderedContent<"booking">;
 export type RenderedFeatures = RenderedContent<"features">;
+export type RenderedFaq = RenderedContent<"faq">;
+export type RenderedTestimonials = RenderedContent<"testimonials">;
+export type RenderedContact = RenderedContent<"contact">;
+export type RenderedServicesList = RenderedContent<"servicesList">;
 
 /**
  * Validate rendered content for a block type.

@@ -1,5 +1,5 @@
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, mutate, orgBase } from "@/lib/api/http";
+import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * CRM Leads data access for app.saroh.in (S3-005). Org-scoped list / detail /
@@ -122,6 +122,13 @@ export function createLead(
 }
 
 /** Patch a lead's title / status / value. */
+/** Delete a lead for good; its timeline goes with it. */
+export function deleteLead(
+    leadId: string,
+): Promise<CrmResult<{ id: string; deleted: true }>> {
+    return destroy(`/leads/${leadId}`, "Could not delete the lead");
+}
+
 export function updateLead(
     leadId: string,
     input: UpdateLeadInput,
@@ -184,4 +191,25 @@ export function completeTask(
         {},
         "Could not complete the task",
     );
+}
+
+/** An open follow-up, as the business-wide worklist returns it. */
+export interface OpenTask {
+    id: string;
+    leadId: string;
+    body: string | null;
+    dueAt: string | null;
+    createdAt: string;
+}
+
+/**
+ * Every follow-up not yet done, soonest first — across all leads. Null when it
+ * cannot be read, so the tab can say so rather than claim there are none.
+ */
+export async function listOpenTasks(): Promise<OpenTask[] | null> {
+    const base = await orgBase();
+    if (!base) return [];
+    const res = await apiFetch(`${base}/tasks?open=true`);
+    if (!res.ok) return null;
+    return (await res.json()) as OpenTask[];
 }

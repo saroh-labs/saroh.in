@@ -1,23 +1,31 @@
 import type {
     RenderedBooking,
+    RenderedContact,
     RenderedCtaSection,
     RenderedEnquiry,
+    RenderedFaq,
     RenderedFeatures,
     RenderedGallery,
     RenderedHero,
     RenderedRichText,
+    RenderedServicesList,
+    RenderedTestimonials,
 } from "@saroh/block-contract";
 import { BLOCK_META, blockFixture } from "@saroh/block-contract";
 import { act, render } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import BookingSection from "./blocks/booking";
+import ContactSection from "./blocks/contact";
 import CtaSection from "./blocks/cta";
 import EnquirySection from "./blocks/enquiry";
+import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import RichTextSection from "./blocks/rich-text";
+import ServicesListSection from "./blocks/services-list";
+import TestimonialsSection from "./blocks/testimonials";
 
 /**
  * Gate G5 (#252) — what these blocks draw must not change.
@@ -200,6 +208,107 @@ describe("block rendering", () => {
         ).container.innerHTML;
         expect(grid).toContain("lg:grid-cols-3");
         expect(list).not.toContain("lg:grid-cols-3");
+    });
+
+    it("faq", () => {
+        const { container } = render(
+            <FaqSection
+                content={BLOCK_META.faq.fixtures.default as RenderedFaq}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    it("testimonials", () => {
+        const { container } = render(
+            <TestimonialsSection
+                content={
+                    BLOCK_META.testimonials.fixtures
+                        .default as RenderedTestimonials
+                }
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    it("contact", () => {
+        const { container } = render(
+            <ContactSection
+                content={BLOCK_META.contact.fixtures.default as RenderedContact}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    /*
+     * Contact builds its links rather than drawing authored hrefs. These are the
+     * ones a visitor taps, so they are asserted, not left to a snapshot.
+     */
+    it("builds the contact links a visitor taps", () => {
+        const { container } = render(
+            <ContactSection
+                content={BLOCK_META.contact.fixtures.default as RenderedContact}
+            />,
+        );
+        const hrefs = Array.from(container.querySelectorAll("a")).map((a) =>
+            a.getAttribute("href"),
+        );
+        expect(hrefs).toEqual([
+            "https://www.google.com/maps/search/?api=1&query=Unit%204%2C%20Riverside%20Trade%20Park%2C%20Leeds%20LS10%201AB",
+            "tel:+441134960000",
+            "mailto:hello@example.com",
+            "https://wa.me/447700900000",
+        ]);
+    });
+
+    it("keeps a map link that has no address beside it", () => {
+        const { container } = render(
+            <ContactSection
+                content={{
+                    phone: "+44 113 496 0000",
+                    mapUrl: "https://maps.example.com/?q=riverside",
+                }}
+            />,
+        );
+        const link = container.querySelector(
+            'a[href="https://maps.example.com/?q=riverside"]',
+        );
+        expect(link?.textContent).toBe("Open in maps");
+    });
+
+    it("draws no map link from an unsafe snapshot value", () => {
+        const { container } = render(
+            <ContactSection
+                content={{
+                    phone: "+44 113 496 0000",
+                    mapUrl: "javascript:alert(1)",
+                }}
+            />,
+        );
+        expect(container.innerHTML).not.toContain("javascript:");
+    });
+
+    // Sample services rather than a fetch: fixture ids belong to no Service.
+    it("servicesList", () => {
+        const { container } = render(
+            <ServicesListSection
+                content={
+                    BLOCK_META.servicesList.fixtures
+                        .default as RenderedServicesList
+                }
+                services={[
+                    {
+                        id: "fixture-cut",
+                        name: "Cut and finish",
+                        description: "Wash, cut and blow-dry.",
+                        durationMinutes: 45,
+                        priceCents: 3800,
+                        currency: "GBP",
+                    },
+                ]}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
     });
 
     /**

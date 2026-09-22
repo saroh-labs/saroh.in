@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { can } from "../organizations/organization-policy";
+import { allows } from "../organizations/organization-policy";
 
 /**
  * Cross-entity quick search for the command palette.
@@ -102,13 +102,13 @@ export class SearchService {
         // it must not become the one place where a role sees rows the list
         // screens would have refused it.
         const [contacts, leads, orders] = await Promise.all([
-            can(ctx.role, "contact:read")
+            allows(ctx, "contact:read")
                 ? this.contacts(ctx.organizationId, query)
                 : [],
-            can(ctx.role, "lead:read")
+            allows(ctx, "lead:read")
                 ? this.leads(ctx.organizationId, query)
                 : [],
-            can(ctx.role, "order:read")
+            allows(ctx, "order:read")
                 ? this.orders(ctx.organizationId, query)
                 : [],
         ]);
@@ -282,7 +282,7 @@ export class SearchService {
             id: row.id,
             title: row.orderId,
             subtitle: `${personName(row.customer)} · ${row.status.toLowerCase()}`,
-            href: `/stores/${row.storeId}/orders/${row.id}`,
+            href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
         }));
     }
 }

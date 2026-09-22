@@ -133,6 +133,9 @@ export default async function SiteEditorPage({
             initialPendingSiteChanges={draft?.pendingSiteChanges ?? null}
             initialSections={initialSections}
             siteName={site.name}
+            // The header and footer the canvas draws around the page (#336).
+            navigation={site.navigation}
+            footerPreview={site.footerPreview}
             initialStyle={site.style}
             styleOptions={site.styleOptions}
             address={site.subdomain ? `${site.subdomain}.${ROOT_DOMAIN}` : null}

@@ -45,19 +45,22 @@ async function asReviewer(browser: Browser): Promise<Page> {
     return page;
 }
 
-/** The seeded site's id, read from the owner's list. */
+/**
+ * The seeded site's id: Website sends the owner straight to the business's
+ * one site (ADR-006), so it is in the address.
+ */
 async function siteId(page: Page): Promise<string> {
     await page.goto(`${urls.APP_URL}/sites`);
-    const href = await page
-        .getByRole("main")
-        .getByRole("link", { name: REVIEWED_SITE })
-        .first()
-        .getAttribute("href");
-    const id = href?.split("/sites/")[1];
+    await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
+    await expect(page.getByRole("main")).toContainText(REVIEWED_SITE, {
+        timeout: 30_000,
+    });
+    const href = page.url();
+    const id = /\/sites\/([^/]+)\//.exec(href)?.[1];
     // Asserted rather than defaulted: an empty id would send every step below
     // to a different, wrong URL and fail somewhere that says nothing.
-    if (id === undefined || id === "") {
-        throw new Error(`no site id in the list link: ${href ?? "(no link)"}`);
+    if (id === undefined) {
+        throw new Error(`no site id in the address: ${href}`);
     }
     return id;
 }

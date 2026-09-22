@@ -146,14 +146,14 @@ function LedgerRow({ row, resembles }: { row: Row; resembles?: Row }) {
                         <span className="truncate font-medium">{row.who}</span>
                         <Badge
                             variant="outline"
-                            className="shrink-0 text-[0.625rem] uppercase tracking-wide"
+                            className="shrink-0 text-[11px] uppercase tracking-wide"
                         >
                             {row.kind === "order" ? "Sale" : "Appointment"}
                         </Badge>
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">
                         {row.what}{" "}
-                        <span className="text-foreground/70">
+                        <span className="text-muted-foreground">
                             · {row.detail}
                         </span>
                     </p>

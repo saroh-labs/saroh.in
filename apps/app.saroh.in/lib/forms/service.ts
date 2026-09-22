@@ -1,4 +1,11 @@
-import { apiFetch, getActiveOrgId, readError } from "@/lib/api/http";
+import {
+    apiFetch,
+    getActiveOrgId,
+    getJson,
+    getList,
+    orgBase,
+    readError,
+} from "@/lib/api/http";
 
 /**
  * Enquiry-Form data access for app.saroh.in (S3-004). An enquiry section in the
@@ -135,4 +142,53 @@ export async function ensureFormForSection(
     return input.formId
         ? patchForm(base, input.formId, input)
         : createForm(base, input);
+}
+
+// ---------------------------------------------------------------------------
+// Reading what came through (#385)
+// ---------------------------------------------------------------------------
+
+/** A form with how much has come through it, for the Forms tab. */
+export interface FormSummary extends Form {
+    siteId: string | null;
+    createdAt: string;
+    submissionCount: number;
+    /** `null` before the first entry. */
+    lastSubmissionAt: string | null;
+}
+
+/** One entry someone sent through a form. */
+export interface Submission {
+    id: string;
+    createdAt: string;
+    /** The raw values, keyed by the form's field names. */
+    data: Record<string, unknown>;
+    /** The contact it became; `null` once that contact is deleted. */
+    contact: { id: string; name: string; email: string } | null;
+    leadId: string | null;
+}
+
+/** The business's forms, each with its count. `form:read` (owner/admin). */
+export async function listForms(): Promise<FormSummary[]> {
+    const base = await orgBase();
+    if (!base) return [];
+    return getList<FormSummary>(`${base}/forms`);
+}
+
+/** One form, or `null` when it is not this business's. */
+export async function getForm(formId: string): Promise<FormSummary | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return getJson<FormSummary>(`${base}/forms/${encodeURIComponent(formId)}`);
+}
+
+/** The latest entries through a form, and how many there are in all. */
+export async function listSubmissions(
+    formId: string,
+): Promise<{ total: number; items: Submission[] } | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return getJson<{ total: number; items: Submission[] }>(
+        `${base}/forms/${encodeURIComponent(formId)}/submissions`,
+    );
 }

@@ -21,6 +21,10 @@ export const AuditAction = {
     ProjectAccessGrant: "project.access.grant",
     ProjectAccessRevoke: "project.access.revoke",
     SecretAccess: "secret.access",
+    ProductReviewInvite: "product-review.invite",
+    ProductReviewReply: "product-review.reply",
+    ProductReviewHide: "product-review.hide",
+    ProductReviewUnhide: "product-review.unhide",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

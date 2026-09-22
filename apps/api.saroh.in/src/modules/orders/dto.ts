@@ -7,6 +7,7 @@ import {
     IsOptional,
     IsString,
     Matches,
+    MaxLength,
     Min,
     ValidateNested,
 } from "class-validator";
@@ -81,6 +82,16 @@ export class CreateOrderDto {
     @IsString()
     @Matches(CURRENCY_RE, { message: "Currency must be a 3-letter code" })
     currency?: string;
+
+    /**
+     * A discount code. The API works out what it takes off; a client-sent
+     * amount is never trusted for it. Not allowed alongside `discount`.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(32)
+    discountCode?: string;
 }
 
 export class UpdateOrderDto {

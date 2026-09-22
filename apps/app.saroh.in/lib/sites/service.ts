@@ -111,6 +111,56 @@ export interface FeaturesContent {
     items: FeatureItem[];
 }
 
+/** One question in an FAQ section (mirror of the section contract). */
+export interface FaqItem {
+    question: string;
+    answer: string;
+}
+
+/** `faq` — questions and their answers. */
+export interface FaqContent {
+    heading?: string;
+    intro?: string;
+    items: FaqItem[];
+}
+
+/** One quote in a testimonials section (mirror of the section contract). */
+export interface TestimonialItem {
+    quote: string;
+    name: string;
+    role?: string;
+}
+
+/** `testimonials` — what customers said, under their names. */
+export interface TestimonialsContent {
+    heading?: string;
+    items: TestimonialItem[];
+}
+
+/** `contact` — where to find the business and how to reach it. */
+export interface ContactContent {
+    heading?: string;
+    intro?: string;
+    address?: string;
+    hours?: string;
+    phone?: string;
+    email?: string;
+    whatsapp?: string;
+    mapUrl?: string;
+}
+
+/**
+ * `servicesList` — which of the org's Services to show, in order. Their names
+ * and prices are read live by the site, not stored here.
+ */
+export interface ServicesListContent {
+    heading?: string;
+    intro?: string;
+    serviceIds: string[];
+    showPrices?: boolean;
+    cta?: CtaValue;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -161,6 +211,10 @@ export interface SectionContentByType {
     enquiry: EnquiryContent;
     booking: BookingContent;
     features: FeaturesContent;
+    faq: FaqContent;
+    testimonials: TestimonialsContent;
+    contact: ContactContent;
+    servicesList: ServicesListContent;
 }
 
 /**
@@ -342,6 +396,12 @@ export interface SiteDetail extends SiteSummary {
      * have written nothing, and nothing renders — see `parseSiteFooter`.
      */
     footer: SiteFooter | null;
+    /**
+     * The same footer, sanitized by the API the way publish does (#336) —
+     * the one the editor's canvas may render as markup. `footer` is for
+     * editing and is never rendered as HTML here.
+     */
+    footerPreview: SiteFooter | null;
     /** The site's menu (#206), by page id. Null until one is built. */
     navigation: SiteNavigation | null;
     /** When the site last went live; null if it has never been published. */

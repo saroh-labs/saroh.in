@@ -20,15 +20,23 @@
  * take the editor down with it.
  */
 
-/** Rail width bounds, in px. From the design spec's §7 measurements. */
+/**
+ * Block-list width bounds, in px. Generous at the top: a long page title or
+ * block name is worth room, and the canvas keeps a floor of its own.
+ */
 export const RAIL_MIN = 200;
-export const RAIL_MAX = 300;
-export const RAIL_DEFAULT = 200;
+export const RAIL_MAX = 400;
+export const RAIL_DEFAULT = 232;
 
-/** Field-panel width bounds, in px. Also §7. */
-export const PANEL_MIN = 240;
-export const PANEL_MAX = 400;
-export const PANEL_DEFAULT = 240;
+/**
+ * Inspector width bounds, in px. Wider than the old field panel: the inspector
+ * sits on the right now (#340) and carries Feedback as well as the fields, and
+ * a note thread at 240px wraps every other word.
+ */
+export const PANEL_MIN = 280;
+/** Wide enough for the rich-text toolbar on one row and a long note thread. */
+export const PANEL_MAX = 560;
+export const PANEL_DEFAULT = 320;
 
 const CHROME_KEY = "saroh.editor.chrome";
 const siteKey = (siteId: string) => `saroh.editor.site.${siteId}`;
@@ -41,7 +49,15 @@ export interface EditorChrome {
 
 export interface EditorPlace {
     selectedIndex: number | null;
-    rail: "sections" | "pages" | "review" | "style";
+    /**
+     * The header or footer, when one of those is selected instead of a block
+     * (#336). Remembered like a block, so a reload comes back to it rather
+     * than to the first block.
+     */
+    chrome: "header" | "footer" | null;
+    rail: "sections" | "style";
+    /** The inspector's tab: the selected block's fields, or its feedback. */
+    inspector: "block" | "feedback";
     /** Where the preview was scrolled to. In the spec's persisted list. */
     scrollTop: number;
 }
@@ -183,7 +199,9 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
 
     const fallback: EditorPlace = {
         selectedIndex: sectionCount > 0 ? 0 : null,
+        chrome: null,
         rail: "sections",
+        inspector: "block",
         scrollTop: 0,
     };
     const v = read(key);
@@ -191,18 +209,27 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
     if (typeof v === "object" && v !== null) {
         const o = v as Partial<Record<keyof EditorPlace, unknown>>;
         const i = o.selectedIndex;
+        const chrome =
+            o.chrome === "header" || o.chrome === "footer" ? o.chrome : null;
         value = {
             selectedIndex:
-                typeof i === "number" &&
-                Number.isInteger(i) &&
-                i >= 0 &&
-                i < sectionCount
-                    ? i
-                    : fallback.selectedIndex,
-            rail:
-                o.rail === "style" || o.rail === "pages" || o.rail === "review"
-                    ? o.rail
-                    : "sections",
+                chrome !== null
+                    ? null
+                    : typeof i === "number" &&
+                        Number.isInteger(i) &&
+                        i >= 0 &&
+                        i < sectionCount
+                      ? i
+                      : fallback.selectedIndex,
+            chrome,
+            // Pages was a rail tab until #335; it is the breadcrumb now.
+            rail: o.rail === "style" ? "style" : "sections",
+            // Review was a rail tab before #340; someone who left it open
+            // comes back to the same notes, now in the inspector.
+            inspector:
+                o.inspector === "feedback" || o.rail === "review"
+                    ? "feedback"
+                    : "block",
             // A negative or non-finite offset would scroll nowhere useful.
             scrollTop:
                 typeof o.scrollTop === "number" &&
@@ -230,7 +257,9 @@ export function getPlace(siteId: string, sectionCount: number): EditorPlace {
 export function placeOnServer(sectionCount: number): EditorPlace {
     return {
         selectedIndex: sectionCount > 0 ? 0 : null,
+        chrome: null,
         rail: "sections",
+        inspector: "block",
         scrollTop: 0,
     };
 }

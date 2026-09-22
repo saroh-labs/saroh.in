@@ -1,9 +1,11 @@
 import { Button } from "@saroh/ui/button";
 import { CapabilityOffState } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AccessDenied } from "@/components/shared/access-denied";
+import { PageContainer } from "@/components/shared/page-container";
 import { moduleAccess } from "@/lib/modules/guard";
 import type { ModuleView } from "@/lib/modules/schema";
 
@@ -18,29 +20,36 @@ import type { ModuleView } from "@/lib/modules/schema";
 function Unavailable({ capability }: { capability: ModuleView }) {
     const archived = capability.lifecycle === "ARCHIVED";
     return (
-        <CapabilityOffState
-            title={`${capability.label} is turned off`}
-            description={
-                archived
-                    ? `${capability.label} has been archived for this organization. Nothing it holds has been deleted — turning it back on restores this section.`
-                    : `${capability.label} is not switched on for this organization. Nothing it holds has been deleted; turning it on brings this section back.`
-            }
-            action={
-                capability.canManage ? (
-                    <Button variant="brand" asChild>
-                        <Link href="/settings/modules">
-                            Manage capabilities
-                        </Link>
-                    </Button>
-                ) : (
-                    // Say what is true: a MEMBER cannot fix this themselves, so
-                    // offering them a settings button would be a dead end.
-                    <p className="text-sm text-muted-foreground">
-                        An owner or admin can switch it on in Settings.
-                    </p>
-                )
-            }
-        />
+        // The page keeps its skeleton. A gate that replaces the whole screen
+        // leaves the person with a card and no title, unsure whether they even
+        // arrived where they meant to — the workspace design draws every state
+        // INSIDE the page, under its own heading.
+        <PageContainer>
+            <PageHeader title={capability.label} className="mb-6" />
+            <CapabilityOffState
+                title={`${capability.label} is turned off`}
+                description={
+                    archived
+                        ? `${capability.label} has been archived for this organization. Nothing it holds has been deleted — turning it back on restores this section.`
+                        : `${capability.label} is not switched on for this organization. Nothing it holds has been deleted; turning it on brings this section back.`
+                }
+                action={
+                    capability.canManage ? (
+                        <Button variant="brand" asChild>
+                            <Link href="/settings/modules">
+                                Manage capabilities
+                            </Link>
+                        </Button>
+                    ) : (
+                        // Say what is true: a MEMBER cannot fix this themselves, so
+                        // offering them a settings button would be a dead end.
+                        <p className="text-sm text-muted-foreground">
+                            An owner or admin can switch it on in Settings.
+                        </p>
+                    )
+                }
+            />
+        </PageContainer>
     );
 }
 

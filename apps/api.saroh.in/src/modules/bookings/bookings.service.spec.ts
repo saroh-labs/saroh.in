@@ -27,10 +27,11 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             count: jest.fn(),
         },
-        contact: { upsert: jest.fn() },
+        contact: { upsert: jest.fn(), findUnique: jest.fn() },
         bookingEvent: { create: jest.fn() },
         job: { create: jest.fn() },
         site: { findUnique: jest.fn() },
+        organizationModule: { findFirst: jest.fn() },
     };
     return {
         ...actual,
@@ -63,11 +64,14 @@ const bookingCreate = prisma.booking.create as jest.Mock;
 const bookingUpdate = prisma.booking.update as jest.Mock;
 const bookingCount = prisma.booking.count as jest.Mock;
 const contactUpsert = prisma.contact.upsert as jest.Mock;
+const contactFindUnique = prisma.contact.findUnique as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 const siteFindUnique = prisma.site.findUnique as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
 const eventCreate = prisma.bookingEvent.create as jest.Mock;
 const ruleFindMany = prisma.availabilityRule.findMany as jest.Mock;
+const bookingFindMany = prisma.booking.findMany as jest.Mock;
+const moduleFindFirst = prisma.organizationModule.findFirst as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -124,6 +128,7 @@ function wireBookHappyPath() {
         ...SERVICE,
         availabilityRules: RULES,
     });
+    moduleFindFirst.mockResolvedValue(null);
     bookingFindUnique.mockResolvedValue(null);
     bookingCount.mockResolvedValue(0);
     contactUpsert.mockResolvedValue({ id: "contact_1" });
@@ -317,6 +322,104 @@ describe("BookingsService.book — capacity-one reservation", () => {
         }
         expect(status).toBe(429);
         expect(transaction).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("BookingsService — public booking follows the Appointments module", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const FROM = "2026-07-20T00:00:00.000Z";
+    const TO = "2026-07-21T00:00:00.000Z";
+    const OFF_MESSAGE = "This business isn't taking online bookings right now";
+
+    function wireAvailability() {
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            availabilityRules: RULES,
+        });
+        moduleFindFirst.mockResolvedValue(null);
+        bookingFindMany.mockResolvedValue([]);
+    }
+
+    it("asks for the organization's APPOINTMENTS row in any state but ENABLED", async () => {
+        wireAvailability();
+
+        await new BookingsService().publicAvailability("svc_1", FROM, TO);
+
+        expect(moduleFindFirst).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_SVC",
+                moduleKey: "APPOINTMENTS",
+                status: { not: "ENABLED" },
+            },
+            select: { id: true },
+        });
+    });
+
+    it("410s availability when the org has switched Appointments off", async () => {
+        wireAvailability();
+        moduleFindFirst.mockResolvedValueOnce({ id: "om_1" });
+
+        const attempt = new BookingsService().publicAvailability(
+            "svc_1",
+            FROM,
+            TO,
+        );
+        await expect(attempt).rejects.toBeInstanceOf(GoneException);
+        await expect(attempt).rejects.toThrow(OFF_MESSAGE);
+        expect(bookingFindMany).not.toHaveBeenCalled();
+    });
+
+    /*
+     * "Switched off" is decided by the query, so pin the query: any
+     * APPOINTMENTS row that is NOT ENABLED — DISABLED and ARCHIVED alike —
+     * counts, and a missing row does not. (This used to be an it.each over
+     * the two statuses whose mock answered the same for both, so it never
+     * distinguished them.)
+     */
+    it("counts any APPOINTMENTS row that is not ENABLED as switched off", async () => {
+        wireAvailability();
+        moduleFindFirst.mockResolvedValueOnce(null);
+        await new BookingsService().publicAvailability("svc_1", FROM, TO);
+        expect(moduleFindFirst.mock.calls[0][0].where).toMatchObject({
+            moduleKey: "APPOINTMENTS",
+            status: { not: "ENABLED" },
+        });
+    });
+
+    it("410s a booking when Appointments is switched off, before any write", async () => {
+        const service = new BookingsService();
+        wireBookHappyPath();
+        moduleFindFirst.mockResolvedValueOnce({ id: "om_1" });
+
+        await expect(
+            service.book("svc_1", baseInput(), "iphash"),
+        ).rejects.toThrow(OFF_MESSAGE);
+        expect(transaction).not.toHaveBeenCalled();
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("keeps booking open when the organization has no APPOINTMENTS row (or it is ENABLED)", async () => {
+        const service = new BookingsService();
+        wireBookHappyPath();
+
+        await expect(
+            service.book("svc_1", baseInput(), "iphash"),
+        ).resolves.toEqual({ id: "bk_1", status: "CONFIRMED" });
+
+        wireAvailability();
+        await expect(
+            service.publicAvailability("svc_1", FROM, TO),
+        ).resolves.toEqual(expect.any(Array));
+    });
+
+    it("still 404s a missing service without asking about the module", async () => {
+        serviceFindUnique.mockResolvedValueOnce(null);
+
+        await expect(
+            new BookingsService().publicAvailability("nope", FROM, TO),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(moduleFindFirst).not.toHaveBeenCalled();
     });
 });
 
@@ -928,5 +1031,182 @@ describe("BookingsService.recordOutcome", () => {
         // A booking marked attended with no record of who said so would be
         // worse than no outcome at all.
         expect(transaction).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("BookingsService.publicServices — the website's services list (#255)", () => {
+    beforeEach(() => jest.clearAllMocks());
+    const serviceFindMany = prisma.service.findMany as jest.Mock;
+
+    const row = (id: string) => ({
+        id,
+        name: `Service ${id}`,
+        description: null,
+        durationMinutes: 30,
+        priceCents: 2500,
+        currency: "GBP",
+    });
+
+    it("returns services in the merchant's order and drops unknown ids", async () => {
+        serviceFindMany.mockResolvedValue([row("b"), row("a")]);
+        const result = await new BookingsService().publicServices([
+            "a",
+            "gone",
+            "b",
+        ]);
+        expect(result.map((s) => s.id)).toEqual(["a", "b"]);
+    });
+
+    it("asks only for active, undeleted services whose Appointments is not disabled", async () => {
+        serviceFindMany.mockResolvedValue([]);
+        await new BookingsService().publicServices(["a"]);
+        const { where, select } = serviceFindMany.mock.calls[0][0];
+        expect(where).toMatchObject({
+            id: { in: ["a"] },
+            deletedAt: null,
+            status: "ACTIVE",
+            organization: {
+                organizationModules: {
+                    none: {
+                        moduleKey: "APPOINTMENTS",
+                        status: { not: "ENABLED" },
+                    },
+                },
+            },
+        });
+        // Nothing internal leaves: no org, site, capacity or buffers.
+        expect(Object.keys(select).sort()).toEqual([
+            "currency",
+            "description",
+            "durationMinutes",
+            "id",
+            "name",
+            "priceCents",
+        ]);
+    });
+
+    it("does not query for an empty list", async () => {
+        expect(await new BookingsService().publicServices([])).toEqual([]);
+        expect(serviceFindMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("BookingsService.bookByHand — a booking the merchant makes (#384)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("books a contact into an open slot, through the same serializable reservation", async () => {
+        wireBookHappyPath();
+        contactFindUnique.mockResolvedValue({
+            id: "contact_9",
+            organizationId: "org_SVC",
+            email: "priya@example.com",
+            firstName: "Priya",
+            lastName: "Raman",
+            phone: null,
+        });
+
+        await new BookingsService().bookByHand(ctx(), "svc_1", {
+            startAt: START,
+            contactId: "contact_9",
+        });
+
+        expect(transaction.mock.calls[0][1]).toMatchObject({
+            isolationLevel: "Serializable",
+        });
+        expect(bookingCount).toHaveBeenCalledTimes(1);
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            organizationId: "org_SVC",
+            serviceId: "svc_1",
+            status: "CONFIRMED",
+            bookerEmail: "priya@example.com",
+            bookerName: "Priya Raman",
+        });
+        // The history says who made it.
+        expect(eventCreate.mock.calls[0][0].data).toMatchObject({
+            type: "BOOKED",
+            actorUserId: "user_1",
+        });
+    });
+
+    it("makes someone new a contact, marked as added by hand", async () => {
+        wireBookHappyPath();
+        await new BookingsService().bookByHand(ctx(), "svc_1", {
+            startAt: START,
+            bookerEmail: "new@example.com",
+            bookerName: "New Person",
+        });
+        expect(contactUpsert.mock.calls[0][0].create).toMatchObject({
+            organizationId: "org_SVC",
+            email: "new@example.com",
+            firstName: "New",
+            lastName: "Person",
+            source: "manual",
+        });
+    });
+
+    it("refuses a full slot with the same 409 as the booking page", async () => {
+        wireBookHappyPath();
+        bookingCount.mockResolvedValue(1);
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                bookerEmail: "new@example.com",
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a time that is not an open slot", async () => {
+        wireBookHappyPath();
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: "2026-07-20T09:30:00.000Z",
+                bookerEmail: "new@example.com",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("404s another business's service, and another business's contact", async () => {
+        wireBookHappyPath();
+        await expect(
+            new BookingsService().bookByHand(
+                ctx({ organizationId: "org_OTHER" }),
+                "svc_1",
+                { startAt: START, bookerEmail: "x@example.com" },
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+
+        contactFindUnique.mockResolvedValue({
+            id: "contact_x",
+            organizationId: "org_OTHER",
+            email: "x@example.com",
+        });
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                contactId: "contact_x",
+            }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("needs a contact or an email", async () => {
+        wireBookHappyPath();
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("refuses a role without booking:write", async () => {
+        await expect(
+            new BookingsService().bookByHand(ctx({ role: "MEMBER" }), "svc_1", {
+                startAt: START,
+                bookerEmail: "x@example.com",
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(serviceFindUnique).not.toHaveBeenCalled();
     });
 });

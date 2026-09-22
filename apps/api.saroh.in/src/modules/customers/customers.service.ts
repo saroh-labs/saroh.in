@@ -9,6 +9,8 @@ import { prisma } from "@saroh/database";
 import { ActivationEvents } from "../analytics/activation-events";
 import { StoresService } from "../stores/stores.service";
 import type { CreateCustomerDto, UpdateCustomerDto } from "./dto";
+import type { CustomerListItemDto } from "./serialize";
+import { serializeCustomerListItem } from "./serialize";
 
 /**
  * Store customers. Authorization delegates to StoresService (read = store
@@ -27,12 +29,33 @@ export class CustomersService {
         @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
-    async list(storeId: string, userId: string) {
+    /**
+     * The list a merchant reads: each customer with their order count, what
+     * they have paid and when they last bought. The orders come back as a
+     * narrow select and are aggregated in `serialize`, because the three
+     * figures are facts about Orders and the frontend would otherwise need
+     * every order of every customer to work them out.
+     */
+    async list(
+        storeId: string,
+        userId: string,
+    ): Promise<CustomerListItemDto[]> {
         await this.stores.getForUser(storeId, userId);
-        return prisma.customer.findMany({
+        const customers = await prisma.customer.findMany({
             where: { storeId },
             orderBy: { createdAt: "desc" },
+            include: {
+                orders: {
+                    select: {
+                        total: true,
+                        currency: true,
+                        paymentStatus: true,
+                        createdAt: true,
+                    },
+                },
+            },
         });
+        return customers.map(serializeCustomerListItem);
     }
 
     async get(storeId: string, customerId: string, userId: string) {
@@ -93,6 +116,35 @@ export class CustomersService {
                 field: "email",
             });
         }
+    }
+
+    /**
+     * Delete a customer who has never ordered. Store write access, as for an
+     * edit; a missing id or another store's customer 404s.
+     *
+     * A customer with orders is refused with a 409 rather than taken apart:
+     * an order is the business's record of a sale and names who bought, so
+     * it is never orphaned (the schema restricts it too). Their carts go with
+     * them; a product review stays, unattributed.
+     */
+    async remove(storeId: string, customerId: string, userId: string) {
+        await this.requireWrite(storeId, userId);
+        const existing = await prisma.customer.findFirst({
+            where: { id: customerId, storeId },
+            select: { id: true, _count: { select: { orders: true } } },
+        });
+        if (!existing) {
+            throw new NotFoundException("Customer not found");
+        }
+        const orders = existing._count.orders;
+        if (orders > 0) {
+            throw new ConflictException({
+                message: `This customer has ${orders === 1 ? "an order" : `${orders} orders`}, and an order keeps who bought it — so they stay.`,
+                orders,
+            });
+        }
+        await prisma.customer.delete({ where: { id: customerId } });
+        return { id: customerId, deleted: true as const };
     }
 
     private fields(dto: CreateCustomerDto) {

@@ -74,6 +74,8 @@ module.exports = {
         // specs run here; the legacy DB-backed stores.service.spec.ts stays in
         // the integration project.
         "<rootDir>/src/modules/stores/**/*.authorization.spec.ts",
+        // ADR-006: one storefront per business, with a mocked Prisma.
+        "<rootDir>/src/modules/stores/stores.service.create-cap.spec.ts",
         // S2-008 media: MediaService specs with a jest-mocked Prisma AND a fake
         // ObjectStorage port (never touch a DB, R2, or the network).
         "<rootDir>/src/modules/media/**/*.spec.ts",
@@ -121,11 +123,36 @@ module.exports = {
         // #175 CSV import: the PURE planning core (what an import will do)
         // and the CSV boundary. Neither touches a DB.
         "<rootDir>/src/modules/imports/**/*.spec.ts",
+        // The customer list's aggregation — order count, what was paid, when
+        // they last bought — is pure serialization over rows handed to it.
+        "<rootDir>/src/modules/customers/serialize.spec.ts",
+        "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
         "<rootDir>/src/modules/orders/order-state.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         // #173 — organization stamping on create; DB-free so CI catches a
         // regression without a provisioned Postgres.
         "<rootDir>/src/modules/orders/orders.service.org-scope.spec.ts",
+        // Sell -> Orders: what a row's status column says when the goods and
+        // the money disagree, and that the business-wide list cannot be
+        // widened past its organization.
+        // Custom roles: the permission list an owner picks from must stay the
+        // same list the policy enforces.
+        "<rootDir>/src/modules/organizations/capability-catalogue.spec.ts",
+        "<rootDir>/src/modules/organizations/resolve-capabilities.spec.ts",
+        "<rootDir>/src/modules/organizations/organization-roles.service.spec.ts",
+        "<rootDir>/src/modules/orders/order-standing.spec.ts",
+        // The order screen reads when an order last changed (#374).
+        "<rootDir>/src/modules/orders/serialize.spec.ts",
+        "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
+        "<rootDir>/src/modules/orders/organization-orders.controller.spec.ts",
+        "<rootDir>/src/modules/stores/storefronts.spec.ts",
+        "<rootDir>/src/modules/discounts/discount-state.spec.ts",
+        "<rootDir>/src/modules/discounts/redeem.spec.ts",
+        "<rootDir>/src/modules/discounts/discounts.service.spec.ts",
+        "<rootDir>/src/modules/discounts/discounts.controller.spec.ts",
+        "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
+        "<rootDir>/src/modules/products/products.remove.spec.ts",
+        "<rootDir>/src/modules/product-reviews/**/*.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
         // missing-key) and PaymentsService specs with a jest-mocked Prisma
         // (incl. $transaction) + a fake MerchantProvider — connect stores only

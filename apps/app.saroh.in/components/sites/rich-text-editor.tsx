@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import {
@@ -206,7 +207,7 @@ export function RichTextEditor({
         return (
             <div
                 className={cn(
-                    "min-h-40 rounded-md border bg-background",
+                    "min-h-40 rounded-md border border-input bg-field",
                     className,
                 )}
             />
@@ -309,7 +310,11 @@ function EditorSurface({
     const chain = () => editor.chain().focus();
 
     return (
-        <div className={cn("rounded-md border bg-background", className)}>
+        // The same border and fill as every other field, so the editor reads as
+        // one more place to type rather than a panel of its own.
+        <div
+            className={cn("rounded-md border border-input bg-field", className)}
+        >
             <div className="flex flex-wrap items-center gap-0.5 border-b p-1">
                 <Tool
                     label="Undo"
@@ -734,7 +739,7 @@ function Swatches({
                             aria-pressed={current === c}
                             onClick={() => onPick(c)}
                             className={cn(
-                                "size-6 rounded border transition-transform active:scale-95",
+                                "size-6 rounded border transition-transform",
                                 current === c &&
                                     "ring-2 ring-ring ring-offset-1",
                             )}
@@ -787,11 +792,11 @@ function LinkTool({
                         onSet(href.trim());
                     }}
                 >
-                    <input
+                    <Input
                         value={href}
                         onChange={(e) => setHref(e.target.value)}
                         placeholder="https://… or /about"
-                        className="h-8 rounded-md border bg-background px-2 text-sm"
+                        className="h-8"
                         aria-label="Link address"
                     />
                     <div className="flex gap-2">

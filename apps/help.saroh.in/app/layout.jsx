@@ -10,10 +10,12 @@ import { getPageMap } from "nextra/page-map";
 // alphabetically, which happens to preserve that — do not rely on it silently.
 import "./globals.css";
 
-// Self-hosted (latin subset, variable) so the build never fetches fonts from an
-// external network — the same two files, loaded the same way, as saroh.in and
-// the workspace. Geist carries UI/body; Bricolage Grotesque is the display face
-// for headings and the wordmark.
+// The brand's product faces, self-hosted (latin subset, variable) so the
+// build never fetches fonts from a network: Geist for all UI, body copy,
+// labels and eyebrows; Space Grotesk for display through H3, money and large
+// figures (never body copy); JetBrains Mono only where a value is measured —
+// SKUs, order references, timestamps, routes. The wordmark's own face ships
+// outlined inside <Wordmark>, so no app loads it.
 const fontSans = localFont({
     src: "../../../packages/ui/fonts/Geist-latin.woff2",
     weight: "100 900",
@@ -23,11 +25,19 @@ const fontSans = localFont({
 });
 
 const fontDisplay = localFont({
-    src: "../../../packages/ui/fonts/BricolageGrotesque-latin.woff2",
-    weight: "200 800",
+    src: "../../../packages/ui/fonts/SpaceGrotesk-latin.woff2",
+    weight: "300 700",
     style: "normal",
     display: "swap",
     variable: "--font-display",
+});
+
+const fontMono = localFont({
+    src: "../../../packages/ui/fonts/JetBrainsMono-latin.woff2",
+    weight: "100 800",
+    style: "normal",
+    display: "swap",
+    variable: "--font-mono",
 });
 
 export const metadata = {
@@ -71,25 +81,25 @@ export default async function RootLayout({ children }) {
         <html
             lang="en"
             dir="ltr"
-            className={`${fontSans.variable} ${fontDisplay.variable}`}
+            className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable}`}
             suppressHydrationWarning
         >
             {/*
              * Nextra derives its whole accent ramp from these three numbers, so
-             * this is where Saroh's one chromatic token enters the theme:
-             * `--brand`, 212 100% 42% in light and 62% in dark, lightened for
-             * dark because it has to stay legible on black. It was stock
-             * Nextra's 221/83 — a different blue, the loudest tell that these
-             * two sites were built from a template rather than from the
-             * product. The grounds are the product's grounds too: pure white
-             * and true black, not Nextra's #fafafa/#111, which also gets the
+             * this is where Saroh's one accent enters the theme: `--brand`,
+             * Saffron 700 in light and Saffron 400 in dark, the two cuts of the
+             * accent that can carry text. Stock Nextra's blue was the loudest
+             * tell that these two sites were built from a template rather than
+             * from the product. The grounds stay pure white and true black, not
+             * Nextra's #fafafa/#111, which also gets the
              * <meta name="theme-color"> right for both schemes.
              */}
             <Head
                 color={{
-                    hue: 212,
-                    saturation: 100,
-                    lightness: { light: 42, dark: 62 },
+                    // Saroh's `--brand`: Saffron 700 on light, 400 on dark.
+                    hue: 35,
+                    saturation: 86,
+                    lightness: { light: 31, dark: 55 },
                 }}
                 backgroundColor={{ light: "#ffffff", dark: "#000000" }}
             />

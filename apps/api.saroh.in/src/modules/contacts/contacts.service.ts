@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+    ConflictException,
+    Injectable,
+    NotFoundException,
+} from "@nestjs/common";
 import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { authorize, can } from "../organizations/organization-policy";
-import type { UpdateContactDto } from "./dto";
+import { allows, authorize } from "../organizations/organization-policy";
+import type { CreateContactDto, UpdateContactDto } from "./dto";
 
 /**
  * A contact as the list screen needs it: the record, plus the few facts that
@@ -121,7 +125,7 @@ export class ContactsService {
         contactIds: string[],
     ): Promise<Map<string, { value: number | null; count: number }>> {
         const out = new Map<string, { value: number | null; count: number }>();
-        if (!can(ctx.role, "lead:read")) return out;
+        if (!allows(ctx, "lead:read")) return out;
 
         const rows = await prisma.lead.groupBy({
             by: ["contactId"],
@@ -152,7 +156,7 @@ export class ContactsService {
         contactIds: string[],
     ): Promise<Map<string, Date>> {
         const out = new Map<string, Date>();
-        if (!can(ctx.role, "booking:read")) return out;
+        if (!allows(ctx, "booking:read")) return out;
 
         const rows = await prisma.booking.groupBy({
             by: ["contactId"],
@@ -200,7 +204,7 @@ export class ContactsService {
         contacts: Contact[],
     ): Promise<Map<string, LastOrder>> {
         const out = new Map<string, LastOrder>();
-        if (!can(ctx.role, "order:read")) return out;
+        if (!allows(ctx, "order:read")) return out;
 
         const contactIds = contacts.map((c) => c.id);
 
@@ -345,6 +349,49 @@ export class ContactsService {
     }
 
     /**
+     * Add a contact by hand. Authorizes `contact:write`. The email is the
+     * org's dedupe key, so an address already in the CRM is refused with a
+     * 409 that names the existing contact — adding them again would fork one
+     * person into two, and the merchant most likely wants the one they have.
+     */
+    async create(
+        ctx: OrganizationContext,
+        dto: CreateContactDto,
+    ): Promise<Contact> {
+        authorize(ctx, "contact:write");
+
+        const existing = await prisma.contact.findUnique({
+            where: {
+                organizationId_email: {
+                    organizationId: ctx.organizationId,
+                    email: dto.email,
+                },
+            },
+            select: { id: true },
+        });
+        if (existing) {
+            throw new ConflictException({
+                message: "Someone with that email is already in your contacts.",
+                field: "email",
+                contactId: existing.id,
+            });
+        }
+
+        return prisma.contact.create({
+            data: {
+                organizationId: ctx.organizationId,
+                email: dto.email,
+                // An empty field is nothing known, stored as nothing.
+                firstName: blankToNull(dto.firstName),
+                lastName: blankToNull(dto.lastName),
+                phone: blankToNull(dto.phone),
+                company: blankToNull(dto.company),
+                source: "manual",
+            },
+        });
+    }
+
+    /**
      * Patch a contact's descriptive fields (never its email identity). Authorizes
      * `contact:write`; cross-tenant or missing ids 404 before any write. Only the
      * fields present in the DTO are applied — a sparse patch.
@@ -374,6 +421,32 @@ export class ContactsService {
     }
 
     /**
+     * Delete a person from the contacts for good. Authorizes `contact:write`;
+     * a missing or cross-tenant id 404s before any write.
+     *
+     * Their leads go with them (and each lead's timeline), and so do their
+     * consent records — a person removed from the business is not kept on as
+     * a consent row. What happened stays: a booking keeps the booker's own
+     * name and email, and a form submission or message keeps its raw record;
+     * each only loses the link (SetNull in the schema). A shop customer with
+     * the same email is a separate record and is untouched.
+     *
+     * Returns how many leads went, so the workspace can say so.
+     */
+    async remove(
+        ctx: OrganizationContext,
+        contactId: string,
+    ): Promise<{ id: string; deleted: true; leads: number }> {
+        authorize(ctx, "contact:write");
+        await this.requireOwned(ctx, contactId);
+        const [leads] = await prisma.$transaction([
+            prisma.lead.count({ where: { contactId } }),
+            prisma.contact.delete({ where: { id: contactId } }),
+        ]);
+        return { id: contactId, deleted: true, leads };
+    }
+
+    /**
      * Load a contact and assert it belongs to `ctx.organizationId`. Throws
      * `NotFoundException` for a missing OR cross-tenant id — a 404 (not 403) so a
      * caller can't probe which contacts exist in another org.
@@ -390,4 +463,8 @@ export class ContactsService {
         }
         return contact;
     }
+}
+
+function blankToNull(value: string | undefined): string | null {
+    return value?.trim() ? value : null;
 }

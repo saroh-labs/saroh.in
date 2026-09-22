@@ -174,7 +174,9 @@ export function MediaPicker({
             <div
                 className={cn(
                     "flex items-center gap-2 rounded-md border border-dashed px-2.5 py-2 transition-colors",
-                    over ? "border-ring bg-accent" : "border-border",
+                    // The same border as the fields around it, dashed because
+                    // it is a place to drop something rather than type.
+                    over ? "border-ring bg-accent" : "border-input",
                 )}
             >
                 <Button
@@ -205,7 +207,7 @@ export function MediaPicker({
                     className="h-1 w-full overflow-hidden rounded bg-muted"
                 >
                     <div
-                        className="h-full bg-foreground transition-[width] duration-150 ease-out"
+                        className="h-full bg-foreground transition-[width] duration-fast ease-out"
                         style={{ width: `${progress}%` }}
                     />
                 </div>

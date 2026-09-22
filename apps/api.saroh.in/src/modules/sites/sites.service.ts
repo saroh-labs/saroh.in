@@ -19,11 +19,14 @@ import {
     TemplateInstantiationError,
 } from "@saroh/templates";
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
+import { addressProblem } from "./site-address";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { parsePostsPrefix } from "../content/posts-prefix";
-import { authorize, can } from "../organizations/organization-policy";
+import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
+import { allows, authorize } from "../organizations/organization-policy";
 import type {
     CreateApprovalDto,
     CreateCommentDto,
@@ -372,6 +375,13 @@ export interface SiteDetailView {
      * the footer colour.
      */
     footer: SiteFooter | null;
+    /**
+     * The same footer, sanitized as publish sanitizes it (#336), for the
+     * editor's canvas to DRAW. `footer` is what the settings screen edits and
+     * stays as written; this one is what may be rendered as markup in someone
+     * else's browser. Null when there is no footer.
+     */
+    footerPreview: SiteFooter | null;
     /** The site's menu (#206), by page id. Null until one is built. */
     navigation: SiteNavigation | null;
     /**
@@ -475,6 +485,52 @@ interface PendingChanges {
     site: SiteChangeKind[];
 }
 
+/** A section as stored on a page's current draft. */
+interface StoredSection {
+    type: string;
+    contractVersion: number;
+    content: unknown;
+}
+
+/** The current draft's sections for `pageId`, by key (#275). */
+async function storedDraftSectionsByKey(
+    ctx: OrganizationContext,
+    pageId: string,
+): Promise<Map<string, StoredSection>> {
+    // The same version getOrCreateDraftVersion writes to: the newest draft.
+    const draft = await prisma.pageVersion.findFirst({
+        where: {
+            pageId,
+            organizationId: ctx.organizationId,
+            status: "DRAFT",
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+    });
+    if (!draft) return new Map();
+    const rows = await prisma.section.findMany({
+        where: { pageVersionId: draft.id },
+        select: { key: true, type: true, contractVersion: true, content: true },
+    });
+    const byKey = new Map<string, StoredSection>();
+    for (const row of rows) {
+        if (row.key) byKey.set(row.key, row);
+    }
+    return byKey;
+}
+
+/**
+ * A footer made safe to draw (#202, #336). Runs through the sanitizer whatever
+ * the format says, rather than making the safety of what is rendered depend
+ * on a string the client sent. Publish and the editor's canvas both use it,
+ * so what the editor draws is what publish would write.
+ */
+function sanitizedFooter(footer: SiteFooter | null): SiteFooter | null {
+    return footer
+        ? { format: footer.format, value: sanitizeRichHtml(footer.value) }
+        : null;
+}
+
 @Injectable()
 export class SitesService {
     constructor(private readonly entitlements: EntitlementService) {}
@@ -494,12 +550,21 @@ export class SitesService {
     ): Promise<CreatedSite> {
         authorize(ctx, "site:create");
 
-        // Enforce the subscription's `sites` cap (S7-005). Count the org's live
-        // sites (soft-deleted excluded) and let the EntitlementService throw a
-        // 403 when the org is already at its plan limit. FREE default is 1.
+        // Two caps on the org's live sites (soft-deleted excluded). The
+        // product's comes first (ADR-006): one website per business for now,
+        // whatever the plan says, and upgrading would not help — so it is a
+        // 409 in plain words, not "upgrade to add more". Then the
+        // subscription's `sites` entitlement (S7-005), a 403 at the plan
+        // limit. The lower of the two wins.
         const siteCount = await prisma.site.count({
             where: { organizationId: ctx.organizationId, deletedAt: null },
         });
+        if (siteCount >= MAX_WEBSITES_PER_BUSINESS) {
+            throw new ConflictException({
+                message:
+                    "This business already has its website. Change its pages, look and address from Website.",
+            });
+        }
         await this.entitlements.check(ctx.organizationId, "sites", siteCount);
 
         const templateId = dto.templateId ?? STARTER_TEMPLATE_ID;
@@ -552,19 +617,62 @@ export class SitesService {
                 );
             }
 
-            // Subdomain is globally unique when set; reject a clash up front
-            // rather than surfacing a raw constraint error. (Full claim /
-            // verification is S2-007.)
-            if (dto.subdomain) {
-                const taken = await tx.site.findUnique({
-                    where: { subdomain: dto.subdomain },
+            /*
+             * Where the site is served (`<subdomain>.saroh.app`).
+             *
+             * Asked for: it must be a usable address, free of other sites,
+             * and not the address ANOTHER business reserved at setup — that
+             * reservation is a promise (see site-address.ts), and a site
+             * taking it would break it.
+             *
+             * Not asked for: the site takes the address its own business
+             * reserved, while no site of theirs uses it yet — so the address
+             * a merchant chose at setup is where their first website appears.
+             */
+            let subdomain = dto.subdomain;
+            if (subdomain) {
+                const problem = addressProblem(subdomain);
+                if (problem) {
+                    throw new BadRequestException({
+                        message: problem,
+                        details: { field: "subdomain" },
+                    });
+                }
+                const reserved = await tx.organization.findUnique({
+                    where: { slug: subdomain },
                     select: { id: true },
                 });
-                if (taken) {
-                    throw new ConflictException(
-                        `The subdomain "${dto.subdomain}" is already taken`,
-                    );
+                if (reserved && reserved.id !== ctx.organizationId) {
+                    throw new ConflictException({
+                        message: `${subdomain}.saroh.app belongs to another business`,
+                        details: { field: "subdomain" },
+                    });
                 }
+            } else {
+                const business = await tx.organization.findUnique({
+                    where: { id: ctx.organizationId },
+                    select: { slug: true },
+                });
+                if (business?.slug && !addressProblem(business.slug)) {
+                    subdomain = business.slug;
+                }
+            }
+
+            // Subdomain is globally unique when set; reject a clash up front
+            // rather than surfacing a raw constraint error. A default that
+            // turns out to be in use is simply not taken, not an error.
+            if (subdomain) {
+                const taken = await tx.site.findUnique({
+                    where: { subdomain },
+                    select: { id: true },
+                });
+                if (taken && dto.subdomain) {
+                    throw new ConflictException({
+                        message: `The subdomain "${subdomain}" is already taken`,
+                        details: { field: "subdomain" },
+                    });
+                }
+                if (taken) subdomain = undefined;
             }
 
             const site = await tx.site.create({
@@ -572,7 +680,7 @@ export class SitesService {
                     organizationId: ctx.organizationId,
                     name: dto.name,
                     slug,
-                    subdomain: dto.subdomain,
+                    subdomain,
                 },
                 select: { id: true, slug: true },
             });
@@ -819,14 +927,14 @@ export class SitesService {
         const pending = await this.pendingSectionChanges([site.id]);
         return {
             ...rest,
-            canEdit: can(ctx.role, "section:write"),
+            canEdit: allows(ctx, "section:write"),
             can: {
-                edit: can(ctx.role, "section:write"),
-                publish: can(ctx.role, "site:publish"),
-                comment: can(ctx.role, "site:comment"),
-                approve: can(ctx.role, "site:approve"),
-                manageSettings: can(ctx.role, "site:update"),
-                manageDomain: can(ctx.role, "domain:manage"),
+                edit: allows(ctx, "section:write"),
+                publish: allows(ctx, "site:publish"),
+                comment: allows(ctx, "site:comment"),
+                approve: allows(ctx, "site:approve"),
+                manageSettings: allows(ctx, "site:update"),
+                manageDomain: allows(ctx, "domain:manage"),
             },
             /*
              * What publishing would change (#190). The editor's top bar and the
@@ -840,6 +948,7 @@ export class SitesService {
             style: parseSiteStyle(style),
             styleOptions: siteStyleOptions(),
             footer: parseSiteFooter(footer),
+            footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
         };
     }
@@ -1345,14 +1454,52 @@ export class SitesService {
         await assertPageInSite(ctx, siteId, pageId);
 
         // Validate the entire list up front — reject before touching the DB.
-        const seenKeys = new Set<string>();
-        const validated = dto.sections.map((section, index) => {
-            const result = parseSectionContent(
+        const parsed = dto.sections.map((section) =>
+            parseSectionContent(
                 section.type,
                 section.contractVersion,
                 section.content,
-            );
+            ),
+        );
+        /*
+         * A section this request does not CHANGE is not re-validated (#275,
+         * review of #328). One stored before its contract tightened fails
+         * validation for ever, and since every save sends the whole list, it
+         * used to make every save of its page fail too: nothing on that page
+         * could be saved until someone found and rewrote it. A section equal
+         * to the stored one under the same key (type, version and content;
+         * key order ignored, since jsonb reorders keys) is carried through as
+         * stored. Anything new or changed is validated as before, so nothing
+         * invalid can be ADDED this way. Read only when something fails, so
+         * an ordinary save costs nothing extra.
+         */
+        const stored = parsed.some((r) => !r.success)
+            ? await storedDraftSectionsByKey(ctx, pageId)
+            : new Map<string, StoredSection>();
+        const seenKeys = new Set<string>();
+        const validated = dto.sections.map((section, index) => {
+            const result = parsed[index];
             if (!result.success) {
+                const unchanged = section.key
+                    ? stored.get(section.key)
+                    : undefined;
+                if (
+                    unchanged?.type === section.type &&
+                    unchanged.contractVersion === section.contractVersion &&
+                    isDeepStrictEqual(unchanged.content, section.content)
+                ) {
+                    return {
+                        type: section.type,
+                        contractVersion: section.contractVersion,
+                        order: index,
+                        // Already sanitized when it was first stored.
+                        content: unchanged.content,
+                        // Hiding is not content: a stored-invalid section can
+                        // still be hidden or shown.
+                        hidden: section.hidden ?? false,
+                        key: claimKey(seenKeys, section.key),
+                    };
+                }
                 throw new BadRequestException({
                     message: `Section at index ${index} is invalid: ${result.error.message}`,
                     index,
@@ -1571,12 +1718,7 @@ export class SitesService {
          * through the sanitizer whatever the format says, rather than making
          * the safety of a permanent write depend on a string the client sent.
          */
-        const publishedFooter: SiteFooter | null = draftFooter
-            ? {
-                  format: draftFooter.format,
-                  value: sanitizeRichHtml(draftFooter.value),
-              }
-            : null;
+        const publishedFooter = sanitizedFooter(draftFooter);
         const snapshot: SiteSnapshot = {
             site: {
                 name: site.name,

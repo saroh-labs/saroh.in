@@ -1,9 +1,11 @@
 "use server";
 
-import type { UpdateLeadInput } from "./service";
+import type { CreateLeadInput, UpdateLeadInput } from "./service";
 import {
     completeTask as completeTaskApi,
+    createLead as createLeadApi,
     createTask as createTaskApi,
+    deleteLead as deleteLeadApi,
     logActivity as logActivityApi,
     moveLead as moveLeadApi,
     updateLead as updateLeadApi,
@@ -18,8 +20,16 @@ import {
  * atomically. Client components call these — never the api or the DB directly.
  */
 
+export async function createLead(input: CreateLeadInput) {
+    return createLeadApi(input);
+}
+
 export async function updateLead(leadId: string, input: UpdateLeadInput) {
     return updateLeadApi(leadId, input);
+}
+
+export async function deleteLead(leadId: string) {
+    return deleteLeadApi(leadId);
 }
 
 export async function moveLead(leadId: string, stageId: string) {

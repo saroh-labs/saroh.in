@@ -61,3 +61,24 @@ export function needsOutcome(
         hasEnded(booking, now)
     );
 }
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Whether a booking belongs under "Next 7 days": not over yet, and starting
+ * within a week of now.
+ *
+ * "Not over yet" is the half that was missing (#360). The filter compared
+ * days-until-start against 7, and days-until is negative for every booking
+ * that has already happened — so the tab listed the past, while Upcoming,
+ * which asked the right question, said nothing was coming.
+ */
+export function isInNextWeek(
+    booking: Pick<BookingStateFields, "endAt"> & { startAt: string },
+    now: number = Date.now(),
+): boolean {
+    return (
+        !hasEnded(booking, now) &&
+        new Date(booking.startAt).getTime() <= now + WEEK_MS
+    );
+}

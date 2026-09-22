@@ -254,14 +254,14 @@ function SectionSlot({
                                     className={cn(
                                         "rounded border p-2",
                                         note.resolvedAt !== null &&
-                                            "opacity-60",
+                                            "text-muted-foreground",
                                     )}
                                 >
                                     <div className="flex items-baseline justify-between gap-2">
                                         <span className="text-xs font-medium">
                                             {note.author.name}
                                         </span>
-                                        <span className="text-[0.625rem] text-muted-foreground">
+                                        <span className="text-[11px] text-muted-foreground">
                                             {shortDate(note.createdAt)}
                                             {note.resolvedAt === null
                                                 ? ""

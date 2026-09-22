@@ -215,6 +215,47 @@ export class BookServiceDto {
 }
 
 /**
+ * A booking the merchant makes for someone (#384). The org and the service
+ * come from the route; the booker is either a contact (`contactId`) or someone
+ * new (`bookerEmail`, optionally a name and phone). The service checks that
+ * one of the two is given.
+ */
+export class BookByHandDto {
+    @IsISO8601()
+    startAt!: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    contactId?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(128)
+    bookerName?: string;
+
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @IsEmail()
+    @MaxLength(320)
+    bookerEmail?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(32)
+    bookerPhone?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(128)
+    idempotencyKey?: string;
+}
+
+/**
  * Move an existing booking to a different slot (#121).
  *
  * Only the instant. Everything else about the booking — who it is for, what

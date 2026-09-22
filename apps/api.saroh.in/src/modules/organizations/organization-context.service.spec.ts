@@ -3,6 +3,13 @@ import { ForbiddenException, NotFoundException } from "@nestjs/common";
 // Mock the database package so the service never touches a real Postgres.
 jest.mock("@saroh/database", () => ({
     prisma: {
+        // The role's own permissions, read alongside the membership since
+        // roles became rows. `null` means the business has invented nothing,
+        // so the shipped map decides — which is what these tests assert.
+        organizationRole: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
         membership: {
             findUnique: jest.fn(),
             findMany: jest.fn(),
@@ -28,16 +35,37 @@ describe("OrganizationContextService.resolve", () => {
         jest.clearAllMocks();
     });
 
+    it("resolves an invented role from what the business stored", async () => {
+        membershipFindUnique.mockResolvedValue({ role: "stock-clerk" });
+        (prisma.organizationRole.findUnique as jest.Mock).mockResolvedValueOnce(
+            { actions: ["order:read", "order:write"] },
+        );
+
+        const ctx = await service.resolve("user_1", "org_1");
+
+        // `role` is the floor, which is fail-safe for anything still reading a
+        // role name; `actions` is what actually decides.
+        expect(ctx.role).toBe("MEMBER");
+        expect(ctx.roleKey).toBe("stock-clerk");
+        expect(ctx.actions?.has("order:write")).toBe(true);
+        expect(ctx.actions?.has("member:read")).toBe(false);
+    });
+
     it("returns a context when the user is a member", async () => {
         membershipFindUnique.mockResolvedValue({ role: "ADMIN" });
 
         const ctx = await service.resolve("user_1", "org_1");
 
-        expect(ctx).toEqual({
+        expect(ctx).toMatchObject({
             organizationId: "org_1",
             userId: "user_1",
             role: "ADMIN",
+            roleKey: "ADMIN",
         });
+        // Resolved from the shipped map, because this business has stored no
+        // role of its own — ADMIN is everything except closing the business.
+        expect(ctx.actions?.has("org:update")).toBe(true);
+        expect(ctx.actions?.has("org:delete")).toBe(false);
         expect(membershipFindUnique).toHaveBeenCalledWith({
             where: {
                 organizationId_userId: {
@@ -103,10 +131,41 @@ describe("OrganizationContextService.listForUser", () => {
 
         const result = await service.listForUser("user_1");
 
-        expect(result).toEqual([
+        expect(result).toMatchObject([
             { id: "org_1", name: "Acme", slug: "acme", role: "OWNER" },
             { id: "org_2", name: "Beta", slug: "beta", role: "MEMBER" },
         ]);
+        // Each membership carries what the actor may do there, so the rail
+        // renders what the API allows instead of a map compiled into it.
+        expect(result[0]!.actions).toContain("org:delete");
+        expect(result[1]!.actions).not.toContain("org:delete");
+        expect(result[1]!.actions).toContain("member:read");
+    });
+
+    it("asks for the stored roles of every membership in one query", async () => {
+        membershipFindMany.mockResolvedValue([
+            {
+                role: "stock-clerk",
+                organization: { id: "org_1", name: "Acme", slug: "acme" },
+            },
+        ]);
+        (prisma.organizationRole.findMany as jest.Mock).mockResolvedValueOnce([
+            {
+                organizationId: "org_1",
+                key: "stock-clerk",
+                actions: ["order:read"],
+            },
+        ]);
+
+        const result = await service.listForUser("user_1");
+
+        // One round trip for the whole list, not one per organization.
+        expect(prisma.organizationRole.findMany).toHaveBeenCalledTimes(1);
+        expect(result[0]).toMatchObject({
+            role: "MEMBER",
+            roleKey: "stock-clerk",
+            actions: ["order:read"],
+        });
     });
 
     it("returns an empty list when the user has no memberships", async () => {

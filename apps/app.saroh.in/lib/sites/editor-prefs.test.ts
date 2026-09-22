@@ -119,6 +119,16 @@ describe("reading the chrome back", () => {
         expect(prefs.getChrome().device).toBe("desktop");
     });
 
+    it("remembers the tablet width", async () => {
+        useStorage(
+            storage({
+                "saroh.editor.chrome": JSON.stringify({ device: "tablet" }),
+            }),
+        );
+        const prefs = await load();
+        expect(prefs.getChrome().device).toBe("tablet");
+    });
+
     it("merges a patch against the store, not against a caller's snapshot", async () => {
         const prefs = await load();
         prefs.setChrome({ device: "phone" });
@@ -166,6 +176,29 @@ describe("where the merchant was in one site", () => {
         expect(prefs.getPlace("site_1", 1).rail).toBe("sections");
     });
 
+    it("opens Feedback for someone who left the old Review tab open", async () => {
+        useStorage(storage({ [KEY]: JSON.stringify({ rail: "review" }) }));
+        const prefs = await load();
+        const place = prefs.getPlace("site_1", 1);
+        expect(place.rail).toBe("sections");
+        expect(place.inspector).toBe("feedback");
+    });
+
+    it("comes back to a selected header rather than the first block", async () => {
+        useStorage(
+            storage({
+                [KEY]: JSON.stringify({
+                    selectedIndex: null,
+                    chrome: "header",
+                }),
+            }),
+        );
+        const prefs = await load();
+        const place = prefs.getPlace("site_1", 3);
+        expect(place.chrome).toBe("header");
+        expect(place.selectedIndex).toBeNull();
+    });
+
     it("refuses a scroll offset that would go nowhere useful", async () => {
         useStorage(
             storage({
@@ -198,7 +231,9 @@ describe("what the server renders", () => {
         expect(prefs.getChromeOnServer()).toEqual(prefs.CHROME_DEFAULT);
         expect(prefs.placeOnServer(3)).toEqual({
             selectedIndex: 0,
+            chrome: null,
             rail: "sections",
+            inspector: "block",
             scrollTop: 0,
         });
     });

@@ -151,7 +151,7 @@ export function RescheduleBooking({
                                             className={cn(
                                                 "wk-press rounded-md border border-border px-3 py-1.5 text-sm tabular-nums",
                                                 "hover:border-brand/40 hover:bg-brand-subtle",
-                                                "disabled:pointer-events-none disabled:opacity-50",
+                                                "disabled:pointer-events-none disabled:text-disabled-foreground",
                                             )}
                                         >
                                             {clockTime(slot.startAt, timezone)}

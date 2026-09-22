@@ -7,17 +7,35 @@ import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import type { FieldErrors } from "react-hook-form";
-import { useFieldArray, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { OptionSelect } from "@/components/shared/option-select";
+import { formatMoney } from "@/lib/format/money";
 import { createOrder } from "@/lib/orders/actions";
+import { orderHref } from "@/lib/orders/links";
 
 interface ProductLite {
     id: string;
     name: string;
     price: string;
 }
+/**
+ * What the storefront says about checkout (Sell → Storefronts). Defaults, not
+ * rules: an order keyed in by hand is the merchant's own call, so every figure
+ * here can still be typed over.
+ */
+export interface CheckoutDefaults {
+    currency: string;
+    taxEnabled: boolean;
+    /** A percentage, "18.00". */
+    taxRate: string;
+    shippingEnabled: boolean;
+    freeShippingThreshold: string | null;
+}
+
 interface CustomerLite {
     id: string;
     email: string;
@@ -53,6 +71,7 @@ const formSchema = z.object({
     tax: z.string(),
     shipping: z.string(),
     discount: z.string(),
+    discountCode: z.string(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -68,12 +87,19 @@ export function OrderForm({
     storeId,
     customers,
     products,
+    checkout = null,
 }: {
     storeId: string;
     customers: CustomerLite[];
     products: ProductLite[];
+    /** `null` when it could not be read: the form then assumes nothing. */
+    checkout?: CheckoutDefaults | null;
 }) {
     const router = useRouter();
+    // Amounts as money, in the storefront's currency, for reading. Inputs keep
+    // the plain decimal they are typed in.
+    const show = (cents: number) =>
+        formatMoney(cents, checkout?.currency) ?? money(cents);
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -82,6 +108,7 @@ export function OrderForm({
             tax: "0",
             shipping: "0",
             discount: "0",
+            discountCode: "",
         },
     });
     const { fields, append, remove } = useFieldArray({
@@ -95,6 +122,10 @@ export function OrderForm({
     const tax = form.watch("tax");
     const shipping = form.watch("shipping");
     const discount = form.watch("discount");
+    const discountCode = form.watch("discountCode").trim();
+    // A code and a typed amount are one or the other, as the API insists:
+    // two answers to "why did this come off" would leave no way to tell.
+    const typedOff = toCents(discount) > 0;
 
     const priceOf = (id: string) =>
         toCents(products.find((p) => p.id === id)?.price ?? "0");
@@ -104,9 +135,34 @@ export function OrderForm({
         (sum, l) => sum + priceOf(l.productId) * quantityOf(l.quantity),
         0,
     );
+    // Tax follows the storefront's rate until the merchant types their own.
+    // Written into the field rather than computed beside it, so what is on
+    // screen is exactly what is sent.
+    const taxBasisPoints = checkout?.taxEnabled
+        ? Math.round(Number(checkout.taxRate) * 100)
+        : 0;
+    const suggestedTax = money(
+        Math.round((subtotalCents * taxBasisPoints) / 10_000),
+    );
+    const taxTouched = form.formState.dirtyFields.tax;
+    useEffect(() => {
+        if (taxBasisPoints > 0 && !taxTouched) {
+            form.setValue("tax", suggestedTax);
+        }
+    }, [form, suggestedTax, taxBasisPoints, taxTouched]);
+
+    const freeOver = checkout?.freeShippingThreshold
+        ? toCents(checkout.freeShippingThreshold)
+        : null;
+    const qualifiesForFree = freeOver !== null && subtotalCents >= freeOver;
+    const offersDelivery = checkout?.shippingEnabled ?? true;
+
     const totalCents = Math.max(
         0,
-        subtotalCents + toCents(tax) + toCents(shipping) - toCents(discount),
+        subtotalCents +
+            toCents(tax) +
+            toCents(shipping) -
+            (discountCode ? 0 : toCents(discount)),
     );
 
     async function onSubmit(values: FormValues) {
@@ -118,14 +174,20 @@ export function OrderForm({
             items,
             tax: values.tax,
             shipping: values.shipping,
-            discount: values.discount,
+            ...(values.discountCode.trim()
+                ? { discountCode: values.discountCode.trim().toUpperCase() }
+                : { discount: values.discount }),
         });
         if (!res.ok) {
-            showError(res.error);
+            if (res.field === "discountCode") {
+                form.setError("discountCode", { message: res.error });
+            } else {
+                showError(res.error);
+            }
             return;
         }
         showSuccess("Order created");
-        router.push(`/stores/${storeId}/orders/${res.data.id}`);
+        router.push(orderHref(storeId, res.data.id));
     }
 
     /** Preserve the original toast UX for the two top-level guards. */
@@ -169,22 +231,30 @@ export function OrderForm({
         >
             <div className="grid gap-2">
                 <Label htmlFor="customer">Customer</Label>
-                <select
-                    id="customer"
-                    disabled={isSubmitting}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    {...form.register("customerId")}
-                >
-                    <option value="">Select a customer…</option>
-                    {customers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                            {[c.firstName, c.lastName]
-                                .filter(Boolean)
-                                .join(" ")}
-                            {c.firstName ? ` · ${c.email}` : c.email}
-                        </option>
-                    ))}
-                </select>
+                <Controller
+                    control={form.control}
+                    name="customerId"
+                    render={({ field }) => (
+                        <OptionSelect
+                            id="customer"
+                            placeholder="Select a customer…"
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            disabled={isSubmitting}
+                            options={customers.map((c) => {
+                                const name = [c.firstName, c.lastName]
+                                    .filter(Boolean)
+                                    .join(" ");
+                                return {
+                                    value: c.id,
+                                    label: name
+                                        ? `${name} · ${c.email}`
+                                        : c.email,
+                                };
+                            })}
+                        />
+                    )}
+                />
             </div>
 
             <div className="space-y-3">
@@ -199,18 +269,23 @@ export function OrderForm({
                     const watched = watchedLines.at(i);
                     return (
                         <div key={line.id} className="flex items-center gap-2">
-                            <select
-                                aria-label="Product"
-                                disabled={isSubmitting}
-                                className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-                                {...form.register(`lines.${i}.productId`)}
-                            >
-                                {products.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.name} — {p.price}
-                                    </option>
-                                ))}
-                            </select>
+                            <Controller
+                                control={form.control}
+                                name={`lines.${i}.productId`}
+                                render={({ field }) => (
+                                    <OptionSelect
+                                        aria-label="Product"
+                                        value={field.value}
+                                        onValueChange={field.onChange}
+                                        disabled={isSubmitting}
+                                        className="flex-1"
+                                        options={products.map((p) => ({
+                                            value: p.id,
+                                            label: `${p.name} — ${show(toCents(p.price))}`,
+                                        }))}
+                                    />
+                                )}
+                            />
                             <Input
                                 aria-label="Quantity"
                                 type="number"
@@ -222,7 +297,7 @@ export function OrderForm({
                                 })}
                             />
                             <span className="w-20 text-right text-sm tabular-nums text-muted-foreground">
-                                {money(
+                                {show(
                                     priceOf(watched?.productId ?? "") *
                                         quantityOf(watched?.quantity),
                                 )}
@@ -255,9 +330,20 @@ export function OrderForm({
                 </Button>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div
+                className={
+                    offersDelivery
+                        ? "grid grid-cols-3 gap-4"
+                        : "grid grid-cols-2 gap-4"
+                }
+            >
                 <div className="grid gap-2">
-                    <Label htmlFor="tax">Tax</Label>
+                    <Label htmlFor="tax">
+                        Tax
+                        {taxBasisPoints > 0
+                            ? ` (${Number(checkout?.taxRate)}%)`
+                            : null}
+                    </Label>
                     <Input
                         id="tax"
                         inputMode="decimal"
@@ -265,34 +351,94 @@ export function OrderForm({
                         {...form.register("tax")}
                     />
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="shipping">Shipping</Label>
-                    <Input
-                        id="shipping"
-                        inputMode="decimal"
-                        disabled={isSubmitting}
-                        {...form.register("shipping")}
-                    />
-                </div>
+                {/* A storefront that does not deliver has no shipping to
+                    charge; the field stays at 0 rather than inviting one. */}
+                {offersDelivery ? (
+                    <div className="grid gap-2">
+                        <Label htmlFor="shipping">Shipping</Label>
+                        <Input
+                            id="shipping"
+                            inputMode="decimal"
+                            disabled={isSubmitting}
+                            aria-describedby={
+                                freeOver !== null ? "shipping-note" : undefined
+                            }
+                            {...form.register("shipping")}
+                        />
+                        {freeOver !== null ? (
+                            <p
+                                id="shipping-note"
+                                className="text-[12px] text-muted-foreground"
+                            >
+                                {qualifiesForFree
+                                    ? "Qualifies for free delivery."
+                                    : `Free over ${show(freeOver)}.`}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
                 <div className="grid gap-2">
                     <Label htmlFor="discount">Discount</Label>
                     <Input
                         id="discount"
                         inputMode="decimal"
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || Boolean(discountCode)}
                         {...form.register("discount")}
                     />
                 </div>
             </div>
 
+            <div className="grid gap-2">
+                <Label htmlFor="discountCode">Discount code</Label>
+                <Input
+                    id="discountCode"
+                    placeholder="MARKETDAY"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    disabled={isSubmitting || typedOff}
+                    aria-describedby="discountCode-note"
+                    aria-invalid={
+                        form.formState.errors.discountCode ? true : undefined
+                    }
+                    className="w-56 font-mono uppercase"
+                    {...form.register("discountCode")}
+                />
+                <p
+                    id="discountCode-note"
+                    className={
+                        form.formState.errors.discountCode
+                            ? "text-[12px] font-medium text-destructive"
+                            : "text-[12px] text-muted-foreground"
+                    }
+                    role={
+                        form.formState.errors.discountCode ? "alert" : undefined
+                    }
+                >
+                    {form.formState.errors.discountCode?.message ??
+                        (typedOff
+                            ? "An amount is typed above — clear it to use a code instead."
+                            : discountCode
+                              ? "What it takes off is worked out when the order is placed."
+                              : "Instead of typing an amount off.")}
+                </p>
+            </div>
+
             <div className="flex items-center justify-between border-t pt-4">
                 <div className="text-sm">
                     <p className="text-muted-foreground">
-                        Subtotal {money(subtotalCents)}
+                        Subtotal {show(subtotalCents)}
                     </p>
                     <p className="text-lg font-semibold tabular-nums">
-                        Total {money(totalCents)}
+                        Total {show(totalCents)}
                     </p>
+                    {discountCode ? (
+                        <p className="text-[12px] text-muted-foreground">
+                            Before{" "}
+                            <span className="font-mono">
+                                {discountCode.toUpperCase()}
+                            </span>
+                        </p>
+                    ) : null}
                 </div>
                 <Button
                     type="submit"

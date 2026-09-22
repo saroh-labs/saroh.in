@@ -1,5 +1,5 @@
 import { BLOCK_META, blockFixture, isSectionType } from "@saroh/block-contract";
-import { SectionRenderer, SiteTheme } from "@saroh/site-blocks";
+import { BlockFixturePreview, SiteTheme } from "@saroh/site-blocks";
 import { notFound } from "next/navigation";
 
 import { paletteById } from "@/lib/data/palettes";
@@ -47,7 +47,7 @@ export default async function BlockPreviewPage({
                 one. Without it the block would float on the browser default and
                 every palette would look the same behind the section. */}
             <div className="min-h-screen bg-site-bg text-site-fg">
-                <SectionRenderer section={{ type, content }} />
+                <BlockFixturePreview type={type} variant={variantId} />
             </div>
         </>
     );

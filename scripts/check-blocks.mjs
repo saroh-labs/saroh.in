@@ -66,22 +66,6 @@ const G2_EXCEPTIONS = new Map([
         "packages/site-blocks/src/alert.ts",
         /^(?:bg|text)-destructive(?:-foreground)?$/,
     ],
-    /*
-     * KNOWN ISSUE, not a sanctioned exception — see #263.
-     *
-     * These two are a bare `text-destructive` on a required-field asterisk,
-     * drawn straight onto the merchant's page ground. That is precisely what
-     * `alert.ts` explains cannot be done: `--destructive` measures 5.43:1 on
-     * the merchant light ground and only 3.87:1 on the dark one, which is why
-     * the alert a few lines away brings its OWN opaque ground and is measured
-     * against itself. The asterisks were missed because nothing was checking.
-     *
-     * Listed rather than fixed because #252 Step 2 moved these files verbatim,
-     * and changing what a published merchant site draws is not something to
-     * smuggle into a move. Remove both entries with the fix.
-     */
-    ["packages/site-blocks/src/blocks/enquiry.tsx", /^text-destructive$/],
-    ["packages/site-blocks/src/blocks/booking.tsx", /^text-destructive$/],
 ]);
 
 /** `--site-*` drawn either as a `site-` utility or as an arbitrary value. */
@@ -157,11 +141,11 @@ for await (const file of walk(BLOCKS)) {
  * live on a merchant's page. Adding to it should require saying why.
  */
 const SITE_LAYER_ALLOWED = new Set([
-    // The merchant's own header and footer. Chrome, not sections — #253 decides
-    // whether that changes.
-    "apps/saroh.app/components/site-chrome.tsx",
     // Saroh surfaces on a merchant's page, in the merchant's palette.
     "apps/saroh.app/components/checkout.tsx",
+    // The review page a customer reaches from an invitation email.
+    "apps/saroh.app/components/review-form.tsx",
+    "apps/saroh.app/app/review/[token]/page.tsx",
     "apps/saroh.app/components/post-view.tsx",
     "apps/saroh.app/app/[domain]/[slug]/not-found.tsx",
     "apps/saroh.app/app/[domain]/layout.tsx",
@@ -191,6 +175,11 @@ const SITE_LAYER_ALLOWED = new Set([
     // merchant's page ground and the selection outlines around each block, and
     // delegates every block to @saroh/site-blocks rather than drawing one.
     "apps/app.saroh.in/components/sites/section-preview.tsx",
+    // The Add-section picker's thumbnails (#267). Same category again: it
+    // supplies the merchant's page ground inside a scaled frame and hands the
+    // block to BlockFixturePreview from @saroh/site-blocks, which the catalog
+    // uses too. It draws no block of its own.
+    "apps/app.saroh.in/components/sites/block-thumbnail.tsx",
     // Version history's preview of a past version (#283). The same category as
     // the editor's frame directly above: it supplies the merchant's page ground
     // — in the palette THAT version was published with, read from its snapshot —

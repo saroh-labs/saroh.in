@@ -8,8 +8,14 @@ jest.mock("@saroh/database", () => {
                 findMany: jest.fn(),
                 findUnique: jest.fn(),
                 update: jest.fn(),
+                create: jest.fn(),
+                delete: jest.fn(),
             },
-            lead: { groupBy: jest.fn() },
+            lead: { groupBy: jest.fn(), count: jest.fn() },
+            // The batch form: resolve each queued call in order.
+            $transaction: jest.fn((calls: Promise<unknown>[]) =>
+                Promise.all(calls),
+            ),
             booking: { groupBy: jest.fn() },
             customerIdentityLink: { findMany: jest.fn() },
             customer: { findMany: jest.fn() },
@@ -18,7 +24,11 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -27,12 +37,15 @@ import { ContactsService } from "./contacts.service";
 const findMany = prisma.contact.findMany as jest.Mock;
 const findUnique = prisma.contact.findUnique as jest.Mock;
 const update = prisma.contact.update as jest.Mock;
+const create = prisma.contact.create as jest.Mock;
 const leadGroupBy = prisma.lead.groupBy as jest.Mock;
 const bookingGroupBy = prisma.booking.groupBy as jest.Mock;
 const linkFindMany = prisma.customerIdentityLink.findMany as jest.Mock;
 const customerFindMany = prisma.customer.findMany as jest.Mock;
 const orderGroupBy = prisma.order.groupBy as jest.Mock;
 const orderFindMany = prisma.order.findMany as jest.Mock;
+const contactDelete = prisma.contact.delete as jest.Mock;
+const leadCount = prisma.lead.count as jest.Mock;
 
 /** A Prisma Decimal serialises via `toString`; the mock must do the same. */
 const decimal = (v: string) => ({ toString: () => v });
@@ -414,5 +427,83 @@ describe("ContactsService.update", () => {
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(findUnique).not.toHaveBeenCalled();
         expect(update).not.toHaveBeenCalled();
+    });
+});
+
+describe("ContactsService.create", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("adds someone by hand, in the caller's org, marked as manual", async () => {
+        findUnique.mockResolvedValue(null);
+        create.mockResolvedValue({ id: "c_new" });
+        await new ContactsService().create(ctx(), {
+            email: "meera@example.com",
+            firstName: "Meera",
+            phone: "  ",
+        });
+        expect(create).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                email: "meera@example.com",
+                firstName: "Meera",
+                lastName: null,
+                phone: null,
+                company: null,
+                source: "manual",
+            },
+        });
+    });
+
+    it("refuses an email already in the org, naming who has it", async () => {
+        findUnique.mockResolvedValue({ id: "c_1" });
+        await expect(
+            new ContactsService().create(ctx(), {
+                email: "ananya@example.com",
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it("refuses a role that may not write contacts", async () => {
+        await expect(
+            new ContactsService().create(ctx({ role: "REVIEWER" }), {
+                email: "x@example.com",
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(create).not.toHaveBeenCalled();
+    });
+});
+
+describe("ContactsService.remove", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("deletes an owned contact and says how many leads went with them", async () => {
+        findUnique.mockResolvedValue({ id: "c_1", organizationId: "org_1" });
+        leadCount.mockResolvedValue(2);
+        contactDelete.mockResolvedValue({ id: "c_1" });
+
+        await expect(
+            new ContactsService().remove(ctx(), "c_1"),
+        ).resolves.toEqual({ id: "c_1", deleted: true, leads: 2 });
+        expect(leadCount).toHaveBeenCalledWith({ where: { contactId: "c_1" } });
+        expect(contactDelete).toHaveBeenCalledWith({ where: { id: "c_1" } });
+    });
+
+    it("404s a cross-tenant contact and deletes nothing", async () => {
+        findUnique.mockResolvedValue({
+            id: "c_1",
+            organizationId: "org_OTHER",
+        });
+        await expect(
+            new ContactsService().remove(ctx(), "c_1"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(contactDelete).not.toHaveBeenCalled();
+    });
+
+    it("refuses a role without contact:write", async () => {
+        await expect(
+            new ContactsService().remove(ctx({ role: "MEMBER" }), "c_1"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(contactDelete).not.toHaveBeenCalled();
     });
 });

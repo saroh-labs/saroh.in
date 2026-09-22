@@ -84,6 +84,39 @@ export function emptySection(type: SectionType): Section {
                     items: [{ title: "", body: "" }],
                 },
             };
+        // Like `features`: one empty item, because the contract needs one and
+        // the merchant should see the shape they are filling in.
+        case "faq":
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { heading: "", items: [{ question: "", answer: "" }] },
+            };
+        case "testimonials":
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { heading: "", items: [{ quote: "", name: "" }] },
+            };
+        case "servicesList":
+            // Empty until the merchant picks a service; the editor lists
+            // theirs, or says there are none yet.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { heading: "Services", serviceIds: [] },
+            };
+        case "contact":
+            // Invalid until one channel is filled in, and the editor says so.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { heading: "" },
+            };
         case "booking":
             return {
                 key: newKey(),

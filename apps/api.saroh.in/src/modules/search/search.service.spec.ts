@@ -171,7 +171,7 @@ describe("SearchService", () => {
 
         expect(hits[0]).toMatchObject({
             kind: "order",
-            href: "/stores/store_1/orders/ord_1",
+            href: "/commerce/orders/ord_1?storefront=store_1",
             subtitle: "Vikram Shetty · pending",
         });
     });

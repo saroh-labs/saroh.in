@@ -11,13 +11,24 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
+import { isBuiltInRole, resolveCapabilities } from "./organization-policy";
 
 /** A user's Organization membership as surfaced to the switcher/list UI. */
 export interface UserOrganization {
     id: string;
     name: string;
     slug: string;
+    /** The built-in this maps to; MEMBER for a role the business invented. */
     role: OrgRole;
+    /** The role as stored — a built-in name, or an invented role's key. */
+    roleKey: string;
+    /** An invented role's own name; null for a built-in. */
+    roleLabel: string | null;
+    /**
+     * What this actor may do here, so the rail can render what the API allows
+     * rather than what a compiled-in map guesses.
+     */
+    actions: string[];
 }
 
 /** Minimal Organization identity returned alongside a resolved context. */
@@ -63,10 +74,34 @@ export class OrganizationContextService {
         });
 
         if (membership) {
+            /*
+             * The role's own permissions, when the business has stored any.
+             *
+             * One indexed read on the unique (organizationId, key), on the
+             * same path that already reads the membership. A business that
+             * has invented nothing has no row, `resolveCapabilities` falls
+             * back to the shipped map, and the two reads cost what one did.
+             */
+            const stored = await prisma.organizationRole.findUnique({
+                where: {
+                    organizationId_key: {
+                        organizationId,
+                        key: membership.role,
+                    },
+                },
+                select: { actions: true },
+            });
+
             return {
                 organizationId,
                 userId,
-                role: this.toOrgRole(membership.role, organizationId),
+                role: this.toOrgRole(
+                    membership.role,
+                    organizationId,
+                    stored !== null,
+                ),
+                roleKey: membership.role,
+                actions: resolveCapabilities(membership.role, stored?.actions),
             };
         }
 
@@ -93,12 +128,56 @@ export class OrganizationContextService {
             orderBy: { organization: { name: "asc" } },
         });
 
-        return memberships.map((membership) => ({
-            id: membership.organization.id,
-            name: membership.organization.name,
-            slug: membership.organization.slug,
-            role: this.toOrgRole(membership.role, membership.organization.id),
-        }));
+        /*
+         * The permissions behind each membership, in ONE query rather than one
+         * per organization. The rail renders from these — a business that
+         * invents roles cannot have its navigation decided by a map compiled
+         * into the frontend, and the pattern doc is explicit that frontends
+         * "render what the API allows".
+         */
+        // No memberships, no second query — and an empty `OR` is a filter
+        // nobody meant to write.
+        if (memberships.length === 0) return [];
+
+        const stored = await prisma.organizationRole.findMany({
+            where: {
+                OR: memberships.map((m) => ({
+                    organizationId: m.organization.id,
+                    key: m.role,
+                })),
+            },
+            select: {
+                organizationId: true,
+                key: true,
+                label: true,
+                actions: true,
+            },
+        });
+        const byOrgAndKey = new Map(
+            stored.map((r) => [`${r.organizationId}:${r.key}`, r]),
+        );
+
+        return memberships.map((membership) => {
+            const orgId = membership.organization.id;
+            const own = byOrgAndKey.get(`${orgId}:${membership.role}`);
+            return {
+                id: orgId,
+                name: membership.organization.name,
+                slug: membership.organization.slug,
+                role: this.toOrgRole(membership.role, orgId, own !== undefined),
+                roleKey: membership.role,
+                // An invented role's own name, or null for a built-in, which
+                // the app names in its own words. This was the raw key at
+                // first, as a placeholder — and the business switcher went on
+                // calling a Stock clerk "Member", by the built-in it maps to.
+                roleLabel: isBuiltInRole(membership.role)
+                    ? null
+                    : (own?.label ?? null),
+                actions: [
+                    ...resolveCapabilities(membership.role, own?.actions),
+                ],
+            };
+        });
     }
 
     /**
@@ -122,13 +201,33 @@ export class OrganizationContextService {
      * An unrecognized value is treated as the least-privileged `MEMBER` (fail
      * closed) and logged, so a bad row can never silently escalate privileges.
      */
-    private toOrgRole(role: string, organizationId: string): OrgRole {
+    /**
+     * The BUILT-IN role a key maps to, for anything still reading a role name.
+     *
+     * A role the business invented maps to MEMBER — the read-only floor —
+     * which is fail-safe rather than tidy, and never the gate: `authorize()`
+     * reads the resolved `actions` instead.
+     *
+     * `recognised` says whether the business actually has this role. Without
+     * it every invented role logged "Unknown membership role" on every
+     * request, turning a warning that means "a row is wrong" into noise that
+     * means "this business uses the feature". A key that matches NOTHING —
+     * built-in or stored — is still worth a warning, because that one really
+     * is a row nobody can explain.
+     */
+    private toOrgRole(
+        role: string,
+        organizationId: string,
+        recognised = false,
+    ): OrgRole {
         if ((ORG_ROLES as readonly string[]).includes(role)) {
             return role as OrgRole;
         }
-        this.logger.warn(
-            `Unknown membership role "${role}" on organization ${organizationId}; treating as MEMBER`,
-        );
+        if (!recognised) {
+            this.logger.warn(
+                `Unknown membership role "${role}" on organization ${organizationId}; treating as MEMBER`,
+            );
+        }
         return "MEMBER";
     }
 }

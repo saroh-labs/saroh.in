@@ -33,6 +33,10 @@ module.exports = {
         "<rootDir>/src/modules/organizations/",
         "<rootDir>/src/modules/admin/",
         "\\.authorization\\.spec\\.ts$",
+        // #384 customer delete: mocked Prisma, runs in the unit project.
+        "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
+        // ADR-006 store creation cap: mocked Prisma, runs in the unit project.
+        "<rootDir>/src/modules/stores/stores.service.create-cap.spec.ts",
         // S5-001: the pure order-state machine and the mocked-Prisma
         // updateStatus guard spec run in the default/unit project (they mock
         // @saroh/database), so keep them out of the DB-backed run. The legacy
@@ -42,6 +46,15 @@ module.exports = {
         // The waitlist spec mocks Prisma (pure unit test) and runs in the
         // default/unit project — keep it out of the DB-backed run.
         "<rootDir>/src/modules/waitlist/",
+        // DB-free specs that mock @saroh/database and run in the unit project:
+        // the discount redemption core and the storefront settings spec.
+        "<rootDir>/src/modules/discounts/discount-state.spec.ts",
+        "<rootDir>/src/modules/discounts/redeem.spec.ts",
+        "<rootDir>/src/modules/discounts/discounts.service.spec.ts",
+        "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
+        "<rootDir>/src/modules/stores/storefronts.spec.ts",
+        "<rootDir>/src/modules/products/products.remove.spec.ts",
+        "<rootDir>/src/modules/product-reviews/",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
     globalSetup: "<rootDir>/test/global-setup.ts",

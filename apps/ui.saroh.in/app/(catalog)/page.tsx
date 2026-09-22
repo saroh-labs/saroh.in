@@ -57,7 +57,7 @@ export default function Home() {
 
             <Section
                 title="Brand & color tokens"
-                description="Semantic tokens from @saroh/ui globals.css — “Midnight & Lime”. brand is INTERACTIVE and lightens in dark mode; brand-surface is a FILL and stays deep in both."
+                description="Semantic tokens from @saroh/ui globals.css — “Ink & Saffron”. brand is the Saffron that sets text: 700 on light, 400 on dark. highlight is the Saffron fill, one per screen. brand-surface is a FILL and stays Ink in both."
             >
                 <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
                     <Swatch name="brand" className="bg-brand" />

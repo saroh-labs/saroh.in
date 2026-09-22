@@ -31,8 +31,10 @@ import {
     SEEDED_FOOTER,
     SEEDED_STYLE_VARIABLES,
     SERVICES,
+    SIDE_BUSINESSES,
     SITES,
     STORE_SLUG,
+    SUBMISSIONS,
 } from "./data";
 
 /**
@@ -263,11 +265,13 @@ export async function seed(): Promise<void> {
     // Billing first: the sites and the domain claim below are both entitlement-
     // gated, and an org on the FREE default may hold neither.
     await seedBilling(prisma, org.id, now);
-    const siteIds = await seedWebsite(prisma, org.id, user.id, now);
+    const sideOrgIds = await seedSideBusinesses(prisma, user.id, now);
+    const siteIds = await seedWebsite(prisma, org.id, sideOrgIds, user.id, now);
     await seedReviewer(prisma, org.id, user.id, siteIds[0]);
     // Content after the website: a post belongs to the site it is published on
     // (ADR-004), so there has to be a site first.
     await seedContent(prisma, org.id, siteIds[0] ?? "", user.id);
+    await seedSubmissions(prisma, org.id, siteIds[0] ?? "", now);
     await seedProviders(prisma, org.id, siteIds, now);
     await seedAnalytics(prisma, org.id, now);
 
@@ -798,6 +802,135 @@ async function seedBilling(prisma: Db, orgId: string, now: Date) {
     });
 }
 
+// --- Form entries --------------------------------------------------------
+
+/**
+ * Entries through Northwind's website enquiry form (#385), each tied to the
+ * contact it came from and that contact's first lead — the shape a live
+ * submission leaves. Immutable in the product, so a re-run leaves them be.
+ */
+async function seedSubmissions(
+    prisma: Db,
+    orgId: string,
+    siteId: string,
+    now: Date,
+) {
+    const form = await prisma.form.findFirst({
+        where: {
+            siteId,
+            organizationId: orgId,
+            id: { startsWith: SEED_PREFIX },
+        },
+        select: { id: true },
+    });
+    if (!form) return;
+
+    for (let i = 0; i < SUBMISSIONS.length; i++) {
+        const entry = SUBMISSIONS[i];
+        const person = CONTACTS[entry.contact];
+        const leadIndex = LEADS.findIndex((l) => l.contact === entry.contact);
+        await prisma.submission.upsert({
+            where: { id: id("submission", i) },
+            update: {},
+            create: {
+                id: id("submission", i),
+                organizationId: orgId,
+                formId: form.id,
+                contactId: id("contact", entry.contact),
+                leadId: leadIndex >= 0 ? id("lead", leadIndex) : null,
+                data: {
+                    name: `${person.first} ${person.last}`,
+                    email: emailFor(person.first, person.last),
+                    ...(entry.phone ? { phone: entry.phone } : {}),
+                    ...(person.company ? { company: person.company } : {}),
+                    message: entry.message,
+                },
+                createdAt: at(now, -entry.daysAgo, 11 + (i % 6)),
+            },
+        });
+    }
+}
+
+// --- Side businesses -----------------------------------------------------
+
+/**
+ * The demo owner's other businesses, each holding one website (ADR-006).
+ *
+ * Only what a website needs: the business, the owner's membership, and the
+ * Website module on with its rollout override — the same two rows Northwind
+ * gets, for the reason given there. No plan: the FREE default allows one site,
+ * which is all each of these has.
+ *
+ * @returns each business's id, by its `SIDE_BUSINESSES` key.
+ */
+async function seedSideBusinesses(
+    prisma: Db,
+    userId: string,
+    now: Date,
+): Promise<Record<string, string>> {
+    const ids: Record<string, string> = {};
+    for (const business of SIDE_BUSINESSES) {
+        const org = await prisma.organization.upsert({
+            where: { slug: business.slug },
+            update: { name: business.name },
+            create: {
+                id: id("org", business.key),
+                name: business.name,
+                slug: business.slug,
+            },
+        });
+        ids[business.key] = org.id;
+
+        await prisma.membership.upsert({
+            where: {
+                organizationId_userId: { organizationId: org.id, userId },
+            },
+            update: { role: "OWNER" },
+            create: {
+                id: id("membership", business.key),
+                organizationId: org.id,
+                userId,
+                role: "OWNER",
+            },
+        });
+
+        await prisma.organizationModule.upsert({
+            where: {
+                organizationId_moduleKey: {
+                    organizationId: org.id,
+                    moduleKey: "WEBSITE",
+                },
+            },
+            update: { status: "ENABLED" },
+            create: {
+                id: id("module", business.key, "website"),
+                organizationId: org.id,
+                moduleKey: "WEBSITE",
+                status: "ENABLED",
+                enabledAt: now,
+                enabledByUserId: userId,
+            },
+        });
+        // The flag row itself is written with Northwind's modules, above.
+        await prisma.featureFlagOverride.upsert({
+            where: {
+                flagKey_organizationId: {
+                    flagKey: "MODULE_WEBSITE",
+                    organizationId: org.id,
+                },
+            },
+            update: { enabled: true },
+            create: {
+                id: id("flagoverride", business.key, "website"),
+                flagKey: "MODULE_WEBSITE",
+                organizationId: org.id,
+                enabled: true,
+            },
+        });
+    }
+    return ids;
+}
+
 // --- Website ------------------------------------------------------------
 
 /**
@@ -895,6 +1028,7 @@ async function seedReviewer(
 async function seedWebsite(
     prisma: Db,
     orgId: string,
+    sideOrgIds: Readonly<Record<string, string>>,
     userId: string,
     now: Date,
 ): Promise<string[]> {
@@ -903,18 +1037,46 @@ async function seedWebsite(
     for (let s = 0; s < SITES.length; s++) {
         const fixture = SITES[s];
         const createdAt = at(now, -fixture.createdDaysAgo, 11);
+        // One website per business (ADR-006): Northwind's own, or the side
+        // business the fixture names.
+        const siteOrgId = fixture.business
+            ? sideOrgIds[fixture.business]
+            : orgId;
+        if (!siteOrgId) {
+            throw new Error(
+                `site ${fixture.slug}: no business "${fixture.business}"`,
+            );
+        }
+
+        /*
+         * A database seeded before ADR-006 has this site under Northwind.
+         * Every row beneath it carries its business's id, so it is rebuilt
+         * where it now belongs rather than re-pointed: the site cascades to
+         * its pages, versions, sections and publications, and its forms —
+         * which outlive a site by design — go with it. Seed rows only.
+         */
+        const stale = await prisma.site.findFirst({
+            where: { id: id("site", s), organizationId: { not: siteOrgId } },
+            select: { id: true },
+        });
+        if (stale) {
+            await prisma.form.deleteMany({
+                where: { id: { startsWith: id("form", s, "") } },
+            });
+            await prisma.site.delete({ where: { id: stale.id } });
+        }
 
         const site = await prisma.site.upsert({
             where: {
                 organizationId_slug: {
-                    organizationId: orgId,
+                    organizationId: siteOrgId,
                     slug: fixture.slug,
                 },
             },
             update: { name: fixture.name, subdomain: fixture.subdomain },
             create: {
                 id: id("site", s),
-                organizationId: orgId,
+                organizationId: siteOrgId,
                 name: fixture.name,
                 slug: fixture.slug,
                 subdomain: fixture.subdomain,
@@ -945,7 +1107,7 @@ async function seedWebsite(
                 create: {
                     id: id("page", s, p),
                     siteId: site.id,
-                    organizationId: orgId,
+                    organizationId: siteOrgId,
                     path: pageFixture.path,
                     title: pageFixture.title,
                     isHome: pageFixture.isHome ?? false,
@@ -959,7 +1121,7 @@ async function seedWebsite(
                 create: {
                     id: id("pageversion", s, p),
                     pageId: page.id,
-                    organizationId: orgId,
+                    organizationId: siteOrgId,
                     status: "DRAFT",
                     createdByUserId: userId,
                     createdAt,
@@ -999,7 +1161,7 @@ async function seedWebsite(
                 const seedSection = pageFixture.sections[n];
                 const content = await resolveSectionContent(
                     prisma,
-                    orgId,
+                    siteOrgId,
                     site.id,
                     [s, p, n],
                     seedSection,
@@ -1017,7 +1179,7 @@ async function seedWebsite(
                     create: {
                         id: id("section", s, p, n),
                         pageVersionId: version.id,
-                        organizationId: orgId,
+                        organizationId: siteOrgId,
                         type: seedSection.type,
                         contractVersion: 1,
                         order: n,
@@ -1063,7 +1225,7 @@ async function seedWebsite(
             create: {
                 id: id("publication", s),
                 siteId: site.id,
-                organizationId: orgId,
+                organizationId: siteOrgId,
                 snapshot: {
                     /*
                      * SHAPED LIKE A REAL PUBLISH (#265).
@@ -1445,6 +1607,9 @@ export async function reset(): Promise<void> {
         () => prisma.page.deleteMany({ where }),
         // Forms outlive their Site by design (SetNull), so they are removed
         // explicitly rather than left behind by the Site delete below.
+        // Entries cascade from their form, but are removed first so the
+        // count the reset reports is what the seed wrote.
+        () => prisma.submission.deleteMany({ where }),
         () => prisma.form.deleteMany({ where }),
         () => prisma.domain.deleteMany({ where }),
         // Before the Site: Site.currentPublicationId is SetNull, so dropping

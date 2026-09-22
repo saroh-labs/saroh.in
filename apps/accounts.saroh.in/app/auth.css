@@ -2,30 +2,24 @@
    AUTH MOTION — accounts.saroh.in
    =============================================================================
 
-   This file replaces the previous "atmosphere" sheet, and the deletion is the
-   point. That version painted a drifting navy aurora with a lime hairline and a
-   grain overlay over a translucent, blurred panel. In a monochrome register
-   every one of those is wrong: there is no navy, no lime, and a blurred
-   translucent card contradicts the whole idea that separation comes from a
-   crisp 1px line rather than from depth.
+   Retuned to the brand's motion rules (brand file §16, 2026-09-19): quick, and
+   never bouncy. One curve (`--ease-out`, nothing overshoots), one default
+   duration (`--duration-base`, 140ms), exits faster than entries, no more than
+   10px of travel, and never position and size at once.
 
-   What is left is the MOTION — staggered entrance, focus, shake, checkmark —
-   retuned so it reads on both a white page and a black one. Nothing here paints
-   a colour of its own; every value is a token or an alpha of one, so the same
-   rules work in light and dark without a branch.
+   What that removed, and why each one had to go:
+   - The two springs (`--sa-spring`, `--sa-out`) both overshot or ran long.
+   - The staggered cascade put the last field 750ms behind the first. Someone
+     signing in should not wait for the page to finish arriving.
+   - The shake. Motion is not the feedback; the error message says what went
+     wrong, so the animation had no job the copy did not already do.
+   - Press and hover scales. Press is a colour step now (the Button primitive),
+     which says "pressed" without moving the label.
 
    Still CSS-only: this is the product's LCP and often a cold session's first
-   request, and shipping an animation runtime to render five form fields would
-   trade real first-paint cost for nothing.
-
-   Reduced motion is clamped suite-wide in @saroh/ui/globals.css, and every rule
-   below is written so its RESTING state is the correct one.
+   request. Reduced motion is clamped suite-wide in @saroh/ui/globals.css, and
+   every rule below is written so its RESTING state is the correct one.
    ========================================================================== */
-
-:root {
-    --sa-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-    --sa-out: cubic-bezier(0.16, 1, 0.3, 1);
-}
 
 /* ─── Page ───────────────────────────────────────────────────────────────────
    Flat. The old backdrop was three blurred radial fields plus grain; the
@@ -59,54 +53,38 @@
     );
 }
 
-/* ─── Entrance ───────────────────────────────────────────────────────────── */
+/* ─── Entrance ──────────────────────────────────────────────────────────────
+   One short rise for the brand and one for the panel. Opacity carries it; the
+   8px of travel only stops it appearing from nowhere. */
 
 .sa-rise {
-    animation: sa-rise 500ms var(--sa-out) backwards;
-    animation-delay: var(--sa-delay, 0ms);
+    animation: sa-rise var(--duration-base) var(--ease-out) backwards;
 }
 
 @keyframes sa-rise {
     from {
         opacity: 0;
-        transform: translate3d(0, 10px, 0);
-    }
-    to {
-        opacity: 1;
-        transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 8px, 0);
     }
 }
 
 /* ─── Panel ──────────────────────────────────────────────────────────────────
-   Solid card, 1px border, barely-there shadow. No blur, no translucency, no
-   coloured hairline — the border does the work.
-   ─── */
+   A raised white surface on Paper: 1px border and the brand's "raised" shadow,
+   Ink at 8%, never black. */
 
 .sa-panel {
     position: relative;
     background: hsl(var(--card));
     border-color: hsl(var(--border));
-    box-shadow:
-        0 1px 2px 0 hsl(var(--shadow-color) / 0.04),
-        0 8px 24px -16px hsl(var(--shadow-color) / 0.12);
-    animation: sa-panel-in 560ms var(--sa-out) backwards;
-}
-
-@keyframes sa-panel-in {
-    from {
-        opacity: 0;
-        transform: translate3d(0, 14px, 0);
-    }
-    to {
-        opacity: 1;
-        transform: translate3d(0, 0, 0);
-    }
+    box-shadow: var(--shadow-sm);
+    animation: sa-rise var(--duration-base) var(--ease-out) backwards;
 }
 
 /* Success exit — the panel leaves before the cross-origin redirect, so the
-   handoff reads as one motion rather than a freeze then a jump. */
+   handoff reads as one motion rather than a freeze then a jump. Exit is faster
+   than entry. */
 .sa-panel--leaving {
-    animation: sa-panel-out 380ms var(--sa-out) forwards;
+    animation: sa-panel-out var(--duration-fast) var(--ease-out) forwards;
 }
 
 @keyframes sa-panel-out {
@@ -116,145 +94,64 @@
     }
 }
 
-/* ─── Controls ───────────────────────────────────────────────────────────── */
+/* ─── Controls ──────────────────────────────────────────────────────────────
+   The Input and Button primitives already carry the brand's focus ring (Ink
+   900 with a Paper offset, Saffron 400 on dark) and their colour steps. These
+   classes only keep the transitions on the brand's timing. */
 
-.sa-input {
-    transition:
-        border-color 150ms ease,
-        box-shadow 150ms ease;
-}
-
-/* Blue focus ring — the one chromatic thing in the system, and focus is
-   precisely what it is for. */
-.sa-input:focus-visible {
-    border-color: hsl(var(--ring));
-    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.22);
-}
-
-/* The filled control. No sheen, no glow: this register does emphasis with
-   contrast, and a sweeping highlight on a black button reads as a gimmick. */
-.sa-cta {
-    transition:
-        transform 130ms var(--sa-spring),
-        opacity 150ms ease,
-        background-color 150ms ease;
-}
-
-.sa-cta:active:not(:disabled) {
-    transform: scale(0.985);
-}
-
+.sa-input,
+.sa-cta,
 .sa-press {
-    transition:
-        transform 130ms var(--sa-spring),
-        background-color 150ms ease,
-        border-color 150ms ease;
+    transition-property: color, background-color, border-color, box-shadow;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
 }
 
-.sa-press:active:not(:disabled) {
-    transform: scale(0.985);
-}
-
-/* ─── Code entry ─────────────────────────────────────────────────────────────
-   The verify screen's one job. The focused box takes the blue ring and lifts a
-   hair; a landed digit settles with overshoot. The previous version pulsed a
-   lime glow forever — an infinite animation on the one control you are already
-   looking at is noise, not guidance.
-   ─── */
+/* ─── Code entry ────────────────────────────────────────────────────────────
+   The verify screen's one job. Focus takes the same ring as every other field;
+   a filled box takes the stronger edge — a colour step, not an alpha. */
 
 .sa-otp {
-    transition:
-        border-color 150ms ease,
-        box-shadow 180ms ease,
-        transform 150ms var(--sa-spring);
+    transition-property: border-color, box-shadow, background-color;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
 }
 
-.sa-otp:focus {
+.sa-otp:focus-visible {
     outline: none;
     border-color: hsl(var(--ring));
-    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.22);
-    transform: translateY(-1px);
+    box-shadow:
+        0 0 0 2px hsl(var(--background)),
+        0 0 0 4px hsl(var(--ring));
 }
 
 .sa-otp[data-filled="true"] {
-    border-color: hsl(var(--foreground) / 0.45);
-    animation: sa-land 200ms var(--sa-spring);
-}
-
-@keyframes sa-land {
-    0% {
-        transform: scale(1);
-    }
-    45% {
-        transform: scale(1.07);
-    }
-    100% {
-        transform: scale(1);
-    }
-}
-
-.sa-shake {
-    animation: sa-shake 400ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
-}
-
-@keyframes sa-shake {
-    10%,
-    90% {
-        transform: translate3d(-2px, 0, 0);
-    }
-    20%,
-    80% {
-        transform: translate3d(4px, 0, 0);
-    }
-    30%,
-    50%,
-    70% {
-        transform: translate3d(-5px, 0, 0);
-    }
-    40%,
-    60% {
-        transform: translate3d(5px, 0, 0);
-    }
+    border-color: hsl(var(--border-strong));
 }
 
 /* ─── Feedback ───────────────────────────────────────────────────────────── */
 
 .sa-alert {
-    animation: sa-alert-in 260ms var(--sa-out);
+    animation: sa-rise var(--duration-base) var(--ease-out);
 }
 
-@keyframes sa-alert-in {
-    from {
-        opacity: 0;
-        transform: translate3d(0, -5px, 0);
-    }
-    to {
-        opacity: 1;
-        transform: translate3d(0, 0, 0);
-    }
-}
-
-/* Success mark — ring wipes in, then the tick draws. Two stages, because a
-   single fade cannot say "this completed" the way a travelling stroke can. */
+/* Success mark — the ring fades in, then the tick draws. The draw is the one
+   travelling stroke here: it says "this completed", and it lands inside the
+   200ms ceiling. */
 .sa-check-ring {
-    transform-origin: center;
-    animation: sa-ring 380ms var(--sa-spring) backwards;
+    animation: sa-fade var(--duration-base) var(--ease-out) backwards;
 }
 
 .sa-check-path {
     stroke-dasharray: 32;
     stroke-dashoffset: 32;
-    animation: sa-draw 340ms var(--sa-out) 240ms forwards;
+    animation: sa-draw var(--duration-slow) var(--ease-out)
+        var(--duration-fast) forwards;
 }
 
-@keyframes sa-ring {
+@keyframes sa-fade {
     from {
         opacity: 0;
-        transform: scale(0.5);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
     }
 }
 

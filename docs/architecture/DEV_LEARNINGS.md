@@ -314,3 +314,71 @@ explicitly with `@Type(() => Number)`. The per-field transforms are gone, and
 the plain decorator is the whole rule again. The lesson generalises — a trap you
 step around in code review is a trap you will fall into; the fix is to remove it.
 **Category**: api · rule in `docs/patterns/backend-nestjs.md`
+
+## Sites — adding one section stopped the whole page from saving (#328, #275)
+
+**Problem**: After adding a section, nothing else on the page saved: other
+edits, a reorder, a hide. The bar said "Not saved", a toast repeated every
+1.5s, and publish stayed blocked.
+**Root cause**: The editor autosaves the page's WHOLE section list, and
+`replaceDraftSections` refuses the list on the first section that fails its
+contract. New sections start empty, so they fail. Three routes hit it: a new
+section; an enquiry section with an empty field, whose Form sync ran before
+anything was held back; and a section stored before its contract tightened,
+which fails for ever.
+**Fix**: The editor holds back sections that fail their contract
+(`saveable-sections.ts`), sending a held-back section's saved version so the
+save does not delete it. The held-back list is derived from the sections on
+screen, never stored, because a stored list went stale on every revert,
+removal or failed save. The enquiry sync skips unfinished sections
+(`sync-enquiry-forms.ts`). The API carries through, unvalidated, a section
+equal to the stored one under the same key, since nothing new is being
+stored. A failed sync sets `failedJson` like any failed save, so it does not
+loop.
+**Category**: sites editor · tests in `saveable-sections.test.ts`,
+`sync-enquiry-forms.test.ts`, `draft-revision.service.spec.ts`
+
+## Blocks — a ¥1,500 service showed as ¥150,000 on the site (#325)
+
+**Problem**: A price read right in the workspace but was 100× too high on a
+merchant's site, for yen only. Rupees and pounds were fine, so nothing caught
+it.
+**Root cause**: `Service.priceCents` is the amount × 100 for EVERY currency:
+that is how the service form writes it and how `formatMoney` reads it. The
+site block divided by the currency's own minor unit (10⁰ for JPY), which is
+the textbook reading of "cents", but not this codebase's.
+**Fix**: The block divides by 100 and lets `Intl` choose only the displayed
+decimals. Check how a money field is WRITTEN before formatting it anywhere
+new.
+**Category**: money · `packages/site-blocks/src/blocks/services-list.tsx`,
+test in `services-list.test.tsx`
+
+## Public pages — API error text is not visitor copy (#327, #322)
+
+**Problem**: Booking visitors saw "Validation failed" or "startAt is not a
+valid instant". Checkout was one field-name fix away from showing buyers
+"Stored provider credentials are malformed".
+**Root cause**: The API's 4xx messages are written for developers or for the
+MERCHANT, and describe their setup. A block that showed `error.message`
+(#327), and checkout's `readError`, which only failed because it read
+`body.message` instead of `body.error.message`, both treated them as copy for
+the public.
+**Fix**: Merchant-site blocks and the checkout page show their own sentences,
+chosen by status: 404/410 is "closed", 400 is "check your details", 429 is
+"slow down". API text never reaches a visitor. Checkout has a comment where
+`readError` was, so nobody "fixes" it back.
+**Category**: public pages · `booking.tsx`, `apps/saroh.app/lib/checkout.ts`
+
+## Catalog — a preview hydrated with different times than the server drew (#326)
+
+**Problem**: The ui.saroh.in catalog's booking preview could hydrate with a
+mismatch.
+**Root cause**: The preview drew sample open times formatted in the viewer's
+time zone, and prices in their locale, during server rendering, so they came
+out in the SERVER's zone and locale, then differed in the browser. The live
+blocks never hit this, because they load in an effect after mount.
+**Fix**: `BlockFixturePreview` renders live-data previews only after mount
+(`useSyncExternalStore` with a false server snapshot), from one list,
+`LIVE_DATA_PREVIEWS`. Anything formatted for the viewer's zone or locale
+waits for the browser.
+**Category**: site blocks · `packages/site-blocks/src/block-fixture-preview.tsx`

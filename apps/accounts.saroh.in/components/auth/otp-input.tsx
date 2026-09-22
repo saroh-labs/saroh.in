@@ -99,10 +99,9 @@ export function OtpInput({
     }
 
     return (
-        <div
-            key={invalid ? "invalid" : "valid"}
-            className={cn("flex justify-between gap-2", invalid && "sa-shake")}
-        >
+        // No shake. Motion is not the feedback: the error message under the
+        // boxes says what went wrong, and the Destructive edge marks where.
+        <div className="flex justify-between gap-2">
             {Array.from({ length }).map((_, index) => (
                 <input
                     key={index}
@@ -125,9 +124,9 @@ export function OtpInput({
                     aria-invalid={invalid ? true : undefined}
                     aria-describedby={describedBy}
                     className={cn(
-                        "sa-otp border-input h-14 w-full rounded-lg border text-center text-xl font-semibold tabular-nums",
-                        "disabled:cursor-not-allowed disabled:opacity-50",
-                        invalid && "border-destructive",
+                        "sa-otp border-input bg-field h-[46px] w-full rounded-[9px] border text-center text-[18px] font-semibold tabular-nums",
+                        "disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground disabled:cursor-not-allowed",
+                        invalid && "border-destructive bg-destructive-subtle",
                     )}
                 />
             ))}

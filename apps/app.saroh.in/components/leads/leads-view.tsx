@@ -1,8 +1,8 @@
 "use client";
 
+import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
-import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { DataView } from "@/components/shared/data-view/data-view";
@@ -14,6 +14,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { contactName } from "@/lib/crm/format";
 import { formatWaiting } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
+import { formatStatus } from "@/lib/format/status";
 import type { LeadListItem, LeadStatus } from "@/lib/leads/service";
 
 /**
@@ -28,13 +29,13 @@ import type { LeadListItem, LeadStatus } from "@/lib/leads/service";
  * hands merchants. See `DataFilter`.
  */
 
-const STATUS: Record<LeadStatus, string> = {
-    // Won is the brand's own colour because it is the outcome the whole screen
-    // is for; lost is muted rather than destructive — a lost lead is a normal
-    // result, not an error the merchant should be alarmed by.
-    OPEN: "border-border text-foreground bg-transparent border",
-    WON: "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground",
-    LOST: "text-muted-foreground border-border bg-transparent border",
+const STATUS: Record<LeadStatus, NonNullable<BadgeProps["variant"]>> = {
+    // Won is success because it is the outcome the whole screen is for; lost
+    // is neutral rather than destructive — a lost lead is a normal result, not
+    // an error the merchant should be alarmed by.
+    OPEN: "outline",
+    WON: "success",
+    LOST: "neutral",
 };
 
 const FILTERS: DataFilter<LeadListItem>[] = [
@@ -44,7 +45,7 @@ const FILTERS: DataFilter<LeadListItem>[] = [
     { id: "lost", label: "Lost", predicate: (l) => l.status === "LOST" },
 ];
 
-const Missing = () => <span className="text-muted-foreground/60">—</span>;
+const Missing = () => <span className="text-muted-foreground">—</span>;
 
 export function LeadsView({
     leads,
@@ -61,14 +62,10 @@ export function LeadsView({
             header: "Lead",
             priority: "primary",
             sortValue: (l) => l.title.toLowerCase(),
-            cell: (l) => (
-                <Link
-                    href={`/leads/${l.id}`}
-                    className="font-medium underline-offset-4 hover:text-brand hover:underline"
-                >
-                    {l.title}
-                </Link>
-            ),
+            // Plain text: the table wraps the primary cell in the row's own
+            // link (`rowHref`), and a link inside a link is invalid HTML that
+            // broke hydration on every load of this screen.
+            cell: (l) => <span className="font-medium">{l.title}</span>,
         },
         {
             id: "contact",
@@ -93,6 +90,7 @@ export function LeadsView({
             header: "Value",
             priority: "secondary",
             numeric: true,
+            money: true,
             sortValue: (l) => l.value ?? 0,
             // No currency is recorded against a Lead anywhere in the schema, so
             // none is drawn — see `lib/format/money.ts`.
@@ -118,13 +116,8 @@ export function LeadsView({
             priority: "secondary",
             sortValue: (l) => l.status,
             cell: (l) => (
-                <Badge
-                    className={cn(
-                        "text-[0.625rem] font-medium uppercase tracking-wider",
-                        STATUS[l.status],
-                    )}
-                >
-                    {l.status}
+                <Badge variant={STATUS[l.status]}>
+                    {formatStatus(l.status)}
                 </Badge>
             ),
         },
@@ -165,7 +158,7 @@ export function LeadsView({
             filters={FILTERS}
             initialFilterId={initialView}
             searchableColumnIds={["title", "contact", "stage"]}
-            empty="Leads appear here as enquiries come in. You can also create one by hand from a contact."
+            empty="Leads appear here as enquiries come in, or when you add one."
             renderCard={(l) => (
                 <Link href={`/leads/${l.id}`} className="block">
                     {/* `wk-surface`, not a brand-tinted hover edge: the card is a

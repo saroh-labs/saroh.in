@@ -14,6 +14,7 @@ import { IANAZone } from "luxon";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { authorize } from "../organizations/organization-policy";
+import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type {
     AvailabilityRuleWindow,
     AvailabilityService,
@@ -94,6 +95,16 @@ export type BookingDetail = Prisma.BookingGetPayload<{
  * SERIALIZABLE transaction that re-counts CONFIRMED overlaps INSIDE the tx (see
  * {@link book} for the full race argument).
  */
+/** A service as a website visitor sees it (#255). No internal fields. */
+export interface PublicService {
+    id: string;
+    name: string;
+    description: string | null;
+    durationMinutes: number;
+    priceCents: number | null;
+    currency: string | null;
+}
+
 @Injectable()
 export class BookingsService {
     /**
@@ -338,8 +349,9 @@ export class BookingsService {
 
     /**
      * PUBLIC availability for a bookable service — no auth, org-agnostic. Loads
-     * the ACTIVE service (404/410 otherwise) and returns open slots for the
-     * range. The org is never surfaced.
+     * the ACTIVE service of an organization with Appointments on (404/410
+     * otherwise) and returns open slots for the range. The org is never
+     * surfaced.
      */
     async publicAvailability(
         serviceId: string,
@@ -356,6 +368,49 @@ export class BookingsService {
             to,
             confirmed,
         );
+    }
+
+    /**
+     * The public view of a merchant's chosen services, for the website's
+     * services list (#255). Guardless like availability: the ids come from a
+     * published section, and only fields a visitor is meant to see leave here.
+     *
+     * Read live, not frozen at publish, so a changed price or a deleted service
+     * is right on the next page view. Filtered to what may be offered:
+     * - not deleted, and ACTIVE (an archived service is not on offer);
+     * - its Organization has not DISABLED Appointments. A missing module row
+     *   counts as on: enforcement is still dark (#117) and the backfill may not
+     *   have written one, and hiding a merchant's services over an absent row
+     *   would be the wrong way to fail.
+     *
+     * Returned in the order asked for, which is the order the merchant set.
+     * Unknown ids are dropped, never an error: the page must degrade, not 404.
+     */
+    async publicServices(ids: string[]): Promise<PublicService[]> {
+        if (ids.length === 0) return [];
+        const rows = await prisma.service.findMany({
+            where: {
+                id: { in: ids },
+                deletedAt: null,
+                status: "ACTIVE",
+                // The same rule public booking closes on (#327), so a list
+                // never offers a service its booking block would refuse.
+                organization: APPOINTMENTS_OPEN,
+            },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                durationMinutes: true,
+                priceCents: true,
+                currency: true,
+            },
+        });
+        const byId = new Map(rows.map((row) => [row.id, row]));
+        return ids.flatMap((id) => {
+            const row = byId.get(id);
+            return row ? [row] : [];
+        });
     }
 
     // ── Bookings (management) ──────────────────────────────────────────────
@@ -750,11 +805,144 @@ export class BookingsService {
             }
         }
 
+        // 5. Atomic, serializable reservation (see the method doc for WHY).
+        return this.reserve(service, startAt, endAt, input, {
+            source: `booking:service:${serviceId}`,
+            actorUserId: null,
+        });
+    }
+
+    /**
+     * A booking the merchant makes for someone — on the phone, at the
+     * counter — rather than one the booker makes on the booking page (#384).
+     *
+     * The same reservation as {@link book}, so it cannot promise what the
+     * public page could not: the time must be a real open slot of an ACTIVE
+     * service, and the serializable capacity re-count still decides. What
+     * differs is who is acting — `booking:write`, the service must belong to
+     * the caller's business, there is no IP rate limit, and the history
+     * records the person who made it.
+     *
+     * The booker is someone already in the contacts (`contactId`, whose name
+     * and email are used as they stand) or someone new (`bookerEmail`, and
+     * optionally a name and phone), who becomes a contact the way a booking
+     * page booker does.
+     */
+    async bookByHand(
+        ctx: OrganizationContext,
+        serviceId: string,
+        dto: {
+            startAt: string;
+            contactId?: string;
+            bookerName?: string;
+            bookerEmail?: string;
+            bookerPhone?: string;
+            idempotencyKey?: string;
+        },
+    ): Promise<Booking> {
+        authorize(ctx, "booking:write");
+
+        const { service, rules } = await this.loadBookableService(serviceId);
+        if (service.organizationId !== ctx.organizationId) {
+            throw new NotFoundException("Service not found");
+        }
+
+        const startAt = new Date(dto.startAt);
+        if (Number.isNaN(startAt.getTime())) {
+            throw new BadRequestException("startAt is not a valid instant");
+        }
+        if (
+            !isValidSlotStart(
+                this.toAvailabilityService(service),
+                rules,
+                startAt,
+            )
+        ) {
+            throw new BadRequestException(
+                "That time is not an open slot for this service",
+            );
+        }
+        const endAt = new Date(
+            startAt.getTime() + service.durationMinutes * 60_000,
+        );
+
+        let booker: BookInput;
+        if (dto.contactId) {
+            const contact = await prisma.contact.findUnique({
+                where: { id: dto.contactId },
+            });
+            if (contact?.organizationId !== ctx.organizationId) {
+                throw new NotFoundException("Contact not found");
+            }
+            const name = [contact.firstName, contact.lastName]
+                .filter(Boolean)
+                .join(" ")
+                .trim();
+            booker = {
+                startAt: dto.startAt,
+                bookerEmail: contact.email,
+                bookerName: name || undefined,
+                bookerPhone: contact.phone ?? undefined,
+            };
+        } else if (dto.bookerEmail) {
+            booker = {
+                startAt: dto.startAt,
+                bookerEmail: dto.bookerEmail,
+                // A field left blank is not given, rather than "".
+                bookerName: dto.bookerName?.trim() ? dto.bookerName : undefined,
+                bookerPhone: dto.bookerPhone?.trim()
+                    ? dto.bookerPhone
+                    : undefined,
+            };
+        } else {
+            throw new BadRequestException({
+                message: "Choose someone from your contacts, or give an email.",
+                field: "bookerEmail",
+            });
+        }
+
+        if (dto.idempotencyKey) {
+            const existing = await prisma.booking.findUnique({
+                where: {
+                    serviceId_idempotencyKey: {
+                        serviceId,
+                        idempotencyKey: dto.idempotencyKey,
+                    },
+                },
+            });
+            if (existing) return existing;
+            booker.idempotencyKey = dto.idempotencyKey;
+        }
+
+        return this.reserve(service, startAt, endAt, booker, {
+            source: "manual",
+            actorUserId: ctx.userId,
+        });
+    }
+
+    /**
+     * The reservation itself, shared by the booking page and a booking made
+     * by hand: re-count inside a Serializable transaction, upsert the contact,
+     * write the CONFIRMED booking, its first history event and the notify job.
+     * See {@link book} for why the in-transaction re-count is the guarantee.
+     */
+    private async reserve(
+        service: Service,
+        startAt: Date,
+        endAt: Date,
+        input: BookInput,
+        by: {
+            /** `Contact.source` for someone new. */
+            source: string;
+            /** Who made it; `null` when the booker did it themselves. */
+            actorUserId: string | null;
+        },
+    ): Promise<Booking> {
+        const serviceId = service.id;
         const organizationId = service.organizationId;
         const email = input.bookerEmail.trim().toLowerCase();
         const snapshot = this.buildSnapshot(service, input, startAt, endAt);
 
-        // 5. Atomic, serializable reservation (see the method doc for WHY).
         let booked: Booking;
         try {
             booked = await prisma.$transaction(
@@ -787,7 +975,7 @@ export class BookingsService {
                             lastName:
                                 this.splitName(input.bookerName).last ?? null,
                             phone: input.bookerPhone ?? null,
-                            source: `booking:service:${serviceId}`,
+                            source: by.source,
                         },
                     });
 
@@ -809,14 +997,17 @@ export class BookingsService {
                     });
 
                     // Where the history starts. No `fromStartAt`: there was
-                    // no before, and no actor either — the booker did this
-                    // themselves, which is what distinguishes it from a move.
+                    // no before. The actor is whoever made it by hand; a
+                    // booker who did it themselves leaves it empty.
                     await tx.bookingEvent.create({
                         data: {
                             bookingId: booking.id,
                             organizationId,
                             type: BookingEventType.Booked,
                             toStartAt: startAt,
+                            ...(by.actorUserId
+                                ? { actorUserId: by.actorUserId }
+                                : {}),
                         },
                         select: { id: true },
                     });
@@ -884,7 +1075,12 @@ export class BookingsService {
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
-    /** Load an ACTIVE, non-deleted bookable service + its rules, or throw (404/410). */
+    /**
+     * Load an ACTIVE, non-deleted bookable service + its rules, or throw
+     * (404/410). A service whose organization switched Appointments off is 410
+     * like an archived one: the booking would otherwise land behind a module
+     * the merchant can no longer open.
+     */
     private async loadBookableService(
         serviceId: string,
     ): Promise<{ service: Service; rules: AvailabilityRuleWindow[] }> {
@@ -897,6 +1093,11 @@ export class BookingsService {
         }
         if (service.status !== "ACTIVE") {
             throw new GoneException("This service is not accepting bookings");
+        }
+        if (!(await appointmentsOpen(service.organizationId))) {
+            throw new GoneException(
+                "This business isn't taking online bookings right now",
+            );
         }
         const { availabilityRules, ...rest } = service;
         return { service: rest, rules: availabilityRules };

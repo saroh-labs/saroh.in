@@ -3,14 +3,11 @@ import {
     ArrayMaxSize,
     IsArray,
     IsEmail,
-    IsIn,
     IsOptional,
     IsString,
     MaxLength,
+    MinLength,
 } from "class-validator";
-
-import type { OrgRole } from "../../common/types/organization-context";
-import { ORG_ROLES } from "../../common/types/organization-context";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -21,11 +18,11 @@ const trimLower = ({ value }: { value: unknown }) =>
 /**
  * Invite someone to the organization (#276).
  *
- * The role is validated against {@link ORG_ROLES} rather than accepted as a
- * string: `organization-context.service.ts` turns an unrecognized role into
- * MEMBER and logs it, so a typo here would silently hand someone the whole
- * read-only floor — the roster, the stores, every site — instead of the
- * narrow role that was meant.
+ * `role` is any role this business HAS — one of the four built-ins or one it
+ * invented — so it cannot be checked against a fixed list here. The service
+ * checks it against the business's own roles and refuses a key it does not
+ * have: a typo must be a 400, never a membership that silently resolves to
+ * the read-only floor instead of the narrow role that was meant.
  */
 export class InviteMemberDto {
     @Transform(trimLower)
@@ -34,8 +31,10 @@ export class InviteMemberDto {
     email!: string;
 
     @Transform(trim)
-    @IsIn(ORG_ROLES, { message: "Unknown role" })
-    role!: OrgRole;
+    @IsString()
+    @MinLength(1, { message: "Choose a role" })
+    @MaxLength(64)
+    role!: string;
 
     /**
      * Sites a REVIEWER invite grants. Required for REVIEWER and rejected for
@@ -57,9 +56,12 @@ export class InviteMemberDto {
  * site is no longer theirs to see.
  */
 export class UpdateMemberRoleDto {
+    /** A built-in or invented role key; checked against the business. */
     @Transform(trim)
-    @IsIn(ORG_ROLES, { message: "Unknown role" })
-    role!: OrgRole;
+    @IsString()
+    @MinLength(1, { message: "Choose a role" })
+    @MaxLength(64)
+    role!: string;
 
     @IsOptional()
     @IsArray()

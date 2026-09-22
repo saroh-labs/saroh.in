@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from "@nestjs/common";
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    HttpCode,
+    Param,
+    Patch,
+    Post,
+    UseGuards,
+} from "@nestjs/common";
 
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
@@ -7,7 +17,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { ContactsService } from "./contacts.service";
-import { UpdateContactDto } from "./dto";
+import { CreateContactDto, UpdateContactDto } from "./dto";
 
 /**
  * CRM Contact endpoints for an Organization (S3-005), scoped to
@@ -30,6 +40,15 @@ export class ContactsController {
         return this.contacts.list(ctx);
     }
 
+    @Post()
+    @HttpCode(201)
+    create(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: CreateContactDto,
+    ) {
+        return this.contacts.create(ctx, dto);
+    }
+
     @Get(":contactId")
     get(
         @OrgContext() ctx: OrganizationContext,
@@ -45,5 +64,13 @@ export class ContactsController {
         @Body() dto: UpdateContactDto,
     ) {
         return this.contacts.update(ctx, contactId, dto);
+    }
+
+    @Delete(":contactId")
+    remove(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ): Promise<{ id: string; deleted: true; leads: number }> {
+        return this.contacts.remove(ctx, contactId);
     }
 }

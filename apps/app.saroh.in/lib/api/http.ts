@@ -187,3 +187,24 @@ export async function mutate<T>(
     }
     return { ok: false, error: readError(data, fallback) };
 }
+
+/**
+ * DELETE helper returning a {@link CrmResult}, the counterpart to `mutate`.
+ *
+ * Lived privately in `organizations/members.ts` while it had two callers; the
+ * roles screen made a third, and a third copy is how three error messages come
+ * to disagree about what a failed delete says. A 204 has no body, which is
+ * why an empty object stands in for `data`.
+ */
+export async function destroy<T>(
+    path: string,
+    fallback: string,
+): Promise<CrmResult<T>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}${path}`, { method: "DELETE" });
+    const data = (await res.json().catch(() => null)) as
+        (T & { message?: string }) | null;
+    if (res.ok) return { ok: true, data: (data ?? {}) as T };
+    return { ok: false, error: readError(data, fallback) };
+}

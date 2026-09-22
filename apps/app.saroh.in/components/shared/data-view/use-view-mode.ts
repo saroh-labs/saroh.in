@@ -5,8 +5,12 @@ import { useCallback, useSyncExternalStore } from "react";
 import type { DataViewMode } from "./types";
 
 const STORAGE_PREFIX = "saroh-view-mode:";
-/** Tailwind's `lg`. Below this, a table cannot be read without pinch-zoom. */
-const TABLE_MIN_WIDTH = 1024;
+/**
+ * The design's table boundary (brand file §21): above it a table shows every
+ * column, below it rows become cards. Collapsing the rail to 64px at 1100 is
+ * what buys a table the width to reach down here.
+ */
+const TABLE_MIN_WIDTH = 760;
 
 /**
  * In-memory overrides, so a click updates every mounted view of the same id
@@ -15,9 +19,20 @@ const TABLE_MIN_WIDTH = 1024;
 const chosen = new Map<string, DataViewMode>();
 const listeners = new Set<() => void>();
 
+/**
+ * A resize counts as a change too: with no stored preference the viewport
+ * decides, so crossing the table boundary has to re-read it. A tablet that
+ * rotates, or a window dragged narrow, otherwise keeps a table it no longer
+ * has the width for.
+ */
 function subscribe(onChange: () => void) {
     listeners.add(onChange);
-    return () => listeners.delete(onChange);
+    const mq = window.matchMedia(`(min-width: ${TABLE_MIN_WIDTH}px)`);
+    mq.addEventListener("change", onChange);
+    return () => {
+        listeners.delete(onChange);
+        mq.removeEventListener("change", onChange);
+    };
 }
 
 function readPreference(
@@ -38,7 +53,7 @@ function readPreference(
         // preference is not worth failing a render over.
     }
 
-    const wide = window.innerWidth >= TABLE_MIN_WIDTH;
+    const wide = window.matchMedia(`(min-width: ${TABLE_MIN_WIDTH}px)`).matches;
     const preferred = wide ? defaultMode : "list";
     return available.includes(preferred) ? preferred : defaultMode;
 }

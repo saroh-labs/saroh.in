@@ -32,8 +32,10 @@ export function ListSkeleton({
             {/* The rows come from the shared `LoadingState` (#177) so there is
                 ONE loading treatment rather than two that drift: it carries the
                 `aria-busy` and the announced label, so a screen reader is told
-                this is arriving instead of being read a wall of empty boxes. */}
-            <LoadingState rows={rows} className="gap-3 [&>*]:h-20" />
+                this is arriving instead of being read a wall of empty boxes.
+                `list` is the shape the rows themselves have, so nothing jumps
+                when they arrive. */}
+            <LoadingState rows={rows} variant="list" />
         </main>
     );
 }

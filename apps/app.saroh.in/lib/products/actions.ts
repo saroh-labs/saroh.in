@@ -15,6 +15,7 @@ import {
     deleteProduct as deleteProductApi,
     deleteVariant as deleteVariantApi,
     setInventory as setInventoryApi,
+    updateCategory as updateCategoryApi,
     updateProduct as updateProductApi,
     updateVariant as updateVariantApi,
 } from "./service";
@@ -43,6 +44,14 @@ export async function deleteProduct(storeId: string, productId: string) {
 
 export async function createCategory(storeId: string, input: CategoryInput) {
     return createCategoryApi(storeId, input);
+}
+
+export async function updateCategory(
+    storeId: string,
+    categoryId: string,
+    input: CategoryInput,
+) {
+    return updateCategoryApi(storeId, categoryId, input);
 }
 
 export async function deleteCategory(storeId: string, categoryId: string) {

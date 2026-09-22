@@ -22,6 +22,8 @@
  * wrong in the merchant's own terms, not the schema's.
  */
 
+import { BLOCK_META, exampleTextIn, resolveVariant } from "@saroh/database";
+
 /**
  * The nine types, spelled out even where the data to detect them does not exist
  * yet. Naming all nine keeps the vocabulary the spec settled on, and makes the
@@ -165,6 +167,30 @@ function checkSection(
      */
     if (section.hidden) return flags;
 
+    /*
+     * A block added with its example content (#347 review) that still carries
+     * some of it. Named in the merchant's terms, with the words themselves, so
+     * the pre-publish check says exactly what to replace. Advisory like every
+     * flag here: an example sentence the merchant decides to keep is theirs.
+     */
+    const example = exampleTextIn(section.type, section.content);
+    if (example !== null) {
+        const label =
+            section.type in BLOCK_META
+                ? BLOCK_META[section.type as keyof typeof BLOCK_META].label
+                : "block";
+        const quoted =
+            example.length > 60
+                ? `${example.slice(0, 57).trimEnd()}…`
+                : example;
+        at(
+            "placeholderText",
+            // "FAQ" stays "FAQ"; "Rich text" reads "rich text" mid-sentence.
+            `This ${label === label.toUpperCase() ? label : label.toLowerCase()} still has example text in it ("${quoted}") — replace it with your own before going live.`,
+            null,
+        );
+    }
+
     switch (section.type) {
         case "hero": {
             const heading = str(c.heading);
@@ -267,9 +293,13 @@ function checkSection(
             /*
              * Four across is the case the spec names: three stack cleanly on a
              * phone, four leaves a widow on the second row and the images end
-             * up too small to make out.
+             * up too small to make out. The look is resolved, not read: v2
+             * content names it as `variant`, v1 as `layout`.
              */
-            if (c.layout === "grid" && images.length === 4) {
+            if (
+                resolveVariant("gallery", c) === "grid" &&
+                images.length === 4
+            ) {
                 at(
                     "phoneWidth",
                     "Four images in a grid do not stack evenly on a phone.",

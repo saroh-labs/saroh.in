@@ -3,7 +3,7 @@
 > **Read when:** designing or changing anything a merchant sees, deciding what
 > to build, or writing copy, a claim or a status.
 > Sources: `PRODUCT.md` (the short brief), `docs/PRODUCT_STRATEGY.md` (§ numbers
-> below), ADR-001 to ADR-004 and DEC-010 to DEC-016. Where this file and those
+> below), ADR-001 to ADR-006 and DEC-010 to DEC-018. Where this file and those
 > disagree, they win — fix this file in the same change.
 
 These are the product facts that change engineering rules. The technical
@@ -58,6 +58,11 @@ pattern files refer back here.
 
 - **Current** — Commerce-led, not commerce-only (decided 2026-08-02). A `Store`
   is a commerce channel beneath an Organization (ADR-001), not the tenant.
+- **Current** — **One storefront and one website per business, for now**
+  (ADR-006). The API refuses a second; the schema stays multi. Design screens
+  for one: no picker unless a business already has more than one, no "New
+  storefront" / "New site" once it has one, singular copy. Storefront and
+  website stay separate — mapping them is future work.
 - **Current** — **One customer record behind an order and a booking is not true
   yet.** `Customer` is store-scoped (its `organizationId` is still nullable), and
   linking it to a `Contact` is manual
@@ -67,6 +72,12 @@ pattern files refer back here.
   phone, and keep links reversible and auditable (§14).
 - **Current** — Merchant payments run on the Organization's own providers —
   Razorpay and Cashfree first — kept apart from Saroh's billing (DEC-010).
+- **Current** — **Deleting a contact, a lead or a customer is permanent, so it
+  asks first** and says what goes and what stays (#384). A contact takes their
+  leads and consent records; bookings, form entries and messages keep their
+  own record and lose only the link. **A customer who has ordered cannot be
+  deleted** — an order keeps who bought it; the menu shows why, it does not
+  hide the option.
 
 ## Bookings
 
@@ -78,6 +89,9 @@ pattern files refer back here.
 - **Adopted** — The booker and the merchant hear about a new or moved booking.
   Not true yet: `booking.notify` has no handler (`backend-jobs.md`, known gaps).
   Don't write copy that promises a confirmation message.
+- **Current** — A booking made by hand follows the booking page's rules: a
+  real open slot, the same serializable capacity check, and its history names
+  who on the team made it (#384).
 
 ## Websites
 
@@ -91,6 +105,10 @@ pattern files refer back here.
   publications keep validating.
 - **Current** — A merchant's site never wears Saroh's brand (`--site-*`, gates
   G2 and G6). A Site owns its Posts (ADR-004).
+- **Current** — A form entry is the record of what someone typed; it
+  outlives the contact and lead it created. Reading entries is `form:read`
+  (owner/admin), not the site's permission, because they are people's details
+  (#385).
 
 ## Communications
 

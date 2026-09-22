@@ -1,8 +1,25 @@
 "use client";
 
+import { blockExample } from "@saroh/block-contract";
+import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
+import {
+    ChevronDown,
+    ChevronLeft,
+    Eye,
+    Link2,
+    Lock,
+    Monitor,
+    Palette,
+    PanelBottom,
+    PanelTop,
+    Smartphone,
+    Tablet,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,38 +30,64 @@ import {
     useSyncExternalStore,
 } from "react";
 
-import { PanelDivider, RailTabs } from "@/components/sites/editor-chrome";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { AddBlockPanel } from "@/components/sites/add-block-panel";
+import { AddSectionDialog } from "@/components/sites/add-section-dialog";
+import { BlockFeedback } from "@/components/sites/block-feedback";
+import { SECTION_ICONS } from "@/components/sites/block-icons";
+import {
+    BlockInspector,
+    FixedBlockInspector,
+} from "@/components/sites/block-inspector";
+import {
+    EditorTabs,
+    PanelDivider,
+    railRowState,
+} from "@/components/sites/editor-chrome";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
 import {
     DEVICE_PX,
     DEVICE_WIDTH,
     DEVICES,
     SECTION_LABELS,
-    SECTION_ORDER,
     sectionTitle,
     ZOOMS,
 } from "@/components/sites/editor-constants";
 import { emptySection } from "@/components/sites/empty-section";
-import type { ServiceOption } from "@/components/sites/section-fields";
-import { SectionFields } from "@/components/sites/section-fields";
-import { SectionPadding } from "@/components/sites/section-fields/padding";
+import {
+    heldBackSummary,
+    unfinishedPhrase,
+} from "@/components/sites/held-back-copy";
+import type { HeldBackSection } from "@/components/sites/saveable-sections";
+import { saveableSections } from "@/components/sites/saveable-sections";
+import { withVariant } from "@/components/sites/section-fields/variant-field";
+import { syncEnquiryForms } from "@/components/sites/sync-enquiry-forms";
+import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { useServicesForPicker } from "@/components/sites/use-services-for-picker";
 
-import { NoteComposer } from "@/components/sites/note-composer";
+import { OptionSelect } from "@/components/shared/option-select";
+import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { PagesPanel } from "@/components/sites/pages-panel";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
 import { ReviewPanel } from "@/components/sites/review-panel";
 import { DraftPreview } from "@/components/sites/section-preview";
 import { StylePanel } from "@/components/sites/style-panel";
+import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { ensureFormForSection } from "@/lib/forms/actions";
-import { listServicesForPicker } from "@/lib/services/actions";
 import {
     getReviewState,
     getSiteFlags,
     listComments,
     publishSite,
+    requestReview,
     saveDraftSections,
     updateSiteStyle,
 } from "@/lib/sites/actions";
+import {
+    flagsByScreenPosition,
+    insertPosition,
+} from "@/lib/sites/editor-positions";
 import {
     getChrome,
     getChromeOnServer,
@@ -60,20 +103,24 @@ import {
     setPlace,
     subscribe,
 } from "@/lib/sites/editor-prefs";
+import type { EditorStatusTone } from "@/lib/sites/editor-status";
+import { editorStatus } from "@/lib/sites/editor-status";
 import { exactDate } from "@/lib/sites/format-date";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import { describePendingChanges } from "@/lib/sites/pending";
 import type {
     ApprovalOutcome,
-    Flag,
     ReviewState,
     Section,
     SectionType,
     SiteCommentView,
     SiteFlags,
+    SiteFooter,
+    SiteNavigation,
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import { resolveStyleVariables } from "@/lib/sites/style";
 
 /**
  * The bar's verdict badge, worded per outcome. Keyed by the union so a new
@@ -112,6 +159,17 @@ const APPROVAL_BADGE: Record<
     },
 };
 
+/** The status pill's colour, by what it means (#335). */
+const STATUS_BADGE: Record<
+    EditorStatusTone,
+    "error" | "draft" | "neutral" | "success"
+> = {
+    danger: "error",
+    attention: "draft",
+    quiet: "neutral",
+    done: "success",
+};
+
 /**
  * SiteEditor (S2-004) — the ticket's core deliverable. A client-side editable
  * list of sections rendered next to a LIVE `DraftPreview` that reflects local
@@ -134,6 +192,8 @@ export function SiteEditor({
     initialSections,
     initialRevision,
     siteName,
+    navigation,
+    footerPreview,
     address,
     initialStyle,
     styleOptions,
@@ -171,14 +231,27 @@ export function SiteEditor({
     /** Which edit of the draft `initialSections` are (#285). */
     initialRevision: number;
     siteName: string;
+    /** The site's menu, by page id; resolved here for the canvas header. */
+    navigation: SiteNavigation | null;
+    /** The footer, sanitized by the API, for the canvas to draw (#336). */
+    footerPreview: SiteFooter | null;
     initialStyle: SiteStyle;
     styleOptions: SiteStyleOptions;
     /** Where this site lives, shown in the bar. Null before a subdomain exists. */
     address?: string | null;
 }) {
     const [sections, setSections] = useState<Section[]>(initialSections);
-    const [lastSavedJson, setLastSavedJson] = useState(() =>
-        JSON.stringify(initialSections),
+    /*
+     * The list the server holds for this page: what the last accepted save
+     * SENT, which is not always what is on screen. A section that fails its
+     * contract is held back from the save (`saveable-sections.ts`), and this is
+     * where its previously saved version is found.
+     */
+    const [savedSections, setSavedSections] =
+        useState<Section[]>(initialSections);
+    const lastSavedJson = useMemo(
+        () => JSON.stringify(savedSections),
+        [savedSections],
     );
     const [saving, setSaving] = useState(false);
     const router = useRouter();
@@ -288,7 +361,7 @@ export function SiteEditor({
         () => getPlace(siteId, initialCount),
         () => serverPlace,
     );
-    const { selectedIndex, rail } = place;
+    const { selectedIndex, rail, inspector } = place;
 
     // Setters that keep every call site below unchanged. Writing through the
     // store is what makes the choice survive a reload; the re-render is the
@@ -306,10 +379,21 @@ export function SiteEditor({
         setSwitching(true);
         setTimeout(() => setSwitching(false), 300);
     };
+    /*
+     * The header or footer, when one of those is selected instead of a block
+     * (#336). Remembered with the place, so a reload comes back to it.
+     */
+    const selectedChrome = place.chrome;
     const setSelectedIndex = (next: number | null) =>
-        setPlace(siteId, initialCount, { selectedIndex: next });
-    const setRail = (next: "sections" | "pages" | "review" | "style") =>
+        setPlace(siteId, initialCount, { selectedIndex: next, chrome: null });
+    const selectChrome = (part: "header" | "footer") => {
+        setPlace(siteId, initialCount, { selectedIndex: null, chrome: part });
+        setInspector("block");
+    };
+    const setRail = (next: "sections" | "style") =>
         setPlace(siteId, initialCount, { rail: next });
+    const setInspector = (next: "block" | "feedback") =>
+        setPlace(siteId, initialCount, { inspector: next });
 
     /*
      * "Zoom is the readout dropdown only — 50 / 75 / 100 / Fit. No ⌘scroll, no
@@ -321,8 +405,10 @@ export function SiteEditor({
     const [switching, setSwitching] = useState(false);
     /** Full-screen preview: everything else hides, Escape returns (spec §2). */
     const [fullScreen, setFullScreen] = useState(false);
+    /** The page switcher under the page name in the breadcrumb. */
+    const [pagesOpen, setPagesOpen] = useState(false);
+    const [asking, setAsking] = useState(false);
     const canvasRef = useRef<HTMLDivElement | null>(null);
-    const scrollWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     /*
      * "Fit" is the only value that is not a fixed percentage: it scales the
@@ -346,6 +432,7 @@ export function SiteEditor({
         ro.observe(el);
         return () => ro.disconnect();
     }, [device]);
+    const scrollWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     /*
      * Restore where the merchant was scrolled to. Mount-only: re-running it on
@@ -375,6 +462,16 @@ export function SiteEditor({
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
     const [style, setStyle] = useState<SiteStyle>(initialStyle);
+    /** Feedback for the selected block, or the whole site's review. */
+    const [feedbackScope, setFeedbackScope] = useState<"block" | "site">(
+        "block",
+    );
+    /** The rail shows the Add block tab instead of this page's blocks (#337). */
+    const [adding, setAdding] = useState(false);
+    /** The block whose look is being chosen before it is added (#267). */
+    const [lookFor, setLookFor] = useState<SectionType | null>(null);
+    /** The full picker, every block drawn with previews (#267). */
+    const [browsing, setBrowsing] = useState(false);
     const [styleSaving, setStyleSaving] = useState(false);
     const [savedStyleJson, setSavedStyleJson] = useState(() =>
         JSON.stringify(initialStyle),
@@ -392,25 +489,55 @@ export function SiteEditor({
     const [revision, setRevision] = useState(initialRevision);
     const [conflict, setConflict] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    // The org's services for the booking-section picker. Loaded once on mount;
-    // Services are authored in the service editor, never inline here.
-    const [services, setServices] = useState<ServiceOption[]>([]);
+    // The Remove-section confirmation (replaces window.confirm, §9). Mirrors
+    // pages-panel.tsx's pendingDelete + deleteOpen: the section removed is
+    // kept after the dialog closes so its title does not blank out during
+    // the closing animation, and so onConfirm still has something to remove
+    // once removeAt has cleared the selection and `active` has gone null.
+    const [pendingRemove, setPendingRemove] = useState<{
+        index: number;
+        title: string;
+    } | null>(null);
+    const [removeOpen, setRemoveOpen] = useState(false);
+    const services = useServicesForPicker();
 
-    useEffect(() => {
-        let active = true;
-        listServicesForPicker()
-            .then((list) => {
-                if (active) setServices(list);
-            })
-            .catch(() => {
-                /* leave the picker empty on failure */
-            });
-        return () => {
-            active = false;
-        };
-    }, []);
+    const sectionsJson = JSON.stringify(sections);
+    const dirty = sectionsJson !== lastSavedJson;
+    /*
+     * Everything that could be saved is, and only unfinished sections are
+     * waiting. Still `dirty` — publish stays blocked, because the page on
+     * screen is not the page that would go live.
+     */
+    /*
+     * What a save would send right now, and what it would hold back. DERIVED
+     * from the sections on screen, not stored from the last save: a stored
+     * list went stale whenever the page changed without a save — a revert, a
+     * removal, a fix typed while a save was in flight, a failed save (review
+     * of #328). The save itself runs the same function, so the markers and
+     * what is actually sent cannot disagree.
+     */
+    const livePlan = useMemo(
+        () => saveableSections(sections, savedSections),
+        [sections, savedSections],
+    );
+    const heldBack = livePlan.heldBack;
+    const onlyHeldBack =
+        dirty &&
+        heldBack.length > 0 &&
+        JSON.stringify(livePlan.toSend) === lastSavedJson;
 
-    const dirty = JSON.stringify(sections) !== lastSavedJson;
+    // Unfinished sections that were never saved live only in this tab, and the
+    // bar reads "Saved · …" for everything else (review of #328).
+    useLeaveGuard(dirty);
+
+    /** Why the section at this position is not saved, if the last save held it back. */
+    function heldBackAt(index: number): HeldBackSection | undefined {
+        // Nothing differs from what is saved, so nothing is waiting. (A
+        // section stored invalid before its contract tightened is reported
+        // by `unreadableSections` instead.)
+        if (!dirty) return undefined;
+        return heldBack.find((h) => h.index === index);
+    }
     /*
      * A style change that is unsaved or still saving counts as unpublished
      * work too (#282). Publish only waited on the sections, so publishing inside
@@ -426,8 +553,57 @@ export function SiteEditor({
         setSections((prev) => prev.map((s, i) => (i === index ? next : s)));
     }
 
-    function addSection(type: SectionType) {
-        setSections((prev) => [...prev, emptySection(type)]);
+    /**
+     * Add a block after the selected one (or at the end), select it, and
+     * bring it into view (#337). A look chosen in the picker is set the way
+     * the Look field sets it, so the two cannot disagree (#267, #254).
+     */
+    /** The block count as of the last add, ahead of React's next render. */
+    const sectionCount = useRef(sections.length);
+    useEffect(() => {
+        sectionCount.current = sections.length;
+    }, [sections.length]);
+
+    function addSection(type: SectionType, variant?: string) {
+        const empty = emptySection(type);
+        /*
+         * Start from the example the picker showed, so the block reads like
+         * the preview that was chosen rather than an empty box. The flag
+         * engine names any example text still there before it goes live.
+         * Blocks with no example (testimonials, contact, gallery, and those
+         * seeded with working defaults) start as they always have.
+         */
+        const example = blockExample(type, variant);
+        const section: Section = example
+            ? ({
+                  ...empty,
+                  contractVersion: example.contractVersion,
+                  content: structuredClone(example.content),
+              } as Section)
+            : variant
+              ? withVariant(empty, variant)
+              : empty;
+        // Read at call time, not from this render: two quick adds must land
+        // in the order they were clicked.
+        const at = insertPosition(
+            getPlace(siteId, initialCount).selectedIndex,
+            sectionCount.current,
+        );
+        sectionCount.current += 1;
+        setSections((prev) => [
+            ...prev.slice(0, at),
+            section,
+            ...prev.slice(at),
+        ]);
+        setSelectedIndex(at);
+        setAdding(false);
+        setInspector("block");
+        // After the render that draws it.
+        requestAnimationFrame(() => {
+            canvasRef.current
+                ?.querySelector(`[data-block-index="${at}"]`)
+                ?.scrollIntoView({ block: "center", behavior: "smooth" });
+        });
     }
 
     function removeAt(index: number) {
@@ -476,35 +652,6 @@ export function SiteEditor({
      * failure (including a missing active org) the offending section index +
      * message are surfaced and the save is aborted.
      */
-    async function syncEnquiryForms(
-        current: Section[],
-    ): Promise<
-        | { ok: true; sections: Section[] }
-        | { ok: false; index: number; error: string }
-    > {
-        const next = [...current];
-        for (let i = 0; i < next.length; i++) {
-            const section = next[i];
-            if (section.type !== "enquiry") continue;
-            const content = section.content;
-            const res = await ensureFormForSection({
-                formId: content.formId,
-                name:
-                    [content.title?.trim()].find((s) => s) ??
-                    `${siteName} enquiry`,
-                fields: content.fields,
-            });
-            if (!res.ok) {
-                return { ok: false, index: i, error: res.error };
-            }
-            next[i] = {
-                ...section,
-                content: { ...content, formId: res.data.formId },
-            };
-        }
-        return { ok: true, sections: next };
-    }
-
     /*
      * The draft the last save failed on, as JSON. Without it a failure re-arms
      * the autosave below — still dirty, no longer saving — and the same draft
@@ -521,7 +668,11 @@ export function SiteEditor({
 
         // Keep every enquiry section's Form in sync first — this stamps the
         // returned formId into the content we then persist + publish.
-        const synced = await syncEnquiryForms(sections);
+        const synced = await syncEnquiryForms(
+            sections,
+            siteName,
+            ensureFormForSection,
+        );
         if (!synced.ok) {
             setSaving(false);
             // Not saved, and the bar has to say so (#281). A failed form sync
@@ -531,6 +682,9 @@ export function SiteEditor({
             setErrorIndex(synced.index);
             setErrorMessage(synced.error);
             showError(synced.error);
+            // Recorded like any other failed save, so the autosave does not
+            // send the same draft again every 1.5s with a fresh toast.
+            failedJson.current = JSON.stringify(sections);
             return;
         }
         /*
@@ -559,9 +713,15 @@ export function SiteEditor({
                     if (section.type !== "enquiry" || section.content.formId) {
                         return section;
                     }
+                    // By position only while the list is the same length
+                    // as when the save began: a block added in the middle
+                    // since would shift every position after it, and hand
+                    // another block's Form to its neighbour (review).
                     const hit =
                         newFormIds.find((n) => n.before === section) ??
-                        newFormIds.find((n) => n.index === index);
+                        (current.length === sections.length
+                            ? newFormIds.find((n) => n.index === index)
+                            : undefined);
                     return hit
                         ? {
                               ...section,
@@ -586,10 +746,29 @@ export function SiteEditor({
          * than a Save button that visibly fails. An outage has to look like a
          * failure, and the retry is the next edit.
          */
+        /*
+         * Send only what passes its contract. The API refuses the whole list
+         * on the first invalid section, and a section is added empty — so one
+         * new section used to stop every other edit on the page from saving.
+         * An unfinished section is held back instead: left out if it was never
+         * saved, or sent as its saved version so the save does not delete it.
+         */
+        const plan = saveableSections(synced.sections, savedSections);
+        if (
+            plan.heldBack.length > 0 &&
+            JSON.stringify(plan.toSend) === lastSavedJson
+        ) {
+            // The server already has everything that can be sent: only the
+            // unfinished sections changed. No request, nothing to announce.
+            setSaving(false);
+            failedJson.current = null;
+            setSaveError(false);
+            return;
+        }
         const res = await saveDraftSections(
             siteId,
             pageId,
-            synced.sections,
+            plan.toSend,
             revision,
         ).catch(() => ({
             ok: false as const,
@@ -601,7 +780,7 @@ export function SiteEditor({
             if (typeof res.data.revision === "number") {
                 setRevision(res.data.revision);
             }
-            setLastSavedJson(JSON.stringify(synced.sections));
+            setSavedSections(plan.toSend);
             setLastSavedAt(new Date());
             setSaveError(false);
             // The save recounted what publishing would change; take its answer
@@ -628,7 +807,9 @@ export function SiteEditor({
             setConflict(true);
         }
         if ("index" in res && typeof res.index === "number") {
-            setErrorIndex(res.index);
+            // The server counts positions in what was SENT; the editor's list
+            // may have held-back sections in between.
+            setErrorIndex(plan.sentFrom[res.index] ?? res.index);
             setErrorMessage(res.error);
         }
         showError(res.error);
@@ -660,6 +841,9 @@ export function SiteEditor({
         if (saveError && JSON.stringify(sections) === failedJson.current) {
             return;
         }
+        // Nor a list whose only unsaved part is unfinished sections: sending
+        // it again changes nothing until one of them is filled in.
+        if (onlyHeldBack) return;
         const id = setTimeout(() => {
             void onSave(true);
         }, 1500);
@@ -667,7 +851,15 @@ export function SiteEditor({
         // `onSave` is redefined each render; depending on it would restart the
         // timer on every keystroke and never fire.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dirty, saving, publishing, saveError, conflict, sections]);
+    }, [
+        dirty,
+        saving,
+        publishing,
+        saveError,
+        conflict,
+        sections,
+        onlyHeldBack,
+    ]);
 
     /*
      * Style autosave.
@@ -702,6 +894,13 @@ export function SiteEditor({
                     if (res.ok) {
                         failedStyleJson.current = null;
                         setSavedStyleJson(payloadJson);
+                        // A saved style is a change publishing would make;
+                        // without this the pill read "Published" (review).
+                        setPendingSiteChanges((prev) =>
+                            prev === null || prev.includes("style")
+                                ? prev
+                                : [...prev, "style"],
+                        );
                     } else {
                         failedStyleJson.current = payloadJson;
                         showError(res.error);
@@ -740,7 +939,13 @@ export function SiteEditor({
      */
     async function openCheck() {
         if (dirty) {
-            showError("You have unsaved changes — save the draft first.");
+            // "Save first" cannot help when everything saveable IS saved and
+            // only unfinished sections are waiting; name what will.
+            showError(
+                onlyHeldBack
+                    ? `Finish or remove ${unfinishedPhrase(heldBack)} before publishing.`
+                    : "You have unsaved changes — save the draft first.",
+            );
             return;
         }
         setChecking(true);
@@ -783,10 +988,34 @@ export function SiteEditor({
          * than after a reload. Flags are re-read for the same reason.
          */
         setPendingChanges(0);
+        // The site-level settings went live too.
+        setPendingSiteChanges([]);
         // Something is live now, so the button stops offering to publish the
         // site and the "nothing's live yet" line goes (#288).
         setNeverPublished(false);
         await Promise.all([refreshFlags(), refreshReview()]);
+    }
+
+    /**
+     * Open the block a note is about. A note names a block by KEY, and only
+     * the open page's blocks are loaded — so a note on another page is a
+     * navigation first and a selection after it.
+     */
+    function jumpToNote(jumpPageId: string, sectionKey: string) {
+        if (jumpPageId !== pageId) {
+            // The same guard the Pages tab puts on opening a page: leaving
+            // mid-flight loses whatever autosave has not sent yet.
+            if (dirty) {
+                showError("Save this page before opening another.");
+                return;
+            }
+            router.push(`/sites/${siteId}?page=${jumpPageId}`);
+            return;
+        }
+        const index = sections.findIndex((sec) => sec.key === sectionKey);
+        if (index === -1) return;
+        setRail("sections");
+        setSelectedIndex(index);
     }
 
     /*
@@ -805,13 +1034,11 @@ export function SiteEditor({
      * flags for the whole site; the rail can only draw dots for the sections it
      * is showing.
      */
-    const flagsBySection = new Map<number, Flag[]>();
-    for (const flag of siteFlags.flags) {
-        if (flag.pageId !== pageId || flag.sectionIndex === null) continue;
-        const list = flagsBySection.get(flag.sectionIndex) ?? [];
-        list.push(flag);
-        flagsBySection.set(flag.sectionIndex, list);
-    }
+    const flagsBySection = flagsByScreenPosition(
+        siteFlags.flags,
+        pageId,
+        livePlan.sentFrom,
+    );
     const activeFlags =
         active === null ? [] : (flagsBySection.get(active.index) ?? []);
 
@@ -830,285 +1057,322 @@ export function SiteEditor({
             .map((c) => c.sectionKey),
     );
 
+    /** Open notes per block on this page — the canvas draws them as pins. */
+    const notesByKey = new Map<string, number>();
+    for (const c of comments) {
+        if (c.pageId !== pageId || c.resolvedAt !== null || c.orphaned)
+            continue;
+        notesByKey.set(c.sectionKey, (notesByKey.get(c.sectionKey) ?? 0) + 1);
+    }
+
+    /*
+     * The header the canvas draws, with the menu resolved the way publish
+     * resolves it: over the pages that will be written, so an entry for a
+     * hidden page is absent here exactly as it will be on the live site.
+     */
+    const canvasChrome = {
+        name: siteName,
+        navigation: (navigation?.items ?? []).flatMap((item) => {
+            const page = pages.find((p) => p.id === item.pageId && !p.hidden);
+            return page
+                ? [{ label: item.label ?? page.title, href: page.path }]
+                : [];
+        }),
+        // Sanitizing can leave nothing; nothing is no footer.
+        footer: footerPreview?.value.trim() ? footerPreview : null,
+    };
+
+    const activePage = pages.find((page) => page.id === pageId);
+    const status = editorStatus({
+        // The style is saved on its own clock; unsaved or saving style is
+        // unsaved work too, and the pill has to say so (#282).
+        saving: saving || styleSaving,
+        saveError,
+        heldBackSummary: onlyHeldBack ? heldBackSummary(heldBack) : null,
+        dirty: dirty || styleDirty,
+        review: {
+            pending: review.pending,
+            outcome: review.latestApproval?.outcome ?? null,
+            approvalIsStale: review.approvalIsStale,
+        },
+        neverPublished,
+        hasPendingChanges: pendingSummary !== null,
+    });
+    /*
+     * What the pill leaves out, for anyone who hovers it: when it last saved,
+     * what publishing would change, and the reviewer's verdict in full.
+     */
+    const statusDetail = [
+        lastSavedAt && !dirty
+            ? `Saved at ${lastSavedAt.toLocaleTimeString(DISPLAY_LOCALE, { hour: "2-digit", minute: "2-digit" })}`
+            : null,
+        pendingSummary
+            ? `${pendingSummary} changed since the last publish`
+            : null,
+        review.latestApproval
+            ? `${APPROVAL_BADGE[review.latestApproval.outcome].text(
+                  review.latestApproval.by,
+                  review.approvalIsStale,
+              )} · ${exactDate(review.latestApproval.at)}`
+            : null,
+        openNotes > 0
+            ? `${openNotes} open ${openNotes === 1 ? "note" : "notes"}`
+            : null,
+    ]
+        .filter(Boolean)
+        .join("\n");
+
+    /** The visible line beside the pill: the same facts, in one row. */
+    const statusLine = [
+        pendingSummary ? `${pendingSummary} changed` : null,
+        review.latestApproval
+            ? APPROVAL_BADGE[review.latestApproval.outcome].text(
+                  review.latestApproval.by,
+                  review.approvalIsStale,
+              )
+            : null,
+        openNotes > 0
+            ? `${openNotes} open ${openNotes === 1 ? "note" : "notes"}`
+            : null,
+    ]
+        .filter(Boolean)
+        .join(" · ");
+
+    /**
+     * Share for review (#335): ask for a review, which is what reviewers
+     * are notified of and what puts the page In review (#278). It blocks
+     * nothing — publishing while it stands is recorded as a bypass.
+     */
+    async function askForReview() {
+        setAsking(true);
+        try {
+            const res = await requestReview(siteId);
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            showSuccess(
+                "Asked for a review. Reviewers can comment on any block and cannot change the page.",
+            );
+            // Still disabled until the refreshed state reads In review, so a
+            // second click cannot send a second request in between.
+            await refreshReview();
+        } finally {
+            setAsking(false);
+        }
+    }
+
     return (
         /*
-         * Editor chrome, per the website spec §7 and its "dark on dark"
-         * resolution.
-         *
-         * `dark` is forced rather than inherited: the spec says the editor
-         * chrome is always dark regardless of theme, because entering the
-         * editor is meant to feel like changing mode — and because the rendered
-         * site must be the only bright object on screen. A light editor around
-         * a light site loses that entirely.
-         *
-         * Ground and card are the SAME value (#0b0b0b), which is what "flush
-         * panels — no floating cards" means: one flat plane divided by
-         * hairlines (#1c1c1c), not a card stack floating on black like the
-         * workspace shell.
+         * The editor follows the workspace's theme (#335), and the bar has a
+         * toggle for it. It used to force dark; the design gives the merchant
+         * the choice, and the page on the canvas is bright either way.
          */
-        <div
-            className="dark flex h-screen flex-col bg-background text-foreground"
-            style={
-                {
-                    // 4.31%, not 4% — 4% rounds to #0a0a0a and the spec names
-                    // #0b0b0b exactly.
-                    "--background": "0 0% 4.3%",
-                    "--card": "0 0% 4.3%",
-                    "--border": "0 0% 11%",
-                } as React.CSSProperties
-            }
-        >
+        <div className="flex h-screen flex-col bg-background text-foreground">
             {/*
-             * Top bar. The design puts the site's identity, its state and the
-             * one irreversible action on one line — a merchant should be able to
-             * tell what will happen when they press Publish without scrolling.
+             * ONE line, and it has to stay one line: the actions never
+             * shrink, the breadcrumb truncates instead. Losing the end of a
+             * page name is a smaller loss than losing Publish.
              */}
-            {/*
-             * ONE line, and it has to stay one line.
-             *
-             * This was `flex-wrap` inside a fixed `h-[52px]`, which is a
-             * contradiction: the moment the bar's contents were wider than the
-             * window — a site name, an address, an autosave time, what has
-             * changed, and a reviewer's verdict is not a rare amount — the
-             * actions wrapped onto a second row the bar has no height for, and
-             * overflowed 14px into the panes below. Publish ended up half
-             * underneath the canvas and could not be clicked at all: the
-             * browser flow in `e2e/tests/site-versions.spec.ts` failed on
-             * exactly that, at 1440×900, which is a common desk width.
-             *
-             * So the middle facts shrink and truncate instead, and the actions
-             * never do. Losing the end of an address is a smaller loss than
-             * losing the one action that puts a site in front of the public.
-             */}
-            <header className="flex h-[52px] shrink-0 items-center gap-3 overflow-hidden border-b px-3.5">
-                {/*
-                 * "Workspace", not "Sites" — the design's wording, and the
-                 * truer one: leaving the editor returns you to the whole
-                 * workspace, not to a list of sites.
-                 */}
-                <Link
-                    href="/sites"
-                    className="shrink-0 rounded-md border px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <header className="flex h-14 shrink-0 items-center gap-3 overflow-hidden border-b px-4">
+                <nav
+                    aria-label="Breadcrumb"
+                    className="flex min-w-0 items-center gap-2 text-sm"
                 >
-                    ← Workspace
-                </Link>
-                {/* The design separates the way out from the site's identity. */}
-                <span aria-hidden className="h-[18px] w-px bg-border" />
-                <span className="shrink-0 text-[0.8125rem] font-medium">
-                    {siteName}
-                </span>
-                {address ? (
-                    <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">
-                        {address}
-                    </span>
-                ) : null}
-
-                {/*
-                 * Autosave state as a PILL, as the design has it.
-                 *
-                 * Tinted by what it means rather than uniformly grey: a failed
-                 * save and a saved draft should not look alike at a glance, and
-                 * this line is the only place a merchant learns their work is
-                 * safe. Grey when everything is fine, so the colour is only
-                 * ever spent on something worth reading.
-                 */}
-                <span
-                    className={cn(
-                        "flex h-[22px] shrink-0 items-center rounded-[3px] px-2 text-[0.6875rem]",
-                        saveError
-                            ? "border border-destructive/30 bg-destructive/10 text-destructive"
-                            : dirty || saving
-                              ? "border border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
-                              : "border border-[#2a2a2a] bg-[#1a1a1a] text-muted-foreground",
-                    )}
-                >
-                    {saving
-                        ? "Saving…"
-                        : saveError
-                          ? "Not saved"
-                          : dirty
-                            ? "Draft changes"
-                            : lastSavedAt
-                              ? `Draft changes · autosaved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                              : "Draft"}
-                </span>
-
-                {/*
-                 * What publishing would actually change, in the bar where the
-                 * design puts it. It used to be the badge on Publish, but the
-                 * spec gives that badge to the outstanding FLAG count — and the
-                 * two answer different questions: how much work is waiting, and
-                 * how much of it is worth a second look.
-                 *
-                 * "Changed" means since the last PUBLISH, not since the last
-                 * save — the same number the settings screen and the sites list
-                 * show. What is unsaved is the pill's job, two elements to the
-                 * left, and the two together say the whole truth: your work is
-                 * safe, and this much of it is not live yet.
-                 */}
-                {pendingSummary ? (
-                    <span className="min-w-0 truncate text-xs text-muted-foreground">
-                        {pendingSummary} changed
-                    </span>
-                ) : null}
-
-                {/*
-                 * The design's "Approved by Priya Raman" line. The note count
-                 * rides it rather than forming a second badge: the spec's
-                 * "approved with notes" is ONE badge carrying both, because
-                 * approval and outstanding notes answer the same question —
-                 * is this ready.
-                 */}
-                {review.latestApproval === null ? null : (
-                    <span
-                        className={cn(
-                            "flex h-[22px] min-w-0 shrink items-center gap-1.5 truncate rounded-[3px] border px-2 text-xs",
-                            APPROVAL_BADGE[
-                                review.latestApproval.outcome
-                            ].approved(review.approvalIsStale)
-                                ? "border-[#3d3020] bg-[#241d14] text-[#c99f6f]"
-                                : "border-border text-muted-foreground",
-                        )}
-                        title={exactDate(review.latestApproval.at)}
+                    <Link
+                        href={`/sites/${siteId}/pages`}
+                        title={address ?? undefined}
+                        className="flex min-w-0 shrink items-center gap-1 rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                        {APPROVAL_BADGE[review.latestApproval.outcome].text(
-                            review.latestApproval.by,
-                            review.approvalIsStale,
-                        )}
-                        {openNotes > 0 ? (
-                            <span className="tabular-nums opacity-80">
-                                · {openNotes}{" "}
-                                {openNotes === 1 ? "note" : "notes"}
-                            </span>
-                        ) : null}
+                        <ChevronLeft aria-hidden className="size-4 shrink-0" />
+                        <span className="truncate">{siteName}</span>
+                    </Link>
+                    <span aria-hidden className="text-muted-foreground">
+                        /
                     </span>
-                )}
+                    {/*
+                     * The page name is the page switcher: which page is open
+                     * is part of where you are, so it lives in the
+                     * breadcrumb rather than in a tab beside the blocks.
+                     */}
+                    <Popover open={pagesOpen} onOpenChange={setPagesOpen}>
+                        <PopoverTrigger asChild>
+                            <button
+                                type="button"
+                                aria-label={`Page: ${activePage?.title ?? "Page"}. Switch or manage pages`}
+                                className="flex min-w-0 items-center gap-1 rounded font-semibold transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <span className="truncate">
+                                    {activePage?.title ?? "Page"}
+                                </span>
+                                <ChevronDown
+                                    aria-hidden
+                                    className="size-4 shrink-0 text-muted-foreground"
+                                />
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                            align="start"
+                            className="max-h-[70vh] w-80 overflow-y-auto p-0"
+                        >
+                            <PagesPanel
+                                siteId={siteId}
+                                pages={pages}
+                                activePageId={pageId}
+                                dirty={dirty}
+                                unfinished={
+                                    onlyHeldBack
+                                        ? unfinishedPhrase(heldBack)
+                                        : undefined
+                                }
+                            />
+                        </PopoverContent>
+                    </Popover>
+                    <span aria-hidden className="text-muted-foreground">
+                        /
+                    </span>
+                    <Badge
+                        role="status"
+                        variant={STATUS_BADGE[status.tone]}
+                        title={statusDetail || undefined}
+                        className="shrink-0 whitespace-nowrap uppercase tracking-[0.06em]"
+                    >
+                        {status.label}
+                    </Badge>
+                    {/*
+                     * What the pill sums up, said in the bar as it was
+                     * before the redesign: what publishing would change,
+                     * the reviewer's verdict and how many notes are open.
+                     * It truncates rather than wraps — Publish never moves.
+                     */}
+                    {statusLine ? (
+                        <span
+                            className="min-w-0 truncate text-xs text-muted-foreground"
+                            title={statusDetail}
+                        >
+                            {statusLine}
+                        </span>
+                    ) : null}
+                </nav>
 
                 <div className="ml-auto flex shrink-0 items-center gap-2">
+                    <ThemeToggle />
                     {/*
-                     * Device preview. §18 makes the phone co-primary for the
-                     * merchant's CUSTOMERS as much as the merchant: without this
-                     * a headline that wraps badly is discovered by a visitor.
-                     * Width only — the preview is already local, and switching
-                     * must not become a re-fetch.
+                     * Width only — the preview is already local, and
+                     * switching must not become a re-fetch.
                      */}
                     <div
                         role="group"
                         aria-label="Preview width"
-                        className="flex h-7 overflow-hidden rounded border"
+                        className="flex h-8 items-center gap-0.5 rounded-md border p-0.5"
                     >
-                        {DEVICES.map((d) => (
-                            <button
-                                key={d.key}
-                                type="button"
-                                onClick={() => setDevice(d.key)}
-                                aria-pressed={device === d.key}
-                                className={cn(
-                                    "border-l px-2.5 text-[0.6875rem] transition-colors first:border-l-0",
-                                    device === d.key
-                                        ? "bg-[#242424] text-foreground"
-                                        : "text-muted-foreground hover:text-foreground active:bg-[#242424] active:text-foreground",
-                                )}
-                            >
-                                {d.label}
-                            </button>
-                        ))}
+                        {DEVICES.map((d) => {
+                            const Icon =
+                                d.key === "phone"
+                                    ? Smartphone
+                                    : d.key === "tablet"
+                                      ? Tablet
+                                      : Monitor;
+                            return (
+                                <button
+                                    key={d.key}
+                                    type="button"
+                                    onClick={() => setDevice(d.key)}
+                                    aria-pressed={device === d.key}
+                                    aria-label={`Show at ${d.label.toLowerCase()} width`}
+                                    title={d.label}
+                                    className={cn(
+                                        "flex h-full w-8 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                        device === d.key
+                                            ? "bg-secondary text-foreground"
+                                            : "text-muted-foreground hover:text-foreground",
+                                    )}
+                                >
+                                    <Icon aria-hidden className="size-4" />
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/*
-                     * Style opens from the BAR, not a rail tab. The design moved
-                     * it there because it belongs to the whole site while the
-                     * rail lists one page's sections — a tab would file a
-                     * site-wide setting under a page.
+                     * The zoom readout IS the control (spec §2): no ⌘scroll,
+                     * no pinch, no shortcut.
                      */}
-                    {/*
-                     * The zoom readout IS the control (spec §2 resolved the
-                     * contradiction that way): no ⌘scroll, no pinch, no
-                     * shortcut. A select rather than a menu because it is a
-                     * value being chosen, and a native select is the one
-                     * control every keyboard and screen reader already knows.
-                     */}
-                    <select
+                    <OptionSelect
                         aria-label="Zoom"
+                        size="sm"
                         value={String(zoom)}
-                        onChange={(e) =>
-                            setZoom(
-                                e.target.value === "fit"
-                                    ? "fit"
-                                    : (Number(e.target.value) as Zoom),
-                            )
-                        }
-                        className="h-7 w-[4.25rem] rounded border bg-transparent px-1.5 text-xs tabular-nums text-muted-foreground"
-                    >
-                        {ZOOMS.map((z) => (
-                            <option key={String(z)} value={String(z)}>
-                                {z === "fit" ? "Fit" : `${z}%`}
-                            </option>
-                        ))}
-                    </select>
+                        onValueChange={(v) => {
+                            setZoom(v === "fit" ? "fit" : (Number(v) as Zoom));
+                        }}
+                        options={ZOOMS.map((z) => ({
+                            value: String(z),
+                            label: z === "fit" ? "Fit" : `${z}%`,
+                        }))}
+                        className="h-8 w-[4.75rem] tabular-nums text-muted-foreground"
+                    />
 
+                    {/*
+                     * Preview removes the editing chrome; it does not switch
+                     * to another renderer. Escape returns.
+                     */}
                     <Button
                         variant="outline"
                         size="sm"
-                        className="h-7 px-2 text-xs"
-                        aria-label="Full-screen preview"
-                        title="Full-screen preview — Escape returns"
+                        className="h-8 gap-1.5"
                         onClick={() => setFullScreen(true)}
                     >
-                        ⤢
+                        <Eye aria-hidden className="size-4" />
+                        Preview
                     </Button>
 
                     <Button
                         variant={rail === "style" ? "secondary" : "outline"}
                         size="sm"
-                        className="h-7 rounded px-3 text-xs"
+                        className="h-8 gap-1.5"
                         onClick={() =>
                             setRail(rail === "style" ? "sections" : "style")
                         }
                         aria-pressed={rail === "style"}
                     >
+                        <Palette aria-hidden className="size-4" />
                         Style
                     </Button>
 
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5"
+                        disabled={asking || review.pending}
+                        onClick={() => void askForReview()}
+                    >
+                        <Link2 aria-hidden className="size-4" />
+                        {review.pending ? "In review" : "Share for review"}
+                    </Button>
+
                     {/*
-                     * Publish carries the EDITOR's accent (#8a5a3c, spec §7),
-                     * not Saroh's brand blue. §1 is explicit that the shell
-                     * accent drops away on entering the editor: inside here the
-                     * only chromatic things should be the merchant's site and
-                     * the one action that puts it in front of the public.
+                     * The one action that puts the site in front of the
+                     * public. Not disabled while In review: publishing then
+                     * is allowed and recorded as a bypass (#278).
                      */}
                     <Button
-                        className="wk-press h-7 rounded bg-[#8a5a3c] px-3 text-xs font-medium text-white hover:bg-[#794e34]"
+                        size="sm"
+                        className="wk-press h-8"
+                        title="Make these changes live"
                         onClick={() => void openCheck()}
                         disabled={publishing || dirty || saving || styleDirty}
                     >
                         {publishing
                             ? "Publishing…"
-                            : /*
-                               * "Never-published sites say Publish site, not
-                               * Publish changes" (spec §2). Before anything is
-                               * live there are no changes to publish — there is
-                               * a site to put up.
-                               */
-                              neverPublished
+                            : neverPublished
                               ? "Publish site"
                               : "Publish"}
                         {/*
-                         * The count as a BADGE rather than in the label, as the
-                         * design has it: "Publish" stays the same width whatever
-                         * the number, so the button a merchant is about to press
-                         * does not move under the cursor as they edit.
-                         */}
-                        {/*
-                         * "Publish button carries the outstanding flag count"
-                         * (spec §2) — the flags, not the changed-section count
-                         * that used to sit here. A number next to Publish
-                         * should say what is worth looking at before going
-                         * live, and the changed count already has its own line
-                         * in the bar.
+                         * The outstanding flag count as a badge, so the
+                         * button keeps its width while the number moves.
                          */}
                         {!publishing && siteFlags.flags.length > 0 ? (
-                            <span className="ml-1.5 rounded bg-black/30 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
+                            <span className="ml-1.5 rounded bg-background/20 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
                                 {siteFlags.flags.length}
                             </span>
                         ) : null}
@@ -1120,86 +1384,28 @@ export function SiteEditor({
                 className="grid min-h-0 flex-1 lg:grid-cols-[var(--editor-cols)]"
                 style={
                     {
-                        // The two 1px tracks are the drag handles. Giving them
-                        // real grid tracks — rather than absolutely positioning
-                        // them over a border — is what keeps the hit area and
-                        // the line the merchant is aiming at the same object.
-                        /*
-                         * "Review tab auto-widens the rail to 300px; the other
-                         * tabs stay at 200." The merchant's own width is not
-                         * overwritten — it comes straight back when they leave
-                         * the tab, because this widens the LAYOUT, not the
-                         * stored preference.
-                         */
-                        "--editor-cols": `${rail === "review" ? Math.max(railWidth, 300) : railWidth}px 1px ${panelWidth}px 1px minmax(0,1fr)`,
+                        // Blocks, the page, the inspector (#340). The two 1px
+                        // tracks are the drag handles. Giving them real grid
+                        // tracks — rather than absolutely positioning them over
+                        // a border — is what keeps the hit area and the line
+                        // the merchant is aiming at the same object.
+                        // The canvas keeps a floor, so widening a side column
+                        // can never squeeze the page out of sight.
+                        // Each side column is its chosen width, or its share of
+                        // what the window leaves after the canvas's floor —
+                        // so a width chosen on a wide screen never pushes the
+                        // inspector off a narrower one (review of #345).
+                        "--editor-cols": `min(${railWidth}px, calc((100vw - 20rem - 2px) * ${(railWidth / (railWidth + panelWidth)).toFixed(4)})) 1px minmax(20rem,1fr) 1px min(${panelWidth}px, calc((100vw - 20rem - 2px) * ${(panelWidth / (railWidth + panelWidth)).toFixed(4)}))`,
                     } as React.CSSProperties
                 }
             >
-                {/* Rail — the page as a list of sections, not a wall of fields. */}
+                {/*
+                 * Left: this page's blocks, in order (#340). The fields are on
+                 * the right now, so this column is only ever a list — the
+                 * page as the merchant reads it, top to bottom.
+                 */}
                 <aside className="flex min-h-0 flex-col">
-                    {rail === "pages" ? (
-                        <>
-                            <RailTabs
-                                rail={rail}
-                                onSelect={setRail}
-                                openNotes={openNotes}
-                            />
-                            <PagesPanel
-                                siteId={siteId}
-                                pages={pages}
-                                activePageId={pageId}
-                                dirty={dirty}
-                            />
-                        </>
-                    ) : rail === "review" ? (
-                        <>
-                            <RailTabs
-                                rail={rail}
-                                onSelect={setRail}
-                                openNotes={openNotes}
-                            />
-                            <ReviewPanel
-                                siteId={siteId}
-                                pages={pages}
-                                comments={comments}
-                                review={review}
-                                onChanged={() => void refreshReview()}
-                                onJump={(jumpPageId, sectionKey) => {
-                                    /*
-                                     * A note names a section by KEY, and only
-                                     * the open page's sections are loaded — so
-                                     * a note on another page is a navigation
-                                     * first and a selection after it.
-                                     */
-                                    if (jumpPageId !== pageId) {
-                                        /*
-                                         * The same guard the Pages tab puts on
-                                         * opening a page, in its words: leaving
-                                         * mid-flight loses whatever autosave
-                                         * has not sent yet, and a note is no
-                                         * reason to lose work.
-                                         */
-                                        if (dirty) {
-                                            showError(
-                                                "Save this page before opening another.",
-                                            );
-                                            return;
-                                        }
-                                        router.push(
-                                            `/sites/${siteId}?page=${jumpPageId}`,
-                                        );
-                                        return;
-                                    }
-                                    const index = sections.findIndex(
-                                        (sec) => sec.key === sectionKey,
-                                    );
-                                    if (index === -1) return;
-                                    setRail("sections");
-                                    setSelectedIndex(index);
-                                }}
-                            />
-                        </>
-                    ) : rail === "style" ? (
+                    {rail === "style" ? (
                         <StylePanel
                             style={style}
                             options={styleOptions}
@@ -1210,471 +1416,261 @@ export function SiteEditor({
                         />
                     ) : (
                         <>
-                            {/*
-                             * The design's rail carries Sections / Pages /
-                             * Review. Review is still unbuilt, so it is absent
-                             * rather than dead — a tab leading nowhere is worse
-                             * than one that is not there. Style is not a tab at
-                             * all: it opens from the bar, because it applies to
-                             * the whole site while this rail lists one page.
-                             */}
-                            <RailTabs
-                                rail={rail}
-                                onSelect={setRail}
-                                openNotes={openNotes}
+                            <EditorTabs
+                                label="Page"
+                                tabs={[
+                                    { key: "sections", label: "This page" },
+                                    { key: "add", label: "Add block" },
+                                ]}
+                                value={adding ? "add" : "sections"}
+                                onSelect={(tab) => setAdding(tab === "add")}
                             />
-                            <ul className="min-h-0 flex-1 overflow-y-auto p-2">
-                                {sections.map((section, index) => (
-                                    <li
-                                        key={index}
-                                        /*
-                                         * The row is the drop target, not the
-                                         * handle: aiming at a 32px row is far
-                                         * easier than aiming at the grip, and
-                                         * the grip is what starts the drag.
-                                         */
-                                        onDragOver={(e) => {
-                                            if (dragIndex === null) return;
-                                            e.preventDefault();
-                                            setDropIndex(index);
-                                        }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            if (dragIndex === null) return;
-                                            moveTo(dragIndex, index);
-                                            setSelectedIndex(index);
-                                            setDragIndex(null);
-                                            setDropIndex(null);
-                                        }}
-                                        className={cn(
-                                            "rounded",
-                                            dropIndex === index &&
-                                                dragIndex !== index &&
-                                                "ring-1 ring-inset ring-ring",
-                                        )}
-                                    >
-                                        <div
-                                            className={cn(
-                                                // A row is not a button and must not
-                                                // scale — at 32px tall a shrink reads
-                                                // as a jitter. It answers a press with
-                                                // the surface it would settle on, so
-                                                // the feedback is the outcome arriving
-                                                // early rather than a separate effect.
-                                                "group flex h-8 w-full items-center gap-1.5 rounded pr-1 text-left text-xs transition-colors",
-                                                selectedIndex === index
-                                                    ? "bg-secondary"
-                                                    : "hover:bg-muted active:bg-secondary",
-                                                errorIndex === index &&
-                                                    "text-destructive",
-                                                dragIndex === index &&
-                                                    "opacity-40",
-                                            )}
-                                        >
-                                            {/*
-                                             * The grip is the drag surface. It
-                                             * carries no click of its own — a
-                                             * handle that also navigates makes
-                                             * every aborted drag a selection.
-                                             */}
-                                            <span
-                                                draggable
-                                                onDragStart={() => {
-                                                    setDragIndex(index);
+                            {adding ? (
+                                <AddBlockPanel
+                                    onBrowse={() => setBrowsing(true)}
+                                    onPick={(type, looks) => {
+                                        if (looks > 1) setLookFor(type);
+                                        else addSection(type);
+                                    }}
+                                />
+                            ) : (
+                                <>
+                                    <p className="px-4 pb-1 pt-4 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                        {`${sections.length + 2} blocks`}
+                                    </p>
+                                    <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pl-4">
+                                        <FixedBlockRow
+                                            part="header"
+                                            selected={
+                                                selectedChrome === "header"
+                                            }
+                                            onSelect={() =>
+                                                selectChrome("header")
+                                            }
+                                        />
+                                        {sections.map((section, index) => (
+                                            <li
+                                                key={index}
+                                                /*
+                                                 * The row is the drop target, not the
+                                                 * handle: aiming at a 32px row is far
+                                                 * easier than aiming at the grip, and
+                                                 * the grip is what starts the drag.
+                                                 */
+                                                onDragOver={(e) => {
+                                                    if (dragIndex === null)
+                                                        return;
+                                                    e.preventDefault();
                                                     setDropIndex(index);
                                                 }}
-                                                onDragEnd={() => {
+                                                onDrop={(e) => {
+                                                    e.preventDefault();
+                                                    if (dragIndex === null)
+                                                        return;
+                                                    moveTo(dragIndex, index);
+                                                    setSelectedIndex(index);
                                                     setDragIndex(null);
                                                     setDropIndex(null);
                                                 }}
-                                                aria-hidden="true"
-                                                className="cursor-grab select-none px-1 text-muted-foreground/50 active:cursor-grabbing group-hover:text-muted-foreground"
+                                                className={cn(
+                                                    "rounded",
+                                                    dropIndex === index &&
+                                                        dragIndex !== index &&
+                                                        "ring-1 ring-inset ring-ring",
+                                                )}
                                             >
-                                                ⋮
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setSelectedIndex(index)
-                                                }
-                                                className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
-                                            >
-                                                <span
+                                                <div
                                                     className={cn(
-                                                        "truncate",
+                                                        // A row is not a button and must not
+                                                        // scale — at 32px tall a shrink reads
+                                                        // as a jitter. It answers a press with
+                                                        // the surface it would settle on, so
+                                                        // the feedback is the outcome arriving
+                                                        // early rather than a separate effect.
+                                                        "group relative flex h-10 w-full items-center gap-1 rounded-md pr-2 text-left text-[0.8125rem] transition-colors",
                                                         /*
-                                                         * A hidden section is
-                                                         * dimmed rather than
-                                                         * removed: it is still
-                                                         * part of the page the
-                                                         * merchant is building,
-                                                         * just not part of the
-                                                         * one visitors get.
+                                                         * The selected row carries a bar
+                                                         * on its edge as well as a fill,
+                                                         * as the design draws it: the
+                                                         * fill alone is too quiet on the
+                                                         * dark chrome.
                                                          */
-                                                        section.hidden &&
-                                                            "text-muted-foreground/50 line-through",
+                                                        railRowState(
+                                                            selectedIndex ===
+                                                                index,
+                                                        ),
+                                                        (errorIndex === index ||
+                                                            heldBackAt(
+                                                                index,
+                                                            )) &&
+                                                            "text-destructive",
+                                                        dragIndex === index &&
+                                                            "opacity-40",
                                                     )}
                                                 >
-                                                    {sectionTitle(section)}
-                                                </span>
-                                                <span className="flex shrink-0 items-center gap-1.5">
-                                                    <span className="text-[0.625rem] uppercase tracking-[0.06em] text-muted-foreground/70">
-                                                        {
+                                                    {/*
+                                                     * The grip is the drag surface. It
+                                                     * carries no click of its own — a
+                                                     * handle that also navigates makes
+                                                     * every aborted drag a selection.
+                                                     */}
+                                                    <span
+                                                        draggable
+                                                        onDragStart={() => {
+                                                            setDragIndex(index);
+                                                            setDropIndex(index);
+                                                        }}
+                                                        onDragEnd={() => {
+                                                            setDragIndex(null);
+                                                            setDropIndex(null);
+                                                        }}
+                                                        aria-hidden="true"
+                                                        className="cursor-grab select-none px-1 text-muted-foreground active:cursor-grabbing group-hover:text-muted-foreground"
+                                                    >
+                                                        ⋮
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        aria-current={
+                                                            selectedIndex ===
+                                                            index
+                                                                ? "true"
+                                                                : undefined
+                                                        }
+                                                        title={
                                                             SECTION_LABELS[
                                                                 section.type
                                                             ]
                                                         }
-                                                    </span>
-                                                    {/*
-                                                     * The spec's flag dot: 4px,
-                                                     * amber #c99f6f (§7). It is
-                                                     * the ONLY thing flags draw
-                                                     * while editing — "quiet
-                                                     * until publish" — so it
-                                                     * carries a title rather
-                                                     * than expanding into the
-                                                     * row.
-                                                     */}
-                                                    {(flagsBySection.get(index)
-                                                        ?.length ?? 0) > 0 ||
-                                                    (section.key !==
-                                                        undefined &&
-                                                        notedKeys.has(
-                                                            section.key,
-                                                        )) ? (
-                                                        <span
-                                                            className="size-1 shrink-0 rounded-full bg-[#c99f6f]"
-                                                            title={[
-                                                                ...(flagsBySection
-                                                                    .get(index)
-                                                                    ?.map(
-                                                                        (f) =>
-                                                                            f.message,
-                                                                    ) ?? []),
-                                                                ...(section.key !==
-                                                                    undefined &&
+                                                        onClick={() =>
+                                                            setSelectedIndex(
+                                                                index,
+                                                            )
+                                                        }
+                                                        className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
+                                                    >
+                                                        <span className="flex min-w-0 items-center gap-2.5">
+                                                            {(() => {
+                                                                const Icon =
+                                                                    SECTION_ICONS[
+                                                                        section
+                                                                            .type
+                                                                    ];
+                                                                return (
+                                                                    <Icon
+                                                                        aria-hidden="true"
+                                                                        className="size-4 shrink-0 text-muted-foreground"
+                                                                    />
+                                                                );
+                                                            })()}
+                                                            <span
+                                                                className={cn(
+                                                                    "truncate",
+                                                                    /*
+                                                                     * A hidden block is
+                                                                     * dimmed rather than
+                                                                     * removed: it is still
+                                                                     * part of the page the
+                                                                     * merchant is building,
+                                                                     * just not part of the
+                                                                     * one visitors get.
+                                                                     */
+                                                                    section.hidden &&
+                                                                        "text-muted-foreground line-through",
+                                                                )}
+                                                            >
+                                                                {sectionTitle(
+                                                                    section,
+                                                                )}
+                                                            </span>
+                                                        </span>
+                                                        <span className="flex shrink-0 items-center gap-1.5">
+                                                            {/*
+                                                             * The spec's flag dot: 4px,
+                                                             * amber #c99f6f (§7). It is
+                                                             * the ONLY thing flags draw
+                                                             * while editing — "quiet
+                                                             * until publish" — so it
+                                                             * carries a title rather
+                                                             * than expanding into the
+                                                             * row.
+                                                             */}
+                                                            {(flagsBySection.get(
+                                                                index,
+                                                            )?.length ?? 0) >
+                                                                0 ||
+                                                            (section.key !==
+                                                                undefined &&
                                                                 notedKeys.has(
                                                                     section.key,
-                                                                )
-                                                                    ? [
-                                                                          "A reviewer has left a note on this section.",
-                                                                      ]
-                                                                    : []),
-                                                            ].join("\n")}
-                                                        />
-                                                    ) : null}
-                                                </span>
-                                            </button>
-                                        </div>
-                                    </li>
-                                ))}
-                                {sections.length === 0 ? (
-                                    <li className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                        No sections yet.
-                                    </li>
-                                ) : null}
-                            </ul>
-                            <div className="p-2">
-                                {/*
-                                 * The design draws this as a dashed outline
-                                 * spanning the rail — reading as a slot waiting
-                                 * to be filled rather than another row in the
-                                 * list, which is what it is. Still a disclosure:
-                                 * the type picker only matters once you have
-                                 * decided to add something.
-                                 */}
-                                <details className="group">
-                                    <summary className="cursor-pointer list-none rounded-md border border-dashed px-2 py-2 text-center text-sm text-muted-foreground transition-colors hover:border-solid hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                        + Add section
-                                    </summary>
-                                    <div className="flex flex-wrap gap-1 px-2 pt-2">
-                                        {SECTION_ORDER.map((type) => (
-                                            <Button
-                                                key={type}
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    addSection(type);
-                                                    setSelectedIndex(
-                                                        sections.length,
-                                                    );
-                                                }}
-                                            >
-                                                {SECTION_LABELS[type]}
-                                            </Button>
+                                                                )) ? (
+                                                                <span
+                                                                    className="size-1 shrink-0 rounded-full bg-highlight"
+                                                                    title={[
+                                                                        ...(flagsBySection
+                                                                            .get(
+                                                                                index,
+                                                                            )
+                                                                            ?.map(
+                                                                                (
+                                                                                    f,
+                                                                                ) =>
+                                                                                    f.message,
+                                                                            ) ??
+                                                                            []),
+                                                                        ...(section.key !==
+                                                                            undefined &&
+                                                                        notedKeys.has(
+                                                                            section.key,
+                                                                        )
+                                                                            ? [
+                                                                                  "A reviewer has left a note on this section.",
+                                                                              ]
+                                                                            : []),
+                                                                    ].join(
+                                                                        "\n",
+                                                                    )}
+                                                                />
+                                                            ) : null}
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            </li>
                                         ))}
-                                    </div>
-                                </details>
-                            </div>
+                                        {sections.length === 0 ? (
+                                            <li className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                                No blocks yet.
+                                            </li>
+                                        ) : null}
+                                        <FixedBlockRow
+                                            part="footer"
+                                            selected={
+                                                selectedChrome === "footer"
+                                            }
+                                            onSelect={() =>
+                                                selectChrome("footer")
+                                            }
+                                        />
+                                    </ul>
+                                    <p className="px-4 pb-3 text-xs leading-relaxed text-muted-foreground">
+                                        Header and footer carry a lock — they
+                                        are on every page, so this page cannot
+                                        remove them.
+                                    </p>
+                                </>
+                            )}
                         </>
                     )}
                 </aside>
 
                 <PanelDivider
-                    label="Resize the section list"
+                    label="Resize the block list"
                     width={railWidth}
                     min={RAIL_MIN}
                     max={RAIL_MAX}
                     reset={RAIL_DEFAULT}
                     onResize={setRailWidth}
                     onNudge={nudgeRail}
-                />
-
-                {/* Field panel — one section at a time. */}
-                <div className="min-h-0 overflow-y-auto p-4">
-                    {active ? (
-                        <div className="space-y-4">
-                            {/*
-                             * Two rows, because 240px will not hold a section
-                             * name and four controls on one line — the header
-                             * clipped its own Remove button at the design's
-                             * own panel width.
-                             *
-                             * The split is not just fitting: the design's
-                             * header carries what the section IS and whether
-                             * it is on the live site. Moving it, and deleting
-                             * it, are actions taken ON it and belong under it.
-                             */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between gap-2">
-                                    <h2 className="min-w-0 truncate text-sm font-semibold">
-                                        {SECTION_LABELS[active.section.type]}
-                                    </h2>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        aria-pressed={
-                                            active.section.hidden === true
-                                        }
-                                        title={
-                                            active.section.hidden
-                                                ? "Hidden — this section is left out when you publish"
-                                                : "Visible — this section publishes with the page"
-                                        }
-                                        onClick={() =>
-                                            toggleHidden(active.index)
-                                        }
-                                        className={cn(
-                                            "h-7 shrink-0 gap-1.5 px-2 text-xs",
-                                            active.section.hidden &&
-                                                "text-muted-foreground",
-                                        )}
-                                    >
-                                        <span aria-hidden="true">
-                                            {active.section.hidden ? "○" : "●"}
-                                        </span>
-                                        {active.section.hidden
-                                            ? "Hidden"
-                                            : "Visible"}
-                                    </Button>
-                                </div>
-
-                                <div className="flex items-center gap-1">
-                                    {/*
-                                     * The arrows survive the drag handle: a
-                                     * list you can only reorder by dragging is
-                                     * a list some people cannot reorder.
-                                     */}
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        aria-label="Move section up"
-                                        className="h-7 w-7 p-0"
-                                        disabled={active.index === 0}
-                                        onClick={() => {
-                                            move(active.index, -1);
-                                            setSelectedIndex(active.index - 1);
-                                        }}
-                                    >
-                                        ↑
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        aria-label="Move section down"
-                                        className="h-7 w-7 p-0"
-                                        disabled={
-                                            active.index === sections.length - 1
-                                        }
-                                        onClick={() => {
-                                            move(active.index, 1);
-                                            setSelectedIndex(active.index + 1);
-                                        }}
-                                    >
-                                        ↓
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="ml-auto h-7 px-2 text-xs"
-                                        onClick={() => {
-                                            /*
-                                             * Ask first, and name the section.
-                                             *
-                                             * Removing one used to be the only
-                                             * destructive action in the editor
-                                             * with no guard at all, while
-                                             * deleting a PAGE — the rarer of
-                                             * the two — has always confirmed.
-                                             * The weaker guard sat on the more
-                                             * frequent action, next to the move
-                                             * arrows a merchant is reaching for
-                                             * while reordering.
-                                             *
-                                             * Autosave then commits it, and
-                                             * version history only covers what
-                                             * has been PUBLISHED, so copy
-                                             * written since the last publish is
-                                             * gone for good. The question says
-                                             * so rather than asking "are you
-                                             * sure" about a cost it does not
-                                             * name.
-                                             *
-                                             * It also names hiding. A merchant
-                                             * reaching for Remove usually wants
-                                             * the section off the site, not
-                                             * destroyed, and the control that
-                                             * does that is two inches away —
-                                             * an error is cheaper to prevent
-                                             * than to apologise for.
-                                             */
-                                            const title = sectionTitle(
-                                                active.section,
-                                            );
-                                            const ok = window.confirm(
-                                                `Remove "${title}"? Anything written here since your last publish cannot be brought back. To take it off the site and keep the work, hide it instead.`,
-                                            );
-                                            if (!ok) return;
-                                            removeAt(active.index);
-                                            setSelectedIndex(null);
-                                            showSuccess(`Removed ${title}.`);
-                                        }}
-                                    >
-                                        Remove
-                                    </Button>
-                                </div>
-                            </div>
-
-                            <SectionFields
-                                section={active.section}
-                                services={services}
-                                pages={pages}
-                                onChange={(next) =>
-                                    replaceAt(active.index, next)
-                                }
-                            />
-
-                            {/*
-                             * Leaving a note is an action taken ON this
-                             * section (#277), so it sits under its fields —
-                             * the same place the design puts it, which is why
-                             * the composer needs no section picker.
-                             */}
-                            <div className="border-t pt-3">
-                                <NoteComposer
-                                    siteId={siteId}
-                                    pageId={pageId}
-                                    sectionKey={active.section.key}
-                                    onAdded={refreshReview}
-                                />
-                            </div>
-
-                            {/*
-                             * Per-field markers, the other half of what flags
-                             * are allowed to show while editing. Listed under
-                             * the fields rather than inline beside each one:
-                             * the field components are shared with the section
-                             * types and threading a marker through all six for
-                             * a advisory note would cost more than it is worth
-                             * until the notes need to sit on the input itself.
-                             */}
-                            {active.section.key !== undefined &&
-                            unreadableSections.includes(active.section.key) ? (
-                                /*
-                                 * Said, not hidden (#275). This section's
-                                 * stored content does not match the shape its
-                                 * block promises, so the fields below may show
-                                 * blanks that are not what was written. The
-                                 * work is still here; saving over it is what
-                                 * would lose it.
-                                 */
-                                <p className="rounded-md border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
-                                    Saroh cannot read this section&apos;s saved
-                                    content. The fields may look empty even
-                                    though something is stored. Editing and
-                                    saving will replace whatever is there.
-                                </p>
-                            ) : null}
-
-                            {activeFlags.length > 0 ? (
-                                <ul className="grid gap-1.5 border-t pt-3">
-                                    {activeFlags.map((flag, i) => (
-                                        <li
-                                            key={i}
-                                            className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
-                                        >
-                                            <span
-                                                aria-hidden="true"
-                                                className="mt-1.5 size-1 shrink-0 rounded-full bg-[#c99f6f]"
-                                            />
-                                            <span>{flag.message}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : null}
-
-                            <SectionPadding
-                                section={active.section}
-                                siteDefault={style.scalars.sectionPadding}
-                                bounds={styleOptions.scalars.find(
-                                    (sc) => sc.key === "sectionPadding",
-                                )}
-                                onChange={(next) =>
-                                    replaceAt(active.index, next)
-                                }
-                            />
-
-                            {errorIndex === active.index && errorMessage ? (
-                                <p className="text-sm text-destructive">
-                                    {errorMessage}
-                                </p>
-                            ) : null}
-
-                            {/*
-                             * The design closes the field panel by saying where
-                             * editing does NOT happen. Worth keeping: a merchant
-                             * who expects to change a price here would otherwise
-                             * hunt for a field that is deliberately absent,
-                             * because those values belong to the modules that
-                             * own them.
-                             */}
-                            <p className="border-t pt-3 text-xs leading-relaxed text-muted-foreground">
-                                Written copy edits here and in the preview at
-                                the same time. Prices, dates and stock come from
-                                the workspace and change there.
-                            </p>
-                        </div>
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            Pick a section on the left to edit it. Changes
-                            appear in the preview as you type.
-                        </p>
-                    )}
-                </div>
-
-                <PanelDivider
-                    label="Resize the field panel"
-                    width={panelWidth}
-                    min={PANEL_MIN}
-                    max={PANEL_MAX}
-                    reset={PANEL_DEFAULT}
-                    onResize={setPanelWidth}
-                    onNudge={nudgePanel}
                 />
 
                 {/*
@@ -1715,7 +1711,7 @@ export function SiteEditor({
                     {conflict ? (
                         <div
                             role="alert"
-                            className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm"
+                            className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-sm"
                         >
                             <p className="font-medium">
                                 Someone else saved this page while you were
@@ -1775,7 +1771,7 @@ export function SiteEditor({
                          * rather than the 300 it was, because every frame here
                          * costs a layout pass over the whole rendered site.
                          */
-                        className={`mx-auto transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none ${
+                        className={`mx-auto transition-[max-width,opacity,transform] duration-slow ease-out motion-reduce:transition-none ${
                             switching ? "opacity-70" : "opacity-100"
                         }`}
                         style={{
@@ -1784,19 +1780,249 @@ export function SiteEditor({
                             transformOrigin: "top center",
                         }}
                     >
-                        <DraftPreview
-                            sections={sections}
-                            pages={pages}
-                            style={style}
-                            styleOptions={styleOptions}
-                            selectedIndex={selectedIndex}
-                            onSelect={(index) => {
-                                setRail("sections");
-                                setSelectedIndex(index);
-                            }}
-                        />
+                        {/*
+                         * The page sits in a window whose bar names the
+                         * address it lives at (#340): this is the merchant's
+                         * website, not a mock-up of one, and the bar says
+                         * where a customer would find it.
+                         */}
+                        <div className="overflow-hidden rounded-lg border shadow-xl shadow-black/10 dark:shadow-black/40">
+                            <div className="flex h-9 items-center gap-3 border-b bg-muted px-3">
+                                <span
+                                    aria-hidden="true"
+                                    className="flex gap-1.5"
+                                >
+                                    <span className="size-2 rounded-full bg-foreground/15" />
+                                    <span className="size-2 rounded-full bg-foreground/15" />
+                                    <span className="size-2 rounded-full bg-foreground/15" />
+                                </span>
+                                <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
+                                    {address
+                                        ? `${address}/`
+                                        : "Not published yet"}
+                                </span>
+                                {address ? (
+                                    <span className="ml-auto hidden shrink-0 text-[0.6875rem] text-muted-foreground xl:inline">
+                                        ⌘-click a link to open it on your site
+                                    </span>
+                                ) : null}
+                            </div>
+                            <DraftPreview
+                                siteAddress={address}
+                                sections={sections}
+                                pages={pages}
+                                style={style}
+                                styleOptions={styleOptions}
+                                selectedIndex={selectedIndex}
+                                onSelect={(index) => {
+                                    setRail("sections");
+                                    setSelectedIndex(index);
+                                }}
+                                chrome={canvasChrome}
+                                selectedChrome={selectedChrome}
+                                onSelectChrome={selectChrome}
+                                notesByKey={notesByKey}
+                                onOpenNotes={(index) => {
+                                    setSelectedIndex(index);
+                                    setInspector("feedback");
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
+
+                <PanelDivider
+                    label="Resize the inspector"
+                    width={panelWidth}
+                    min={PANEL_MIN}
+                    max={PANEL_MAX}
+                    reset={PANEL_DEFAULT}
+                    onResize={setPanelWidth}
+                    onNudge={nudgePanel}
+                    panelSide="right"
+                />
+
+                {/*
+                 * Right: the inspector (#340). Block is what can be changed
+                 * about the selected block; Feedback is what reviewers have
+                 * said. Both answer questions about the thing selected on the
+                 * page, which is why they sit beside it rather than under the
+                 * list.
+                 */}
+                <aside aria-label="Inspector" className="flex min-h-0 flex-col">
+                    <EditorTabs
+                        label="Inspector"
+                        tabs={[
+                            { key: "block", label: "Block" },
+                            {
+                                key: "feedback",
+                                label: "Feedback",
+                                // The selected block's own count, as its pin
+                                // shows; the whole site's with none selected.
+                                count:
+                                    active === null
+                                        ? openNotes
+                                        : active.section.key === undefined
+                                          ? 0
+                                          : (notesByKey.get(
+                                                active.section.key,
+                                            ) ?? 0),
+                            },
+                        ]}
+                        value={inspector}
+                        onSelect={setInspector}
+                    />
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                        {/*
+                         * Feedback reaches two things: what was said about
+                         * the selected block, and the whole site's review —
+                         * verdicts, preview links and every note, on every
+                         * page, settled ones included. The second must stay
+                         * reachable whatever is selected (review of #347).
+                         */}
+                        {inspector === "feedback" && active ? (
+                            <div className="px-4 pt-4">
+                                <ToggleGroup
+                                    type="single"
+                                    value={feedbackScope}
+                                    onValueChange={(v) => {
+                                        if (v === "block" || v === "site") {
+                                            setFeedbackScope(v);
+                                        }
+                                    }}
+                                    aria-label="Whose feedback"
+                                    className={SEGMENTED}
+                                >
+                                    <ToggleGroupItem
+                                        value="block"
+                                        className={SEGMENT}
+                                    >
+                                        This block
+                                    </ToggleGroupItem>
+                                    <ToggleGroupItem
+                                        value="site"
+                                        className={SEGMENT}
+                                    >
+                                        Whole site
+                                        {openNotes > 0 ? (
+                                            <span className="ml-1.5 tabular-nums text-highlight">
+                                                {openNotes}
+                                            </span>
+                                        ) : null}
+                                    </ToggleGroupItem>
+                                </ToggleGroup>
+                            </div>
+                        ) : null}
+                        {inspector === "feedback" &&
+                        active &&
+                        feedbackScope === "block" ? (
+                            <BlockFeedback
+                                // Remounted per block: a half-typed reply must
+                                // not follow the selection to another block.
+                                key={active.section.key ?? `i${active.index}`}
+                                siteId={siteId}
+                                pageId={pageId}
+                                sectionKey={active.section.key}
+                                label={SECTION_LABELS[active.section.type]}
+                                comments={comments}
+                                onChanged={refreshReview}
+                            />
+                        ) : inspector === "feedback" ? (
+                            <ReviewPanel
+                                siteId={siteId}
+                                pages={pages}
+                                comments={comments}
+                                review={review}
+                                onChanged={() => void refreshReview()}
+                                onJump={(jumpPageId, sectionKey) => {
+                                    jumpToNote(jumpPageId, sectionKey);
+                                    // Arrived at the block: show its notes.
+                                    setFeedbackScope("block");
+                                }}
+                            />
+                        ) : selectedChrome ? (
+                            <FixedBlockInspector
+                                part={selectedChrome}
+                                siteId={siteId}
+                                hasFooter={canvasChrome.footer !== null}
+                            />
+                        ) : (
+                            <BlockInspector
+                                active={active}
+                                count={sections.length}
+                                pages={pages}
+                                services={services}
+                                style={style}
+                                styleOptions={styleOptions}
+                                flags={activeFlags}
+                                unreadable={
+                                    active?.section.key !== undefined &&
+                                    unreadableSections.includes(
+                                        active.section.key,
+                                    )
+                                }
+                                error={
+                                    active !== null &&
+                                    errorIndex === active.index
+                                        ? errorMessage
+                                        : null
+                                }
+                                heldBack={
+                                    active === null
+                                        ? undefined
+                                        : heldBackAt(active.index)
+                                }
+                                onChange={(next) => {
+                                    if (active) replaceAt(active.index, next);
+                                }}
+                                onToggleHidden={() => {
+                                    if (active) toggleHidden(active.index);
+                                }}
+                                onMove={(delta) => {
+                                    if (!active) return;
+                                    move(active.index, delta);
+                                    setSelectedIndex(active.index + delta);
+                                }}
+                                onRemove={() => {
+                                    if (!active) return;
+                                    /*
+                                     * Ask first, and name the block. Autosave
+                                     * commits a removal, and version history
+                                     * only covers what was PUBLISHED, so copy
+                                     * written since is gone for good. The
+                                     * question names hiding too — usually what
+                                     * a merchant reaching for Remove wants.
+                                     */
+                                    setPendingRemove({
+                                        index: active.index,
+                                        title: sectionTitle(active.section),
+                                    });
+                                    setRemoveOpen(true);
+                                }}
+                            />
+                        )}
+                    </div>
+                    {/*
+                     * Outside both branches: confirming removes the block,
+                     * which sets `active` to null and would otherwise unmount
+                     * this dialog mid-close.
+                     */}
+                    <ConfirmDialog
+                        open={removeOpen}
+                        onOpenChange={setRemoveOpen}
+                        title={`Remove "${pendingRemove?.title ?? ""}"?`}
+                        description="Anything written here since your last publish cannot be brought back. To take it off the site and keep the work, hide it instead."
+                        confirmLabel="Remove section"
+                        cancelLabel="Keep section"
+                        onConfirm={() => {
+                            if (!pendingRemove) return;
+                            const { index, title } = pendingRemove;
+                            removeAt(index);
+                            setSelectedIndex(null);
+                            showSuccess(`Removed ${title}.`);
+                        }}
+                    />
+                </aside>
             </div>
 
             {/*
@@ -1821,18 +2047,38 @@ export function SiteEditor({
                         Escape to return
                     </button>
                     <div
-                        className="mx-auto transition-[max-width] duration-200 ease-out motion-reduce:transition-none"
+                        className="mx-auto transition-[max-width] duration-slow ease-out motion-reduce:transition-none"
                         style={{ maxWidth: DEVICE_WIDTH[device] }}
                     >
                         <DraftPreview
+                            siteAddress={address}
                             sections={sections}
                             pages={pages}
                             style={style}
                             styleOptions={styleOptions}
+                            chrome={canvasChrome}
                         />
                     </div>
                 </div>
             ) : null}
+
+            {/*
+             * Choosing a look before the block goes in (#267). Keyed on the
+             * block so each opening starts on that block's looks.
+             */}
+            <AddSectionDialog
+                key={lookFor ?? (browsing ? "browse" : "none")}
+                open={lookFor !== null || browsing}
+                startType={lookFor}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setLookFor(null);
+                        setBrowsing(false);
+                    }
+                }}
+                variables={resolveStyleVariables(style, styleOptions)}
+                onAdd={(type, variant) => addSection(type, variant)}
+            />
 
             {checking ? (
                 <PrePublishCheck
@@ -1860,6 +2106,8 @@ export function SiteEditor({
                         if (sectionIndex !== null) {
                             setRail("sections");
                             setSelectedIndex(sectionIndex);
+                            // The flag is about the block's fields.
+                            setInspector("block");
                         }
                     }}
                 />
@@ -1869,3 +2117,44 @@ export function SiteEditor({
 }
 
 /** Per-type field editor. Narrowing on `section.type` gives the exact shape. */
+
+/**
+ * The header or footer in the block list (#336): on every page, so it is
+ * listed where it sits — first and last — with a lock instead of a grip. It
+ * can be selected, never dragged.
+ */
+function FixedBlockRow({
+    part,
+    selected,
+    onSelect,
+}: {
+    part: "header" | "footer";
+    selected: boolean;
+    onSelect: () => void;
+}) {
+    const Icon = part === "header" ? PanelTop : PanelBottom;
+    const label = part === "header" ? "Header" : "Footer";
+    return (
+        <li>
+            <button
+                type="button"
+                onClick={onSelect}
+                aria-current={selected ? "true" : undefined}
+                className={cn(
+                    "relative flex h-10 w-full items-center gap-2.5 rounded-md pl-5 pr-2 text-left text-[0.8125rem] transition-colors",
+                    railRowState(selected),
+                )}
+            >
+                <Icon
+                    aria-hidden
+                    className="size-4 shrink-0 text-muted-foreground"
+                />
+                <span className="flex-1 truncate">{label}</span>
+                <Lock
+                    aria-label="On every page"
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                />
+            </button>
+        </li>
+    );
+}

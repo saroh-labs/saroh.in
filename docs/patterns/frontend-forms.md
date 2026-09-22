@@ -45,17 +45,16 @@ waitlist; `components/stores/product-form.tsx` is the reference.
   the waitlist do.
 - **Adopted** — **Every field has a visible label; a placeholder is never the
   label** (13 §5). Not measured.
-- **Adopted** — **Form primitives, not raw inputs,** in application forms. Gap:
-  28 raw `<input>`, `<select>` or `<textarea>` elements in
-  `app.saroh.in/components`.
-- **Adopted** — **Submission errors are announced.** `FormMessage` has no
-  `role="alert"`, so an error that appears after submit is not read out
-  (13 §5).
-- **Adopted** — **Dates use a shared picker, not `<input type="date">`.** Gap:
-  there is none yet — `@saroh/ui` has `calendar.tsx` only — so three native
-  inputs remain (`bookings/availability-rules-editor.tsx` twice,
-  `crm/task-form.tsx`). Build the picker in `packages/ui` rather than adding a
-  fourth.
+- **Current** — **shadcn controls, never native pickers.** A list is a
+  `Select` — `components/shared/option-select.tsx` wraps it for flat option
+  lists and maps a `""` "None" value, which Radix reserves. A time of day is
+  `@saroh/ui/time-select` (fixed steps, value stays "HH:MM"); a date is
+  `@saroh/ui/date-picker` (Popover + Calendar). No `<select>`,
+  `type="date"`, `type="time"` or `type="datetime-local"` remains in
+  `app.saroh.in`; with react-hook-form, drive them through `Controller` or
+  `FormField`, not `register`.
+- **Adopted** — **Form primitives, not raw inputs,** in application forms.
+  Raw `<input>` and `<textarea>` elements remain in some inline managers.
 - **Adopted** — **Controls meet the touch target on a phone.** `Button` does
   (`coarse:`, `frontend-design-system.md`); inputs were not re-checked.
 

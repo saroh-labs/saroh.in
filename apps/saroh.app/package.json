@@ -8,7 +8,8 @@
         "build": "next build",
         "start": "next start",
         "lint": "eslint .",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
     },
     "portless": "saroh.app",
     "dependencies": {
@@ -41,6 +42,7 @@
         "eslint-config-next": "catalog:",
         "postcss": "catalog:",
         "tailwindcss": "catalog:",
-        "typescript": "catalog:"
+        "typescript": "catalog:",
+        "vitest": "^4.1.11"
     }
 }

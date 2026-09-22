@@ -1,13 +1,13 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
-import type { FeatureItem, FeaturesContent } from "@/lib/sites/service";
+import type { FeaturesContent } from "@/lib/sites/service";
 
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
+import { RepeatedItems } from "./repeated-items";
 
 /**
  * The `features` section's editor fields (#255).
@@ -35,13 +35,6 @@ export function FeaturesFields({
     const patch = (next: Partial<FeaturesContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
 
-    const setItem = (index: number, next: Partial<FeatureItem>) =>
-        patch({
-            items: c.items.map((item, i) =>
-                i === index ? { ...item, ...next } : item,
-            ),
-        });
-
     return (
         <div className="grid gap-3">
             <Field label="Heading">
@@ -60,74 +53,35 @@ export function FeaturesFields({
                 />
             </Field>
 
-            {c.items.map((item, index) => (
-                <div key={index} className="grid gap-2 rounded-md border p-3">
-                    <div className="flex items-center justify-between">
-                        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                            Point {index + 1}
-                        </span>
-                        {/*
-                         * The contract requires at least one point, so the last
-                         * one cannot be removed — a section with none would
-                         * save as invalid and the merchant would be told at
-                         * publish rather than here.
-                         */}
-                        {c.items.length > 1 ? (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                    patch({
-                                        items: c.items.filter(
-                                            (_, i) => i !== index,
-                                        ),
-                                    })
-                                }
-                            >
-                                Remove
-                            </Button>
-                        ) : null}
-                    </div>
-                    <Field label="Title">
-                        <Input
-                            value={item.title}
-                            onChange={(e) =>
-                                setItem(index, { title: e.target.value })
-                            }
-                            placeholder="Stocked, not ordered in"
-                        />
-                    </Field>
-                    <Field label="Detail">
-                        <Textarea
-                            value={item.body ?? ""}
-                            onChange={(e) =>
-                                setItem(index, { body: e.target.value })
-                            }
-                            rows={3}
-                            placeholder="A sentence or two. Optional."
-                        />
-                    </Field>
-                </div>
-            ))}
-
-            {c.items.length < MAX_ITEMS ? (
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                        patch({ items: [...c.items, { title: "", body: "" }] })
-                    }
-                >
-                    Add a point
-                </Button>
-            ) : (
-                <p className="text-[12px] text-muted-foreground">
-                    That is the most this block carries. More than twelve points
-                    is a page, not a summary.
-                </p>
-            )}
+            <RepeatedItems
+                items={c.items}
+                onChange={(items) => patch({ items })}
+                max={MAX_ITEMS}
+                itemNoun="Point"
+                addLabel="Add a point"
+                fullMessage="That is the most this block carries. More than twelve points is a page, not a summary."
+                newItem={() => ({ title: "", body: "" })}
+            >
+                {(item, set) => (
+                    <>
+                        <Field label="Title">
+                            <Input
+                                value={item.title}
+                                onChange={(e) => set({ title: e.target.value })}
+                                placeholder="Stocked, not ordered in"
+                            />
+                        </Field>
+                        <Field label="Detail">
+                            <Textarea
+                                value={item.body ?? ""}
+                                onChange={(e) => set({ body: e.target.value })}
+                                rows={3}
+                                placeholder="A sentence or two. Optional."
+                            />
+                        </Field>
+                    </>
+                )}
+            </RepeatedItems>
         </div>
     );
 }

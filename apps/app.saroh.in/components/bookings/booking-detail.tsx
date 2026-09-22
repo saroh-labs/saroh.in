@@ -1,6 +1,5 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
@@ -8,6 +7,7 @@ import { CancelBookingControl } from "@/components/bookings/cancel-booking-contr
 import { OutcomeControl } from "@/components/bookings/outcome-control";
 import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
+import { formatStatus } from "@/lib/format/status";
 import type { BookingDetail, BookingEvent } from "@/lib/services/service";
 
 /**
@@ -41,12 +41,19 @@ export function BookingDetailView({
     // `find`, not `moved[0]`: indexing is typed as always-present here, and
     // this must actually be optional — most bookings have never been moved.
     const firstMove = booking.events.find((e) => e.type === "RESCHEDULED");
+    // Someone on the team made it by hand (#384): it is FOR the booker, and
+    // BY them. A booker who used the booking page made it themselves.
+    const madeBy = booking.events.find((e) => e.type === "BOOKED")?.actor?.name;
 
     return (
         <main className="mx-auto w-full max-w-4xl p-6 sm:p-8">
             <PageHeader
                 title={service.name}
-                description={`Booked by ${bookerLabel(booking)}.`}
+                description={
+                    madeBy
+                        ? `Booked for ${bookerLabel(booking)} by ${madeBy}.`
+                        : `Booked by ${bookerLabel(booking)}.`
+                }
                 actions={
                     <div className="flex flex-wrap items-center gap-2">
                         <Button asChild variant="ghost" size="sm">
@@ -207,30 +214,22 @@ function Row({ label, value }: { label: string; value: string | null }) {
 function StatusBadge({ status }: { status: BookingDetail["status"] }) {
     return (
         <Badge
-            className={cn(
-                "text-[0.625rem] font-medium uppercase tracking-wider",
+            variant={
                 status === "CONFIRMED"
-                    ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
+                    ? "success"
                     : status === "CANCELLED"
-                      ? "border border-border bg-transparent text-muted-foreground"
-                      : "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
-            )}
+                      ? "neutral"
+                      : "warning"
+            }
         >
-            {status}
+            {formatStatus(status)}
         </Badge>
     );
 }
 
 function OutcomeBadge({ outcome }: { outcome: "ATTENDED" | "NO_SHOW" }) {
     return (
-        <Badge
-            className={cn(
-                "text-[0.625rem] font-medium uppercase tracking-wider",
-                outcome === "ATTENDED"
-                    ? "border border-brand/30 bg-brand-subtle text-brand-subtle-foreground"
-                    : "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground",
-            )}
-        >
+        <Badge variant={outcome === "ATTENDED" ? "success" : "warning"}>
             {outcome === "ATTENDED" ? "Attended" : "No-show"}
         </Badge>
     );

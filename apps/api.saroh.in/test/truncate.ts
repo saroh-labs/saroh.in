@@ -46,8 +46,15 @@ export async function truncateAll(): Promise<void> {
     );
 }
 
-/** Disconnect the real client. Mirrors `truncateAll`'s mock-proof resolution. */
+/**
+ * Close the real client and its connection pool. Mirrors `truncateAll`'s
+ * mock-proof resolution.
+ *
+ * The POOL is the point: every test file loads `@saroh/database` afresh and
+ * so builds its own pool, and `$disconnect()` leaves that pool's connections
+ * open — a full run exhausted Postgres's connection limit and the last suites
+ * failed to start with "too many clients".
+ */
 export async function disconnectPrisma(): Promise<void> {
-    const { prisma } = actualDatabase();
-    await prisma.$disconnect();
+    await actualDatabase().disconnectDatabase();
 }

@@ -45,6 +45,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "automations/automations.controller.ts": "AUTOMATIONS",
     "categories/categories.controller.ts": "COMMERCE",
     "customers/customers.controller.ts": "COMMERCE",
+    "discounts/discounts.controller.ts": "COMMERCE",
+    "product-reviews/product-reviews.controller.ts": "COMMERCE",
     "orders/orders.controller.ts": "COMMERCE",
     "products/products.controller.ts": "COMMERCE",
     "products/product-details.controller.ts": "COMMERCE",
@@ -66,6 +68,8 @@ const METHOD_LEVEL: Record<string, string> = {
  * finishing the rollout and would in fact break the thing the runbook protects.
  */
 const NEVER: Record<string, string> = {
+    "product-reviews/public-product-reviews.controller.ts":
+        "the customer review page — no session, hangs on its token",
     "capabilities/capabilities.controller.ts":
         "gating this locks a merchant out of turning the module back on",
     "home/home.controller.ts":
@@ -80,6 +84,8 @@ const NEVER: Record<string, string> = {
     "notifications/notifications.controller.ts": "cross-cutting",
     "media/media.controller.ts": "shared by more than one module",
     "organizations/organizations.controller.ts": "tenancy, not a capability",
+    "organizations/organization-roles.controller.ts":
+        "roles decide who may switch modules; a module switch must never lock the owner out of roles",
     "projects/projects.controller.ts": "tenancy",
     "projects/teams.controller.ts": "tenancy",
     "members/members.controller.ts": "tenancy",
@@ -88,12 +94,18 @@ const NEVER: Record<string, string> = {
     "admin/admin.controller.ts": "staff control plane, not a tenant surface",
     "health/health.controller.ts": "liveness",
     "self-test/self-test.controller.ts": "diagnostics",
-    // Public surfaces. A merchant switching a module off must not take down a
-    // checkout, a booking page, a published site, or a provider's webhook.
+    // Public surfaces. A visitor has no organization context, so the guard
+    // would answer them 401/403, and a merchant switching a module off must not
+    // take down a checkout, a published site, or a provider's webhook. Where a
+    // public route must still honour a module, the service decides from the
+    // resource: public booking answers 410 when the organization switched
+    // Appointments off (`bookings/appointments-open.ts`).
     "payments/public-payments.controller.ts": "public checkout",
     "bookings/public-bookings.controller.ts": "public booking",
     "sites/public-sites.controller.ts": "published sites",
     "enquiry/enquiry.controller.ts": "public forms",
+    "organizations/public-invitations.controller.ts":
+        "someone reads an invitation before they have an account, let alone a module",
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
     "billing/billing-webhook.controller.ts": "billing webhook inbox",
     "waitlist/waitlist.controller.ts": "public waitlist",

@@ -5,6 +5,7 @@ import {
     NAV_GROUPS,
     filterNavGroups,
     filterNavGroupsByRole,
+    isNavChildCurrent,
     navFor,
     navRoleCan,
 } from "@/components/shared/nav-items";
@@ -142,8 +143,23 @@ describe("what each role is offered", () => {
         );
         expect(offered).toContain("/settings/providers");
         expect(offered).toContain("/notifications");
-        expect(offered).toContain("/sites/new");
         expect(offered).toContain("/sites/site_1");
+        expect(offered).toContain("/sites/site_2");
+    });
+
+    it("offers a new site only to a business that has none (ADR-006)", () => {
+        const offeredWith = (sites: typeof SITES) =>
+            hrefs(
+                navFor({
+                    role: "OWNER",
+                    moduleKeys: AVAILABLE_TO.OWNER,
+                    sites,
+                }),
+            );
+        expect(offeredWith([])).toContain("/sites/new");
+        expect(offeredWith([SITES[0]])).not.toContain("/sites/new");
+        // A business that already has two keeps both, and still makes no more.
+        expect(offeredWith(SITES)).not.toContain("/sites/new");
     });
 
     it("does not offer a member what it would be refused", () => {
@@ -204,9 +220,21 @@ describe("the site tree", () => {
                 sites: [SITES[0]],
             }),
         );
+        expect(offered).toContain("/sites/site_1/pages");
         expect(offered).toContain("/sites/site_1");
         expect(offered).toContain("/sites/site_1/posts");
         expect(offered).toContain("/sites/site_1/settings");
+    });
+
+    it("is left out of the rail, where Website is one row", () => {
+        // The rail and the drawer ask without sites; only the palette hangs
+        // them. A merchant who can create a site is offered it on the Website
+        // screen, not as a child row.
+        const website = navFor({ role: "OWNER", moduleKeys: ["WEBSITE"] })
+            .flatMap((g) => g.items)
+            .find((i) => i.href === "/sites");
+        expect(website).toBeDefined();
+        expect(website?.children ?? []).toHaveLength(0);
     });
 
     it("takes a reader to the screen built for reading", () => {
@@ -258,5 +286,195 @@ describe("what the two filters each answer", () => {
             const groups = navFor({ role, moduleKeys: null, sites: [] });
             expect(hrefs(groups)).toContain("/sites");
         }
+    });
+});
+
+/**
+ * Roles a business invents. The rail renders what the API allows, because a
+ * map compiled into the frontend only knows the four roles that ship.
+ */
+describe("navFor — an invented role", () => {
+    const sites: { id: string; name: string }[] = [];
+    const hrefsOf = (groups: ReturnType<typeof navFor>) =>
+        groups.flatMap((g) => g.items.map((i) => i.href));
+
+    it("uses the actor's own permissions over their built-in role", () => {
+        // `role` is MEMBER — what an invented role maps to — but this business
+        // granted the role the roster and the modules screen, and neither the
+        // business details nor the providers.
+        const hrefs = hrefsOf(
+            navFor({
+                role: "MEMBER",
+                actions: ["member:read", "module:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).toContain("/settings/people");
+        expect(hrefs).toContain("/settings/modules");
+        expect(hrefs).not.toContain("/settings/organization");
+        expect(hrefs).not.toContain("/settings/providers");
+        expect(hrefs).not.toContain("/notifications");
+    });
+
+    it("can offer MORE than the floor the role maps to", () => {
+        const hrefs = hrefsOf(
+            navFor({
+                role: "MEMBER",
+                actions: ["org:settings:read", "member:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        // Business details is OWNER/ADMIN in the shipped map. A business may
+        // grant it to a role it invented, and the rail has to follow.
+        expect(hrefs).toContain("/settings/organization");
+    });
+
+    it("falls back to the role map when permissions were not loaded", () => {
+        const withNull = navFor({
+            role: "OWNER",
+            actions: null,
+            moduleKeys: null,
+            sites,
+        });
+        const without = navFor({ role: "OWNER", moduleKeys: null, sites });
+        expect(withNull).toEqual(without);
+    });
+});
+
+/**
+ * Orders across the business are gated on `order:read`. The rail has to agree
+ * with the API, or a Member clicks a row that answers them with a refusal.
+ */
+describe("Sell → Orders is offered only to roles that can read orders", () => {
+    const childHrefs = (groups: ReturnType<typeof navFor>) =>
+        groups.flatMap((g) =>
+            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
+        );
+    const sites: { id: string; name: string }[] = [];
+
+    it.each(["OWNER", "ADMIN"] as const)("offers it to %s", (role) => {
+        expect(childHrefs(navFor({ role, moduleKeys: null, sites }))).toContain(
+            "/commerce/orders",
+        );
+    });
+
+    it.each(["MEMBER", "REVIEWER"] as const)(
+        "does not offer it to %s",
+        (role) => {
+            expect(
+                childHrefs(navFor({ role, moduleKeys: null, sites })),
+            ).not.toContain("/commerce/orders");
+        },
+    );
+
+    it("offers it to an invented role that was granted it", () => {
+        const hrefs = childHrefs(
+            navFor({
+                role: "MEMBER",
+                actions: ["order:read", "store:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).toContain("/commerce/orders");
+    });
+});
+
+describe("the storefront rows follow store:read", () => {
+    const childHrefs = (groups: ReturnType<typeof navFor>) =>
+        groups.flatMap((g) =>
+            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
+        );
+    const sites: { id: string; name: string }[] = [];
+    const storefront = [
+        "/commerce/products",
+        "/commerce/customers",
+        "/commerce/storefronts",
+    ];
+
+    it("still offers them to a Member, whose floor includes it", () => {
+        const hrefs = childHrefs(
+            navFor({ role: "MEMBER", moduleKeys: null, sites }),
+        );
+        for (const h of storefront) expect(hrefs).toContain(h);
+    });
+
+    it("hides them from an invented role granted orders but not storefronts", () => {
+        const hrefs = childHrefs(
+            navFor({
+                role: "MEMBER",
+                actions: ["order:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).toContain("/commerce/orders");
+        for (const h of storefront) expect(hrefs).not.toContain(h);
+    });
+});
+
+describe("Sell → Discounts follows discount:read", () => {
+    const childHrefs = (groups: ReturnType<typeof navFor>) =>
+        groups.flatMap((g) =>
+            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
+        );
+    const sites: { id: string; name: string }[] = [];
+
+    it.each(["OWNER", "ADMIN"] as const)("offers it to %s", (role) => {
+        expect(childHrefs(navFor({ role, moduleKeys: null, sites }))).toContain(
+            "/commerce/discounts",
+        );
+    });
+
+    it("withholds it from a Member, who cannot read codes", () => {
+        expect(
+            childHrefs(navFor({ role: "MEMBER", moduleKeys: null, sites })),
+        ).not.toContain("/commerce/discounts");
+    });
+
+    it("follows an invented role's own permissions", () => {
+        const hrefs = childHrefs(
+            navFor({
+                role: "MEMBER",
+                actions: ["discount:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).toContain("/commerce/discounts");
+    });
+});
+
+describe("isNavChildCurrent", () => {
+    it("keeps a row lit on the pages beneath it", () => {
+        expect(
+            isNavChildCurrent("/commerce/products/p_1", "/commerce/products"),
+        ).toBe(true);
+    });
+
+    it("does not light a row whose address only starts the same", () => {
+        expect(
+            isNavChildCurrent("/commerce/productsx", "/commerce/products"),
+        ).toBe(false);
+    });
+
+    it("lets the deepest sibling win, so only one row is current", () => {
+        const siblings = [{ href: "/sites/s1" }, { href: "/sites/s1/posts" }];
+        expect(
+            isNavChildCurrent("/sites/s1/posts/new", "/sites/s1", siblings),
+        ).toBe(false);
+        expect(
+            isNavChildCurrent(
+                "/sites/s1/posts/new",
+                "/sites/s1/posts",
+                siblings,
+            ),
+        ).toBe(true);
+    });
+
+    it("never lights a label row", () => {
+        expect(isNavChildCurrent("/sites", undefined)).toBe(false);
     });
 });

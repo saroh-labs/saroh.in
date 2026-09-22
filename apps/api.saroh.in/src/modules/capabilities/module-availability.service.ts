@@ -20,6 +20,7 @@ import { prisma } from "@saroh/database";
 import type { OrgRole } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import type { OrgAction } from "../organizations/organization-actions";
 import { can } from "../organizations/organization-policy";
 import type {
     ModuleKey,
@@ -53,7 +54,27 @@ export interface AvailabilityInput {
     organizationId: string;
     moduleKey: ModuleKey;
     organizationRole: OrgRole;
+    /**
+     * What the actor may do, resolved from the business's own roles. Preferred
+     * over `organizationRole`, which is MEMBER for a role the business
+     * invented: judged by that name, a role granted orders was told Commerce
+     * was off, and a role NOT granted websites was offered Website.
+     */
+    organizationActions?: ReadonlySet<OrgAction>;
     projectId?: string;
+}
+
+/** Whether the actor may take `action`, by their resolved permissions first. */
+function mayIn(
+    input: {
+        organizationRole: OrgRole;
+        organizationActions?: ReadonlySet<OrgAction>;
+    },
+    action: OrgAction,
+): boolean {
+    return input.organizationActions
+        ? input.organizationActions.has(action)
+        : can(input.organizationRole, action);
 }
 
 /**
@@ -90,11 +111,8 @@ export class ModuleAvailabilityService {
             throw new Error(`unknown module: ${input.moduleKey}`);
         }
 
-        const authorized = can(
-            input.organizationRole,
-            descriptor.requiredAction,
-        );
-        const canManage = can(input.organizationRole, "module:manage");
+        const authorized = mayIn(input, descriptor.requiredAction);
+        const canManage = mayIn(input, "module:manage");
 
         const rolloutAllowed = await this.flags.isEnabled(
             descriptor.rolloutFlag,
@@ -206,7 +224,7 @@ export class ModuleAvailabilityService {
         const lifecycleByKey = new Map(
             installations.map((i) => [i.moduleKey, i.status]),
         );
-        const canManage = can(input.organizationRole, "module:manage");
+        const canManage = mayIn(input, "module:manage");
 
         return availabilities.map((a) => ({
             key: a.key,
@@ -242,7 +260,7 @@ export class ModuleAvailabilityService {
             lifecycle: (installation?.status ?? "DISABLED") as ModuleLifecycle,
             readiness: availability.readiness,
             selectedForProject: availability.selectedForProject,
-            canManage: can(input.organizationRole, "module:manage"),
+            canManage: mayIn(input, "module:manage"),
             dependencies: [
                 ...(MODULE_BY_KEY.get(availability.key)?.dependencies ?? []),
             ],

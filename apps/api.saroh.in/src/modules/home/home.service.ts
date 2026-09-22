@@ -3,6 +3,8 @@ import { prisma } from "@saroh/database";
 
 import type { OrgRole } from "../../common/types/organization-context";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import { UNFULFILLED_STATUSES } from "../orders/order-standing";
+import type { OrgAction } from "../organizations/organization-actions";
 
 /**
  * Home read model (cross-product UX #119, Task 4).
@@ -152,6 +154,8 @@ export interface HomeModel {
 export interface HomeInput {
     organizationId: string;
     organizationRole: OrgRole;
+    /** Resolved permissions; see `AvailabilityInput.organizationActions`. */
+    organizationActions?: ReadonlySet<OrgAction>;
     projectId?: string;
 }
 
@@ -321,7 +325,12 @@ export class HomeService {
                     key: "OPEN_ORDERS",
                     label: "Open orders",
                     value: open.count,
-                    href: "/commerce",
+                    // The SCREEN that shows them, not the section above it.
+                    // The rail badges whatever href an OVERDUE action carries,
+                    // so pointing this at "/commerce" put the count on Sell
+                    // and sent the merchant to a list of storefronts to hunt
+                    // for orders one storefront at a time.
+                    href: "/commerce/orders",
                     moduleKey: "COMMERCE",
                 });
             }
@@ -334,7 +343,7 @@ export class HomeService {
                     actions.push({
                         code: "COMMERCE_OPEN_ORDERS",
                         title: `Fulfil ${open.count} open order${open.count === 1 ? "" : "s"}`,
-                        href: "/commerce",
+                        href: "/commerce/orders",
                         severity: "OVERDUE",
                         moduleKey: "COMMERCE",
                         count: open.count,
@@ -344,7 +353,8 @@ export class HomeService {
                     actions.push({
                         code: "COMMERCE_SUGGEST_PRODUCT",
                         title: "Add a product to your catalog",
-                        href: "/commerce",
+                        // Likewise the catalogue, not the storefront list.
+                        href: "/commerce/products",
                         severity: "SUGGESTION",
                         moduleKey: "COMMERCE",
                     });
@@ -456,7 +466,9 @@ export class HomeService {
     ): Promise<{ count: number; evidence: HomeEvidence[] }> {
         const where = {
             organizationId,
-            status: { in: ["PENDING", "PROCESSING"] },
+            // The same constant Sell -> Orders resolves a row's standing
+            // from, so the number badged here and the tab there cannot drift.
+            status: { in: [...UNFULFILLED_STATUSES] },
         };
 
         const [count, rows] = await Promise.all([
@@ -480,7 +492,7 @@ export class HomeService {
                 // units, so it is converted once here rather than in each client.
                 amountMinor: Math.round(Number(row.total) * 100),
                 currency: row.currency,
-                href: `/stores/${row.storeId}/orders/${row.id}`,
+                href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
             })),
         };
     }

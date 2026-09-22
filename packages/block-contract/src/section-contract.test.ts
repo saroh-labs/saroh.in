@@ -286,6 +286,10 @@ describe("per-section padding override (#189)", () => {
         },
         booking: {},
         features: { items: [{ title: "Stocked, not ordered in" }] },
+        faq: { items: [{ question: "Open Sundays?", answer: "No." }] },
+        testimonials: { items: [{ quote: "Quick.", name: "Sam" }] },
+        contact: { phone: "+44 113 496 0000" },
+        servicesList: { serviceIds: ["svc_1"] },
     };
 
     it("is accepted on every section type", () => {

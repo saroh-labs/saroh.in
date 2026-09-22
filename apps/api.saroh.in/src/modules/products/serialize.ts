@@ -38,6 +38,19 @@ export interface ProductDto {
     category?: { id: string; name: string } | null;
 }
 
+/**
+ * A catalogue row: what the products table shows without opening a product —
+ * how many variants it has, the SKU it is known by, and its stock against its
+ * own low-stock threshold (a threshold is per product: five is low for mugs
+ * and high for wedding cakes).
+ */
+export interface ProductListItemDto extends ProductDto {
+    variantCount: number;
+    /** The first variant's SKU; `null` for a product with no variants. */
+    sku: string | null;
+    inventory: { quantity: number; lowStockAlert: number } | null;
+}
+
 export interface ProductDetailDto extends ProductDto {
     variants: VariantDto[];
     inventory: {
@@ -109,6 +122,28 @@ export function serializeProduct(product: RawProduct): ProductDto {
         createdAt: product.createdAt,
         updatedAt: product.updatedAt,
         category: product.category ?? null,
+    };
+}
+
+interface RawProductListItem extends RawProduct {
+    _count: { variants: number };
+    variants: { sku: string }[];
+    inventory: { quantity: number; lowStockAlert: number } | null;
+}
+
+export function serializeProductListItem(
+    product: RawProductListItem,
+): ProductListItemDto {
+    return {
+        ...serializeProduct(product),
+        variantCount: product._count.variants,
+        sku: product.variants[0]?.sku ?? null,
+        inventory: product.inventory
+            ? {
+                  quantity: product.inventory.quantity,
+                  lowStockAlert: product.inventory.lowStockAlert,
+              }
+            : null,
     };
 }
 

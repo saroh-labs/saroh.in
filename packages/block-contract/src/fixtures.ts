@@ -310,14 +310,128 @@ export const BLOCK_META = {
                 // Caught by looking at the page, which is the argument for
                 // having one.
                 //
-                // The id belongs to no Service, so availability 404s and the
-                // widget shows its "no times" state. That is a real state a
-                // visitor sees, and an honest thing to put in a catalog.
+                // The id belongs to no Service, so previews (the catalog, the
+                // editor's Add-section picker) hand the widget sample open
+                // times instead of fetching (#267); the G5 snapshot stubs the
+                // fetch and shows the "no times" state.
                 serviceId: "fixture-service",
                 title: "Book a table",
                 description: "Lunch and dinner, seven days a week.",
                 submitLabel: "Confirm booking",
                 successMessage: "Booked. A confirmation is on its way.",
+            },
+        },
+    },
+    /*
+     * #255's three content blocks. One look each: the design system is about to
+     * change, so these ship functional first. A second look is a variant added
+     * later, not a new block.
+     */
+    faq: {
+        label: "FAQ",
+        description:
+            "Questions a visitor would otherwise call to ask, each answer one tap away.",
+        variants: soleVariant(
+            "Questions stacked in one column; each opens to show its answer.",
+        ),
+        fixtures: {
+            default: {
+                variant: "default",
+                heading: "Questions we get asked",
+                items: [
+                    {
+                        question: "Do you deliver outside the city?",
+                        answer: "Yes, anywhere on the mainland. Orders over £150 go free; below that it is a flat £12.",
+                    },
+                    {
+                        question: "Can I collect instead?",
+                        answer: "From the trade counter, Monday to Saturday. We text you when it is ready.",
+                    },
+                    {
+                        question: "Do you take returns?",
+                        answer: "Unopened stock within 30 days, with the receipt.\nCut-to-size and custom runs can't be returned.",
+                    },
+                ],
+            },
+        },
+    },
+    testimonials: {
+        label: "Testimonials",
+        description:
+            "What customers said, in their words and under their names.",
+        variants: soleVariant(
+            "Quotes side by side in columns, one column on a phone.",
+        ),
+        fixtures: {
+            default: {
+                variant: "default",
+                heading: "What our customers say",
+                items: [
+                    {
+                        quote: "Ordered at eleven, on site by three. That's why we stopped shopping around.",
+                        name: "Priya Shah",
+                        role: "Site manager, Shah & Sons Builders",
+                    },
+                    {
+                        quote: "They told me the cheaper part would do the job. It did.",
+                        name: "Tom Ellis",
+                    },
+                    {
+                        quote: "The trade account paid for itself in the second month.",
+                        name: "Grace Obi",
+                        role: "Customer since 2019",
+                    },
+                ],
+            },
+        },
+    },
+    contact: {
+        label: "Contact",
+        description:
+            "Where to find you and how to reach you: address, hours, phone, email and WhatsApp.",
+        variants: soleVariant(
+            "Address and hours beside a list of ways to get in touch.",
+        ),
+        fixtures: {
+            default: {
+                variant: "default",
+                heading: "Visit or get in touch",
+                intro: "The trade counter is at the back of the yard.",
+                address: "Unit 4, Riverside Trade Park\nLeeds LS10 1AB",
+                hours: "Mon–Fri 7:30–17:00\nSat 8:00–12:00\nSun closed",
+                // Ofcom's drama range and a reserved domain: never a real
+                // business's number or inbox.
+                phone: "+44 113 496 0000",
+                email: "hello@example.com",
+                whatsapp: "+44 7700 900000",
+            },
+        },
+    },
+    servicesList: {
+        label: "Services",
+        description:
+            "Your bookable services with their duration and price, kept current from Appointments.",
+        variants: soleVariant(
+            "Services in a list, each with its duration and price.",
+        ),
+        fixtures: {
+            default: {
+                variant: "default",
+                heading: "Services",
+                intro: "Book online; we confirm by email straight away.",
+                // Ids that belong to no Service: the catalog and the snapshot
+                // hand the component sample services instead of fetching.
+                serviceIds: [
+                    "fixture-cut",
+                    "fixture-colour",
+                    "fixture-consult",
+                ],
+                cta: {
+                    label: "Book now",
+                    href: "/book",
+                    style: "primary",
+                    action: { kind: "page" },
+                },
             },
         },
     },

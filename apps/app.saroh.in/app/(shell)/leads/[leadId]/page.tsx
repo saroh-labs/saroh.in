@@ -11,8 +11,10 @@ import { MessageComposer } from "@/components/crm/message-composer";
 import { MessageHistory } from "@/components/crm/message-history";
 import { MoveStageControl } from "@/components/crm/move-stage-control";
 import { TaskForm } from "@/components/crm/task-form";
+import { DeleteLeadMenu } from "@/components/leads/delete-lead-menu";
+import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { PageContainer } from "@/components/shared/page-container";
-import { contactName, formatValue } from "@/lib/crm/format";
+import { contactName, formatValue, LEAD_STATUS } from "@/lib/crm/format";
 import { getLead } from "@/lib/leads/service";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/service";
 import { listContactConsents, listLeadMessages } from "@/lib/messages/service";
@@ -87,19 +89,23 @@ export default async function LeadDetailPage({
                 actions={
                     <>
                         {lead.stage && (
-                            <Badge variant="secondary">{lead.stage.name}</Badge>
+                            <Badge variant="neutral">{lead.stage.name}</Badge>
                         )}
-                        <Badge
-                            variant={
-                                lead.status === "WON"
-                                    ? "default"
-                                    : lead.status === "LOST"
-                                      ? "destructive"
-                                      : "outline"
-                            }
-                        >
-                            {lead.status}
+                        <Badge variant={LEAD_STATUS[lead.status].variant}>
+                            {LEAD_STATUS[lead.status].label}
                         </Badge>
+                        <EditLeadDialog
+                            leadId={lead.id}
+                            title={lead.title}
+                            value={lead.value}
+                        />
+                        <DeleteLeadMenu
+                            leadId={lead.id}
+                            title={lead.title}
+                            contactName={
+                                lead.contact ? contactName(lead.contact) : null
+                            }
+                        />
                     </>
                 }
             />

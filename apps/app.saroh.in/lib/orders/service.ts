@@ -1,3 +1,4 @@
+import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, getList } from "@/lib/api/http";
 
 /**
@@ -7,11 +8,7 @@ import { apiFetch, getJson, getList } from "@/lib/api/http";
  */
 
 export type OrderStatus =
-    | "PENDING"
-    | "PROCESSING"
-    | "SHIPPED"
-    | "DELIVERED"
-    | "CANCELLED";
+    "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 export type PaymentStatus = "UNPAID" | "PAID" | "FAILED" | "REFUNDED";
 
 export interface OrderSummary {
@@ -39,11 +36,15 @@ export interface OrderItem {
 }
 
 export interface OrderDetail extends OrderSummary {
+    /** When anything on the order last changed. */
+    updatedAt: string | null;
     subtotal: string;
     tax: string;
     shipping: string;
     discount: string;
     items: OrderItem[];
+    /** The code used, as it was when used — never the code as it is now. */
+    discountCode: { code: string; rule: string } | null;
 }
 
 export interface CreateOrderInput {
@@ -53,6 +54,8 @@ export interface CreateOrderInput {
     shipping?: string;
     discount?: string;
     currency?: string;
+    /** A discount code; the API works out what it takes off. */
+    discountCode?: string;
 }
 
 export interface UpdateOrderInput {
@@ -62,7 +65,7 @@ export interface UpdateOrderInput {
 
 export type OrderResult =
     | { ok: true; data: { id: string } }
-    | { ok: false; error: string };
+    | { ok: false; error: string; field?: string };
 
 export function listOrders(storeId: string): Promise<OrderSummary[]> {
     return getList<OrderSummary>(`/stores/${storeId}/orders`);
@@ -81,12 +84,12 @@ async function mutate(
     body: unknown,
 ): Promise<OrderResult> {
     const res = await apiFetch(path, { method, body: JSON.stringify(body) });
-    const data = (await res.json().catch(() => null)) as {
-        id?: string;
-        message?: string;
-    } | null;
-    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
-    return { ok: false, error: data?.message ?? "Something went wrong" };
+    const data: unknown = await res.json().catch(() => null);
+    const id = (data as { id?: unknown } | null)?.id;
+    if (res.ok && typeof id === "string") return { ok: true, data: { id } };
+    // The API's envelope is `{ error: { message, details } }`; reading only a
+    // top-level `message` turned every refusal into "Something went wrong".
+    return toFailure(data, "Something went wrong");
 }
 
 export function createOrder(storeId: string, input: CreateOrderInput) {

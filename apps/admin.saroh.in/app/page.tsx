@@ -20,6 +20,12 @@ import { requireSession } from "@/lib/session";
  * group-bys, never a tenant's records. Per-tenant inspection stays a separate,
  * explicitly-audited surface rather than something this quietly grows into.
  */
+/** `COMMERCE` → "Commerce", `page_view` → "Page view": say it in words. */
+function asWords(key: string): string {
+    const words = key.toLowerCase().replace(/[_.]/g, " ");
+    return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export default async function DashboardPage() {
     const session = await requireSession();
 
@@ -69,7 +75,7 @@ export default async function DashboardPage() {
                         empty="No module has been enabled yet."
                         rows={metrics.moduleAdoption.map((row) => ({
                             key: row.moduleKey,
-                            label: row.moduleKey,
+                            label: asWords(row.moduleKey),
                             value: row.organizations,
                         }))}
                     />
@@ -79,7 +85,7 @@ export default async function DashboardPage() {
                         empty="No events captured in the last 30 days."
                         rows={metrics.activity.map((row) => ({
                             key: row.type,
-                            label: row.type,
+                            label: asWords(row.type),
                             value: row.events,
                         }))}
                     />
@@ -130,7 +136,11 @@ function Panel({
                                     aria-hidden
                                 >
                                     <div
-                                        className="h-full rounded-full bg-brand"
+                                        // Ink, not Saffron: a set of bars is
+                                        // a scale (the brand's W2 ramp), and
+                                        // Saffron is saved for the one value
+                                        // that matters on a screen.
+                                        className="h-full rounded-full bg-primary"
                                         style={{
                                             width: `${(row.value / max) * 100}%`,
                                         }}

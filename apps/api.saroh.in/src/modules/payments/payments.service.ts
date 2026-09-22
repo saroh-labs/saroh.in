@@ -84,6 +84,19 @@ export interface PublicReceiptResult {
         amountCents: number;
         currency: string;
     } | null;
+    /**
+     * Where the order was placed, as the storefront describes itself to
+     * customers (Sell → Storefronts). Public by nature: it is what the shop
+     * puts on its own door.
+     */
+    storefront: {
+        name: string;
+        kind: string;
+        address: string | null;
+        openingHours: unknown;
+        /** Paused storefronts take no payments until they are turned back on. */
+        acceptingPayments: boolean;
+    };
 }
 
 /** One PaymentIntent (+ its attempts and refunds) in the owner summary. */
@@ -432,6 +445,7 @@ export class PaymentsService {
         organizationId: string,
         order: {
             id: string;
+            storeId: string;
             total: Prisma.Decimal | string | number;
             currency: string;
         },
@@ -456,10 +470,21 @@ export class PaymentsService {
             }
         }
 
-        // Resolve the provider row: the pinned one, or the single CONNECTED one.
+        // Resolve the provider row: the one the caller pinned, else the one
+        // the order's storefront chose (Sell → Storefronts), else the single
+        // CONNECTED one. A business with two providers connected could not be
+        // paid at all before a storefront could say which it uses.
+        const storefrontProvider = options.provider
+            ? undefined
+            : ((
+                  await prisma.storeSettings.findUnique({
+                      where: { storeId: order.storeId },
+                      select: { checkoutProvider: true },
+                  })
+              )?.checkoutProvider ?? undefined);
         const providerRow = await this.resolveConnectedProvider(
             organizationId,
-            options.provider,
+            options.provider ?? storefrontProvider,
         );
 
         // Decrypt in-memory ONLY here, at the moment of the provider call.
@@ -549,6 +574,19 @@ export class PaymentsService {
                 currency: true,
                 paymentStatus: true,
                 status: true,
+                store: {
+                    select: {
+                        name: true,
+                        settings: {
+                            select: {
+                                kind: true,
+                                address: true,
+                                openingHours: true,
+                                pausedAt: true,
+                            },
+                        },
+                    },
+                },
             },
         });
         if (!order) {
@@ -584,6 +622,21 @@ export class PaymentsService {
                       currency: intent.currency,
                   }
                 : null,
+            storefront: {
+                name: order.store.name,
+                kind: order.store.settings?.kind ?? "ONLINE",
+                // An online store has no door, so no address or hours
+                // are shown for it even if some were once saved.
+                address:
+                    order.store.settings?.kind === "SHOP"
+                        ? order.store.settings.address
+                        : null,
+                openingHours:
+                    order.store.settings?.kind === "SHOP"
+                        ? (order.store.settings.openingHours ?? null)
+                        : null,
+                acceptingPayments: !order.store.settings?.pausedAt,
+            },
         };
     }
 
@@ -797,6 +850,7 @@ export class PaymentsService {
      */
     private async requirePayableOrder(orderId: string): Promise<{
         id: string;
+        storeId: string;
         organizationId: string;
         total: Prisma.Decimal;
         currency: string;
@@ -805,14 +859,26 @@ export class PaymentsService {
             where: { id: orderId },
             select: {
                 id: true,
+                storeId: true,
                 organizationId: true,
                 total: true,
                 currency: true,
+                store: { select: { settings: { select: { pausedAt: true } } } },
             },
         });
         if (!order?.organizationId) {
             throw new NotFoundException("Order not found");
         }
-        return { ...order, organizationId: order.organizationId };
+        // A paused storefront takes no payments (Sell → Storefronts → Closing
+        // up). Refused here, on the buyer's path, so no intent is ever
+        // created — a checkout page that merely hid its button would still
+        // accept a payment posted straight at this endpoint.
+        if (order.store.settings?.pausedAt) {
+            throw new ConflictException(
+                "This storefront is paused and is not taking payments.",
+            );
+        }
+        const { store: _store, ...payable } = order;
+        return { ...payable, organizationId: order.organizationId };
     }
 }

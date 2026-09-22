@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
+import {
+    Body,
+    Controller,
+    Get,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
+} from "@nestjs/common";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
@@ -45,6 +53,17 @@ export class OrganizationsController {
     @UseGuards(BetterAuthGuard)
     list(@CurrentUser() user: AuthUser) {
         return this.organizations.listForUser(user.id);
+    }
+
+    /**
+     * Whether an address can be reserved at setup (`?address=`), and why not.
+     * Session-scoped only — there is no business yet to guard. Declared
+     * BEFORE `:organizationId` so the segment is not parsed as an id.
+     */
+    @Get("address-availability")
+    @UseGuards(BetterAuthGuard)
+    addressAvailability(@Query("address") address = "") {
+        return this.onboarding.checkAddress(address);
     }
 
     /**

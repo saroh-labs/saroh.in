@@ -22,14 +22,15 @@ export interface Notification {
     title: string;
     body: string | null;
     leadId: string | null;
+    /** A product review's notice ("A review needs a reply"). */
+    reviewId: string | null;
     readAt: string | null;
     createdAt: string;
 }
 
 /** Discriminated result so callers can surface a message. */
 export type NotificationsResult<T> =
-    | { ok: true; data: T }
-    | { ok: false; error: string };
+    { ok: true; data: T } | { ok: false; error: string };
 
 /** Base path for the active org's notifications, or null when no org is active. */
 async function notificationsBase(): Promise<string | null> {

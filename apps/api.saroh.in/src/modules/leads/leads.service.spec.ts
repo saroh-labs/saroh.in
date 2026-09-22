@@ -8,6 +8,7 @@ jest.mock("@saroh/database", () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        delete: jest.fn(),
     };
     const contact = { findUnique: jest.fn(), upsert: jest.fn() };
     const stage = { findUnique: jest.fn() };
@@ -54,6 +55,7 @@ const leadFindMany = prisma.lead.findMany as jest.Mock;
 const leadFindUnique = prisma.lead.findUnique as jest.Mock;
 const leadCreate = prisma.lead.create as jest.Mock;
 const leadUpdate = prisma.lead.update as jest.Mock;
+const leadDelete = prisma.lead.delete as jest.Mock;
 const contactFindUnique = prisma.contact.findUnique as jest.Mock;
 const contactUpsert = prisma.contact.upsert as jest.Mock;
 const stageFindUnique = prisma.stage.findUnique as jest.Mock;
@@ -386,6 +388,42 @@ describe("LeadsService.update", () => {
             service.update(ctx(), "l_1", { status: "WON" }),
         ).rejects.toBeInstanceOf(NotFoundException);
         expect(leadUpdate).not.toHaveBeenCalled();
+    });
+});
+
+describe("LeadsService.remove", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("deletes an owned lead", async () => {
+        leadFindUnique.mockResolvedValue({
+            id: "l_1",
+            organizationId: "org_1",
+        });
+        leadDelete.mockResolvedValue({ id: "l_1" });
+
+        await expect(makeService().remove(ctx(), "l_1")).resolves.toEqual({
+            id: "l_1",
+            deleted: true,
+        });
+        expect(leadDelete).toHaveBeenCalledWith({ where: { id: "l_1" } });
+    });
+
+    it("404s a cross-tenant lead and deletes nothing", async () => {
+        leadFindUnique.mockResolvedValue({
+            id: "l_1",
+            organizationId: "org_OTHER",
+        });
+        await expect(makeService().remove(ctx(), "l_1")).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        expect(leadDelete).not.toHaveBeenCalled();
+    });
+
+    it("refuses a role without lead:write", async () => {
+        await expect(
+            makeService().remove(ctx({ role: "MEMBER" }), "l_1"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(leadDelete).not.toHaveBeenCalled();
     });
 });
 

@@ -13,6 +13,7 @@ import {
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
 import { listSites } from "@/lib/sites/service";
+import { listStorefronts } from "@/lib/stores/storefronts";
 
 /**
  * The authenticated app shell, rendered once in the root layout. It is the
@@ -59,29 +60,38 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // a transient API error never blanks the shell; a successful fetch that
     // returns nothing is "nothing is enabled yet", which a new Organization
     // should see reflected in its nav rather than papered over.
-    const [unread, moduleKeys, home, sites] = await Promise.all([
-        unreadNotificationCount(),
-        listModules()
-            .then((modules) =>
-                modules
-                    .filter((m) => m.readiness !== "DISABLED")
-                    .map((m) => m.key),
-            )
-            .catch(() => null),
-        // The rail's work counts come from the same ranked read model Home uses,
-        // so the two can never disagree. Non-fatal: a rail without badges is a
-        // working rail, and this renders on every page.
-        getHome().catch(() => null),
-        /*
-         * The merchant's own sites, hung under Website in the rail.
-         *
-         * Non-fatal like the counts: a rail without the tree is still a working
-         * rail, and this renders on every screen in the app. It joins the same
-         * Promise.all rather than being awaited after, so it costs the slowest
-         * of four round trips instead of adding a fifth in series.
-         */
-        listSites().catch(() => []),
-    ]);
+    const [unread, moduleKeys, home, sites, storefrontCount] =
+        await Promise.all([
+            unreadNotificationCount(),
+            listModules()
+                .then((modules) =>
+                    modules
+                        .filter((m) => m.readiness !== "DISABLED")
+                        .map((m) => m.key),
+                )
+                .catch(() => null),
+            // The rail's work counts come from the same ranked read model Home uses,
+            // so the two can never disagree. Non-fatal: a rail without badges is a
+            // working rail, and this renders on every page.
+            getHome().catch(() => null),
+            /*
+             * The merchant's own sites, for the command palette's jump to one.
+             *
+             * Non-fatal like the counts: a palette without them still works, and
+             * this renders on every screen in the app. It joins the same
+             * Promise.all rather than being awaited after, so it costs the slowest
+             * of four round trips instead of adding a fifth in series.
+             */
+            listSites().catch(() => []),
+            /*
+             * How many storefronts, so the palette stops offering "New storefront"
+             * once the business has its one (ADR-006). `null` on failure: the
+             * palette then offers it, and the page says there is one already.
+             */
+            listStorefronts()
+                .then((list) => list.length)
+                .catch(() => null),
+        ]);
 
     /*
      * Only actions that represent OUTSTANDING WORK become badges.
@@ -99,14 +109,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
     /*
      * Only what the nav needs crosses the boundary. `SiteSummary` carries a
-     * publication pointer, a style blob and timestamps; the rail wants a name
-     * and an id, and shipping the rest to three client components on every page
+     * publication pointer, a style blob and timestamps; the palette wants a name
+     * and an id, and shipping the rest to a client component on every page
      * would be paying for it in the payload on every navigation.
      */
     const navSites = sites.map((site) => ({ id: site.id, name: site.name }));
 
     return (
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen flex-col">
             {/*
              * Without this, reaching the page content by keyboard means tabbing
              * through the wordmark, search, every nav item, the org switcher,
@@ -129,36 +139,44 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             <CommandMenu
                 moduleKeys={moduleKeys}
                 role={activeOrg?.role ?? null}
+                actions={activeOrg?.actions ?? null}
                 sites={navSites}
+                storefrontCount={storefrontCount}
             />
-            <AppSidebar
+            {/* The top bar runs the full width; the rail and the working
+                area sit below it. */}
+            <AppHeader
+                user={session.user}
+                organizations={organizations}
+                activeOrg={activeOrg}
                 unread={unread}
                 moduleKeys={moduleKeys}
-                role={activeOrg?.role ?? null}
                 counts={counts}
-                sites={navSites}
             />
-            <div className="flex min-w-0 flex-1 flex-col">
-                <AppHeader
-                    user={session.user}
-                    organizations={organizations}
-                    activeOrg={activeOrg}
+            <div className="flex min-h-0 flex-1">
+                <AppSidebar
                     unread={unread}
                     moduleKeys={moduleKeys}
+                    role={activeOrg?.role ?? null}
+                    actions={activeOrg?.actions ?? null}
                     counts={counts}
-                    sites={navSites}
                 />
-                {/*
-                 * `tabIndex={-1}` makes this a valid focus target: following the
-                 * skip link must MOVE focus, not just scroll, or the next Tab
-                 * would land back at the top of the nav.
-                 */}
-                <div
-                    id="main-content"
-                    tabIndex={-1}
-                    className="flex flex-1 flex-col outline-none"
-                >
-                    {children}
+                {/* The working area is white and the rail sits on Paper: the
+                product spends white surfaces, and the page you work on is
+                the raised one (brand file §5, and the applied screens). */}
+                <div className="flex min-w-0 flex-1 flex-col bg-card">
+                    {/*
+                     * `tabIndex={-1}` makes this a valid focus target: following the
+                     * skip link must MOVE focus, not just scroll, or the next Tab
+                     * would land back at the top of the nav.
+                     */}
+                    <div
+                        id="main-content"
+                        tabIndex={-1}
+                        className="flex flex-1 flex-col outline-none"
+                    >
+                        {children}
+                    </div>
                 </div>
             </div>
         </div>

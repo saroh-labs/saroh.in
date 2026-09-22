@@ -14,6 +14,11 @@ jest.mock("@saroh/database", () => {
             },
             site: { findUnique: jest.fn() },
             pipeline: { findUnique: jest.fn() },
+            submission: {
+                groupBy: jest.fn(),
+                count: jest.fn(),
+                findMany: jest.fn(),
+            },
         },
     };
 });
@@ -151,6 +156,7 @@ describe("FormsService.list", () => {
     it("scopes to the ctx org, excludes soft-deleted, newest first", async () => {
         const service = new FormsService();
         formFindMany.mockResolvedValue([]);
+        (prisma.submission.groupBy as jest.Mock).mockResolvedValue([]);
         await service.list(ctx());
         expect(formFindMany).toHaveBeenCalledWith({
             where: { organizationId: "org_1", deletedAt: null },
@@ -287,5 +293,101 @@ describe("FormsService.remove", () => {
             NotFoundException,
         );
         expect(formUpdate).not.toHaveBeenCalled();
+    });
+});
+
+describe("FormsService — what came through each form (#385)", () => {
+    const groupBy = prisma.submission.groupBy as jest.Mock;
+    const count = prisma.submission.count as jest.Mock;
+    const findMany = prisma.submission.findMany as jest.Mock;
+    beforeEach(() => jest.clearAllMocks());
+
+    it("gives each form its count and latest entry, zero for one never used", async () => {
+        formFindMany.mockResolvedValue([{ id: "f_1" }, { id: "f_2" }]);
+        groupBy.mockResolvedValue([
+            {
+                formId: "f_1",
+                _count: { _all: 3 },
+                _max: { createdAt: new Date("2026-09-21T10:00:00Z") },
+            },
+        ]);
+        const forms = await new FormsService().list(ctx());
+        expect(forms).toEqual([
+            {
+                id: "f_1",
+                submissionCount: 3,
+                lastSubmissionAt: "2026-09-21T10:00:00.000Z",
+            },
+            { id: "f_2", submissionCount: 0, lastSubmissionAt: null },
+        ]);
+        expect(groupBy.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+        });
+    });
+
+    it("lists a form's entries newest first, naming the contact, keeping one whose contact is gone", async () => {
+        formFindUnique.mockResolvedValue({
+            id: "f_1",
+            organizationId: "org_1",
+            deletedAt: null,
+        });
+        count.mockResolvedValue(2);
+        findMany.mockResolvedValue([
+            {
+                id: "s_2",
+                createdAt: new Date("2026-09-21T10:00:00Z"),
+                data: { name: "Priya", email: "p@example.com" },
+                leadId: "l_1",
+                contact: {
+                    id: "c_1",
+                    email: "p@example.com",
+                    firstName: "Priya",
+                    lastName: "Raman",
+                },
+            },
+            {
+                id: "s_1",
+                createdAt: new Date("2026-09-20T10:00:00Z"),
+                data: { email: "gone@example.com" },
+                leadId: null,
+                contact: null,
+            },
+        ]);
+
+        const res = await new FormsService().listSubmissions(ctx(), "f_1");
+
+        expect(res.total).toBe(2);
+        expect(res.items[0]).toMatchObject({
+            id: "s_2",
+            createdAt: "2026-09-21T10:00:00.000Z",
+            contact: { id: "c_1", name: "Priya Raman" },
+            leadId: "l_1",
+        });
+        expect(res.items[1]).toMatchObject({
+            data: { email: "gone@example.com" },
+            contact: null,
+        });
+        expect(findMany.mock.calls[0][0]).toMatchObject({
+            where: { formId: "f_1", organizationId: "org_1" },
+            orderBy: { createdAt: "desc" },
+        });
+    });
+
+    it("404s another business's form and reads nothing", async () => {
+        formFindUnique.mockResolvedValue({
+            id: "f_1",
+            organizationId: "org_OTHER",
+            deletedAt: null,
+        });
+        await expect(
+            new FormsService().listSubmissions(ctx(), "f_1"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(findMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses a MEMBER: entries are people's details", async () => {
+        await expect(
+            new FormsService().listSubmissions(ctx({ role: "MEMBER" }), "f_1"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
     });
 });

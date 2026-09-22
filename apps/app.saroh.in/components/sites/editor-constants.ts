@@ -18,6 +18,32 @@ export const SECTION_LABELS: Record<SectionType, string> = {
     enquiry: "Enquiry form",
     booking: "Booking",
     features: "Features",
+    faq: "FAQ",
+    testimonials: "Testimonials",
+    contact: "Contact",
+    servicesList: "Services",
+};
+
+/**
+ * One line per block for the Add-section picker (#267), in a merchant's words.
+ *
+ * Not `BLOCK_META.description`: that is written for the people building Saroh
+ * ("Backed by a Form record the submit endpoint validates against") and the
+ * catalog is where it belongs. Typed like the labels, so a new block without a
+ * line here does not compile.
+ */
+export const SECTION_HINTS: Record<SectionType, string> = {
+    hero: "The first thing a visitor sees: a headline, a line under it and a button.",
+    richText: "Paragraphs of your own words, with headings and links.",
+    cta: "A single button asking for the next step.",
+    gallery: "Your photos, in a grid, a carousel or a masonry wall.",
+    enquiry: "A form visitors fill in; each one arrives in Leads.",
+    booking: "Visitors pick a time for one of your services and book it.",
+    features: "A few short points: what you do, or why buy from you.",
+    faq: "Questions and answers, each answer one tap away.",
+    testimonials: "Quotes from customers, with their names.",
+    contact: "Your address, opening hours, phone, email and WhatsApp.",
+    servicesList: "Your services with duration and price, always up to date.",
 };
 
 /** Preview widths. The phone value is a real handset, not a breakpoint. */
@@ -78,6 +104,10 @@ export const SECTION_ORDER: SectionType[] = [
     "enquiry",
     "booking",
     "features",
+    "faq",
+    "testimonials",
+    "contact",
+    "servicesList",
 ];
 
 /** A sensible empty section for the chosen type (contract v1). */

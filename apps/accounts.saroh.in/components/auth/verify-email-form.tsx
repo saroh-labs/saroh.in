@@ -1,21 +1,21 @@
 "use client";
 
+import { AuthHeading } from "@/components/auth/field";
 import { OtpInput } from "@/components/auth/otp-input";
 import { getOnboardingUrl } from "@/lib/app-urls";
 import { authClient } from "@/lib/auth.client";
-import { VERIFICATION_OTP_LENGTH } from "@saroh/auth/constants";
-import { Button } from "@saroh/ui/button";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@saroh/ui/card";
+    VERIFICATION_OTP_EXPIRY_SECONDS,
+    VERIFICATION_OTP_LENGTH,
+} from "@saroh/auth/constants";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+
+/** The code's lifetime in minutes, read from the server's own constant. */
+const CODE_MINUTES = Math.round(VERIFICATION_OTP_EXPIRY_SECONDS / 60);
 
 /** Seconds before "Resend code" becomes clickable again. */
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -29,15 +29,6 @@ const RESEND_COOLDOWN_SECONDS = 60;
    1140ms navigation fires, with the panel already gone */
 const SUCCESS_EXIT_AT_MS = 720;
 const SUCCESS_HOLD_MS = 1140;
-
-const STAGGER_MS = 70;
-const FIELD_BASE_MS = 260;
-
-function delay(index: number): React.CSSProperties {
-    return {
-        "--sa-delay": `${FIELD_BASE_MS + index * STAGGER_MS}ms`,
-    } as React.CSSProperties;
-}
 
 /**
  * Better Auth's own messages here are developer-facing ("Invalid OTP", "OTP
@@ -156,166 +147,157 @@ export function VerifyEmailForm({
     // there is nothing to verify against, so send them back to signup.
     if (!email) {
         return (
-            <Card className="sa-panel mx-auto w-full max-w-sm">
-                <CardHeader>
-                    <CardTitle className="font-display text-2xl">
-                        Verification link incomplete
-                    </CardTitle>
-                    <CardDescription>
-                        We don&apos;t know which address to verify. Start the
-                        signup again and we&apos;ll send a fresh code.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button
-                        asChild
-                        variant="highlight"
-                        className="sa-cta w-full"
-                    >
-                        <Link href="/signup">Back to sign up</Link>
-                    </Button>
-                </CardContent>
-            </Card>
+            <div>
+                <AuthHeading
+                    title="Nothing to verify yet"
+                    blurb="We don't know which address to verify. Start the sign-up again and we'll send a fresh code."
+                />
+                <Button
+                    asChild
+                    className="sa-cta sa-rise h-10 w-full rounded-[9px] text-[13.5px] font-semibold"
+                >
+                    <Link href="/signup">Back to sign up</Link>
+                </Button>
+            </div>
         );
     }
 
+    if (isVerified) {
+        return (
+            <div
+                className={cn(
+                    "flex flex-col items-center gap-4 py-14 text-center",
+                    isLeaving && "sa-panel--leaving",
+                )}
+            >
+                <SuccessMark />
+                <div>
+                    <p className="font-display text-xl font-semibold">
+                        You&apos;re verified
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                        Taking you to your workspace…
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    const complete = code.length === VERIFICATION_OTP_LENGTH;
+
     return (
-        <Card
-            className={cn(
-                "sa-panel mx-auto w-full max-w-sm",
-                isLeaving && "sa-panel--leaving",
-            )}
-        >
-            {isVerified ? (
-                <CardContent className="flex flex-col items-center gap-4 py-14 text-center">
-                    <SuccessMark />
-                    <div>
-                        <p className="font-display text-xl font-semibold">
-                            You&apos;re verified
-                        </p>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                            Taking you to your workspace…
-                        </p>
-                    </div>
-                </CardContent>
-            ) : (
-                <>
-                    <CardHeader>
-                        <CardTitle
-                            className="sa-rise font-display text-2xl"
-                            style={delay(0)}
-                        >
-                            Check your email
-                        </CardTitle>
-                        <CardDescription className="sa-rise" style={delay(1)}>
-                            We sent a {VERIFICATION_OTP_LENGTH}-digit code to{" "}
-                            <span className="text-foreground font-medium">
-                                {email}
-                            </span>
-                            . Enter it below to finish setting up your account.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                void verify(code);
-                            }}
-                            className="grid gap-4"
-                        >
-                            {error && (
-                                <p
-                                    id="otp-error"
-                                    role="alert"
-                                    className="sa-alert border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm"
-                                >
-                                    {error}
-                                </p>
-                            )}
-                            {notice && (
-                                <p
-                                    role="status"
-                                    className="sa-alert bg-muted text-muted-foreground rounded-md border px-3 py-2 text-sm"
-                                >
-                                    {notice}
-                                </p>
-                            )}
+        <div>
+            {/*
+             * The design's verify step, in the split (#U4). The account was
+             * created at sign-up; what the code opens is the session, so the
+             * line says that rather than the design's "nothing has been
+             * created yet", which is not true of Better Auth.
+             */}
+            <AuthHeading
+                title="Check your email"
+                blurb="Not signed in yet. The session starts once this code is accepted."
+            />
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    void verify(code);
+                }}
+                noValidate
+            >
+                {error ? (
+                    <p
+                        id="otp-error"
+                        role="alert"
+                        className="sa-alert border-destructive/40 bg-destructive-subtle text-destructive-subtle-foreground mb-3.5 rounded-[9px] border px-3 py-2 text-[12.5px]"
+                    >
+                        {error}
+                    </p>
+                ) : null}
+                {notice ? (
+                    <p
+                        role="status"
+                        className="sa-alert bg-muted text-muted-foreground mb-3.5 rounded-[9px] px-3 py-2 text-[12.5px]"
+                    >
+                        {notice}
+                    </p>
+                ) : null}
 
-                            <div className="sa-rise" style={delay(2)}>
-                                <OtpInput
-                                    value={code}
-                                    onChange={(next) => {
-                                        setCode(next);
-                                        if (next !== submittedCode.current)
-                                            setError(null);
-                                    }}
-                                    onComplete={(next) => {
-                                        // Don't re-submit the exact code that
-                                        // just failed.
-                                        if (next !== submittedCode.current)
-                                            void verify(next);
-                                    }}
-                                    length={VERIFICATION_OTP_LENGTH}
-                                    disabled={isVerifying}
-                                    invalid={!!error}
-                                    describedBy={
-                                        error ? "otp-error" : undefined
-                                    }
-                                />
-                            </div>
+                <div className="sa-rise">
+                    <OtpInput
+                        value={code}
+                        onChange={(next) => {
+                            setCode(next);
+                            if (next !== submittedCode.current) setError(null);
+                        }}
+                        onComplete={(next) => {
+                            // Don't re-submit the exact code that just failed.
+                            if (next !== submittedCode.current)
+                                void verify(next);
+                        }}
+                        length={VERIFICATION_OTP_LENGTH}
+                        disabled={isVerifying}
+                        invalid={!!error}
+                        describedBy={error ? "otp-error" : undefined}
+                    />
+                </div>
 
-                            {/* Deliberately secondary. The code auto-submits on
-                                the sixth digit, so the field is the action and
-                                this button is the fallback — giving it the
-                                filled black treatment would make the fallback
-                                the loudest thing on the screen. */}
-                            <Button
-                                type="submit"
-                                variant="secondary"
-                                className="sa-press sa-rise w-full font-semibold"
-                                style={delay(3)}
-                                disabled={
-                                    isVerifying ||
-                                    code.length !== VERIFICATION_OTP_LENGTH
-                                }
-                            >
-                                {isVerifying ? "Verifying…" : "Verify email"}
-                            </Button>
-                        </form>
+                {/* Where the code went and how long it lasts, with the way to
+                    ask for another beside it rather than below the form. */}
+                <div className="sa-rise mb-4 mt-2 flex items-baseline gap-2.5">
+                    <p className="text-muted-foreground min-w-0 flex-1 text-pretty text-[11.5px] leading-[1.45]">
+                        {VERIFICATION_OTP_LENGTH} digits, sent to{" "}
+                        <span className="text-foreground">{email}</span>.{" "}
+                        {CODE_MINUTES} minutes before it expires.
+                    </p>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={resend}
+                        disabled={cooldown > 0 || isResending}
+                        title={
+                            cooldown > 0
+                                ? `A new code can be sent in ${cooldown}s`
+                                : undefined
+                        }
+                        className="h-7 shrink-0 rounded-[7px] px-2.5 text-[11.5px] font-semibold"
+                    >
+                        {isResending
+                            ? "Sending…"
+                            : cooldown > 0
+                              ? `Resend (${cooldown}s)`
+                              : "Resend"}
+                    </Button>
+                </div>
 
-                        <div
-                            className="sa-rise text-muted-foreground mt-5 space-y-2 text-center text-sm"
-                            style={delay(4)}
-                        >
-                            <p>
-                                Didn&apos;t get it?{" "}
-                                <button
-                                    type="button"
-                                    onClick={resend}
-                                    disabled={cooldown > 0 || isResending}
-                                    className="text-foreground underline-offset-4 transition-colors hover:underline disabled:no-underline disabled:opacity-60"
-                                >
-                                    {isResending
-                                        ? "Sending…"
-                                        : cooldown > 0
-                                          ? `Resend code (${cooldown}s)`
-                                          : "Resend code"}
-                                </button>
-                            </p>
-                            <p>
-                                Wrong address?{" "}
-                                <Link
-                                    href="/signup"
-                                    className="text-foreground underline-offset-4 transition-colors hover:underline"
-                                >
-                                    Sign up again
-                                </Link>
-                            </p>
-                        </div>
-                    </CardContent>
-                </>
-            )}
-        </Card>
+                <div className="sa-rise flex gap-2">
+                    <Button
+                        asChild
+                        variant="outline"
+                        className="h-10 rounded-[9px]"
+                    >
+                        <Link href="/signup" aria-label="Back to sign up">
+                            Back
+                        </Link>
+                    </Button>
+                    {/* The code submits itself on the sixth digit, so this is
+                        the fallback — and when it cannot be pressed, it says
+                        why rather than sitting inert. */}
+                    <Button
+                        type="submit"
+                        className="sa-cta h-10 flex-1 rounded-[9px] text-[13.5px] font-semibold"
+                        disabled={isVerifying || !complete}
+                        title={
+                            complete
+                                ? undefined
+                                : `All ${VERIFICATION_OTP_LENGTH} digits are needed`
+                        }
+                    >
+                        {isVerifying ? "Verifying…" : "Verify"}
+                    </Button>
+                </div>
+            </form>
+        </div>
     );
 }
 

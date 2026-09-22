@@ -1,5 +1,5 @@
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, mutate, orgBase } from "@/lib/api/http";
+import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * CRM Pipelines data access for app.saroh.in (S3-005). Org-scoped reads (the
@@ -73,5 +73,16 @@ export function updateStage(
         "PATCH",
         input,
         "Could not update the stage",
+    );
+}
+
+/** Remove a stage. The API refuses while any lead is still in it. */
+export function deleteStage(
+    pipelineId: string,
+    stageId: string,
+): Promise<CrmResult<{ id: string }>> {
+    return destroy<{ id: string }>(
+        `/pipelines/${pipelineId}/stages/${stageId}`,
+        "Could not remove the stage",
     );
 }

@@ -29,6 +29,7 @@ jest.mock("@saroh/database", () => {
             findFirst: jest.fn(),
         },
         order: { findUnique: jest.fn() },
+        storeSettings: { findUnique: jest.fn() },
     };
     return {
         ...actual,
@@ -105,6 +106,8 @@ describe("PaymentsService.createIntentForOrderPublic (S5-004)", () => {
         // The public order lookup (requirePayableOrder select) resolves the org.
         orderFindUnique.mockResolvedValue({
             id: "order_1",
+            storeId: "store_1",
+            store: { name: "High Street", settings: null },
             organizationId: "org_1",
             total: "42.50",
             currency: "INR",
@@ -143,6 +146,8 @@ describe("PaymentsService.createIntentForOrderPublic (S5-004)", () => {
         const { service, fake } = makeService();
         orderFindUnique.mockResolvedValue({
             id: "order_1",
+            storeId: "store_1",
+            store: { name: "High Street", settings: null },
             organizationId: "org_1",
             total: "10.00",
             currency: "INR",
@@ -207,6 +212,15 @@ describe("PaymentsService.getReceipt (S5-004)", () => {
             currency: "INR",
             paymentStatus: "PAID",
             status: "PROCESSING",
+            store: {
+                name: "High Street",
+                settings: {
+                    kind: "SHOP",
+                    address: "12 Hill Road",
+                    openingHours: null,
+                    pausedAt: null,
+                },
+            },
         });
         intentFindFirst.mockResolvedValue({
             provider: "RAZORPAY",
@@ -233,6 +247,13 @@ describe("PaymentsService.getReceipt (S5-004)", () => {
                 amountCents: 4250,
                 currency: "INR",
             },
+            storefront: {
+                name: "High Street",
+                kind: "SHOP",
+                address: "12 Hill Road",
+                openingHours: null,
+                acceptingPayments: true,
+            },
         });
         // No internal ids leak to the buyer.
         expect(JSON.stringify(receipt)).not.toContain("order_1");
@@ -250,6 +271,7 @@ describe("PaymentsService.getReceipt (S5-004)", () => {
             currency: "INR",
             paymentStatus: "UNPAID",
             status: "PENDING",
+            store: { name: "High Street", settings: null },
         });
         intentFindFirst.mockResolvedValue(null);
 
@@ -274,6 +296,8 @@ describe("PaymentsService.listOrderPayments (S5-004)", () => {
         const { service } = makeService();
         orderFindUnique.mockResolvedValue({
             id: "order_1",
+            storeId: "store_1",
+            store: { name: "High Street", settings: null },
             organizationId: "org_1",
             total: "42.50",
             currency: "INR",
@@ -329,6 +353,8 @@ describe("PaymentsService.listOrderPayments (S5-004)", () => {
         const { service } = makeService();
         orderFindUnique.mockResolvedValue({
             id: "order_1",
+            storeId: "store_1",
+            store: { name: "High Street", settings: null },
             organizationId: "org_OTHER",
             total: "1.00",
             currency: "INR",
@@ -337,5 +363,92 @@ describe("PaymentsService.listOrderPayments (S5-004)", () => {
         await expect(
             service.listOrderPayments(ctx(), "order_1"),
         ).rejects.toBeInstanceOf(NotFoundException);
+    });
+});
+
+describe("Storefront settings on the buyer's path", () => {
+    const storeSettingsFindUnique = prisma.storeSettings
+        .findUnique as jest.Mock;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        storeSettingsFindUnique.mockResolvedValue(null);
+    });
+
+    const payable = (settings: Record<string, unknown> | null) => ({
+        id: "order_1",
+        storeId: "store_1",
+        organizationId: "org_1",
+        total: "10.00",
+        currency: "INR",
+        store: { name: "High Street", settings },
+    });
+
+    it("refuses to take a payment for a paused storefront", async () => {
+        const { service, fake } = makeService();
+        orderFindUnique.mockResolvedValue(payable({ pausedAt: new Date() }));
+        providerFindMany.mockResolvedValue([connectedRow()]);
+
+        await expect(
+            service.createIntentForOrderPublic("order_1"),
+        ).rejects.toThrow(/paused/);
+        expect(fake.calls).toHaveLength(0);
+        expect(intentCreate).not.toHaveBeenCalled();
+    });
+
+    it("charges through the provider the storefront chose", async () => {
+        // Two connected: without the storefront's choice this is a 409.
+        const { service } = makeService();
+        orderFindUnique.mockResolvedValue(payable(null));
+        storeSettingsFindUnique.mockResolvedValue({
+            checkoutProvider: "RAZORPAY",
+        });
+        providerFindUnique.mockResolvedValue(connectedRow());
+        intentCreate.mockResolvedValue({ id: "pi_1" });
+        attemptCreate.mockResolvedValue({ id: "att_1" });
+
+        await service.createIntentForOrderPublic("order_1");
+        expect(providerFindUnique).toHaveBeenCalledWith({
+            where: {
+                organizationId_provider: {
+                    organizationId: "org_1",
+                    provider: "RAZORPAY",
+                },
+            },
+        });
+        expect(providerFindMany).not.toHaveBeenCalled();
+    });
+
+    it("shows no address or hours for an online store", async () => {
+        const { service } = makeService();
+        orderFindUnique.mockResolvedValue({
+            orderId: "ORD-003",
+            subtotal: "1",
+            tax: "0",
+            shipping: "0",
+            discount: "0",
+            total: "1",
+            currency: "INR",
+            paymentStatus: "UNPAID",
+            status: "PENDING",
+            store: {
+                name: "Web shop",
+                settings: {
+                    kind: "ONLINE",
+                    address: "left over from when it was a shop",
+                    openingHours: [],
+                    pausedAt: new Date(),
+                },
+            },
+        });
+        intentFindFirst.mockResolvedValue(null);
+        const receipt = await service.getReceipt("order_3");
+        expect(receipt.storefront).toEqual({
+            name: "Web shop",
+            kind: "ONLINE",
+            address: null,
+            openingHours: null,
+            acceptingPayments: false,
+        });
     });
 });

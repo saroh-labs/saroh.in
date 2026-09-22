@@ -1,3 +1,6 @@
+import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
+
+import { VERIFY_PANEL } from "@/components/auth/panel-copy";
 import { VerifyEmailForm } from "@/components/auth/verify-email-form";
 import { safeDestination } from "@/lib/return-to";
 import type { Metadata } from "next";
@@ -22,8 +25,10 @@ export default async function VerifyEmailPage({
     // `useSearchParams` (the form reads ?email=) opts the tree into client-side
     // rendering, so it needs a Suspense boundary to prerender.
     return (
-        <Suspense>
-            <VerifyEmailForm returnTo={safeDestination(redirect)} />
-        </Suspense>
+        <SplitShell panel={<SplitPanel {...VERIFY_PANEL} />}>
+            <Suspense>
+                <VerifyEmailForm returnTo={safeDestination(redirect)} />
+            </Suspense>
+        </SplitShell>
     );
 }

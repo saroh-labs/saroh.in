@@ -20,12 +20,13 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { mayAddStorefront, mayAddWebsite } from "@/lib/business-limits";
 import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 
 import type { NavAction, NavRole } from "./nav-items";
-import { navFor, navRoleCan } from "./nav-items";
+import { navCan, navFor } from "./nav-items";
 
 const OPEN_EVENT = "saroh:open-command";
 
@@ -116,6 +117,8 @@ const ACTIONS: {
     icon: typeof UserRound;
     moduleKey?: string;
     action?: NavAction;
+    /** Offered only while the business may still make one (ADR-006). */
+    limit?: "website" | "storefront";
 }[] = [
     {
         href: "/services/new",
@@ -129,12 +132,14 @@ const ACTIONS: {
         icon: Globe,
         moduleKey: "WEBSITE",
         action: "site:create",
+        limit: "website",
     },
     {
-        href: "/stores/new",
-        label: "New store",
+        href: "/commerce/storefronts/new",
+        label: "New storefront",
         icon: Store,
         moduleKey: "COMMERCE",
+        limit: "storefront",
     },
 ];
 
@@ -163,30 +168,45 @@ const ACTIONS: {
 export function CommandMenu({
     moduleKeys = null,
     role = null,
+    // Renamed on the way in: this file already has an `actions` of its own,
+    // the quick actions the palette offers.
+    actions: permissions = null,
     sites = [],
+    storefrontCount = null,
 }: {
     moduleKeys?: string[] | null;
     /** The actor's role here; `null` = unknown, and the palette fails open. */
     role?: NavRole | null;
+    /**
+     * What the actor may do, resolved by the API. Search offers the same
+     * destinations the rail does, so it has to judge them the same way.
+     */
+    actions?: readonly string[] | null;
     /**
      * The merchant's own sites. They join the nav results, so a site is
      * reachable by typing its name — which is the payoff for putting the tree
      * in `NAV_GROUPS` rather than in the sidebar alone.
      */
     sites?: { id: string; name: string }[];
+    /** How many storefronts the business has; `null` = unknown, and offered. */
+    storefrontCount?: number | null;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [hits, setHits] = useState<SearchHit[]>([]);
     const [searching, setSearching] = useState(false);
-    const groups = navFor({ role, moduleKeys, sites });
+    const groups = navFor({ role, actions: permissions, moduleKeys, sites });
 
     const available = moduleKeys === null ? null : new Set(moduleKeys);
     const actions = ACTIONS.filter(
         (a) =>
             (!a.moduleKey || !available || available.has(a.moduleKey)) &&
-            (!a.action || navRoleCan(role, a.action)),
+            (!a.action || navCan({ role, actions: permissions }, a.action)) &&
+            (a.limit !== "website" || mayAddWebsite(sites.length)) &&
+            (a.limit !== "storefront" ||
+                storefrontCount === null ||
+                mayAddStorefront(storefrontCount)),
     );
 
     useEffect(() => {

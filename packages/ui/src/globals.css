@@ -3,23 +3,34 @@
 @tailwind utilities;
 
 /* =============================================================================
-   Saroh design tokens — "Midnight & Lime"
+   Saroh design tokens — "Ink & Saffron" (brand and design system v1)
    =============================================================================
 
-   Every value is an unwrapped HSL triple so it composes with Tailwind's opacity
-   modifier: hsl(var(--brand) / 0.4) works, #hex would not.
+   The base register below IS the brand. Its source of truth is the "Saroh
+   Brand System" page in the Claude Design project; values here are that page's
+   hexes as HSL triples, with the hex beside the ones people look up. The plan
+   and the one deliberate departure (`--input`) are in
+   docs/architecture/adr/ADR-005-ink-and-saffron-brand.md.
 
-   THREE RULES worth knowing before editing:
+   Colour tokens are unwrapped HSL triples so they compose with Tailwind's
+   opacity modifier: hsl(var(--brand) / 0.4) works, #hex would not. The -hover
+   and -active action tokens are the exception — complete colours, so the
+   legacy skins can define theirs as an alpha of their own fill.
+
+   FOUR RULES worth knowing before editing:
+
+   0. Saffron is punctuation. The cursor dot, one progress fill, one active
+      state per screen. Two visible accents means one is wrong.
 
    1. `--accent` is NOT the brand accent. In the shadcn component contract it is
       the neutral hover/selected surface (button ghost+outline hover, menu focus,
       calendar selection — 32 usages). It must stay neutral. The brand accent is
-      `--highlight`.
+      `--highlight` (a Saffron fill) and `--brand` (Saffron that sets text).
 
-   2. `--brand` is INTERACTIVE (links, focus, emphasis) so it lightens in dark
-      mode to stay legible on dark surfaces. `--brand-surface` is a FILL (heroes,
-      filled chrome) and stays deep in both modes. Using one token for both is
-      why a hero inverts to pale blue in dark mode.
+   2. `--brand` is INTERACTIVE (links, emphasis, the active nav label) so it is
+      Saffron 700 on light and Saffron 400 on dark to stay legible on both.
+      `--brand-surface` is a FILL (heroes, filled chrome) and stays Ink in both
+      modes. Using one token for both is why a hero inverts in dark mode.
 
    3. Contrast is verified, not eyeballed. All pairs meet WCAG AA (4.5:1 text,
       3:1 non-text per 1.4.11). `--input` is deliberately much darker than stock
@@ -42,228 +53,306 @@
 
 @layer base {
     :root {
-        /* ---- ramps: brand (interactive blue) ----
-           The one chromatic thing left in the system. It is for LINKS, focus
-           rings and emphasis — never for the primary button, which is the
-           inverted black/white control below. Anchored on #0070f3. */
-        --brand-50: 212 100% 97%;
-        --brand-100: 212 100% 93%;
-        --brand-200: 212 100% 86%;
-        --brand-300: 212 100% 76%;
-        --brand-400: 212 100% 64%;
-        --brand-500: 212 100% 55%;
-        --brand-600: 212 100% 48%;
-        --brand-700: 212 96% 40%;
-        --brand-800: 212 92% 32%;
-        --brand-900: 212 88% 25%;
-        --brand-950: 212 90% 16%;
+        /* ---- ramps: Saffron (the one accent) ----
+           `brand-*` carries Saffron, the accent of the mark's cursor dot.
+           Saffron is punctuation: the cursor dot, one progress fill, one active
+           state per screen. 500 is for fills; 700 whenever it carries text —
+           500 measures 2.5:1 on Paper and fails. 800 and 950 are not in the
+           brand file; they are interpolated so the ramp keeps its eleven steps. */
+        --brand-50: 41 85% 95%; /* #FDF6E7 */
+        --brand-100: 42 85% 87%; /* #FAE9C2 */
+        --brand-200: 41 84% 75%; /* #F5D48A */
+        --brand-300: 40 83% 63%; /* #EFBA50 */
+        --brand-400: 39 79% 53%; /* #E5A227 */
+        --brand-500: 36 82% 47%; /* #D98A15 */
+        --brand-600: 34 85% 39%; /* #B86F0F */
+        --brand-700: 33 85% 31%; /* #91550C */
+        --brand-800: 32 83% 24%;
+        --brand-900: 33 83% 16%; /* #4A2C07 */
+        --brand-950: 33 84% 10%;
 
-        /* ---- ramps: highlight (achromatic) ----
-           `--highlight` is the loudest token and stays budgeted at one element
-           per view, but in a monochrome system "loudest" is CONTRAST, not hue:
-           a near-black fill on a white page, inverted in dark. That is why this
-           ramp is grey rather than a colour. */
-        --highlight-50: 0 0% 98%;
-        --highlight-100: 0 0% 95%;
-        --highlight-200: 0 0% 90%;
-        --highlight-300: 0 0% 83%;
-        --highlight-400: 0 0% 64%;
-        --highlight-500: 0 0% 45%;
-        --highlight-600: 0 0% 32%;
-        --highlight-700: 0 0% 25%;
-        --highlight-800: 0 0% 15%;
-        --highlight-900: 0 0% 9%;
-        --highlight-950: 0 0% 4%;
+        /* ---- ramps: highlight and neutral are both Ink ----
+           Ink is the primary: the mark, the wordmark and the filled button.
+           It is a warm near-black, never a pure grey — the warm cast is what
+           Paper and Saffron are tuned against. `highlight-*` and `neutral-*`
+           are the same ramp under two names so neither set of call sites
+           breaks. 500 is the de-emphasis step: labels, captions, secondary
+           text. 800 and 950 are interpolated. */
+        --highlight-50: 45 20% 96%;
+        --highlight-100: 45 18% 91%;
+        --highlight-200: 46 15% 83%;
+        --highlight-300: 45 11% 71%;
+        --highlight-400: 43 8% 55%;
+        --highlight-500: 42 9% 39%;
+        --highlight-600: 40 8% 28%;
+        --highlight-700: 40 9% 19%;
+        --highlight-800: 45 5% 15%;
+        --highlight-900: 60 4% 11%;
+        --highlight-950: 60 5% 7%;
 
-        /* ---- ramps: neutral (true grey) ----
-           Previously navy-tinted on purpose. That tint is exactly what made the
-           workspace read as dull: every surface carried a cast, so nothing was
-           ever actually white. Pure greys are what give the crisp register. */
-        --neutral-50: 0 0% 98%;
-        --neutral-100: 0 0% 96%;
-        --neutral-200: 0 0% 92%;
-        --neutral-300: 0 0% 87%;
-        --neutral-400: 0 0% 64%;
-        --neutral-500: 0 0% 45%;
-        --neutral-600: 0 0% 40%;
-        --neutral-700: 0 0% 25%;
-        --neutral-800: 0 0% 15%;
-        --neutral-900: 0 0% 9%;
-        --neutral-950: 0 0% 4%;
+        --neutral-50: 45 20% 96%; /* #F7F6F3 */
+        --neutral-100: 45 18% 91%; /* #EDEBE5 */
+        --neutral-200: 46 15% 83%; /* #D9D6CC */
+        --neutral-300: 45 11% 71%; /* #BCB8AC */
+        --neutral-400: 43 8% 55%; /* #948F82 */
+        --neutral-500: 42 9% 39%; /* #6B665A */
+        --neutral-600: 40 8% 28%; /* #4D4941 */
+        --neutral-700: 40 9% 19%; /* #35322C */
+        --neutral-800: 45 5% 15%;
+        --neutral-900: 60 4% 11%; /* #1C1C1A */
+        --neutral-950: 60 5% 7%; /* #141412 */
 
         /* ---- semantic: surfaces ----
-           Pure white, not an off-white. The page and the card are the SAME
-           colour; separation comes from a 1px line, not from a tint. That is
-           the whole trick of this register — take the tint away and borders
-           have to do real work, which is why they are tuned so carefully. */
-        --background: 0 0% 100%;
-        --foreground: 0 0% 9%;
+           Paper is the page and white is the raised surface: cards, tables,
+           menus and fields sit on Paper as white. Sunken is `--muted`. */
+        --background: 40 31% 94%; /* Paper #F5F2EC */
+        --foreground: 60 4% 11%; /* Ink 900 */
         --card: 0 0% 100%;
-        --card-foreground: 0 0% 9%;
+        --card-foreground: 60 4% 11%;
         --popover: 0 0% 100%;
-        --popover-foreground: 0 0% 9%;
+        --popover-foreground: 60 4% 11%;
 
         /* ---- semantic: actions ----
-           The primary control is near-black with white text, and inverts in
-           dark. Contrast is the emphasis; there is no coloured button. */
-        --primary: 0 0% 9%;
-        --primary-foreground: 0 0% 100%;
-        --secondary: 0 0% 96%;
-        --secondary-foreground: 0 0% 9%;
-        --muted: 0 0% 96%;
-        /* 44%, not 45%. Verified against the MUTED surface, not just the
-           page: at 45% this measured 4.76:1 on --background but only
-           4.36:1 on --muted — under the floor — and muted is exactly
-           where secondary text in table cells and cards actually sits.
-           44% gives 4.94:1 on background and 4.52:1 on muted. */
-        --muted-foreground: 0 0% 44%;
+           Hover moves one ramp step and pressed two — never a new hue, never
+           an opacity. The -hover / -active tokens are complete colours rather
+           than HSL triples so the legacy skins can express theirs as an alpha
+           of their own fill. */
+        --primary: 60 4% 11%; /* Ink 900 */
+        --primary-foreground: 40 31% 94%; /* Paper — 15.3:1 */
+        --primary-hover: hsl(40 9% 19%); /* Ink 700 */
+        --primary-active: hsl(40 8% 28%); /* Ink 600 */
+        --secondary: 45 18% 91%; /* Ink 100 */
+        --secondary-foreground: 60 4% 11%;
+        --secondary-hover: hsl(46 15% 83%); /* Ink 200 */
+        --muted: 42 22% 91%; /* Sunken #EDEAE3 */
+        /* Ink 500. De-emphasis is a colour, not an opacity: 4.76:1 on Sunken,
+           5.12:1 on Paper, 5.72:1 on white. */
+        --muted-foreground: 42 9% 39%;
 
-        /* Neutral hover/selected surface — see rule 1. Not the brand accent. */
-        --accent: 0 0% 96%;
-        --accent-foreground: 0 0% 9%;
+        /* Neutral hover/selected surface. Not the brand accent — Saffron is
+           `--highlight`. Ink 100 at rest-hover, Ink 200 pressed. */
+        --accent: 45 18% 91%;
+        --accent-foreground: 60 4% 11%;
+        --accent-active: hsl(46 15% 83%);
 
-        --destructive: 0 84% 45%;
-        --destructive-foreground: 0 0% 100%;
+        --destructive: 3 71% 41%; /* #B3261E */
+        --destructive-foreground: 40 31% 94%; /* 5.85:1 */
+        --destructive-hover: hsl(3 71% 33%); /* #8F1E18 */
+        --destructive-active: hsl(3 73% 26%); /* #751712 */
 
         /* ---- semantic: lines ---- */
-        --border: 0 0% 92%; /* decorative */
-        --input: 0 0% 56%; /* form control boundary — 3.23:1 on white */
-        --ring: 212 100% 48%;
+        --border: 46 15% 83%; /* Ink 200 #D9D6CC — structure */
+        --border-strong: 45 11% 71%; /* Ink 300 — hovered outline control */
+        /* Form control boundary. The brand file draws inputs at #D9D6CC, which
+           is 1.45:1 on white; WCAG 1.4.11 asks 3:1 of a control's edge, so this
+           is Ink 400 at 3.23:1 on the white field. */
+        --input: 43 8% 55%;
+        --field: 0 0% 100%; /* form field fill */
+        /* The ring is Ink 900 with a Paper offset (`ring-offset-background`),
+           so it carries its own separator and reads on white, Paper, Ink and
+           Saffron alike. */
+        --ring: 60 4% 11%;
 
-        /* ---- brand (interactive blue) ---- */
-        --brand: 212 100% 42%; /* links + emphasis; 4.6:1 on white */
-        --brand-foreground: 0 0% 100%;
-        --brand-surface: 0 0% 9%; /* fill: heroes, filled chrome */
-        --brand-surface-foreground: 0 0% 100%;
-        --brand-subtle: 212 100% 97%; /* tinted background */
-        --brand-subtle-foreground: 212 92% 32%;
+        /* ---- disabled: one treatment for every variant ----
+           Disabled text is not lighter text. Ink 500 on Sunken clears 4.76:1;
+           the WCAG exemption for disabled text is declined on purpose. */
+        --disabled: 42 22% 91%;
+        --disabled-foreground: 42 9% 39%;
 
-        /* ---- highlight (the once-per-view CTA — contrast, not colour) ---- */
-        --highlight: 0 0% 9%;
-        --highlight-foreground: 0 0% 100%;
-        --highlight-border: 0 0% 9%; /* CTA boundary on light surfaces */
-        --highlight-subtle: 0 0% 96%;
-        --highlight-subtle-foreground: 0 0% 25%;
+        /* ---- brand: Saffron that can carry text ----
+           `--brand` is the INTERACTIVE accent — links, emphasis, the active
+           nav label. It is Saffron 700 because it sets text (5.36:1 on
+           Paper). `--brand-surface` is a filled ground (heroes, filled chrome)
+           and is Ink, in both modes. */
+        --brand: 33 85% 31%;
+        --brand-foreground: 40 31% 94%;
+        --brand-surface: 60 4% 11%;
+        --brand-surface-foreground: 40 31% 94%;
+        --brand-subtle: 41 85% 95%; /* Saffron 50 */
+        --brand-subtle-foreground: 33 85% 31%; /* 5.56:1 */
 
-        /* ---- status. These stay chromatic on purpose: red/amber/green are the
-               only things on screen carrying MEANING in their hue, and a
-               monochrome error state is an error state nobody sees. The old
-               "hold hues 40 apart from --highlight" rule is retired — the
-               highlight is achromatic now, so there is no hue to collide with.
-               ---- */
-        --success: 145 63% 30%;
-        --success-foreground: 0 0% 100%;
-        --warning: 38 92% 45%;
-        --warning-foreground: 38 90% 10%;
-        --warning-subtle: 38 92% 94%;
-        --warning-subtle-foreground: 32 96% 26%;
-        --info: 212 100% 42%;
-        --info-foreground: 0 0% 100%;
+        /* ---- highlight: "Accent · sparingly" ----
+           The Saffron fill, spent on the one action a screen exists for. Two
+           visible accents means one is wrong. Ink label on Saffron 500 (6.17:1);
+           pressed moves two steps to 700 and the label flips to Paper. */
+        --highlight: 36 82% 47%;
+        --highlight-foreground: 60 4% 11%;
+        --highlight-hover: hsl(36 85% 42%); /* #C57C10 */
+        --highlight-active: hsl(33 85% 31%);
+        --highlight-active-foreground: hsl(40 31% 94%);
+        --highlight-border: 36 82% 47%;
+        --highlight-subtle: 41 85% 95%;
+        --highlight-subtle-foreground: 33 85% 31%;
 
-        /* ---- chart series. Deliberately NOT monochrome: a series is only
-               readable if its members are distinguishable, and five greys are
-               not. Restrained hues at even steps, anchored on the brand blue.
-               ---- */
-        --chart-1: 212 100% 45%;
-        --chart-2: 262 62% 55%;
-        --chart-3: 190 80% 38%;
-        --chart-4: 340 70% 50%;
-        --chart-5: 38 88% 45%;
+        /* ---- status ----
+           Warning stays red-orange, never amber: amber reads as Saffron. Each
+           status has a fill and a subtle pair; the subtle ground is the hue
+           mixed into the page, never an alpha, and its text is the 700 cut. */
+        --success: 145 45% 34%; /* #2F7D4F */
+        --success-foreground: 40 31% 94%; /* 4.51:1 */
+        --success-subtle: 138 26% 93%;
+        --success-subtle-foreground: 146 50% 25%; /* 6.68:1 */
+        --warning: 17 88% 40%; /* #C2410C */
+        --warning-foreground: 40 31% 94%; /* 4.63:1 */
+        --warning-subtle: 18 59% 93%;
+        --warning-subtle-foreground: 15 79% 34%; /* 6.22:1 */
+        --destructive-subtle: 6 70% 95%;
+        --destructive-subtle-foreground: 3 71% 33%; /* 7.62:1 */
+        --info: 212 64% 40%; /* #2563A8 */
+        --info-foreground: 40 31% 94%; /* 5.48:1 */
+        --info-subtle: 212 42% 94%;
+        --info-subtle-foreground: 209 63% 29%; /* 7.67:1 */
 
-        /* ---- shape. The ANCHOR, not the button radius: the scale in
-               tailwind.config.ts derives 4/6/8/12/16px from this, so controls
-               land on 6px and cards on 12px — the two values this register
-               actually cares about. The old 10px anchor read soft next to 1px
-               borders and tight type. ---- */
-        --radius: 0.5rem;
+        /* ---- role rings (Team screen) ----
+           Each workspace role wears one ring around a neutral monogram, and a
+           dot of the same colour beside its name. A ring only reinforces: the
+           role name is always beside it in words, which is why Member's
+           Saffron may sit under 3:1 on white. Every ring is a pair — the dark
+           cut is for Ink grounds, where the light one would vanish. */
+        --role-owner: 60 4% 11%; /* Ink */
+        --role-admin: 33 85% 31%; /* Clay #91550C */
+        --role-member: 36 82% 47%; /* Saffron #D98A15 */
+        --role-reviewer: 209 44% 27%; /* Slate #264562 */
 
-        /* ---- elevation. Neutral black: with no tint anywhere else, a coloured
-               shadow would be the only hue on the surface and would read as a
-               smudge. ---- */
-        --shadow-color: 0 0% 0%;
-        --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.05);
-        --shadow-sm:
-            0 1px 3px 0 hsl(var(--shadow-color) / 0.08),
-            0 1px 2px -1px hsl(var(--shadow-color) / 0.06);
-        --shadow-md:
-            0 6px 16px -3px hsl(var(--shadow-color) / 0.1),
-            0 2px 6px -2px hsl(var(--shadow-color) / 0.05);
-        --shadow-lg:
-            0 14px 32px -8px hsl(var(--shadow-color) / 0.13),
-            0 4px 10px -4px hsl(var(--shadow-color) / 0.06);
-        --shadow-xl:
-            0 28px 56px -12px hsl(var(--shadow-color) / 0.18),
-            0 8px 18px -8px hsl(var(--shadow-color) / 0.08);
+        /* ---- chart series: W6, Saffron and slate ----
+           Up to six unrelated series; slate is the only hue from outside the
+           brand and stays at low chroma. Use the steps in order. Every fill
+           clears 3:1 on white and takes a hairline border. The sixth step
+           (#6B8DAD) waits for a sixth series token. */
+        --chart-1: 31 100% 22%;
+        --chart-2: 36 100% 34%;
+        --chart-3: 33 52% 51%;
+        --chart-4: 209 44% 27%;
+        --chart-5: 209 35% 42%;
 
-        /* ---- motion. One easing curve for the whole suite; duration carries
-               the meaning. ---- */
-        --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
-        --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-        --duration-fast: 120ms;
-        --duration-base: 200ms;
-        --duration-slow: 320ms;
+        /* ---- shape ----
+           10px anchor: md 8 (buttons, inputs), xl 14 (cards), 2xl 18 (panels).
+           The mark has round caps, so nothing beside it is sharp-cornered. */
+        --radius: 0.625rem;
+
+        /* ---- elevation ----
+           Ink at low alpha, never black — black shadows go grey-blue against
+           Paper. Flat surfaces take a border and no shadow. */
+        --shadow-color: 60 4% 11%;
+        --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.08);
+        --shadow-sm: 0 1px 2px 0 hsl(var(--shadow-color) / 0.08);
+        --shadow-md: 0 4px 12px 0 hsl(var(--shadow-color) / 0.1);
+        --shadow-lg: 0 12px 32px 0 hsl(var(--shadow-color) / 0.14);
+        --shadow-xl: 0 12px 32px 0 hsl(var(--shadow-color) / 0.14);
+
+        /* ---- motion ----
+           Quick, and never bouncy. 100ms under the finger (hover, pressed),
+           140ms the default (toasts, menus, row states), 200ms for drawers and
+           sheets. Ease-out, always; nothing overshoots. */
+        --ease-out: cubic-bezier(0, 0, 0.58, 1);
+        --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
+        --duration-fast: 100ms;
+        --duration-base: 140ms;
+        --duration-slow: 200ms;
     }
 
     .dark {
-        /* TRUE black, not a dark grey. This is the half of the register people
-           actually recognise, and it only works if the page is #000 and the
-           raised surface is a hair above it (#0a0a0a) — the card reads as lit
-           BY its border rather than by being lighter. */
-        --background: 0 0% 0%;
-        --foreground: 0 0% 93%;
-        --card: 0 0% 4%;
-        --card-foreground: 0 0% 93%;
-        --popover: 0 0% 7%;
-        --popover-foreground: 0 0% 93%;
+        /* The same system, inverted. Depth comes from four surface steps
+           rather than shadows, which barely read on Ink; borders get lighter,
+           not darker; and the one rule that reverses is that Saffron 400 may
+           set text (8.46:1). Never pure white — it glares against Ink. */
+        --background: 60 5% 7%; /* #141412 */
+        --foreground: 40 31% 94%; /* Paper */
+        --card: 60 5% 12%; /* Raised #1F1F1C */
+        --card-foreground: 40 31% 94%;
+        --popover: 60 5% 16%; /* Inset #2A2A26 — a menu floats a step higher */
+        --popover-foreground: 40 31% 94%;
 
-        /* Inverted: the primary control is white on black here. */
-        --primary: 0 0% 93%;
-        --primary-foreground: 0 0% 4%;
-        --secondary: 0 0% 12%;
-        --secondary-foreground: 0 0% 93%;
-        --muted: 0 0% 12%;
-        --muted-foreground: 0 0% 63%; /* 8.1:1 on black */
+        /* Direction flips: on dark, hover goes lighter. */
+        --primary: 40 31% 94%;
+        --primary-foreground: 60 4% 11%;
+        --primary-hover: hsl(43 23% 88%); /* #E8E4DA */
+        --primary-active: hsl(46 15% 83%);
+        --secondary: 60 5% 16%;
+        --secondary-foreground: 40 31% 94%;
+        --secondary-hover: hsl(60 5% 19%);
+        --muted: 60 5% 16%;
+        --muted-foreground: 41 10% 69%; /* Ink 250 — 6.9:1 on Inset */
 
-        --accent: 0 0% 14%;
-        --accent-foreground: 0 0% 93%;
+        --accent: 60 5% 16%;
+        --accent-foreground: 40 31% 94%;
+        --accent-active: hsl(60 5% 19%);
 
-        --destructive: 0 90% 60%;
-        --destructive-foreground: 0 0% 4%;
+        /* A dark red fill with light text is unreadable at button scale on
+           Ink, so the fill lightens and the label goes Ink. */
+        --destructive: 4 74% 67%; /* #E9736B */
+        --destructive-foreground: 60 4% 11%; /* 5.79:1 */
+        --destructive-hover: hsl(3 76% 73%);
+        --destructive-active: hsl(4 77% 78%);
 
-        --border: 0 0% 18%;
-        --input: 0 0% 42%; /* 3.94:1 on black */
-        --ring: 212 100% 60%;
+        --border: 60 5% 19%; /* #33332E */
+        --border-strong: 51 5% 28%; /* #4A4943 */
+        /* A control boundary, which needs 3:1 against WHATEVER it sits on —
+           and in dark that is usually the card (#1F1F1C), not the sunken
+           field. At 39% it cleared the sunken fill (3.45:1) and failed the
+           card (2.90:1), which is where most controls actually are: a
+           checkbox in a table row, an input inside a panel. 44% clears both
+           (4.18:1 sunken, 3.51:1 card). The brand file's #4A4943 measures
+           1.84:1 on the card and was never a boundary at all. */
+        --input: 42 9% 44%;
+        /* The SURFACE a field sits on, and the border does the separating —
+           which is what light already does (white field on a white card) and
+           what dark was not. Sunken (#0E0E0D) is darker than every surface a
+           control is placed on, so a search box, a select and an OTP cell all
+           read as holes punched through the page rather than fields on it.
+           `--input` at 3.51:1 against this is what now draws the edge. */
+        --field: 60 5% 12%; /* #1F1F1C, the same step as `--card` */
+        /* Ink 900 is invisible here; the ring becomes Saffron 400. */
+        --ring: 38 87% 55%;
 
-        /* Lightened for legibility ON dark; the surface token below does not
-           move, so heroes stay deep. See rule 2. */
-        --brand: 212 100% 62%;
-        --brand-foreground: 0 0% 4%;
-        --brand-surface: 0 0% 9%;
-        --brand-surface-foreground: 0 0% 93%;
-        --brand-subtle: 212 60% 14%;
-        --brand-subtle-foreground: 212 100% 78%;
+        /* Ink 500 reaches only 2.52:1 on the dark surface, so dark takes its
+           own step: #9E9A8F on #33332E, 4.52:1. */
+        --disabled: 60 5% 19%;
+        --disabled-foreground: 44 7% 59%;
 
-        /* The CTA inverts with the page: white fill, black label. */
-        --highlight: 0 0% 93%;
-        --highlight-foreground: 0 0% 4%;
-        --highlight-border: 0 0% 93%;
-        --highlight-subtle: 0 0% 14%;
-        --highlight-subtle-foreground: 0 0% 88%;
+        --brand: 38 87% 55%; /* Saffron 400 */
+        --brand-foreground: 60 4% 11%;
+        --brand-surface: 60 5% 12%;
+        --brand-surface-foreground: 40 31% 94%;
+        --brand-subtle: 34 38% 12%;
+        --brand-subtle-foreground: 38 87% 55%; /* 7.92:1 */
 
-        --success: 145 58% 55%;
-        --success-foreground: 145 60% 6%;
-        --warning: 38 92% 62%;
-        --warning-foreground: 38 80% 8%;
-        --warning-subtle: 34 50% 14%;
-        --warning-subtle-foreground: 40 96% 70%;
-        --info: 212 100% 62%;
-        --info-foreground: 212 60% 6%;
+        --highlight: 38 87% 55%;
+        --highlight-foreground: 60 4% 11%;
+        --highlight-hover: hsl(41 84% 75%);
+        --highlight-active: hsl(39 79% 53%);
+        --highlight-active-foreground: hsl(60 4% 11%);
+        --highlight-border: 38 87% 55%;
+        --highlight-subtle: 34 38% 12%;
+        --highlight-subtle-foreground: 38 87% 55%;
 
-        --chart-1: 212 100% 62%;
-        --chart-2: 262 75% 70%;
-        --chart-3: 190 85% 52%;
-        --chart-4: 340 80% 65%;
-        --chart-5: 38 92% 60%;
+        /* The light semantics all fail on Ink (#2F7D4F drops to 2.6:1); these
+           are their dark cuts. */
+        --success: 147 43% 56%;
+        --success-foreground: 60 4% 11%;
+        --success-subtle: 145 26% 13%;
+        --success-subtle-foreground: 146 49% 66%;
+        --warning: 22 77% 60%;
+        --warning-foreground: 60 4% 11%;
+        --warning-subtle: 19 41% 12%;
+        --warning-subtle-foreground: 22 77% 60%;
+        --destructive-subtle: 357 29% 13%;
+        --destructive-subtle-foreground: 3 76% 73%;
+        --info: 211 73% 66%;
+        --info-foreground: 60 4% 11%;
+        --info-subtle: 211 37% 13%;
+        --info-subtle-foreground: 211 74% 74%;
+
+        --role-owner: 40 31% 94%; /* Paper */
+        --role-admin: 33 58% 50%; /* #CA8837 */
+        --role-member: 36 82% 47%;
+        --role-reviewer: 209 42% 60%; /* #6E9BC4 */
+
+        --chart-1: 35 76% 36%;
+        --chart-2: 33 58% 50%;
+        --chart-3: 31 69% 69%;
+        --chart-4: 210 31% 47%;
+        --chart-5: 210 34% 61%;
 
         --shadow-color: 0 0% 0%;
     }
@@ -358,10 +447,11 @@
    `[data-skin=x]` is that skin's light register, `.dark[data-skin=x]` its dark
    one.
 
-   THERE IS NO `[data-skin="mono"]` BLOCK, and that is not an omission. Mono IS
-   the base `:root` / `.dark` register above; selecting it means "apply no
-   overrides". Giving it a block would mean keeping the monochrome palette in
-   two places and waiting for them to drift.
+   THE BRAND HAS NO `[data-skin]` BLOCK. It is the base `:root` / `.dark`
+   register above, so an element with no `data-skin` — every app but the
+   workspace, and a workspace with nothing stored — gets it. Mono WAS that base
+   until 2026-09-19; it now lives in the legacy block (A) below, with the other
+   three skins built on top of it, all hidden from the switcher for now.
 
    The three worlds below are DARK-FIRST — dark is where they were designed and
    where they are strongest; the light registers are honest translations, not
@@ -397,9 +487,10 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ─── Skin scopes ────────────────────────────────────────────────────────────
-   Three visual worlds for the workspace, selected by `data-skin` on <html>.
-   Only app.saroh.in sets that attribute, so nothing here reaches the marketing
-   site, the docs, or a merchant's own storefront.
+   Visual worlds selected by `data-skin` on <html>. app.saroh.in sets it from
+   the switcher, and saroh.app pins `mono` so the Saroh-drawn surfaces on a
+   merchant's site (404, error, checkout chrome) keep the pre-brand register.
+   Nothing here reaches the marketing site or the docs.
 
    TWO RULES THESE SCOPES GOT WRONG, both fixed by measurement (2026-08-04) and
    both worth stating so they are not reintroduced:
@@ -418,6 +509,287 @@
       what `--warning-subtle` / `--warning-subtle-foreground` are for, matching
       the pair `brand` and `highlight` already had.
    ─── */
+
+/* ─── A · LEGACY BASE ── the register every pre-brand skin sits on.
+       Until 2026-09-19 this was the base `:root` / `.dark` itself ("Midnight &
+       Lime", later monochrome). Ink & Saffron took the base; these values moved
+       here VERBATIM so the four earlier skins render exactly as they did.
+
+       The cascade is built to match the old one step for step. Before, the
+       base lived in `@layer base` and the skin blocks below were unlayered, so
+       a skin's LIGHT block beat the base `.dark` — in dark mode, anything a
+       skin's dark block did not restate came from its light block. Here the
+       legacy light block is `[data-skin]` (0,1,0) and the legacy dark block is
+       `.dark:where([data-skin])`, which is also (0,1,0): it beats the legacy
+       light block by coming later, and loses to each skin's own light block by
+       coming earlier. Do not raise its specificity.
+
+       `mono` is the old base and needs nothing else. The three coloured skins
+       keep their own blocks below. All four are hidden in the switcher while
+       the brand settles (`apps/app.saroh.in/lib/skins.ts`). ─── */
+[data-skin="mono"],
+[data-skin="panel"],
+[data-skin="instrument"],
+[data-skin="stockroom"] {
+    /* ---- ramps: brand (interactive blue) ----
+       The one chromatic thing left in the system. It is for LINKS, focus
+       rings and emphasis — never for the primary button, which is the
+       inverted black/white control below. Anchored on #0070f3. */
+    --brand-50: 212 100% 97%;
+    --brand-100: 212 100% 93%;
+    --brand-200: 212 100% 86%;
+    --brand-300: 212 100% 76%;
+    --brand-400: 212 100% 64%;
+    --brand-500: 212 100% 55%;
+    --brand-600: 212 100% 48%;
+    --brand-700: 212 96% 40%;
+    --brand-800: 212 92% 32%;
+    --brand-900: 212 88% 25%;
+    --brand-950: 212 90% 16%;
+
+    /* ---- ramps: highlight (achromatic) ----
+       `--highlight` is the loudest token and stays budgeted at one element
+       per view, but in a monochrome system "loudest" is CONTRAST, not hue:
+       a near-black fill on a white page, inverted in dark. That is why this
+       ramp is grey rather than a colour. */
+    --highlight-50: 0 0% 98%;
+    --highlight-100: 0 0% 95%;
+    --highlight-200: 0 0% 90%;
+    --highlight-300: 0 0% 83%;
+    --highlight-400: 0 0% 64%;
+    --highlight-500: 0 0% 45%;
+    --highlight-600: 0 0% 32%;
+    --highlight-700: 0 0% 25%;
+    --highlight-800: 0 0% 15%;
+    --highlight-900: 0 0% 9%;
+    --highlight-950: 0 0% 4%;
+
+    /* ---- ramps: neutral (true grey) ----
+       Previously navy-tinted on purpose. That tint is exactly what made the
+       workspace read as dull: every surface carried a cast, so nothing was
+       ever actually white. Pure greys are what give the crisp register. */
+    --neutral-50: 0 0% 98%;
+    --neutral-100: 0 0% 96%;
+    --neutral-200: 0 0% 92%;
+    --neutral-300: 0 0% 87%;
+    --neutral-400: 0 0% 64%;
+    --neutral-500: 0 0% 45%;
+    --neutral-600: 0 0% 40%;
+    --neutral-700: 0 0% 25%;
+    --neutral-800: 0 0% 15%;
+    --neutral-900: 0 0% 9%;
+    --neutral-950: 0 0% 4%;
+
+    /* ---- semantic: surfaces ----
+       Pure white, not an off-white. The page and the card are the SAME
+       colour; separation comes from a 1px line, not from a tint. That is
+       the whole trick of this register — take the tint away and borders
+       have to do real work, which is why they are tuned so carefully. */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+
+    /* ---- semantic: actions ----
+       The primary control is near-black with white text, and inverts in
+       dark. Contrast is the emphasis; there is no coloured button. */
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    /* 44%, not 45%. Verified against the MUTED surface, not just the
+       page: at 45% this measured 4.76:1 on --background but only
+       4.36:1 on --muted — under the floor — and muted is exactly
+       where secondary text in table cells and cards actually sits.
+       44% gives 4.94:1 on background and 4.52:1 on muted. */
+    --muted-foreground: 0 0% 44%;
+
+    /* Neutral hover/selected surface — see rule 1. Not the brand accent. */
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+
+    --destructive: 0 84% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* ---- semantic: lines ---- */
+    --border: 0 0% 92%; /* decorative */
+    --input: 0 0% 56%; /* form control boundary — 3.23:1 on white */
+    --ring: 212 100% 48%;
+
+    /* ---- brand (interactive blue) ---- */
+    --brand: 212 100% 42%; /* links + emphasis; 4.6:1 on white */
+    --brand-foreground: 0 0% 100%;
+    --brand-surface: 0 0% 9%; /* fill: heroes, filled chrome */
+    --brand-surface-foreground: 0 0% 100%;
+    --brand-subtle: 212 100% 97%; /* tinted background */
+    --brand-subtle-foreground: 212 92% 32%;
+
+    /* ---- highlight (the once-per-view CTA — contrast, not colour) ---- */
+    --highlight: 0 0% 9%;
+    --highlight-foreground: 0 0% 100%;
+    --highlight-border: 0 0% 9%; /* CTA boundary on light surfaces */
+    --highlight-subtle: 0 0% 96%;
+    --highlight-subtle-foreground: 0 0% 25%;
+
+    /* ---- status. These stay chromatic on purpose: red/amber/green are the
+           only things on screen carrying MEANING in their hue, and a
+           monochrome error state is an error state nobody sees. The old
+           "hold hues 40 apart from --highlight" rule is retired — the
+           highlight is achromatic now, so there is no hue to collide with.
+           ---- */
+    --success: 145 63% 30%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 45%;
+    --warning-foreground: 38 90% 10%;
+    --warning-subtle: 38 92% 94%;
+    --warning-subtle-foreground: 32 96% 26%;
+    --info: 212 100% 42%;
+    --info-foreground: 0 0% 100%;
+
+    /* ---- chart series. Deliberately NOT monochrome: a series is only
+           readable if its members are distinguishable, and five greys are
+           not. Restrained hues at even steps, anchored on the brand blue.
+           ---- */
+    --chart-1: 212 100% 45%;
+    --chart-2: 262 62% 55%;
+    --chart-3: 190 80% 38%;
+    --chart-4: 340 70% 50%;
+    --chart-5: 38 88% 45%;
+
+    /* ---- shape. The ANCHOR, not the button radius: the scale in
+           tailwind.config.ts derives 4/6/8/12/16px from this, so controls
+           land on 6px and cards on 12px — the two values this register
+           actually cares about. The old 10px anchor read soft next to 1px
+           borders and tight type. ---- */
+    --radius: 0.5rem;
+
+    /* ---- elevation. Neutral black: with no tint anywhere else, a coloured
+           shadow would be the only hue on the surface and would read as a
+           smudge. ---- */
+    --shadow-color: 0 0% 0%;
+    --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.05);
+    --shadow-sm:
+        0 1px 3px 0 hsl(var(--shadow-color) / 0.08),
+        0 1px 2px -1px hsl(var(--shadow-color) / 0.06);
+    --shadow-md:
+        0 6px 16px -3px hsl(var(--shadow-color) / 0.1),
+        0 2px 6px -2px hsl(var(--shadow-color) / 0.05);
+    --shadow-lg:
+        0 14px 32px -8px hsl(var(--shadow-color) / 0.13),
+        0 4px 10px -4px hsl(var(--shadow-color) / 0.06);
+    --shadow-xl:
+        0 28px 56px -12px hsl(var(--shadow-color) / 0.18),
+        0 8px 18px -8px hsl(var(--shadow-color) / 0.08);
+
+    /* ---- motion. One easing curve for the whole suite; duration carries
+           the meaning. ---- */
+    --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --duration-fast: 120ms;
+    --duration-base: 200ms;
+    --duration-slow: 320ms;
+
+    /* ---- tokens the brand added, expressed in this register's terms ----
+       These did not exist before Ink & Saffron. Each one reproduces what the
+       primitives did here before they had a token: hover and pressed were an
+       alpha of the fill, disabled was the muted pair, a field was the page,
+       and status pills had no tinted ground. */
+    --primary-hover: hsl(var(--primary) / 0.9);
+    --primary-active: hsl(var(--primary) / 0.8);
+    --secondary-hover: hsl(var(--secondary) / 0.8);
+    --accent-active: hsl(var(--accent));
+    --destructive-hover: hsl(var(--destructive) / 0.9);
+    --destructive-active: hsl(var(--destructive) / 0.8);
+    --highlight-hover: hsl(var(--highlight) / 0.9);
+    --highlight-active: hsl(var(--highlight) / 0.8);
+    --highlight-active-foreground: hsl(var(--highlight-foreground));
+    --border-strong: var(--input);
+    --field: var(--background);
+    --disabled: var(--muted);
+    --disabled-foreground: var(--muted-foreground);
+    --success-subtle: var(--muted);
+    --success-subtle-foreground: var(--foreground);
+    --destructive-subtle: var(--muted);
+    --destructive-subtle-foreground: var(--foreground);
+    --info-subtle: var(--muted);
+    --info-subtle-foreground: var(--foreground);
+    --role-owner: var(--foreground);
+    --role-admin: var(--muted-foreground);
+    --role-member: var(--highlight);
+    --role-reviewer: var(--brand);
+}
+
+.dark:where(
+    [data-skin="mono"],
+    [data-skin="panel"],
+    [data-skin="instrument"],
+    [data-skin="stockroom"]
+) {
+    /* TRUE black, not a dark grey. This is the half of the register people
+       actually recognise, and it only works if the page is #000 and the
+       raised surface is a hair above it (#0a0a0a) — the card reads as lit
+       BY its border rather than by being lighter. */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 93%;
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 93%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 93%;
+
+    /* Inverted: the primary control is white on black here. */
+    --primary: 0 0% 93%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 93%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 63%; /* 8.1:1 on black */
+
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 93%;
+
+    --destructive: 0 90% 60%;
+    --destructive-foreground: 0 0% 4%;
+
+    --border: 0 0% 18%;
+    --input: 0 0% 42%; /* 3.94:1 on black */
+    --ring: 212 100% 60%;
+
+    /* Lightened for legibility ON dark; the surface token below does not
+       move, so heroes stay deep. See rule 2. */
+    --brand: 212 100% 62%;
+    --brand-foreground: 0 0% 4%;
+    --brand-surface: 0 0% 9%;
+    --brand-surface-foreground: 0 0% 93%;
+    --brand-subtle: 212 60% 14%;
+    --brand-subtle-foreground: 212 100% 78%;
+
+    /* The CTA inverts with the page: white fill, black label. */
+    --highlight: 0 0% 93%;
+    --highlight-foreground: 0 0% 4%;
+    --highlight-border: 0 0% 93%;
+    --highlight-subtle: 0 0% 14%;
+    --highlight-subtle-foreground: 0 0% 88%;
+
+    --success: 145 58% 55%;
+    --success-foreground: 145 60% 6%;
+    --warning: 38 92% 62%;
+    --warning-foreground: 38 80% 8%;
+    --warning-subtle: 34 50% 14%;
+    --warning-subtle-foreground: 40 96% 70%;
+    --info: 212 100% 62%;
+    --info-foreground: 212 60% 6%;
+
+    --chart-1: 212 100% 62%;
+    --chart-2: 262 75% 70%;
+    --chart-3: 190 85% 52%;
+    --chart-4: 340 80% 65%;
+    --chart-5: 38 92% 60%;
+
+    --shadow-color: 0 0% 0%;
+}
 
 /* ─── B · STOCKROOM ── carbon, stockroom white, RUST (hue 20).
        The hard one: 0 radius, the heaviest rules in the system, and grounds

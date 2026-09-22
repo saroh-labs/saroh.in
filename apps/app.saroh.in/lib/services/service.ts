@@ -183,6 +183,28 @@ async function send<T>(
 // Reads (called from server components)
 // ---------------------------------------------------------------------------
 
+/**
+ * The org's services, or why they could not be read. For callers that must
+ * tell "none" from "failed" (the site editor's pickers): a failed read is
+ * never an empty one (`frontend-error-feedback.md`). A 403 is reported as
+ * such, so the picker can say the person has no access rather than offer a
+ * retry that cannot work.
+ */
+export async function readServices(): Promise<
+    { ok: true; services: Service[] } | { ok: false; forbidden: boolean }
+> {
+    const base = await orgBase();
+    if (!base) return { ok: false, forbidden: false };
+    try {
+        const res = await apiFetch(`${base}/services`);
+        if (res.status === 403) return { ok: false, forbidden: true };
+        if (!res.ok) return { ok: false, forbidden: false };
+        return { ok: true, services: (await res.json()) as Service[] };
+    } catch {
+        return { ok: false, forbidden: false };
+    }
+}
+
 /** The org's services, newest first (excludes soft-deleted). Empty on failure. */
 export async function listServices(): Promise<Service[]> {
     const base = await orgBase();
@@ -378,6 +400,27 @@ export function recordBookingOutcome(
 }
 
 /** Move a booking to another slot (#121). */
+/** Who a booking made by hand is for: a contact, or someone new. */
+export type BookByHandInput = { startAt: string; idempotencyKey?: string } & (
+    { contactId: string } | { bookerEmail: string; bookerName?: string }
+);
+
+/**
+ * Book someone in by hand (#384): the same open-slot and capacity rules as
+ * the booking page, with the history naming who made it.
+ */
+export function bookByHand(
+    serviceId: string,
+    input: BookByHandInput,
+): Promise<CrmResult<Booking>> {
+    return send<Booking>(
+        `/${serviceId}/bookings`,
+        "POST",
+        input,
+        "Could not make the booking",
+    );
+}
+
 export function rescheduleBooking(
     bookingId: string,
     startAt: string,

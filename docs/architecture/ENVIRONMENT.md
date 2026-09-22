@@ -39,7 +39,7 @@ That is the **only** hard requirement to boot the stack in development.
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Auth URLs            | `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`                                                                                                                                   | Trusted origins default to the built-in `*.saroh.in` list; base URL inferred.                                                                                                                                        |
 | OAuth                | `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`                                                                                                     | Social login buttons are inert; **email + password login works**.                                                                                                                                                    |
-| CORS/links           | `CORS_ORIGIN`, `APP_URL`                                                                                                                                                           | CORS uses the trusted-origins list + localhost; links use `https://app.saroh.in`.                                                                                                                                    |
+| CORS/links           | `CORS_ORIGIN`, `APP_URL`, `RENDERER_URL`                                                                                                                                           | CORS uses the trusted-origins list + localhost; links use `https://app.saroh.in`.                                                                                                                                    |
 | Storage              | `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_BASE_URL`                                                                                       | Media uploads use the **in-memory adapter** (network-free); nothing persists off-process.                                                                                                                            |
 | Email                | `EMAIL_FROM`/`SENDER_EMAIL_ID`, `SMTP_HOST`/`SMTP_HOSTNAME`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `USER_ACCOUNT`, `USER_PASSWORD`                                 | Email is **logged to the console** instead of sent (verification/reset/notify still visible).                                                                                                                        |
 | Merchant payments    | `PAYMENTS_ENC_KEY`                                                                                                                                                                 | Payments boot fine; the crypto module validates the key **at use time** (first en/decrypt) and throws a clear error only if you actually try to connect a provider. A 32-byte key as base64 or 64-hex. Never logged. |
@@ -59,13 +59,13 @@ and fall back to the production `*.saroh.in` URLs baked into the code.
 
 Common optional overrides (point a frontend at a local api instead of prod):
 
-| Variable                                                         | App(s)               | Absent →                                 |
-| ---------------------------------------------------------------- | -------------------- | ---------------------------------------- |
-| `API_URL` / `NEXT_PUBLIC_API_URL`                                | app, sites           | Defaults to `https://api.saroh.in`.      |
-| `NEXT_PUBLIC_ACCOUNTS_URL`                                       | app, accounts, admin | Defaults to `https://accounts.saroh.in`. |
-| `NEXT_PUBLIC_BETTER_AUTH_URL`                                    | app, accounts        | Defaults to the canonical auth host.     |
-| `ADMIN_ALLOWLIST`                                                | admin                | No extra admin allowlist applied.        |
-| `NEXT_PUBLIC_ROOT_DOMAIN`, `REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS` | sites                | Sensible built-in defaults.              |
+| Variable                                                         | App(s)                    | Absent →                                 |
+| ---------------------------------------------------------------- | ------------------------- | ---------------------------------------- |
+| `API_URL` / `NEXT_PUBLIC_API_URL`                                | app, sites                | Defaults to `https://api.saroh.in`.      |
+| `NEXT_PUBLIC_ACCOUNTS_URL`                                       | app, accounts, admin, web | Defaults to `https://accounts.saroh.in`. |
+| `NEXT_PUBLIC_BETTER_AUTH_URL`                                    | app, accounts             | Defaults to the canonical auth host.     |
+| `ADMIN_ALLOWLIST`                                                | admin                     | No extra admin allowlist applied.        |
+| `NEXT_PUBLIC_ROOT_DOMAIN`, `REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS` | sites                     | Sensible built-in defaults.              |
 
 ## Local URLs
 

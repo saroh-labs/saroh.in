@@ -1,5 +1,6 @@
 import { apiFetch, getJson, getList } from "@/lib/api/http";
 
+import { listStorefronts } from "@/lib/stores/storefronts";
 import type { CreateStoreInput, StoreResult, UpdateStoreInput } from "./schema";
 
 /**
@@ -66,4 +67,26 @@ export function updateStore(
     input: UpdateStoreInput,
 ): Promise<StoreResult<{ id: string }>> {
     return mutate(`/stores/${storeId}`, "PUT", input);
+}
+
+/**
+ * The storefronts of the ACTIVE business, with their store records.
+ *
+ * `listStores()` is `GET /stores`, which returns every store the signed-in
+ * person owns in EVERY business they belong to — so a merchant with two
+ * businesses saw the other one's storefront in this one's Products, Customers
+ * and "which storefront?" pickers. The org-scoped storefronts list says which
+ * belong here; this keeps only those.
+ *
+ * If that list cannot be read, the old behaviour stands rather than the page
+ * going blank: the API still refuses any write outside the active business.
+ */
+export async function listBusinessStores(): Promise<Store[]> {
+    const [stores, storefronts] = await Promise.all([
+        listStores(),
+        listStorefronts().catch(() => null),
+    ]);
+    if (!storefronts) return stores;
+    const here = new Set(storefronts.map((s) => s.id));
+    return stores.filter((s) => here.has(s.id));
 }

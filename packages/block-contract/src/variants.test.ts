@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { BLOCK_META } from "./fixtures";
 import { parseSectionContent, SECTION_TYPES } from "./section-contract";
+import { toRendered } from "./to-rendered";
 import { defaultVariant, isKnownVariant, resolveVariant } from "./variants";
 
 /**
@@ -195,5 +196,118 @@ describe("features", () => {
     it("takes a look like every other block", () => {
         expect(resolveVariant("features", { variant: "list" })).toBe("list");
         expect(resolveVariant("features", {})).toBe("grid");
+    });
+});
+
+/** #255 — the three content blocks that followed `features`. */
+describe("faq, testimonials and contact", () => {
+    it("caps an FAQ at twenty questions and needs one", () => {
+        const q = { question: "Open Sundays?", answer: "No." };
+        const twenty = Array.from({ length: 20 }, () => q);
+        expect(parseSectionContent("faq", 1, { items: [] }).success).toBe(
+            false,
+        );
+        expect(parseSectionContent("faq", 1, { items: twenty }).success).toBe(
+            true,
+        );
+        expect(
+            parseSectionContent("faq", 1, { items: [...twenty, q] }).success,
+        ).toBe(false);
+    });
+
+    it("refuses a question with no answer", () => {
+        expect(
+            parseSectionContent("faq", 1, {
+                items: [{ question: "Open Sundays?", answer: "  " }],
+            }).success,
+        ).toBe(false);
+    });
+
+    it("refuses an unattributed testimonial", () => {
+        expect(
+            parseSectionContent("testimonials", 1, {
+                items: [{ quote: "Quick and friendly.", name: "" }],
+            }).success,
+        ).toBe(false);
+    });
+
+    it("needs at least one way to reach the business", () => {
+        expect(
+            parseSectionContent("contact", 1, { heading: "Find us" }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("contact", 1, { email: "hello@example.com" })
+                .success,
+        ).toBe(true);
+    });
+
+    it("takes a map link only as a web address", () => {
+        const base = { address: "Unit 4, Riverside Trade Park" };
+        for (const mapUrl of ["javascript:alert(1)", "/map", "maps"]) {
+            expect(
+                parseSectionContent("contact", 1, { ...base, mapUrl }).success,
+            ).toBe(false);
+        }
+        expect(
+            parseSectionContent("contact", 1, {
+                ...base,
+                mapUrl: "https://maps.example.com/?q=riverside",
+            }).success,
+        ).toBe(true);
+    });
+
+    it("checks phone and WhatsApp numbers like a call button does", () => {
+        expect(
+            parseSectionContent("contact", 1, { phone: "call us" }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("contact", 1, { whatsapp: "+44 7700 900000" })
+                .success,
+        ).toBe(true);
+    });
+});
+
+/** #255 — the first block that shows module data. */
+describe("servicesList", () => {
+    it("needs at least one service, and no service twice", () => {
+        expect(
+            parseSectionContent("servicesList", 1, { serviceIds: [] }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("servicesList", 1, {
+                serviceIds: ["a", "a"],
+            }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("servicesList", 1, { serviceIds: ["a", "b"] })
+                .success,
+        ).toBe(true);
+    });
+
+    it("caps the list at 24", () => {
+        const ids = (n: number) => Array.from({ length: n }, (_, i) => `s${i}`);
+        expect(
+            parseSectionContent("servicesList", 1, { serviceIds: ids(24) })
+                .success,
+        ).toBe(true);
+        expect(
+            parseSectionContent("servicesList", 1, { serviceIds: ids(25) })
+                .success,
+        ).toBe(false);
+    });
+
+    it("resolves its button's page at publish, like hero", () => {
+        const rendered = toRendered(
+            "servicesList",
+            {
+                serviceIds: ["a"],
+                cta: {
+                    label: "Book now",
+                    action: { kind: "page", pageId: "p1" },
+                },
+            },
+            { resolvePage: (id) => (id === "p1" ? "/book" : undefined) },
+        ) as { cta: { href: string } };
+        expect(rendered.cta.href).toBe("/book");
     });
 });

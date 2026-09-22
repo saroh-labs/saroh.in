@@ -20,6 +20,7 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
         "org:read",
         "member:read",
         "store:read",
+        "product-review:read",
         "site:read",
         "media:read",
         // ADR-003: every role may read effective module availability.
@@ -136,5 +137,44 @@ describe("organization-policy: authorize()", () => {
         expect(() => authorize(ctx("MEMBER"), "org:delete")).toThrow(
             /MEMBER.*org:delete/,
         );
+    });
+});
+
+describe("discount codes", () => {
+    it.each([
+        ["OWNER", true, true],
+        ["ADMIN", true, true],
+        ["MEMBER", false, false],
+        ["REVIEWER", false, false],
+    ] as const)("%s: read %s, write %s", (role, read, write) => {
+        expect(can(role, "discount:read")).toBe(read);
+        expect(can(role, "discount:write")).toBe(write);
+    });
+
+    // Creating an order with a code tells the caller whether that code works
+    // and why not. So order:write is, in effect, a way to read codes — and a
+    // built-in role that may create orders must be one that may read them.
+    it.each(ORG_ROLES)(
+        "%s never writes orders without reading discount codes",
+        (role) => {
+            if (can(role, "order:write")) {
+                expect(can(role, "discount:read")).toBe(true);
+            }
+        },
+    );
+});
+
+describe("product reviews", () => {
+    it.each([
+        ["OWNER", true, true],
+        ["ADMIN", true, true],
+        // Members see reviews — they are about products, which Members see —
+        // but reply to, hide and invite nothing.
+        ["MEMBER", true, false],
+        // "Review" in REVIEWER is site review; product reviews are not theirs.
+        ["REVIEWER", false, false],
+    ] as const)("%s: read %s, write %s", (role, read, write) => {
+        expect(can(role, "product-review:read")).toBe(read);
+        expect(can(role, "product-review:write")).toBe(write);
     });
 });

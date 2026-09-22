@@ -5,13 +5,15 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { createPage, deletePage, updatePage } from "@/lib/sites/actions";
 import type { SitePage } from "@/lib/sites/service";
 
 /**
- * The rail's Pages tab: every page on this site, which one is open, and the
+ * The page switcher under the page name in the editor's breadcrumb (#335):
+ * every page on this site, which one is open, and the
  * three things you can do to the set.
  *
  * Switching pages is a NAVIGATION (`?page=<id>`), not local state. The open
@@ -29,20 +31,34 @@ export function PagesPanel({
     pages,
     activePageId,
     dirty,
+    unfinished,
 }: {
     siteId: string;
     pages: SitePage[];
     activePageId: string;
     /** Unsaved section edits on the page currently open. */
     dirty: boolean;
+    /**
+     * When the only unsaved work is unfinished sections, a phrase naming them
+     * ("the unfinished FAQ section"). Saving
+     * cannot help then, so the message says what will.
+     */
+    unfinished?: string;
 }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
+    // The page a Delete was last chosen for. Kept after the dialog closes so
+    // its title does not blank out during the closing animation.
+    const [pendingDelete, setPendingDelete] = useState<SitePage | null>(null);
+    const [deleteOpen, setDeleteOpen] = useState(false);
     const [adding, setAdding] = useState(false);
     const [title, setTitle] = useState("");
     const [path, setPath] = useState("");
     const [renaming, setRenaming] = useState<string | null>(null);
     const [renameTitle, setRenameTitle] = useState("");
+    // The confirm action stays clickable during the dialog's exit animation,
+    // so a double click can fire this twice before `busy` re-renders.
+    const removeInFlight = useRef(false);
 
     function open(pageId: string) {
         if (pageId === activePageId) return;
@@ -52,7 +68,11 @@ export function PagesPanel({
          * merchant would have no way to know it happened.
          */
         if (dirty) {
-            showError("Save this page before opening another.");
+            showError(
+                unfinished
+                    ? `Finish or remove ${unfinished} before opening another page.`
+                    : "Save this page before opening another.",
+            );
             return;
         }
         router.push(`/sites/${siteId}?page=${pageId}`);
@@ -113,23 +133,22 @@ export function PagesPanel({
     }
 
     async function remove(page: SitePage) {
-        // Deleting a page destroys every section on it, and nothing here
-        // restores it — the sections are not versioned the way publications
-        // are. So the confirm names the page rather than asking "are you sure".
-        const ok = window.confirm(
-            `Delete "${page.title}" and everything on it? This cannot be undone.`,
-        );
-        if (!ok) return;
+        if (removeInFlight.current) return;
+        removeInFlight.current = true;
         setBusy(true);
-        const res = await deletePage(siteId, page.id);
-        setBusy(false);
-        if (!res.ok) {
-            showError(res.error);
-            return;
+        try {
+            const res = await deletePage(siteId, page.id);
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            showSuccess(`Deleted ${page.title}.`);
+            if (page.id === activePageId) router.push(`/sites/${siteId}`);
+            router.refresh();
+        } finally {
+            setBusy(false);
+            removeInFlight.current = false;
         }
-        showSuccess(`Deleted ${page.title}.`);
-        if (page.id === activePageId) router.push(`/sites/${siteId}`);
-        router.refresh();
     }
 
     return (
@@ -191,14 +210,14 @@ export function PagesPanel({
                                             "truncate",
                                             /*
                                              * Dimmed and struck through, the
-                                             * same as a hidden SECTION in the
-                                             * rail next door. Two lists that
-                                             * look alike must mean alike — the
+                                             * same as a hidden block in the
+                                             * block list. Two lists that look
+                                             * alike must mean alike — the
                                              * merchant should not have to learn
-                                             * a second vocabulary one tab over.
+                                             * a second vocabulary.
                                              */
                                             page.hidden &&
-                                                "text-muted-foreground/50 line-through",
+                                                "text-muted-foreground line-through",
                                         )}
                                     >
                                         {page.title}
@@ -208,7 +227,7 @@ export function PagesPanel({
                                      * what the merchant typed and what visitors
                                      * see, and "/" already says home.
                                      */}
-                                    <span className="shrink-0 font-mono text-[0.625rem] text-muted-foreground/70">
+                                    <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
                                         {page.path}
                                     </span>
                                 </button>
@@ -292,7 +311,10 @@ export function PagesPanel({
                                             aria-label={`Delete ${page.title}`}
                                             className="h-6 w-6 p-0 text-xs hover:text-destructive"
                                             disabled={busy}
-                                            onClick={() => void remove(page)}
+                                            onClick={() => {
+                                                setPendingDelete(page);
+                                                setDeleteOpen(true);
+                                            }}
                                         >
                                             ×
                                         </Button>
@@ -358,6 +380,23 @@ export function PagesPanel({
                     </button>
                 )}
             </div>
+            {/*
+             * Deleting a page destroys every section on it, and nothing here
+             * restores it — the sections are not versioned the way
+             * publications are. So the dialog names the page rather than
+             * asking "are you sure".
+             */}
+            <ConfirmDialog
+                open={deleteOpen}
+                onOpenChange={setDeleteOpen}
+                title={`Delete "${pendingDelete?.title ?? ""}"?`}
+                description="Everything on the page is deleted with it. This cannot be undone."
+                confirmLabel="Delete page"
+                cancelLabel="Keep page"
+                onConfirm={() => {
+                    if (pendingDelete) void remove(pendingDelete);
+                }}
+            />
         </>
     );
 }

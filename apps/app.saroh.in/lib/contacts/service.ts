@@ -1,5 +1,5 @@
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, mutate, orgBase } from "@/lib/api/http";
+import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * CRM Contacts data access for app.saroh.in (S3-005). Org-scoped reads +
@@ -96,4 +96,34 @@ export function updateContact(
         input,
         "Could not update the contact",
     );
+}
+
+export interface CreateContactInput {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    company?: string;
+}
+
+/** Add someone by hand. A 409 means that email is already a contact. */
+export function createContact(
+    input: CreateContactInput,
+): Promise<CrmResult<Contact>> {
+    return mutate<Contact>(
+        "/contacts",
+        "POST",
+        input,
+        "Could not add the contact",
+    );
+}
+
+/**
+ * Delete a person from the contacts for good. Their leads go with them; the
+ * result says how many, so the toast can.
+ */
+export function deleteContact(
+    contactId: string,
+): Promise<CrmResult<{ id: string; deleted: true; leads: number }>> {
+    return destroy(`/contacts/${contactId}`, "Could not delete the contact");
 }

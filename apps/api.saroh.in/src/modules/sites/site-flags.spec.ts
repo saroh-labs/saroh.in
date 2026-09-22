@@ -247,6 +247,20 @@ describe("breaks at phone width", () => {
         expect(types(four)).toContain("phoneWidth");
         expect(types(three)).not.toContain("phoneWidth");
     });
+
+    it("flags a four-image grid named as a gallery@2 variant", () => {
+        const img = { src: "x.jpg" };
+        const flags = checkPage(
+            page([
+                {
+                    type: "gallery",
+                    content: { variant: "grid", images: [img, img, img, img] },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(flags)).toContain("phoneWidth");
+    });
 });
 
 describe("hidden sections", () => {
@@ -575,6 +589,76 @@ describe("the contract the spec sets", () => {
         const flags = checkPage(page([{ type: "somethingNew", content: {} }]), [
             "/",
         ]);
+        expect(flags).toEqual([]);
+    });
+});
+
+describe("example text left in an added block", () => {
+    it("names the example words still on the page", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: {
+                        heading: "Fresh bread, baked every morning",
+                        subheading: "Our own words.",
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        const example = flags.find(
+            (f) =>
+                f.type === "placeholderText" && f.message.includes("example"),
+        );
+        expect(example?.message).toContain(
+            '"Fresh bread, baked every morning"',
+        );
+        expect(example?.sectionIndex).toBe(0);
+    });
+
+    it("finds an example paragraph kept inside the merchant's own rich text", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "richText",
+                    content: {
+                        format: "html",
+                        value: "<p>Our story.</p><p>We have been on the same corner since 1998.</p>",
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(flags)).toContain("placeholderText");
+    });
+
+    it("stays quiet once the merchant has written their own", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: {
+                        heading: "Packaging, storage and safety supplies",
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(flags.some((f) => f.message.includes("example"))).toBe(false);
+    });
+
+    it("does not check a hidden block", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "hero",
+                    hidden: true,
+                    content: { heading: "Fresh bread, baked every morning" },
+                },
+            ]),
+            ["/"],
+        );
         expect(flags).toEqual([]);
     });
 });

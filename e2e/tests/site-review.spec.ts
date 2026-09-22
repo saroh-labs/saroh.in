@@ -35,10 +35,9 @@ async function signIn(page: Page, who: { email: string; password: string }) {
     });
 }
 
-/** The reviewer's one site, opened from their own list. */
+/** The reviewer's one site, opened from Website in the rail. */
 async function openTheReviewedSite(page: Page) {
     await page.goto(`${urls.APP_URL}/sites`);
-    await page.getByRole("link", { name: REVIEWED_SITE }).first().click();
     await page.waitForURL(/\/sites\/[^/]+\/review/, { timeout: 30_000 });
 }
 
@@ -48,19 +47,18 @@ test.describe("a reviewer", () => {
     });
 
     test("sees only the site they were invited to", async ({ page }) => {
-        await page.goto(`${urls.APP_URL}/sites`);
+        await openTheReviewedSite(page);
 
-        // The seed builds three sites and grants this reviewer one. A reviewer
-        // who could see the other two would be a MEMBER with extra powers.
-        //
-        // Counted inside `main` only: the sidebar links to the site the
-        // workspace last had open, which is not the list and would make one
-        // card look like two.
-        const cards = page
-            .getByRole("main")
-            .locator('a[href^="/sites/"]:not([href$="/new"])');
-        await expect(cards.filter({ hasText: REVIEWED_SITE })).toHaveCount(1);
-        await expect(cards).toHaveCount(1);
+        // The reviewer is granted the business's site. With one site and no
+        // right to make another, there is nothing to pick. That a reviewer
+        // sees only the sites they were granted, when a business has several,
+        // is `reviewer-scope.spec.ts` in the API.
+        await expect(
+            page.getByRole("heading", { name: REVIEWED_SITE, exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: /^Website: .*Change it\.$/ }),
+        ).toHaveCount(0);
     });
 
     test("is offered nothing in the rail that they cannot open", async ({
@@ -129,9 +127,10 @@ test.describe("a reviewer", () => {
             await expect(rail.locator(`a[href="${gone}"]`)).toHaveCount(0);
         }
 
-        // What is left is their site, by the name they were invited to.
+        // What is left is Website, one row: which site, and Review, are on
+        // the Website screen rather than hung under it.
         await expect(rail.getByRole("link", { name: "Website" })).toBeVisible();
-        await expect(rail.getByRole("link", { name: "Review" })).toBeVisible();
+        await expect(rail.locator('a[href^="/sites/"]')).toHaveCount(0);
     });
 
     test("is taken to Review, not to the editor, and is told why", async ({
@@ -206,11 +205,21 @@ test.describe("a shared preview link", () => {
         context,
     }) => {
         await signIn(page, demoUser);
+        // Website opens on the business's one site (ADR-006), and the Pages
+        // tab's action opens it in the editor.
         await page.goto(`${urls.APP_URL}/sites`);
-        await page.getByRole("link", { name: REVIEWED_SITE }).first().click();
+        await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
+        await expect(page.getByRole("main")).toContainText(REVIEWED_SITE, {
+            timeout: 30_000,
+        });
+        await page.getByRole("link", { name: "Open editor" }).click();
         await page.waitForURL(/\/sites\/[^/]+$/, { timeout: 30_000 });
 
-        await page.getByRole("tab", { name: "review" }).click();
+        // Review lives in the inspector's Feedback tab since #340.
+        await page.getByRole("tab", { name: /^Feedback/ }).click();
+        // With a block selected, Feedback opens on that block; preview links
+        // are part of the whole site's review.
+        await page.getByRole("radio", { name: /^Whole site/ }).click();
         await page
             .getByRole("button", { name: /^(Create link|New link)$/ })
             .click();

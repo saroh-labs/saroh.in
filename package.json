@@ -39,6 +39,7 @@
     "devDependencies": {
         "@babel/traverse": "^7.29.8",
         "@saroh/tsconfig": "workspace:*",
+        "babel-plugin-react-compiler": "^1.0.0",
         "eslint": "^10.8.1",
         "husky": "^9.1.7",
         "madge": "^8.0.0",

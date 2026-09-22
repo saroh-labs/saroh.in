@@ -24,6 +24,7 @@ export class HomeController {
         return this.home.build({
             organizationId: ctx.organizationId,
             organizationRole: ctx.role,
+            organizationActions: ctx.actions,
             projectId,
         });
     }

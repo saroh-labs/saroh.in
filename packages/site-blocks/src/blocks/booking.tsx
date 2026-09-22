@@ -32,15 +32,44 @@ import { ctaClasses } from "./cta";
  * `idempotencyKey` is stable per mount so a double-click / retry can't create
  * two bookings. On a 409 ("slot just taken") the slots refresh so the visitor
  * can pick another; a 429 asks them to slow down.
+ *
+ * A 404 or 410 on availability means the service is gone, archived, or its
+ * business switched Appointments off — retrying cannot help, so the section
+ * says booking isn't open and offers no retry. Any other failure keeps the
+ * error and its Try again. A failed booking shows the API's own message only
+ * for a 4xx, where the API words it for visitors; a 5xx body never reaches
+ * the page.
  */
 
 /** How far ahead to offer slots. */
 const WINDOW_DAYS = 14;
 
 /** A bookable slot as returned by the public availability endpoint (UTC ISO). */
-interface Slot {
+export interface Slot {
     startAt: string;
     endAt: string;
+}
+
+/**
+ * Narrow the availability response instead of casting it (#264). A 200 in the
+ * wrong shape used to reach `groupByDay` and throw during render, taking the
+ * merchant's page down with it; now it lands in the same error state as a
+ * failed request. `null` means "not a list of slots".
+ */
+function parseSlots(value: unknown): Slot[] | null {
+    if (!Array.isArray(value)) return null;
+    const slots: Slot[] = [];
+    for (const item of value) {
+        if (typeof item !== "object" || item === null) return null;
+        const { startAt, endAt } = item as Record<string, unknown>;
+        if (typeof startAt !== "string" || typeof endAt !== "string") {
+            return null;
+        }
+        // The formatters below throw a RangeError on an invalid date.
+        if (Number.isNaN(Date.parse(startAt))) return null;
+        slots.push({ startAt, endAt });
+    }
+    return slots;
 }
 
 type SubmitState =
@@ -52,6 +81,8 @@ type SubmitState =
 type SlotsState =
     | { kind: "loading" }
     | { kind: "ready"; slots: Slot[] }
+    /** 404/410: the service can't be booked online. Retrying won't change it. */
+    | { kind: "closed" }
     | { kind: "error"; message: string };
 
 /** The visitor's resolved IANA timezone, for the "times shown in …"note. */
@@ -120,10 +151,17 @@ function groupByDay(slots: Slot[]): DayGroup[] {
 export default function BookingSection({
     content,
     apiUrl = DEFAULT_API_URL,
+    slots: givenSlots,
 }: {
     content: RenderedBooking;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
+    /**
+     * Sample slots to draw instead of fetching (previews, #267). A fixture's
+     * Service id belongs to no Service, and a picker thumbnail must not show a
+     * healthy block as broken because a request it never needed failed.
+     */
+    slots?: Slot[];
 }) {
     const baseId = useId();
     // A stable idempotency key per mount so a double-click / retry can't create
@@ -134,9 +172,9 @@ export default function BookingSection({
             : Math.random().toString(36).slice(2),
     );
 
-    const [slotsState, setSlotsState] = useState<SlotsState>({
-        kind: "loading",
-    });
+    const [slotsState, setSlotsState] = useState<SlotsState>(
+        givenSlots ? { kind: "ready", slots: givenSlots } : { kind: "loading" },
+    );
     const [selected, setSelected] = useState<string | null>(null);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
@@ -152,6 +190,11 @@ export default function BookingSection({
         if (!serviceId) return { kind: "ready", slots: [] };
         const from = new Date();
         const to = new Date(from.getTime() + WINDOW_DAYS * 24 * 60 * 60 * 1000);
+        const couldNotLoad: SlotsState = {
+            kind: "error",
+            message:
+                "We couldn't load available times right now — please try again shortly.",
+        };
         try {
             const res = await fetch(
                 `${apiUrl}/public/services/${encodeURIComponent(serviceId)}/availability` +
@@ -160,14 +203,19 @@ export default function BookingSection({
                 { headers: { accept: "application/json" } },
             );
             if (!res.ok) {
-                return {
-                    kind: "error",
-                    message:
-                        "We couldn't load available times right now — please try again shortly.",
-                };
+                // A 404 or 410 means booking is closed (the service is gone
+                // or the business switched Appointments off); retrying cannot
+                // help, so it is not an error state.
+                if (res.status === 404 || res.status === 410) {
+                    return { kind: "closed" };
+                }
+                return couldNotLoad;
             }
-            const slots = (await res.json()) as Slot[];
-            return { kind: "ready", slots };
+            // The server answered, so a body that isn't JSON or isn't a list
+            // of slots is "couldn't load times", not "couldn't reach".
+            const body: unknown = await res.json().catch(() => null);
+            const slots = parseSlots(body);
+            return slots ? { kind: "ready", slots } : couldNotLoad;
         } catch {
             return {
                 kind: "error",
@@ -199,6 +247,7 @@ export default function BookingSection({
     }, [fetchSlots, applyResult]);
 
     useEffect(() => {
+        if (givenSlots) return;
         let active = true;
         void fetchSlots().then((next) => {
             if (active) applyResult(next);
@@ -206,7 +255,7 @@ export default function BookingSection({
         return () => {
             active = false;
         };
-    }, [fetchSlots, applyResult]);
+    }, [givenSlots, fetchSlots, applyResult]);
 
     // No service picked → nothing to book against. Render nothing.
     if (!serviceId) return null;
@@ -267,13 +316,34 @@ export default function BookingSection({
                 return;
             }
 
-            const body = (await res.json().catch(() => null)) as {
-                message?: string;
-            } | null;
+            if (res.status === 404 || res.status === 410) {
+                // Booking closed while the visitor was filling the form (the
+                // service went, or Appointments was switched off). Show the
+                // same notice a fresh page would, instead of a form that can
+                // only keep failing.
+                setSelected(null);
+                setSlotsState({ kind: "closed" });
+                setSubmit({ kind: "idle" });
+                return;
+            }
+
+            if (res.status === 400) {
+                // The booking API's 400s are written for developers
+                // ("Validation failed", "startAt is not a valid instant"), so
+                // none is shown. A rejected time is the likely cause after
+                // the email, so the times are refreshed too.
+                reload();
+                setSubmit({
+                    kind: "error",
+                    message:
+                        "We couldn't book that — please check your email address and choose a time again.",
+                });
+                return;
+            }
+
             setSubmit({
                 kind: "error",
                 message:
-                    body?.message ??
                     "Something went wrong — please check your details and try again.",
             });
         } catch {
@@ -325,6 +395,11 @@ export default function BookingSection({
                 {slotsState.kind === "loading" ? (
                     <p className="text-site-muted mt-4 text-sm">
                         Loading available times…
+                    </p>
+                ) : slotsState.kind === "closed" ? (
+                    <p className="text-site-muted mt-4 text-sm">
+                        Online booking isn't open right now — please contact the
+                        business directly.
                     </p>
                 ) : slotsState.kind === "error" ? (
                     <div className="mt-4">
@@ -387,8 +462,9 @@ export default function BookingSection({
                 )}
             </div>
 
-            {/* Booker details */}
+            {/* Booker details — hidden once booking is closed. */}
             <form
+                hidden={slotsState.kind === "closed"}
                 className="mt-8 grid gap-[var(--site-grid-gap)]"
                 onSubmit={onSubmit}
                 noValidate
@@ -416,13 +492,9 @@ export default function BookingSection({
                         className="text-site-fg text-sm font-medium"
                     >
                         Email
-                        {/* Decorative and aria-hidden — the field's own
-                            `required` carries the meaning — so this marker is
-                            held to the 3:1 non-text floor on the merchant's
-                            ground, which it clears in both registers. */}
-                        <span aria-hidden="true" className="text-destructive">
-                            {" *"}
-                        </span>
+                        {/* The label's own colour, not a red (#263); see
+                            the enquiry block. */}
+                        <span aria-hidden="true">{" *"}</span>
                     </label>
                     <input
                         id={`${baseId}-email`}

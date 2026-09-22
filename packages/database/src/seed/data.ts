@@ -25,8 +25,9 @@ export const OWNER_PASSWORD = "demo-password-123";
  * `Membership` and a `SiteReviewer` by hand, so in practice nobody did — and
  * the one browser test that could have caught #274 had nobody to sign in as.
  *
- * Invited to the FIRST seeded site only. That is the point of the role: the
- * second site must not appear in their list.
+ * Invited to Northwind's site, the only one it has (ADR-006). That a reviewer
+ * sees only the sites they were granted, when a business has several, is
+ * covered by the API's `reviewer-scope.spec.ts`.
  */
 export const REVIEWER_EMAIL = "reviewer@saroh.dev";
 export const REVIEWER_PASSWORD = "demo-password-123";
@@ -724,6 +725,60 @@ export type SeedSection =
           };
       };
 
+/**
+ * What came in through the website's enquiry form (#385): the raw entries
+ * behind some of the WEBSITE-sourced contacts, so the Forms screen has real
+ * rows. `contact` indexes CONTACTS; the entry links to that contact's first
+ * lead, the way a live submission opens one. One contact has no lead in the
+ * fixture, so one entry shows as a lead since deleted.
+ */
+export const SUBMISSIONS: readonly {
+    contact: number;
+    daysAgo: number;
+    phone?: string;
+    message: string;
+}[] = [
+    {
+        contact: 0,
+        daysAgo: 12,
+        phone: "98450 11223",
+        message:
+            "We open a second cafe next month. Can you quote 200 units of the 12oz cups with lids, delivered to Indiranagar?",
+    },
+    {
+        contact: 3,
+        daysAgo: 10,
+        message:
+            "Fitting out a showroom in HSR. Need corner guards, stretch film and about 40 cartons in mixed sizes. Is there a trade rate?",
+    },
+    {
+        contact: 8,
+        daysAgo: 8,
+        phone: "99001 45678",
+        message:
+            "Looking for wholesale pricing on food-safe pouches for dry goods, roughly 5,000 a month.",
+    },
+    {
+        contact: 13,
+        daysAgo: 4,
+        message:
+            "Do you deliver to Hosur? Just need a few rolls of tape and gloves for a small workshop.",
+    },
+    {
+        contact: 15,
+        daysAgo: 3,
+        phone: "98860 33445",
+        message:
+            "Enquiring about steel fittings and pallet strapping for a plant in Peenya. Can someone call?",
+    },
+    {
+        contact: 18,
+        daysAgo: 1,
+        message:
+            "We pack spices in 100g and 250g. Please share options for printed pouches and your minimum order.",
+    },
+];
+
 /** The enquiry form Northwind uses everywhere it asks a visitor for details. */
 const ENQUIRY_FIELDS: readonly SeedFormField[] = [
     { name: "name", label: "Your name", type: "text", required: true },
@@ -739,12 +794,35 @@ const ENQUIRY_FIELDS: readonly SeedFormField[] = [
 ];
 
 /**
- * The org's websites.
+ * Other businesses the demo owner runs, each with its own website.
  *
- * Three, in the two states the list page can distinguish: two live on a
- * saroh.app subdomain and one still being written, which is why the third has
- * no subdomain — the card falls back to the slug, and a merchant should see
- * both renderings rather than three identical ones.
+ * A business has one website for now (ADR-006), so Northwind keeps its own
+ * site and the other two the fixture has always carried — a live campaign site
+ * and a draft still being written — each belong to a business of their own.
+ * They show both site states, and give the business switcher something to
+ * switch between. Website only: nothing else is seeded for them.
+ */
+export const SIDE_BUSINESSES: readonly {
+    key: string;
+    slug: string;
+    name: string;
+}[] = [
+    { key: "monsoon", slug: "monsoon", name: "Monsoon Stock-Up" },
+    {
+        key: "whitefield",
+        slug: "trade-counter-whitefield",
+        name: "Trade Counter Whitefield",
+    },
+];
+
+/**
+ * The websites, one per business.
+ *
+ * Northwind's own comes first and is the one with posts, a reviewer and a
+ * domain. The other two belong to {@link SIDE_BUSINESSES}: one live on a
+ * saroh.app subdomain and one still being written, which is why it has no
+ * subdomain — the card falls back to the slug, and a merchant should see both
+ * renderings rather than identical ones.
  *
  * Only the bare label is stored ("northwind"), never the full host. The suffix
  * is composed at render time from NEXT_PUBLIC_ROOT_DOMAIN, which is why moving
@@ -757,6 +835,8 @@ const ENQUIRY_FIELDS: readonly SeedFormField[] = [
 export const SITES: readonly {
     slug: string;
     name: string;
+    /** A {@link SIDE_BUSINESSES} key; absent for Northwind's own site. */
+    business?: string;
     subdomain: string | null;
     /** Published sites get a Publication and a live pointer; drafts do not. */
     published: boolean;
@@ -906,6 +986,7 @@ export const SITES: readonly {
     {
         slug: "monsoon-stock-up-2026",
         name: "Monsoon Stock-Up 2026",
+        business: "monsoon",
         subdomain: "monsoon",
         published: true,
         createdDaysAgo: 41,
@@ -968,6 +1049,7 @@ export const SITES: readonly {
     {
         slug: "trade-counter-whitefield",
         name: "Trade Counter — Whitefield",
+        business: "whitefield",
         subdomain: null,
         published: false,
         createdDaysAgo: 9,

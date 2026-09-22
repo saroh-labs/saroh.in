@@ -5,6 +5,23 @@ const nextConfig = {
     // imports no database code — every read and write goes to api.saroh.in over
     // HTTP (enforced by the DB-import ban in @saroh/eslint-config/nextjs).
     reactStrictMode: false,
+    /*
+     * Auto-memoization, so a component does not depend on somebody having
+     * remembered a `useMemo`. This app is where it pays: 121 client components,
+     * and the busiest of them (`DataView`, behind nine screens) recomputes
+     * filtered, searched and sorted rows on every keystroke.
+     *
+     * Not a risk switch. A component the compiler cannot safely memoize is
+     * SKIPPED, not broken — those are the "Compilation Skipped" warnings the
+     * react-hooks lint rule has been reporting all along, which is also why
+     * the codebase was already compiler-clean before this was turned on.
+     *
+     * Next runs it through Babel, but only over files that actually contain
+     * JSX or hooks (an SWC pre-pass decides), so the build cost is localized.
+     * `experimental.turbopackRustReactCompiler` is the native port and is
+     * faster still — left off until it stops being experimental.
+     */
+    reactCompiler: true,
     // The dev-tools badge sits in the bottom-left of every screen and was
     // getting baked into the product screenshots used on the marketing site —
     // shipping the product with a development overlay in it. It carries no

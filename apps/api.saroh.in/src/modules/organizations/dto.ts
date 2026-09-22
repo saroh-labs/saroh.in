@@ -78,6 +78,19 @@ export class OnboardOrganizationDto {
     @ValidateNested()
     @Type(() => BusinessProfileDto)
     profile?: BusinessProfileDto;
+
+    /**
+     * The business's address on Saroh — the `<address>.saroh.app` its website
+     * will live at — chosen at setup. Optional: absent, it is derived from
+     * the name, as it always was. Its shape, the reserved words and whether
+     * it is free are checked by the service (`site-address.ts`), where the
+     * answer can name the field and say why.
+     */
+    @IsOptional()
+    @Transform(trimLower)
+    @IsString()
+    @MaxLength(63)
+    address?: string;
 }
 
 /**

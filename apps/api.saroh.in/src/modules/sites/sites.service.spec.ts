@@ -89,13 +89,35 @@ describe("SitesService.createFromTemplate", () => {
         pageCreate.mockResolvedValue({ id: "page_x" });
     });
 
+    it("refuses a second website before the plan is asked (ADR-006, 409, no write)", async () => {
+        siteCount.mockResolvedValue(1);
+
+        await expect(
+            service.createFromTemplate(ctx(), { name: "Acme" }),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: {
+                message: expect.stringMatching(/already has its website/),
+            },
+        });
+
+        // A paid plan that allows more changes nothing: the product cap is
+        // checked first, so the merchant is never told to upgrade.
+        expect(entCheck).not.toHaveBeenCalled();
+        expect(transaction).not.toHaveBeenCalled();
+        expect(siteCount).toHaveBeenCalledWith({
+            where: { organizationId: "org_1", deletedAt: null },
+        });
+    });
+
     it("enforces the plan's `sites` entitlement before creating (403 when at the limit, no write)", async () => {
-        // Simulate the EntitlementService rejecting at the plan cap.
+        // Simulate the EntitlementService rejecting at the plan cap — a plan
+        // that allows no sites at all, since the product cap stops the second.
         const { ForbiddenException } =
             jest.requireActual<typeof import("@nestjs/common")>(
                 "@nestjs/common",
             );
-        siteCount.mockResolvedValue(1);
+        siteCount.mockResolvedValue(0);
         entCheck.mockRejectedValueOnce(
             new ForbiddenException("Plan limit reached"),
         );
@@ -105,9 +127,62 @@ describe("SitesService.createFromTemplate", () => {
         ).rejects.toThrow(/Plan limit reached/);
 
         // The cap is checked with the current site count and blocks the write.
-        expect(entCheck).toHaveBeenCalledWith("org_1", "sites", 1);
+        expect(entCheck).toHaveBeenCalledWith("org_1", "sites", 0);
         expect(transaction).not.toHaveBeenCalled();
         expect(siteCreate).not.toHaveBeenCalled();
+    });
+
+    describe("where a new site is served", () => {
+        it("takes the address its business reserved at setup when none is asked for", async () => {
+            orgFindUnique.mockResolvedValue({
+                name: "Rye",
+                slug: "ryeandco",
+                businessProfile: null,
+            });
+            await service.createFromTemplate(ctx(), { name: "Rye" });
+            expect(siteCreate.mock.calls[0][0].data.subdomain).toBe("ryeandco");
+        });
+
+        it("leaves the address empty when a site already uses the reserved one", async () => {
+            orgFindUnique.mockResolvedValue({
+                name: "Rye",
+                slug: "ryeandco",
+                businessProfile: null,
+            });
+            siteFindUnique.mockResolvedValue({ id: "site_old" });
+            await service.createFromTemplate(ctx(), { name: "Rye 2" });
+            expect(siteCreate.mock.calls[0][0].data.subdomain).toBeUndefined();
+        });
+
+        it("refuses an address another business reserved", async () => {
+            orgFindUnique.mockImplementation(({ where }) =>
+                Promise.resolve(
+                    where.slug === "kiln"
+                        ? { id: "org_other" }
+                        : { name: "Rye", businessProfile: null },
+                ),
+            );
+            await expect(
+                service.createFromTemplate(ctx(), {
+                    name: "Rye",
+                    subdomain: "kiln",
+                }),
+            ).rejects.toMatchObject({
+                response: { details: { field: "subdomain" } },
+            });
+            expect(siteCreate).not.toHaveBeenCalled();
+        });
+
+        it("refuses an address kept for Saroh", async () => {
+            await expect(
+                service.createFromTemplate(ctx(), {
+                    name: "Rye",
+                    subdomain: "status",
+                }),
+            ).rejects.toMatchObject({
+                response: { message: "That address is kept for Saroh" },
+            });
+        });
     });
 
     it("creates a Site + Pages + DRAFT PageVersions + Sections in one org-scoped transaction from the real starter template", async () => {
@@ -280,6 +355,30 @@ describe("SitesService.getSite", () => {
             ).resolves.toMatchObject({ canEdit });
         },
     );
+
+    it("hands the editor a sanitized footer to draw, and the written one to edit", async () => {
+        const written =
+            '<p>Hill Road</p><script>alert(1)</script><img src=x onerror="alert(2)">';
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            pages: [],
+            footer: { format: "html", value: written },
+        });
+        (prisma.site.findMany as jest.Mock).mockResolvedValue([]);
+        const site = await service.getSite(ctx(), "site_1");
+        // What the settings screen edits is left as the merchant wrote it.
+        expect(site.footer?.value).toBe(written);
+        // What the canvas renders as markup is what publish would write.
+        expect(site.footerPreview?.value).toContain("<p>Hill Road</p>");
+        expect(site.footerPreview?.value).not.toMatch(/script|onerror/i);
+    });
+
+    it("has no footer preview when there is no footer", async () => {
+        siteFindFirst.mockResolvedValue({ id: "site_1", pages: [] });
+        (prisma.site.findMany as jest.Mock).mockResolvedValue([]);
+        const site = await service.getSite(ctx(), "site_1");
+        expect(site.footerPreview).toBeNull();
+    });
 
     it("returns 404 for a site in another org (cross-tenant read)", async () => {
         siteFindFirst.mockResolvedValue(null);

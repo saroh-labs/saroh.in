@@ -86,3 +86,20 @@ export function redactObject(value: unknown, depth = 0): unknown {
     }
     return value;
 }
+
+/**
+ * Public routes whose path carries a secret: the token IS the credential, so
+ * the path is logged with it replaced. Review links are stored only as a hash;
+ * a log line with the raw token would undo that. Preview links, the same.
+ */
+const TOKEN_PATHS = [
+    /^(\/public\/product-reviews\/)[^/?#]+/,
+    /^(\/public\/sites\/preview\/)[^/?#]+/,
+];
+
+export function redactUrl(url: string): string {
+    for (const pattern of TOKEN_PATHS) {
+        if (pattern.test(url)) return url.replace(pattern, "$1[token]");
+    }
+    return url;
+}

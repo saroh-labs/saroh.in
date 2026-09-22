@@ -115,7 +115,7 @@ function Row({
 }
 
 const Missing = () => (
-    <span className="text-muted-foreground/70">Nothing set yet</span>
+    <span className="text-muted-foreground">Nothing set yet</span>
 );
 
 export function SiteSettings({ site }: { site: SiteDetail }) {
@@ -305,7 +305,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                         // on every visit to this page.
                         exactDate(site.currentPublication.publishedAt)
                     ) : (
-                        <span className="text-muted-foreground/70">Never</span>
+                        <span className="text-muted-foreground">Never</span>
                     )}
                 </Row>
                 {/*
@@ -329,7 +329,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                             // the draft after a search title had changed.
                             `${describePendingChanges(site.pendingSectionChanges, site.pendingSiteChanges)} changed since the last publish`
                         ) : (
-                            <span className="text-muted-foreground/70">
+                            <span className="text-muted-foreground">
                                 Nothing — the live site matches your draft
                             </span>
                         )}

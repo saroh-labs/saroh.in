@@ -152,3 +152,77 @@ describe("saving a draft against the revision it was read at (#285)", () => {
         ).rejects.toBeInstanceOf(ConflictException);
     });
 });
+
+/**
+ * #275 / review of #328: a section stored before its contract tightened must
+ * not stop the rest of its page from saving — but nothing invalid may be
+ * ADDED by the same route.
+ */
+describe("a section the save does not change is not re-validated", () => {
+    /** A hero stored before `heading` was required. */
+    const LEGACY = {
+        key: "sec_legacy",
+        type: "hero",
+        contractVersion: 1,
+        content: { subheading: "Stored before headings were required" },
+    };
+
+    function storedDraft(...rows: (typeof LEGACY)[]) {
+        // The lookup reads the newest draft, then its sections.
+        db.section.findMany.mockResolvedValueOnce(rows);
+    }
+
+    it("saves the rest of the page with the stored section carried through", async () => {
+        storedDraft(LEGACY);
+        await service.replaceDraftSections(ctx, "site_1", "page_1", {
+            sections: [
+                { ...HERO, key: "sec_new" },
+                // Same content, keys in another order: jsonb reorders them.
+                { ...LEGACY, content: { ...LEGACY.content } },
+            ],
+            revision: 3,
+        });
+        const written = db.section.createMany.mock.calls[0][0].data;
+        expect(written.map((s: { key: string }) => s.key)).toEqual([
+            "sec_new",
+            "sec_legacy",
+        ]);
+        expect(written[1].content).toEqual(LEGACY.content);
+    });
+
+    it("still lets the stored section be hidden", async () => {
+        storedDraft(LEGACY);
+        await service.replaceDraftSections(ctx, "site_1", "page_1", {
+            sections: [{ ...LEGACY, hidden: true }],
+            revision: 3,
+        });
+        expect(db.section.createMany.mock.calls[0][0].data[0].hidden).toBe(
+            true,
+        );
+    });
+
+    it.each([
+        ["changed content", { ...LEGACY, content: { subheading: "Edited" } }],
+        ["a new key", { ...LEGACY, key: "sec_other" }],
+        ["no key", { ...LEGACY, key: undefined }],
+        ["another type", { ...LEGACY, type: "cta" }],
+    ])("still refuses an invalid section with %s", async (_label, section) => {
+        storedDraft(LEGACY);
+        await expect(
+            service.replaceDraftSections(ctx, "site_1", "page_1", {
+                sections: [section],
+                revision: 3,
+            }),
+        ).rejects.toThrow(/Section at index 0 is invalid/);
+        expect(db.section.createMany).not.toHaveBeenCalled();
+    });
+
+    it("does not read the stored draft when everything is valid", async () => {
+        await service.replaceDraftSections(ctx, "site_1", "page_1", {
+            sections: [HERO],
+            revision: 3,
+        });
+        // Only the read-back after the write, not a lookup before it.
+        expect(db.section.findMany).toHaveBeenCalledTimes(1);
+    });
+});

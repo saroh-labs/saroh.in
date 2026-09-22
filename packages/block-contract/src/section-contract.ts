@@ -353,6 +353,126 @@ const featuresV1 = z.object({
     items: z.array(featureItemSchema).min(1).max(12),
 });
 
+/**
+ * faq v1 — questions and their answers (#255).
+ *
+ * Pure content. Drawn as native `<details>` so each answer opens without
+ * JavaScript and with the keyboard, on a phone as on a desk. Answers are plain
+ * text: a merchant's line breaks are kept, and nothing here is authored HTML.
+ * Bounded like `features`; twenty questions is already a page of its own.
+ */
+const faqItemSchema = z.object({
+    question: z.string().trim().min(1).max(200),
+    answer: z.string().trim().min(1).max(2000),
+});
+
+const faqV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    heading: z.string().max(160).optional(),
+    intro: z.string().max(600).optional(),
+    items: z.array(faqItemSchema).min(1).max(20),
+});
+
+/**
+ * testimonials v1 — what customers said, and who said it (#255).
+ *
+ * Pure content, and attributed on purpose: a quote needs a name, because an
+ * unattributed one reads as invented. The role ("Regular since 2019", "Owner,
+ * Café Nero") is optional. No photo in v1, for the reason `features` has no
+ * icon: an added optional field is not breaking.
+ */
+const testimonialItemSchema = z.object({
+    quote: z.string().trim().min(1).max(600),
+    name: z.string().trim().min(1).max(120),
+    role: z.string().max(120).optional(),
+});
+
+const testimonialsV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    heading: z.string().max(160).optional(),
+    items: z.array(testimonialItemSchema).min(1).max(12),
+});
+
+/**
+ * contact v1 — how to reach the business and where to find it (#255).
+ *
+ * Every channel is optional, but a contact block with none of them has nothing
+ * to say, so at least one of address, phone, email or WhatsApp is required.
+ * Phone and WhatsApp use the same `phone` rule a call button does, and their
+ * links are built by `ctaHref`, so a number that works on a button works here.
+ *
+ * `hours` is free text rather than a weekly table: "Mon–Fri 9–6, Sat 10–2" is
+ * how a merchant already writes it, and a structured schedule is a bigger
+ * question than this block. `mapUrl` overrides the map link, which is otherwise
+ * a search for the address; it must be a web address, never a script.
+ */
+const mapUrl = z
+    .string()
+    .trim()
+    .url("Enter a full web address, starting with https://")
+    .refine(
+        (url) => /^https?:\/\//i.test(url) && isSafeHref(url),
+        "Enter a full web address, starting with https://",
+    );
+
+const contactV1 = z
+    .object({
+        variant,
+        padding: paddingOverride,
+        heading: z.string().max(160).optional(),
+        intro: z.string().max(600).optional(),
+        address: z.string().trim().max(500).optional(),
+        hours: z.string().trim().max(500).optional(),
+        phone: phone.optional(),
+        email: z.string().trim().email("Enter an email address").optional(),
+        whatsapp: phone.optional(),
+        mapUrl: mapUrl.optional(),
+    })
+    .refine(
+        // An empty string is not a channel, so this is a truthiness test.
+        (c) => [c.address, c.phone, c.email, c.whatsapp].some(Boolean),
+        {
+            message:
+                "Add at least one way to reach you: address, phone, email or WhatsApp",
+            path: ["address"],
+        },
+    );
+
+/**
+ * servicesList v1 — the merchant's real Services, read live (#255).
+ *
+ * The first block that shows module data. It stores only WHICH services and in
+ * what order; names, prices and durations are fetched when the page is viewed,
+ * so a changed price or a deleted service is right without a republish. What a
+ * visitor sees when the data is not there:
+ * - a service deleted or archived after publish: it is left out;
+ * - none left, or Appointments switched off: the block renders nothing, rather
+ *   than a heading over an empty list or a claim the business cannot keep;
+ * - the API unreachable: the block's own error state, with a retry.
+ * A price is never drawn as 0 when absent (`saroh-product.md`).
+ *
+ * `cta` is the usual button (#207), typically "Book now" pointing at the page
+ * with the booking block. Up to 24 services: past that it is a catalogue.
+ */
+const servicesListV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    heading: z.string().max(160).optional(),
+    intro: z.string().max(600).optional(),
+    serviceIds: z
+        .array(z.string().min(1))
+        .min(1, "Choose at least one service")
+        .max(24)
+        .refine(
+            (ids) => new Set(ids).size === ids.length,
+            "A service is listed twice",
+        ),
+    showPrices: z.boolean().optional(),
+    cta: ctaSchemaV2.optional(),
+});
+
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
 const enquiryFieldTypes = ["text", "email", "tel", "textarea"] as const;
 
@@ -446,6 +566,10 @@ export const SECTION_TYPES = [
     "enquiry",
     "booking",
     "features",
+    "faq",
+    "testimonials",
+    "contact",
+    "servicesList",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -527,6 +651,35 @@ const REGISTRY: Record<string, SectionContract> = {
         version: 1,
         // Plain text throughout — nothing here is authored HTML.
         schema: featuresV1,
+        sanitizedFields: [],
+    },
+    [key("faq", 1)]: {
+        type: "faq",
+        version: 1,
+        // Plain text throughout — answers keep line breaks, not markup.
+        schema: faqV1,
+        sanitizedFields: [],
+    },
+    [key("testimonials", 1)]: {
+        type: "testimonials",
+        version: 1,
+        // Plain text throughout — nothing here is authored HTML.
+        schema: testimonialsV1,
+        sanitizedFields: [],
+    },
+    [key("contact", 1)]: {
+        type: "contact",
+        version: 1,
+        // Plain text; its links are built from validated numbers, addresses
+        // and an http(s) map URL, never taken as authored hrefs.
+        schema: contactV1,
+        sanitizedFields: [],
+    },
+    [key("servicesList", 1)]: {
+        type: "servicesList",
+        version: 1,
+        // Ids, a flag and a button; the service text comes from the API live.
+        schema: servicesListV1,
         sanitizedFields: [],
     },
     [key("booking", 1)]: {

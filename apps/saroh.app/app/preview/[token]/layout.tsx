@@ -4,8 +4,8 @@ import { notFound } from "next/navigation";
 import { SiteTheme } from "@saroh/site-blocks";
 
 import { PreviewGone } from "@/components/preview-gone";
-import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { getPreviewByToken } from "@/lib/publication";
+import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 /**
  * A draft, shown to whoever holds the link (#198).
