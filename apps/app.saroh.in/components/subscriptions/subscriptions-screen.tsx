@@ -150,7 +150,9 @@ export function SubscriptionsScreen({
                 <span className="min-w-0">
                     <Link
                         href={`/contacts/${s.contact.id}`}
-                        className="block truncate text-[13.5px] font-medium underline-offset-4 hover:underline"
+                        // The padding, taken back by the margin, makes a
+                        // 28px target on a phone without moving the text.
+                        className="-my-1 block truncate py-1 text-[13.5px] font-medium underline-offset-4 hover:underline"
                     >
                         {s.contact.name}
                     </Link>
