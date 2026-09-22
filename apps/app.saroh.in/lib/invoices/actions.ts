@@ -8,10 +8,10 @@ import * as api from "./service";
 /** Thin: the API decides who may and what an invoice may become. */
 
 function refresh(id?: string) {
-    revalidatePath("/invoices");
-    if (id) revalidatePath(`/invoices/${id}`);
+    revalidatePath("/billing/invoices");
+    if (id) revalidatePath(`/billing/invoices/${id}`);
     // Subscriptions show what their invoices still owe.
-    revalidatePath("/subscriptions");
+    revalidatePath("/billing/subscriptions");
 }
 
 export async function createInvoice(input: InvoiceInput) {

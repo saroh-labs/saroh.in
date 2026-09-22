@@ -163,18 +163,18 @@ export function InvoiceForm({
         const id = saved.data.id;
         if (intent === "draft") {
             showSuccess("Saved as a draft");
-            router.push(`/invoices/${id}`);
+            router.push(`/billing/invoices/${id}`);
             return;
         }
         const issued = await issueInvoice(id);
         if (!issued.ok) {
             // The draft is saved; only issuing failed. Say which.
             showError(`Saved as a draft, but not issued: ${issued.error}`);
-            router.push(`/invoices/${id}`);
+            router.push(`/billing/invoices/${id}`);
             return;
         }
         showSuccess(`${issued.data.number ?? "Invoice"} issued`);
-        router.push(`/invoices/${id}`);
+        router.push(`/billing/invoices/${id}`);
     }
 
     function onInvalid(errs: FieldErrors<FormValues>) {

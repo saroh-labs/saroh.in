@@ -26,7 +26,7 @@ export default async function NewInvoicePage() {
                     breadcrumb={[
                         <Link
                             key="invoices"
-                            href="/invoices"
+                            href="/billing/invoices"
                             className="hover:text-foreground"
                         >
                             Invoices
@@ -36,7 +36,9 @@ export default async function NewInvoicePage() {
                     title="New invoice"
                     actions={
                         <Button variant="outline" asChild>
-                            <Link href="/invoices">Back to invoices</Link>
+                            <Link href="/billing/invoices">
+                                Back to invoices
+                            </Link>
                         </Button>
                     }
                 />

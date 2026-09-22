@@ -70,7 +70,7 @@ export default async function InvoicePage({
                     breadcrumb={[
                         <Link
                             key="invoices"
-                            href="/invoices"
+                            href="/billing/invoices"
                             className="hover:text-foreground"
                         >
                             Invoices
@@ -90,7 +90,9 @@ export default async function InvoicePage({
                     }
                     actions={
                         <Button variant="outline" asChild>
-                            <Link href="/invoices">Back to invoices</Link>
+                            <Link href="/billing/invoices">
+                                Back to invoices
+                            </Link>
                         </Button>
                     }
                 />
@@ -360,7 +362,7 @@ function StatusNote({ invoice }: { invoice: Invoice }) {
                     <>
                         {" "}
                         <Link
-                            href={`/invoices/${invoice.reissuedAsId}`}
+                            href={`/billing/invoices/${invoice.reissuedAsId}`}
                             className="font-medium text-foreground underline underline-offset-4"
                         >
                             Open the invoice that replaced it
@@ -400,7 +402,7 @@ function StatusNote({ invoice }: { invoice: Invoice }) {
                     <>
                         This draft replaces a voided invoice.{" "}
                         <Link
-                            href={`/invoices/${invoice.reissuedFromId}`}
+                            href={`/billing/invoices/${invoice.reissuedFromId}`}
                             className="font-medium text-foreground underline underline-offset-4"
                         >
                             Open the voided one
