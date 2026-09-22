@@ -8,6 +8,12 @@ studio or a shop: one login instead of four tools. It is **source-available**,
 so you can use, modify and self-host it, including to run your own business
 ([licence](#licence)).
 
+> **Where it stands:** early, and built in the open. The hosted service is not
+> open yet — [join the waitlist at saroh.in](https://saroh.in). The whole
+> product runs on your machine today; running your own copy for real use works
+> but has no step-by-step guide yet
+> ([what it takes](setup-instructions.md#running-your-own-copy)).
+
 ## What it does
 
 A business turns on the parts it needs. Each part is a module that can be
@@ -21,10 +27,27 @@ switched on or off.
 | **Sell**             | Catalogue, storefront, orders, customers, discounts and CSV import                                                                                        |
 | **Contacts & leads** | Everyone the business knows, plus leads, a pipeline and follow-ups                                                                                        |
 | **Billing**          | Plans, subscriptions that renew on their own, and invoices, paid by hand or through a pay link on the business's own payment provider                     |
+| **Insights**         | Site views, enquiries and sales over the last 7, 30 or 90 days                                                                                            |
 | **Team**             | Owners, admins, members and reviewers. Each role sees only what it may use                                                                                |
 
-Admin tooling, sales and social are specified but not built yet; the
+Messaging (with each contact's consent, over the business's own providers) and
+automations exist in the API but have no workspace screens yet. Platform staff
+have an admin app for feature flags and the audit log. The
 [roadmap](docs/architecture/PRODUCT_ROADMAP.md) tracks what is next.
+
+## Try it
+
+```bash
+pnpm install && cp .env.example .env        # fill in DATABASE_URL and BETTER_AUTH_SECRET
+npm install -g portless && portless service install --wildcard   # once per machine
+pnpm --filter @saroh/database build && pnpm --filter @saroh/database db:migrate:deploy
+pnpm --filter @saroh/database db:seed:showcase && pnpm dev:app
+```
+
+Open https://app.saroh.localhost and sign in as `demo@saroh.dev` /
+`demo-password-123`. The showcase gives that login a gym, a yoga studio, a
+clinic and a shop to look around. Every step is explained in
+[setup-instructions.md](setup-instructions.md).
 
 ## How it is built
 

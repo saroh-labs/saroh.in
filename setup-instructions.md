@@ -122,6 +122,28 @@ pnpm run check:routes && pnpm run check:blocks && pnpm run check:cycles
 `TEST_DATABASE_URL` must point at a throwaway database whose name contains
 `test`. Contribution terms are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Running your own copy
+
+There is no step-by-step self-hosting guide yet. What it takes:
+
+- **PostgreSQL**, with migrations applied by
+  `pnpm --filter @saroh/database db:migrate:deploy` before a new API version
+  serves traffic — and a backup first.
+- **The API** as a container: from the repository root,
+  `docker build -f apps/api.saroh.in/Dockerfile -t saroh-api .`. It reports
+  readiness at `/health/ready`.
+- **The Next.js apps** on any Node host (Saroh's own run on Vercel). At least
+  `accounts`, `app` and `saroh.app` for a working business; the rest are
+  optional.
+- **The environment** for each, listed with what happens when a value is unset
+  in [`ENVIRONMENT.md`](docs/architecture/ENVIRONMENT.md). Sessions are one
+  cookie shared across subdomains, so the API, `accounts` and every signed-in
+  app must sit under one parent domain. Merchant sites (`saroh.app`) sit on
+  their own domain, reading the API server-to-server.
+
+How Saroh's own API ships is in
+[`devops-tooling-and-deploy.md`](docs/patterns/devops-tooling-and-deploy.md).
+
 ## When something goes wrong
 
 [`DEV_LEARNINGS.md`](docs/architecture/DEV_LEARNINGS.md) records the non-obvious
