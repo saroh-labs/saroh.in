@@ -8,6 +8,7 @@ const base = {
     leads: 0,
     subscriptions: 0,
     packs: 0,
+    courses: 0,
     bookingsCancelled: 0,
 };
 
@@ -37,10 +38,11 @@ describe("deletedLine", () => {
             deletedLine("Asha Rao", {
                 ...base,
                 packs: 1,
+                courses: 1,
                 bookingsCancelled: 2,
             }),
         ).toBe(
-            "Asha Rao deleted, with 1 class pack. 2 bookings paid with a pack were cancelled",
+            "Asha Rao deleted, with 1 class pack and 1 course. 2 bookings still to come were cancelled",
         );
     });
 });

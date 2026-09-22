@@ -15,6 +15,7 @@ import { ClassPacksModule } from "./modules/class-packs/class-packs.module";
 import { CommunicationsModule } from "./modules/communications/communications.module";
 import { ContactsModule } from "./modules/contacts/contacts.module";
 import { ContentModule } from "./modules/content/content.module";
+import { CoursesModule } from "./modules/courses/courses.module";
 import { CustomerWorkspaceModule } from "./modules/customer-workspace/customer-workspace.module";
 import { CustomersModule } from "./modules/customers/customers.module";
 import { DiscountsModule } from "./modules/discounts/discounts.module";
@@ -100,6 +101,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         InvoicesModule,
         SubscriptionsModule,
         ClassPacksModule,
+        CoursesModule,
         ProductReviewsModule,
         EnquiryModule,
         ContactsModule,

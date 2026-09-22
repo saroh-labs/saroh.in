@@ -23,6 +23,7 @@ import type {
     Slot,
 } from "./availability";
 import { availableSlots, isValidSlotStart } from "./availability";
+import { courseSeatIntervals, courseSeatsHeld } from "./course-seats";
 import type {
     AvailabilityRuleDto,
     BookingOutcome,
@@ -217,7 +218,26 @@ export class BookingsService {
         if (dto.bufferAfterMinutes !== undefined) {
             data.bufferAfterMinutes = dto.bufferAfterMinutes;
         }
-        if (dto.capacity !== undefined) data.capacity = dto.capacity;
+        if (dto.capacity !== undefined) {
+            // A course promises its seats on this service (ADR-007).
+            if (dto.capacity < service.capacity) {
+                const widest = await prisma.course.findFirst({
+                    where: {
+                        serviceId: service.id,
+                        status: { not: "ARCHIVED" },
+                        seats: { gt: dto.capacity },
+                    },
+                    orderBy: { seats: "desc" },
+                    select: { name: true, seats: true },
+                });
+                if (widest) {
+                    throw new ConflictException(
+                        `${widest.name} has ${widest.seats} seats on this service. Lower its seats first, or keep the capacity at ${widest.seats} or more.`,
+                    );
+                }
+            }
+            data.capacity = dto.capacity;
+        }
         if (dto.priceCents !== undefined) data.priceCents = dto.priceCents;
         if (dto.currency !== undefined) data.currency = dto.currency;
         if (dto.timezone !== undefined) data.timezone = dto.timezone;
@@ -363,13 +383,13 @@ export class BookingsService {
         const rules = await prisma.availabilityRule.findMany({
             where: { serviceId },
         });
-        const confirmed = await this.confirmedOverlapping(serviceId, from, to);
+        const busy = await this.busyOverlapping(serviceId, from, to);
         return availableSlots(
             this.toAvailabilityService(service),
             rules,
             from,
             to,
-            confirmed,
+            busy,
         );
     }
 
@@ -386,13 +406,13 @@ export class BookingsService {
     ): Promise<Slot[]> {
         const { service, rules } = await this.loadBookableService(serviceId);
         const { from, to } = this.parseRange(fromISO, toISO);
-        const confirmed = await this.confirmedOverlapping(serviceId, from, to);
+        const busy = await this.busyOverlapping(serviceId, from, to);
         return availableSlots(
             this.toAvailabilityService(service),
             rules,
             from,
             to,
-            confirmed,
+            busy,
         );
     }
 
@@ -650,6 +670,12 @@ export class BookingsService {
                 "This booking was cancelled. Book a new time instead of moving it.",
             );
         }
+        if (booking.courseEnrollmentId) {
+            // A course's sessions move together, for everyone on it.
+            throw new ConflictException(
+                "This is a course session. Change the course's sessions instead of moving one booking.",
+            );
+        }
 
         const startAt = new Date(input.startAt);
         if (Number.isNaN(startAt.getTime())) {
@@ -701,7 +727,13 @@ export class BookingsService {
                             id: { not: booking.id },
                         },
                     });
-                    if (taken >= service.capacity) {
+                    const held = await courseSeatsHeld(
+                        tx,
+                        service.id,
+                        startAt,
+                        endAt,
+                    );
+                    if (taken + held >= service.capacity) {
                         throw new ConflictException(
                             "That slot is fully booked",
                         );
@@ -1102,6 +1134,7 @@ export class BookingsService {
         endAt: Date,
         input: BookInput,
         by: ReserveBy,
+        course?: { courseId: string; enrollmentId: string },
     ): Promise<Booking> {
         const serviceId = service.id;
         const organizationId = service.organizationId;
@@ -1117,7 +1150,17 @@ export class BookingsService {
                 endAt: { gt: startAt },
             },
         });
-        if (confirmed >= service.capacity) {
+        // Seats an open course still holds count as taken (ADR-007) — other
+        // courses' seats, for a course's own booking: its unsold seats are
+        // the ones it is filling.
+        const held = await courseSeatsHeld(
+            tx,
+            serviceId,
+            startAt,
+            endAt,
+            course?.courseId,
+        );
+        if (confirmed + held >= service.capacity) {
             throw new ConflictException("This slot is fully booked");
         }
 
@@ -1150,6 +1193,7 @@ export class BookingsService {
                 bookerEmail: email,
                 bookerPhone: input.bookerPhone ?? null,
                 idempotencyKey: input.idempotencyKey ?? null,
+                courseEnrollmentId: course?.enrollmentId ?? null,
             },
         });
 
@@ -1166,6 +1210,10 @@ export class BookingsService {
             },
             select: { id: true },
         });
+
+        // A course session's booking is not notified: nothing sends these yet,
+        // and one enrolment would queue a dead letter per session (ADR-007).
+        if (course) return booking;
 
         // Transactional outbox: a committed booking always has a queued
         // notification job. The handler never landed: the worker dead-letters
@@ -1214,6 +1262,22 @@ export class BookingsService {
         }
         const { availabilityRules, ...rest } = service;
         return { service: rest, rules: availabilityRules };
+    }
+
+    /**
+     * What fills a service's time over `[from, to)`: its confirmed bookings,
+     * and the seats open courses still hold on their sessions (ADR-007).
+     */
+    private async busyOverlapping(
+        serviceId: string,
+        from: Date,
+        to: Date,
+    ): Promise<Interval[]> {
+        const [confirmed, held] = await Promise.all([
+            this.confirmedOverlapping(serviceId, from, to),
+            courseSeatIntervals(prisma, serviceId, from, to),
+        ]);
+        return [...confirmed, ...held];
     }
 
     /** Confirmed bookings overlapping `[from, to)` for a service (for capacity checks). */

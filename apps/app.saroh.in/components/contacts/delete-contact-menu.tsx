@@ -29,7 +29,7 @@ export function DeleteContactMenu({
             name={name}
             verb="Delete contact"
             title={`Delete ${name}?`}
-            description={`${leads}Any subscription or class pack they hold ends, and future bookings paid with a pack are cancelled. Other bookings, invoices, form entries and messages stay on record under the name they gave, and a shop customer with the same email is kept. This cannot be undone.`}
+            description={`${leads}Any subscription, class pack or course seat they hold ends, and their bookings paid with a pack or for a course are cancelled. Other bookings, invoices, form entries and messages stay on record under the name they gave, and a shop customer with the same email is kept. This cannot be undone.`}
             onDelete={() => deleteContact(contactId)}
             done={(data) => deletedLine(name, data)}
             then="/contacts"

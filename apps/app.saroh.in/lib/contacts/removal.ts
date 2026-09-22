@@ -11,6 +11,7 @@ export function deletedLine(name: string, data: ContactRemoval): string {
             ? count(data.subscriptions, "subscription", "subscriptions")
             : null,
         data.packs > 0 ? count(data.packs, "class pack", "class packs") : null,
+        data.courses > 0 ? count(data.courses, "course", "courses") : null,
     ].filter(Boolean);
     const withWhat =
         went.length === 0
@@ -18,7 +19,7 @@ export function deletedLine(name: string, data: ContactRemoval): string {
             : `, with ${went.length === 1 ? went[0] : `${went.slice(0, -1).join(", ")} and ${went.at(-1)}`}`;
     const cancelled =
         data.bookingsCancelled > 0
-            ? `. ${count(data.bookingsCancelled, "booking", "bookings")} paid with a pack ${data.bookingsCancelled === 1 ? "was" : "were"} cancelled`
+            ? `. ${count(data.bookingsCancelled, "booking", "bookings")} still to come ${data.bookingsCancelled === 1 ? "was" : "were"} cancelled`
             : "";
     return `${name} deleted${withWhat}${cancelled}`;
 }

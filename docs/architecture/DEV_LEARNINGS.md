@@ -415,3 +415,19 @@ off by default, so no test or environment ever showed it.
 Prisma call, carry every argument through, not just the one you are adding
 to.
 **Category**: database · `packages/database/src/rls-proxy.ts`
+
+## Database — deleting a contact on a course was refused (ADR-007, U7)
+
+**Problem**: Deleting a contact enrolled on a course failed with a foreign key
+error on `Booking_courseEnrollmentId_fkey`, though that key is
+`ON DELETE SET NULL`.
+**Root cause**: A booking points at both the contact (SET NULL) and the
+enrolment (SET NULL), and the enrolment cascades from the contact. In one
+delete, Postgres cleared the booking's `contactId` while the enrolment was
+already gone but the booking's own `courseEnrollmentId` had not been cleared
+yet. That update re-checked the enrolment key and failed the whole delete.
+**Fix**: `ContactsService.remove` deletes the person's enrolments on their
+own first, which clears the bookings' link, then deletes the contact. When
+a row references two parents that cascade from each other, clear the inner
+one first.
+**Category**: database · `apps/api.saroh.in/src/modules/contacts/contacts.service.ts`

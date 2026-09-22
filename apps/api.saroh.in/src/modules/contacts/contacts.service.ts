@@ -84,7 +84,9 @@ export interface ContactRemoval {
     subscriptions: number;
     /** Unexpired class packs that went. */
     packs: number;
-    /** Future bookings paid with those packs, now cancelled. */
+    /** Courses they were on. */
+    courses: number;
+    /** Future bookings paid with those packs, and course sessions to come, now cancelled. */
     bookingsCancelled: number;
 }
 
@@ -445,11 +447,12 @@ export class ContactsService {
      * each only loses the link (SetNull in the schema). A shop customer with
      * the same email is a separate record and is untouched.
      *
-     * What they hold goes too (ADR-007): their subscriptions stop and their
-     * class packs go with their balances. A future booking paid for with one
-     * of those packs is cancelled in the same transaction — it was paid with
-     * credit that no longer exists. Invoices stay, under the name and email
-     * they were issued to.
+     * What they hold goes too (ADR-007): their subscriptions stop, their
+     * class packs go with their balances, and their course seats go. Their
+     * future bookings paid with one of those packs, and their course sessions
+     * still to come, are cancelled in the same transaction — the seat or the
+     * credit behind them no longer exists. Invoices stay, under the name and
+     * email they were issued to.
      *
      * Returns how much went, so the workspace can say so.
      */
@@ -468,15 +471,23 @@ export class ContactsService {
             const packs = await tx.packPurchase.count({
                 where: { contactId, expiresAt: { gt: now } },
             });
+            const courses = await tx.courseEnrollment.count({
+                where: { contactId, status: "ACTIVE" },
+            });
             const paidWithPack = await tx.booking.findMany({
                 where: {
                     organizationId: ctx.organizationId,
                     status: "CONFIRMED",
                     startAt: { gt: now },
-                    packRedemption: {
-                        reversedAt: null,
-                        purchase: { contactId },
-                    },
+                    OR: [
+                        {
+                            packRedemption: {
+                                reversedAt: null,
+                                purchase: { contactId },
+                            },
+                        },
+                        { courseEnrollment: { contactId, status: "ACTIVE" } },
+                    ],
                 },
                 select: { id: true, startAt: true },
             });
@@ -495,6 +506,11 @@ export class ContactsService {
                     })),
                 });
             }
+            // Enrolments first, on their own: a booking points at both the
+            // contact and an enrolment, and in one cascade Postgres clears
+            // the booking's contact while its enrolment is already gone,
+            // re-checks that key, and refuses the whole delete.
+            await tx.courseEnrollment.deleteMany({ where: { contactId } });
             await tx.contact.delete({ where: { id: contactId } });
             return {
                 id: contactId,
@@ -502,6 +518,7 @@ export class ContactsService {
                 leads,
                 subscriptions,
                 packs,
+                courses,
                 bookingsCancelled: paidWithPack.length,
             };
         });
