@@ -28,12 +28,12 @@ what the API allows.
 `OrgRole` has four values (`common/types/organization-context.ts`), and
 `organization-policy.ts` maps each to a closed set of actions.
 
-| Role       | What it may do                                                                                          |
-| ---------- | ------------------------------------------------------------------------------------------------------- |
-| `OWNER`    | Everything, including `org:delete`.                                                                     |
-| `ADMIN`    | Everything except `org:delete`.                                                                         |
-| `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`. |
-| `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                     |
+| Role       | What it may do                                                                                                                                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `OWNER`    | Everything, including `org:delete`.                                                                                                                                                                                |
+| `ADMIN`    | Everything except `org:delete`.                                                                                                                                                                                    |
+| `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`, and the diary — `booking:read`, `service:read`, `contact:read` (DEC-020). No leads, no pipeline, no money. |
+| `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                                                                                                                                |
 
 - **Current** — **REVIEWER is enumerated, never derived** (#276). The read-only
   floor includes the roster, the stores and the media library; a reviewer is an

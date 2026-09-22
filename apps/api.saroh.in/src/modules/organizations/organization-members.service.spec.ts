@@ -523,6 +523,9 @@ describe("invented roles on the roster", () => {
             "site:read",
             "media:read",
             "module:read",
+            "booking:read",
+            "service:read",
+            "contact:read",
         ]);
         await service.updateRole(lead, "user_x", { role: "stock-clerk" });
         expect(db.membership.update.mock.calls[0][0].data).toEqual({

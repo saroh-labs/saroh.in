@@ -221,13 +221,13 @@ describe("SearchService", () => {
 
     it("reads nothing a MEMBER could not read from the list screens", async () => {
         // The whole point of gating per entity: a palette is a read surface like
-        // any other, and must not be the one place a role sees more.
+        // any other, and must not be the one place a role sees more. A Member
+        // reads contacts (the diary's people), never leads or orders.
         const service = new SearchService();
 
-        const result = await service.search(ctx({ role: "MEMBER" }), "ananya");
+        await service.search(ctx({ role: "MEMBER" }), "ananya");
 
-        expect(result.hits).toEqual([]);
-        expect(contactFindMany).not.toHaveBeenCalled();
+        expect(contactFindMany).toHaveBeenCalled();
         expect(leadFindMany).not.toHaveBeenCalled();
         expect(orderFindMany).not.toHaveBeenCalled();
     });

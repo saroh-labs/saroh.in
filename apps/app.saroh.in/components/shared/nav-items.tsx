@@ -64,6 +64,14 @@ export type NavAction =
     // every storefront. Not in the read-only floor, so a Member or Reviewer
     // is not offered a row the API would refuse them.
     | "order:read"
+    // Leads and the pipeline (Owner and Admin by default; a Member reads
+    // contacts, not the sales funnel).
+    | "lead:read"
+    | "pipeline:read"
+    // The diary and the people on it: a Member holds these (DEC-020).
+    | "contact:read"
+    | "booking:read"
+    | "service:read"
     // Sell → Discounts. Owner and Admin by default; money off is money.
     | "discount:read"
     // Products, Customers and Storefronts read storefront data. In the Member
@@ -116,6 +124,8 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "subscription:write",
         "course:write",
         "pack:write",
+        "lead:read",
+        "pipeline:read",
     ],
     ADMIN: [
         "site:read",
@@ -137,8 +147,18 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "subscription:write",
         "course:write",
         "pack:write",
+        "lead:read",
+        "pipeline:read",
     ],
-    MEMBER: ["site:read", "member:read", "module:read", "store:read"],
+    MEMBER: [
+        "site:read",
+        "member:read",
+        "module:read",
+        "store:read",
+        "contact:read",
+        "booking:read",
+        "service:read",
+    ],
     REVIEWER: ["site:read"],
 };
 
@@ -429,17 +449,22 @@ export const NAV_GROUPS: NavGroup[] = [
                 icon: Users,
                 moduleKey: "CRM",
             },
+            // Contacts is reached with the CRM module (`contact:read`, which a
+            // Member holds); leads and the pipeline need `lead:read` and
+            // `pipeline:read`, which a Member does not.
             {
                 href: "/leads",
                 label: "Leads",
                 icon: Target,
                 moduleKey: "CRM",
+                action: "lead:read",
             },
             {
                 href: "/pipeline",
                 label: "Pipeline",
                 icon: KanbanSquare,
                 moduleKey: "CRM",
+                action: "pipeline:read",
             },
         ],
     },

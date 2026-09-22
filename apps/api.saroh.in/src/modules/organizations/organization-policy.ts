@@ -56,8 +56,9 @@ import { ORG_ACTIONS } from "./organization-actions";
  *
  *  - `form:*` / `contact:*` / `lead:*` / `pipeline:*` / `activity:*`
  *                — the enquiry funnel + CRM (Stage 3 — S3-001). ALL are
- *                OWNER/ADMIN-only: none are in READ_ONLY_ACTIONS, so a MEMBER
- *                cannot read contacts, leads, or the pipeline. This is the
+ *                OWNER/ADMIN-only except `contact:read`, which the floor
+ *                gained with the diary (a Member sees who is booked); a
+ *                MEMBER still cannot read leads or the pipeline. This is the
  *                least-privilege default — CRM rows are customer PII and sales
  *                data (the same reasoning as `audit:read`). Note: the PUBLIC
  *                enquiry submission (S3-002) is UNAUTHENTICATED and org-agnostic
@@ -90,6 +91,13 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
     // Every role may read effective module availability (ADR-003); managing
     // modules requires the separate OWNER/ADMIN `module:manage` action.
     "module:read",
+    // The diary and who is on it (DEC-019 follow-up, 2026-09-22): a
+    // receptionist or a doctor on the team sees the appointments, the
+    // services they are for, and the people booked — without leads,
+    // pipeline or anything to do with money.
+    "booking:read",
+    "service:read",
+    "contact:read",
 ];
 
 /**
@@ -106,8 +114,9 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
  *             role→action capability. It IS enforced now: `assertNotLastOwner`
  *             in `organization-members.service.ts` (#276), inside a
  *             serializable transaction.)
- *  - MEMBER — read-only: can see the org, its roster, and its stores, but
- *             mutates nothing.
+ *  - MEMBER — read-only: can see the org, its roster, its stores, and the
+ *             diary (bookings, services, contacts), but mutates nothing and
+ *             sees no money.
  *  - REVIEWER — website only, and narrower than MEMBER rather than beneath it.
  *             Its three actions are enumerated in CAPABILITIES below, and
  *             `SiteReviewer` narrows them to named sites (#276).

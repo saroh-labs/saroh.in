@@ -165,7 +165,8 @@ test("a denied module explains access instead of saying it is off", async ({
     page,
     context,
 }) => {
-    await scenario(context, "MEMBER");
+    // A Reviewer: a Member reads contacts since DEC-020.
+    await scenario(context, "REVIEWER");
     await page.goto("/contacts");
     await expect(
         page.getByRole("heading", {

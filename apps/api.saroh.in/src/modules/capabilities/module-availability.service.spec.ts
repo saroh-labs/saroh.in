@@ -89,11 +89,11 @@ describe("ModuleAvailabilityService", () => {
     });
 
     it("blocks UNAUTHORIZED first and never queries readiness", async () => {
-        // MEMBER lacks CRM's requiredAction (lead:read).
-        const { service, readiness } = build({ role: "MEMBER" });
+        // A REVIEWER lacks CRM's requiredAction (contact:read).
+        const { service, readiness } = build({ role: "REVIEWER" });
         const r = await service.evaluate({
             ...base,
-            organizationRole: "MEMBER",
+            organizationRole: "REVIEWER",
         });
         expect(r.authorized).toBe(false);
         expect(r.readiness).toBe("DISABLED");

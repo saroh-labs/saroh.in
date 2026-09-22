@@ -111,10 +111,10 @@ describe("ContactsService.list", () => {
         });
     });
 
-    it("denies a MEMBER (contact:read is OWNER/ADMIN-only) before any I/O", async () => {
+    it("denies a REVIEWER (website only) before any I/O", async () => {
         const service = new ContactsService();
         await expect(
-            service.list(ctx({ role: "MEMBER" })),
+            service.list(ctx({ role: "REVIEWER" })),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(findMany).not.toHaveBeenCalled();
     });
