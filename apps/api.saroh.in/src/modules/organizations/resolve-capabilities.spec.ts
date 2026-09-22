@@ -37,6 +37,24 @@ describe("resolveCapabilities", () => {
         expect([...set]).toEqual(["order:read"]);
     });
 
+    it("does not hand a stored role powers added after it was saved", () => {
+        // A business that invented "front desk" before invoices existed
+        // granted it what it could see then. New powers reach the built-in
+        // roles; an invented one gains them only when someone ticks them.
+        const set = resolveCapabilities("front-desk", [
+            "booking:read",
+            "booking:write",
+        ]);
+        for (const action of [
+            "subscription:read",
+            "invoice:write",
+            "course:write",
+            "pack:write",
+        ] as const) {
+            expect(set.has(action)).toBe(false);
+        }
+    });
+
     it("lets a role grant nothing", () => {
         // A half-built role is not an invalid one.
         expect(resolveCapabilities("draft", []).size).toBe(0);

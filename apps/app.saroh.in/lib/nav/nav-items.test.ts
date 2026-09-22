@@ -122,6 +122,22 @@ describe("navRoleCan", () => {
         expect(navRoleCan("REVIEWER", "section:write")).toBe(false);
     });
 
+    it("offers memberships, invoices, courses and packs to owners and admins only", () => {
+        // ADR-007: who owes what is not in the Member floor, and a Reviewer
+        // checks a website, not the books.
+        for (const action of [
+            "subscription:read",
+            "invoice:read",
+            "course:read",
+            "pack:read",
+        ] as const) {
+            expect(navRoleCan("OWNER", action)).toBe(true);
+            expect(navRoleCan("ADMIN", action)).toBe(true);
+            expect(navRoleCan("MEMBER", action)).toBe(false);
+            expect(navRoleCan("REVIEWER", action)).toBe(false);
+        }
+    });
+
     it("fails open when the role is not known", () => {
         // A chrome that empties itself because one read failed is worse than
         // one that offers a destination the server then refuses — the same
