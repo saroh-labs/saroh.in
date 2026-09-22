@@ -29,7 +29,7 @@ export default async function StorefrontDetailsPage({
         <PageContainer width="form">
             <PageHeader
                 breadcrumb={sellCrumbs(
-                    { label: "Storefronts", href: "/commerce/storefronts" },
+                    { label: "Storefront", href: "/commerce/storefronts" },
                     { label: store.name, href: storefrontHref(store.id) },
                     "Details",
                 )}

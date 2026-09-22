@@ -25,6 +25,7 @@ import { addressProblem } from "./site-address";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { parsePostsPrefix } from "../content/posts-prefix";
+import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
 import { allows, authorize } from "../organizations/organization-policy";
 import type {
     CreateApprovalDto,
@@ -549,12 +550,21 @@ export class SitesService {
     ): Promise<CreatedSite> {
         authorize(ctx, "site:create");
 
-        // Enforce the subscription's `sites` cap (S7-005). Count the org's live
-        // sites (soft-deleted excluded) and let the EntitlementService throw a
-        // 403 when the org is already at its plan limit. FREE default is 1.
+        // Two caps on the org's live sites (soft-deleted excluded). The
+        // product's comes first (ADR-006): one website per business for now,
+        // whatever the plan says, and upgrading would not help — so it is a
+        // 409 in plain words, not "upgrade to add more". Then the
+        // subscription's `sites` entitlement (S7-005), a 403 at the plan
+        // limit. The lower of the two wins.
         const siteCount = await prisma.site.count({
             where: { organizationId: ctx.organizationId, deletedAt: null },
         });
+        if (siteCount >= MAX_WEBSITES_PER_BUSINESS) {
+            throw new ConflictException({
+                message:
+                    "This business already has its website. Change its pages, look and address from Website.",
+            });
+        }
         await this.entitlements.check(ctx.organizationId, "sites", siteCount);
 
         const templateId = dto.templateId ?? STARTER_TEMPLATE_ID;

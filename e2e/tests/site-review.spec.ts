@@ -49,10 +49,10 @@ test.describe("a reviewer", () => {
     test("sees only the site they were invited to", async ({ page }) => {
         await openTheReviewedSite(page);
 
-        // The seed builds three sites and grants this reviewer one. A reviewer
-        // who could see the other two would be a MEMBER with extra powers — and
-        // the Website screen would offer a picker to move between them. With
-        // one site and no right to make another, there is nothing to pick.
+        // The reviewer is granted the business's site. With one site and no
+        // right to make another, there is nothing to pick. That a reviewer
+        // sees only the sites they were granted, when a business has several,
+        // is `reviewer-scope.spec.ts` in the API.
         await expect(
             page.getByRole("heading", { name: REVIEWED_SITE, exact: true }),
         ).toBeVisible();
@@ -205,22 +205,13 @@ test.describe("a shared preview link", () => {
         context,
     }) => {
         await signIn(page, demoUser);
-        // Website opens on a site; the picker chooses which, and the Pages
+        // Website opens on the business's one site (ADR-006), and the Pages
         // tab's action opens it in the editor.
         await page.goto(`${urls.APP_URL}/sites`);
         await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
-        await page
-            .getByRole("button", { name: /^Website: .*Change it\.$/ })
-            .click();
-        await page
-            .getByRole("menuitem", { name: new RegExp(REVIEWED_SITE) })
-            .click();
-        await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
-        await expect(
-            page.getByRole("button", {
-                name: new RegExp(`^Website: ${REVIEWED_SITE}`),
-            }),
-        ).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByRole("main")).toContainText(REVIEWED_SITE, {
+            timeout: 30_000,
+        });
         await page.getByRole("link", { name: "Open editor" }).click();
         await page.waitForURL(/\/sites\/[^/]+$/, { timeout: 30_000 });
 
