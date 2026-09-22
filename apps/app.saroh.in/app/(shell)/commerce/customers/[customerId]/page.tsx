@@ -15,7 +15,7 @@ import type { OrderStanding } from "@/lib/orders/business-service";
 import { listBusinessOrders } from "@/lib/orders/business-service";
 import { requireSession } from "@/lib/session";
 import type { Store } from "@/lib/stores/service";
-import { listStores } from "@/lib/stores/service";
+import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Customer" };
 
@@ -48,7 +48,7 @@ export default async function CustomerPage({
     const [{ customerId }, { storefront }, stores] = await Promise.all([
         params,
         searchParams,
-        listStores(),
+        listBusinessStores(),
     ]);
     const found = await findCustomer(stores, customerId, storefront);
     if (!found) notFound();

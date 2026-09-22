@@ -27,8 +27,7 @@ export interface Invitation {
 }
 
 export type MemberResult<T = { ok: true }> =
-    | { ok: true; data: T }
-    | { ok: false; error: string; field?: "email" };
+    { ok: true; data: T } | { ok: false; error: string; field?: "email" };
 
 /**
  * GET a store membership collection, treating a 403/404 as "nothing to show"

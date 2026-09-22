@@ -1,3 +1,4 @@
+import { newStorefrontHref } from "@/lib/stores/links";
 import { EmptyState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronRight, Store as StoreIcon } from "lucide-react";
@@ -52,7 +53,7 @@ export function StorefrontChooser({
                     description="Everything you sell is sold at a storefront, so the first one comes first."
                     action={
                         <Link
-                            href="/stores/new"
+                            href={newStorefrontHref}
                             className="font-medium underline-offset-4 hover:underline"
                         >
                             Make a storefront

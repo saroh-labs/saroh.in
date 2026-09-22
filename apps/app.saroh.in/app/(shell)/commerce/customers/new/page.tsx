@@ -6,7 +6,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { CustomerForm } from "@/components/stores/customer-form";
 import { newCustomerHref } from "@/lib/customers/links";
 import { requireSession } from "@/lib/session";
-import { listStores } from "@/lib/stores/service";
+import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Add customer" };
 
@@ -22,7 +22,7 @@ export default async function NewCustomerPage({
     await requireSession();
     const [{ storefront }, stores] = await Promise.all([
         searchParams,
-        listStores(),
+        listBusinessStores(),
     ]);
     const store =
         stores.find((s) => s.id === storefront) ??

@@ -11,7 +11,7 @@ import {
 import type { ProductListItem } from "@/lib/products/service";
 import { listProducts } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
-import { listStores } from "@/lib/stores/service";
+import { listBusinessStores } from "@/lib/stores/service";
 import { viewParam } from "@/lib/views/search-params";
 
 /**
@@ -32,7 +32,7 @@ export default async function CataloguePage({
 }) {
     await requireSession();
     const [stores, query, organization] = await Promise.all([
-        listStores(),
+        listBusinessStores(),
         searchParams,
         resolveActiveOrganization(),
     ]);

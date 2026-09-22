@@ -13,6 +13,7 @@ import {
 } from "@/components/stores/order-payments";
 import { OrderReviews } from "@/components/stores/order-reviews";
 import { RefundButton } from "@/components/stores/refund-button";
+import { customerHref } from "@/lib/customers/links";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { OrderStanding } from "@/lib/orders/lifecycle";
 import {
@@ -28,7 +29,7 @@ import { getOrderPayments } from "@/lib/payments/service";
 import { invitationState } from "@/lib/product-reviews/service";
 import { requireSession } from "@/lib/session";
 import type { Store } from "@/lib/stores/service";
-import { listStores } from "@/lib/stores/service";
+import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Order" };
 
@@ -64,7 +65,7 @@ export default async function OrderPage({
     const [{ orderId }, { storefront }, stores] = await Promise.all([
         params,
         searchParams,
-        listStores(),
+        listBusinessStores(),
     ]);
     const found = await findOrder(stores, orderId, storefront);
     if (!found) notFound();
@@ -271,7 +272,10 @@ export default async function OrderPage({
                                         </div>
                                     </div>
                                     <Link
-                                        href={`/stores/${store.id}/customers/${order.customerId}`}
+                                        href={customerHref(
+                                            store.id,
+                                            order.customerId,
+                                        )}
                                         className="text-[12.5px] font-medium underline-offset-4 hover:underline print:hidden"
                                     >
                                         Open customer

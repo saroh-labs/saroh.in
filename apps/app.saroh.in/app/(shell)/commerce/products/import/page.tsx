@@ -1,23 +1,22 @@
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { sellCrumbs } from "@/components/commerce/sell-crumbs";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
 import { CsvImport } from "@/components/stores/csv-import";
-import { importCustomersHref } from "@/lib/customers/links";
 import { describeImport } from "@/lib/imports/service";
 import { requireSession } from "@/lib/session";
+import { importProductsHref } from "@/lib/stores/links";
 import { listBusinessStores } from "@/lib/stores/service";
 
-export const metadata = { title: "Import customers" };
+export const metadata = { title: "Import products" };
 
 /**
- * Sell → Customers → Import (#175). The mappable fields come from the API, so
- * they cannot drift from the DTOs that validate each row; the write role is
- * enforced by the import itself.
+ * Sell → Products → Import. The mappable fields come from the API, so they
+ * cannot drift from the DTOs that validate each row.
  */
-export default async function ImportCustomersPage({
+export default async function ImportProductsPage({
     searchParams,
 }: {
     searchParams: Promise<{ storefront?: string }>;
@@ -35,42 +34,35 @@ export default async function ImportCustomersPage({
         return (
             <PageContainer width="form">
                 <StorefrontChooser
-                    section="Customers"
-                    sectionHref="/commerce/customers"
+                    section="Products"
+                    sectionHref="/commerce/products"
                     crumb="Import"
-                    title="Which storefront are they customers of?"
-                    description="A spreadsheet is brought in at one storefront."
+                    title="Which storefront do they go into?"
+                    description="A spreadsheet of products is brought into one storefront's catalogue."
                     stores={stores}
-                    hrefFor={importCustomersHref}
+                    hrefFor={importProductsHref}
                 />
             </PageContainer>
         );
     }
 
-    const descriptor = await describeImport(store.id, "customers");
+    const descriptor = await describeImport(store.id, "products");
     if (!descriptor) notFound();
 
     return (
         <PageContainer width="default">
             <PageHeader
-                breadcrumb={[
-                    "Sell",
-                    <Link
-                        key="customers"
-                        href="/commerce/customers"
-                        className="hover:text-foreground"
-                    >
-                        Customers
-                    </Link>,
+                breadcrumb={sellCrumbs(
+                    { label: "Products", href: "/commerce/products" },
                     "Import",
-                ]}
-                title="Import customers"
+                )}
+                title="Import products"
                 description={`From a spreadsheet, into ${store.name}.`}
             />
             <CsvImport
                 storeId={store.id}
                 descriptor={descriptor}
-                backHref="/commerce/customers"
+                backHref="/commerce/products"
             />
         </PageContainer>
     );

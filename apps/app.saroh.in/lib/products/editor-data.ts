@@ -1,4 +1,5 @@
 import { listCategories } from "@/lib/products/service";
+import { productCategoriesHref } from "@/lib/stores/links";
 import type { Store } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";
 
@@ -18,7 +19,6 @@ export async function loadEditorContext(store: Store) {
         storeName: store.name,
         storeCurrency: settings?.currency ?? "INR",
         categories,
-        // Categories are still managed on the storefront's own screen.
-        categoriesHref: `/stores/${store.id}/products/categories`,
+        categoriesHref: productCategoriesHref(store.id),
     };
 }

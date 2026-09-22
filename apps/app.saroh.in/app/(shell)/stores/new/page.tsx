@@ -1,19 +1,8 @@
-import { PageHeader } from "@saroh/ui/page-header";
+import { redirect } from "next/navigation";
 
-import { PageContainer } from "@/components/shared/page-container";
-import { CreateStoreForm } from "@/components/stores/create-store-form";
-import { requireSession } from "@/lib/session";
+import { newStorefrontHref } from "@/lib/stores/links";
 
-export default async function NewStorePage() {
-    await requireSession();
-
-    return (
-        <PageContainer width="form">
-            <PageHeader
-                title="Create a store"
-                description="Set up a new store to start selling."
-            />
-            <CreateStoreForm />
-        </PageContainer>
-    );
+/** Retired in favour of Sell (#376); this address still works. */
+export default function Retired() {
+    redirect(newStorefrontHref);
 }

@@ -56,6 +56,7 @@ import type { CatalogueRow } from "@/lib/products/catalogue";
 import { inStorefront, mergeCatalogue } from "@/lib/products/catalogue";
 import { newProductHref, productHref } from "@/lib/products/links";
 import type { ProductListItem, ProductStatus } from "@/lib/products/service";
+import { importProductsHref, newStorefrontHref } from "@/lib/stores/links";
 
 const STATUS_LABEL: Record<ProductStatus, string> = {
     PUBLISHED: "Published",
@@ -389,7 +390,10 @@ export function CatalogueScreen({
                         <>
                             <Button variant="outline" asChild>
                                 <Link
-                                    href={`/stores/${(store ?? first).id}/products/import`}
+                                    href={importProductsHref(
+                                        store?.id ??
+                                            (many ? undefined : first.id),
+                                    )}
                                 >
                                     <Upload className="mr-1.5 size-4" />
                                     Import
@@ -461,7 +465,9 @@ export function CatalogueScreen({
                         and the catalogue starts here.
                     </p>
                     <Button asChild className="mt-1">
-                        <Link href="/stores/new">Create a storefront</Link>
+                        <Link href={newStorefrontHref}>
+                            Create a storefront
+                        </Link>
                     </Button>
                 </div>
             ) : (

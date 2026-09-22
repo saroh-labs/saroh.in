@@ -8,7 +8,9 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
+import { formatStatus } from "@/lib/format/status";
 import {
     inviteMember,
     removeMember,
@@ -18,6 +20,9 @@ import {
 import type { Invitation, Member, MemberRole } from "@/lib/members/service";
 
 const ROLES: MemberRole[] = ["ADMIN", "MANAGER", "EDITOR", "VIEWER"];
+
+/** A role in words: "Viewer", not "VIEWER". */
+const roleLabel = (r: string) => formatStatus(r);
 
 export function MembersManager({
     storeId,
@@ -33,6 +38,12 @@ export function MembersManager({
     const router = useRouter();
     const [email, setEmail] = useState("");
     const [role, setRole] = useState<MemberRole>("VIEWER");
+    // Removing someone cannot be undone from here — bringing them back means
+    // a new invitation they have to accept — so it asks first.
+    const [removing, setRemoving] = useState<{
+        userId: string;
+        name: string;
+    } | null>(null);
     const [inviting, setInviting] = useState(false);
     const [busy, setBusy] = useState<string | null>(null);
 
@@ -114,7 +125,10 @@ export function MembersManager({
                             value={role}
                             disabled={inviting}
                             onValueChange={setRole}
-                            options={ROLES.map((r) => ({ value: r, label: r }))}
+                            options={ROLES.map((r) => ({
+                                value: r,
+                                label: roleLabel(r),
+                            }))}
                             className="w-40"
                         />
                     </div>
@@ -129,7 +143,7 @@ export function MembersManager({
             )}
 
             <section className="space-y-3">
-                <h3 className="text-sm font-medium">Team</h3>
+                <h3 className="text-sm font-medium">At this storefront</h3>
                 <ul className="divide-y rounded-xl border">
                     {members.map((m, i) => (
                         <li
@@ -150,7 +164,7 @@ export function MembersManager({
                             <div className="flex items-center gap-2">
                                 {m.kind === "owner" ? (
                                     <Badge variant="secondary">
-                                        {m.role === "OWNER" ? "Owner" : m.role}
+                                        {roleLabel(m.role)}
                                     </Badge>
                                 ) : canManage ? (
                                     <>
@@ -164,7 +178,7 @@ export function MembersManager({
                                             }
                                             options={ROLES.map((r) => ({
                                                 value: r,
-                                                label: r,
+                                                label: roleLabel(r),
                                             }))}
                                             className="w-36"
                                         />
@@ -174,13 +188,24 @@ export function MembersManager({
                                             size="sm"
                                             className="wk-press"
                                             disabled={busy === m.userId}
-                                            onClick={() => onRemove(m.userId)}
+                                            onClick={() =>
+                                                setRemoving({
+                                                    userId: m.userId,
+                                                    name:
+                                                        m.name &&
+                                                        m.name.length > 0
+                                                            ? m.name
+                                                            : m.email,
+                                                })
+                                            }
                                         >
                                             Remove
                                         </Button>
                                     </>
                                 ) : (
-                                    <Badge variant="secondary">{m.role}</Badge>
+                                    <Badge variant="secondary">
+                                        {roleLabel(m.role)}
+                                    </Badge>
                                 )}
                             </div>
                         </li>
@@ -203,7 +228,8 @@ export function MembersManager({
                                         {inv.email}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        Invited as {inv.role}
+                                        Invited as{" "}
+                                        {roleLabel(inv.role).toLowerCase()}
                                     </p>
                                 </div>
                                 <Button
@@ -221,6 +247,22 @@ export function MembersManager({
                     </ul>
                 </section>
             )}
+            {removing ? (
+                <ConfirmDialog
+                    open
+                    onOpenChange={(o) => {
+                        if (!o) setRemoving(null);
+                    }}
+                    title={`Remove ${removing.name}?`}
+                    description="They lose access to this storefront's catalogue, orders and customers straight away. Bringing them back means inviting them again."
+                    confirmLabel="Remove"
+                    onConfirm={() => {
+                        const r = removing;
+                        setRemoving(null);
+                        void onRemove(r.userId);
+                    }}
+                />
+            ) : null}
         </div>
     );
 }

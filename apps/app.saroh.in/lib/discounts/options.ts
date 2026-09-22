@@ -1,6 +1,6 @@
 import type { ReachOptions } from "@/components/stores/discount-form";
 import { listCategories, listProducts } from "@/lib/products/service";
-import { listStores } from "@/lib/stores/service";
+import { listBusinessStores } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";
 
 /**
@@ -14,7 +14,7 @@ export async function loadReachOptions(): Promise<{
     options: ReachOptions;
     defaultCurrency: string;
 }> {
-    const stores = await listStores();
+    const stores = await listBusinessStores();
     const many = stores.length > 1;
     const [categories, products, first] = await Promise.all([
         Promise.all(stores.map((s) => listCategories(s.id).catch(() => []))),
