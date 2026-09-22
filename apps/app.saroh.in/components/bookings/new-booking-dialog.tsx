@@ -13,11 +13,13 @@ import {
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
-import { Info, Plus } from "lucide-react";
+import { showError, showSuccess } from "@saroh/ui/toast";
+import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
-import { listAvailability } from "@/lib/services/actions";
+import { bookByHand, listAvailability } from "@/lib/services/actions";
 import type { Slot } from "@/lib/services/service";
 
 const WINDOW_DAYS = 14;
@@ -29,12 +31,11 @@ const WINDOW_DAYS = 14;
  *
  * The times offered are REAL: the same open-slot read the reschedule dialog
  * and the public booking page use, so nothing here can offer a time the
- * service is closed or already full.
+ * service is closed or already full. Saving goes through the same reservation
+ * as the booking page (#384): if someone takes the time while this is open,
+ * the API says so, and the times are read again.
  *
- * Saving is held back, and the dialog says so. The API takes bookings only
- * from the public booking page today; a booking made by the merchant needs its
- * own endpoint (#384), and a button that pretended would be worse than one
- * that waits.
+ * A dialog commits on Save, so nothing is written until "Book it".
  */
 export function NewBookingDialog({
     services,
@@ -43,7 +44,12 @@ export function NewBookingDialog({
     services: { id: string; name: string; timezone: string; minutes: number }[];
     contacts: { id: string; name: string; email: string }[];
 }) {
+    const router = useRouter();
     const [open, setOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
+    // One per attempt, so a double-click books once (the API replays it).
+    const [attempt, setAttempt] = useState(() => crypto.randomUUID());
+    const [reload, setReload] = useState(0);
     const [serviceId, setServiceId] = useState(services.at(0)?.id ?? "");
     const [who, setWho] = useState<"known" | "new">(
         contacts.length > 0 ? "known" : "new",
@@ -79,9 +85,52 @@ export function NewBookingDialog({
         return () => {
             live = false;
         };
-    }, [open, serviceId]);
+    }, [open, serviceId, reload]);
 
     const byDay = service ? groupByDay(slots ?? [], service.timezone) : [];
+    const contact = contacts.find((c) => c.id === contactId);
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    const whoOk = who === "known" ? Boolean(contact) : emailOk;
+    const ready = Boolean(service && picked && whoOk) && !saving;
+
+    async function save() {
+        if (!service || !picked) return;
+        setSaving(true);
+        const res = await bookByHand(
+            service.id,
+            who === "known"
+                ? { startAt: picked, contactId, idempotencyKey: attempt }
+                : {
+                      startAt: picked,
+                      bookerEmail: email.trim(),
+                      bookerName: name.trim() || undefined,
+                      idempotencyKey: attempt,
+                  },
+        );
+        setSaving(false);
+        if (!res.ok) {
+            showError(res.error);
+            // Most likely the time went while this was open: read again.
+            setPicked(null);
+            setLoaded(null);
+            setReload((n) => n + 1);
+            setAttempt(crypto.randomUUID());
+            return;
+        }
+        const whom =
+            who === "known"
+                ? (contact?.name ?? "They")
+                : name.trim() || email.trim();
+        showSuccess(
+            `${whom} booked for ${service.name}, ${dayTime(picked, service.timezone)}`,
+        );
+        setOpen(false);
+        setPicked(null);
+        setName("");
+        setEmail("");
+        setAttempt(crypto.randomUUID());
+        router.refresh();
+    }
 
     return (
         <Dialog
@@ -268,16 +317,6 @@ export function NewBookingDialog({
                             </p>
                         ) : null}
                     </div>
-
-                    <p className="flex items-start gap-2 text-pretty rounded-[9px] bg-info-subtle px-3 py-2.5 text-[12px] leading-[1.5] text-info-subtle-foreground">
-                        <Info
-                            aria-hidden
-                            className="mt-0.5 size-3.5 shrink-0"
-                        />
-                        Booking someone in from here is coming. Until then,
-                        bookings arrive from your booking page — share its link,
-                        and they appear in this list.
-                    </p>
                 </div>
 
                 <DialogFooter className="gap-2 sm:gap-0">
@@ -290,10 +329,10 @@ export function NewBookingDialog({
                     </Button>
                     <Button
                         type="button"
-                        disabled
-                        title="Booking by hand is not available yet"
+                        disabled={!ready}
+                        onClick={() => void save()}
                     >
-                        Book it
+                        {saving ? "Booking…" : "Book it"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -317,6 +356,19 @@ function groupByDay(slots: Slot[], timeZone: string): [string, Slot[]][] {
         else days.set(key, [slot]);
     }
     return Array.from(days.entries());
+}
+
+/** "Tue 23 Sept, 10:00", in the service's own zone. */
+function dayTime(iso: string, timeZone: string): string {
+    return new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+    }).format(new Date(iso));
 }
 
 function clockTime(iso: string, timeZone: string): string {

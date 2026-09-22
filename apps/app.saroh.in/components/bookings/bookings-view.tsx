@@ -126,7 +126,9 @@ export function BookingsView({
         },
         {
             id: "booker",
-            header: "Booked by",
+            // Who it is for — not always who made it, since a booking can be
+            // made by hand (#384).
+            header: "Who",
             priority: "secondary",
             sortValue: (b) => bookerLabel(b).toLowerCase(),
             cell: (b) =>

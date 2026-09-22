@@ -24,6 +24,7 @@ import type { BookingDetail } from "./bookings.service";
 import { BookingsService } from "./bookings.service";
 import {
     AddRuleDto,
+    BookByHandDto,
     CreateServiceDto,
     RecordOutcomeDto,
     ReplaceRulesDto,
@@ -147,6 +148,17 @@ export class BookingsController {
         @Param("serviceId") serviceId: string,
     ): Promise<Booking[]> {
         return this.bookings.listBookings(ctx, serviceId);
+    }
+
+    /** A booking made by the merchant for someone (#384). */
+    @Post(":serviceId/bookings")
+    @HttpCode(201)
+    bookByHand(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("serviceId") serviceId: string,
+        @Body() dto: BookByHandDto,
+    ): Promise<Booking> {
+        return this.bookings.bookByHand(ctx, serviceId, dto);
     }
 
     /**

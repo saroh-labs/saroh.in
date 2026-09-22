@@ -27,7 +27,7 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             count: jest.fn(),
         },
-        contact: { upsert: jest.fn() },
+        contact: { upsert: jest.fn(), findUnique: jest.fn() },
         bookingEvent: { create: jest.fn() },
         job: { create: jest.fn() },
         site: { findUnique: jest.fn() },
@@ -64,6 +64,7 @@ const bookingCreate = prisma.booking.create as jest.Mock;
 const bookingUpdate = prisma.booking.update as jest.Mock;
 const bookingCount = prisma.booking.count as jest.Mock;
 const contactUpsert = prisma.contact.upsert as jest.Mock;
+const contactFindUnique = prisma.contact.findUnique as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 const siteFindUnique = prisma.site.findUnique as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
@@ -1087,5 +1088,125 @@ describe("BookingsService.publicServices — the website's services list (#255)"
     it("does not query for an empty list", async () => {
         expect(await new BookingsService().publicServices([])).toEqual([]);
         expect(serviceFindMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("BookingsService.bookByHand — a booking the merchant makes (#384)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("books a contact into an open slot, through the same serializable reservation", async () => {
+        wireBookHappyPath();
+        contactFindUnique.mockResolvedValue({
+            id: "contact_9",
+            organizationId: "org_SVC",
+            email: "priya@example.com",
+            firstName: "Priya",
+            lastName: "Raman",
+            phone: null,
+        });
+
+        await new BookingsService().bookByHand(ctx(), "svc_1", {
+            startAt: START,
+            contactId: "contact_9",
+        });
+
+        expect(transaction.mock.calls[0][1]).toMatchObject({
+            isolationLevel: "Serializable",
+        });
+        expect(bookingCount).toHaveBeenCalledTimes(1);
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            organizationId: "org_SVC",
+            serviceId: "svc_1",
+            status: "CONFIRMED",
+            bookerEmail: "priya@example.com",
+            bookerName: "Priya Raman",
+        });
+        // The history says who made it.
+        expect(eventCreate.mock.calls[0][0].data).toMatchObject({
+            type: "BOOKED",
+            actorUserId: "user_1",
+        });
+    });
+
+    it("makes someone new a contact, marked as added by hand", async () => {
+        wireBookHappyPath();
+        await new BookingsService().bookByHand(ctx(), "svc_1", {
+            startAt: START,
+            bookerEmail: "new@example.com",
+            bookerName: "New Person",
+        });
+        expect(contactUpsert.mock.calls[0][0].create).toMatchObject({
+            organizationId: "org_SVC",
+            email: "new@example.com",
+            firstName: "New",
+            lastName: "Person",
+            source: "manual",
+        });
+    });
+
+    it("refuses a full slot with the same 409 as the booking page", async () => {
+        wireBookHappyPath();
+        bookingCount.mockResolvedValue(1);
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                bookerEmail: "new@example.com",
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a time that is not an open slot", async () => {
+        wireBookHappyPath();
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: "2026-07-20T09:30:00.000Z",
+                bookerEmail: "new@example.com",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("404s another business's service, and another business's contact", async () => {
+        wireBookHappyPath();
+        await expect(
+            new BookingsService().bookByHand(
+                ctx({ organizationId: "org_OTHER" }),
+                "svc_1",
+                { startAt: START, bookerEmail: "x@example.com" },
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+
+        contactFindUnique.mockResolvedValue({
+            id: "contact_x",
+            organizationId: "org_OTHER",
+            email: "x@example.com",
+        });
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                contactId: "contact_x",
+            }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("needs a contact or an email", async () => {
+        wireBookHappyPath();
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("refuses a role without booking:write", async () => {
+        await expect(
+            new BookingsService().bookByHand(ctx({ role: "MEMBER" }), "svc_1", {
+                startAt: START,
+                bookerEmail: "x@example.com",
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(serviceFindUnique).not.toHaveBeenCalled();
     });
 });

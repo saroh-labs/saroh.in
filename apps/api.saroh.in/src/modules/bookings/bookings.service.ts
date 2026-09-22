@@ -805,11 +805,144 @@ export class BookingsService {
             }
         }
 
+        // 5. Atomic, serializable reservation (see the method doc for WHY).
+        return this.reserve(service, startAt, endAt, input, {
+            source: `booking:service:${serviceId}`,
+            actorUserId: null,
+        });
+    }
+
+    /**
+     * A booking the merchant makes for someone — on the phone, at the
+     * counter — rather than one the booker makes on the booking page (#384).
+     *
+     * The same reservation as {@link book}, so it cannot promise what the
+     * public page could not: the time must be a real open slot of an ACTIVE
+     * service, and the serializable capacity re-count still decides. What
+     * differs is who is acting — `booking:write`, the service must belong to
+     * the caller's business, there is no IP rate limit, and the history
+     * records the person who made it.
+     *
+     * The booker is someone already in the contacts (`contactId`, whose name
+     * and email are used as they stand) or someone new (`bookerEmail`, and
+     * optionally a name and phone), who becomes a contact the way a booking
+     * page booker does.
+     */
+    async bookByHand(
+        ctx: OrganizationContext,
+        serviceId: string,
+        dto: {
+            startAt: string;
+            contactId?: string;
+            bookerName?: string;
+            bookerEmail?: string;
+            bookerPhone?: string;
+            idempotencyKey?: string;
+        },
+    ): Promise<Booking> {
+        authorize(ctx, "booking:write");
+
+        const { service, rules } = await this.loadBookableService(serviceId);
+        if (service.organizationId !== ctx.organizationId) {
+            throw new NotFoundException("Service not found");
+        }
+
+        const startAt = new Date(dto.startAt);
+        if (Number.isNaN(startAt.getTime())) {
+            throw new BadRequestException("startAt is not a valid instant");
+        }
+        if (
+            !isValidSlotStart(
+                this.toAvailabilityService(service),
+                rules,
+                startAt,
+            )
+        ) {
+            throw new BadRequestException(
+                "That time is not an open slot for this service",
+            );
+        }
+        const endAt = new Date(
+            startAt.getTime() + service.durationMinutes * 60_000,
+        );
+
+        let booker: BookInput;
+        if (dto.contactId) {
+            const contact = await prisma.contact.findUnique({
+                where: { id: dto.contactId },
+            });
+            if (contact?.organizationId !== ctx.organizationId) {
+                throw new NotFoundException("Contact not found");
+            }
+            const name = [contact.firstName, contact.lastName]
+                .filter(Boolean)
+                .join(" ")
+                .trim();
+            booker = {
+                startAt: dto.startAt,
+                bookerEmail: contact.email,
+                bookerName: name || undefined,
+                bookerPhone: contact.phone ?? undefined,
+            };
+        } else if (dto.bookerEmail) {
+            booker = {
+                startAt: dto.startAt,
+                bookerEmail: dto.bookerEmail,
+                // A field left blank is not given, rather than "".
+                bookerName: dto.bookerName?.trim() ? dto.bookerName : undefined,
+                bookerPhone: dto.bookerPhone?.trim()
+                    ? dto.bookerPhone
+                    : undefined,
+            };
+        } else {
+            throw new BadRequestException({
+                message: "Choose someone from your contacts, or give an email.",
+                field: "bookerEmail",
+            });
+        }
+
+        if (dto.idempotencyKey) {
+            const existing = await prisma.booking.findUnique({
+                where: {
+                    serviceId_idempotencyKey: {
+                        serviceId,
+                        idempotencyKey: dto.idempotencyKey,
+                    },
+                },
+            });
+            if (existing) return existing;
+            booker.idempotencyKey = dto.idempotencyKey;
+        }
+
+        return this.reserve(service, startAt, endAt, booker, {
+            source: "manual",
+            actorUserId: ctx.userId,
+        });
+    }
+
+    /**
+     * The reservation itself, shared by the booking page and a booking made
+     * by hand: re-count inside a Serializable transaction, upsert the contact,
+     * write the CONFIRMED booking, its first history event and the notify job.
+     * See {@link book} for why the in-transaction re-count is the guarantee.
+     */
+    private async reserve(
+        service: Service,
+        startAt: Date,
+        endAt: Date,
+        input: BookInput,
+        by: {
+            /** `Contact.source` for someone new. */
+            source: string;
+            /** Who made it; `null` when the booker did it themselves. */
+            actorUserId: string | null;
+        },
+    ): Promise<Booking> {
+        const serviceId = service.id;
         const organizationId = service.organizationId;
         const email = input.bookerEmail.trim().toLowerCase();
         const snapshot = this.buildSnapshot(service, input, startAt, endAt);
 
-        // 5. Atomic, serializable reservation (see the method doc for WHY).
         let booked: Booking;
         try {
             booked = await prisma.$transaction(
@@ -842,7 +975,7 @@ export class BookingsService {
                             lastName:
                                 this.splitName(input.bookerName).last ?? null,
                             phone: input.bookerPhone ?? null,
-                            source: `booking:service:${serviceId}`,
+                            source: by.source,
                         },
                     });
 
@@ -864,14 +997,17 @@ export class BookingsService {
                     });
 
                     // Where the history starts. No `fromStartAt`: there was
-                    // no before, and no actor either — the booker did this
-                    // themselves, which is what distinguishes it from a move.
+                    // no before. The actor is whoever made it by hand; a
+                    // booker who did it themselves leaves it empty.
                     await tx.bookingEvent.create({
                         data: {
                             bookingId: booking.id,
                             organizationId,
                             type: BookingEventType.Booked,
                             toStartAt: startAt,
+                            ...(by.actorUserId
+                                ? { actorUserId: by.actorUserId }
+                                : {}),
                         },
                         select: { id: true },
                     });
