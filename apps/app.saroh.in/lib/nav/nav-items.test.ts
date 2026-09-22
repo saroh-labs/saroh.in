@@ -494,3 +494,53 @@ describe("isNavChildCurrent", () => {
         expect(isNavChildCurrent("/sites", undefined)).toBe(false);
     });
 });
+
+describe("Billing (ADR-007)", () => {
+    it("offers an owner with Payments on Billing › Invoices", () => {
+        const offered = hrefs(
+            navFor({ role: "OWNER", moduleKeys: AVAILABLE_TO.OWNER }),
+        );
+        expect(offered).toContain("/invoices");
+    });
+
+    it("offers it to no one without Payments", () => {
+        const offered = hrefs(
+            navFor({ role: "OWNER", moduleKeys: ["COMMERCE", "CRM"] }),
+        );
+        expect(offered).not.toContain("/invoices");
+    });
+
+    it("does not offer a member invoices, even where Payments is on", () => {
+        const offered = hrefs(
+            navFor({ role: "MEMBER", moduleKeys: ["PAYMENTS", "WEBSITE"] }),
+        );
+        expect(offered).not.toContain("/invoices");
+    });
+
+    it("drops the section when every page in it is refused, rather than an empty heading", () => {
+        // An invented role in a business with Payments on, granted payments
+        // but no invoices: Billing would be a row that opens onto nothing.
+        const groups = navFor({
+            role: "MEMBER",
+            actions: ["payment:read"],
+            moduleKeys: ["PAYMENTS"],
+        });
+        const labels = groups.flatMap((g) => g.items.map((i) => i.label));
+        expect(labels).not.toContain("Billing");
+    });
+
+    it("keeps Website when a business has no sites yet", () => {
+        const groups = navFor({
+            role: "OWNER",
+            moduleKeys: ["WEBSITE"],
+            sites: [],
+        });
+        expect(hrefs(groups)).toContain("/sites");
+    });
+
+    it("lets owners and admins make an invoice from the command menu", () => {
+        expect(navRoleCan("OWNER", "invoice:write")).toBe(true);
+        expect(navRoleCan("ADMIN", "invoice:write")).toBe(true);
+        expect(navRoleCan("MEMBER", "invoice:write")).toBe(false);
+    });
+});

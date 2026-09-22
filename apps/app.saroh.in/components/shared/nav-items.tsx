@@ -10,6 +10,7 @@ import {
     Home,
     KanbanSquare,
     Plug,
+    ReceiptText,
     Store,
     Target,
     Users,
@@ -74,6 +75,8 @@ export type NavAction =
     // page only has to add the row.
     | "subscription:read"
     | "invoice:read"
+    // "New invoice" in the command menu makes one.
+    | "invoice:write"
     | "course:read"
     | "pack:read";
 
@@ -103,6 +106,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "invoice:read",
         "course:read",
         "pack:read",
+        "invoice:write",
     ],
     ADMIN: [
         "site:read",
@@ -120,6 +124,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "invoice:read",
         "course:read",
         "pack:read",
+        "invoice:write",
     ],
     MEMBER: ["site:read", "member:read", "module:read", "store:read"],
     REVIEWER: ["site:read"],
@@ -339,6 +344,23 @@ export const NAV_GROUPS: NavGroup[] = [
                         // Singular: a business has one for now (ADR-006).
                         label: "Storefront",
                         action: "store:read",
+                    },
+                ],
+            },
+            // Billing (ADR-007): money a business is owed by a person —
+            // memberships and the invoices for them — under Payments, after
+            // the "Saroh Billing and Classes" design. Its pages nest like
+            // Sell's; each unit adds its row once its page exists.
+            {
+                href: "/invoices",
+                label: "Billing",
+                icon: ReceiptText,
+                moduleKey: "PAYMENTS",
+                children: [
+                    {
+                        href: "/invoices",
+                        label: "Invoices",
+                        action: "invoice:read",
                     },
                 ],
             },
@@ -625,20 +647,20 @@ export function filterNavGroupsByRole(
     return groups
         .map((group) => ({
             ...group,
-            items: group.items
-                .filter((item) => !item.action || navCan(actor, item.action))
-                .map((item) =>
-                    item.children === undefined
-                        ? item
-                        : {
-                              ...item,
-                              children: item.children.filter(
-                                  (child) =>
-                                      !child.action ||
-                                      navCan(actor, child.action),
-                              ),
-                          },
-                ),
+            items: group.items.flatMap((item) => {
+                if (item.action && !navCan(actor, item.action)) return [];
+                if (item.children === undefined) return [item];
+                const children = item.children.filter(
+                    (child) => !child.action || navCan(actor, child.action),
+                );
+                // A section whose every page is refused is not offered as an
+                // empty heading. Only a section that HAD pages: Website with
+                // no sites yet is still a destination in its own right.
+                if (item.children.length > 0 && children.length === 0) {
+                    return [];
+                }
+                return [{ ...item, children }];
+            }),
         }))
         .filter((group) => group.items.length > 0);
 }
