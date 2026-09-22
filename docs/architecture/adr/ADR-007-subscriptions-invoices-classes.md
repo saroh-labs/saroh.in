@@ -74,6 +74,9 @@ business pays Saroh). To keep the two apart in code and in conversation:
   2026-09-22, from the ADR-007 code review.)
 - A subscription set to end at its period end ends then even if it was paused
   meanwhile; resuming it after that date does not bill it again.
+- A person is on a plan **once at a time**: a second live subscription to the
+  same plan is refused (a partial unique index backs it, so two subscribes at
+  once cannot both land). Change or resume the one they have instead.
 - The subscriptions list points each row at the **oldest unpaid invoice while
   any is overdue** — the one to chase first — and at the latest otherwise.
   (Decided 2026-09-22.)

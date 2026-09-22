@@ -3359,6 +3359,9 @@ model CustomerSubscription {
   @@index([organizationId])
   @@index([contactId])
   @@index([status, currentPeriodEnd])
+  // One live subscription per person per plan: a second is a double-click,
+  // and it would bill them twice every period.
+  @@unique([planId, contactId], map: "CustomerSubscription_one_live_per_person", where: raw("status <> 'CANCELLED'"))
 }
 
 // A bill. DRAFT → ISSUED → PAID, or VOID. An issued invoice never changes: a

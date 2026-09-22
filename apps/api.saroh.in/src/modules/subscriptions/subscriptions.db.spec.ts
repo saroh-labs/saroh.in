@@ -54,6 +54,20 @@ const invoicesOf = (subscriptionId: string) =>
         orderBy: { periodStart: "asc" },
     });
 
+/** Someone new each time: a person may be on a plan only once at a time. */
+let people = 0;
+async function person(): Promise<string> {
+    people += 1;
+    return (
+        await prisma.contact.create({
+            data: {
+                organizationId: org.organizationId,
+                email: `member-${people}@example.com`,
+            },
+        })
+    ).id;
+}
+
 /** Push a subscription's period into the past so it is due now. */
 async function makeDue(id: string): Promise<void> {
     const start = new Date(Date.now() - 40 * 86_400_000);
@@ -70,7 +84,7 @@ async function makeDue(id: string): Promise<void> {
 describe("subscriptions (real database)", () => {
     it("bills a backdated start for the current period only", async () => {
         const s = await service.subscribe(org, {
-            contactId,
+            contactId: await person(),
             planId,
             startDate: "2026-01-15",
         });
@@ -83,7 +97,10 @@ describe("subscriptions (real database)", () => {
     });
 
     it("renews a due subscription exactly once, however often and however concurrently it runs", async () => {
-        const s = await service.subscribe(org, { contactId, planId });
+        const s = await service.subscribe(org, {
+            contactId: await person(),
+            planId,
+        });
         await makeDue(s.id);
         const now = new Date();
 
@@ -101,7 +118,10 @@ describe("subscriptions (real database)", () => {
     });
 
     it("stays overdue for an unpaid old period after the next is issued", async () => {
-        const s = await service.subscribe(org, { contactId, planId });
+        const s = await service.subscribe(org, {
+            contactId: await person(),
+            planId,
+        });
         const [first] = await invoicesOf(s.id);
         await prisma.invoice.update({
             where: { id: first!.id },
@@ -117,7 +137,10 @@ describe("subscriptions (real database)", () => {
     });
 
     it("never invoices after a cancel that won the race", async () => {
-        const s = await service.subscribe(org, { contactId, planId });
+        const s = await service.subscribe(org, {
+            contactId: await person(),
+            planId,
+        });
         await makeDue(s.id);
         await Promise.all([
             service.cancel(org, s.id, { when: "now" }),
@@ -164,6 +187,23 @@ describe("subscriptions (real database)", () => {
 
         await handler.renewDue(new Date());
         expect(await invoicesOf(s.id)).toHaveLength(1);
+    });
+
+    it("lets one of two subscribes at the same moment through", async () => {
+        const results = await Promise.allSettled([
+            service.subscribe(org, { contactId, planId }),
+            service.subscribe(org, { contactId, planId }),
+        ]);
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        const refused = results.find(
+            (r) => r.status === "rejected",
+        ) as PromiseRejectedResult;
+        expect(String(refused.reason)).toMatch(/already on Monthly/);
+        expect(
+            await prisma.customerSubscription.count({
+                where: { contactId, planId },
+            }),
+        ).toBe(1);
     });
 
     it("keeps one pending renewal run, however many times it is scheduled", async () => {

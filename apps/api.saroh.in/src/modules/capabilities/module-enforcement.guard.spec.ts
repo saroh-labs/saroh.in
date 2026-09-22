@@ -26,6 +26,7 @@ function execContext(request: unknown): ExecutionContext {
 function build(opts: {
     moduleKey?: string;
     blockers?: { code: string }[];
+    gatesPassed?: boolean;
     /** Org context resolved from a store, or an error the resolver throws. */
     resolved?: unknown;
     resolveError?: Error;
@@ -33,9 +34,10 @@ function build(opts: {
     const reflector = {
         getAllAndOverride: jest.fn().mockReturnValue(opts.moduleKey),
     } as unknown as Reflector;
-    const evaluate = jest
-        .fn()
-        .mockResolvedValue({ blockers: opts.blockers ?? [] });
+    const evaluate = jest.fn().mockResolvedValue({
+        blockers: opts.blockers ?? [],
+        gatesPassed: opts.gatesPassed ?? false,
+    });
     const availability = { evaluate } as unknown as ModuleAvailabilityService;
     const resolve = opts.resolveError
         ? jest.fn().mockRejectedValue(opts.resolveError)
@@ -132,9 +134,13 @@ describe("ModuleEnforcementGuard", () => {
     describe("a route that works before setup is finished", () => {
         // Payments with no provider connected is "not ready", and invoices
         // recorded by hand need no provider (ADR-007). The readiness opt-out
-        // drops that blocker — and only that kind.
-        function optedOut(blockers: { code: string }[]) {
-            const built = build({ moduleKey: "PAYMENTS", blockers });
+        // passes once every gate has — and only then.
+        function optedOut(blockers: { code: string }[], gatesPassed = false) {
+            const built = build({
+                moduleKey: "PAYMENTS",
+                blockers,
+                gatesPassed,
+            });
             const reflector = {
                 getAllAndOverride: jest.fn((key: string) =>
                     key === IGNORE_MODULE_READINESS_KEY ? true : "PAYMENTS",
@@ -151,10 +157,18 @@ describe("ModuleEnforcementGuard", () => {
 
         it("allows a module whose only blocker is unfinished setup", async () => {
             process.env.MODULE_ENFORCEMENT = "1";
-            const guard = optedOut([{ code: "PAYMENTS_NO_PROVIDER" }]);
+            const guard = optedOut([{ code: "PAYMENTS_NO_PROVIDER" }], true);
             await expect(guard.canActivate(execContext(REQUEST))).resolves.toBe(
                 true,
             );
+        });
+
+        it("refuses a gate it has never heard of, rather than failing open", async () => {
+            process.env.MODULE_ENFORCEMENT = "1";
+            const guard = optedOut([{ code: "SOME_NEW_GATE" }], false);
+            await expect(
+                guard.canActivate(execContext(REQUEST)),
+            ).rejects.toBeInstanceOf(ForbiddenException);
         });
 
         it("still refuses a module that is switched off", async () => {

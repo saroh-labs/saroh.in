@@ -965,17 +965,22 @@ export class BookingsService {
             booker,
             { source: "manual", actorUserId: ctx.userId },
             withPack
-                ? async (tx, booking) => {
-                      await redeemPackInTx(tx, {
-                          organizationId: ctx.organizationId,
-                          bookingId: booking.id,
-                          // The contact the booking resolved to — a pack
-                          // is only ever spent by the person who holds it.
-                          contactId: booking.contactId ?? "",
-                          serviceId: service.id,
-                          startAt,
-                          purchaseId: dto.packPurchaseId,
-                      });
+                ? {
+                      inTx: async (tx, booking) => {
+                          await redeemPackInTx(tx, {
+                              organizationId: ctx.organizationId,
+                              bookingId: booking.id,
+                              // The contact the booking resolved to — a pack
+                              // is only ever spent by the person who holds it.
+                              contactId: booking.contactId ?? "",
+                              serviceId: service.id,
+                              startAt,
+                              purchaseId: dto.packPurchaseId,
+                          });
+                      },
+                      // It may have been the pack's last class rather than
+                      // the slot, so this says only that something changed.
+                      onRace: "That changed while you were booking. Try again.",
                   }
                 : undefined,
         );
@@ -987,9 +992,11 @@ export class BookingsService {
      * write the CONFIRMED booking, its first history event and the notify job.
      * See {@link book} for why the in-transaction re-count is the guarantee.
      *
-     * `alsoInTx` runs on the same transaction after the booking is written —
+     * `also.inTx` runs on the same transaction after the booking is written —
      * spending a class pack on it, for one — so a refusal there takes the
-     * booking back with it, and a booking never exists half-paid.
+     * booking back with it, and a booking never exists half-paid. Losing a
+     * race then may be about what it touched rather than the slot, so the
+     * caller says what to tell the booker (`also.onRace`).
      */
     private async reserve(
         service: Service,
@@ -997,10 +1004,13 @@ export class BookingsService {
         endAt: Date,
         input: BookInput,
         by: ReserveBy,
-        alsoInTx?: (
-            tx: Prisma.TransactionClient,
-            booking: Booking,
-        ) => Promise<void>,
+        also?: {
+            inTx: (
+                tx: Prisma.TransactionClient,
+                booking: Booking,
+            ) => Promise<void>;
+            onRace: string;
+        },
     ): Promise<Booking> {
         const serviceId = service.id;
         const organizationId = service.organizationId;
@@ -1017,7 +1027,7 @@ export class BookingsService {
                         input,
                         by,
                     );
-                    if (alsoInTx) await alsoInTx(tx, booking);
+                    if (also) await also.inTx(tx, booking);
                     return booking;
                 },
                 {
@@ -1042,14 +1052,10 @@ export class BookingsService {
                 if (existing) return existing;
             }
             // Serialization failure — Postgres aborted the loser of a race.
-            // Without a pack, the only thing two bookings contend for is the
-            // slot. With one, it may have been the pack's last class, so the
-            // message says only that something changed.
+            // On its own, the only thing two bookings contend for is the slot.
             if (code === "P2034") {
                 throw new ConflictException(
-                    alsoInTx
-                        ? "That changed while you were booking. Try again."
-                        : "This slot is fully booked",
+                    also?.onRace ?? "This slot is fully booked",
                 );
             }
             throw err;

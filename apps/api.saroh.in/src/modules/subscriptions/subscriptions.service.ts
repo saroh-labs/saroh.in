@@ -29,10 +29,16 @@ import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
 type Tx = Prisma.TransactionClient;
 
 const LIST_LIMIT = 500;
-const DAY_MS = 86_400_000;
 
 function fieldError(message: string, field: string): never {
     throw new BadRequestException({ message, details: { field } });
+}
+
+/** One live subscription per person per plan (the partial unique index). */
+function alreadyOn(planName: string): never {
+    throw new ConflictException(
+        `They are already on ${planName}. Resume or change that subscription instead.`,
+    );
 }
 
 function notFound(what: string, field?: string): never {
@@ -351,38 +357,56 @@ export class SubscriptionsService {
         );
         const price = toMoneyString(plan.price);
 
-        const id = await prisma.$transaction(async (tx) => {
-            await assertPaymentsOn(tx, organizationId, "subscribe people");
-            const created = await tx.customerSubscription.create({
-                data: {
+        const live = await prisma.customerSubscription.count({
+            where: {
+                organizationId,
+                planId: plan.id,
+                contactId: contact.id,
+                status: { in: ["ACTIVE", "PAUSED"] },
+            },
+        });
+        if (live > 0) alreadyOn(plan.name);
+
+        const id = await prisma
+            .$transaction(async (tx) => {
+                await assertPaymentsOn(tx, organizationId, "subscribe people");
+                const created = await tx.customerSubscription.create({
+                    data: {
+                        organizationId,
+                        planId: plan.id,
+                        contactId: contact.id,
+                        status: "ACTIVE",
+                        price,
+                        currency: plan.currency,
+                        interval,
+                        timezone,
+                        anchorAt: anchor.toJSDate(),
+                        currentPeriodStart: period.start,
+                        currentPeriodEnd: period.end,
+                        createdByUserId: ctx.userId,
+                    },
+                    select: { id: true },
+                });
+                await this.invoicePeriod(tx, {
                     organizationId,
-                    planId: plan.id,
+                    subscriptionId: created.id,
                     contactId: contact.id,
-                    status: "ACTIVE",
+                    planName: plan.name,
                     price,
                     currency: plan.currency,
-                    interval,
                     timezone,
-                    anchorAt: anchor.toJSDate(),
-                    currentPeriodStart: period.start,
-                    currentPeriodEnd: period.end,
+                    period,
                     createdByUserId: ctx.userId,
-                },
-                select: { id: true },
+                });
+                return created.id;
+            })
+            .catch((err: unknown) => {
+                // The same subscribe, twice at once: the index lets one through.
+                if ((err as { code?: string }).code === "P2002") {
+                    alreadyOn(plan.name);
+                }
+                throw err;
             });
-            await this.invoicePeriod(tx, {
-                organizationId,
-                subscriptionId: created.id,
-                contactId: contact.id,
-                planName: plan.name,
-                price,
-                currency: plan.currency,
-                timezone,
-                period,
-                createdByUserId: ctx.userId,
-            });
-            return created.id;
-        });
         return this.read(organizationId, id);
     }
 
@@ -431,8 +455,15 @@ export class SubscriptionsService {
             const interval = sub.interval as Interval;
 
             if (now < sub.currentPeriodEnd) {
+                // Calendar days in its own zone, so a pause across a clock
+                // change is not a day short.
                 const days = Math.floor(
-                    (now.getTime() - sub.pausedAt.getTime()) / DAY_MS,
+                    DateTime.fromJSDate(now, { zone: sub.timezone }).diff(
+                        DateTime.fromJSDate(sub.pausedAt, {
+                            zone: sub.timezone,
+                        }),
+                        "days",
+                    ).days,
                 );
                 const end =
                     days > 0

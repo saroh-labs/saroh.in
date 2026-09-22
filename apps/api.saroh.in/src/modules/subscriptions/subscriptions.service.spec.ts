@@ -26,7 +26,11 @@ jest.mock("@saroh/database", () => {
                 updateMany: jest.fn(),
             },
             businessProfile: { findUnique: jest.fn() },
-            customerSubscription: { findFirst: jest.fn(), findMany: jest.fn() },
+            customerSubscription: {
+                findFirst: jest.fn(),
+                findMany: jest.fn(),
+                count: jest.fn(),
+            },
             invoice: { findMany: jest.fn(), count: jest.fn() },
             job: { findFirst: jest.fn() },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
@@ -132,6 +136,32 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers());
 
 describe("subscribing", () => {
+    beforeEach(() => {
+        db.customerSubscription!.count!.mockResolvedValue(0);
+    });
+
+    it("refuses a second live subscription to the same plan", async () => {
+        db.customerSubscription!.count!.mockResolvedValue(1);
+        const attempt = service.subscribe(owner, {
+            contactId: "c_1",
+            planId: "plan_1",
+        });
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toThrow(
+            "They are already on Monthly membership.",
+        );
+        expect(tx.customerSubscription!.create).not.toHaveBeenCalled();
+    });
+
+    it("refuses the second of two subscribes at once, by the index", async () => {
+        tx.customerSubscription!.create!.mockRejectedValueOnce(
+            Object.assign(new Error("unique"), { code: "P2002" }),
+        );
+        await expect(
+            service.subscribe(owner, { contactId: "c_1", planId: "plan_1" }),
+        ).rejects.toThrow("They are already on Monthly membership.");
+    });
+
     it("bills only the period holding today when the start is six months back", async () => {
         await service.subscribe(owner, {
             contactId: "c_1",
@@ -251,6 +281,26 @@ describe("pause and resume", () => {
             },
         });
         expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("counts a pause across a clock change in whole calendar days", async () => {
+        // New York springs forward on 8 Mar 2026: noon 1 Mar to noon 10 Mar
+        // is nine days, though an hour short of nine times 24 hours.
+        jest.setSystemTime(at("2026-03-10T16:00:00Z"));
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                timezone: "America/New_York",
+                status: "PAUSED",
+                pausedAt: at("2026-03-01T17:00:00Z"),
+                currentPeriodStart: at("2026-02-15T05:00:00Z"),
+                currentPeriodEnd: at("2026-03-15T04:00:00Z"),
+            }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(
+            tx.customerSubscription!.update!.mock.calls[0]![0].data
+                .currentPeriodEnd,
+        ).toEqual(at("2026-03-24T04:00:00Z"));
     });
 
     it("changes nothing when a pause is undone within seconds", async () => {

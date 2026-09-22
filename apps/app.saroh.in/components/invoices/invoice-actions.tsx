@@ -193,6 +193,19 @@ function RecordPaymentDialog({
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState(false);
 
+    // The dialog stays mounted, so each opening starts fresh: paid today,
+    // not on the day the page was loaded.
+    const [wasOpen, setWasOpen] = useState(open);
+    if (open !== wasOpen) {
+        setWasOpen(open);
+        if (open) {
+            setMethod("UPI");
+            setReference("");
+            setPaidOn(new Date());
+            setNote("");
+        }
+    }
+
     async function save() {
         setBusy(true);
         const res = await recordPayment(invoice.id, {
