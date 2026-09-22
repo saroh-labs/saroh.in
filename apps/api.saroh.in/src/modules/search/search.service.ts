@@ -282,7 +282,7 @@ export class SearchService {
             id: row.id,
             title: row.orderId,
             subtitle: `${personName(row.customer)} · ${row.status.toLowerCase()}`,
-            href: `/stores/${row.storeId}/orders/${row.id}`,
+            href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
         }));
     }
 }

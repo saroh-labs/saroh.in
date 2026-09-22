@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -41,14 +42,14 @@ export function RefundButton({ orderId }: { orderId: string }) {
 
     return (
         <>
-            <button
-                type="button"
+            <Button
+                variant="outline"
                 onClick={() => setConfirming(true)}
                 disabled={busy}
-                className="wk-press h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:text-disabled-foreground"
+                className="print:hidden"
             >
                 {busy ? "Refunding…" : "Refund"}
-            </button>
+            </Button>
             <ConfirmDialog
                 open={confirming}
                 onOpenChange={setConfirming}
