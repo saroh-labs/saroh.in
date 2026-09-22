@@ -14,6 +14,16 @@ so you can use, modify and self-host it, including to run your own business
 > but has no step-by-step guide yet
 > ([what it takes](setup-instructions.md#running-your-own-copy)).
 
+## Watch it
+
+[![The Saroh workspace, filmed](docs/demos/tour/poster.jpg)](docs/demos/tour/saroh-tour.mp4)
+
+**[A four-minute tour](docs/demos/tour/saroh-tour.mp4)** of the workspace, with
+voice-over: a shop's products and orders, a gym's members, memberships and
+invoices, a yoga studio's courses and class packs, a team and its roles, and
+the same person seeing less as a member of staff. Filmed from the running
+product against the showcase seed, so every screen is real.
+
 ## What it does
 
 A business turns on the parts it needs. Each part is a module that can be
