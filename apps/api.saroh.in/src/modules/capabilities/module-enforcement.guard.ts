@@ -12,7 +12,23 @@ import type { AuthUser } from "../../common/types/store-context";
 import { OrganizationContextService } from "../organizations/organization-context.service";
 import { ModuleAvailabilityService } from "./module-availability.service";
 import type { ModuleKey } from "./module-registry";
-import { REQUIRE_MODULE_KEY } from "./require-module.decorator";
+import {
+    IGNORE_MODULE_READINESS_KEY,
+    REQUIRE_MODULE_KEY,
+} from "./require-module.decorator";
+
+/**
+ * The blockers that say the actor may not use the module at all — as opposed
+ * to readiness blockers, which say its setup is unfinished. The order and the
+ * codes are `ModuleAvailabilityService.evaluate`'s.
+ */
+const GATE_BLOCKER_CODES: ReadonlySet<string> = new Set([
+    "UNAUTHORIZED",
+    "ROLLOUT_DISABLED",
+    "ORG_MODULE_DISABLED",
+    "PROJECT_MODULE_UNSELECTED",
+    "ENTITLEMENT_REQUIRED",
+]);
 
 /**
  * True when API module enforcement is switched on for this environment. Read
@@ -88,12 +104,22 @@ export class ModuleEnforcementGuard implements CanActivate {
             projectId,
         });
 
-        if (availability.blockers.length === 0) return true;
+        const ignoreReadiness =
+            this.reflector.getAllAndOverride<boolean | undefined>(
+                IGNORE_MODULE_READINESS_KEY,
+                [context.getHandler(), context.getClass()],
+            ) === true;
+        const blockers = ignoreReadiness
+            ? availability.blockers.filter((b) =>
+                  GATE_BLOCKER_CODES.has(b.code),
+              )
+            : availability.blockers;
+        if (blockers.length === 0) return true;
 
         // Preserve the no-existence-leak policy: an unauthorized actor gets 404,
         // never an upsell; any other gate (rollout/module/project/entitlement)
         // is a deliberate "unavailable" 403 that reveals no flag detail.
-        const codes = availability.blockers.map((b) => b.code);
+        const codes = blockers.map((b) => b.code);
         if (codes.includes("UNAUTHORIZED")) {
             throw new NotFoundException();
         }
