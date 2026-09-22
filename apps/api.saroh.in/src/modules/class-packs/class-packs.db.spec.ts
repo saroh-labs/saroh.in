@@ -270,11 +270,70 @@ describe("class packs (real database)", () => {
             currency: "INR",
             serviceIds: [s.id],
         });
+        expect(await packs.sellingTerms(offCtx)).toEqual({
+            invoicesOnSale: false,
+        });
         const sold = await packs.sell(offCtx, pack.id, { contactId: c.id });
         expect(sold.invoiceId).toBeNull();
         expect(sold.price).toBe("2500.00");
         expect(
             await prisma.invoice.count({ where: { organizationId: off.id } }),
         ).toBe(0);
+    });
+
+    it("says on the booking which pack pays for it, and stops saying so once it is taken off", async () => {
+        const pack = await makePack(5, 60);
+        const sold = await packs.sell(org, pack.id, { contactId });
+        const b = await booking(slot(12));
+        await packs.useOnBooking(org, b.id, { packPurchaseId: sold.id });
+
+        const paid = await bookings.getBooking(org, b.id);
+        expect(paid.packRedemption).toMatchObject({
+            reversedAt: null,
+            purchase: { id: sold.id, pack: { name: "5-class pack" } },
+        });
+
+        await packs.removeFromBooking(org, b.id);
+        const unpaid = await bookings.getBooking(org, b.id);
+        expect(unpaid.packRedemption?.reversedAt).toBeInstanceOf(Date);
+    });
+
+    it("lists only the packs that cover a service when asked, and counts sales", async () => {
+        const covering = await makePack(5, 60);
+        const other = await prisma.service.create({
+            data: {
+                organizationId: org.organizationId,
+                name: "Yin",
+                durationMinutes: 60,
+                timezone: "UTC",
+                status: "ACTIVE",
+            },
+        });
+        const elsewhere = await packs.createPack(org, {
+            name: "Yin pack",
+            credits: 3,
+            validityDays: 30,
+            price: "900",
+            currency: "INR",
+            serviceIds: [other.id],
+        });
+        await packs.sell(org, covering.id, { contactId });
+        await packs.sell(org, elsewhere.id, { contactId });
+
+        const forVinyasa = await packs.listPurchases(org, {
+            contactId,
+            serviceId,
+        });
+        expect(forVinyasa.map((p) => p.pack.id)).toEqual([covering.id]);
+        expect(
+            (await packs.listPurchases(org, { contactId })).map(
+                (p) => p.pack.id,
+            ),
+        ).toHaveLength(2);
+        expect(await packs.getPack(org, covering.id)).toMatchObject({
+            sold: 1,
+            activeHolders: 1,
+        });
+        expect(await packs.sellingTerms(org)).toEqual({ invoicesOnSale: true });
     });
 });

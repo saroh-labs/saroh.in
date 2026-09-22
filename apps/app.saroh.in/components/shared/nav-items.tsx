@@ -14,6 +14,7 @@ import {
     ReceiptText,
     Store,
     Target,
+    Ticket,
     Users,
 } from "lucide-react";
 
@@ -76,13 +77,14 @@ export type NavAction =
     // page only has to add the row.
     | "subscription:read"
     | "invoice:read"
-    // "New invoice", "Subscribe someone" and "New course" in the command
-    // menu make one.
+    // "New invoice", "Subscribe someone", "New course", "New class pack"
+    // and "Sell a pack" in the command menu make one.
     | "invoice:write"
     | "subscription:write"
     | "course:write"
     | "course:read"
-    | "pack:read";
+    | "pack:read"
+    | "pack:write";
 
 /**
  * Role → what it may reach here.
@@ -113,6 +115,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "invoice:write",
         "subscription:write",
         "course:write",
+        "pack:write",
     ],
     ADMIN: [
         "site:read",
@@ -133,6 +136,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "invoice:write",
         "subscription:write",
         "course:write",
+        "pack:write",
     ],
     MEMBER: ["site:read", "member:read", "module:read", "store:read"],
     REVIEWER: ["site:read"],
@@ -408,6 +412,16 @@ export const NAV_GROUPS: NavGroup[] = [
                 icon: GraduationCap,
                 moduleKey: "COURSES",
                 action: "course:read",
+            },
+            // Class packs: booked time sold ahead, so under Appointments —
+            // but its own row, not nested under Schedule (ADR-007, 2026-09-22):
+            // Schedule and Services stay where merchants already find them.
+            {
+                href: "/class-packs",
+                label: "Class packs",
+                icon: Ticket,
+                moduleKey: "APPOINTMENTS",
+                action: "pack:read",
             },
             {
                 href: "/contacts",

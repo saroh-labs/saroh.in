@@ -32,6 +32,7 @@ jest.mock("@saroh/database", () => {
             packPurchase: { findFirst: jest.fn(), findMany: jest.fn() },
             contact: { findFirst: jest.fn() },
             service: { count: jest.fn() },
+            organizationModule: { findFirst: jest.fn() },
             booking: { findFirst: jest.fn() },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
@@ -115,6 +116,7 @@ beforeEach(() => {
     tx.classPack!.create!.mockResolvedValue({ id: "pack_1" });
     tx.packPurchase!.create!.mockResolvedValue({ id: "pp_1" });
     tx.organizationModule!.findFirst!.mockResolvedValue(null);
+    db.organizationModule!.findFirst!.mockResolvedValue(null);
 });
 
 describe("selling a pack", () => {
@@ -247,6 +249,100 @@ describe("who sees the invoice", () => {
             actions: resolveCapabilities("front-desk", ["pack:read"]),
         };
         expect((await service.getPurchase(desk, "pp_1")).invoiceId).toBeNull();
+    });
+});
+
+describe("the packs list", () => {
+    it("counts every sale, and the ones still live", async () => {
+        const future = new Date(Date.now() + 30 * 86_400_000);
+        db.packPurchase!.findMany!.mockResolvedValue([
+            // Live: time and classes left.
+            {
+                packId: "pack_1",
+                credits: 10,
+                expiresAt: future,
+                _count: { redemptions: 3 },
+            },
+            // Used up.
+            {
+                packId: "pack_1",
+                credits: 10,
+                expiresAt: future,
+                _count: { redemptions: 10 },
+            },
+            // Expired.
+            {
+                packId: "pack_1",
+                credits: 10,
+                expiresAt: new Date("2026-01-01T00:00:00Z"),
+                _count: { redemptions: 0 },
+            },
+        ]);
+        const [view] = await service.listPacks(owner, {});
+        expect(view).toMatchObject({ sold: 3, activeHolders: 1 });
+        expect(db.packPurchase!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { organizationId: "org_1", packId: { in: ["pack_1"] } },
+            }),
+        );
+    });
+
+    it("says none sold for a pack nobody has bought", async () => {
+        const [view] = await service.listPacks(owner, {});
+        expect(view).toMatchObject({ sold: 0, activeHolders: 0 });
+    });
+});
+
+describe("the purchases list", () => {
+    it("keeps to this business, and to packs covering a service when asked", async () => {
+        await service.listPurchases(owner, {
+            contactId: "c_1",
+            serviceId: "svc_1",
+        });
+        expect(db.packPurchase!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    contactId: "c_1",
+                    pack: { services: { some: { serviceId: "svc_1" } } },
+                },
+            }),
+        );
+    });
+
+    it("leaves the service out of the query when none is asked for", async () => {
+        await service.listPurchases(owner, { contactId: "c_1" });
+        expect(db.packPurchase!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { organizationId: "org_1", contactId: "c_1" },
+            }),
+        );
+    });
+});
+
+describe("what selling does", () => {
+    it("invoices a sale while Payments is on", async () => {
+        expect(await service.sellingTerms(owner)).toEqual({
+            invoicesOnSale: true,
+        });
+        expect(db.organizationModule!.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ organizationId: "org_1" }),
+            }),
+        );
+    });
+
+    it("does not while Payments is off", async () => {
+        db.organizationModule!.findFirst!.mockResolvedValue({ id: "mod_1" });
+        expect(await service.sellingTerms(owner)).toEqual({
+            invoicesOnSale: false,
+        });
+    });
+
+    it("is refused to a role that may not see packs", async () => {
+        await expect(service.sellingTerms(member)).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
     });
 });
 

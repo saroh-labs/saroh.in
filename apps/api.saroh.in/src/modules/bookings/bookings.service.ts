@@ -74,6 +74,17 @@ const bookingDetailInclude = {
         orderBy: { createdAt: "asc" },
         include: { actor: { select: { name: true } } },
     },
+    // How it is paid, when a class pack pays for it (ADR-007). A pack taken
+    // back off leaves its row with `reversedAt` set: that booking is no
+    // longer paid with it. Only the pack's name — what the screen says.
+    packRedemption: {
+        select: {
+            reversedAt: true,
+            purchase: {
+                select: { id: true, pack: { select: { name: true } } },
+            },
+        },
+    },
 } satisfies Prisma.BookingInclude;
 
 export type BookingDetail = Prisma.BookingGetPayload<{

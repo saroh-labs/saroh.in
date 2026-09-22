@@ -3,11 +3,14 @@ import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
+import { BookingPackControl } from "@/components/bookings/booking-pack-control";
 import { CancelBookingControl } from "@/components/bookings/cancel-booking-control";
+import { JoinOnline } from "@/components/bookings/join-online";
 import { OutcomeControl } from "@/components/bookings/outcome-control";
 import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
 import { formatStatus } from "@/lib/format/status";
+import { joinLink } from "@/lib/services/meeting-link";
 import type { BookingDetail, BookingEvent } from "@/lib/services/service";
 
 /**
@@ -23,10 +26,20 @@ import type { BookingDetail, BookingEvent } from "@/lib/services/service";
 export function BookingDetailView({
     booking,
     past,
+    packs,
 }: {
     booking: BookingDetail;
     /** Whether the slot has ended. Read by the page so "now" stays out of render. */
     past: boolean;
+    /**
+     * Class packs (ADR-007), read by the page: what pays for it now, and the
+     * person's packs that could. Absent where packs are not for this person.
+     */
+    packs?: {
+        paidWith: { name: string } | null;
+        usable: { id: string; label: string }[];
+        canWrite: boolean;
+    };
 }) {
     const { service, contact, timezone } = booking;
     const cancelled = booking.status === "CANCELLED";
@@ -44,6 +57,12 @@ export function BookingDetailView({
     // Someone on the team made it by hand (#384): it is FOR the booker, and
     // BY them. A booker who used the booking page made it themselves.
     const madeBy = booking.events.find((e) => e.type === "BOOKED")?.actor?.name;
+    // The link it was booked with — frozen on the booking, like its terms.
+    const link = joinLink(booking);
+    const showPacks =
+        packs !== undefined &&
+        (packs.paidWith !== null ||
+            (packs.canWrite && packs.usable.length > 0));
 
     return (
         <main className="mx-auto w-full max-w-4xl p-6 sm:p-8">
@@ -134,6 +153,7 @@ export function BookingDetailView({
                             reschedule, or cancel the booking.
                         </p>
                     ) : null}
+                    {link ? <JoinOnline url={link} /> : null}
                 </section>
 
                 <section className="rounded-lg border border-border p-5">
@@ -165,6 +185,18 @@ export function BookingDetailView({
                     ) : null}
                 </section>
             </div>
+
+            {showPacks ? (
+                <section className="mt-6 rounded-lg border border-border p-5">
+                    <h2 className="mb-3 text-sm font-medium">Class pack</h2>
+                    <BookingPackControl
+                        bookingId={booking.id}
+                        paidWith={packs.paidWith}
+                        usable={packs.usable}
+                        canWrite={packs.canWrite}
+                    />
+                </section>
+            ) : null}
 
             <section className="mt-6 rounded-lg border border-border p-5">
                 <h2 className="text-sm font-medium">History</h2>

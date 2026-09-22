@@ -18,6 +18,12 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import {
+    checkLocation,
+    locationFields,
+    locationPayload,
+    ServiceLocationFields,
+} from "@/components/bookings/service-location-fields";
 import { TimezoneSelect } from "@/components/shared/timezone-select";
 import { trimmedOr } from "@/lib/forms/values";
 import { createService } from "@/lib/services/actions";
@@ -43,30 +49,33 @@ function guessTimezone(): string {
     }
 }
 
-const formSchema = z.object({
-    name: z.string().trim().min(1, { message: "Name is required" }),
-    description: z.string().optional(),
-    durationMinutes: z.string().refine(
-        (v) => {
-            const n = Number(v);
-            return Number.isInteger(n) && n >= 1;
-        },
-        { message: "Duration must be at least 1 minute" },
-    ),
-    capacity: z.string().optional(),
-    bufferBefore: z.string().optional(),
-    bufferAfter: z.string().optional(),
-    timezone: z.string().trim().min(1, { message: "Timezone is required" }),
-    price: z.string().refine(
-        (v) => {
-            if (!v.trim()) return true;
-            const n = Number(v);
-            return !Number.isNaN(n) && n >= 0;
-        },
-        { message: "Price must be a positive amount" },
-    ),
-    currency: z.string().optional(),
-});
+const formSchema = z
+    .object({
+        name: z.string().trim().min(1, { message: "Name is required" }),
+        description: z.string().optional(),
+        durationMinutes: z.string().refine(
+            (v) => {
+                const n = Number(v);
+                return Number.isInteger(n) && n >= 1;
+            },
+            { message: "Duration must be at least 1 minute" },
+        ),
+        capacity: z.string().optional(),
+        bufferBefore: z.string().optional(),
+        bufferAfter: z.string().optional(),
+        timezone: z.string().trim().min(1, { message: "Timezone is required" }),
+        price: z.string().refine(
+            (v) => {
+                if (!v.trim()) return true;
+                const n = Number(v);
+                return !Number.isNaN(n) && n >= 0;
+            },
+            { message: "Price must be a positive amount" },
+        ),
+        currency: z.string().optional(),
+        ...locationFields,
+    })
+    .superRefine(checkLocation);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -84,6 +93,8 @@ export function CreateServiceForm() {
             timezone: guessTimezone(),
             price: "",
             currency: "",
+            locationType: "IN_PERSON",
+            meetingUrl: "",
         },
     });
     const { isSubmitting } = form.formState;
@@ -108,9 +119,14 @@ export function CreateServiceForm() {
             currency: values.currency?.trim()
                 ? values.currency.trim().toUpperCase()
                 : undefined,
+            ...locationPayload(values),
         });
 
         if (!res.ok) {
+            if (res.field === "meetingUrl") {
+                form.setError("meetingUrl", { message: res.error });
+                return;
+            }
             showError(res.error);
             return;
         }
@@ -275,9 +291,11 @@ export function CreateServiceForm() {
                     )}
                 />
 
+                <ServiceLocationFields disabled={isSubmitting} index={4} />
+
                 <div
                     className="wk-item grid gap-4 sm:grid-cols-2"
-                    style={{ "--wk-i": 4 } as React.CSSProperties}
+                    style={{ "--wk-i": 5 } as React.CSSProperties}
                 >
                     <FormField
                         control={form.control}
@@ -322,7 +340,7 @@ export function CreateServiceForm() {
                 <Button
                     type="submit"
                     disabled={isSubmitting || !name.trim()}
-                    style={{ "--wk-i": 5 } as React.CSSProperties}
+                    style={{ "--wk-i": 6 } as React.CSSProperties}
                     className="wk-item wk-press justify-self-start"
                 >
                     {isSubmitting ? "Creating…" : "Create service"}

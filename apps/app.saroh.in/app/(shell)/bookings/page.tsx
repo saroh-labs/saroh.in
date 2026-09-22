@@ -5,8 +5,10 @@ import Link from "next/link";
 import { BookingsView } from "@/components/bookings/bookings-view";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
+import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
 import { listContacts } from "@/lib/contacts/service";
 import { contactName } from "@/lib/crm/format";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listBookingsWithPast, listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
@@ -36,14 +38,16 @@ export default async function BookingsPage({
 }) {
     await requireSession();
 
-    const [upcoming, params, services, contacts] = await Promise.all([
-        listBookingsWithPast(),
-        searchParams,
-        listServices().catch(() => []),
-        // Contacts belong to CRM, which may be off: then the dialog asks for
-        // a name and email instead of offering people you know.
-        listContacts().catch(() => []),
-    ]);
+    const [upcoming, params, services, contacts, organization] =
+        await Promise.all([
+            listBookingsWithPast(),
+            searchParams,
+            listServices().catch(() => []),
+            // Contacts belong to CRM, which may be off: then the dialog asks for
+            // a name and email instead of offering people you know.
+            listContacts().catch(() => []),
+            resolveActiveOrganization(),
+        ]);
 
     return (
         <PageContainer width="wide">
@@ -69,6 +73,11 @@ export default async function BookingsPage({
                                 name: contactName(c),
                                 email: c.email,
                             }))}
+                            // Paying with a class pack spends one (ADR-007).
+                            canUsePacks={
+                                canReadPacks(organization) &&
+                                canWritePacks(organization)
+                            }
                         />
                     </>
                 }

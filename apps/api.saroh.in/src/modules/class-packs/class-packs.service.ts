@@ -48,9 +48,17 @@ export interface PackView {
     currency: string;
     status: string;
     services: { id: string; name: string }[];
+    /** Every time it has been sold, still live or not. */
+    sold: number;
     /** Purchases that still have classes and time left. */
     activeHolders: number;
     createdAt: string;
+}
+
+/** What selling a pack does besides recording it, for the sell dialog to say. */
+export interface SellingTerms {
+    /** Payments is on, so a sale issues its invoice there and then. */
+    invoicesOnSale: boolean;
 }
 
 export type PurchaseStanding = "ACTIVE" | "USED_UP" | "EXPIRED";
@@ -131,11 +139,20 @@ export class ClassPacksService {
             orderBy: [{ status: "asc" }, { createdAt: "asc" }],
             include: PACK_INCLUDE,
         });
-        const holders = await this.activeHolders(
+        const holders = await this.holderCounts(
             ctx.organizationId,
             rows.map((r) => r.id),
         );
-        return rows.map((r) => this.packView(r, holders.get(r.id) ?? 0));
+        return rows.map((r) => this.packView(r, holders.get(r.id)));
+    }
+
+    /**
+     * Whether a sale issues an invoice right now — Payments on or off — so
+     * the sell dialog mentions one only when there will be one.
+     */
+    async sellingTerms(ctx: OrganizationContext): Promise<SellingTerms> {
+        authorize(ctx, "pack:read");
+        return { invoicesOnSale: await paymentsOn(prisma, ctx.organizationId) };
     }
 
     async getPack(ctx: OrganizationContext, id: string): Promise<PackView> {
@@ -337,6 +354,15 @@ export class ClassPacksService {
                 organizationId: ctx.organizationId,
                 ...(query.contactId ? { contactId: query.contactId } : {}),
                 ...(query.packId ? { packId: query.packId } : {}),
+                ...(query.serviceId
+                    ? {
+                          pack: {
+                              services: {
+                                  some: { serviceId: query.serviceId },
+                              },
+                          },
+                      }
+                    : {}),
             },
             orderBy: { createdAt: "desc" },
             take: LIST_LIMIT,
@@ -495,8 +521,8 @@ export class ClassPacksService {
             include: PACK_INCLUDE,
         });
         if (!row) notFound("Class pack");
-        const holders = await this.activeHolders(organizationId, [id]);
-        return this.packView(row, holders.get(id) ?? 0);
+        const holders = await this.holderCounts(organizationId, [id]);
+        return this.packView(row, holders.get(id));
     }
 
     private async readPurchase(
@@ -511,31 +537,35 @@ export class ClassPacksService {
         return this.purchaseView(row, new Date(), ctx);
     }
 
-    /** Unexpired purchases with a class left, per pack. */
-    private async activeHolders(
+    /**
+     * Per pack: how many times it has been sold, and how many of those are
+     * still live — unexpired, with a class left.
+     */
+    private async holderCounts(
         organizationId: string,
         packIds: string[],
-    ): Promise<Map<string, number>> {
-        const counts = new Map<string, number>();
+    ): Promise<Map<string, { sold: number; active: number }>> {
+        const counts = new Map<string, { sold: number; active: number }>();
         if (packIds.length === 0) return counts;
         const rows = await prisma.packPurchase.findMany({
-            where: {
-                organizationId,
-                packId: { in: packIds },
-                expiresAt: { gt: new Date() },
-            },
+            where: { organizationId, packId: { in: packIds } },
             select: {
                 packId: true,
                 credits: true,
+                expiresAt: true,
                 _count: {
                     select: { redemptions: { where: { reversedAt: null } } },
                 },
             },
         });
+        const now = new Date();
         for (const r of rows) {
-            if (r.credits - r._count.redemptions > 0) {
-                counts.set(r.packId, (counts.get(r.packId) ?? 0) + 1);
+            const c = counts.get(r.packId) ?? { sold: 0, active: 0 };
+            c.sold += 1;
+            if (r.expiresAt > now && r.credits - r._count.redemptions > 0) {
+                c.active += 1;
             }
+            counts.set(r.packId, c);
         }
         return counts;
     }
@@ -553,7 +583,7 @@ export class ClassPacksService {
             createdAt: Date;
             services: { service: { id: string; name: string } }[];
         },
-        activeHolders: number,
+        holders: { sold: number; active: number } | undefined,
     ): PackView {
         return {
             id: row.id,
@@ -565,7 +595,8 @@ export class ClassPacksService {
             currency: row.currency,
             status: row.status,
             services: row.services.map((s) => s.service),
-            activeHolders,
+            sold: holders?.sold ?? 0,
+            activeHolders: holders?.active ?? 0,
             createdAt: row.createdAt.toISOString(),
         };
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Checkbox } from "@saroh/ui/checkbox";
 import {
     Dialog,
     DialogContent,
@@ -20,6 +21,9 @@ import { useEffect, useId, useState } from "react";
 
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
+import { packsFor } from "@/lib/class-packs/actions";
+import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
+import type { PackPurchase } from "@/lib/class-packs/service";
 import { bookByHand, listAvailability } from "@/lib/services/actions";
 import type { Slot } from "@/lib/services/service";
 
@@ -37,13 +41,21 @@ const WINDOW_DAYS = 14;
  * the API says so, and the times are read again.
  *
  * A dialog commits on Save, so nothing is written until "Book it".
+ *
+ * When the person holds a class pack that covers the service and is still
+ * valid at the chosen time (ADR-007), it is offered by name and ticked; the
+ * booking then spends a class from it. A pack that does not cover the
+ * service, is used up, or runs out before the session is not offered.
  */
 export function NewBookingDialog({
     services,
     contacts,
+    canUsePacks = false,
 }: {
     services: { id: string; name: string; timezone: string; minutes: number }[];
     contacts: { id: string; name: string; email: string }[];
+    /** May read and spend class packs (`pack:read` and `pack:write`). */
+    canUsePacks?: boolean;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -63,11 +75,21 @@ export function NewBookingDialog({
         serviceId: string;
         slots: Slot[];
     } | null>(null);
+    // The chosen person's packs for the chosen service, keyed so a stale
+    // read for someone else is never shown.
+    const [held, setHeld] = useState<{
+        key: string;
+        packs: PackPurchase[];
+    } | null>(null);
+    const [usePack, setUsePack] = useState(true);
+    const [packId, setPackId] = useState("");
+    const [packRefusal, setPackRefusal] = useState<string | null>(null);
     const ids = {
         service: useId(),
         contact: useId(),
         name: useId(),
         email: useId(),
+        pack: useId(),
     };
 
     const service = services.find((s) => s.id === serviceId);
@@ -88,6 +110,27 @@ export function NewBookingDialog({
         };
     }, [open, serviceId, reload]);
 
+    const packKey =
+        canUsePacks && who === "known" && contactId && serviceId
+            ? `${contactId}:${serviceId}`
+            : null;
+    useEffect(() => {
+        if (!open || !packKey) return;
+        let live = true;
+        const [forContact = "", forService = ""] = packKey.split(":");
+        void packsFor(forContact, forService).then((found) => {
+            if (live) setHeld({ key: packKey, packs: found ?? [] });
+        });
+        return () => {
+            live = false;
+        };
+    }, [open, packKey, reload]);
+
+    const heldNow = held?.key === packKey ? held.packs : [];
+    const usable = picked ? usablePacks(heldNow, picked) : [];
+    const pack = usable.find((p) => p.id === packId) ?? usable.at(0);
+    const paying = usePack && pack !== undefined;
+
     const byDay = service ? groupByDay(slots ?? [], service.timezone) : [];
     const contact = contacts.find((c) => c.id === contactId);
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -97,10 +140,16 @@ export function NewBookingDialog({
     async function save() {
         if (!service || !picked) return;
         setSaving(true);
+        setPackRefusal(null);
         const res = await bookByHand(
             service.id,
             who === "known"
-                ? { startAt: picked, contactId, idempotencyKey: attempt }
+                ? {
+                      startAt: picked,
+                      contactId,
+                      idempotencyKey: attempt,
+                      ...(paying ? { packPurchaseId: pack.id } : {}),
+                  }
                 : {
                       startAt: picked,
                       bookerEmail: email.trim(),
@@ -109,6 +158,18 @@ export function NewBookingDialog({
                   },
         );
         setSaving(false);
+        if (!res.ok && res.field === "packPurchaseId") {
+            // The pack changed while this was open — its last class went on
+            // another booking, say. Nothing was booked; read its packs again
+            // and say so here, where the choice is.
+            setPackRefusal(
+                `${res.error} Nothing has been booked and no class was spent. Book it paid another way, or sell them another pack.`,
+            );
+            setHeld(null);
+            setReload((n) => n + 1);
+            setAttempt(crypto.randomUUID());
+            return;
+        }
         if (!res.ok) {
             showError(res.error);
             // Most likely the time went while this was open: read again.
@@ -123,7 +184,9 @@ export function NewBookingDialog({
                 ? (contact?.name ?? "They")
                 : name.trim() || email.trim();
         showSuccess(
-            `${whom} booked for ${service.name}, ${dayTime(picked, service.timezone)}`,
+            paying
+                ? `${whom} booked for ${service.name}, ${dayTime(picked, service.timezone)} — paid with ${pack.pack.name}`
+                : `${whom} booked for ${service.name}, ${dayTime(picked, service.timezone)}`,
         );
         setOpen(false);
         setPicked(null);
@@ -138,7 +201,11 @@ export function NewBookingDialog({
             open={open}
             onOpenChange={(o) => {
                 setOpen(o);
-                if (!o) setPicked(null);
+                if (!o) {
+                    setPicked(null);
+                    setPackRefusal(null);
+                    setUsePack(true);
+                }
             }}
         >
             <DialogTrigger asChild>
@@ -312,6 +379,57 @@ export function NewBookingDialog({
                             </p>
                         ) : null}
                     </div>
+
+                    {pack && service ? (
+                        <div
+                            className={cn(
+                                "grid gap-2.5 rounded-[10px] border px-3.5 py-3 transition-colors duration-fast",
+                                usePack
+                                    ? "border-border-strong bg-foreground/[0.03]"
+                                    : "border-border",
+                            )}
+                        >
+                            <label className="flex cursor-pointer items-start gap-2.5">
+                                <Checkbox
+                                    checked={usePack}
+                                    onCheckedChange={(c) =>
+                                        setUsePack(c === true)
+                                    }
+                                    className="mt-0.5"
+                                />
+                                <span className="grid gap-0.5">
+                                    <span className="text-[13.5px] font-medium">
+                                        Use their class pack
+                                    </span>
+                                    <span className="text-[12px] text-muted-foreground">
+                                        {usePack
+                                            ? `${packOffer(pack, service.timezone)}. ${classesLeft(pack) - 1} after this booking; cancelling gives it back.`
+                                            : `${packOffer(pack, service.timezone)}. They pay another way and keep every class.`}
+                                    </span>
+                                </span>
+                            </label>
+                            {usePack && usable.length > 1 ? (
+                                <OptionSelect
+                                    id={ids.pack}
+                                    aria-label="Which pack"
+                                    value={pack.id}
+                                    onValueChange={setPackId}
+                                    options={usable.map((p) => ({
+                                        value: p.id,
+                                        label: packOffer(p, service.timezone),
+                                    }))}
+                                />
+                            ) : null}
+                        </div>
+                    ) : null}
+                    {packRefusal ? (
+                        <p
+                            role="alert"
+                            className="rounded-[10px] border border-destructive/50 bg-destructive/10 px-3.5 py-3 text-[12.5px] leading-[1.55] text-destructive-subtle-foreground"
+                        >
+                            {packRefusal}
+                        </p>
+                    ) : null}
                 </div>
 
                 <DialogFooter className="gap-2 sm:gap-0">

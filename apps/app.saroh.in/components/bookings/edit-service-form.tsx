@@ -18,6 +18,12 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import {
+    checkLocation,
+    locationFields,
+    locationPayload,
+    ServiceLocationFields,
+} from "@/components/bookings/service-location-fields";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import { TimezoneSelect } from "@/components/shared/timezone-select";
@@ -36,28 +42,31 @@ import type { Service } from "@/lib/services/service";
  * the form primitives rather than hand-rolled `useState`.
  */
 
-const formSchema = z.object({
-    name: z.string().trim().min(1, { message: "Name is required" }),
-    description: z.string().optional(),
-    durationMinutes: z.string().refine(
-        (v) => {
-            const n = Number(v);
-            return Number.isInteger(n) && n >= 1;
-        },
-        { message: "Duration must be at least 1 minute" },
-    ),
-    capacity: z.string().optional(),
-    bufferBefore: z.string().optional(),
-    bufferAfter: z.string().optional(),
-    timezone: z.string().trim().min(1, { message: "Timezone is required" }),
-    price: z
-        .string()
-        .trim()
-        .refine((v) => v === "" || /^\d+(\.\d{1,2})?$/.test(v), {
-            message: "A price in numbers, like 1800 — or empty.",
-        }),
-    currency: z.string(),
-});
+const formSchema = z
+    .object({
+        name: z.string().trim().min(1, { message: "Name is required" }),
+        description: z.string().optional(),
+        durationMinutes: z.string().refine(
+            (v) => {
+                const n = Number(v);
+                return Number.isInteger(n) && n >= 1;
+            },
+            { message: "Duration must be at least 1 minute" },
+        ),
+        capacity: z.string().optional(),
+        bufferBefore: z.string().optional(),
+        bufferAfter: z.string().optional(),
+        timezone: z.string().trim().min(1, { message: "Timezone is required" }),
+        price: z
+            .string()
+            .trim()
+            .refine((v) => v === "" || /^\d+(\.\d{1,2})?$/.test(v), {
+                message: "A price in numbers, like 1800 — or empty.",
+            }),
+        currency: z.string(),
+        ...locationFields,
+    })
+    .superRefine(checkLocation);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -85,6 +94,8 @@ export function EditServiceForm({
                     ? ""
                     : (service.priceCents / 100).toString(),
             currency: service.currency ?? defaultCurrency,
+            locationType: service.locationType,
+            meetingUrl: service.meetingUrl ?? "",
         },
     });
     const { isSubmitting } = form.formState;
@@ -116,8 +127,13 @@ export function EditServiceForm({
                       currency: values.currency,
                   }
                 : {}),
+            ...locationPayload(values),
         });
         if (!res.ok) {
+            if (res.field === "meetingUrl") {
+                form.setError("meetingUrl", { message: res.error });
+                return;
+            }
             showError(res.error);
             return;
         }
@@ -368,9 +384,11 @@ export function EditServiceForm({
                     />
                 </div>
 
+                <ServiceLocationFields disabled={isSubmitting} index={4} />
+
                 <div
                     className="wk-item flex flex-wrap items-center gap-3 pt-2"
-                    style={{ "--wk-i": 4 } as React.CSSProperties}
+                    style={{ "--wk-i": 5 } as React.CSSProperties}
                 >
                     <Button
                         type="submit"

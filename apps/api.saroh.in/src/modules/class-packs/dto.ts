@@ -90,6 +90,16 @@ export class ListPurchasesQueryDto {
     @IsOptional()
     @IsString()
     packId?: string;
+
+    /**
+     * Only packs that pay for this service — what New booking and "Use a
+     * class pack" offer. A filter, not a lookup: another business's service
+     * id simply matches nothing here.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    serviceId?: string;
 }
 
 /** Pay an existing booking with a pack; no purchase means the soonest to expire. */

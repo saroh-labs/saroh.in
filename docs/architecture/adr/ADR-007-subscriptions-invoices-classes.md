@@ -141,8 +141,22 @@ credit. The balance is **derived** from purchases minus live redemptions.
   business that takes bookings need not run courses. With Courses off, an
   open course holds no seats. (Decided 2026-09-22, replacing "Schedule gains
   Courses".)
-- **Class packs** sit with Schedule, and Services gains the online fields —
-  they are about booked time, so they stay under the Appointments module.
+- **Class packs** belong to the Appointments module — they are booked time
+  sold ahead — with **their own row in the rail at `/class-packs`**, after
+  Courses, rather than nesting under Schedule: Schedule (`/bookings`) and
+  Services (`/services`) stay the rows and addresses merchants already know.
+  The pack list and its purchases (`/class-packs/purchases`) are two tabs of
+  one screen; ⌘K offers "New class pack" and "Sell a pack". (Decided
+  2026-09-22, replacing "Schedule becomes a section".) Services gains the
+  online fields.
+- **Paying for a booking with a pack** is offered, never assumed silently:
+  New booking ticks the person's usable pack by name ("Morning pack · 7 left,
+  expires 12 Oct"), and booking detail says "Paid with …" with "Take the pack
+  off", or offers "Use a class pack". Only packs that cover the service, have
+  a class left and are valid when the session starts are offered — the API's
+  rule, asked of the API (`purchases?serviceId=`). The sell dialog mentions an
+  invoice only when Payments is on, read from `GET class-packs/selling`.
+  (2026-09-22.)
 - **Subscriptions** and **Invoices** are money a business is owed, under the
   Payments module, in the rail's **Billing** section. Its pages live under
   `/billing` — `/billing/subscriptions`, `/billing/plans`, `/billing/invoices`
