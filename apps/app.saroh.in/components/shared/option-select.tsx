@@ -21,6 +21,23 @@ export interface Option<V extends string> {
 }
 
 /**
+ * What Radix is given for `value`.
+ *
+ * "" means two different things. With a "None" row among the options it is
+ * that row, so it travels as {@link NONE}. Without one it means nothing is
+ * chosen yet — and Radix must get "" to show the placeholder. Sending NONE
+ * then selected a row that does not exist, and the trigger rendered blank:
+ * "Select a customer…" on New order never appeared.
+ */
+export function radixValue<V extends string>(
+    value: V,
+    options: readonly Option<V>[],
+): string {
+    if (value !== "") return value;
+    return options.some((o) => o.value === "") ? NONE : "";
+}
+
+/**
  * A shadcn Select over a flat list of options, for the places that were a
  * native `<select>`. The native control drew the operating system's menu —
  * a different one per browser, unstyled, and in dark mode often a white list
@@ -48,10 +65,11 @@ export function OptionSelect<V extends string>({
     size?: "default" | "sm";
     "aria-label"?: string;
     "aria-describedby"?: string;
+    "aria-invalid"?: boolean;
 }) {
     return (
         <Select
-            value={value === "" ? NONE : value}
+            value={radixValue(value, options)}
             onValueChange={(v) => {
                 onValueChange((v === NONE ? "" : v) as V);
             }}
@@ -61,6 +79,7 @@ export function OptionSelect<V extends string>({
                 id={id}
                 aria-label={aria["aria-label"]}
                 aria-describedby={aria["aria-describedby"]}
+                aria-invalid={aria["aria-invalid"]}
                 className={cn(size === "sm" && "h-8 text-xs", className)}
             >
                 <SelectValue placeholder={placeholder} />
