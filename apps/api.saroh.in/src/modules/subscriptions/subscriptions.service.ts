@@ -23,6 +23,7 @@ import type {
 } from "./dto";
 import type { Interval, Period } from "./periods";
 import { periodContaining } from "./periods";
+import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
 
 type Tx = Prisma.TransactionClient;
 
@@ -73,6 +74,8 @@ export interface SubscriptionView {
     cancelledAt: string | null;
     /** Derived from its invoices, never stored: any issued one past due. */
     overdue: boolean;
+    /** How many of its issued invoices are past due. */
+    overdueCount: number;
     unpaidCount: number;
     unpaidTotal: string;
     oldestUnpaid: {
@@ -80,7 +83,30 @@ export interface SubscriptionView {
         number: string | null;
         dueAt: string | null;
     } | null;
+    /** The most recent invoice issued for it, paid or not. */
+    latestInvoice: {
+        id: string;
+        number: string | null;
+        status: "ISSUED" | "PAID";
+        dueAt: string | null;
+        paidAt: string | null;
+    } | null;
+    /**
+     * When it began: the start date a member was moved over with, when that
+     * is earlier than the day they were added.
+     */
+    startedAt: string;
     createdAt: string;
+}
+
+/** When the renewal job last looked, and what it did today (ADR-007). */
+export interface RenewalsView {
+    /** The last run that finished, or null if none has yet. */
+    lastCheckedAt: string | null;
+    /** The run waiting to go, or null if none is scheduled. */
+    nextCheckAt: string | null;
+    /** Renewal invoices this business issued since midnight, UTC. */
+    issuedToday: number;
 }
 
 const SUBSCRIPTION_SELECT = {
@@ -110,12 +136,21 @@ type SubscriptionRow = Prisma.CustomerSubscriptionGetPayload<{
     select: typeof SUBSCRIPTION_SELECT;
 }>;
 
-interface UnpaidRow {
+interface InvoiceRowLite {
     id: string;
     number: string | null;
+    status: string;
     subscriptionId: string | null;
     total: { toString(): string };
     dueAt: Date | null;
+    paidAt: Date | null;
+}
+
+/** A subscription's invoices, as its row needs them. */
+interface SubscriptionInvoices {
+    /** Issued and unpaid, oldest first. */
+    unpaid: InvoiceRowLite[];
+    latest: InvoiceRowLite | null;
 }
 
 /**
@@ -248,12 +283,12 @@ export class SubscriptionsService {
             take: LIST_LIMIT,
             select: SUBSCRIPTION_SELECT,
         });
-        const unpaid = await this.unpaidFor(
+        const invoices = await this.invoicesFor(
             ctx.organizationId,
             rows.map((r) => r.id),
         );
         const now = new Date();
-        return rows.map((r) => this.view(r, unpaid.get(r.id) ?? [], now));
+        return rows.map((r) => this.view(r, invoices.get(r.id), now));
     }
 
     async get(ctx: OrganizationContext, id: string): Promise<SubscriptionView> {
@@ -507,6 +542,43 @@ export class SubscriptionsService {
         return this.read(ctx.organizationId, id);
     }
 
+    /**
+     * When the renewal job last ran and will next run, and how many renewal
+     * invoices went out today. There is no scheduler to look at, so the
+     * screen says this rather than leaving silence that reads the same as a
+     * stopped job. The run times are the job's, shared by every business.
+     */
+    async renewals(ctx: OrganizationContext): Promise<RenewalsView> {
+        authorize(ctx, "subscription:read");
+        const midnight = new Date();
+        midnight.setUTCHours(0, 0, 0, 0);
+        const [last, next, issuedToday] = await Promise.all([
+            prisma.job.findFirst({
+                where: { type: SUBSCRIPTION_RENEW_TYPE, status: "DONE" },
+                orderBy: { processedAt: "desc" },
+                select: { processedAt: true },
+            }),
+            prisma.job.findFirst({
+                where: { type: SUBSCRIPTION_RENEW_TYPE, status: "PENDING" },
+                orderBy: { runAt: "asc" },
+                select: { runAt: true },
+            }),
+            prisma.invoice.count({
+                where: {
+                    organizationId: ctx.organizationId,
+                    source: "SUBSCRIPTION",
+                    createdByUserId: null,
+                    issuedAt: { gte: midnight },
+                },
+            }),
+        ]);
+        return {
+            lastCheckedAt: last?.processedAt?.toISOString() ?? null,
+            nextCheckAt: next?.runAt.toISOString() ?? null,
+            issuedToday,
+        };
+    }
+
     // — Renewal (called by the job) ————————————————————————————————
 
     /**
@@ -638,8 +710,8 @@ export class SubscriptionsService {
             select: SUBSCRIPTION_SELECT,
         });
         if (!row) notFound("Subscription");
-        const unpaid = await this.unpaidFor(organizationId, [id]);
-        return this.view(row, unpaid.get(id) ?? [], new Date());
+        const invoices = await this.invoicesFor(organizationId, [id]);
+        return this.view(row, invoices.get(id), new Date());
     }
 
     private async readPlan(
@@ -662,43 +734,56 @@ export class SubscriptionsService {
         return this.planView(row);
     }
 
-    /** Issued, unpaid invoices per subscription, oldest first. */
-    private async unpaidFor(
+    /**
+     * Each subscription's issued and paid invoices in one read: the unpaid
+     * ones, oldest first, and the latest of them all.
+     */
+    private async invoicesFor(
         organizationId: string,
         subscriptionIds: string[],
-    ): Promise<Map<string, UnpaidRow[]>> {
-        const byId = new Map<string, UnpaidRow[]>();
+    ): Promise<Map<string, SubscriptionInvoices>> {
+        const byId = new Map<string, SubscriptionInvoices>();
         if (subscriptionIds.length === 0) return byId;
-        const rows: UnpaidRow[] = await prisma.invoice.findMany({
+        const rows: InvoiceRowLite[] = await prisma.invoice.findMany({
             where: {
                 organizationId,
-                status: "ISSUED",
+                status: { in: ["ISSUED", "PAID"] },
                 subscriptionId: { in: subscriptionIds },
             },
             orderBy: { issuedAt: "asc" },
             select: {
                 id: true,
                 number: true,
+                status: true,
                 subscriptionId: true,
                 total: true,
                 dueAt: true,
+                paidAt: true,
             },
         });
         for (const r of rows) {
             if (!r.subscriptionId) continue;
-            byId.set(r.subscriptionId, [
-                ...(byId.get(r.subscriptionId) ?? []),
-                r,
-            ]);
+            const entry = byId.get(r.subscriptionId) ?? {
+                unpaid: [],
+                latest: null,
+            };
+            if (r.status === "ISSUED") entry.unpaid.push(r);
+            entry.latest = r;
+            byId.set(r.subscriptionId, entry);
         }
         return byId;
     }
 
     private view(
         row: SubscriptionRow,
-        unpaid: UnpaidRow[],
+        invoices: SubscriptionInvoices | undefined,
         now: Date,
     ): SubscriptionView {
+        const unpaid = invoices?.unpaid ?? [];
+        const latest = invoices?.latest ?? null;
+        const pastDue = unpaid.filter(
+            (u) => u.dueAt !== null && u.dueAt < now,
+        ).length;
         const renews = row.status === "ACTIVE" && !row.cancelAtPeriodEnd;
         const oldest = unpaid.length > 0 ? unpaid[0] : null;
         return {
@@ -723,7 +808,8 @@ export class SubscriptionsService {
                     : null,
             pausedAt: row.pausedAt?.toISOString() ?? null,
             cancelledAt: row.cancelledAt?.toISOString() ?? null,
-            overdue: unpaid.some((u) => u.dueAt !== null && u.dueAt < now),
+            overdue: pastDue > 0,
+            overdueCount: pastDue,
             unpaidCount: unpaid.length,
             unpaidTotal: fromCents(
                 unpaid.reduce((sum, u) => sum + toCents(u.total.toString()), 0),
@@ -735,6 +821,21 @@ export class SubscriptionsService {
                       dueAt: oldest.dueAt?.toISOString() ?? null,
                   }
                 : null,
+            latestInvoice: latest
+                ? {
+                      id: latest.id,
+                      number: latest.number,
+                      status: latest.status === "PAID" ? "PAID" : "ISSUED",
+                      dueAt: latest.dueAt?.toISOString() ?? null,
+                      paidAt: latest.paidAt?.toISOString() ?? null,
+                  }
+                : null,
+            // A resume re-anchors a subscription later, so the anchor is
+            // its start only while it is the earlier of the two.
+            startedAt: (row.anchorAt < row.createdAt
+                ? row.anchorAt
+                : row.createdAt
+            ).toISOString(),
             createdAt: row.createdAt.toISOString(),
         };
     }

@@ -26,7 +26,8 @@ jest.mock("@saroh/database", () => {
             },
             businessProfile: { findUnique: jest.fn() },
             customerSubscription: { findFirst: jest.fn(), findMany: jest.fn() },
-            invoice: { findMany: jest.fn() },
+            invoice: { findMany: jest.fn(), count: jest.fn() },
+            job: { findFirst: jest.fn() },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
         },
@@ -404,24 +405,38 @@ describe("what a subscription owes", () => {
     it("is overdue while any issued invoice is past due, even after the next is issued", async () => {
         db.invoice!.findMany!.mockResolvedValue([
             {
+                id: "inv_0",
+                number: "INV-0000",
+                status: "PAID",
+                subscriptionId: "sub_1",
+                total: decimal("1200"),
+                dueAt: at("2026-08-08T00:00:00Z"),
+                paidAt: at("2026-08-02T00:00:00Z"),
+            },
+            {
                 id: "inv_1",
                 number: "INV-0001",
+                status: "ISSUED",
                 subscriptionId: "sub_1",
                 total: decimal("1200"),
                 dueAt: at("2026-09-08T00:00:00Z"),
+                paidAt: null,
             },
             {
                 id: "inv_2",
                 number: "INV-0002",
+                status: "ISSUED",
                 subscriptionId: "sub_1",
                 total: decimal("1200"),
                 dueAt: at("2026-10-08T00:00:00Z"),
+                paidAt: null,
             },
         ]);
         const view = await service.get(owner, "sub_1");
         expect(view).toEqual(
             expect.objectContaining({
                 overdue: true,
+                overdueCount: 1,
                 unpaidCount: 2,
                 unpaidTotal: "2400.00",
                 oldestUnpaid: {
@@ -431,7 +446,43 @@ describe("what a subscription owes", () => {
                 },
                 nextRenewalAt: "2026-10-01T00:00:00.000Z",
                 endsAt: null,
+                // The latest issued, whatever is still owed on older ones.
+                latestInvoice: {
+                    id: "inv_2",
+                    number: "INV-0002",
+                    status: "ISSUED",
+                    dueAt: "2026-10-08T00:00:00.000Z",
+                    paidAt: null,
+                },
             }),
+        );
+        // Paid invoices are not owed.
+        expect(db.invoice!.findMany!.mock.calls[0]![0].where.status).toEqual({
+            in: ["ISSUED", "PAID"],
+        });
+    });
+
+    it("dates a moved-over member from the start they were given", async () => {
+        db.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                anchorAt: at("2026-03-15T00:00:00Z"),
+                createdAt: at("2026-09-22T00:00:00Z"),
+            }),
+        );
+        expect((await service.get(owner, "sub_1")).startedAt).toBe(
+            "2026-03-15T00:00:00.000Z",
+        );
+    });
+
+    it("dates a resumed member from when they were added, not the new anchor", async () => {
+        db.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                anchorAt: at("2026-10-06T00:00:00Z"),
+                createdAt: at("2026-09-01T00:00:00Z"),
+            }),
+        );
+        expect((await service.get(owner, "sub_1")).startedAt).toBe(
+            "2026-09-01T00:00:00.000Z",
         );
     });
 
@@ -442,6 +493,39 @@ describe("what a subscription owes", () => {
         const view = await service.get(owner, "sub_1");
         expect(view.nextRenewalAt).toBeNull();
         expect(view.endsAt).toBe("2026-10-01T00:00:00.000Z");
+    });
+});
+
+describe("renewals", () => {
+    it("says when the job last ran, when it runs next, and what went out today", async () => {
+        const jobs = (db as unknown as { job: Mocked }).job;
+        jobs.findFirst!.mockResolvedValueOnce({
+            processedAt: at("2026-09-22T09:46:00Z"),
+        });
+        jobs.findFirst!.mockResolvedValueOnce({
+            runAt: at("2026-09-22T10:46:00Z"),
+        });
+        (db.invoice as Mocked).count!.mockResolvedValue(3);
+
+        await expect(service.renewals(owner)).resolves.toEqual({
+            lastCheckedAt: "2026-09-22T09:46:00.000Z",
+            nextCheckAt: "2026-09-22T10:46:00.000Z",
+            issuedToday: 3,
+        });
+        // Only this business's own renewal invoices, the job's (no person).
+        expect((db.invoice as Mocked).count!.mock.calls[0]![0].where).toEqual(
+            expect.objectContaining({
+                organizationId: "org_1",
+                source: "SUBSCRIPTION",
+                createdByUserId: null,
+            }),
+        );
+    });
+
+    it("is refused to a Member", async () => {
+        await expect(service.renewals(member)).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
     });
 });
 

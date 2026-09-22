@@ -75,8 +75,9 @@ export type NavAction =
     // page only has to add the row.
     | "subscription:read"
     | "invoice:read"
-    // "New invoice" in the command menu makes one.
+    // "New invoice" and "Subscribe someone" in the command menu make one.
     | "invoice:write"
+    | "subscription:write"
     | "course:read"
     | "pack:read";
 
@@ -107,6 +108,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "course:read",
         "pack:read",
         "invoice:write",
+        "subscription:write",
     ],
     ADMIN: [
         "site:read",
@@ -125,6 +127,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "course:read",
         "pack:read",
         "invoice:write",
+        "subscription:write",
     ],
     MEMBER: ["site:read", "member:read", "module:read", "store:read"],
     REVIEWER: ["site:read"],
@@ -352,11 +355,21 @@ export const NAV_GROUPS: NavGroup[] = [
             // the "Saroh Billing and Classes" design. Its pages nest like
             // Sell's; each unit adds its row once its page exists.
             {
-                href: "/invoices",
+                href: "/subscriptions",
                 label: "Billing",
                 icon: ReceiptText,
                 moduleKey: "PAYMENTS",
                 children: [
+                    {
+                        href: "/subscriptions",
+                        label: "Subscriptions",
+                        action: "subscription:read",
+                    },
+                    {
+                        href: "/subscriptions/plans",
+                        label: "Plans",
+                        action: "subscription:read",
+                    },
                     {
                         href: "/invoices",
                         label: "Invoices",

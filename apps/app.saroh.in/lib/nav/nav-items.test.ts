@@ -503,6 +503,33 @@ describe("Billing (ADR-007)", () => {
         expect(offered).toContain("/invoices");
     });
 
+    it("puts Subscriptions and Plans beside Invoices, and only the page you are on lights", () => {
+        const offered = hrefs(
+            navFor({ role: "OWNER", moduleKeys: AVAILABLE_TO.OWNER }),
+        );
+        expect(offered).toContain("/subscriptions");
+        expect(offered).toContain("/subscriptions/plans");
+        const siblings = [
+            { href: "/subscriptions" },
+            { href: "/subscriptions/plans" },
+            { href: "/invoices" },
+        ];
+        expect(
+            isNavChildCurrent(
+                "/subscriptions/plans",
+                "/subscriptions",
+                siblings,
+            ),
+        ).toBe(false);
+        expect(
+            isNavChildCurrent(
+                "/subscriptions/plans",
+                "/subscriptions/plans",
+                siblings,
+            ),
+        ).toBe(true);
+    });
+
     it("offers it to no one without Payments", () => {
         const offered = hrefs(
             navFor({ role: "OWNER", moduleKeys: ["COMMERCE", "CRM"] }),
