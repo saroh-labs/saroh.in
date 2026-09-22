@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
@@ -70,6 +71,7 @@ export function PostEditor({
 }) {
     const router = useRouter();
     const [postId, setPostId] = useState(post?.id ?? null);
+    const [confirmDelete, setConfirmDelete] = useState(false);
 
     const [title, setTitle] = useState(post?.title ?? "");
     const [content, setContent] = useState(post?.content ?? "");
@@ -457,10 +459,22 @@ export function PostEditor({
                                         "mt-2 h-7 px-1.5 text-xs",
                                         "text-destructive hover:text-destructive",
                                     )}
-                                    onClick={() => void onDelete()}
+                                    onClick={() => setConfirmDelete(true)}
                                 >
                                     Delete this post
                                 </Button>
+                                <ConfirmDialog
+                                    open={confirmDelete}
+                                    onOpenChange={setConfirmDelete}
+                                    title="Delete this post?"
+                                    description={
+                                        liveAt
+                                            ? "It comes off the site and out of your posts, and its address stops working for anyone who saved it. This cannot be undone — to take it down and keep it, use Take off the site instead."
+                                            : "It has never been published, so nobody outside your team has seen it. It cannot be brought back."
+                                    }
+                                    confirmLabel="Delete post"
+                                    onConfirm={() => void onDelete()}
+                                />
                             </div>
                         ) : null}
                     </aside>
