@@ -29,6 +29,7 @@ jest.mock("@saroh/database", () => {
             bookingEvent: { createMany: jest.fn() },
             customerSubscription: { count: jest.fn() },
             packPurchase: { count: jest.fn() },
+            courseEnrollment: { count: jest.fn(), deleteMany: jest.fn() },
             customerIdentityLink: { findMany: jest.fn() },
             customer: { findMany: jest.fn() },
             order: { groupBy: jest.fn(), findMany: jest.fn() },
@@ -60,6 +61,7 @@ const contactDelete = prisma.contact.delete as jest.Mock;
 const leadCount = prisma.lead.count as jest.Mock;
 const subCount = prisma.customerSubscription.count as jest.Mock;
 const packCount = prisma.packPurchase.count as jest.Mock;
+const courseCount = prisma.courseEnrollment.count as jest.Mock;
 const bookingFindMany = prisma.booking.findMany as jest.Mock;
 const bookingUpdateMany = prisma.booking.updateMany as jest.Mock;
 const eventCreateMany = prisma.bookingEvent.createMany as jest.Mock;
@@ -497,6 +499,7 @@ describe("ContactsService.remove", () => {
     beforeEach(() => {
         subCount.mockResolvedValue(0);
         packCount.mockResolvedValue(0);
+        courseCount.mockResolvedValue(0);
         bookingFindMany.mockResolvedValue([]);
     });
 
@@ -513,6 +516,7 @@ describe("ContactsService.remove", () => {
             leads: 2,
             subscriptions: 0,
             packs: 0,
+            courses: 0,
             bookingsCancelled: 0,
         });
         expect(leadCount).toHaveBeenCalledWith({ where: { contactId: "c_1" } });
@@ -520,11 +524,12 @@ describe("ContactsService.remove", () => {
         expect(bookingUpdateMany).not.toHaveBeenCalled();
     });
 
-    it("says what they held, and cancels future bookings paid with their packs", async () => {
+    it("says what they held, and cancels their pack-paid bookings and course sessions to come", async () => {
         findUnique.mockResolvedValue({ id: "c_1", organizationId: "org_1" });
         leadCount.mockResolvedValue(0);
         subCount.mockResolvedValue(1);
         packCount.mockResolvedValue(2);
+        courseCount.mockResolvedValue(1);
         const startAt = new Date("2099-01-01T09:00:00Z");
         bookingFindMany.mockResolvedValue([{ id: "bk_1", startAt }]);
 
@@ -533,6 +538,7 @@ describe("ContactsService.remove", () => {
         ).resolves.toMatchObject({
             subscriptions: 1,
             packs: 2,
+            courses: 1,
             bookingsCancelled: 1,
         });
         expect(bookingFindMany).toHaveBeenCalledWith(
@@ -540,10 +546,20 @@ describe("ContactsService.remove", () => {
                 where: expect.objectContaining({
                     organizationId: "org_1",
                     status: "CONFIRMED",
-                    packRedemption: {
-                        reversedAt: null,
-                        purchase: { contactId: "c_1" },
-                    },
+                    OR: [
+                        {
+                            packRedemption: {
+                                reversedAt: null,
+                                purchase: { contactId: "c_1" },
+                            },
+                        },
+                        {
+                            courseEnrollment: {
+                                contactId: "c_1",
+                                status: "ACTIVE",
+                            },
+                        },
+                    ],
                 }),
             }),
         );

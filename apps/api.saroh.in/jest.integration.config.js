@@ -65,6 +65,7 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
+        "<rootDir>/src/modules/courses/courses.service.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
     globalSetup: "<rootDir>/test/global-setup.ts",

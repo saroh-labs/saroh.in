@@ -125,6 +125,7 @@ export interface ContactRemoval {
     leads: number;
     subscriptions: number;
     packs: number;
+    courses: number;
     bookingsCancelled: number;
 }
 

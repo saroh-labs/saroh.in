@@ -32,6 +32,8 @@ jest.mock("@saroh/database", () => {
         job: { create: jest.fn() },
         site: { findUnique: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
+        courseSession: { findMany: jest.fn().mockResolvedValue([]) },
+        course: { findFirst: jest.fn().mockResolvedValue(null) },
         packRedemption: {
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             findFirst: jest.fn().mockResolvedValue(null),
@@ -1507,5 +1509,127 @@ describe("class packs on bookings (ADR-007)", () => {
             }),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(serviceFindUnique).not.toHaveBeenCalled();
+    });
+});
+
+describe("courses on a service's time (ADR-007)", () => {
+    const client = prisma as unknown as {
+        courseSession: { findMany: jest.Mock };
+        course: { findFirst: jest.Mock };
+    };
+
+    beforeEach(() => jest.clearAllMocks());
+
+    /** An open course with a session on the slot, and seats nobody has taken. */
+    function heldSeats(seats: number, enrolled: number) {
+        client.courseSession.findMany.mockResolvedValueOnce([
+            {
+                startAt: new Date(START),
+                endAt: new Date(AT_11),
+                course: {
+                    id: "course_1",
+                    seats,
+                    _count: { enrollments: enrolled },
+                },
+            },
+        ]);
+    }
+
+    it("counts the seats an open course still holds as taken, so a public booker cannot fill them", async () => {
+        const service = new BookingsService();
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            capacity: 4,
+            availabilityRules: RULES,
+        });
+        bookingCount.mockResolvedValue(2);
+        heldSeats(3, 1); // two seats still held; 2 booked + 2 held = 4
+
+        await expect(
+            service.book("svc_1", baseInput(), "iphash"),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(bookingCreate).not.toHaveBeenCalled();
+        expect(client.courseSession.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    course: { serviceId: "svc_1", status: "OPEN" },
+                }),
+            }),
+        );
+    });
+
+    it("links a course booking to its enrolment and queues no notification", async () => {
+        const service = new BookingsService();
+        wireBookHappyPath();
+        await service.reserveInTx(
+            prisma as never,
+            { ...SERVICE, capacity: 4 } as never,
+            new Date(START),
+            new Date(AT_11),
+            baseInput(),
+            { source: "course:course_1", actorUserId: "user_1" },
+            { courseId: "course_1", enrollmentId: "enr_1" },
+        );
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            courseEnrollmentId: "enr_1",
+        });
+        expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("will not move one course booking on its own", async () => {
+        wireReschedule({ courseEnrollmentId: "enr_1" } as never);
+        await expect(
+            new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                startAt: AT_10,
+            }),
+        ).rejects.toThrow("This is a course session.");
+        expect(bookingUpdate).not.toHaveBeenCalled();
+    });
+
+    it("will not lower a service's capacity below a course's seats", async () => {
+        serviceFindUnique.mockResolvedValue({ ...SERVICE, capacity: 10 });
+        client.course.findFirst.mockResolvedValueOnce({
+            name: "Beginners' wheel",
+            seats: 8,
+        });
+        await expect(
+            new BookingsService().updateService(ctx(), "svc_1", {
+                capacity: 6,
+            }),
+        ).rejects.toThrow("Beginners' wheel has 8 seats on this service.");
+        expect(client.course.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    serviceId: "svc_1",
+                    status: { not: "ARCHIVED" },
+                    seats: { gt: 6 },
+                },
+            }),
+        );
+    });
+
+    it("shows a slot the course still holds as taken in the availability", async () => {
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            capacity: 2,
+            availabilityRules: RULES,
+        });
+        moduleFindFirst.mockResolvedValue(null);
+        (prisma.booking.findMany as jest.Mock).mockResolvedValue([]);
+        // Without the course, the slot is open.
+        const open = await new BookingsService().publicAvailability(
+            "svc_1",
+            "2026-07-20T00:00:00.000Z",
+            "2026-07-21T00:00:00.000Z",
+        );
+        expect(open.map((s) => s.startAt.toISOString())).toContain(START);
+        heldSeats(2, 0);
+        const slots = await new BookingsService().publicAvailability(
+            "svc_1",
+            "2026-07-20T00:00:00.000Z",
+            "2026-07-21T00:00:00.000Z",
+        );
+        expect(slots.map((s) => s.startAt.toISOString())).not.toContain(START);
     });
 });
