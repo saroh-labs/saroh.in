@@ -3,7 +3,7 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Plus, Store } from "lucide-react";
+import { Download, Plus, Store } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -19,6 +19,7 @@ import type {
     BusinessOrder,
     OrderStanding,
 } from "@/lib/orders/business-service";
+import { ordersToCsv } from "@/lib/orders/export";
 import { newOrderHref, orderHref } from "@/lib/orders/links";
 
 /**
@@ -188,21 +189,37 @@ export function OrdersScreen({
                 className="mb-0"
                 actions={
                     stores.length > 0 ? (
-                        <Button asChild>
-                            {/* Into the storefront in view, or — with several
-                                and none chosen — a page that asks which. */}
-                            <Link
-                                href={newOrderHref(
-                                    storeId ??
-                                        (stores.length === 1
-                                            ? stores[0].id
-                                            : undefined),
-                                )}
+                        <>
+                            <Button
+                                variant="outline"
+                                disabled={rows.length === 0}
+                                onClick={() =>
+                                    downloadCsv(
+                                        rows,
+                                        stores.find((s) => s.id === storeId)
+                                            ?.name,
+                                    )
+                                }
                             >
-                                <Plus className="mr-1.5 size-4" />
-                                New order
-                            </Link>
-                        </Button>
+                                <Download className="mr-1.5 size-4" />
+                                Export
+                            </Button>
+                            <Button asChild>
+                                {/* Into the storefront in view, or — with several
+                                and none chosen — a page that asks which. */}
+                                <Link
+                                    href={newOrderHref(
+                                        storeId ??
+                                            (stores.length === 1
+                                                ? stores[0].id
+                                                : undefined),
+                                    )}
+                                >
+                                    <Plus className="mr-1.5 size-4" />
+                                    New order
+                                </Link>
+                            </Button>
+                        </>
                     ) : undefined
                 }
             />
@@ -255,4 +272,29 @@ export function OrdersScreen({
             />
         </>
     );
+}
+
+/**
+ * Hand the orders in view to the browser as a CSV file. Named for the
+ * storefront when the list is filtered to one, and dated, so a folder of
+ * exports sorts itself.
+ */
+function downloadCsv(rows: BusinessOrder[], storeName?: string) {
+    // A byte-order mark, so Excel reads ₹ and names in the right encoding.
+    const blob = new Blob(["\ufeff", ordersToCsv(rows)], {
+        type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const day = new Date().toISOString().slice(0, 10);
+    const scope = storeName
+        ? `-${storeName
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, "")}`
+        : "";
+    a.href = url;
+    a.download = `orders${scope}-${day}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
 }
