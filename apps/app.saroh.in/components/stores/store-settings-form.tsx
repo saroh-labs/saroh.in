@@ -93,7 +93,7 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
                     name="slug"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Slug</FormLabel>
+                            <FormLabel>Web address</FormLabel>
                             <FormControl>
                                 <Input disabled={isSubmitting} {...field} />
                             </FormControl>
@@ -119,7 +119,7 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
                     name="logo"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Logo URL</FormLabel>
+                            <FormLabel>Logo address</FormLabel>
                             <FormControl>
                                 <Input
                                     placeholder="https://…"
@@ -133,7 +133,7 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
                 />
                 <Button
                     type="submit"
-                    className="wk-press"
+                    className="wk-press justify-self-start"
                     disabled={isSubmitting}
                 >
                     {isSubmitting ? "Saving…" : "Save changes"}

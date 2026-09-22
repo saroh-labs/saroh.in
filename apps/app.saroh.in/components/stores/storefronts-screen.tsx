@@ -28,6 +28,11 @@ import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import {
+    newStorefrontHref,
+    storefrontDetailsHref,
+    storefrontPeopleHref,
+} from "@/lib/stores/links";
+import {
     closeStorefront,
     updateStorefront,
 } from "@/lib/stores/storefront-actions";
@@ -115,7 +120,7 @@ export function StorefrontsScreen({
             actions={
                 canCreate ? (
                     <Button asChild variant="brand">
-                        <Link href="/stores/new">New storefront</Link>
+                        <Link href={newStorefrontHref}>New storefront</Link>
                     </Button>
                 ) : undefined
             }
@@ -132,7 +137,7 @@ export function StorefrontsScreen({
                     action={
                         canCreate ? (
                             <Button asChild variant="brand">
-                                <Link href="/stores/new">
+                                <Link href={newStorefrontHref}>
                                     Create a storefront
                                 </Link>
                             </Button>
@@ -410,6 +415,21 @@ function BasicsSection({
                     collection. An online store is a channel and needs none of
                     them.
                 </Note>
+            </div>
+
+            {/* What used to be the storefront's own Settings and Members
+                tabs, now reached from here (#376). */}
+            <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline" size="sm">
+                    <Link href={storefrontDetailsHref(store.id)}>
+                        Web address, description and logo
+                    </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                    <Link href={storefrontPeopleHref(store.id)}>
+                        People who work on it
+                    </Link>
+                </Button>
             </div>
         </Section>
     );

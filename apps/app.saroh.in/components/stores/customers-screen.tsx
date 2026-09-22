@@ -22,6 +22,7 @@ import {
 } from "@/lib/customers/links";
 import type { CustomerListItem } from "@/lib/customers/service";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { newStorefrontHref } from "@/lib/stores/links";
 
 /** Two letters from the name, or one from the email when there is no name. */
 function initials(row: DirectoryRow): string {
@@ -207,7 +208,9 @@ export function CustomersScreen({
                         Make a storefront, and the list starts filling itself.
                     </p>
                     <Button asChild className="mt-1">
-                        <Link href="/stores/new">Create a storefront</Link>
+                        <Link href={newStorefrontHref}>
+                            Create a storefront
+                        </Link>
                     </Button>
                 </div>
             ) : (

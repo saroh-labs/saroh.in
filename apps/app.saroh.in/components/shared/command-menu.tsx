@@ -131,7 +131,7 @@ const ACTIONS: {
         action: "site:create",
     },
     {
-        href: "/stores/new",
+        href: "/commerce/storefronts/new",
         label: "New store",
         icon: Store,
         moduleKey: "COMMERCE",

@@ -2,7 +2,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { OrdersScreen } from "@/components/stores/orders-screen";
 import { listBusinessOrders } from "@/lib/orders/business-service";
 import { requireSession } from "@/lib/session";
-import { listStores } from "@/lib/stores/service";
+import { listBusinessStores } from "@/lib/stores/service";
 
 /**
  * Sell → Orders: every order in the business.
@@ -27,7 +27,7 @@ export default async function OrdersPage({
     await requireSession();
     const [orders, stores, { view }] = await Promise.all([
         listBusinessOrders(),
-        listStores(),
+        listBusinessStores(),
         searchParams,
     ]);
 

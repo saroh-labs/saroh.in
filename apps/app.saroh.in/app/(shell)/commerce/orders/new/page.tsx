@@ -8,7 +8,7 @@ import { listCustomers } from "@/lib/customers/service";
 import { newOrderHref } from "@/lib/orders/links";
 import { listProducts } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
-import { listStores } from "@/lib/stores/service";
+import { listBusinessStores } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";
 
 export const metadata = { title: "New order" };
@@ -25,7 +25,7 @@ export default async function NewOrderPage({
     await requireSession();
     const [{ storefront }, stores] = await Promise.all([
         searchParams,
-        listStores(),
+        listBusinessStores(),
     ]);
     const store =
         stores.find((s) => s.id === storefront) ??

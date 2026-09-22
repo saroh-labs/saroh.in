@@ -7,7 +7,7 @@ import type { ProductDetail } from "@/lib/products/service";
 import { getProduct } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
 import type { Store } from "@/lib/stores/service";
-import { listStores } from "@/lib/stores/service";
+import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Product" };
 
@@ -29,7 +29,7 @@ export default async function ProductPage({
     const [{ productId }, { storefront }, stores] = await Promise.all([
         params,
         searchParams,
-        listStores(),
+        listBusinessStores(),
     ]);
 
     const found = await findProduct(stores, productId, storefront);

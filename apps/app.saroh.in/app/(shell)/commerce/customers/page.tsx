@@ -3,7 +3,7 @@ import { CustomersScreen } from "@/components/stores/customers-screen";
 import type { CustomerListItem } from "@/lib/customers/service";
 import { listCustomers } from "@/lib/customers/service";
 import { requireSession } from "@/lib/session";
-import { listStores } from "@/lib/stores/service";
+import { listBusinessStores } from "@/lib/stores/service";
 
 /**
  * Sell → Customers: everyone who has bought from this business.
@@ -18,7 +18,7 @@ export const metadata = { title: "Customers" };
 
 export default async function CustomersPage() {
     await requireSession();
-    const stores = await listStores();
+    const stores = await listBusinessStores();
     const lists = await Promise.all(
         stores.map((s) =>
             listCustomers(s.id).catch((): CustomerListItem[] | null => null),

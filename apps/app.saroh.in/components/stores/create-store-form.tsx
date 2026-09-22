@@ -19,6 +19,7 @@ import { z } from "zod";
 
 import { trimmedOr } from "@/lib/forms/values";
 import { createStore } from "@/lib/stores/actions";
+import { storefrontHref } from "@/lib/stores/links";
 import { slugify } from "@/lib/stores/slug";
 
 const formSchema = z.object({
@@ -59,7 +60,7 @@ export function CreateStoreForm() {
             }
             return;
         }
-        router.push(`/stores/${res.data.id}`);
+        router.push(storefrontHref(res.data.id));
     }
 
     return (
@@ -73,10 +74,10 @@ export function CreateStoreForm() {
                     name="name"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Store name</FormLabel>
+                            <FormLabel>Storefront name</FormLabel>
                             <FormControl>
                                 <Input
-                                    placeholder="My Blog"
+                                    placeholder="Hill Road shop"
                                     disabled={isSubmitting}
                                     {...field}
                                     onChange={(e) => {
@@ -99,10 +100,10 @@ export function CreateStoreForm() {
                     name="slug"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Slug</FormLabel>
+                            <FormLabel>Web address</FormLabel>
                             <FormControl>
                                 <Input
-                                    placeholder="my-blog"
+                                    placeholder="hill-road"
                                     disabled={isSubmitting}
                                     {...field}
                                     onChange={(e) => {
@@ -130,10 +131,10 @@ export function CreateStoreForm() {
                 />
                 <Button
                     type="submit"
-                    className="wk-press"
+                    className="wk-press justify-self-start"
                     disabled={isSubmitting || !name.trim()}
                 >
-                    {isSubmitting ? "Creating…" : "Create store"}
+                    {isSubmitting ? "Creating…" : "Create storefront"}
                 </Button>
             </form>
         </Form>

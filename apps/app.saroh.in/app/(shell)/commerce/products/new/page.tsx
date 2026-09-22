@@ -1,14 +1,10 @@
-import { EmptyState } from "@saroh/ui/data-state";
-import { PageHeader } from "@saroh/ui/page-header";
-import { ChevronRight, Package } from "lucide-react";
-import Link from "next/link";
-
 import { ProductEditor } from "@/components/commerce/product-editor";
+import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
 import { loadEditorContext } from "@/lib/products/editor-data";
 import { newProductHref } from "@/lib/products/links";
 import { requireSession } from "@/lib/session";
-import { listStores } from "@/lib/stores/service";
+import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "New product" };
 
@@ -28,7 +24,7 @@ export default async function NewProductPage({
     await requireSession();
     const [{ storefront }, stores] = await Promise.all([
         searchParams,
-        listStores(),
+        listBusinessStores(),
     ]);
     const store =
         stores.find((s) => s.id === storefront) ??
@@ -45,63 +41,15 @@ export default async function NewProductPage({
 
     return (
         <PageContainer width="form">
-            <PageHeader
-                breadcrumb={[
-                    "Sell",
-                    <Link
-                        key="products"
-                        href="/commerce/products"
-                        className="hover:text-foreground"
-                    >
-                        Products
-                    </Link>,
-                    "New product",
-                ]}
+            <StorefrontChooser
+                section="Products"
+                sectionHref="/commerce/products"
+                crumb="New product"
                 title="Where is it sold?"
                 description="A product is made at one storefront, and priced in that storefront's currency."
+                stores={stores}
+                hrefFor={newProductHref}
             />
-            {stores.length === 0 ? (
-                <EmptyState
-                    icon={<Package />}
-                    title="No storefront yet"
-                    description="Products are sold at a storefront, so the first one comes before the first product."
-                    action={
-                        <Link
-                            href="/stores/new"
-                            className="font-medium underline-offset-4 hover:underline"
-                        >
-                            Make a storefront
-                        </Link>
-                    }
-                />
-            ) : (
-                <ul className="overflow-hidden rounded-[12px] border border-border">
-                    {stores.map((s) => (
-                        <li
-                            key={s.id}
-                            className="border-b border-border last:border-b-0"
-                        >
-                            <Link
-                                href={newProductHref(s.id)}
-                                className="flex items-center gap-3 bg-card px-[18px] py-[14px] transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                            >
-                                <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[13.5px] font-medium">
-                                        {s.name}
-                                    </span>
-                                    <span className="block font-mono text-[11.5px] text-muted-foreground">
-                                        /{s.slug}
-                                    </span>
-                                </span>
-                                <ChevronRight
-                                    aria-hidden
-                                    className="size-4 text-muted-foreground"
-                                />
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
-            )}
         </PageContainer>
     );
 }

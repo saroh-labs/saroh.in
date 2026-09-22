@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { acceptInvitation } from "@/lib/members/service";
 import { requireSession } from "@/lib/session";
+import { storefrontHref } from "@/lib/stores/links";
 
 /**
  * Accept a store invitation. Requires a session (requireSession bounces an
@@ -22,7 +23,7 @@ export default async function AcceptInvitationPage({
 
     const result = await acceptInvitation(token);
     if (result.ok) {
-        redirect(`/stores/${result.storeId}`);
+        redirect(storefrontHref(result.storeId));
     }
 
     return (
