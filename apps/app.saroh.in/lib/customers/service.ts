@@ -1,4 +1,5 @@
-import { apiFetch, getJson, getList } from "@/lib/api/http";
+import type { CrmResult } from "@/lib/api/http";
+import { apiFetch, getJson, getList, readError } from "@/lib/api/http";
 
 /**
  * Customers data access for app.saroh.in. Forwards the session cookie to
@@ -90,4 +91,27 @@ export function updateCustomer(
     input: CustomerInput,
 ) {
     return mutate(`/stores/${storeId}/customers/${customerId}`, "PUT", input);
+}
+
+/**
+ * Delete a customer who has never ordered. One with orders is refused by the
+ * API (an order keeps who bought it), and its reason comes back as the error.
+ */
+export async function deleteCustomer(
+    storeId: string,
+    customerId: string,
+): Promise<CrmResult<{ id: string }>> {
+    const res = await apiFetch(`/stores/${storeId}/customers/${customerId}`, {
+        method: "DELETE",
+    });
+    const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        message?: string;
+        error?: string | { message?: string };
+    } | null;
+    if (res.ok) return { ok: true, data: { id: customerId } };
+    return {
+        ok: false,
+        error: readError(data, "Could not delete the customer"),
+    };
 }

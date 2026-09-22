@@ -1,5 +1,5 @@
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, mutate, orgBase } from "@/lib/api/http";
+import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * CRM Leads data access for app.saroh.in (S3-005). Org-scoped list / detail /
@@ -122,6 +122,13 @@ export function createLead(
 }
 
 /** Patch a lead's title / status / value. */
+/** Delete a lead for good; its timeline goes with it. */
+export function deleteLead(
+    leadId: string,
+): Promise<CrmResult<{ id: string; deleted: true }>> {
+    return destroy(`/leads/${leadId}`, "Could not delete the lead");
+}
+
 export function updateLead(
     leadId: string,
     input: UpdateLeadInput,

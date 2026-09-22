@@ -3,6 +3,7 @@
 import type { CustomerInput, CustomerResult } from "./service";
 import {
     createCustomer as createCustomerApi,
+    deleteCustomer as deleteCustomerApi,
     updateCustomer as updateCustomerApi,
 } from "./service";
 
@@ -21,4 +22,8 @@ export async function updateCustomer(
     input: CustomerInput,
 ): Promise<CustomerResult> {
     return updateCustomerApi(storeId, customerId, input);
+}
+
+export async function deleteCustomer(storeId: string, customerId: string) {
+    return deleteCustomerApi(storeId, customerId);
 }

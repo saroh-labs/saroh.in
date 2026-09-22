@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     Param,
@@ -45,6 +46,15 @@ export class CustomersController {
         @Param("customerId") customerId: string,
     ) {
         return this.customers.get(storeId, customerId, user.id);
+    }
+
+    @Delete(":customerId")
+    remove(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("customerId") customerId: string,
+    ) {
+        return this.customers.remove(storeId, customerId, user.id);
     }
 
     @Put(":customerId")

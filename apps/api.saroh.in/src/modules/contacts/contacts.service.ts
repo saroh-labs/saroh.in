@@ -421,6 +421,32 @@ export class ContactsService {
     }
 
     /**
+     * Delete a person from the contacts for good. Authorizes `contact:write`;
+     * a missing or cross-tenant id 404s before any write.
+     *
+     * Their leads go with them (and each lead's timeline), and so do their
+     * consent records — a person removed from the business is not kept on as
+     * a consent row. What happened stays: a booking keeps the booker's own
+     * name and email, and a form submission or message keeps its raw record;
+     * each only loses the link (SetNull in the schema). A shop customer with
+     * the same email is a separate record and is untouched.
+     *
+     * Returns how many leads went, so the workspace can say so.
+     */
+    async remove(
+        ctx: OrganizationContext,
+        contactId: string,
+    ): Promise<{ id: string; deleted: true; leads: number }> {
+        authorize(ctx, "contact:write");
+        await this.requireOwned(ctx, contactId);
+        const [leads] = await prisma.$transaction([
+            prisma.lead.count({ where: { contactId } }),
+            prisma.contact.delete({ where: { id: contactId } }),
+        ]);
+        return { id: contactId, deleted: true, leads };
+    }
+
+    /**
      * Load a contact and assert it belongs to `ctx.organizationId`. Throws
      * `NotFoundException` for a missing OR cross-tenant id — a 404 (not 403) so a
      * caller can't probe which contacts exist in another org.

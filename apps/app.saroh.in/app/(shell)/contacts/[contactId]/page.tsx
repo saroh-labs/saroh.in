@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { DeleteContactMenu } from "@/components/contacts/delete-contact-menu";
 import { EditContactDialog } from "@/components/contacts/edit-contact-dialog";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { PageContainer } from "@/components/shared/page-container";
@@ -86,6 +87,11 @@ export default async function ContactDetailPage({
                                     },
                                 ]}
                                 stages={addLead.stages}
+                            />
+                            <DeleteContactMenu
+                                contactId={contact.id}
+                                name={name}
+                                leadCount={contact.leads.length}
                             />
                         </>
                     }
