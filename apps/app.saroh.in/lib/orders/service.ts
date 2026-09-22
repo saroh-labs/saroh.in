@@ -36,6 +36,8 @@ export interface OrderItem {
 }
 
 export interface OrderDetail extends OrderSummary {
+    /** When anything on the order last changed. */
+    updatedAt: string | null;
     subtotal: string;
     tax: string;
     shipping: string;

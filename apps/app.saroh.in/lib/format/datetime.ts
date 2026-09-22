@@ -128,3 +128,19 @@ export function formatShortDate(iso: string | Date, timeZone: string): string {
         year: "numeric",
     }).format(new Date(iso));
 }
+
+/** A short date and time for a timeline, e.g. "21 Jul 2026, 14:05". */
+export function formatShortDateTime(
+    iso: string | Date,
+    timeZone: string,
+): string {
+    return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
+        timeZone,
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+    }).format(new Date(iso));
+}

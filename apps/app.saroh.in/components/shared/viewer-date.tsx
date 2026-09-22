@@ -2,7 +2,11 @@
 
 import { useSyncExternalStore } from "react";
 
-import { formatDayHeading, formatShortDate } from "@/lib/format/datetime";
+import {
+    formatDayHeading,
+    formatShortDate,
+    formatShortDateTime,
+} from "@/lib/format/datetime";
 
 /**
  * A date shown in the VIEWER'S timezone, without breaking hydration.
@@ -39,8 +43,11 @@ export function ViewerDate({
     className,
 }: {
     iso: string;
-    /** `heading` says "Today" / "Tomorrow" where it applies; `short` is a date. */
-    variant?: "short" | "heading";
+    /**
+     * `heading` says "Today" / "Tomorrow" where it applies; `short` is a date;
+     * `datetime` adds the time, for a timeline where the hour matters.
+     */
+    variant?: "short" | "heading" | "datetime";
     className?: string;
 }) {
     const timeZone = useSyncExternalStore(
@@ -52,7 +59,9 @@ export function ViewerDate({
     const text =
         variant === "heading"
             ? formatDayHeading(iso, timeZone)
-            : formatShortDate(iso, timeZone);
+            : variant === "datetime"
+              ? formatShortDateTime(iso, timeZone)
+              : formatShortDate(iso, timeZone);
 
     return (
         // `<time dateTime>` carries the exact instant regardless of how the

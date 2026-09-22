@@ -13,7 +13,9 @@ import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { OptionSelect } from "@/components/shared/option-select";
+import { formatMoney } from "@/lib/format/money";
 import { createOrder } from "@/lib/orders/actions";
+import { orderHref } from "@/lib/orders/links";
 
 interface ProductLite {
     id: string;
@@ -94,6 +96,10 @@ export function OrderForm({
     checkout?: CheckoutDefaults | null;
 }) {
     const router = useRouter();
+    // Amounts as money, in the storefront's currency, for reading. Inputs keep
+    // the plain decimal they are typed in.
+    const show = (cents: number) =>
+        formatMoney(cents, checkout?.currency) ?? money(cents);
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -181,7 +187,7 @@ export function OrderForm({
             return;
         }
         showSuccess("Order created");
-        router.push(`/stores/${storeId}/orders/${res.data.id}`);
+        router.push(orderHref(storeId, res.data.id));
     }
 
     /** Preserve the original toast UX for the two top-level guards. */
@@ -275,7 +281,7 @@ export function OrderForm({
                                         className="flex-1"
                                         options={products.map((p) => ({
                                             value: p.id,
-                                            label: `${p.name} — ${p.price}`,
+                                            label: `${p.name} — ${show(toCents(p.price))}`,
                                         }))}
                                     />
                                 )}
@@ -291,7 +297,7 @@ export function OrderForm({
                                 })}
                             />
                             <span className="w-20 text-right text-sm tabular-nums text-muted-foreground">
-                                {money(
+                                {show(
                                     priceOf(watched?.productId ?? "") *
                                         quantityOf(watched?.quantity),
                                 )}
@@ -366,7 +372,7 @@ export function OrderForm({
                             >
                                 {qualifiesForFree
                                     ? "Qualifies for free delivery."
-                                    : `Free over ${money(freeOver)}.`}
+                                    : `Free over ${show(freeOver)}.`}
                             </p>
                         ) : null}
                     </div>
@@ -420,11 +426,10 @@ export function OrderForm({
             <div className="flex items-center justify-between border-t pt-4">
                 <div className="text-sm">
                     <p className="text-muted-foreground">
-                        Subtotal {money(subtotalCents)}
+                        Subtotal {show(subtotalCents)}
                     </p>
                     <p className="text-lg font-semibold tabular-nums">
-                        Total {money(totalCents)}
-                        {checkout ? ` ${checkout.currency}` : null}
+                        Total {show(totalCents)}
                     </p>
                     {discountCode ? (
                         <p className="text-[12px] text-muted-foreground">

@@ -37,6 +37,8 @@ export interface OrderSummaryDto {
 }
 
 export interface OrderDetailDto extends OrderSummaryDto {
+    /** When anything on the order last changed; `null` if never read. */
+    updatedAt: Date | null;
     subtotal: string;
     tax: string;
     shipping: string;
@@ -81,6 +83,7 @@ interface RawItem {
 }
 
 interface RawDetail extends RawSummary {
+    updatedAt?: Date;
     subtotal: DecimalLike;
     tax: DecimalLike;
     shipping: DecimalLike;
@@ -121,6 +124,7 @@ export function serializeOrderSummary(order: RawSummary): OrderSummaryDto {
 export function serializeOrderDetail(order: RawDetail): OrderDetailDto {
     return {
         ...serializeOrderSummary(order),
+        updatedAt: order.updatedAt ?? null,
         subtotal: toMoneyString(order.subtotal),
         tax: toMoneyString(order.tax),
         shipping: toMoneyString(order.shipping),

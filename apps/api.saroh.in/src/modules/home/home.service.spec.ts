@@ -348,7 +348,7 @@ describe("HomeService evidence", () => {
         expect(row?.currency).toBe("INR");
         expect(row?.title).toBe("ORD-004");
         expect(row?.subtitle).toBe("Vikram Shetty");
-        expect(row?.href).toBe("/stores/store_1/orders/ord_1");
+        expect(row?.href).toBe("/commerce/orders/ord_1?storefront=store_1");
     });
 
     it("reports the true total even when evidence is capped", async () => {

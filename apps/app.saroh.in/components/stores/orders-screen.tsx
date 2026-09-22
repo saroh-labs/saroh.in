@@ -1,8 +1,10 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Store } from "lucide-react";
+import { Plus, Store } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { DataView } from "@/components/shared/data-view/data-view";
@@ -17,6 +19,7 @@ import type {
     BusinessOrder,
     OrderStanding,
 } from "@/lib/orders/business-service";
+import { newOrderHref, orderHref } from "@/lib/orders/links";
 
 /**
  * How a standing is said, and in what shape.
@@ -183,6 +186,25 @@ export function OrdersScreen({
                 breadcrumb={["Sell", "Orders"]}
                 title="Orders"
                 className="mb-0"
+                actions={
+                    stores.length > 0 ? (
+                        <Button asChild>
+                            {/* Into the storefront in view, or — with several
+                                and none chosen — a page that asks which. */}
+                            <Link
+                                href={newOrderHref(
+                                    storeId ??
+                                        (stores.length === 1
+                                            ? stores[0].id
+                                            : undefined),
+                                )}
+                            >
+                                <Plus className="mr-1.5 size-4" />
+                                New order
+                            </Link>
+                        </Button>
+                    ) : undefined
+                }
             />
 
             <DataView
@@ -190,10 +212,7 @@ export function OrdersScreen({
                 rows={rows}
                 columns={columns}
                 rowKey={(o) => o.id}
-                // Into the storefront that owns it — that is where an order can
-                // actually be worked on. A business-wide order detail is a
-                // screen of its own and does not exist yet.
-                rowHref={(o) => `/stores/${o.store.id}/orders/${o.id}`}
+                rowHref={(o) => orderHref(o.store.id, o.id)}
                 modes={["table", "list"]}
                 hideModeToggle
                 filters={FILTERS}
