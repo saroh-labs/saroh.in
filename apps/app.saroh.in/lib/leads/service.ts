@@ -185,3 +185,24 @@ export function completeTask(
         "Could not complete the task",
     );
 }
+
+/** An open follow-up, as the business-wide worklist returns it. */
+export interface OpenTask {
+    id: string;
+    leadId: string;
+    body: string | null;
+    dueAt: string | null;
+    createdAt: string;
+}
+
+/**
+ * Every follow-up not yet done, soonest first — across all leads. Null when it
+ * cannot be read, so the tab can say so rather than claim there are none.
+ */
+export async function listOpenTasks(): Promise<OpenTask[] | null> {
+    const base = await orgBase();
+    if (!base) return [];
+    const res = await apiFetch(`${base}/tasks?open=true`);
+    if (!res.ok) return null;
+    return (await res.json()) as OpenTask[];
+}
