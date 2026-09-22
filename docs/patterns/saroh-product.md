@@ -72,6 +72,12 @@ pattern files refer back here.
   phone, and keep links reversible and auditable (§14).
 - **Current** — Merchant payments run on the Organization's own providers —
   Razorpay and Cashfree first — kept apart from Saroh's billing (DEC-010).
+- **Current** — **Deleting a contact, a lead or a customer is permanent, so it
+  asks first** and says what goes and what stays (#384). A contact takes their
+  leads and consent records; bookings, form entries and messages keep their
+  own record and lose only the link. **A customer who has ordered cannot be
+  deleted** — an order keeps who bought it; the menu shows why, it does not
+  hide the option.
 
 ## Bookings
 
@@ -83,6 +89,9 @@ pattern files refer back here.
 - **Adopted** — The booker and the merchant hear about a new or moved booking.
   Not true yet: `booking.notify` has no handler (`backend-jobs.md`, known gaps).
   Don't write copy that promises a confirmation message.
+- **Current** — A booking made by hand follows the booking page's rules: a
+  real open slot, the same serializable capacity check, and its history names
+  who on the team made it (#384).
 
 ## Websites
 
@@ -96,6 +105,10 @@ pattern files refer back here.
   publications keep validating.
 - **Current** — A merchant's site never wears Saroh's brand (`--site-*`, gates
   G2 and G6). A Site owns its Posts (ADR-004).
+- **Current** — A form entry is the record of what someone typed; it
+  outlives the contact and lead it created. Reading entries is `form:read`
+  (owner/admin), not the site's permission, because they are people's details
+  (#385).
 
 ## Communications
 
