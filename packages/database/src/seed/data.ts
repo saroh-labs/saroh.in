@@ -47,8 +47,9 @@ export const CURRENCY = "INR";
  * when the rules change.
  *
  * The consequence, now that the fixture also carries sites, analytics and live
- * providers: every ENABLED module below evaluates to ACTIVE, except COURSES,
- * which asks for a course until the showcase seed makes one (ADR-007, U14). AUTOMATIONS is the
+ * providers: every ENABLED module below evaluates to ACTIVE, except COURSES:
+ * Northwind runs no course, so it asks for one (the showcase's Pulse Fitness
+ * and Prana Yoga are where courses are seeded — ADR-007). AUTOMATIONS is the
  * one capability left genuinely absent, and it short-circuits at the
  * "configured" gate rather than on readiness — so `SETUP_REQUIRED` and
  * `ATTENTION_REQUIRED` are no longer reachable from this fixture. Reaching them
@@ -72,7 +73,7 @@ export const MODULE_STATES: readonly {
     {
         key: "COURSES",
         status: "ENABLED",
-        why: "classes run as courses; reads SETUP_REQUIRED until the showcase seeds one (U14)",
+        why: "switched on but no course yet, so it reads SETUP_REQUIRED; the showcase's Pulse and Prana run courses",
     },
     {
         key: "PAYMENTS",
@@ -729,7 +730,48 @@ export type SeedSection =
               submitLabel: string;
               successMessage: string;
           };
+      }
+    | {
+          type: "features";
+          content: {
+              heading?: string;
+              intro?: string;
+              items: readonly { title: string; body?: string }[];
+          };
+      }
+    | {
+          type: "faq";
+          content: {
+              heading?: string;
+              intro?: string;
+              items: readonly { question: string; answer: string }[];
+          };
+      }
+    | {
+          type: "servicesList";
+          /** Indexes into the business's services, resolved to ids on write. */
+          services: readonly number[];
+          content: { heading?: string; intro?: string; showPrices?: boolean };
       };
+
+/** One website: its pages and whether it is live. */
+export interface SeedSite {
+    slug: string;
+    name: string;
+    /** A {@link SIDE_BUSINESSES} key; absent for Northwind's own site. */
+    business?: string;
+    subdomain: string | null;
+    /** Published sites get a Publication and a live pointer; drafts do not. */
+    published: boolean;
+    /** Days before today the site was created, so the list is not all "just now". */
+    createdDaysAgo: number;
+    pages: readonly {
+        path: string;
+        title: string;
+        isHome?: boolean;
+        sections: readonly SeedSection[];
+    }[];
+}
 
 /**
  * What came in through the website's enquiry form (#385): the raw entries
@@ -786,7 +828,7 @@ export const SUBMISSIONS: readonly {
 ];
 
 /** The enquiry form Northwind uses everywhere it asks a visitor for details. */
-const ENQUIRY_FIELDS: readonly SeedFormField[] = [
+export const ENQUIRY_FIELDS: readonly SeedFormField[] = [
     { name: "name", label: "Your name", type: "text", required: true },
     { name: "email", label: "Email", type: "email", required: true },
     { name: "phone", label: "Phone", type: "tel" },
@@ -838,23 +880,7 @@ export const SIDE_BUSINESSES: readonly {
  * `/templates/starter/*.jpg`, and those files do not exist in any app's
  * `public/` — seeding them would put broken images in the editor.
  */
-export const SITES: readonly {
-    slug: string;
-    name: string;
-    /** A {@link SIDE_BUSINESSES} key; absent for Northwind's own site. */
-    business?: string;
-    subdomain: string | null;
-    /** Published sites get a Publication and a live pointer; drafts do not. */
-    published: boolean;
-    /** Days before today the site was created, so the list is not all "just now". */
-    createdDaysAgo: number;
-    pages: readonly {
-        path: string;
-        title: string;
-        isHome?: boolean;
-        sections: readonly SeedSection[];
-    }[];
-}[] = [
+export const SITES: readonly SeedSite[] = [
     {
         slug: "northwind-supply",
         name: "Northwind Supply",
