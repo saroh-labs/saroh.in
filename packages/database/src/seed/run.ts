@@ -34,6 +34,7 @@ import {
     SIDE_BUSINESSES,
     SITES,
     STORE_SLUG,
+    SUBMISSIONS,
 } from "./data";
 
 /**
@@ -270,6 +271,7 @@ export async function seed(): Promise<void> {
     // Content after the website: a post belongs to the site it is published on
     // (ADR-004), so there has to be a site first.
     await seedContent(prisma, org.id, siteIds[0] ?? "", user.id);
+    await seedSubmissions(prisma, org.id, siteIds[0] ?? "", now);
     await seedProviders(prisma, org.id, siteIds, now);
     await seedAnalytics(prisma, org.id, now);
 
@@ -798,6 +800,55 @@ async function seedBilling(prisma: Db, orgId: string, now: Date) {
             currentPeriodEnd: at(now, 19, 9),
         },
     });
+}
+
+// --- Form entries --------------------------------------------------------
+
+/**
+ * Entries through Northwind's website enquiry form (#385), each tied to the
+ * contact it came from and that contact's first lead — the shape a live
+ * submission leaves. Immutable in the product, so a re-run leaves them be.
+ */
+async function seedSubmissions(
+    prisma: Db,
+    orgId: string,
+    siteId: string,
+    now: Date,
+) {
+    const form = await prisma.form.findFirst({
+        where: {
+            siteId,
+            organizationId: orgId,
+            id: { startsWith: SEED_PREFIX },
+        },
+        select: { id: true },
+    });
+    if (!form) return;
+
+    for (let i = 0; i < SUBMISSIONS.length; i++) {
+        const entry = SUBMISSIONS[i];
+        const person = CONTACTS[entry.contact];
+        const leadIndex = LEADS.findIndex((l) => l.contact === entry.contact);
+        await prisma.submission.upsert({
+            where: { id: id("submission", i) },
+            update: {},
+            create: {
+                id: id("submission", i),
+                organizationId: orgId,
+                formId: form.id,
+                contactId: id("contact", entry.contact),
+                leadId: leadIndex >= 0 ? id("lead", leadIndex) : null,
+                data: {
+                    name: `${person.first} ${person.last}`,
+                    email: emailFor(person.first, person.last),
+                    ...(entry.phone ? { phone: entry.phone } : {}),
+                    ...(person.company ? { company: person.company } : {}),
+                    message: entry.message,
+                },
+                createdAt: at(now, -entry.daysAgo, 11 + (i % 6)),
+            },
+        });
+    }
 }
 
 // --- Side businesses -----------------------------------------------------
@@ -1556,6 +1607,9 @@ export async function reset(): Promise<void> {
         () => prisma.page.deleteMany({ where }),
         // Forms outlive their Site by design (SetNull), so they are removed
         // explicitly rather than left behind by the Site delete below.
+        // Entries cascade from their form, but are removed first so the
+        // count the reset reports is what the seed wrote.
+        () => prisma.submission.deleteMany({ where }),
         () => prisma.form.deleteMany({ where }),
         () => prisma.domain.deleteMany({ where }),
         // Before the Site: Site.currentPublicationId is SetNull, so dropping

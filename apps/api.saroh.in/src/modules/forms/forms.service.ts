@@ -10,6 +10,28 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { authorize } from "../organizations/organization-policy";
 import type { CreateFormDto, FormFieldDto, UpdateFormDto } from "./dto";
 
+/** A form, with how much has come through it. */
+export type FormWithActivity = Form & {
+    submissionCount: number;
+    /** ISO time of the latest submission; `null` before the first. */
+    lastSubmissionAt: string | null;
+};
+
+/** One entry someone sent through a form, as the workspace lists it. */
+export interface SubmissionItem {
+    id: string;
+    createdAt: string;
+    /** The raw values, keyed by the form's field names. */
+    data: Record<string, unknown>;
+    /** The contact it became, unless that contact was since deleted. */
+    contact: { id: string; name: string; email: string } | null;
+    /** The lead it opened, unless that lead was since deleted. */
+    leadId: string | null;
+}
+
+/** How many entries one read returns; the page says when there are more. */
+export const SUBMISSIONS_PAGE = 200;
+
 /**
  * Org-owned enquiry Form management (S3-002).
  *
@@ -55,13 +77,99 @@ export class FormsService {
         });
     }
 
-    /** List the org's forms, newest first. Authorizes `form:read`. Excludes soft-deleted. */
-    async list(ctx: OrganizationContext): Promise<Form[]> {
+    /**
+     * List the org's forms, newest first, each with how many entries it has
+     * had and when the latest came (#385). Authorizes `form:read`. Excludes
+     * soft-deleted. One grouped read for the counts, not one per form.
+     */
+    async list(ctx: OrganizationContext): Promise<FormWithActivity[]> {
         authorize(ctx, "form:read");
-        return prisma.form.findMany({
-            where: { organizationId: ctx.organizationId, deletedAt: null },
-            orderBy: { createdAt: "desc" },
+        const [forms, activity] = await Promise.all([
+            prisma.form.findMany({
+                where: { organizationId: ctx.organizationId, deletedAt: null },
+                orderBy: { createdAt: "desc" },
+            }),
+            prisma.submission.groupBy({
+                by: ["formId"],
+                where: { organizationId: ctx.organizationId },
+                _count: { _all: true },
+                _max: { createdAt: true },
+            }),
+        ]);
+        const byForm = new Map(activity.map((a) => [a.formId, a]));
+        return forms.map((form) => {
+            const a = byForm.get(form.id);
+            return {
+                ...form,
+                submissionCount: a?._count._all ?? 0,
+                lastSubmissionAt: a?._max.createdAt?.toISOString() ?? null,
+            };
         });
+    }
+
+    /**
+     * What people have sent through one form, newest first (#385).
+     * Authorizes `form:read`; another business's form 404s.
+     *
+     * The raw entry is the record: it outlives the contact and lead it
+     * created (SetNull), so a deleted contact shows as `null` here while what
+     * they typed stays. Returns the latest {@link SUBMISSIONS_PAGE}, and the
+     * total, so the screen can say when it is showing only some.
+     */
+    async listSubmissions(
+        ctx: OrganizationContext,
+        formId: string,
+    ): Promise<{ total: number; items: SubmissionItem[] }> {
+        authorize(ctx, "form:read");
+        await this.requireOwned(ctx, formId);
+        const where = { formId, organizationId: ctx.organizationId };
+        const [total, rows] = await Promise.all([
+            prisma.submission.count({ where }),
+            prisma.submission.findMany({
+                where,
+                orderBy: { createdAt: "desc" },
+                take: SUBMISSIONS_PAGE,
+                select: {
+                    id: true,
+                    createdAt: true,
+                    data: true,
+                    leadId: true,
+                    contact: {
+                        select: {
+                            id: true,
+                            email: true,
+                            firstName: true,
+                            lastName: true,
+                        },
+                    },
+                },
+            }),
+        ]);
+        return {
+            total,
+            items: rows.map((r) => ({
+                id: r.id,
+                createdAt: r.createdAt.toISOString(),
+                data:
+                    r.data &&
+                    typeof r.data === "object" &&
+                    !Array.isArray(r.data)
+                        ? (r.data as Record<string, unknown>)
+                        : {},
+                leadId: r.leadId,
+                contact: r.contact
+                    ? {
+                          id: r.contact.id,
+                          email: r.contact.email,
+                          name:
+                              [r.contact.firstName, r.contact.lastName]
+                                  .filter(Boolean)
+                                  .join(" ")
+                                  .trim() || r.contact.email,
+                      }
+                    : null,
+            })),
+        };
     }
 
     /** Get one owned form. Authorizes `form:read`; cross-tenant/missing → 404. */

@@ -25,7 +25,7 @@ export interface WebsiteHeaderSite {
     state: { label: string; tone: SiteStateTone };
 }
 
-type TabId = "pages" | "posts" | "settings" | "review";
+type TabId = "pages" | "posts" | "forms" | "settings" | "review";
 
 /**
  * The Website screen's head: its name, which site is open, what can be done
@@ -48,6 +48,7 @@ export function WebsiteHeader({
     mayCreate,
     pageCount,
     postCount,
+    formEntries,
 }: {
     site: WebsiteHeaderSite;
     sites: WebsiteHeaderSite[];
@@ -58,6 +59,12 @@ export function WebsiteHeader({
     mayCreate: boolean;
     pageCount: number;
     postCount: number | null;
+    /**
+     * Entries through this site's forms, when this person may read them
+     * (`form:read`); `undefined` hides the Forms tab. People's details are
+     * in there, so it follows its own permission, not the site's.
+     */
+    formEntries?: number | null;
 }) {
     const pathname = usePathname();
     const base = `/sites/${site.id}`;
@@ -67,6 +74,17 @@ export function WebsiteHeader({
     const showPicker =
         sites.length > 1 || (mayCreate && mayAddWebsite(sites.length));
 
+    const formsTab =
+        formEntries === undefined
+            ? []
+            : [
+                  {
+                      id: "forms" as const,
+                      label: "Forms",
+                      href: `${base}/forms`,
+                      count: formEntries ?? undefined,
+                  },
+              ];
     const tabs: { id: TabId; label: string; href: string; count?: number }[] =
         canEdit
             ? [
@@ -82,6 +100,7 @@ export function WebsiteHeader({
                       href: `${base}/posts`,
                       count: postCount ?? undefined,
                   },
+                  ...formsTab,
                   {
                       id: "settings",
                       label: "Settings",
@@ -99,13 +118,14 @@ export function WebsiteHeader({
                       href: `${base}/posts`,
                       count: postCount ?? undefined,
                   },
+                  ...formsTab,
               ];
     const active =
         tabs.find((t) => pathname.startsWith(t.href))?.id ?? tabs[0].id;
 
     // Switching site keeps the tab you were on, where the other site has it.
     const switchTo = (id: string) =>
-        active === "posts" || active === "settings"
+        active === "posts" || active === "forms" || active === "settings"
             ? `/sites/${id}/${active}`
             : `/sites/${id}/pages`;
 

@@ -725,6 +725,60 @@ export type SeedSection =
           };
       };
 
+/**
+ * What came in through the website's enquiry form (#385): the raw entries
+ * behind some of the WEBSITE-sourced contacts, so the Forms screen has real
+ * rows. `contact` indexes CONTACTS; the entry links to that contact's first
+ * lead, the way a live submission opens one. One contact has no lead in the
+ * fixture, so one entry shows as a lead since deleted.
+ */
+export const SUBMISSIONS: readonly {
+    contact: number;
+    daysAgo: number;
+    phone?: string;
+    message: string;
+}[] = [
+    {
+        contact: 0,
+        daysAgo: 12,
+        phone: "98450 11223",
+        message:
+            "We open a second cafe next month. Can you quote 200 units of the 12oz cups with lids, delivered to Indiranagar?",
+    },
+    {
+        contact: 3,
+        daysAgo: 10,
+        message:
+            "Fitting out a showroom in HSR. Need corner guards, stretch film and about 40 cartons in mixed sizes. Is there a trade rate?",
+    },
+    {
+        contact: 8,
+        daysAgo: 8,
+        phone: "99001 45678",
+        message:
+            "Looking for wholesale pricing on food-safe pouches for dry goods, roughly 5,000 a month.",
+    },
+    {
+        contact: 13,
+        daysAgo: 4,
+        message:
+            "Do you deliver to Hosur? Just need a few rolls of tape and gloves for a small workshop.",
+    },
+    {
+        contact: 15,
+        daysAgo: 3,
+        phone: "98860 33445",
+        message:
+            "Enquiring about steel fittings and pallet strapping for a plant in Peenya. Can someone call?",
+    },
+    {
+        contact: 18,
+        daysAgo: 1,
+        message:
+            "We pack spices in 100g and 250g. Please share options for printed pouches and your minimum order.",
+    },
+];
+
 /** The enquiry form Northwind uses everywhere it asks a visitor for details. */
 const ENQUIRY_FIELDS: readonly SeedFormField[] = [
     { name: "name", label: "Your name", type: "text", required: true },

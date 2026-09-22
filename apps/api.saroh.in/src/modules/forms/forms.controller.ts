@@ -19,6 +19,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { CreateFormDto, UpdateFormDto } from "./dto";
+import type { FormWithActivity, SubmissionItem } from "./forms.service";
 import { FormsService } from "./forms.service";
 
 /**
@@ -48,7 +49,7 @@ export class FormsController {
     }
 
     @Get()
-    list(@OrgContext() ctx: OrganizationContext): Promise<Form[]> {
+    list(@OrgContext() ctx: OrganizationContext): Promise<FormWithActivity[]> {
         return this.forms.list(ctx);
     }
 
@@ -58,6 +59,14 @@ export class FormsController {
         @Param("formId") formId: string,
     ): Promise<Form> {
         return this.forms.get(ctx, formId);
+    }
+
+    @Get(":formId/submissions")
+    listSubmissions(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("formId") formId: string,
+    ): Promise<{ total: number; items: SubmissionItem[] }> {
+        return this.forms.listSubmissions(ctx, formId);
     }
 
     @Patch(":formId")
