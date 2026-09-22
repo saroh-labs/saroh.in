@@ -46,6 +46,15 @@ export class ClassPacksController {
         return this.packs.listPacks(ctx, query);
     }
 
+    /**
+     * Whether selling a pack issues an invoice now (Payments on). Declared
+     * before `:packId`, like "purchases".
+     */
+    @Get("selling")
+    selling(@OrgContext() ctx: OrganizationContext) {
+        return this.packs.sellingTerms(ctx);
+    }
+
     /** Declared before `:packId`, or "purchases" would be read as a pack id. */
     @Get("purchases")
     purchases(

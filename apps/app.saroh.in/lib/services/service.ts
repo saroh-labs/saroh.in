@@ -1,5 +1,7 @@
+import type { ApiResult } from "@/lib/api/failure";
+import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, orgBase, readError } from "@/lib/api/http";
+import { apiFetch, orgBase } from "@/lib/api/http";
 
 /**
  * Bookable Services data access for app.saroh.in (S4-003). Org-scoped Service
@@ -12,6 +14,9 @@ import { apiFetch, orgBase, readError } from "@/lib/api/http";
  */
 
 export type ServiceStatus = "ACTIVE" | "ARCHIVED";
+
+/** Where a service happens (ADR-007): at the business, or by a link. */
+export type LocationType = "IN_PERSON" | "ONLINE";
 
 /** A bookable Service (mirror of the api's Service row, JSON-serialized). */
 export interface Service {
@@ -28,6 +33,9 @@ export interface Service {
     currency: string | null;
     timezone: string;
     status: ServiceStatus;
+    locationType: LocationType;
+    /** The link an online service's bookers join by; null in person. */
+    meetingUrl: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -108,6 +116,14 @@ export interface BookingDetail extends Omit<Booking, "contact"> {
         (NonNullable<Booking["contact"]> & { phone: string | null }) | null;
     events: BookingEvent[];
     snapshot: unknown;
+    /**
+     * The class pack paying for it (ADR-007). A pack taken back off leaves
+     * `reversedAt` set: the booking is no longer paid with it.
+     */
+    packRedemption: {
+        reversedAt: string | null;
+        purchase: { id: string; pack: { name: string } };
+    } | null;
 }
 
 /** One open slot on a service, as the api's availability preview returns it. */
@@ -131,6 +147,8 @@ export interface CreateServiceInput {
     priceCents?: number;
     currency?: string;
     timezone: string;
+    locationType?: LocationType;
+    meetingUrl?: string | null;
 }
 
 /** Update a Service (PATCH semantics — every field optional). */
@@ -145,6 +163,9 @@ export interface UpdateServiceInput {
     currency?: string;
     timezone?: string;
     status?: ServiceStatus;
+    locationType?: LocationType;
+    /** `null` clears it; the API also clears it on going back to in person. */
+    meetingUrl?: string | null;
 }
 
 /** One availability window to persist (no id — position is not meaningful). */
@@ -155,28 +176,29 @@ export interface AvailabilityRuleInput {
 }
 
 /**
- * Send a mutation to a services route and return a {@link CrmResult}. Unlike
- * `lib/api/http`'s `mutate`, this also carries PUT/DELETE (the rule-replace and
- * archive/cancel verbs) and paths are relative to the services base.
+ * Send a mutation to a services route and return an {@link ApiResult} — with
+ * the field a refusal is about, so a form can put it there (the meeting link,
+ * say). Unlike `lib/api/http`'s `mutate`, this also carries PUT/DELETE (the
+ * rule-replace and archive/cancel verbs) and paths are relative to the
+ * services base.
  */
 async function send<T>(
     path: string,
     method: "POST" | "PATCH" | "PUT" | "DELETE",
     body: unknown,
     fallback: string,
-): Promise<CrmResult<T>> {
+): Promise<ApiResult<T>> {
     const base = await orgBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/services${path}`, {
         method,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    const data = (await res.json().catch(() => null)) as
-        (T & { message?: string; error?: string }) | null;
+    const data: unknown = await res.json().catch(() => null);
     if (res.ok) {
         return { ok: true, data: (data ?? {}) as T };
     }
-    return { ok: false, error: readError(data, fallback) };
+    return toFailure(data, fallback);
 }
 
 // ---------------------------------------------------------------------------
@@ -343,7 +365,7 @@ export { hasEnded, needsOutcome } from "./booking-state";
 /** Create a bookable service. Returns the new service (with its id). */
 export function createService(
     input: CreateServiceInput,
-): Promise<CrmResult<Service>> {
+): Promise<ApiResult<Service>> {
     return send<Service>("", "POST", input, "Could not create the service");
 }
 
@@ -351,7 +373,7 @@ export function createService(
 export function updateService(
     serviceId: string,
     input: UpdateServiceInput,
-): Promise<CrmResult<Service>> {
+): Promise<ApiResult<Service>> {
     return send<Service>(
         `/${serviceId}`,
         "PATCH",
@@ -401,9 +423,12 @@ export function recordBookingOutcome(
 
 /** Move a booking to another slot (#121). */
 /** Who a booking made by hand is for: a contact, or someone new. */
-export type BookByHandInput = { startAt: string; idempotencyKey?: string } & (
-    { contactId: string } | { bookerEmail: string; bookerName?: string }
-);
+export type BookByHandInput = {
+    startAt: string;
+    idempotencyKey?: string;
+    /** Pay with this class pack (ADR-007); needs `pack:write`. */
+    packPurchaseId?: string;
+} & ({ contactId: string } | { bookerEmail: string; bookerName?: string });
 
 /**
  * Book someone in by hand (#384): the same open-slot and capacity rules as
@@ -412,7 +437,7 @@ export type BookByHandInput = { startAt: string; idempotencyKey?: string } & (
 export function bookByHand(
     serviceId: string,
     input: BookByHandInput,
-): Promise<CrmResult<Booking>> {
+): Promise<ApiResult<Booking>> {
     return send<Booking>(
         `/${serviceId}/bookings`,
         "POST",

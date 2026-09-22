@@ -616,3 +616,57 @@ describe("Courses (ADR-007), its own module", () => {
         ).not.toContain("/courses");
     });
 });
+
+describe("Class packs (ADR-007), its own row under Appointments", () => {
+    it("offers an owner Class packs where Appointments is on, after Courses", () => {
+        const offered = hrefs(
+            navFor({
+                role: "OWNER",
+                moduleKeys: ["APPOINTMENTS", "COURSES"],
+            }),
+        );
+        expect(offered).toContain("/class-packs");
+        expect(offered.indexOf("/class-packs")).toBe(
+            offered.indexOf("/courses") + 1,
+        );
+    });
+
+    it("keeps Schedule and Services as rows of their own beside it", () => {
+        const items = navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS"] })
+            .flatMap((g) => g.items)
+            .map((i) => i.href);
+        expect(items).toEqual(
+            expect.arrayContaining(["/bookings", "/services", "/class-packs"]),
+        );
+    });
+
+    it("marks Class packs on its purchases and editor pages", () => {
+        for (const page of [
+            "/class-packs",
+            "/class-packs/purchases",
+            "/class-packs/pk_1/edit",
+        ]) {
+            expect(isNavItemActive(page, "/class-packs")).toBe(true);
+        }
+        expect(isNavItemActive("/class-packs", "/bookings")).toBe(false);
+    });
+
+    it("leaves it out without Appointments", () => {
+        expect(
+            hrefs(navFor({ role: "OWNER", moduleKeys: ["COMMERCE"] })),
+        ).not.toContain("/class-packs");
+    });
+
+    it("does not offer it to a member, who may not read packs", () => {
+        expect(
+            hrefs(navFor({ role: "MEMBER", moduleKeys: ["APPOINTMENTS"] })),
+        ).not.toContain("/class-packs");
+    });
+
+    it("lets owners and admins make and sell a pack from the command menu", () => {
+        expect(navRoleCan("OWNER", "pack:write")).toBe(true);
+        expect(navRoleCan("ADMIN", "pack:write")).toBe(true);
+        expect(navRoleCan("MEMBER", "pack:write")).toBe(false);
+        expect(navRoleCan("REVIEWER", "pack:write")).toBe(false);
+    });
+});

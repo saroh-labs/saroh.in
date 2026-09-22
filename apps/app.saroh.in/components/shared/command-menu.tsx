@@ -18,6 +18,7 @@ import {
     Repeat,
     Store,
     Target,
+    Ticket,
     UserRound,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -135,6 +136,20 @@ const ACTIONS: {
         icon: GraduationCap,
         moduleKey: "COURSES",
         action: "course:write",
+    },
+    {
+        href: "/class-packs/new",
+        label: "New class pack",
+        icon: Ticket,
+        moduleKey: "APPOINTMENTS",
+        action: "pack:write",
+    },
+    {
+        href: "/class-packs?sell=1",
+        label: "Sell a pack",
+        icon: Ticket,
+        moduleKey: "APPOINTMENTS",
+        action: "pack:write",
     },
     {
         href: "/sites/new",

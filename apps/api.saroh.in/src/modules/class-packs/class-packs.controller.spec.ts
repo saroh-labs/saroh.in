@@ -38,6 +38,7 @@ const service = {
     updatePack: jest.fn(),
     setPackStatus: jest.fn(),
     sell: jest.fn(),
+    sellingTerms: jest.fn(),
     useOnBooking: jest.fn(),
     removeFromBooking: jest.fn(),
 };
@@ -91,6 +92,8 @@ describe("routes", () => {
         expect(order.indexOf("purchases")).toBeLessThan(
             order.indexOf(":packId"),
         );
+        expect(order.indexOf("selling")).toBeGreaterThanOrEqual(0);
+        expect(order.indexOf("selling")).toBeLessThan(order.indexOf(":packId"));
     });
 
     it("hands the caller's context and ids to the service", async () => {
@@ -109,6 +112,15 @@ describe("routes", () => {
         await onBooking.use(ctx, "bk_1", { packPurchaseId: "pp_1" });
         expect(service.useOnBooking).toHaveBeenCalledWith(ctx, "bk_1", {
             packPurchaseId: "pp_1",
+        });
+
+        await packs.selling(ctx);
+        expect(service.sellingTerms).toHaveBeenCalledWith(ctx);
+
+        await packs.purchases(ctx, { contactId: "c_1", serviceId: "svc_1" });
+        expect(service.listPurchases).toHaveBeenCalledWith(ctx, {
+            contactId: "c_1",
+            serviceId: "svc_1",
         });
 
         await onBooking.remove(ctx, "bk_1");
