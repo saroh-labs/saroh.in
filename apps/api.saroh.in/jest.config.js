@@ -23,6 +23,8 @@ module.exports = {
     ],
     testEnvironment: "node",
     rootDir: ".",
+    // `*.db.spec.ts` needs Postgres and runs only in the integration project.
+    testPathIgnorePatterns: ["/node_modules/", "\\.db\\.spec\\.ts$"],
     testMatch: [
         "<rootDir>/src/common/**/*.spec.ts",
         "<rootDir>/src/modules/organizations/**/*.spec.ts",
