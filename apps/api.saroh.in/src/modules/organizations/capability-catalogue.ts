@@ -210,6 +210,19 @@ export const CAPABILITIES: readonly Capability[] = [
     { action: "service:write", group: "schedule", label: "Change services" },
     { action: "booking:read", group: "schedule", label: "See bookings" },
     { action: "booking:write", group: "schedule", label: "Change bookings" },
+    { action: "course:read", group: "schedule", label: "See courses" },
+    {
+        action: "course:write",
+        group: "schedule",
+        label: "Run courses and enrol people",
+        note: "Enrolling books every session of the course for that person.",
+    },
+    { action: "pack:read", group: "schedule", label: "See class packs" },
+    {
+        action: "pack:write",
+        group: "schedule",
+        label: "Sell class packs and book with them",
+    },
 
     // — Money —————————————————————————————————————————————————
     { action: "payment:read", group: "money", label: "See payments" },
@@ -218,6 +231,24 @@ export const CAPABILITIES: readonly Capability[] = [
         group: "money",
         label: "Manage payments",
         note: "Includes refunds.",
+    },
+    {
+        action: "subscription:read",
+        group: "money",
+        label: "See memberships and plans",
+    },
+    {
+        action: "subscription:write",
+        group: "money",
+        label: "Sign people up, pause and cancel memberships",
+        note: "Each renewal bills the person again.",
+    },
+    { action: "invoice:read", group: "money", label: "See invoices" },
+    {
+        action: "invoice:write",
+        group: "money",
+        label: "Issue, void and mark invoices paid",
+        note: "Marking an invoice paid records money that was never checked by Saroh.",
     },
     {
         action: "billing:read",

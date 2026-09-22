@@ -67,7 +67,15 @@ export type NavAction =
     // floor, so nothing changes for the built-ins; it matters for a role the
     // business invented without it, which was offered three rows that each
     // answered it with a refusal.
-    | "store:read";
+    | "store:read"
+    // Billing (Subscriptions, Invoices) and Schedule's Courses and Class
+    // packs (ADR-007). Owner and Admin by default: who owes what is not in
+    // the Member floor. Listed ahead of their rows so each unit that ships a
+    // page only has to add the row.
+    | "subscription:read"
+    | "invoice:read"
+    | "course:read"
+    | "pack:read";
 
 /**
  * Role → what it may reach here.
@@ -91,6 +99,10 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "order:read",
         "discount:read",
         "store:read",
+        "subscription:read",
+        "invoice:read",
+        "course:read",
+        "pack:read",
     ],
     ADMIN: [
         "site:read",
@@ -104,6 +116,10 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "order:read",
         "discount:read",
         "store:read",
+        "subscription:read",
+        "invoice:read",
+        "course:read",
+        "pack:read",
     ],
     MEMBER: ["site:read", "member:read", "module:read", "store:read"],
     REVIEWER: ["site:read"],
