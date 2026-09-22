@@ -21,6 +21,65 @@ export interface SeededService {
     fixture: ShowcaseService;
 }
 
+/** Where it happens: an online class carries its meeting link (ADR-007). */
+export const location = (s: ShowcaseService) => ({
+    locationType: s.meetingUrl ? "ONLINE" : "IN_PERSON",
+    meetingUrl: s.meetingUrl ?? null,
+});
+
+/**
+ * The snapshot `BookingsService.buildSnapshot` freezes into a booking: the
+ * service's terms, the slot and the booker.
+ */
+export function bookingSnapshot(
+    service: SeededService,
+    slot: { startAt: Date; endAt: Date },
+    booker: { name: string; email: string; phone: string },
+): Prisma.InputJsonObject {
+    const s = service.fixture;
+    return {
+        service: {
+            id: service.id,
+            name: s.name,
+            durationMinutes: s.minutes,
+            bufferBeforeMinutes: 0,
+            bufferAfterMinutes: 0,
+            capacity: s.capacity,
+            timezone: TIMEZONE,
+            priceCents: s.priceCents,
+            currency: s.priceCents === null ? null : "INR",
+            ...location(s),
+        },
+        slot: {
+            startAt: slot.startAt.toISOString(),
+            endAt: slot.endAt.toISOString(),
+        },
+        booker,
+    };
+}
+
+/**
+ * Whether `startAt` is a slot the service's weekly rules produce: on an open
+ * day, inside a window, on the duration grid from the window's start.
+ */
+export function isSlotStart(s: ShowcaseService, startAt: Date): boolean {
+    const local = new Date(startAt.getTime() + 330 * 60_000);
+    const minute = local.getUTCHours() * 60 + local.getUTCMinutes();
+    return s.rules.some((rule) => {
+        const from = minuteOf(rule.from);
+        return (
+            rule.days.includes(local.getUTCDay()) &&
+            minute >= from &&
+            minute + s.minutes <= minuteOf(rule.to) &&
+            (minute - from) % s.minutes === 0
+        );
+    });
+}
+
+/** One slot of one service, as a key. */
+export const slotKey = (service: number, startAt: Date) =>
+    `${service}@${startAt.getTime()}`;
+
 export async function upsertServices(
     prisma: Db,
     options: {
@@ -44,6 +103,7 @@ export async function upsertServices(
                 priceCents: s.priceCents,
                 currency: s.priceCents === null ? null : "INR",
                 status: "ACTIVE",
+                ...location(s),
             },
             create: {
                 id: options.serviceId(i),
@@ -56,6 +116,7 @@ export async function upsertServices(
                 currency: s.priceCents === null ? null : "INR",
                 timezone: TIMEZONE,
                 status: "ACTIVE",
+                ...location(s),
                 createdAt: options.createdAt,
             },
         });
@@ -78,6 +139,9 @@ export async function upsertServices(
                 organizationId: options.orgId,
                 serviceId: service.id,
                 ...r,
+                // Fixed, so writing the same hours again changes nothing.
+                createdAt: options.createdAt,
+                updatedAt: options.createdAt,
             })),
         });
         out.push({ id: service.id, fixture: s });
@@ -123,6 +187,13 @@ export function planBookings(
         prospectServices: readonly number[];
         /** Extra weight for a weekday, Sunday first. */
         weekdayWeights: readonly number[];
+        /**
+         * Places already spoken for, by {@link slotKey}: a course's bookings
+         * and the seats an open course still holds (ADR-007).
+         */
+        reserved?: ReadonlyMap<string, number>;
+        /** Times people are already booked for elsewhere (their courses). */
+        busy?: readonly { contact: number; start: number; end: number }[];
     },
 ): PlannedBooking[] {
     const slots: Slot[] = [];
@@ -143,7 +214,9 @@ export function planBookings(
                         startAt,
                         endAt: addMinutes(startAt, s.minutes),
                         dayOffset: d,
-                        taken: 0,
+                        taken:
+                            options.reserved?.get(slotKey(service, startAt)) ??
+                            0,
                     });
                 }
             }
@@ -167,7 +240,22 @@ export function planBookings(
         );
     };
 
+    // Each service's regulars, when it has them: drawn only for those
+    // services, so a business without any keeps its stream as it was.
+    const everyone = Array.from(
+        { length: options.contacts },
+        (_, i) => i,
+    ).filter((i) => !options.prospects.includes(i));
+    const regulars = options.services.map((s) =>
+        s.regulars
+            ? Array.from({ length: s.regulars }, () => rng.pick(everyone))
+            : null,
+    );
+
     const busy = new Map<number, { start: number; end: number }[]>();
+    for (const b of options.busy ?? []) {
+        busy.set(b.contact, [...(busy.get(b.contact) ?? []), b]);
+    }
     const isFree = (contact: number, slot: Slot) =>
         !(busy.get(contact) ?? []).some(
             (b) =>
@@ -196,9 +284,12 @@ export function planBookings(
             );
             let contact = -1;
             for (let attempt = 0; attempt < 12; attempt++) {
+                const usual = regulars[slot.service];
                 const candidate = prospectOnly
                     ? rng.pick(options.prospects)
-                    : rng.skewed(options.contacts, 1.6);
+                    : usual && rng.chance(0.85)
+                      ? rng.pick(usual)
+                      : rng.skewed(options.contacts, 1.6);
                 if (isFree(candidate, slot)) {
                     contact = candidate;
                     break;
@@ -222,9 +313,21 @@ export function planBookings(
     return planned.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 }
 
+/** A booking as it was placed, for what is built on it (a pack spent on it). */
+export interface PlacedBooking {
+    id: string;
+    contact: number;
+    service: number;
+    startAt: Date;
+    createdAt: Date;
+    status: "CONFIRMED" | "PENDING" | "CANCELLED";
+    cancelledAt: Date | null;
+}
+
 export interface BookingRows {
     bookings: Prisma.BookingCreateManyInput[];
     events: Prisma.BookingEventCreateManyInput[];
+    placed: PlacedBooking[];
 }
 
 /**
@@ -259,10 +362,10 @@ export function bookingRows(
     const { now } = options;
     const bookings: Prisma.BookingCreateManyInput[] = [];
     const events: Prisma.BookingEventCreateManyInput[] = [];
+    const placed: PlacedBooking[] = [];
 
     planned.forEach((b, n) => {
         const service = options.services[b.service];
-        const s = service.fixture;
         const contact = options.contacts[b.contact];
         const [r1, r2, r3, r4] = b.roll;
         const id = options.bookingId(n);
@@ -309,6 +412,15 @@ export function bookingRows(
         const lastTouched =
             cancelledAt ?? (outcome ? addMinutes(b.endAt, 45) : createdAt);
 
+        placed.push({
+            id,
+            contact: b.contact,
+            service: b.service,
+            startAt: b.startAt,
+            createdAt,
+            status,
+            cancelledAt,
+        });
         bookings.push({
             id,
             organizationId: options.orgId,
@@ -323,28 +435,11 @@ export function bookingRows(
             bookerName: contact.name,
             bookerEmail: contact.email,
             bookerPhone: contact.phone,
-            snapshot: {
-                service: {
-                    id: service.id,
-                    name: s.name,
-                    durationMinutes: s.minutes,
-                    bufferBeforeMinutes: 0,
-                    bufferAfterMinutes: 0,
-                    capacity: s.capacity,
-                    timezone: TIMEZONE,
-                    priceCents: s.priceCents,
-                    currency: s.priceCents === null ? null : "INR",
-                },
-                slot: {
-                    startAt: b.startAt.toISOString(),
-                    endAt: b.endAt.toISOString(),
-                },
-                booker: {
-                    name: contact.name,
-                    email: contact.email,
-                    phone: contact.phone,
-                },
-            },
+            snapshot: bookingSnapshot(service, b, {
+                name: contact.name,
+                email: contact.email,
+                phone: contact.phone,
+            }),
             createdAt,
             updatedAt: earliest(now, lastTouched),
         });
@@ -382,5 +477,5 @@ export function bookingRows(
         }
     });
 
-    return { bookings, events };
+    return { bookings, events, placed };
 }

@@ -6,17 +6,24 @@
  * ROLE in it is the point — switching business changes what they can do:
  *
  *   Northwind Supply   OWNER     commerce, CRM, website, payments (base seed)
- *   Pulse Fitness      OWNER     appointments, CRM, website, payments
- *   Mirror & Co.       ADMIN     appointments, CRM, website
- *   Rye & Co. Bakery   MEMBER    commerce, website
+ *   Pulse Fitness      OWNER     appointments, CRM, website, payments, courses:
+ *                                memberships billed monthly or quarterly,
+ *                                class packs, one course
+ *   Prana Yoga         ADMIN     appointments, CRM, website, payments, courses:
+ *                                studio and online classes, courses, packs
+ *   CarePoint Clinic   MEMBER    appointments, CRM, website — no billing; the
+ *                                point is what a Member may and may not see
  *   Lumen Studio       REVIEWER  CRM, website (reviewer of its site only)
  *
  * Data only. `./run.ts` turns it into rows; the volume (customers, orders,
- * bookings) is generated there from a seeded PRNG so every run is identical.
+ * bookings, subscriptions, invoices) is generated there from a seeded PRNG so
+ * every run is identical.
  *
  * Prices on products are rupee strings, as `Product.price` stores them
  * (Decimal(10,2)); prices on services and lead values are paise, as
- * `Service.priceCents` and `Lead.value` store them (minor units, Int).
+ * `Service.priceCents` and `Lead.value` store them (minor units, Int). Plan,
+ * pack, course and invoice prices here are paise too; the run writes them to
+ * their Decimal(12,2) columns.
  */
 import type { SeedSection, SeedSite } from "../data";
 import { ENQUIRY_FIELDS } from "../data";
@@ -39,7 +46,8 @@ export type ModuleKey =
     | "PAYMENTS"
     | "INSIGHTS"
     | "COMMUNICATIONS"
-    | "AUTOMATIONS";
+    | "AUTOMATIONS"
+    | "COURSES";
 
 // --- Accounts ------------------------------------------------------------
 
@@ -881,12 +889,102 @@ export interface ShowcaseService {
     rules: readonly { days: readonly number[]; from: string; to: string }[];
     /** How much of the diary this service fills, relative to the others. */
     weight: number;
+    /**
+     * Booked mostly by a few regulars — personal training is the same dozen
+     * people every week, not a different stranger each hour.
+     */
+    regulars?: number;
+    /**
+     * An online class (ADR-007): its https meeting link. Every booker is sent
+     * it, so it is a placeholder on a reserved domain, never a real room.
+     */
+    meetingUrl?: string;
 }
 
 export interface ShowcaseLead {
     title: string;
     /** Paise. */
     value: number;
+}
+
+// --- What a business sells beyond a single booking (ADR-007) ---------------
+
+/** A plan people subscribe to. Money in paise. */
+export interface ShowcasePlan {
+    name: string;
+    description: string;
+    interval: "MONTH" | "QUARTER";
+    pricePaise: number;
+    /**
+     * What it cost before the last price rise. A subscription keeps the price
+     * it was sold at, so members who joined earlier still pay this.
+     */
+    earlier?: { pricePaise: number; beforeDaysAgo: number };
+    /** Its share of the subscribers. */
+    weight: number;
+}
+
+/** A pack of prepaid classes on some of the business's services. */
+export interface ShowcasePack {
+    name: string;
+    description: string;
+    credits: number;
+    validityDays: number;
+    pricePaise: number;
+    /** Indexes into the business's services. */
+    services: readonly number[];
+    /** Archived packs are no longer sold; the ones sold before still count. */
+    status: "ACTIVE" | "ARCHIVED";
+    /** How many people bought one. */
+    buyers: number;
+}
+
+/** A course: dated sessions on one service, sold once. */
+export interface ShowcaseCourse {
+    name: string;
+    description: string;
+    /** Index into the business's services. */
+    service: number;
+    pricePaise: number;
+    seats: number;
+    status: "DRAFT" | "OPEN" | "CLOSED";
+    /** The first session's day, relative to today (negative: it has begun). */
+    firstDay: number;
+    /** Its weekly times: weekday (0 = Sunday) and local start, "HH:MM". */
+    schedule: readonly { day: number; at: string }[];
+    sessions: number;
+    /** People who enrolled before it began. */
+    enrolled: number;
+    /** People who joined after it began, at a lower price. */
+    lateJoiners?: number;
+    /** Of those enrolled, how many were taken off it part-way. */
+    cancelled?: number;
+}
+
+/** An invoice written by hand, not by a subscription, pack or course. */
+export interface ShowcaseManualInvoice {
+    lines: readonly {
+        description: string;
+        quantity: number;
+        unitPaise: number;
+    }[];
+    taxPaise: number;
+    /** When it was issued (or drafted), days before today. */
+    daysAgo: number;
+    /** PAID, still ISSUED (overdue once past due), a DRAFT, or VOID. */
+    state: "PAID" | "ISSUED" | "DRAFT" | "VOID";
+    voidReason?: string;
+    /** Bill a contact with a company, when there is one. */
+    company?: boolean;
+}
+
+export interface ShowcaseBilling {
+    plans: readonly ShowcasePlan[];
+    /** How many people are, or were, on a plan. */
+    subscriptions: number;
+    packs: readonly ShowcasePack[];
+    courses: readonly ShowcaseCourse[];
+    manualInvoices: readonly ShowcaseManualInvoice[];
 }
 
 export interface ShowcaseBusiness {
@@ -903,14 +1001,20 @@ export interface ShowcaseBusiness {
     roleAccounts: readonly { account: "admin" | "member"; role: OrgRole }[];
     pipeline: { name: string; stages: readonly string[] } | null;
     leads: readonly ShowcaseLead[];
+    /** How many leads it carries, form entries included. */
+    leadTarget?: number;
     /** People in the CRM who are not otherwise generated. */
     contacts: number;
     /** Businesses the contacts work for, when they are businesses. */
     companies?: readonly string[];
     services: readonly ShowcaseService[];
     bookings: number;
+    /** Extra weight for a weekday in the diary, Sunday first. */
+    weekdayWeights?: readonly number[];
     /** A Razorpay connection, so Payments reads as working. */
     paymentProvider?: "RAZORPAY" | "CASHFREE";
+    /** Plans, packs, courses and invoices; needs PAYMENTS for the invoices. */
+    billing?: ShowcaseBilling;
     site: SeedSite;
     footer: string;
     submissions: readonly {
@@ -933,6 +1037,19 @@ const MEMBERSHIP_FIELDS = [
     {
         name: "message",
         label: "What are you training for?",
+        type: "textarea",
+        required: true,
+    },
+] as const;
+
+/** A person's own enquiry: no business name, as a class or a clinic asks. */
+const CONTACT_FIELDS = [
+    { name: "name", label: "Your name", type: "text", required: true },
+    { name: "email", label: "Email", type: "email", required: true },
+    { name: "phone", label: "Phone", type: "tel" },
+    {
+        name: "message",
+        label: "Your message",
         type: "textarea",
         required: true,
     },
@@ -965,7 +1082,7 @@ export const PULSE: ShowcaseBusiness = {
     key: "pulse",
     slug: "pulse-fitness",
     name: "Pulse Fitness",
-    modules: ["APPOINTMENTS", "CRM", "WEBSITE", "PAYMENTS"],
+    modules: ["APPOINTMENTS", "CRM", "WEBSITE", "PAYMENTS", "COURSES"],
     demoRole: "OWNER",
     owner: null,
     staff: [
@@ -995,7 +1112,9 @@ export const PULSE: ShowcaseBusiness = {
         { title: "Corporate plan — 8 seats", value: 9_600_000 },
         { title: "Half-yearly membership", value: 1_100_000 },
     ],
-    contacts: 150,
+    leadTarget: 25,
+    // Leads and entries come first; the members behind them come after.
+    contacts: 190,
     services: [
         {
             name: "Personal training",
@@ -1008,7 +1127,9 @@ export const PULSE: ShowcaseBusiness = {
                 { days: [1, 2, 3, 4, 5, 6], from: "06:00", to: "11:00" },
                 { days: [1, 2, 3, 4, 5], from: "17:00", to: "21:00" },
             ],
-            weight: 3,
+            // One person a slot, so it needs the weight to fill a diary.
+            weight: 40,
+            regulars: 12,
         },
         {
             name: "HIIT class",
@@ -1051,9 +1172,157 @@ export const PULSE: ShowcaseBusiness = {
             ],
             weight: 1.5,
         },
+        {
+            name: "Strength foundations",
+            description:
+                "Squat, hinge, push and pull, taught properly in a small group. Runs as a four-week course; spare places are open to drop-ins.",
+            minutes: 60,
+            capacity: 10,
+            priceCents: 60_000,
+            rules: [
+                { days: [3], from: "19:30", to: "20:30" },
+                { days: [6], from: "10:00", to: "11:00" },
+            ],
+            weight: 0.6,
+        },
     ],
-    bookings: 250,
+    bookings: 420,
     paymentProvider: "RAZORPAY",
+    billing: {
+        plans: [
+            {
+                name: "Monthly membership",
+                description:
+                    "Classes, the gym floor and a monthly review with a coach. Cancel with a month's notice.",
+                interval: "MONTH",
+                pricePaise: 250_000,
+                earlier: { pricePaise: 220_000, beforeDaysAgo: 200 },
+                weight: 7,
+            },
+            {
+                name: "Quarterly membership",
+                description:
+                    "Everything in the monthly plan for three months, at a better rate.",
+                interval: "QUARTER",
+                pricePaise: 650_000,
+                weight: 3,
+            },
+        ],
+        subscriptions: 120,
+        packs: [
+            {
+                name: "Personal training — 12 sessions",
+                description:
+                    "Twelve one-hour sessions with a coach, on top of any membership.",
+                credits: 12,
+                validityDays: 120,
+                pricePaise: 1_440_000,
+                services: [0],
+                status: "ACTIVE",
+                buyers: 8,
+            },
+            {
+                name: "Class pack — 10 classes",
+                description:
+                    "Ten HIIT or yoga classes for people who would rather not join.",
+                credits: 10,
+                validityDays: 60,
+                pricePaise: 450_000,
+                services: [1, 2],
+                status: "ACTIVE",
+                buyers: 14,
+            },
+        ],
+        courses: [
+            {
+                name: "Strength foundations — four weeks",
+                description:
+                    "Eight coached sessions on the big lifts, for people new to the weights floor.",
+                service: 4,
+                pricePaise: 480_000,
+                seats: 8,
+                status: "OPEN",
+                firstDay: -11,
+                schedule: [
+                    { day: 3, at: "19:30" },
+                    { day: 6, at: "10:00" },
+                ],
+                sessions: 8,
+                enrolled: 6,
+                lateJoiners: 1,
+            },
+        ],
+        manualInvoices: [
+            {
+                lines: [
+                    {
+                        description:
+                            "Corporate membership · 8 seats, this month",
+                        quantity: 8,
+                        unitPaise: 220_000,
+                    },
+                ],
+                taxPaise: 316_800,
+                daysAgo: 3,
+                state: "ISSUED",
+                company: true,
+            },
+            {
+                lines: [
+                    {
+                        description: "Personal training session",
+                        quantity: 4,
+                        unitPaise: 120_000,
+                    },
+                    {
+                        description: "Body composition scan",
+                        quantity: 1,
+                        unitPaise: 50_000,
+                    },
+                ],
+                taxPaise: 0,
+                daysAgo: 24,
+                state: "PAID",
+            },
+            {
+                lines: [
+                    {
+                        description: "Locker rental · three months",
+                        quantity: 1,
+                        unitPaise: 90_000,
+                    },
+                ],
+                taxPaise: 0,
+                daysAgo: 16,
+                state: "VOID",
+                voidReason: "Charged twice — the locker is in the membership",
+            },
+            {
+                lines: [
+                    {
+                        description: "Personal training session",
+                        quantity: 6,
+                        unitPaise: 120_000,
+                    },
+                ],
+                taxPaise: 0,
+                daysAgo: 38,
+                state: "ISSUED",
+            },
+            {
+                lines: [
+                    {
+                        description: "Nutrition consultation",
+                        quantity: 1,
+                        unitPaise: 150_000,
+                    },
+                ],
+                taxPaise: 0,
+                daysAgo: 1,
+                state: "DRAFT",
+            },
+        ],
+    },
     footer: "Pulse Fitness · 12th Main, Indiranagar, Bengaluru · Mon–Sat 6am–10pm, Sun 7am–12pm",
     site: {
         slug: "pulse-fitness",
@@ -1271,87 +1540,284 @@ export const PULSE: ShowcaseBusiness = {
     },
 };
 
-export const MIRROR: ShowcaseBusiness = {
-    key: "mirror",
-    slug: "mirror-and-co",
-    name: "Mirror & Co.",
-    modules: ["APPOINTMENTS", "CRM", "WEBSITE"],
+/** A meeting link on a reserved domain: shaped like one, never a real room. */
+const meeting = (room: string) => `https://meet.example.com/${room}`;
+
+export const PRANA: ShowcaseBusiness = {
+    key: "prana",
+    slug: "prana-yoga",
+    name: "Prana Yoga",
+    modules: ["APPOINTMENTS", "CRM", "WEBSITE", "PAYMENTS", "COURSES"],
     demoRole: "ADMIN",
-    owner: { first: "Nandini", last: "Kapoor", role: "OWNER" },
+    owner: { first: "Radhika", last: "Bhat", role: "OWNER" },
     staff: [
-        { first: "Aarav", last: "Menon", role: "MEMBER" },
-        { first: "Zoya", last: "Qadri", role: "MEMBER" },
-        { first: "Lalitha", last: "Raman", role: "MEMBER" },
+        { first: "Anand", last: "Murthy", role: "MEMBER" },
+        { first: "Leela", last: "Krishnan", role: "MEMBER" },
+        { first: "Farah", last: "Siddiqui", role: "MEMBER" },
     ],
     roleAccounts: [{ account: "member", role: "MEMBER" }],
     pipeline: {
-        name: "Bridal & events",
+        name: "Students",
         stages: [
-            "New",
-            "Consultation",
-            "Quote sent",
-            "Trial done",
-            "Confirmed",
+            "New enquiry",
+            "Intro class booked",
+            "Tried a class",
+            "Pack or course offered",
+            "Joined",
         ],
     },
     leads: [
-        { title: "Bridal package — wedding day", value: 4_500_000 },
-        { title: "Bridal trial + engagement look", value: 1_800_000 },
-        { title: "Sangeet — group of 6", value: 2_400_000 },
-        { title: "Pre-wedding hair spa series", value: 950_000 },
-        { title: "Colour correction plan", value: 850_000 },
-        { title: "Corporate grooming day", value: 3_200_000 },
+        { title: "10-class studio pack", value: 550_000 },
+        { title: "Yoga foundations course", value: 720_000 },
+        { title: "Private sessions — 6", value: 1_500_000 },
+        { title: "Online pack", value: 175_000 },
+        { title: "Corporate wellness mornings", value: 4_800_000 },
+        { title: "Prenatal private series", value: 1_200_000 },
     ],
-    contacts: 180,
+    leadTarget: 18,
+    contacts: 200,
     services: [
         {
-            name: "Haircut & style",
+            name: "Hatha yoga",
             description:
-                "Consultation, wash, cut and a finish you can recreate at home.",
-            minutes: 45,
-            capacity: 3,
-            priceCents: 90_000,
-            rules: [{ days: [0, 2, 3, 4, 5, 6], from: "10:00", to: "20:00" }],
-            weight: 6,
-        },
-        {
-            name: "Colour",
-            description:
-                "Global colour, balayage or highlights, with a patch test 48 hours before.",
-            minutes: 120,
-            capacity: 2,
-            priceCents: 450_000,
-            rules: [{ days: [0, 2, 3, 4, 5, 6], from: "10:00", to: "18:00" }],
-            weight: 3,
-        },
-        {
-            name: "Blow-dry",
-            description: "Wash and blow-dry — straight, waves or volume.",
-            minutes: 30,
-            capacity: 2,
+                "An hour of held postures and slow breathing. Good for every level; mats and blocks provided.",
+            minutes: 60,
+            capacity: 16,
             priceCents: 60_000,
-            rules: [{ days: [0, 2, 3, 4, 5, 6], from: "10:00", to: "20:00" }],
-            weight: 3,
+            rules: [
+                { days: [1, 2, 3, 4, 5, 6], from: "07:00", to: "08:00" },
+                { days: [1, 3, 5], from: "18:00", to: "19:00" },
+            ],
+            weight: 8,
         },
         {
-            name: "Bridal trial",
+            name: "Vinyasa flow",
             description:
-                "Ninety minutes to try the hair and make-up for the day, with photos.",
-            minutes: 90,
-            capacity: 1,
-            priceCents: 350_000,
-            rules: [{ days: [2, 3, 4, 5], from: "11:00", to: "17:00" }],
+                "Breath-led movement from one posture to the next. Some yoga behind you helps.",
+            minutes: 60,
+            capacity: 16,
+            priceCents: 70_000,
+            rules: [
+                { days: [2, 4, 6], from: "06:00", to: "07:00" },
+                { days: [2, 4], from: "19:15", to: "20:15" },
+            ],
+            weight: 7,
+        },
+        {
+            name: "Live online class",
+            description:
+                "A 45-minute class on video, taught live from the studio. The link comes with your booking.",
+            minutes: 45,
+            capacity: 25,
+            priceCents: 40_000,
+            rules: [
+                { days: [1, 2, 3, 4, 5], from: "06:00", to: "06:45" },
+                { days: [1, 3], from: "20:30", to: "21:15" },
+            ],
+            weight: 6,
+            meetingUrl: meeting("prana-live-class"),
+        },
+        {
+            name: "Yoga foundations",
+            description:
+                "The class the foundations course is taught in: alignment, breath and the basic postures, at a beginner's pace.",
+            minutes: 75,
+            capacity: 12,
+            priceCents: 80_000,
+            rules: [
+                { days: [2, 4], from: "17:30", to: "18:45" },
+                { days: [6], from: "09:00", to: "10:15" },
+            ],
             weight: 0.8,
         },
+        {
+            name: "Pranayama and meditation",
+            description:
+                "Forty-five minutes of breathwork and a guided sit, online.",
+            minutes: 45,
+            capacity: 30,
+            priceCents: 35_000,
+            rules: [
+                { days: [0], from: "07:00", to: "07:45" },
+                { days: [3], from: "19:00", to: "19:45" },
+            ],
+            weight: 2,
+            meetingUrl: meeting("prana-breath"),
+        },
+        {
+            name: "Private session",
+            description:
+                "One hour, one teacher, at the studio. For an injury, a pregnancy or a practice of your own.",
+            minutes: 60,
+            capacity: 1,
+            priceCents: 250_000,
+            rules: [{ days: [1, 2, 3, 4, 5], from: "10:00", to: "13:00" }],
+            weight: 1.5,
+        },
+        {
+            name: "Free intro class",
+            description:
+                "Thirty minutes with a teacher before your first class: what to expect, and which class to start with.",
+            minutes: 30,
+            capacity: 1,
+            priceCents: null,
+            rules: [{ days: [1, 2, 3, 4, 5, 6], from: "11:00", to: "12:00" }],
+            weight: 1,
+        },
     ],
-    bookings: 200,
-    footer: "Mirror & Co. · 80 Feet Road, Koramangala 4th Block, Bengaluru · Tue–Sun 10am–8pm, closed Mondays",
+    bookings: 320,
+    weekdayWeights: [0.8, 1.1, 1.05, 1.1, 1.05, 0.95, 1.2],
+    paymentProvider: "CASHFREE",
+    billing: {
+        plans: [],
+        subscriptions: 0,
+        packs: [
+            {
+                name: "10-class studio pack",
+                description:
+                    "Ten studio classes — hatha, vinyasa or foundations — within three months.",
+                credits: 10,
+                validityDays: 90,
+                pricePaise: 550_000,
+                services: [0, 1, 3],
+                status: "ACTIVE",
+                buyers: 22,
+            },
+            {
+                name: "5 online classes",
+                description:
+                    "Five live online classes or breathwork sessions within six weeks.",
+                credits: 5,
+                validityDays: 45,
+                pricePaise: 175_000,
+                services: [2, 4],
+                status: "ACTIVE",
+                buyers: 14,
+            },
+            {
+                name: "Monsoon pack — 8 classes",
+                description: "Last monsoon's offer: eight studio classes.",
+                credits: 8,
+                validityDays: 60,
+                pricePaise: 360_000,
+                services: [0, 1],
+                status: "ARCHIVED",
+                buyers: 5,
+            },
+        ],
+        courses: [
+            {
+                name: "Yoga foundations — six weeks",
+                description:
+                    "Twelve evening classes that take a beginner from the first posture to a practice of their own.",
+                service: 3,
+                pricePaise: 720_000,
+                seats: 10,
+                status: "OPEN",
+                firstDay: -22,
+                schedule: [
+                    { day: 2, at: "17:30" },
+                    { day: 4, at: "17:30" },
+                ],
+                sessions: 12,
+                enrolled: 8,
+                lateJoiners: 1,
+                cancelled: 1,
+            },
+            {
+                name: "Breath and stillness — four weeks online",
+                description:
+                    "Eight live online sessions of pranayama and meditation, with a recording of each.",
+                service: 4,
+                pricePaise: 320_000,
+                seats: 20,
+                status: "OPEN",
+                firstDay: 9,
+                schedule: [
+                    { day: 0, at: "07:00" },
+                    { day: 3, at: "19:00" },
+                ],
+                sessions: 8,
+                enrolled: 11,
+            },
+            {
+                name: "Foundations — summer batch",
+                description: "Saturday mornings, six weeks.",
+                service: 3,
+                pricePaise: 540_000,
+                seats: 12,
+                status: "CLOSED",
+                firstDay: -80,
+                schedule: [{ day: 6, at: "09:00" }],
+                sessions: 6,
+                enrolled: 10,
+            },
+            {
+                name: "Yoga for a healthy back",
+                description:
+                    "Four Saturday sessions on the back, for desk workers. Being planned.",
+                service: 3,
+                pricePaise: 360_000,
+                seats: 8,
+                status: "DRAFT",
+                firstDay: 30,
+                schedule: [{ day: 6, at: "09:00" }],
+                sessions: 4,
+                enrolled: 0,
+            },
+        ],
+        manualInvoices: [
+            {
+                lines: [
+                    {
+                        description: "Corporate wellness morning · two hours",
+                        quantity: 1,
+                        unitPaise: 1_200_000,
+                    },
+                    {
+                        description: "Mats and props for 20",
+                        quantity: 1,
+                        unitPaise: 150_000,
+                    },
+                ],
+                taxPaise: 243_000,
+                daysAgo: 19,
+                state: "PAID",
+                company: true,
+            },
+            {
+                lines: [
+                    {
+                        description: "Private session",
+                        quantity: 3,
+                        unitPaise: 250_000,
+                    },
+                ],
+                taxPaise: 0,
+                daysAgo: 12,
+                state: "ISSUED",
+            },
+            {
+                lines: [
+                    {
+                        description: "Teacher for a private event · 90 minutes",
+                        quantity: 1,
+                        unitPaise: 600_000,
+                    },
+                ],
+                taxPaise: 0,
+                daysAgo: 0,
+                state: "DRAFT",
+            },
+        ],
+    },
+    footer: "Prana Yoga · 27th Main, HSR Layout Sector 2, Bengaluru · Classes daily from 6am, and online",
     site: {
-        slug: "mirror-and-co",
-        name: "Mirror & Co.",
-        subdomain: "mirror-and-co",
+        slug: "prana-yoga",
+        name: "Prana Yoga",
+        subdomain: "prana-yoga",
         published: true,
-        createdDaysAgo: 188,
+        createdDaysAgo: 210,
         pages: [
             {
                 path: "/",
@@ -1359,72 +1825,336 @@ export const MIRROR: ShowcaseBusiness = {
                 isHome: true,
                 sections: [
                     hero(
-                        "Hair and beauty, done unhurried",
-                        "A six-chair salon in Koramangala. Every appointment starts with a consultation, and nobody is rushed out of the chair.",
-                        { label: "Book an appointment", href: "/book" },
+                        "Yoga at your pace, in the studio or at home",
+                        "A small studio in HSR Layout with classes from six in the morning, live online classes for the days you cannot come in, and courses for beginners.",
+                        { label: "Book a free intro", href: "/book" },
                     ),
                     {
                         type: "features",
                         content: {
-                            heading: "How we work",
+                            heading: "How Prana works",
                             items: [
                                 {
-                                    title: "Consultation first",
-                                    body: "Five minutes before any scissors come out, so we agree on the result.",
+                                    title: "Small classes",
+                                    body: "Sixteen mats at most, so a teacher can adjust you.",
                                 },
                                 {
-                                    title: "Colour specialists",
-                                    body: "Two colourists who only do colour, with a patch test before every new shade.",
+                                    title: "Online, live",
+                                    body: "The same teachers, on video, at 6am and in the evening. Your link comes with the booking.",
                                 },
                                 {
-                                    title: "Running on time",
-                                    body: "We book realistic slots, so a 3pm appointment starts at 3pm.",
+                                    title: "Courses for beginners",
+                                    body: "Six weeks of foundations with the same group and the same teacher.",
+                                },
+                                {
+                                    title: "Class packs",
+                                    body: "Buy ten classes and use them across the week, studio or online.",
                                 },
                             ],
                         },
                     },
                     {
                         type: "servicesList",
-                        services: [0, 1, 2, 3],
-                        content: { heading: "Services", showPrices: true },
+                        services: [0, 1, 2, 5],
+                        content: { heading: "Classes", showPrices: true },
                     },
-                    button("Book an appointment", "/book"),
+                    button("See the timetable", "/classes"),
                 ],
             },
             {
-                path: "/services",
-                title: "Services",
+                path: "/classes",
+                title: "Classes",
                 sections: [
                     hero(
-                        "Services and prices",
-                        "Prices are a starting point — long or thick hair may take longer, and we will say so before we start.",
+                        "Studio and online classes",
+                        "Drop in to any class, or use a pack. Online classes are live, never recorded replays.",
                     ),
                     {
                         type: "servicesList",
-                        services: [0, 2, 1, 3],
+                        services: [0, 1, 3, 2, 4, 5],
                         content: { showPrices: true },
                     },
                     {
                         type: "faq",
                         content: {
-                            heading: "Good to know",
+                            heading: "Before your first class",
                             items: [
                                 {
                                     question:
-                                        "Do I need a patch test for colour?",
-                                    answer: "Yes, for any new colour — it takes five minutes and needs to be done at least 48 hours before your appointment.",
+                                        "I have never done yoga. Where do I start?",
+                                    answer: "Book the free intro, then hatha or the foundations course. Both go at a beginner's pace.",
                                 },
                                 {
-                                    question: "What if I need to cancel?",
-                                    answer: "Let us know a day ahead and there is no charge. You can move your booking from the confirmation email.",
+                                    question: "How do online classes work?",
+                                    answer: "Book a time and the video link comes with your confirmation. Join five minutes early with a mat and a cushion.",
                                 },
                                 {
-                                    question: "Do you take walk-ins?",
-                                    answer: "When a chair is free, yes. Weekday mornings are your best chance.",
+                                    question: "Do class packs expire?",
+                                    answer: "The studio pack lasts three months and the online pack six weeks from the day you buy it.",
                                 },
                             ],
                         },
                     },
+                ],
+            },
+            {
+                path: "/courses",
+                title: "Courses",
+                sections: [
+                    hero(
+                        "Courses",
+                        "A fixed group, a fixed teacher and a set number of weeks — the easiest way to start a practice that lasts.",
+                    ),
+                    html(
+                        "<h2>Yoga foundations — six weeks</h2>" +
+                            "<p>Tuesday and Thursday evenings, twelve classes, ₹7,200. The next batch opens when this one finishes.</p>" +
+                            "<h2>Breath and stillness — four weeks online</h2>" +
+                            "<p>Sunday mornings and Wednesday evenings, eight live sessions, ₹3,200.</p>",
+                    ),
+                    button("Ask about a course", "/contact"),
+                ],
+            },
+            {
+                path: "/book",
+                title: "Free intro",
+                sections: [
+                    hero(
+                        "Start with a free intro",
+                        "Thirty minutes with a teacher: what to expect, and which class to start with.",
+                    ),
+                    {
+                        type: "booking",
+                        service: 6,
+                        content: {
+                            title: "Book a free intro",
+                            description:
+                                "Pick a time. Come in comfortable clothes.",
+                            submitLabel: "Book my intro",
+                            successMessage: "Booked — see you at the studio.",
+                        },
+                    },
+                ],
+            },
+            {
+                path: "/contact",
+                title: "Contact",
+                sections: [
+                    hero(
+                        "Ask us anything",
+                        "About classes, packs, courses or a session at your office.",
+                    ),
+                    {
+                        type: "enquiry",
+                        form: { name: "Class enquiry", fields: CONTACT_FIELDS },
+                        content: {
+                            title: "Send us a message",
+                            description: "A teacher replies the same day.",
+                            submitLabel: "Send",
+                            successMessage: "Thank you — we will reply today.",
+                        },
+                    },
+                ],
+            },
+        ],
+    },
+    submissions: [
+        {
+            message:
+                "Complete beginner, quite stiff from desk work. Is the foundations course right for me?",
+        },
+        {
+            message:
+                "I travel a lot for work. Can I use the class pack for online classes too?",
+        },
+        {
+            message:
+                "Five months pregnant and cleared by my doctor. Do you do prenatal private sessions?",
+        },
+        {
+            message:
+                "Our team of 20 wants a yoga morning once a month at the office. Do you come to Koramangala?",
+        },
+        {
+            message: "When does the next foundations batch start?",
+        },
+        {
+            message:
+                "Is the 6am online class suitable if I have a slipped disc? Physio says gentle is fine.",
+        },
+        {
+            message: "Can my mother (62) join the hatha class?",
+        },
+        {
+            message:
+                "I bought the monsoon pack last year and have two classes left — can I still use them?",
+        },
+        {
+            message:
+                "Do you teach in Kannada as well? My father would be more comfortable.",
+        },
+    ],
+    analytics: {
+        paths: [
+            { path: "/", weight: 0.38 },
+            { path: "/classes", weight: 0.26 },
+            { path: "/courses", weight: 0.14 },
+            { path: "/book", weight: 0.14 },
+            { path: "/contact", weight: 0.08 },
+        ],
+        trendBase: 52,
+        weekendFactor: 1.1,
+        enquiryRate: 0.015,
+    },
+};
+
+export const CAREPOINT: ShowcaseBusiness = {
+    key: "carepoint",
+    slug: "carepoint-clinic",
+    name: "CarePoint Clinic",
+    modules: ["APPOINTMENTS", "CRM", "WEBSITE"],
+    // A Member, on purpose: the film shows what a Member may and may not see.
+    demoRole: "MEMBER",
+    owner: { first: "Meera", last: "Nair", role: "OWNER" },
+    staff: [
+        { first: "Pooja", last: "Shetty", role: "ADMIN" },
+        { first: "Arjun", last: "Rao", role: "MEMBER" },
+        { first: "Sara", last: "Thomas", role: "MEMBER" },
+    ],
+    roleAccounts: [],
+    // Patients are not a sales pipeline: no board, and the clinic's form
+    // entries open no leads.
+    pipeline: null,
+    leads: [],
+    contacts: 260,
+    services: [
+        {
+            name: "General consultation — Dr. Meera Nair",
+            description:
+                "Fifteen minutes with a general physician for anything new: fever, pain, a check on a long-standing condition.",
+            minutes: 15,
+            capacity: 1,
+            priceCents: 60_000,
+            rules: [
+                { days: [1, 2, 3, 4, 5, 6], from: "09:00", to: "13:00" },
+                { days: [1, 2, 3, 4, 5], from: "17:00", to: "20:00" },
+            ],
+            weight: 8,
+        },
+        {
+            name: "Paediatrics — Dr. Arjun Rao",
+            description:
+                "Twenty minutes for a child's illness, growth check or vaccination schedule.",
+            minutes: 20,
+            capacity: 1,
+            priceCents: 80_000,
+            rules: [
+                { days: [1, 3, 5], from: "10:00", to: "13:00" },
+                { days: [6], from: "10:00", to: "12:00" },
+            ],
+            weight: 4,
+        },
+        {
+            name: "Dermatology — Dr. Sara Thomas",
+            description:
+                "Skin, hair and nails. Bring any creams you are using.",
+            minutes: 20,
+            capacity: 1,
+            priceCents: 90_000,
+            rules: [
+                { days: [2, 4], from: "16:00", to: "19:00" },
+                { days: [6], from: "09:00", to: "12:00" },
+            ],
+            weight: 3,
+        },
+        {
+            name: "Teleconsultation",
+            description:
+                "Fifteen minutes on video with a doctor, for a follow-up or a question that does not need an examination. The link comes with your booking.",
+            minutes: 15,
+            capacity: 1,
+            priceCents: 50_000,
+            rules: [{ days: [1, 2, 3, 4, 5, 6], from: "13:30", to: "15:00" }],
+            weight: 3,
+            meetingUrl: meeting("carepoint-teleconsult"),
+        },
+        {
+            name: "Annual health check",
+            description:
+                "An hour: blood tests, ECG, and a doctor to go through the results. Come fasting.",
+            minutes: 60,
+            capacity: 2,
+            priceCents: 350_000,
+            rules: [{ days: [1, 2, 3, 4, 5, 6], from: "07:30", to: "09:30" }],
+            weight: 1.5,
+        },
+        {
+            name: "Follow-up visit",
+            description:
+                "Ten minutes to review results or a treatment, within two weeks of a consultation.",
+            minutes: 10,
+            capacity: 1,
+            priceCents: 30_000,
+            rules: [{ days: [1, 2, 3, 4, 5], from: "12:00", to: "13:00" }],
+            weight: 3,
+        },
+    ],
+    bookings: 340,
+    weekdayWeights: [0, 1.3, 1.1, 1, 1.05, 1, 1.2],
+    footer: "CarePoint Clinic · 5th Cross, Malleshwaram, Bengaluru · Mon–Sat 7:30am–8pm · For an emergency, call 108",
+    site: {
+        slug: "carepoint-clinic",
+        name: "CarePoint Clinic",
+        subdomain: "carepoint-clinic",
+        published: true,
+        createdDaysAgo: 240,
+        pages: [
+            {
+                path: "/",
+                title: "Home",
+                isHome: true,
+                sections: [
+                    hero(
+                        "A neighbourhood clinic that runs on time",
+                        "General practice, children's health and skin care in Malleshwaram. Book a time online, in person or on video.",
+                        { label: "Book an appointment", href: "/book" },
+                    ),
+                    {
+                        type: "features",
+                        content: {
+                            heading: "What to expect",
+                            items: [
+                                {
+                                    title: "Appointments, not queues",
+                                    body: "Book a time and be seen at that time.",
+                                },
+                                {
+                                    title: "Video when it will do",
+                                    body: "Follow-ups and questions on a teleconsultation, without the trip.",
+                                },
+                                {
+                                    title: "The same doctor",
+                                    body: "Your records and your doctor stay the same from one visit to the next.",
+                                },
+                            ],
+                        },
+                    },
+                    {
+                        type: "servicesList",
+                        services: [0, 1, 2, 3, 4],
+                        content: { heading: "Appointments", showPrices: true },
+                    },
+                ],
+            },
+            {
+                path: "/doctors",
+                title: "Doctors",
+                sections: [
+                    hero("Our doctors"),
+                    html(
+                        "<h2>Dr. Meera Nair</h2><p>General physician, MBBS, MD. Twenty years in family practice.</p>" +
+                            "<h2>Dr. Arjun Rao</h2><p>Paediatrician, MBBS, DCH. Mondays, Wednesdays, Fridays and Saturday mornings.</p>" +
+                            "<h2>Dr. Sara Thomas</h2><p>Dermatologist, MBBS, MD. Tuesday and Thursday evenings, Saturday mornings.</p>",
+                    ),
                 ],
             },
             {
@@ -1433,73 +2163,42 @@ export const MIRROR: ShowcaseBusiness = {
                 sections: [
                     hero(
                         "Book an appointment",
-                        "Choose a time. We will confirm by email and send a reminder the day before.",
+                        "Choose a time. We will send a reminder the day before.",
                     ),
                     {
                         type: "booking",
                         service: 0,
                         content: {
-                            title: "Haircut & style",
-                            description:
-                                "Forty-five minutes with one of our stylists.",
+                            title: "General consultation",
+                            description: "Fifteen minutes with Dr. Meera Nair.",
                             submitLabel: "Book",
-                            successMessage: "Booked — see you soon.",
+                            successMessage:
+                                "Booked — please arrive ten minutes early.",
                         },
                     },
                 ],
             },
             {
-                path: "/bridal",
-                title: "Bridal",
+                path: "/contact",
+                title: "Contact",
                 sections: [
                     hero(
-                        "Bridal hair and make-up",
-                        "From the first trial to the morning of the wedding, the same stylist all the way through.",
-                    ),
-                    html(
-                        "<h2>How it works</h2>" +
-                            "<p>We start with a consultation and a trial about six weeks out, " +
-                            "then plan the day around your schedule — at the salon or at your venue " +
-                            "anywhere in Bengaluru. Packages cover the bride and up to six family members.</p>",
+                        "Ask the clinic",
+                        "For appointments, reports or anything else. Not for emergencies — call 108.",
                     ),
                     {
                         type: "enquiry",
                         form: {
-                            name: "Bridal enquiry",
-                            fields: [
-                                {
-                                    name: "name",
-                                    label: "Your name",
-                                    type: "text",
-                                    required: true,
-                                },
-                                {
-                                    name: "email",
-                                    label: "Email",
-                                    type: "email",
-                                    required: true,
-                                },
-                                { name: "phone", label: "Phone", type: "tel" },
-                                {
-                                    name: "date",
-                                    label: "Wedding date",
-                                    type: "text",
-                                },
-                                {
-                                    name: "message",
-                                    label: "Tell us about the day",
-                                    type: "textarea",
-                                    required: true,
-                                },
-                            ],
+                            name: "Ask the clinic",
+                            fields: CONTACT_FIELDS,
                         },
                         content: {
-                            title: "Ask about bridal",
+                            title: "Send a message",
                             description:
-                                "Share your date and what you have in mind. We reply within a day.",
-                            submitLabel: "Send enquiry",
+                                "The front desk replies within a working day.",
+                            submitLabel: "Send",
                             successMessage:
-                                "Thank you — Nandini will be in touch within a day.",
+                                "Thank you — the front desk will reply within a working day.",
                         },
                     },
                 ],
@@ -1509,520 +2208,45 @@ export const MIRROR: ShowcaseBusiness = {
     submissions: [
         {
             message:
-                "Wedding on 14 February in Whitefield. Need hair and make-up for me and my sister.",
-            phone: "98451 30642",
-            extra: { date: "14 Feb" },
+                "Are my blood test results from last Tuesday ready? Can they be emailed?",
         },
         {
             message:
-                "Looking for a soft, natural look for a registry wedding. Do you do trials on Sundays?",
-            phone: "99009 71254",
-            extra: { date: "22 Nov" },
+                "Does Dr. Arjun Rao give the MMR booster? My daughter is due next month.",
+        },
+        {
+            message: "Do you accept Star Health cashless for the annual check?",
         },
         {
             message:
-                "Sangeet for 6 people — mehendi-friendly hairstyles. Can you come to the venue?",
-            phone: "97310 58427",
-            extra: { date: "7 Dec" },
+                "My father needs a fitness certificate for his driving licence renewal. Which appointment should I book?",
         },
         {
             message:
-                "I have very curly hair and want it worn up on the day. Can we plan two trials?",
-            phone: "98866 12093",
-            extra: { date: "18 Jan" },
+                "Is there parking near the clinic? I will be bringing my mother in a wheelchair.",
         },
         {
             message:
-                "Reception look only, evening. What is included in the bridal package?",
-            phone: "90087 44516",
-        },
-        {
-            message: "Do you do pre-wedding hair spa sessions as a package?",
-            phone: "96322 70381",
-        },
-        {
-            message: "Destination wedding in Coorg — would a stylist travel?",
-            phone: "98450 67214",
-            extra: { date: "3 Jan" },
+                "Can I get a teleconsultation for a rash? I can send photos beforehand.",
         },
         {
             message:
-                "Need colour correction before my engagement next month. Previous salon went too orange.",
-            phone: "99452 18307",
+                "Please could you share the fasting instructions for the health check?",
+        },
+        {
+            message: "Is the clinic open on the Dasara holiday?",
         },
     ],
     analytics: {
         paths: [
             { path: "/", weight: 0.4 },
-            { path: "/services", weight: 0.22 },
-            { path: "/book", weight: 0.26 },
-            { path: "/bridal", weight: 0.12 },
+            { path: "/book", weight: 0.32 },
+            { path: "/doctors", weight: 0.18 },
+            { path: "/contact", weight: 0.1 },
         ],
-        trendBase: 46,
-        weekendFactor: 0.9,
-        enquiryRate: 0.012,
-    },
-};
-
-export const RYE = {
-    orders: 150,
-    customers: 120,
-    orderDays: 60,
-    /** GST on bakery goods as the order form sends it. */
-    taxRate: 0.05,
-    /** Local delivery; free above ₹800. Walk-in orders pay none. */
-    freeDeliveryFromPaise: 80_000,
-    deliveryPaise: 4_000,
-    categories: [
-        { slug: "breads", name: "Breads" },
-        { slug: "pastries", name: "Pastries" },
-        { slug: "cakes", name: "Cakes" },
-    ],
-} as const;
-
-export const RYE_PRODUCTS: readonly CatalogProduct[] = [
-    {
-        slug: "country-sourdough",
-        name: "Country Sourdough",
-        description:
-            "Our everyday loaf: 36-hour ferment, blistered crust, open crumb. About 900g.",
-        price: "240.00",
-        category: "breads",
-        variants: one("RYE-CSD", "Whole loaf", "240.00"),
-        stock: 18,
-        bulk: [1, 2, 1],
-        weight: 8,
-    },
-    {
-        slug: "seeded-rye",
-        name: "Seeded Rye",
-        description:
-            "Dense, dark and sour, with sunflower, flax and pumpkin seeds.",
-        price: "280.00",
-        category: "breads",
-        variants: one("RYE-SRY", "Whole loaf", "280.00"),
-        stock: 7,
-        bulk: [1, 2, 1],
-        weight: 4,
-    },
-    {
-        slug: "multigrain-sandwich-loaf",
-        name: "Multigrain Sandwich Loaf",
-        description: "Soft, sliced, and made for school lunches.",
-        price: "180.00",
-        category: "breads",
-        variants: one("RYE-MSL", "Sliced", "180.00"),
-        stock: 22,
-        bulk: [1, 2, 1],
-        weight: 5,
-    },
-    {
-        slug: "rosemary-focaccia",
-        name: "Olive & Rosemary Focaccia",
-        description:
-            "Kalamata olives, rosemary and a lot of olive oil. Half tray.",
-        price: "220.00",
-        category: "breads",
-        variants: one("RYE-FOC", "Half tray", "220.00"),
-        stock: 9,
-        bulk: [1, 2, 1],
-        weight: 4,
-    },
-    {
-        slug: "baguette",
-        name: "Baguette",
-        description: "Baked twice a day, at 7am and 4pm.",
-        price: "120.00",
-        category: "breads",
-        variants: one("RYE-BAG", "Single", "120.00"),
-        stock: 0,
-        bulk: [1, 3, 1],
-        weight: 4,
-    },
-    {
-        slug: "brioche-loaf",
-        name: "Brioche Loaf",
-        description:
-            "Butter-rich and golden. Makes the best French toast in the city.",
-        price: "260.00",
-        category: "breads",
-        variants: one("RYE-BRI", "Whole loaf", "260.00"),
-        stock: 6,
-        bulk: [1, 2, 1],
-        weight: 3,
-    },
-    {
-        slug: "butter-croissant",
-        name: "Butter Croissant",
-        description: "Laminated with French butter over three days.",
-        price: "110.00",
-        category: "pastries",
-        variants: [
-            { sku: "RYE-CRO-1", title: "Single", price: "110.00" },
-            { sku: "RYE-CRO-4", title: "Box of 4", price: "420.00" },
-        ],
-        stock: 34,
-        bulk: [1, 4, 1],
-        weight: 8,
-    },
-    {
-        slug: "pain-au-chocolat",
-        name: "Pain au Chocolat",
-        description: "Two batons of dark chocolate in croissant dough.",
-        price: "140.00",
-        category: "pastries",
-        variants: one("RYE-PAC", "Single", "140.00"),
-        stock: 20,
-        bulk: [1, 4, 1],
-        weight: 6,
-    },
-    {
-        slug: "cinnamon-knot",
-        name: "Cinnamon Knot",
-        description: "Cardamom dough, cinnamon sugar, tied and glazed.",
-        price: "120.00",
-        category: "pastries",
-        variants: one("RYE-CIN", "Single", "120.00"),
-        stock: 15,
-        bulk: [1, 4, 1],
-        weight: 5,
-    },
-    {
-        slug: "almond-croissant",
-        name: "Almond Croissant",
-        description: "Twice-baked with frangipane and toasted almonds.",
-        price: "160.00",
-        category: "pastries",
-        variants: one("RYE-ALM", "Single", "160.00"),
-        stock: 0,
-        bulk: [1, 3, 1],
-        weight: 4,
-    },
-    {
-        slug: "cardamom-bun",
-        name: "Cardamom Bun",
-        description: "Swedish-style, with freshly ground green cardamom.",
-        price: "110.00",
-        category: "pastries",
-        variants: one("RYE-CAR", "Single", "110.00"),
-        stock: 4,
-        bulk: [1, 4, 1],
-        weight: 4,
-    },
-    {
-        slug: "chocolate-chip-cookies",
-        name: "Brown Butter Chocolate Chip Cookies",
-        description: "Four large cookies with sea salt.",
-        price: "180.00",
-        category: "pastries",
-        variants: one("RYE-CCC", "Box of 4", "180.00"),
-        stock: 26,
-        bulk: [1, 3, 1],
-        weight: 5,
-    },
-    {
-        slug: "basque-cheesecake",
-        name: "Basque Burnt Cheesecake",
-        description:
-            "Caramelised outside, barely set inside. Serves 8. Order a day ahead.",
-        price: "1450.00",
-        category: "cakes",
-        variants: [
-            { sku: "RYE-BCC-W", title: "Whole, 8 inch", price: "1450.00" },
-            { sku: "RYE-BCC-S", title: "Slice", price: "220.00" },
-        ],
-        stock: 3,
-        bulk: [1, 1, 1],
-        weight: 2,
-    },
-    {
-        slug: "chocolate-sea-salt-cake",
-        name: "Dark Chocolate & Sea Salt Cake",
-        description:
-            "70% chocolate, olive oil sponge and a salted ganache. Serves 10.",
-        price: "1250.00",
-        category: "cakes",
-        variants: one("RYE-DCS", "Whole, 8 inch", "1250.00"),
-        stock: 2,
-        bulk: [1, 1, 1],
-        weight: 2,
-    },
-    {
-        slug: "carrot-walnut-cake",
-        name: "Carrot Walnut Cake",
-        description: "Spiced sponge with a cream cheese frosting. Serves 10.",
-        price: "1100.00",
-        category: "cakes",
-        variants: one("RYE-CWC", "Whole, 8 inch", "1100.00"),
-        stock: 5,
-        bulk: [1, 1, 1],
-        weight: 1.5,
-    },
-];
-
-export const RYE_BUSINESS: ShowcaseBusiness = {
-    key: "rye",
-    slug: "rye-and-co",
-    name: "Rye & Co. Bakery",
-    modules: ["COMMERCE", "WEBSITE"],
-    demoRole: "MEMBER",
-    owner: { first: "Tanvi", last: "Desai", role: "OWNER" },
-    staff: [
-        { first: "Joseph", last: "D'Souza", role: "ADMIN" },
-        { first: "Meenal", last: "Joshi", role: "MEMBER" },
-    ],
-    roleAccounts: [],
-    // No CRM here: the only pipeline is the one an enquiry creates on its own
-    // (the enquiry service's default "Sales" board), so the leads that exist
-    // are the ones the cake form opened.
-    pipeline: {
-        name: "Sales",
-        stages: ["New", "Contacted", "Qualified", "Won", "Lost"],
-    },
-    leads: [],
-    contacts: 0,
-    services: [],
-    bookings: 0,
-    footer: "Rye & Co. Bakery · 11th Main, Jayanagar 4th Block, Bengaluru · Open daily 7am–8pm",
-    site: {
-        slug: "rye-and-co",
-        name: "Rye & Co. Bakery",
-        subdomain: "rye-and-co",
-        published: true,
-        createdDaysAgo: 97,
-        pages: [
-            {
-                path: "/",
-                title: "Home",
-                isHome: true,
-                sections: [
-                    hero(
-                        "Sourdough, baked through the night",
-                        "A small bakery in Jayanagar. Bread comes out of the oven at 7am, pastries by 8, and the counter stays open until it is empty.",
-                        { label: "See the menu", href: "/menu" },
-                    ),
-                    html(
-                        "<h2>Slow bread</h2>" +
-                            "<p>Every loaf starts two days before you buy it. We mill some of our " +
-                            "own rye, use no commercial yeast in the sourdough, and bake in small " +
-                            "batches so the last loaf of the day is as good as the first.</p>",
-                    ),
-                    {
-                        type: "features",
-                        content: {
-                            heading: "On the counter",
-                            items: [
-                                {
-                                    title: "Breads",
-                                    body: "Country sourdough, seeded rye, focaccia and baguettes twice a day.",
-                                },
-                                {
-                                    title: "Pastries",
-                                    body: "Croissants laminated over three days, cardamom buns and cinnamon knots.",
-                                },
-                                {
-                                    title: "Cakes",
-                                    body: "Basque cheesecake and dark chocolate cake, whole or by the slice.",
-                                },
-                            ],
-                        },
-                    },
-                    button("Order a custom cake", "/cakes"),
-                ],
-            },
-            {
-                path: "/menu",
-                title: "Menu",
-                sections: [
-                    hero(
-                        "The menu",
-                        "Order online for pickup from 8am, or delivery within 5km of Jayanagar.",
-                    ),
-                    {
-                        type: "features",
-                        content: {
-                            heading: "Every day",
-                            items: [
-                                {
-                                    title: "Country sourdough — ₹240",
-                                    body: "36-hour ferment, about 900g.",
-                                },
-                                {
-                                    title: "Seeded rye — ₹280",
-                                    body: "Sunflower, flax and pumpkin.",
-                                },
-                                {
-                                    title: "Butter croissant — ₹110",
-                                    body: "Or a box of four for ₹420.",
-                                },
-                                { title: "Pain au chocolat — ₹140" },
-                                { title: "Cardamom bun — ₹110" },
-                                {
-                                    title: "Basque cheesecake — ₹1,450",
-                                    body: "Whole, order a day ahead. ₹220 a slice.",
-                                },
-                            ],
-                        },
-                    },
-                ],
-            },
-            {
-                path: "/cakes",
-                title: "Custom cakes",
-                sections: [
-                    hero(
-                        "Cakes for the days that matter",
-                        "Birthdays, anniversaries and office goodbyes. Give us three days and tell us what they love.",
-                    ),
-                    html(
-                        "<p>Custom cakes start at ₹1,800 for an 8-inch round that serves ten. " +
-                            "We do not do fondant or figurines — just very good cake, finished simply, " +
-                            "with a message piped on if you like.</p>",
-                    ),
-                    {
-                        type: "enquiry",
-                        form: {
-                            name: "Custom cake enquiry",
-                            fields: [
-                                {
-                                    name: "name",
-                                    label: "Your name",
-                                    type: "text",
-                                    required: true,
-                                },
-                                {
-                                    name: "email",
-                                    label: "Email",
-                                    type: "email",
-                                    required: true,
-                                },
-                                {
-                                    name: "phone",
-                                    label: "Phone",
-                                    type: "tel",
-                                    required: true,
-                                },
-                                {
-                                    name: "date",
-                                    label: "When do you need it?",
-                                    type: "text",
-                                    required: true,
-                                },
-                                {
-                                    name: "message",
-                                    label: "Flavour, size and message",
-                                    type: "textarea",
-                                    required: true,
-                                },
-                            ],
-                        },
-                        content: {
-                            title: "Ask for a cake",
-                            description:
-                                "We will confirm the price and a pickup time on WhatsApp.",
-                            submitLabel: "Send",
-                            successMessage:
-                                "Thanks — Tanvi will message you to confirm.",
-                        },
-                    },
-                ],
-            },
-            {
-                path: "/visit",
-                title: "Visit",
-                sections: [
-                    hero(
-                        "Visit us",
-                        "11th Main, Jayanagar 4th Block. Open every day, 7am to 8pm.",
-                    ),
-                    {
-                        type: "faq",
-                        content: {
-                            items: [
-                                {
-                                    question: "When is the bread ready?",
-                                    answer: "Sourdough and rye from 7am, baguettes at 7am and 4pm. Weekends sell out by early afternoon.",
-                                },
-                                {
-                                    question: "Can I reserve a loaf?",
-                                    answer: "Yes — order online the night before and it will be waiting at the counter.",
-                                },
-                                {
-                                    question: "Is there anything eggless?",
-                                    answer: "All our breads are eggless, and so is the dark chocolate cake.",
-                                },
-                            ],
-                        },
-                    },
-                ],
-            },
-        ],
-    },
-    submissions: [
-        {
-            message:
-                "Chocolate cake for my daughter's 7th birthday, 'Happy Birthday Anika'. Serves about 15.",
-            phone: "98452 11860",
-            extra: { date: "Saturday" },
-        },
-        {
-            message:
-                "Office farewell for 25 people — can you do two Basque cheesecakes and some cookies?",
-            phone: "99020 64731",
-            extra: { date: "Friday afternoon" },
-        },
-        {
-            message:
-                "Eggless carrot cake for my parents' 40th anniversary, with '40 years' on it.",
-            phone: "97416 30258",
-            extra: { date: "12th" },
-        },
-        {
-            message:
-                "Do you do a sourdough subscription? Two loaves a week, delivered.",
-            phone: "98861 92047",
-            extra: { date: "Weekly" },
-        },
-        {
-            message:
-                "Small wedding tea — 60 cardamom buns and 40 croissants. Is that possible?",
-            phone: "90081 57329",
-            extra: { date: "Next month" },
-        },
-        {
-            message: "Birthday cake, dark chocolate, not too sweet, for 10.",
-            phone: "96320 48115",
-            extra: { date: "Sunday" },
-        },
-        {
-            message:
-                "Can you make a gluten-free cake? My son has coeliac disease.",
-            phone: "98440 73692",
-            extra: { date: "Flexible" },
-        },
-        {
-            message:
-                "Would like to order 30 focaccia halves for a pop-up lunch.",
-            phone: "99450 26184",
-            extra: { date: "Next Saturday" },
-        },
-        {
-            message:
-                "Anniversary cake — Basque cheesecake with a message on the box?",
-            phone: "97392 81506",
-            extra: { date: "Tomorrow" },
-        },
-    ],
-    analytics: {
-        paths: [
-            { path: "/", weight: 0.44 },
-            { path: "/menu", weight: 0.3 },
-            { path: "/cakes", weight: 0.16 },
-            { path: "/visit", weight: 0.1 },
-        ],
-        trendBase: 64,
-        weekendFactor: 1.25,
-        enquiryRate: 0.008,
+        trendBase: 70,
+        weekendFactor: 0.6,
+        enquiryRate: 0.006,
     },
 };
 
@@ -2033,6 +2257,7 @@ export const LUMEN: ShowcaseBusiness = {
     modules: ["CRM", "WEBSITE"],
     demoRole: "REVIEWER",
     owner: { first: "Aditi", last: "Rao", role: "OWNER" },
+    leadTarget: 30,
     staff: [
         { first: "Vikram", last: "Iyer", role: "ADMIN" },
         { first: "Sana", last: "Merchant", role: "MEMBER" },
@@ -2332,10 +2557,17 @@ export const LUMEN_POSTS: readonly {
 
 export const SHOWCASE_BUSINESSES: readonly ShowcaseBusiness[] = [
     PULSE,
-    MIRROR,
-    RYE_BUSINESS,
+    PRANA,
+    CAREPOINT,
     LUMEN,
 ];
+
+/**
+ * Businesses an earlier showcase seeded and this one no longer does. Their
+ * `seed_sc_<key>_` rows are removed on every run, so a database seeded before
+ * the line-up changed does not keep a salon and a bakery nobody can explain.
+ */
+export const RETIRED_BUSINESS_KEYS: readonly string[] = ["mirror", "rye"];
 
 /** What gets written on a lead's timeline, per business. */
 export const LEAD_TIMELINE: Readonly<
@@ -2373,32 +2605,20 @@ export const LEAD_TIMELINE: Readonly<
             "Confirm PT start date with Kabir",
         ],
     },
-    mirror: {
+    prana: {
         notes: [
-            "Wants a soft, natural look. Sent Pinterest references.",
-            "Bride plus mother and two sisters. Venue is in Whitefield.",
-            "Patch test done on Tuesday, no reaction.",
-            "Asked about travel charges for a venue outside the city.",
-            "Budget is flexible for the wedding day, tighter for the sangeet.",
+            "Came to the free intro. Stiff hamstrings, keen to start slowly.",
+            "Asked whether the online pack works with the 6am class — it does.",
+            "Wants the foundations course but travels the first week. Offered the next batch.",
+            "Office team of 20 — HR wants a quote for monthly mornings.",
+            "Tried hatha and vinyasa; prefers hatha. Sent the studio pack price.",
         ],
         tasks: [
-            "Send bridal package quote",
-            "Book the trial with Nandini",
-            "Call to confirm the wedding-day timings",
-            "Share the patch test reminder",
-            "Follow up on the deposit",
-        ],
-    },
-    rye: {
-        notes: [
-            "Confirmed flavour on WhatsApp.",
-            "Wants it boxed with a ribbon — added ₹80 for packaging.",
-            "Regular customer, buys sourdough every Saturday.",
-        ],
-        tasks: [
-            "Message to confirm price and pickup time",
-            "Check oven schedule for the date",
-            "Call back about eggless options",
+            "Call to book the free intro",
+            "Send the class timetable",
+            "Share the foundations course dates",
+            "Follow up after the first class",
+            "Send the corporate wellness quote",
         ],
     },
     lumen: {

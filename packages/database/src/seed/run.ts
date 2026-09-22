@@ -98,6 +98,18 @@ export async function seed(): Promise<void> {
         create: { id: id("org"), name: ORG_NAME, slug: ORG_SLUG },
     });
 
+    // The zone the business keeps time in (ADR-007): renewal dates and
+    // "today" are counted in it.
+    await prisma.businessProfile.upsert({
+        where: { organizationId: org.id },
+        update: { timezone: "Asia/Kolkata" },
+        create: {
+            id: id("profile"),
+            organizationId: org.id,
+            timezone: "Asia/Kolkata",
+        },
+    });
+
     await prisma.membership.upsert({
         where: {
             organizationId_userId: { organizationId: org.id, userId: user.id },
@@ -1168,10 +1180,29 @@ export async function reset(): Promise<void> {
     console.log(`[seed] resetting ${target.database} on ${target.host}`);
 
     const { prisma } = await import("../client");
-    const where = { id: { startsWith: SEED_PREFIX } };
+    const removed = await deleteSeeded(prisma, SEED_PREFIX);
+    console.log(`[seed] removed ${removed} seeded rows.`);
+}
+
+/**
+ * Delete every row whose id starts with `prefix`, children first. The reset
+ * passes the whole seed's prefix; the showcase passes one retired business's
+ * (`seed_sc_<key>_`). Returns how many rows went.
+ */
+export async function deleteSeeded(
+    prisma: Db,
+    prefix: string,
+): Promise<number> {
+    const where = { id: { startsWith: prefix } };
     let removed = 0;
 
     const inOrder = [
+        // What a business sells beyond a booking (ADR-007). Invoices and the
+        // classes spent from packs first; plans and packs are `Restrict` from
+        // what was sold on them, so they go after the sales.
+        () => prisma.invoiceLine.deleteMany({ where }),
+        () => prisma.invoice.deleteMany({ where }),
+        () => prisma.packRedemption.deleteMany({ where }),
         () => prisma.orderItem.deleteMany({ where }),
         () => prisma.order.deleteMany({ where }),
         () => prisma.inventory.deleteMany({ where }),
@@ -1198,6 +1229,17 @@ export async function reset(): Promise<void> {
         // seeded ids, so they are removed explicitly and counted.
         () => prisma.bookingEvent.deleteMany({ where }),
         () => prisma.booking.deleteMany({ where }),
+        () => prisma.courseEnrollment.deleteMany({ where }),
+        () => prisma.courseSession.deleteMany({ where }),
+        () => prisma.course.deleteMany({ where }),
+        () => prisma.packPurchase.deleteMany({ where }),
+        () =>
+            prisma.classPackService.deleteMany({
+                where: { packId: { startsWith: prefix } },
+            }),
+        () => prisma.classPack.deleteMany({ where }),
+        () => prisma.customerSubscription.deleteMany({ where }),
+        () => prisma.subscriptionPlan.deleteMany({ where }),
         () => prisma.availabilityRule.deleteMany({ where }),
         () => prisma.service.deleteMany({ where }),
         () => prisma.activity.deleteMany({ where }),
@@ -1230,6 +1272,12 @@ export async function reset(): Promise<void> {
         () => prisma.featureFlagOverride.deleteMany({ where }),
         () => prisma.organizationModule.deleteMany({ where }),
         () => prisma.membership.deleteMany({ where }),
+        () => prisma.businessProfile.deleteMany({ where }),
+        // Keyed by its organization, so matched on that.
+        () =>
+            prisma.invoiceSequence.deleteMany({
+                where: { organizationId: { startsWith: prefix } },
+            }),
         () => prisma.organization.deleteMany({ where }),
         () => prisma.account.deleteMany({ where }),
         () => prisma.user.deleteMany({ where }),
@@ -1239,8 +1287,7 @@ export async function reset(): Promise<void> {
         const { count } = await step();
         removed += count;
     }
-
-    console.log(`[seed] removed ${removed} seeded rows.`);
+    return removed;
 }
 
 async function report(prisma: Db, organizationId: string) {

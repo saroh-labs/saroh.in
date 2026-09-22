@@ -19,7 +19,17 @@ import {
     utcDay,
     writeSite,
 } from "../helpers";
+import { deleteSeeded } from "../run";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
+import type { BillingContext, InvoiceRows, InvoiceSpec, Seen } from "./billing";
+import {
+    invoiceRows,
+    planCourses,
+    planManualInvoices,
+    planPacks,
+    planSubscriptions,
+} from "./billing";
+import { checkShowcase } from "./check";
 import type { OrderStatus, PaymentStatus, SellableProduct } from "./commerce";
 import { planOrders, toPaise, upsertCatalog } from "./commerce";
 import type { LeadSpec } from "./crm";
@@ -34,14 +44,14 @@ import {
     NORTHWIND_LEADS,
     NORTHWIND_NEW_CATEGORIES,
     NORTHWIND_NEW_PRODUCTS,
+    RETIRED_BUSINESS_KEYS,
     ROLE_ACCOUNTS,
-    RYE,
-    RYE_PRODUCTS,
     SHOWCASE_BUSINESSES,
     SHOWCASE_KEY,
     SHOWCASE_PASSWORD,
     SHOWCASE_SEED,
     staffEmail,
+    TIMEZONE,
 } from "./data";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
@@ -54,13 +64,22 @@ import { createRng } from "./random";
  * modules, catalogue, services, sites — exactly as the base seed does.
  *
  * VOLUME — contacts, customers, orders, bookings, leads and their timelines,
- * form entries — is regenerated each run: this business's `seed_sc_<key>_`
- * rows are deleted and written again with `createMany`, in one pass per table.
- * The generator is a seeded PRNG and every date is relative to today, so a
- * re-run on the same day writes the same rows with the same ids; a re-run a
- * week later moves the diary with the calendar instead of leaving "upcoming"
- * bookings in the past. Rows a developer added by hand have no seed id and are
- * never touched.
+ * form entries, courses and enrolments, subscriptions, pack sales and the
+ * classes spent from them, invoices — is regenerated each run: this
+ * business's `seed_sc_<key>_` rows are deleted and written again with
+ * `createMany`, in one pass per table. The generator is a seeded PRNG and
+ * every date is relative to "now" rounded down to the half hour, so a re-run
+ * in the same half hour writes the same rows with the same ids and values; a
+ * re-run a week later moves the diary, the renewals and the invoices with the
+ * calendar instead of leaving "upcoming" bookings in the past. Rows a
+ * developer added by hand have no seed id and are never touched.
+ *
+ * Jobs: none. Bookings made by hand queue a `booking.notify` job in the API;
+ * the showcase's bookings are history and queue nothing, and the API starts
+ * its own `subscription.renew` run on boot, so the seed never enqueues one.
+ * The checks at the end (`./check.ts`) prove all of this and that the money,
+ * the numbers, the periods and the capacity reconcile; they stop the run if
+ * anything does not.
  */
 
 const sid = (key: string, ...parts: (string | number)[]) =>
@@ -94,8 +113,12 @@ export async function seedShowcase(): Promise<void> {
     console.log(`[showcase] target: ${target.database} on ${target.host}`);
 
     const { prisma } = await import("../../client");
-    const now = new Date();
+    // Rounded down to the half hour: a re-run inside it writes identical rows.
+    // Half past and on the hour are both boundaries in Kolkata (UTC+5:30), so
+    // a renewal due at local midnight is on the same side of both clocks.
+    const now = new Date(Math.floor(Date.now() / 1_800_000) * 1_800_000);
     const started = Date.now();
+    const jobsBefore = await countJobs(prisma);
 
     // One hash for every showcase login. better-auth salts each hash, so a
     // shared one verifies for all of them; hashing ~20 times would only cost
@@ -122,15 +145,83 @@ export async function seedShowcase(): Promise<void> {
         }),
     };
 
+    await retireBusinesses(ctx);
     await seedNorthwind(ctx, roleUsers);
+    const businesses: { id: string; name: string; prefix: string }[] = [
+        {
+            id: NORTHWIND.orgId,
+            name: "Northwind Supply",
+            prefix: sid("nw", ""),
+        },
+    ];
     for (const business of SHOWCASE_BUSINESSES) {
-        await seedBusiness(ctx, business, roleUsers);
+        businesses.push({
+            id: await seedBusiness(ctx, business, roleUsers),
+            name: business.name,
+            prefix: sid(business.key, ""),
+        });
     }
+
+    const counts = await checkShowcase(prisma, now, businesses);
+    const jobsAfter = await countJobs(prisma);
+    if (jobsAfter !== jobsBefore) {
+        throw new Error(
+            `The showcase queued jobs (${jobsBefore} → ${jobsAfter}); it must queue none`,
+        );
+    }
+    console.table(counts);
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +
             `Every account's password: ${SHOWCASE_PASSWORD}`,
     );
+}
+
+/** Notification and renewal jobs: the showcase must add none of either. */
+const countJobs = (prisma: Db) =>
+    prisma.job.count({
+        where: { type: { in: ["booking.notify", "subscription.renew"] } },
+    });
+
+/**
+ * Remove what an earlier line-up seeded for businesses the showcase no longer
+ * has, and the staff logins only they used.
+ */
+async function retireBusinesses(ctx: Context) {
+    let removed = 0;
+    for (const key of RETIRED_BUSINESS_KEYS) {
+        removed += await deleteSeeded(ctx.prisma, sid(key, ""));
+    }
+    const orphans = await ctx.prisma.user.findMany({
+        where: {
+            id: { startsWith: sid("user", "") },
+            memberships: { none: {} },
+        },
+        select: { id: true },
+    });
+    if (orphans.length > 0) {
+        const ids = orphans.map((u) => u.id);
+        await ctx.prisma.account.deleteMany({ where: { userId: { in: ids } } });
+        removed += (
+            await ctx.prisma.user.deleteMany({ where: { id: { in: ids } } })
+        ).count;
+    }
+    if (removed > 0) {
+        console.log(`[showcase] removed ${removed} rows of retired businesses`);
+    }
+}
+
+/** The business's zone (ADR-007): what renewals and "today" are counted in. */
+async function setTimezone(ctx: Context, key: string, orgId: string) {
+    await ctx.prisma.businessProfile.upsert({
+        where: { organizationId: orgId },
+        update: { timezone: TIMEZONE },
+        create: {
+            id: sid(key, "profile"),
+            organizationId: orgId,
+            timezone: TIMEZONE,
+        },
+    });
 }
 
 // --- People and access ----------------------------------------------------
@@ -266,11 +357,19 @@ async function subscribe(ctx: Context, key: string, orgId: string) {
 async function clearVolume(ctx: Context, key: string) {
     const where = { id: { startsWith: sid(key, "") } };
     const p = ctx.prisma;
+    await p.invoiceLine.deleteMany({ where });
+    await p.invoice.deleteMany({ where });
+    await p.packRedemption.deleteMany({ where });
     await p.submission.deleteMany({ where });
     await p.activity.deleteMany({ where });
     await p.lead.deleteMany({ where });
     await p.bookingEvent.deleteMany({ where });
     await p.booking.deleteMany({ where });
+    await p.courseEnrollment.deleteMany({ where });
+    await p.courseSession.deleteMany({ where });
+    await p.course.deleteMany({ where });
+    await p.packPurchase.deleteMany({ where });
+    await p.customerSubscription.deleteMany({ where });
     await p.orderItem.deleteMany({ where });
     await p.order.deleteMany({ where });
     await p.customer.deleteMany({ where });
@@ -710,18 +809,22 @@ async function writeAnalytics(
                 ...r,
                 organizationId: orgId,
                 siteId: "",
+                // The day it counts, so a re-run writes the same row.
+                createdAt: r.date,
+                updatedAt: r.date,
             })),
         }),
     );
 }
 
-// --- The four new businesses ------------------------------------------------
+// --- The four other businesses ---------------------------------------------
 
+/** Seed one business; returns its organization's id. */
 async function seedBusiness(
     ctx: Context,
     biz: ShowcaseBusiness,
     roleUsers: { admin: string; member: string },
-) {
+): Promise<string> {
     const { prisma, now } = ctx;
     const key = biz.key;
     const createdAt = at(now, -biz.site.createdDaysAgo - 14, 10);
@@ -737,6 +840,7 @@ async function seedBusiness(
         },
     });
     const orgId = org.id;
+    await setTimezone(ctx, key, orgId);
 
     // --- team
     const ownerId = biz.owner
@@ -825,13 +929,8 @@ async function seedBusiness(
     });
 
     // Generated volume is rewritten whole, so clear it before anything below
-    // writes some (the shop's orders come first).
+    // writes some.
     await clearVolume(ctx, key);
-
-    // --- commerce (Rye)
-    if (biz.modules.includes("COMMERCE")) {
-        await seedBakeryShop(ctx, key, orgId, ownerId);
-    }
 
     // --- website: before the entries, which belong to its form
     const siteIds = {
@@ -873,7 +972,9 @@ async function seedBusiness(
 
     // --- people in the CRM: entries first, then other leads, then everyone else
     const entryCount = form ? biz.submissions.length : 0;
-    const manualLeadCount = Math.max(0, leadTarget(biz) - entryCount);
+    const manualLeadCount = biz.pipeline
+        ? Math.max(0, (biz.leadTarget ?? entryCount) - entryCount)
+        : 0;
     const peopleRng = rngFor(key, "people");
     const contactCount = Math.max(biz.contacts, entryCount + manualLeadCount);
     const people = makePeople(peopleRng, contactCount, new Set(), {
@@ -922,11 +1023,34 @@ async function seedBusiness(
         });
     }
 
+    // --- what it sells beyond a booking (ADR-007): courses come first, since
+    // their sessions take places in the diary before anyone drops in
+    const leadCount = entryCount + manualLeadCount;
+    const billingCtx: BillingContext = {
+        now,
+        orgId,
+        id: (...parts) => sid(key, ...parts),
+        rng: (concern) => rngFor(key, concern),
+        services,
+        contacts: people.map((p, i) => ({
+            id: contactIds[i],
+            name: fullName(p),
+            email: p.email,
+            phone: p.phone,
+            company: p.company,
+        })),
+        // Members, students and pack buyers are established contacts, not
+        // the people still in the pipeline.
+        pool: people.map((_, i) => i).filter((i) => i >= leadCount),
+        staff: teamIds,
+        invoicing: biz.modules.includes("PAYMENTS"),
+    };
+    const courses = biz.billing
+        ? planCourses(billingCtx, biz.billing.courses)
+        : null;
+
     // --- the diary
-    const leadContactIndexes = Array.from(
-        { length: entryCount + manualLeadCount },
-        (_, i) => i,
-    );
+    const leadContactIndexes = Array.from({ length: leadCount }, (_, i) => i);
     const planned = services.length
         ? planBookings(rngFor(key, "bookings"), {
               now,
@@ -939,12 +1063,51 @@ async function seedBusiness(
               prospectServices: biz.services
                   .map((s, i) => (s.priceCents === null ? i : -1))
                   .filter((i) => i >= 0),
-              weekdayWeights:
-                  key === "mirror"
-                      ? [1.4, 0, 1, 1, 1.1, 1.3, 1.7]
-                      : [0.6, 1.1, 1, 1.1, 1, 1, 0.9],
+              weekdayWeights: biz.weekdayWeights ?? [
+                  0.6, 1.1, 1, 1.1, 1, 1, 0.9,
+              ],
+              reserved: courses?.reserved,
+              busy: courses?.busy,
           })
         : [];
+    const diary = bookingRows(planned, {
+        now,
+        orgId,
+        services,
+        contacts: people.map((p, i) => ({
+            id: contactIds[i],
+            name: fullName(p),
+            email: p.email,
+            phone: p.phone,
+        })),
+        staffUserIds: teamIds,
+        bookingId: (n) => sid(key, "booking", n),
+        eventId: (n, kind) => sid(key, "bookingevent", n, kind),
+    });
+
+    // --- packs spent on that diary, subscriptions, and what was invoiced
+    const packs = biz.billing
+        ? planPacks(billingCtx, biz.billing.packs, diary.placed, createdAt)
+        : null;
+    const subscriptions = biz.billing
+        ? planSubscriptions(
+              billingCtx,
+              biz.billing.plans,
+              biz.billing.subscriptions,
+              createdAt,
+          )
+        : null;
+    const manual =
+        biz.billing && billingCtx.invoicing
+            ? planManualInvoices(billingCtx, biz.billing.manualInvoices)
+            : null;
+    // A class paid from a pack was booked at the desk, by whoever sold it.
+    if (packs) {
+        for (const event of diary.events) {
+            const by = packs.bookedBy.get(event.bookingId);
+            if (event.type === "BOOKED" && by) event.actorUserId = by;
+        }
+    }
 
     // A contact exists from the first thing they did.
     const contactRng = rngFor(key, "contacts");
@@ -961,6 +1124,18 @@ async function seedBusiness(
         firstSeen[b.contact] = earliest(
             firstSeen[b.contact],
             new Date(b.startAt.getTime() - 3 * 86_400_000),
+        );
+    }
+    const seen: Seen[] = [
+        ...(courses?.seen ?? []),
+        ...(packs?.seen ?? []),
+        ...(subscriptions?.seen ?? []),
+        ...(manual?.seen ?? []),
+    ];
+    for (const s of seen) {
+        firstSeen[s.contact] = earliest(
+            firstSeen[s.contact],
+            new Date(s.at.getTime() - 86_400_000),
         );
     }
     const sources = ["WALK_IN", "INSTAGRAM", "REFERRAL", "WEBSITE", "GOOGLE"];
@@ -1031,27 +1206,44 @@ async function seedBusiness(
         await prisma.submission.createMany({ data: entries });
     }
 
-    if (planned.length) {
-        const rows = bookingRows(planned, {
-            now,
-            orgId,
-            services,
-            contacts: people.map((p, i) => ({
-                id: contactIds[i],
-                name: fullName(p),
-                email: p.email,
-                phone: p.phone,
-            })),
-            staffUserIds: teamIds,
-            bookingId: (n) => sid(key, "booking", n),
-            eventId: (n, kind) => sid(key, "bookingevent", n, kind),
+    // Courses before their bookings, which point at the enrolments.
+    if (courses) {
+        await prisma.course.createMany({ data: courses.courses });
+        await prisma.courseSession.createMany({ data: courses.sessions });
+        await prisma.courseEnrollment.createMany({
+            data: courses.enrollments,
         });
-        await createInChunks(rows.bookings, (data) =>
-            prisma.booking.createMany({ data }),
+    }
+    const bookings = [...diary.bookings, ...(courses?.bookings ?? [])];
+    const events = [...diary.events, ...(courses?.events ?? [])];
+    await createInChunks(bookings, (data) =>
+        prisma.booking.createMany({ data }),
+    );
+    await createInChunks(events, (data) =>
+        prisma.bookingEvent.createMany({ data }),
+    );
+
+    let sold = "";
+    if (biz.billing && packs && subscriptions) {
+        await writeCatalogue(ctx, packs, subscriptions);
+        await createInChunks(subscriptions.subscriptions, (data) =>
+            prisma.customerSubscription.createMany({ data }),
         );
-        await createInChunks(rows.events, (data) =>
-            prisma.bookingEvent.createMany({ data }),
-        );
+        await prisma.packPurchase.createMany({ data: packs.purchases });
+        await prisma.packRedemption.createMany({ data: packs.redemptions });
+
+        const invoiced: InvoiceSpec[] = [
+            ...subscriptions.invoices,
+            ...packs.invoices,
+            ...(courses?.invoices ?? []),
+            ...(manual?.invoices ?? []),
+        ];
+        const rows = invoiceRows(billingCtx, invoiced);
+        await writeInvoices(ctx, biz, orgId, rows);
+        sold =
+            `, ${subscriptions.subscriptions.length} subscriptions, ` +
+            `${packs.purchases.length} packs sold (${packs.redemptions.length} classes spent), ` +
+            `${courses?.enrollments.length ?? 0} enrolments, ${rows.invoices.length} invoices`;
     }
 
     await prisma.analyticsDailyAggregate.deleteMany({
@@ -1071,22 +1263,102 @@ async function seedBusiness(
 
     console.log(
         `[showcase] ${biz.name}: ${people.length} contacts, ${specs.length} leads, ` +
-            `${planned.length} bookings, ${entryCount} form entries`,
+            `${bookings.length} bookings, ${entryCount} form entries${sold}`,
     );
+    return orgId;
 }
 
-/** How many leads a business carries, entries included. */
-function leadTarget(biz: ShowcaseBusiness): number {
-    switch (biz.key) {
-        case "pulse":
-            return 25;
-        case "mirror":
-            return 14;
-        case "lumen":
-            return 30;
-        default:
-            return biz.submissions.length;
+/**
+ * Plans and packs are the business's catalogue: upserted on fixed ids, like
+ * its services, so a sale made by hand on one keeps its plan or pack (both
+ * are `Restrict` from what was sold on them).
+ */
+async function writeCatalogue(
+    ctx: Context,
+    packs: ReturnType<typeof planPacks>,
+    subscriptions: ReturnType<typeof planSubscriptions>,
+) {
+    const p = ctx.prisma;
+    for (const plan of subscriptions.plans) {
+        await p.subscriptionPlan.upsert({
+            where: { id: plan.id },
+            update: {
+                name: plan.name,
+                description: plan.description,
+                price: plan.price,
+                currency: plan.currency,
+                interval: plan.interval,
+                status: plan.status,
+                updatedAt: plan.updatedAt,
+            },
+            create: plan,
+        });
     }
+    for (const pack of packs.packs) {
+        await p.classPack.upsert({
+            where: { id: pack.id },
+            update: {
+                name: pack.name,
+                description: pack.description,
+                credits: pack.credits,
+                validityDays: pack.validityDays,
+                price: pack.price,
+                currency: pack.currency,
+                status: pack.status,
+                updatedAt: pack.updatedAt,
+            },
+            create: pack,
+        });
+    }
+    // Which services each pack covers: rewritten whole, like service hours.
+    await p.classPackService.deleteMany({
+        where: {
+            packId: { in: packs.packs.flatMap((x) => (x.id ? [x.id] : [])) },
+        },
+    });
+    await p.classPackService.createMany({ data: packs.packServices });
+}
+
+/**
+ * Write the business's invoices and set its sequence to the last number, so
+ * the next one the API issues follows on with no gap. An invoice someone
+ * issued by hand in a showcase business keeps its number; the seed refuses
+ * rather than hand the same number out twice.
+ */
+async function writeInvoices(
+    ctx: Context,
+    biz: ShowcaseBusiness,
+    orgId: string,
+    rows: InvoiceRows,
+): Promise<void> {
+    const p = ctx.prisma;
+    const byHand = await p.invoice.findMany({
+        where: {
+            organizationId: orgId,
+            number: { not: null },
+            NOT: { id: { startsWith: sid(biz.key, "") } },
+        },
+        select: { number: true },
+    });
+    const handNumbers = byHand.map((i) => Number(i.number?.slice(4)));
+    if (handNumbers.some((n) => n <= rows.lastNumber)) {
+        throw new Error(
+            `${biz.name} has invoices issued by hand that hold numbers the showcase ` +
+                `needs (up to ${rows.lastNumber}). Run db:seed:reset, then seed again.`,
+        );
+    }
+    await createInChunks(rows.invoices, (data) =>
+        p.invoice.createMany({ data }),
+    );
+    await createInChunks(rows.lines, (data) =>
+        p.invoiceLine.createMany({ data }),
+    );
+    const lastNumber = Math.max(rows.lastNumber, ...handNumbers);
+    await p.invoiceSequence.upsert({
+        where: { organizationId: orgId },
+        update: { lastNumber },
+        create: { organizationId: orgId, lastNumber },
+    });
 }
 
 /** The site's enquiry form: its id and the field names it accepts. */
@@ -1108,136 +1380,6 @@ function findEnquiryForm(
         }
     }
     return null;
-}
-
-// --- Rye & Co.'s shop -----------------------------------------------------
-
-async function seedBakeryShop(
-    ctx: Context,
-    key: string,
-    orgId: string,
-    ownerId: string,
-) {
-    const { prisma, now } = ctx;
-    const store = await prisma.store.upsert({
-        where: { slug: "rye-and-co" },
-        update: { name: "Rye & Co. Bakery", organizationId: orgId },
-        create: {
-            id: sid(key, "store"),
-            organizationId: orgId,
-            name: "Rye & Co. Bakery",
-            slug: "rye-and-co",
-            description: "Sourdough, pastries and cakes from Jayanagar.",
-        },
-    });
-    await prisma.storeOwner.upsert({
-        where: { storeId_userId: { storeId: store.id, userId: ownerId } },
-        update: { role: "OWNER" },
-        create: {
-            id: sid(key, "storeowner"),
-            storeId: store.id,
-            userId: ownerId,
-            role: "OWNER",
-        },
-    });
-    await prisma.storeSettings.upsert({
-        where: { storeId: store.id },
-        update: { currency: "INR" },
-        create: {
-            id: sid(key, "storesettings"),
-            storeId: store.id,
-            currency: "INR",
-        },
-    });
-    await prisma.storeFeatures.upsert({
-        where: { storeId: store.id },
-        update: { ecommerceEnabled: true },
-        create: {
-            id: sid(key, "storefeatures"),
-            storeId: store.id,
-            ecommerceEnabled: true,
-        },
-    });
-
-    const categoryIds: Record<string, string> = {};
-    for (const c of RYE.categories) {
-        const category = await prisma.category.upsert({
-            where: { storeId_slug: { storeId: store.id, slug: c.slug } },
-            update: { name: c.name, organizationId: orgId },
-            create: {
-                id: sid(key, "category", c.slug),
-                storeId: store.id,
-                organizationId: orgId,
-                name: c.name,
-                slug: c.slug,
-            },
-        });
-        categoryIds[c.slug] = category.id;
-    }
-
-    const products = await upsertCatalog(prisma, {
-        storeId: store.id,
-        orgId,
-        currency: "INR",
-        categoryId: (slug) => categoryIds[slug],
-        products: RYE_PRODUCTS,
-        productId: (i) => sid(key, "product", i),
-        variantId: (i, v) => sid(key, "variant", i, v),
-        inventoryId: (i) => sid(key, "inventory", i),
-        createdAt: (i) => at(now, -(95 - i), 9),
-    });
-
-    const customers = makePeople(
-        rngFor(key, "customers"),
-        RYE.customers,
-        new Set(),
-    );
-    const planned = planOrders(rngFor(key, "orders"), {
-        now,
-        count: RYE.orders,
-        days: RYE.orderDays,
-        products,
-        customers: customers.length,
-        lineWeights: [50, 32, 18],
-        weekdayWeights: [1.5, 0.8, 0.8, 0.9, 0.9, 1.1, 1.6],
-        growth: 0.35,
-        openMinute: 7 * 60,
-        closeMinute: 20 * 60,
-        taxRate: RYE.taxRate,
-        // Walk-ins and pickups pay nothing; delivery is free above ₹800.
-        shipping: (subtotal, rng) =>
-            rng.chance(0.55) || subtotal >= RYE.freeDeliveryFromPaise
-                ? 0
-                : RYE.deliveryPaise,
-        discount: (subtotal, rng) =>
-            subtotal > 50_000 && rng.chance(0.05) ? 5_000 : 0,
-        status: (daysAgo, r1, r2): [OrderStatus, PaymentStatus] => {
-            if (daysAgo < 0.25)
-                return [r2 < 0.5 ? "PENDING" : "PROCESSING", "PAID"];
-            if (r1 < 0.03) return ["CANCELLED", "REFUNDED"];
-            if (r1 < 0.05) return ["CANCELLED", "UNPAID"];
-            return ["DELIVERED", "PAID"];
-        },
-        orderNumber: (n) => `ORD-${String(n + 1).padStart(3, "0")}`,
-        orderId: (n) => sid(key, "order", n),
-        itemId: (n, line) => sid(key, "orderitem", n, line),
-        storeId: store.id,
-        orgId,
-        currency: "INR",
-    });
-    const customerRng = rngFor(key, "customer-dates");
-    const createdAt = customers.map((_, i) => {
-        const r = customerRng.next();
-        const first = planned.firstOrderAt.get(i);
-        return first
-            ? new Date(first.getTime() - 600_000)
-            : istAt(now, -Math.round(2 + r * 58), 9 * 60);
-    });
-    await writeCustomers(ctx, key, store.id, orgId, customers, createdAt);
-    await writeOrders(ctx, key, planned);
-    console.log(
-        `[showcase] Rye & Co. Bakery: ${products.length} products, ${customers.length} customers, ${planned.orders.length} orders`,
-    );
 }
 
 // --- Lumen's posts ----------------------------------------------------------
