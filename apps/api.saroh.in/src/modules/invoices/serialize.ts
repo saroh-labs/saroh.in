@@ -41,6 +41,20 @@ export const INVOICE_SELECT = {
     updatedAt: true,
 } as const;
 
+/**
+ * The list adds its first line and how many there are — enough to say what
+ * an invoice is for ("Personal training × 4") without sending every line.
+ */
+export const INVOICE_LIST_SELECT = {
+    ...INVOICE_SELECT,
+    lines: {
+        orderBy: { position: "asc" },
+        take: 1,
+        select: { description: true, quantity: true },
+    },
+    _count: { select: { lines: true } },
+} as const;
+
 export const INVOICE_DETAIL_SELECT = {
     ...INVOICE_SELECT,
     lines: {
@@ -94,13 +108,14 @@ export interface InvoiceRow {
     createdAt: Date;
     updatedAt: Date;
     lines?: {
-        id: string;
-        position: number;
+        id?: string;
+        position?: number;
         description: string;
         quantity: number;
-        unitPrice: Money;
-        amount: Money;
+        unitPrice?: Money;
+        amount?: Money;
     }[];
+    _count?: { lines: number };
 }
 
 export interface InvoiceLineView {
@@ -145,6 +160,13 @@ export interface InvoiceViewModel {
     reissuedAsId: string | null;
     createdAt: string;
     updatedAt: string;
+    /** What it is for, from its first line; on lists and details alike. */
+    summary: {
+        description: string;
+        quantity: number;
+        lineCount: number;
+    } | null;
+    /** On a detail read only. */
     lines?: InvoiceLineView[];
 }
 
@@ -160,7 +182,12 @@ export function contactName(c: {
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
-export function serializeInvoice(row: InvoiceRow, now: Date): InvoiceViewModel {
+export function serializeInvoice(
+    row: InvoiceRow,
+    now: Date,
+    { detail = false }: { detail?: boolean } = {},
+): InvoiceViewModel {
+    const first = row.lines?.[0];
     return {
         id: row.id,
         number: row.number,
@@ -203,14 +230,21 @@ export function serializeInvoice(row: InvoiceRow, now: Date): InvoiceViewModel {
         reissuedAsId: row.reissues[0]?.id ?? null,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
-        ...(row.lines
+        summary: first
+            ? {
+                  description: first.description,
+                  quantity: first.quantity,
+                  lineCount: row._count?.lines ?? row.lines?.length ?? 1,
+              }
+            : null,
+        ...(detail && row.lines
             ? {
                   lines: row.lines.map((l) => ({
-                      id: l.id,
+                      id: l.id ?? "",
                       description: l.description,
                       quantity: l.quantity,
-                      unitPrice: toMoneyString(l.unitPrice),
-                      amount: toMoneyString(l.amount),
+                      unitPrice: toMoneyString(l.unitPrice ?? "0"),
+                      amount: toMoneyString(l.amount ?? "0"),
                   })),
               }
             : {}),

@@ -13,6 +13,7 @@ import {
     CircleHelp,
     Globe,
     Receipt,
+    ReceiptText,
     Store,
     Target,
     UserRound,
@@ -133,6 +134,13 @@ const ACTIONS: {
         moduleKey: "WEBSITE",
         action: "site:create",
         limit: "website",
+    },
+    {
+        href: "/invoices/new",
+        label: "New invoice",
+        icon: ReceiptText,
+        moduleKey: "PAYMENTS",
+        action: "invoice:write",
     },
     {
         href: "/commerce/storefronts/new",

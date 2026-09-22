@@ -538,6 +538,27 @@ describe("lists and what is owed", () => {
         });
     });
 
+    it("says what each listed invoice is for, without sending every line", async () => {
+        db.invoice.findMany!.mockResolvedValue([
+            row({
+                lines: [{ description: "Personal training", quantity: 4 }],
+                _count: { lines: 2 },
+            }),
+        ]);
+        const [listed] = await service.list(owner, {});
+        expect(listed!.summary).toEqual({
+            description: "Personal training",
+            quantity: 4,
+            lineCount: 2,
+        });
+        expect(listed!.lines).toBeUndefined();
+        expect(
+            db.invoice.findMany!.mock.calls[0]![0].select.lines,
+        ).toMatchObject({
+            take: 1,
+        });
+    });
+
     it("adds up unpaid invoices per currency and counts the overdue", async () => {
         db.invoice.findMany!.mockResolvedValue([
             { currency: "INR", total: decimal("1200"), dueAt: new Date(0) },

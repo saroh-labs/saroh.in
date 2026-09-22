@@ -23,7 +23,7 @@ import type { InvoiceRow, InvoiceViewModel } from "./serialize";
 import {
     contactName,
     INVOICE_DETAIL_SELECT,
-    INVOICE_SELECT,
+    INVOICE_LIST_SELECT,
     serializeInvoice,
 } from "./serialize";
 import type { LineInput } from "./totals";
@@ -99,7 +99,7 @@ export class InvoicesService {
             },
             orderBy: { createdAt: "desc" },
             take: LIST_LIMIT,
-            select: INVOICE_SELECT,
+            select: INVOICE_LIST_SELECT,
         });
         return rows.map((r) => serializeInvoice(r as InvoiceRow, now));
     }
@@ -476,7 +476,7 @@ export class InvoicesService {
             select: INVOICE_DETAIL_SELECT,
         });
         if (!row) notFound();
-        return serializeInvoice(row, new Date());
+        return serializeInvoice(row, new Date(), { detail: true });
     }
 
     private async voidInTx(
