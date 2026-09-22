@@ -74,6 +74,8 @@ module.exports = {
         // specs run here; the legacy DB-backed stores.service.spec.ts stays in
         // the integration project.
         "<rootDir>/src/modules/stores/**/*.authorization.spec.ts",
+        // ADR-006: one storefront per business, with a mocked Prisma.
+        "<rootDir>/src/modules/stores/stores.service.create-cap.spec.ts",
         // S2-008 media: MediaService specs with a jest-mocked Prisma AND a fake
         // ObjectStorage port (never touch a DB, R2, or the network).
         "<rootDir>/src/modules/media/**/*.spec.ts",

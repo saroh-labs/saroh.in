@@ -20,6 +20,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { mayAddStorefront, mayAddWebsite } from "@/lib/business-limits";
 import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
@@ -116,6 +117,8 @@ const ACTIONS: {
     icon: typeof UserRound;
     moduleKey?: string;
     action?: NavAction;
+    /** Offered only while the business may still make one (ADR-006). */
+    limit?: "website" | "storefront";
 }[] = [
     {
         href: "/services/new",
@@ -129,12 +132,14 @@ const ACTIONS: {
         icon: Globe,
         moduleKey: "WEBSITE",
         action: "site:create",
+        limit: "website",
     },
     {
         href: "/commerce/storefronts/new",
-        label: "New store",
+        label: "New storefront",
         icon: Store,
         moduleKey: "COMMERCE",
+        limit: "storefront",
     },
 ];
 
@@ -167,6 +172,7 @@ export function CommandMenu({
     // the quick actions the palette offers.
     actions: permissions = null,
     sites = [],
+    storefrontCount = null,
 }: {
     moduleKeys?: string[] | null;
     /** The actor's role here; `null` = unknown, and the palette fails open. */
@@ -182,6 +188,8 @@ export function CommandMenu({
      * in `NAV_GROUPS` rather than in the sidebar alone.
      */
     sites?: { id: string; name: string }[];
+    /** How many storefronts the business has; `null` = unknown, and offered. */
+    storefrontCount?: number | null;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -194,7 +202,11 @@ export function CommandMenu({
     const actions = ACTIONS.filter(
         (a) =>
             (!a.moduleKey || !available || available.has(a.moduleKey)) &&
-            (!a.action || navCan({ role, actions: permissions }, a.action)),
+            (!a.action || navCan({ role, actions: permissions }, a.action)) &&
+            (a.limit !== "website" || mayAddWebsite(sites.length)) &&
+            (a.limit !== "storefront" ||
+                storefrontCount === null ||
+                mayAddStorefront(storefrontCount)),
     );
 
     useEffect(() => {

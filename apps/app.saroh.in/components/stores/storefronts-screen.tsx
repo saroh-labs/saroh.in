@@ -27,6 +27,7 @@ import { useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
+import { mayAddStorefront } from "@/lib/business-limits";
 import {
     newStorefrontHref,
     storefrontDetailsHref,
@@ -113,12 +114,19 @@ export function StorefrontsScreen({
     canEdit: boolean;
     canClose: boolean;
 }) {
+    // One storefront per business for now (ADR-006): the screen is about
+    // "your storefront", and a list and a New button appear only for a
+    // business that already has more than one, or may still add one.
+    const many = storefronts.length > 1;
+    const title = many ? "Storefronts" : "Storefront";
     const header = (
         <PageHeader
-            breadcrumb={["Sell", "Storefronts"]}
-            title="Storefronts"
+            breadcrumb={["Sell", title]}
+            title={title}
             actions={
-                canCreate ? (
+                canCreate &&
+                storefronts.length > 0 &&
+                mayAddStorefront(storefronts.length) ? (
                     <Button asChild variant="brand">
                         <Link href={newStorefrontHref}>New storefront</Link>
                     </Button>
@@ -152,11 +160,18 @@ export function StorefrontsScreen({
         <>
             {header}
             <div className="flex flex-wrap items-start gap-5">
-                <StorefrontList
-                    storefronts={storefronts}
-                    selectedId={selected?.id ?? null}
-                />
-                <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-4">
+                {many ? (
+                    <StorefrontList
+                        storefronts={storefronts}
+                        selectedId={selected?.id ?? null}
+                    />
+                ) : null}
+                <div
+                    className={cn(
+                        "flex min-w-0 flex-[1_1_420px] flex-col gap-4",
+                        !many && "max-w-[860px]",
+                    )}
+                >
                     {selected ? (
                         // Keyed by storefront, so picking another one starts
                         // from its own values rather than the last one's edits.

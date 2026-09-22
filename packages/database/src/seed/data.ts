@@ -25,8 +25,9 @@ export const OWNER_PASSWORD = "demo-password-123";
  * `Membership` and a `SiteReviewer` by hand, so in practice nobody did — and
  * the one browser test that could have caught #274 had nobody to sign in as.
  *
- * Invited to the FIRST seeded site only. That is the point of the role: the
- * second site must not appear in their list.
+ * Invited to Northwind's site, the only one it has (ADR-006). That a reviewer
+ * sees only the sites they were granted, when a business has several, is
+ * covered by the API's `reviewer-scope.spec.ts`.
  */
 export const REVIEWER_EMAIL = "reviewer@saroh.dev";
 export const REVIEWER_PASSWORD = "demo-password-123";
@@ -739,12 +740,35 @@ const ENQUIRY_FIELDS: readonly SeedFormField[] = [
 ];
 
 /**
- * The org's websites.
+ * Other businesses the demo owner runs, each with its own website.
  *
- * Three, in the two states the list page can distinguish: two live on a
- * saroh.app subdomain and one still being written, which is why the third has
- * no subdomain — the card falls back to the slug, and a merchant should see
- * both renderings rather than three identical ones.
+ * A business has one website for now (ADR-006), so Northwind keeps its own
+ * site and the other two the fixture has always carried — a live campaign site
+ * and a draft still being written — each belong to a business of their own.
+ * They show both site states, and give the business switcher something to
+ * switch between. Website only: nothing else is seeded for them.
+ */
+export const SIDE_BUSINESSES: readonly {
+    key: string;
+    slug: string;
+    name: string;
+}[] = [
+    { key: "monsoon", slug: "monsoon", name: "Monsoon Stock-Up" },
+    {
+        key: "whitefield",
+        slug: "trade-counter-whitefield",
+        name: "Trade Counter Whitefield",
+    },
+];
+
+/**
+ * The websites, one per business.
+ *
+ * Northwind's own comes first and is the one with posts, a reviewer and a
+ * domain. The other two belong to {@link SIDE_BUSINESSES}: one live on a
+ * saroh.app subdomain and one still being written, which is why it has no
+ * subdomain — the card falls back to the slug, and a merchant should see both
+ * renderings rather than identical ones.
  *
  * Only the bare label is stored ("northwind"), never the full host. The suffix
  * is composed at render time from NEXT_PUBLIC_ROOT_DOMAIN, which is why moving
@@ -757,6 +781,8 @@ const ENQUIRY_FIELDS: readonly SeedFormField[] = [
 export const SITES: readonly {
     slug: string;
     name: string;
+    /** A {@link SIDE_BUSINESSES} key; absent for Northwind's own site. */
+    business?: string;
     subdomain: string | null;
     /** Published sites get a Publication and a live pointer; drafts do not. */
     published: boolean;
@@ -906,6 +932,7 @@ export const SITES: readonly {
     {
         slug: "monsoon-stock-up-2026",
         name: "Monsoon Stock-Up 2026",
+        business: "monsoon",
         subdomain: "monsoon",
         published: true,
         createdDaysAgo: 41,
@@ -968,6 +995,7 @@ export const SITES: readonly {
     {
         slug: "trade-counter-whitefield",
         name: "Trade Counter — Whitefield",
+        business: "whitefield",
         subdomain: null,
         published: false,
         createdDaysAgo: 9,

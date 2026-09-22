@@ -15,6 +15,8 @@ import {
     Users,
 } from "lucide-react";
 
+import { mayAddWebsite } from "@/lib/business-limits";
+
 /**
  * Single source of truth for the primary navigation, shared by the desktop
  * `AppSidebar`, the mobile `MobileNav` drawer and the command menu, so the three
@@ -318,7 +320,8 @@ export const NAV_GROUPS: NavGroup[] = [
                     },
                     {
                         href: "/commerce/storefronts",
-                        label: "Storefronts",
+                        // Singular: a business has one for now (ADR-006).
+                        label: "Storefront",
                         action: "store:read",
                     },
                 ],
@@ -521,8 +524,10 @@ export function navGroupsWithSites(
                     // Last, and marked: creating is a different kind of act
                     // from opening, and putting it in the tree is what saves a
                     // merchant going to the list page to find the button. Only
-                    // for a role that may actually make one.
-                    ...(navRoleCan(role, "site:create")
+                    // for a role that may actually make one, and only while
+                    // the business has no website yet (ADR-006).
+                    ...(navRoleCan(role, "site:create") &&
+                    mayAddWebsite(sites.length)
                         ? [
                               {
                                   href: `${WEBSITE_HREF}/new`,

@@ -143,8 +143,23 @@ describe("what each role is offered", () => {
         );
         expect(offered).toContain("/settings/providers");
         expect(offered).toContain("/notifications");
-        expect(offered).toContain("/sites/new");
         expect(offered).toContain("/sites/site_1");
+        expect(offered).toContain("/sites/site_2");
+    });
+
+    it("offers a new site only to a business that has none (ADR-006)", () => {
+        const offeredWith = (sites: typeof SITES) =>
+            hrefs(
+                navFor({
+                    role: "OWNER",
+                    moduleKeys: AVAILABLE_TO.OWNER,
+                    sites,
+                }),
+            );
+        expect(offeredWith([])).toContain("/sites/new");
+        expect(offeredWith([SITES[0]])).not.toContain("/sites/new");
+        // A business that already has two keeps both, and still makes no more.
+        expect(offeredWith(SITES)).not.toContain("/sites/new");
     });
 
     it("does not offer a member what it would be refused", () => {

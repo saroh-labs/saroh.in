@@ -89,13 +89,35 @@ describe("SitesService.createFromTemplate", () => {
         pageCreate.mockResolvedValue({ id: "page_x" });
     });
 
+    it("refuses a second website before the plan is asked (ADR-006, 409, no write)", async () => {
+        siteCount.mockResolvedValue(1);
+
+        await expect(
+            service.createFromTemplate(ctx(), { name: "Acme" }),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: {
+                message: expect.stringMatching(/already has its website/),
+            },
+        });
+
+        // A paid plan that allows more changes nothing: the product cap is
+        // checked first, so the merchant is never told to upgrade.
+        expect(entCheck).not.toHaveBeenCalled();
+        expect(transaction).not.toHaveBeenCalled();
+        expect(siteCount).toHaveBeenCalledWith({
+            where: { organizationId: "org_1", deletedAt: null },
+        });
+    });
+
     it("enforces the plan's `sites` entitlement before creating (403 when at the limit, no write)", async () => {
-        // Simulate the EntitlementService rejecting at the plan cap.
+        // Simulate the EntitlementService rejecting at the plan cap — a plan
+        // that allows no sites at all, since the product cap stops the second.
         const { ForbiddenException } =
             jest.requireActual<typeof import("@nestjs/common")>(
                 "@nestjs/common",
             );
-        siteCount.mockResolvedValue(1);
+        siteCount.mockResolvedValue(0);
         entCheck.mockRejectedValueOnce(
             new ForbiddenException("Plan limit reached"),
         );
@@ -105,7 +127,7 @@ describe("SitesService.createFromTemplate", () => {
         ).rejects.toThrow(/Plan limit reached/);
 
         // The cap is checked with the current site count and blocks the write.
-        expect(entCheck).toHaveBeenCalledWith("org_1", "sites", 1);
+        expect(entCheck).toHaveBeenCalledWith("org_1", "sites", 0);
         expect(transaction).not.toHaveBeenCalled();
         expect(siteCreate).not.toHaveBeenCalled();
     });

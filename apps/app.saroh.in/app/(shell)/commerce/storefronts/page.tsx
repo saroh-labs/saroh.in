@@ -13,7 +13,7 @@ import { getStorefront, listStorefronts } from "@/lib/stores/storefronts";
  * `useSearchParams` would put the whole screen behind Suspense for a value
  * needed once. An unknown id falls back to the first, not to an error.
  */
-export const metadata = { title: "Storefronts" };
+export const metadata = { title: "Storefront" };
 
 export default async function StorefrontsPage({
     searchParams,

@@ -16,6 +16,7 @@ import { Check, ChevronDown, Globe, PenLine, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { mayAddWebsite } from "@/lib/business-limits";
 import type { SiteStateTone } from "@/lib/sites/site-state";
 
 export interface WebsiteHeaderSite {
@@ -60,6 +61,11 @@ export function WebsiteHeader({
 }) {
     const pathname = usePathname();
     const base = `/sites/${site.id}`;
+    // The picker is for a business with more than one website, or one that
+    // may still add one (ADR-006). Without it, the name it carried is said
+    // beside the address instead, so the screen still says which site it is.
+    const showPicker =
+        sites.length > 1 || (mayCreate && mayAddWebsite(sites.length));
 
     const tabs: { id: TabId; label: string; href: string; count?: number }[] =
         canEdit
@@ -110,13 +116,18 @@ export function WebsiteHeader({
                 className="mb-0"
                 description={
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {showPicker ? null : (
+                            <span className="font-medium text-foreground">
+                                {site.name.trim() || "Untitled site"}
+                            </span>
+                        )}
                         <span className="font-mono text-[12px]">{address}</span>
                         <StateBadge state={site.state} />
                     </span>
                 }
                 actions={
                     <>
-                        {sites.length > 1 || mayCreate ? (
+                        {showPicker ? (
                             <SitePicker
                                 site={site}
                                 sites={sites}
@@ -292,7 +303,7 @@ function SitePicker({
                         </DropdownMenuItem>
                     );
                 })}
-                {mayCreate ? (
+                {mayCreate && mayAddWebsite(sites.length) ? (
                     <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem asChild>
@@ -307,8 +318,8 @@ function SitePicker({
                 ) : null}
                 <DropdownMenuSeparator />
                 <p className="px-[9px] pb-1 pt-0.5 text-[11px] leading-[1.45] text-muted-foreground">
-                    A business can run more than one site. This picks which one
-                    you are editing — it is not a scope the whole rail follows.
+                    This picks which website you are editing — it is not a scope
+                    the whole rail follows.
                 </p>
             </DropdownMenuContent>
         </DropdownMenu>

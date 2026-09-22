@@ -33,6 +33,8 @@ module.exports = {
         "<rootDir>/src/modules/organizations/",
         "<rootDir>/src/modules/admin/",
         "\\.authorization\\.spec\\.ts$",
+        // ADR-006 store creation cap: mocked Prisma, runs in the unit project.
+        "<rootDir>/src/modules/stores/stores.service.create-cap.spec.ts",
         // S5-001: the pure order-state machine and the mocked-Prisma
         // updateStatus guard spec run in the default/unit project (they mock
         // @saroh/database), so keep them out of the DB-backed run. The legacy

@@ -8,6 +8,7 @@ import { prisma } from "@saroh/database";
 
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
+import { MAX_STOREFRONTS_PER_BUSINESS } from "../organizations/business-limits";
 import type { OrgAction } from "../organizations/organization-policy";
 import {
     isBuiltInRole,
@@ -250,12 +251,25 @@ export class StoresService {
      * atomically. `organizationId` is REQUIRED (Store.organizationId is NOT NULL
      * as of B5) and is proven by the caller (the org-scoped controller resolves
      * it from the request context, never the client body).
+     *
+     * A business has one storefront for now (ADR-006): a second is refused
+     * before anything else is checked.
      */
     async createForUser(
         userId: string,
         organizationId: string,
         dto: CreateStoreDto,
     ) {
+        const existing = await prisma.store.count({
+            where: { organizationId, deletedAt: null },
+        });
+        if (existing >= MAX_STOREFRONTS_PER_BUSINESS) {
+            throw new ConflictException({
+                message:
+                    "This business already has its storefront. Its name, web address and settings are changed from Sell, under Storefront.",
+            });
+        }
+
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({

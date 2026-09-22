@@ -45,6 +45,14 @@ what the API allows.
   `assertSiteInOrg`, `listSites`, `getSite`, `getSiteFlags`, posts, post
   categories and preview links. A guard would not do: several services query
   `Site` directly, and a guard is something to forget. An ungranted site is a 404.
+- **Current** — **A reviewer never opens the editor** (#275, decided
+  2026-09-12). Reading and commenting is its own screen, not a read-only
+  editor: `/sites/:id` redirects a caller without `section:write` to
+  `/sites/:id/review`, which renders the page with the live site's blocks and a
+  "Comment on sections" mode. It reads through `getPageForReview` (`site:read`,
+  writes nothing), so `getPageDraft` requiring `section:write` is correct and
+  stays. A read-only editor would make every editor change answer "and with no
+  write access?".
 - **Current** — **Membership is assignable, and invitations are hashed.**
   `OrganizationInvitation` holds the role, a reviewer's sites, and a sha256 of
   the token; the plaintext exists only in the invitee's email. Seven-day expiry,

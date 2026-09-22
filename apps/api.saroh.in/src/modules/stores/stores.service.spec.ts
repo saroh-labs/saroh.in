@@ -29,6 +29,8 @@ describe("StoresService (dev DB)", () => {
     let userA = "";
     let userB = "";
     let orgId = "";
+    // A second business, for a slug clash that is not also a second storefront.
+    let otherOrgId = "";
     const createdStoreIds: string[] = [];
 
     beforeAll(async () => {
@@ -42,6 +44,14 @@ describe("StoresService (dev DB)", () => {
                 },
             })
         ).id;
+        otherOrgId = (
+            await prisma.organization.create({
+                data: {
+                    name: "Stores Test Org Two",
+                    slug: `${slugPrefix}-org-two`,
+                },
+            })
+        ).id;
     });
 
     afterAll(async () => {
@@ -51,7 +61,9 @@ describe("StoresService (dev DB)", () => {
         await prisma.store.deleteMany({
             where: { id: { in: createdStoreIds } },
         });
-        await prisma.organization.deleteMany({ where: { id: orgId } });
+        await prisma.organization.deleteMany({
+            where: { id: { in: [orgId, otherOrgId] } },
+        });
         await prisma.user.deleteMany({
             where: { email: { in: [emailA, emailB] } },
         });
@@ -68,17 +80,32 @@ describe("StoresService (dev DB)", () => {
         expect(await service.isOwner(res.id, userB)).toBe(false);
     });
 
-    it("rejects a taken slug and creates nothing", async () => {
-        const slug = `${slugPrefix}-dup`;
-        const first = await service.createForUser(userA, orgId, {
-            name: "Dup",
-            slug,
-        });
-        createdStoreIds.push(first.id);
+    it("refuses a second storefront in the same business (ADR-006)", async () => {
         await expect(
-            service.createForUser(userB, orgId, { name: "Dup Two", slug }),
+            service.createForUser(userA, orgId, {
+                name: "Second shop",
+                slug: `${slugPrefix}-second`,
+            }),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: {
+                message: expect.stringMatching(/already has its storefront/),
+            },
+        });
+        expect(
+            await prisma.store.count({ where: { organizationId: orgId } }),
+        ).toBe(1);
+    });
+
+    it("rejects a taken slug and creates nothing", async () => {
+        const slug = `${slugPrefix}-blog`;
+        await expect(
+            service.createForUser(userB, otherOrgId, { name: "Dup", slug }),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(await prisma.store.count({ where: { slug } })).toBe(1);
+        expect(
+            await prisma.store.count({ where: { organizationId: otherOrgId } }),
+        ).toBe(0);
     });
 
     it("lists only the user's owned stores", async () => {

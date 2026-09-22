@@ -42,6 +42,7 @@ the right-hand files **before** writing code.
 | Run the stack, seed or pick a database, or check a change in a browser by hand                             | `docs/architecture/LOCAL_DEV.md`                                                               |
 | Design or change anything a merchant sees, decide what to build, or write copy, a claim or a status        | `docs/patterns/saroh-product.md` · `PRODUCT.md`                                                |
 | Debug anything non-obvious                                                                                 | `docs/architecture/DEV_LEARNINGS.md`                                                           |
+| Agree a product or architecture decision with the user — write it down the same day                        | `docs/architecture/DECISIONS.md` · `docs/architecture/adr/` · `00-universal.md` §13            |
 | Add a route, page, layout, component or `lib/` module in a Next app                                        | `docs/patterns/frontend-app-structure.md` · `.agents/skills/saroh-architecture/SKILL.md`       |
 | Read or write API data from a Next app, or add client or URL state                                         | `docs/patterns/frontend-data-and-state.md`                                                     |
 | Build or change a form                                                                                     | `docs/patterns/frontend-forms.md`                                                              |

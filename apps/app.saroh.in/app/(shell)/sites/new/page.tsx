@@ -1,12 +1,19 @@
+import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
+import { Globe } from "lucide-react";
+import Link from "next/link";
 
 import { AccessDenied } from "@/components/shared/access-denied";
 import { navRoleCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { CreateSiteForm } from "@/components/sites/create-site-form";
+import { mayAddWebsite } from "@/lib/business-limits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import { listTemplates } from "@/lib/sites/service";
+import { listSites, listTemplates } from "@/lib/sites/service";
+
+export const metadata = { title: "New site" };
 
 /**
  * New-site page (S2-004). Mirrors the create-store page: a back link, a
@@ -16,9 +23,10 @@ import { listTemplates } from "@/lib/sites/service";
 export default async function NewSitePage() {
     await requireSession();
 
-    const [templates, organization] = await Promise.all([
+    const [templates, organization, sites] = await Promise.all([
         listTemplates(),
         resolveActiveOrganization(),
+        listSites().catch(() => []),
     ]);
 
     /*
@@ -38,6 +46,33 @@ export default async function NewSitePage() {
                 backHref="/sites"
                 backLabel="Back to Website"
             />
+        );
+    }
+
+    /*
+     * One website per business for now (ADR-006), and the API refuses a
+     * second. Nothing links here once there is one; this is for whoever
+     * arrives with the address, told before the template picker.
+     */
+    const existing = sites.at(0);
+    if (existing && !mayAddWebsite(sites.length)) {
+        const name = existing.name.trim() || "Untitled site";
+        return (
+            <PageContainer width="form">
+                <PageHeader title="Create a site" />
+                <EmptyState
+                    icon={<Globe />}
+                    title={`${name} is this business's website`}
+                    description="A business has one website for now. Its pages, posts, look and address are all changed from Website."
+                    action={
+                        <Button asChild variant="outline">
+                            <Link href={`/sites/${existing.id}/pages`}>
+                                Go to {name}
+                            </Link>
+                        </Button>
+                    }
+                />
+            </PageContainer>
         );
     }
 
