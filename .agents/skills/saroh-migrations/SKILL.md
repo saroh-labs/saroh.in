@@ -85,6 +85,12 @@ run has tested your migration; before `migration-replay` existed, it never had.
   a follow-up migration; then re-run the replay check.
 - **Raw SQL in a migration still needs its schema counterpart.** If you write
   `CREATE INDEX` by hand, add the `@@index` to the model in the same commit.
+- **A partial index is declared too.** The client generator enables the
+  `partialIndexes` preview feature, so `@@unique([...], where: raw("..."))` and
+  `@@index([...], where: raw("..."))` express `CREATE … WHERE` in the datamodel.
+  Give each a `map:` name. Generate the SQL with `prisma migrate diff
+--from-schema <old> --to-schema prisma/schema.prisma --script` and the replay
+  check stays clean (first used in `20260922120000_subscriptions_invoices_classes`).
 - **Run the replay check before you commit**, not after review. It takes under a
   minute and it is the only thing that looks at the file you wrote.
 - **The guard is not an obstacle.** `DATABASE_TARGET_CONFIRM` exists so a
