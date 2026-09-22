@@ -6,11 +6,13 @@ import Link from "next/link";
 
 import { MoveStageControl } from "@/components/crm/move-stage-control";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
+import { StagesDialog } from "@/components/leads/stages-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { contactName, formatValue } from "@/lib/crm/format";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import type { LeadListItem, LeadStage } from "@/lib/leads/service";
 import { listLeads } from "@/lib/leads/service";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listPipelines } from "@/lib/pipelines/service";
 import { requireSession } from "@/lib/session";
 
@@ -52,10 +54,16 @@ export default async function PipelinePage() {
     const pipeline = pipelines.find((p) => p.isDefault) ?? pipelines[0];
 
     // Leads for this pipeline only; bucket them by stage id for the columns.
-    const [leads, addLead] = await Promise.all([
+    const [leads, addLead, organization] = await Promise.all([
         listLeads({ pipelineId: pipeline.id }),
         loadAddLead(pipelines),
+        resolveActiveOrganization(),
     ]);
+    // From what the API resolved this person may do; the role's name only as
+    // the fallback for a response that predates permissions.
+    const mayManage = organization?.actions
+        ? organization.actions.includes("pipeline:manage")
+        : organization?.role === "OWNER" || organization?.role === "ADMIN";
     const byStage = new Map<string, LeadListItem[]>();
     for (const stage of pipeline.stages) byStage.set(stage.id, []);
     for (const lead of leads) {
@@ -73,7 +81,22 @@ export default async function PipelinePage() {
         <PageContainer width="wide" className="max-w-full">
             <Header
                 pipelineName={pipeline.name}
-                action={<AddLeadDialog {...addLead} />}
+                action={
+                    <>
+                        {mayManage ? (
+                            <StagesDialog
+                                pipelineId={pipeline.id}
+                                pipelineName={pipeline.name}
+                                stages={pipeline.stages.map((st) => ({
+                                    id: st.id,
+                                    name: st.name,
+                                    leads: byStage.get(st.id)?.length ?? 0,
+                                }))}
+                            />
+                        ) : null}
+                        <AddLeadDialog {...addLead} />
+                    </>
+                }
             />
 
             <div className="mt-6 flex gap-4 overflow-x-auto pb-4">
