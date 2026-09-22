@@ -1,5 +1,6 @@
 import { Badge } from "@saroh/ui/badge";
 import { PageHeader } from "@saroh/ui/page-header";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AvailabilityRulesEditor } from "@/components/bookings/availability-rules-editor";
@@ -30,15 +31,28 @@ export default async function ServiceEditorPage({
     return (
         <PageContainer>
             <PageHeader
+                breadcrumb={[
+                    <Link
+                        key="services"
+                        href="/services"
+                        className="hover:text-foreground"
+                    >
+                        Services
+                    </Link>,
+                    service.name,
+                ]}
                 title={service.name}
                 description="Set this service's terms and weekly availability."
                 actions={
+                    // The same words as the services list's filters.
                     <Badge
                         variant={
-                            service.status === "ACTIVE" ? "default" : "outline"
+                            service.status === "ACTIVE" ? "success" : "neutral"
                         }
                     >
-                        {service.status}
+                        {service.status === "ACTIVE"
+                            ? "Bookable"
+                            : "Not bookable"}
                     </Badge>
                 }
             />

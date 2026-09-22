@@ -12,21 +12,24 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { OptionSelect } from "@/components/shared/option-select";
+import { TimezoneSelect } from "@/components/shared/timezone-select";
 import { archiveService, updateService } from "@/lib/services/actions";
 import type { Service } from "@/lib/services/service";
 
 /**
- * Edit a bookable Service's terms (S4-003). PATCHes only the terms an owner can
- * safely change on an existing service via the `updateService` action, and
- * offers an Archive control (`archiveService`) that stops the service accepting
- * new bookings while its historical bookings survive. Availability windows are
- * edited separately by the AvailabilityRulesEditor.
+ * Edit a bookable Service's terms (S4-003): name, length, buffers, capacity,
+ * timezone and price. Taking bookings is a reversible status (Stop / Take
+ * bookings again, with undo); deleting it is separate and asks first, because
+ * it cannot be undone from here. Availability windows are edited separately by
+ * the AvailabilityRulesEditor.
  *
  * Validation is schema-driven (zod + react-hook-form via the shared `@saroh/ui`
  * `Form`), so field errors and the disabled/submitting states are handled by
@@ -47,11 +50,25 @@ const formSchema = z.object({
     bufferBefore: z.string().optional(),
     bufferAfter: z.string().optional(),
     timezone: z.string().trim().min(1, { message: "Timezone is required" }),
+    price: z
+        .string()
+        .trim()
+        .refine((v) => v === "" || /^\d+(\.\d{1,2})?$/.test(v), {
+            message: "A price in numbers, like 1800 — or empty.",
+        }),
+    currency: z.string(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function EditServiceForm({ service }: { service: Service }) {
+export function EditServiceForm({
+    service,
+    defaultCurrency = "INR",
+}: {
+    service: Service;
+    /** The business's currency, for a service that has no price yet. */
+    defaultCurrency?: string;
+}) {
     const router = useRouter();
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -63,13 +80,28 @@ export function EditServiceForm({ service }: { service: Service }) {
             bufferBefore: String(service.bufferBeforeMinutes),
             bufferAfter: String(service.bufferAfterMinutes),
             timezone: service.timezone,
+            price:
+                service.priceCents === null
+                    ? ""
+                    : (service.priceCents / 100).toString(),
+            currency: service.currency ?? defaultCurrency,
         },
     });
     const { isSubmitting } = form.formState;
     const name = form.watch("name");
-    const [archiving, setArchiving] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
 
     async function onSave(values: FormValues) {
+        if (!values.price && service.priceCents !== null) {
+            // The API sets a price but cannot remove one; say so rather than
+            // report a save that quietly kept the old price.
+            form.setError("price", {
+                message:
+                    "A price can be changed but not removed yet. Set it to 0 if it is free now.",
+            });
+            return;
+        }
         const res = await updateService(service.id, {
             name: values.name.trim(),
             description: values.description?.trim() ?? "",
@@ -78,6 +110,12 @@ export function EditServiceForm({ service }: { service: Service }) {
             bufferAfterMinutes: Number(values.bufferAfter) || 0,
             capacity: Number(values.capacity) || 1,
             timezone: values.timezone.trim(),
+            ...(values.price
+                ? {
+                      priceCents: Math.round(Number(values.price) * 100),
+                      currency: values.currency,
+                  }
+                : {}),
         });
         if (!res.ok) {
             showError(res.error);
@@ -87,15 +125,44 @@ export function EditServiceForm({ service }: { service: Service }) {
         router.refresh();
     }
 
-    async function onArchive() {
-        setArchiving(true);
-        const res = await archiveService(service.id);
-        setArchiving(false);
+    /**
+     * Stop, or start again, taking bookings. A status, so it is reversible —
+     * the service stays in the list as "Not bookable", and its page offers
+     * the way back — and so it takes undo rather than a confirm.
+     */
+    async function setBookable(bookable: boolean) {
+        setBusy(true);
+        const res = await updateService(service.id, {
+            status: bookable ? "ACTIVE" : "ARCHIVED",
+        });
+        setBusy(false);
         if (!res.ok) {
             showError(res.error);
             return;
         }
-        showSuccess("Service archived");
+        router.refresh();
+        if (bookable) {
+            showSuccess(`${service.name} is taking bookings again`);
+        } else {
+            showUndo(`${service.name} has stopped taking bookings`, () => {
+                void setBookable(true);
+            });
+        }
+    }
+
+    /**
+     * Take it out of Services altogether. Bookings already made keep it; it
+     * cannot be brought back from here, so this one asks first.
+     */
+    async function onDelete() {
+        setBusy(true);
+        const res = await archiveService(service.id);
+        setBusy(false);
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        showSuccess(`${service.name} deleted`);
         router.push("/services");
     }
 
@@ -236,14 +303,70 @@ export function EditServiceForm({ service }: { service: Service }) {
                             className="wk-item"
                             style={{ "--wk-i": 3 } as React.CSSProperties}
                         >
-                            <FormLabel>Timezone (IANA)</FormLabel>
+                            <FormLabel>Timezone</FormLabel>
                             <FormControl>
-                                <Input disabled={isSubmitting} {...field} />
+                                <TimezoneSelect
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    disabled={isSubmitting}
+                                />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
                     )}
                 />
+
+                <div
+                    className="wk-item grid gap-4 sm:grid-cols-[2fr_1fr]"
+                    style={{ "--wk-i": 3 } as React.CSSProperties}
+                >
+                    <FormField
+                        control={form.control}
+                        name="price"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Price</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        inputMode="decimal"
+                                        placeholder="Empty if paid in person"
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="currency"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Currency</FormLabel>
+                                <FormControl>
+                                    <OptionSelect
+                                        value={field.value}
+                                        onValueChange={field.onChange}
+                                        disabled={isSubmitting}
+                                        options={[
+                                            field.value,
+                                            ...[
+                                                "INR",
+                                                "USD",
+                                                "EUR",
+                                                "GBP",
+                                                "AED",
+                                                "SGD",
+                                            ].filter((c) => c !== field.value),
+                                        ].map((c) => ({ value: c, label: c }))}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
 
                 <div
                     className="wk-item flex flex-wrap items-center gap-3 pt-2"
@@ -256,18 +379,45 @@ export function EditServiceForm({ service }: { service: Service }) {
                     >
                         {isSubmitting ? "Saving…" : "Save changes"}
                     </Button>
-                    {!archived && (
+                    {archived ? (
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={onArchive}
-                            disabled={archiving}
+                            onClick={() => void setBookable(true)}
+                            disabled={busy}
                             className="wk-press"
                         >
-                            {archiving ? "Archiving…" : "Archive service"}
+                            Take bookings again
+                        </Button>
+                    ) : (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void setBookable(false)}
+                            disabled={busy}
+                            className="wk-press"
+                        >
+                            Stop taking bookings
                         </Button>
                     )}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setConfirmDelete(true)}
+                        disabled={busy}
+                        className="wk-press text-destructive hover:text-destructive"
+                    >
+                        Delete service
+                    </Button>
                 </div>
+                <ConfirmDialog
+                    open={confirmDelete}
+                    onOpenChange={setConfirmDelete}
+                    title={`Delete ${service.name}?`}
+                    description="It leaves your services and can no longer be booked. Bookings already made keep it. This cannot be undone — to stop bookings for now, choose Stop taking bookings instead."
+                    confirmLabel="Delete service"
+                    onConfirm={() => void onDelete()}
+                />
             </form>
         </Form>
     );

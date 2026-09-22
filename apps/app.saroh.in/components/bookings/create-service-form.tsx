@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { TimezoneSelect } from "@/components/shared/timezone-select";
 import { trimmedOr } from "@/lib/forms/values";
 import { createService } from "@/lib/services/actions";
 
@@ -257,12 +258,12 @@ export function CreateServiceForm() {
                             className="wk-item"
                             style={{ "--wk-i": 3 } as React.CSSProperties}
                         >
-                            <FormLabel>Timezone (IANA)</FormLabel>
+                            <FormLabel>Timezone</FormLabel>
                             <FormControl>
-                                <Input
-                                    placeholder="Asia/Kolkata"
+                                <TimezoneSelect
+                                    value={field.value}
+                                    onValueChange={field.onChange}
                                     disabled={isSubmitting}
-                                    {...field}
                                 />
                             </FormControl>
                             <FormDescription>
