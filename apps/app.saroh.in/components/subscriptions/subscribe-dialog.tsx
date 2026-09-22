@@ -85,6 +85,7 @@ export function SubscribeDialog({
         );
         onOpenChange(false);
         setContactId("");
+        setStart(new Date());
         router.refresh();
     }
 

@@ -7,6 +7,7 @@ import {
     latestInvoiceNote,
     nextLine,
     owedLine,
+    renewalsLate,
     standing,
 } from "./renewal";
 
@@ -214,6 +215,21 @@ describe("checkedLine", () => {
         );
     });
 
+    it("warns when no next check is scheduled long after the last", () => {
+        expect(
+            checkedLine(
+                {
+                    lastCheckedAt: "2026-09-24T05:00:00.000Z",
+                    nextCheckAt: null,
+                    issuedToday: 0,
+                },
+                NOW,
+            ),
+        ).toBe(
+            "Renewals last checked 5 hours ago. None went out today; the next check is late.",
+        );
+    });
+
     it("warns when the next check is overdue", () => {
         expect(
             checkedLine(
@@ -240,5 +256,44 @@ describe("intervalWords", () => {
             adj: "Quarterly",
             per: "a quarter",
         });
+    });
+});
+
+describe("renewalsLate", () => {
+    it("is on time while the next check is due", () => {
+        expect(
+            renewalsLate(
+                {
+                    lastCheckedAt: "2026-09-24T09:46:00.000Z",
+                    nextCheckAt: "2026-09-24T10:46:00.000Z",
+                    issuedToday: 0,
+                },
+                NOW,
+            ),
+        ).toBe(false);
+    });
+
+    it("is on time with no pending run just after a check, while one runs", () => {
+        expect(
+            renewalsLate(
+                {
+                    lastCheckedAt: new Date(
+                        NOW.getTime() - 60_000,
+                    ).toISOString(),
+                    nextCheckAt: null,
+                    issuedToday: 0,
+                },
+                NOW,
+            ),
+        ).toBe(false);
+    });
+
+    it("is late when never checked", () => {
+        expect(
+            renewalsLate(
+                { lastCheckedAt: null, nextCheckAt: null, issuedToday: 0 },
+                NOW,
+            ),
+        ).toBe(true);
     });
 });

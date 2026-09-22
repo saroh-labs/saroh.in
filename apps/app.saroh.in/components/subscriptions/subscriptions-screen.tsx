@@ -18,6 +18,7 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { Label } from "@saroh/ui/label";
+import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
@@ -46,6 +47,7 @@ import {
     nextLine,
     owedLine,
     periodEndDay,
+    renewalsLate,
     standing,
 } from "@/lib/subscriptions/renewal";
 import type { Plan, Renewals, Subscription } from "@/lib/subscriptions/service";
@@ -122,7 +124,17 @@ export function SubscriptionsScreen({
     /** `?subscribe=1`, from the command menu. */
     openSubscribe?: boolean;
 }) {
+    const router = useRouter();
     const [subscribing, setSubscribing] = useState(Boolean(openSubscribe));
+
+    /** Drop `?subscribe=1` on close, so a refresh or Back doesn't reopen it. */
+    function onSubscribeOpenChange(open: boolean) {
+        setSubscribing(open);
+        if (open || !openSubscribe) return;
+        const url = new URL(window.location.href);
+        url.searchParams.delete("subscribe");
+        router.replace(url.pathname + url.search, { scroll: false });
+    }
     const [cancelling, setCancelling] = useState<Subscription | null>(null);
 
     const columns: DataColumn<Subscription>[] = [
@@ -238,7 +250,12 @@ export function SubscriptionsScreen({
                 <p className="flex items-start gap-2 text-[12.5px] text-muted-foreground">
                     <span
                         aria-hidden
-                        className="mt-[7px] size-1.5 shrink-0 rounded-full bg-success"
+                        className={cn(
+                            "mt-[7px] size-1.5 shrink-0 rounded-full",
+                            renewalsLate(renewals)
+                                ? "bg-warning"
+                                : "bg-success",
+                        )}
                     />
                     {checkedLine(renewals)}
                 </p>
@@ -280,7 +297,7 @@ export function SubscriptionsScreen({
             {canWrite ? (
                 <SubscribeDialog
                     open={subscribing}
-                    onOpenChange={setSubscribing}
+                    onOpenChange={onSubscribeOpenChange}
                     contacts={contacts}
                     plans={plans}
                 />

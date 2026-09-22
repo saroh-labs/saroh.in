@@ -10,6 +10,8 @@ import * as api from "./service";
 function refresh(id?: string) {
     revalidatePath("/invoices");
     if (id) revalidatePath(`/invoices/${id}`);
+    // Subscriptions show what their invoices still owe.
+    revalidatePath("/subscriptions");
 }
 
 export async function createInvoice(input: InvoiceInput) {
