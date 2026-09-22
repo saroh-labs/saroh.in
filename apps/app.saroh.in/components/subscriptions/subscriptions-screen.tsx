@@ -198,7 +198,7 @@ export function SubscriptionsScreen({
                 return inv ? (
                     <span className="min-w-0">
                         <Link
-                            href={`/invoices/${inv.id}`}
+                            href={`/billing/invoices/${inv.id}`}
                             className={
                                 s.overdue
                                     ? "block font-mono text-[12.5px] text-destructive-subtle-foreground underline-offset-4 hover:underline"
@@ -243,7 +243,7 @@ export function SubscriptionsScreen({
                             </Button>
                         ) : null}
                         <Button variant="outline" asChild>
-                            <Link href="/subscriptions/plans">Plans</Link>
+                            <Link href="/billing/plans">Plans</Link>
                         </Button>
                     </>
                 }

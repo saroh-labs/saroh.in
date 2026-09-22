@@ -6,6 +6,7 @@ import {
     filterNavGroups,
     filterNavGroupsByRole,
     isNavChildCurrent,
+    isNavItemActive,
     navFor,
     navRoleCan,
 } from "@/components/shared/nav-items";
@@ -500,48 +501,61 @@ describe("Billing (ADR-007)", () => {
         const offered = hrefs(
             navFor({ role: "OWNER", moduleKeys: AVAILABLE_TO.OWNER }),
         );
-        expect(offered).toContain("/invoices");
+        expect(offered).toContain("/billing/invoices");
     });
 
     it("puts Subscriptions and Plans beside Invoices, and only the page you are on lights", () => {
         const offered = hrefs(
             navFor({ role: "OWNER", moduleKeys: AVAILABLE_TO.OWNER }),
         );
-        expect(offered).toContain("/subscriptions");
-        expect(offered).toContain("/subscriptions/plans");
+        expect(offered).toContain("/billing/subscriptions");
+        expect(offered).toContain("/billing/plans");
         const siblings = [
-            { href: "/subscriptions" },
-            { href: "/subscriptions/plans" },
-            { href: "/invoices" },
+            { href: "/billing/subscriptions" },
+            { href: "/billing/plans" },
+            { href: "/billing/invoices" },
         ];
         expect(
             isNavChildCurrent(
-                "/subscriptions/plans",
-                "/subscriptions",
+                "/billing/plans",
+                "/billing/subscriptions",
                 siblings,
             ),
         ).toBe(false);
         expect(
-            isNavChildCurrent(
-                "/subscriptions/plans",
-                "/subscriptions/plans",
-                siblings,
-            ),
+            isNavChildCurrent("/billing/plans", "/billing/plans", siblings),
         ).toBe(true);
+    });
+
+    it("marks Billing on every Billing page, Invoices included", () => {
+        const billing = navFor({
+            role: "OWNER",
+            moduleKeys: AVAILABLE_TO.OWNER,
+        })
+            .flatMap((g) => g.items)
+            .find((i) => i.label === "Billing");
+        expect(billing?.href).toBe("/billing");
+        for (const page of [
+            "/billing/subscriptions",
+            "/billing/plans",
+            "/billing/invoices/inv_1",
+        ]) {
+            expect(isNavItemActive(page, billing!.href)).toBe(true);
+        }
     });
 
     it("offers it to no one without Payments", () => {
         const offered = hrefs(
             navFor({ role: "OWNER", moduleKeys: ["COMMERCE", "CRM"] }),
         );
-        expect(offered).not.toContain("/invoices");
+        expect(offered).not.toContain("/billing/invoices");
     });
 
     it("does not offer a member invoices, even where Payments is on", () => {
         const offered = hrefs(
             navFor({ role: "MEMBER", moduleKeys: ["PAYMENTS", "WEBSITE"] }),
         );
-        expect(offered).not.toContain("/invoices");
+        expect(offered).not.toContain("/billing/invoices");
     });
 
     it("drops the section when every page in it is refused, rather than an empty heading", () => {

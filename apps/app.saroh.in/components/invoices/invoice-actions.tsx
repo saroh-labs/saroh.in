@@ -95,7 +95,7 @@ export function InvoiceHeaderActions({
         setBusy(false);
         if (!res.ok) return showError(res.error);
         showSuccess("Draft deleted");
-        router.push("/invoices");
+        router.push("/billing/invoices");
     }
 
     return (
@@ -106,7 +106,7 @@ export function InvoiceHeaderActions({
                         Issue it
                     </Button>
                     <Button variant="outline" asChild>
-                        <Link href={`/invoices/${invoice.id}/edit`}>
+                        <Link href={`/billing/invoices/${invoice.id}/edit`}>
                             <Pencil className="mr-1.5 size-4" />
                             Edit
                         </Link>
@@ -332,7 +332,7 @@ export function VoidInvoice({ invoice }: { invoice: InvoiceRef }) {
             showSuccess(
                 `${invoice.number ?? "Invoice"} voided — a corrected draft is open`,
             );
-            router.push(`/invoices/${res.data.id}/edit`);
+            router.push(`/billing/invoices/${res.data.id}/edit`);
             return;
         }
         showSuccess(`${invoice.number ?? "Invoice"} voided`);

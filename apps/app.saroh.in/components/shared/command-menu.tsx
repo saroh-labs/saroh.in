@@ -137,14 +137,14 @@ const ACTIONS: {
         limit: "website",
     },
     {
-        href: "/subscriptions?subscribe=1",
+        href: "/billing/subscriptions?subscribe=1",
         label: "Subscribe someone",
         icon: Repeat,
         moduleKey: "PAYMENTS",
         action: "subscription:write",
     },
     {
-        href: "/invoices/new",
+        href: "/billing/invoices/new",
         label: "New invoice",
         icon: ReceiptText,
         moduleKey: "PAYMENTS",

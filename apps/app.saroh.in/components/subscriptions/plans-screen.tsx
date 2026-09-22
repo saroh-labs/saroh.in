@@ -67,7 +67,7 @@ export function PlansScreen({
                 breadcrumb={[
                     <Link
                         key="subs"
-                        href="/subscriptions"
+                        href="/billing/subscriptions"
                         className="hover:text-foreground"
                     >
                         Subscriptions

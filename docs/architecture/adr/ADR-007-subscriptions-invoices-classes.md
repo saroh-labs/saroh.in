@@ -139,7 +139,10 @@ credit. The balance is **derived** from purchases minus live redemptions.
   fields — they are all about booked time, so they sit under the Appointments
   module.
 - **Subscriptions** and **Invoices** are money a business is owed, under the
-  Payments module, with their own rows in the rail.
+  Payments module, in the rail's **Billing** section. Its pages live under
+  `/billing` — `/billing/subscriptions`, `/billing/plans`, `/billing/invoices`
+  — as Sell's live under `/commerce`, so the rail marks Billing on every one.
+  The first paths (`/subscriptions`, `/invoices`) redirect. (2026-09-22.)
 - A person's contact page shows their subscriptions, packs, courses and
   invoices together — the one place a merchant looks when that person calls.
 

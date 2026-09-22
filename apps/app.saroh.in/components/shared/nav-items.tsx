@@ -355,23 +355,25 @@ export const NAV_GROUPS: NavGroup[] = [
             // the "Saroh Billing and Classes" design. Its pages nest like
             // Sell's; each unit adds its row once its page exists.
             {
-                href: "/subscriptions",
+                // The section, like Sell's `/commerce`: every Billing page is
+                // under it, so the rail opens and marks Billing on any of them.
+                href: "/billing",
                 label: "Billing",
                 icon: ReceiptText,
                 moduleKey: "PAYMENTS",
                 children: [
                     {
-                        href: "/subscriptions",
+                        href: "/billing/subscriptions",
                         label: "Subscriptions",
                         action: "subscription:read",
                     },
                     {
-                        href: "/subscriptions/plans",
+                        href: "/billing/plans",
                         label: "Plans",
                         action: "subscription:read",
                     },
                     {
-                        href: "/invoices",
+                        href: "/billing/invoices",
                         label: "Invoices",
                         action: "invoice:read",
                     },

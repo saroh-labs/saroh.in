@@ -168,7 +168,7 @@ export function InvoicesScreen({
                 actions={
                     canWrite ? (
                         <Button asChild>
-                            <Link href="/invoices/new">
+                            <Link href="/billing/invoices/new">
                                 <Plus className="mr-1.5 size-4" />
                                 New invoice
                             </Link>
@@ -181,7 +181,7 @@ export function InvoicesScreen({
                 rows={invoices}
                 columns={columns}
                 rowKey={(i) => i.id}
-                rowHref={(i) => `/invoices/${i.id}`}
+                rowHref={(i) => `/billing/invoices/${i.id}`}
                 modes={["table", "list"]}
                 hideModeToggle
                 filters={FILTERS}
@@ -195,7 +195,9 @@ export function InvoicesScreen({
                     note: "Memberships, class packs and courses invoice themselves as they are sold. For anything else, make one by hand.",
                     action: canWrite ? (
                         <Button asChild>
-                            <Link href="/invoices/new">Make an invoice</Link>
+                            <Link href="/billing/invoices/new">
+                                Make an invoice
+                            </Link>
                         </Button>
                     ) : undefined,
                 }}

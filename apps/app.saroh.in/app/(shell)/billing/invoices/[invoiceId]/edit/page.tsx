@@ -24,7 +24,7 @@ export default async function EditInvoicePage({
         contactPickerOptions(),
     ]);
     if (!invoice) notFound();
-    if (invoice.status !== "DRAFT") redirect(`/invoices/${invoice.id}`);
+    if (invoice.status !== "DRAFT") redirect(`/billing/invoices/${invoice.id}`);
 
     return (
         <PageContainer width="full">
@@ -34,7 +34,7 @@ export default async function EditInvoicePage({
                     breadcrumb={[
                         <Link
                             key="invoices"
-                            href="/invoices"
+                            href="/billing/invoices"
                             className="hover:text-foreground"
                         >
                             Invoices
@@ -44,7 +44,9 @@ export default async function EditInvoicePage({
                     title="Edit the draft"
                     actions={
                         <Button variant="outline" asChild>
-                            <Link href="/invoices">Back to invoices</Link>
+                            <Link href="/billing/invoices">
+                                Back to invoices
+                            </Link>
                         </Button>
                     }
                 />

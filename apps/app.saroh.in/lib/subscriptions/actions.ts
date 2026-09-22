@@ -10,9 +10,9 @@ import * as api from "./service";
 /** Thin: the API decides who may, and what a subscription may become. */
 
 function refresh() {
-    revalidatePath("/subscriptions");
-    revalidatePath("/subscriptions/plans");
-    revalidatePath("/invoices");
+    revalidatePath("/billing/subscriptions");
+    revalidatePath("/billing/plans");
+    revalidatePath("/billing/invoices");
 }
 
 async function then<T extends { ok: boolean }>(res: Promise<T>): Promise<T> {
