@@ -135,9 +135,14 @@ credit. The balance is **derived** from purchases minus live redemptions.
 
 ### Where they live in the workspace
 
-- **Schedule** gains Courses and Class packs, and Services gains the online
-  fields — they are all about booked time, so they sit under the Appointments
-  module.
+- **Courses is its own module** (`COURSES`), switched on and off in Settings ›
+  Modules, with its own row in the rail at `/courses`. It depends on
+  Appointments, because a course's sessions are bookings on a service; a
+  business that takes bookings need not run courses. With Courses off, an
+  open course holds no seats. (Decided 2026-09-22, replacing "Schedule gains
+  Courses".)
+- **Class packs** sit with Schedule, and Services gains the online fields —
+  they are about booked time, so they stay under the Appointments module.
 - **Subscriptions** and **Invoices** are money a business is owed, under the
   Payments module, in the rail's **Billing** section. Its pages live under
   `/billing` — `/billing/subscriptions`, `/billing/plans`, `/billing/invoices`

@@ -54,6 +54,12 @@ const GOALS: Goal[] = [
         description: "Offer services and let customers book time with you.",
     },
     {
+        moduleKey: "COURSES",
+        title: "Run courses",
+        description:
+            "Sell a set of dated sessions with limited seats, like a six-week class.",
+    },
+    {
         moduleKey: "WEBSITE",
         title: "Show up online",
         description:

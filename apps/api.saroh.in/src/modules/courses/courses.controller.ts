@@ -27,13 +27,13 @@ import {
 } from "./dto";
 
 /**
- * Schedule → Courses (ADR-007). Booked time sold as a run of sessions, so it
- * sits under Appointments with bookings. Enrolling invoices when Payments is
+ * Courses (ADR-007): its own module, which needs Appointments because its
+ * sessions are bookings on a service. Enrolling invoices when Payments is
  * on, which the service decides. Authorization is in the service.
  */
 @Controller("organizations/:organizationId/courses")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("APPOINTMENTS")
+@RequireModule("COURSES")
 export class CoursesController {
     constructor(private readonly courses: CoursesService) {}
 
@@ -112,7 +112,7 @@ export class CoursesController {
 /** A person's enrolments across courses, for their contact page (ADR-007). */
 @Controller("organizations/:organizationId/course-enrollments")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("APPOINTMENTS")
+@RequireModule("COURSES")
 export class CourseEnrollmentsController {
     constructor(private readonly courses: CoursesService) {}
 

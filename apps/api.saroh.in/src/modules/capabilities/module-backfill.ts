@@ -24,6 +24,7 @@
  *   Site/Page/Form/Domain/Publication ............... WEBSITE
  *   Contact/Lead/Pipeline/Stage/Activity ............ CRM
  *   Service/AvailabilityRule/Booking ................ APPOINTMENTS
+ *   Course ........................................... COURSES
  *   Store/Product/Inventory/Cart/Order/Customer ..... COMMERCE
  *   MerchantPaymentProvider/PaymentIntent/
  *     PaymentAttempt/WebhookEvent ................... PAYMENTS
@@ -102,6 +103,10 @@ export async function deriveModuleEvidence(
         )
     ) {
         evidence.add("APPOINTMENTS");
+    }
+
+    if (await anyExists(client.course.count({ where }))) {
+        evidence.add("COURSES");
     }
 
     if (

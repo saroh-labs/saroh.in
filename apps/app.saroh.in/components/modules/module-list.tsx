@@ -74,6 +74,10 @@ const DISPLAY: Partial<Record<string, { label: string; note: string }>> = {
         label: "Appointments",
         note: "A calendar, services and bookings.",
     },
+    COURSES: {
+        label: "Courses",
+        note: "A run of dated sessions with seats and a price. Needs Appointments.",
+    },
     CRM: { label: "Contacts", note: "People who are not customers yet." },
     INSIGHTS: {
         label: "Insights",

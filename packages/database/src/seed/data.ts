@@ -47,7 +47,8 @@ export const CURRENCY = "INR";
  * when the rules change.
  *
  * The consequence, now that the fixture also carries sites, analytics and live
- * providers: every ENABLED module below evaluates to ACTIVE. AUTOMATIONS is the
+ * providers: every ENABLED module below evaluates to ACTIVE, except COURSES,
+ * which asks for a course until the showcase seed makes one (ADR-007, U14). AUTOMATIONS is the
  * one capability left genuinely absent, and it short-circuits at the
  * "configured" gate rather than on readiness — so `SETUP_REQUIRED` and
  * `ATTENTION_REQUIRED` are no longer reachable from this fixture. Reaching them
@@ -68,6 +69,11 @@ export const MODULE_STATES: readonly {
     },
     { key: "WEBSITE", status: "ENABLED", why: "a site with posts exists" },
     { key: "INSIGHTS", status: "ENABLED", why: "reads the other modules" },
+    {
+        key: "COURSES",
+        status: "ENABLED",
+        why: "classes run as courses; reads SETUP_REQUIRED until the showcase seeds one (U14)",
+    },
     {
         key: "PAYMENTS",
         status: "ENABLED",

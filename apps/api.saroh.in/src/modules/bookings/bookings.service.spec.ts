@@ -1553,7 +1553,10 @@ describe("courses on a service's time (ADR-007)", () => {
         expect(client.courseSession.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({
-                    course: { serviceId: "svc_1", status: "OPEN" },
+                    course: expect.objectContaining({
+                        serviceId: "svc_1",
+                        status: "OPEN",
+                    }),
                 }),
             }),
         );

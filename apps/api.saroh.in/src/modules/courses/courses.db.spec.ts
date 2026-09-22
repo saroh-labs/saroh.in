@@ -271,6 +271,37 @@ describe("courses (real database)", () => {
         ).resolves.toBeDefined();
     });
 
+    it("holds no seats while the business has Courses switched off", async () => {
+        const serviceId = await makeService(2);
+        await openCourse(serviceId, 2, [9]);
+        await prisma.organizationModule.create({
+            data: {
+                organizationId: org.organizationId,
+                moduleKey: "COURSES",
+                status: "DISABLED",
+            },
+        });
+        try {
+            await expect(
+                bookings.book(
+                    serviceId,
+                    {
+                        startAt: slot(9).toISOString(),
+                        bookerEmail: "public@example.com",
+                    },
+                    undefined,
+                ),
+            ).resolves.toBeDefined();
+        } finally {
+            await prisma.organizationModule.deleteMany({
+                where: {
+                    organizationId: org.organizationId,
+                    moduleKey: "COURSES",
+                },
+            });
+        }
+    });
+
     it("lets someone enrol again after cancelling, and cancels only what was still to come", async () => {
         const serviceId = await makeService(10);
         const courseId = await openCourse(serviceId, 4, WEEKS.slice(0, 3));

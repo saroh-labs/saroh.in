@@ -40,8 +40,11 @@ const badgeVariants = cva(
                 // A state with no hue of its own: cancelled, archived, not
                 // connected. Present, but asking nothing of anyone.
                 // Filled Sunken with Ink 600, as the brand file draws
-                // "Refunded": present, and asking nothing of anyone.
-                neutral: "border-transparent bg-muted text-neutral-600",
+                // "Refunded": present, and asking nothing of anyone. Ink 600
+                // is a light-mode cut — on dark Sunken it read at under 2:1 —
+                // so dark takes the muted-foreground token instead.
+                neutral:
+                    "border-transparent bg-muted text-neutral-600 dark:text-muted-foreground",
             },
         },
         defaultVariants: {
