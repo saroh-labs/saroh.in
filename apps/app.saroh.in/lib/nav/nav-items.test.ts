@@ -534,13 +534,14 @@ describe("Billing (ADR-007)", () => {
         })
             .flatMap((g) => g.items)
             .find((i) => i.label === "Billing");
-        expect(billing?.href).toBe("/billing");
+        const href = billing?.href ?? "";
+        expect(href).toBe("/billing");
         for (const page of [
             "/billing/subscriptions",
             "/billing/plans",
             "/billing/invoices/inv_1",
         ]) {
-            expect(isNavItemActive(page, billing!.href)).toBe(true);
+            expect(isNavItemActive(page, href)).toBe(true);
         }
     });
 
