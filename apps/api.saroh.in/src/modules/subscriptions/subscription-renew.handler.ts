@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
+import { PAYMENTS_SWITCHED_OFF } from "../invoices/payments-on";
 import { SubscriptionsService } from "./subscriptions.service";
 
 export const SUBSCRIPTION_RENEW_TYPE = "subscription.renew";
@@ -11,17 +12,6 @@ export const RENEW_EVERY_MS = 60 * 60 * 1000;
 
 /** Subscriptions renewed per run; a full batch runs again straight away. */
 export const RENEW_BATCH = 200;
-
-/**
- * A business that switched Payments off: a PAYMENTS row in any state but
- * ENABLED. A missing row counts as on, the same rule public booking uses
- * for Appointments (`appointments-open.ts`), because enforcement ships dark
- * and the backfill may not have written rows yet.
- */
-const PAYMENTS_SWITCHED_OFF = {
-    moduleKey: "PAYMENTS",
-    status: { not: "ENABLED" },
-} satisfies Prisma.OrganizationModuleWhereInput;
 
 /**
  * Issues each subscription period's invoice on its renewal date (ADR-007).

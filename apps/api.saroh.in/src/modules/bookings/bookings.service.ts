@@ -13,6 +13,7 @@ import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
+import { redeemPackInTx, reversePackInTx } from "../class-packs/redeem-pack";
 import { authorize } from "../organizations/organization-policy";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type {
@@ -96,6 +97,14 @@ export type BookingDetail = Prisma.BookingGetPayload<{
  * SERIALIZABLE transaction that re-counts CONFIRMED overlaps INSIDE the tx (see
  * {@link book} for the full race argument).
  */
+/** Who a reservation is made by. */
+export interface ReserveBy {
+    /** `Contact.source` for someone new. */
+    source: string;
+    /** Who made it; `null` when the booker did it themselves. */
+    actorUserId: string | null;
+}
+
 /** A service as a website visitor sees it (#255). No internal fields. */
 export interface PublicService {
     id: string;
@@ -492,6 +501,8 @@ export class BookingsService {
                 where: { id: booking.id },
                 data: { status: "CANCELLED", cancelledAt: new Date() },
             });
+            // A class paid for with a pack goes back to it (ADR-007).
+            await reversePackInTx(tx, booking.id);
             // The slot it was cancelled OUT of, so the history reads as a
             // sequence rather than a list of states with the times missing.
             await tx.bookingEvent.create({
@@ -855,9 +866,14 @@ export class BookingsService {
             bookerEmail?: string;
             bookerPhone?: string;
             idempotencyKey?: string;
+            useClassPack?: boolean;
+            packPurchaseId?: string;
         },
     ): Promise<Booking> {
         authorize(ctx, "booking:write");
+        const withPack = dto.useClassPack === true || !!dto.packPurchaseId;
+        // Spending someone's prepaid classes is its own power (ADR-007).
+        if (withPack) authorize(ctx, "pack:write");
 
         const { service, rules } = await this.loadBookableService(serviceId);
         if (service.organizationId !== ctx.organizationId) {
@@ -931,10 +947,27 @@ export class BookingsService {
             booker.idempotencyKey = dto.idempotencyKey;
         }
 
-        return this.reserve(service, startAt, endAt, booker, {
-            source: "manual",
-            actorUserId: ctx.userId,
-        });
+        return this.reserve(
+            service,
+            startAt,
+            endAt,
+            booker,
+            { source: "manual", actorUserId: ctx.userId },
+            withPack
+                ? async (tx, booking) => {
+                      await redeemPackInTx(tx, {
+                          organizationId: ctx.organizationId,
+                          bookingId: booking.id,
+                          // The contact the booking resolved to — a pack
+                          // is only ever spent by the person who holds it.
+                          contactId: booking.contactId ?? "",
+                          serviceId: service.id,
+                          startAt,
+                          purchaseId: dto.packPurchaseId,
+                      });
+                  }
+                : undefined,
+        );
     }
 
     /**
@@ -942,109 +975,38 @@ export class BookingsService {
      * by hand: re-count inside a Serializable transaction, upsert the contact,
      * write the CONFIRMED booking, its first history event and the notify job.
      * See {@link book} for why the in-transaction re-count is the guarantee.
+     *
+     * `alsoInTx` runs on the same transaction after the booking is written —
+     * spending a class pack on it, for one — so a refusal there takes the
+     * booking back with it, and a booking never exists half-paid.
      */
     private async reserve(
         service: Service,
         startAt: Date,
         endAt: Date,
         input: BookInput,
-        by: {
-            /** `Contact.source` for someone new. */
-            source: string;
-            /** Who made it; `null` when the booker did it themselves. */
-            actorUserId: string | null;
-        },
+        by: ReserveBy,
+        alsoInTx?: (
+            tx: Prisma.TransactionClient,
+            booking: Booking,
+        ) => Promise<void>,
     ): Promise<Booking> {
         const serviceId = service.id;
         const organizationId = service.organizationId;
-        const email = input.bookerEmail.trim().toLowerCase();
-        const snapshot = this.buildSnapshot(service, input, startAt, endAt);
 
         let booked: Booking;
         try {
             booked = await prisma.$transaction(
                 async (tx) => {
-                    // Authoritative capacity gate — re-counted INSIDE the tx.
-                    const confirmed = await tx.booking.count({
-                        where: {
-                            serviceId,
-                            status: "CONFIRMED",
-                            startAt: { lt: endAt },
-                            endAt: { gt: startAt },
-                        },
-                    });
-                    if (confirmed >= service.capacity) {
-                        throw new ConflictException(
-                            "This slot is fully booked",
-                        );
-                    }
-
-                    const contact = await tx.contact.upsert({
-                        where: {
-                            organizationId_email: { organizationId, email },
-                        },
-                        update: this.contactUpdate(input),
-                        create: {
-                            organizationId,
-                            email,
-                            firstName:
-                                this.splitName(input.bookerName).first ?? null,
-                            lastName:
-                                this.splitName(input.bookerName).last ?? null,
-                            phone: input.bookerPhone ?? null,
-                            source: by.source,
-                        },
-                    });
-
-                    const booking = await tx.booking.create({
-                        data: {
-                            organizationId,
-                            serviceId,
-                            contactId: contact.id,
-                            startAt,
-                            endAt,
-                            timezone: service.timezone,
-                            status: "CONFIRMED",
-                            snapshot: snapshot as Prisma.InputJsonValue,
-                            bookerName: input.bookerName ?? null,
-                            bookerEmail: email,
-                            bookerPhone: input.bookerPhone ?? null,
-                            idempotencyKey: input.idempotencyKey ?? null,
-                        },
-                    });
-
-                    // Where the history starts. No `fromStartAt`: there was
-                    // no before. The actor is whoever made it by hand; a
-                    // booker who did it themselves leaves it empty.
-                    await tx.bookingEvent.create({
-                        data: {
-                            bookingId: booking.id,
-                            organizationId,
-                            type: BookingEventType.Booked,
-                            toStartAt: startAt,
-                            ...(by.actorUserId
-                                ? { actorUserId: by.actorUserId }
-                                : {}),
-                        },
-                        select: { id: true },
-                    });
-
-                    // Transactional outbox: a committed booking always has a
-                    // queued notification job. The handler never landed: the
-                    // worker dead-letters booking.notify until one is
-                    // registered (see jobs/job-consumers.spec.ts).
-                    await tx.job.create({
-                        data: {
-                            organizationId,
-                            type: "booking.notify",
-                            payload: {
-                                bookingId: booking.id,
-                                serviceId,
-                                contactId: contact.id,
-                            },
-                        },
-                    });
-
+                    const booking = await this.reserveInTx(
+                        tx,
+                        service,
+                        startAt,
+                        endAt,
+                        input,
+                        by,
+                    );
+                    if (alsoInTx) await alsoInTx(tx, booking);
                     return booking;
                 },
                 {
@@ -1068,11 +1030,16 @@ export class BookingsService {
                 });
                 if (existing) return existing;
             }
-            // Serialization failure (two books racing for the same capacity-one
-            // slot, both saw 0 and inserted) — Postgres aborted the loser. Map
-            // it to the same 409 as a lost race: the slot is taken.
+            // Serialization failure — Postgres aborted the loser of a race.
+            // Without a pack, the only thing two bookings contend for is the
+            // slot. With one, it may have been the pack's last class, so the
+            // message says only that something changed.
             if (code === "P2034") {
-                throw new ConflictException("This slot is fully booked");
+                throw new ConflictException(
+                    alsoInTx
+                        ? "That changed while you were booking. Try again."
+                        : "This slot is fully booked",
+                );
             }
             throw err;
         }
@@ -1088,6 +1055,105 @@ export class BookingsService {
         // query and no race between two concurrent bookings.
         await this.activation?.firstBookingCreated(organizationId, booked.id);
         return booked;
+    }
+
+    /**
+     * Write one booking on the caller's transaction: re-count capacity,
+     * upsert the contact, create the CONFIRMED booking and its first history
+     * event, and queue its notification.
+     *
+     * Public so a course can book every session in one transaction (ADR-007).
+     * The caller owns the transaction and its isolation, and maps its errors.
+     */
+    async reserveInTx(
+        tx: Prisma.TransactionClient,
+        service: Service,
+        startAt: Date,
+        endAt: Date,
+        input: BookInput,
+        by: ReserveBy,
+    ): Promise<Booking> {
+        const serviceId = service.id;
+        const organizationId = service.organizationId;
+        const email = input.bookerEmail.trim().toLowerCase();
+        const snapshot = this.buildSnapshot(service, input, startAt, endAt);
+
+        // Authoritative capacity gate — re-counted INSIDE the tx.
+        const confirmed = await tx.booking.count({
+            where: {
+                serviceId,
+                status: "CONFIRMED",
+                startAt: { lt: endAt },
+                endAt: { gt: startAt },
+            },
+        });
+        if (confirmed >= service.capacity) {
+            throw new ConflictException("This slot is fully booked");
+        }
+
+        const contact = await tx.contact.upsert({
+            where: {
+                organizationId_email: { organizationId, email },
+            },
+            update: this.contactUpdate(input),
+            create: {
+                organizationId,
+                email,
+                firstName: this.splitName(input.bookerName).first ?? null,
+                lastName: this.splitName(input.bookerName).last ?? null,
+                phone: input.bookerPhone ?? null,
+                source: by.source,
+            },
+        });
+
+        const booking = await tx.booking.create({
+            data: {
+                organizationId,
+                serviceId,
+                contactId: contact.id,
+                startAt,
+                endAt,
+                timezone: service.timezone,
+                status: "CONFIRMED",
+                snapshot: snapshot as Prisma.InputJsonValue,
+                bookerName: input.bookerName ?? null,
+                bookerEmail: email,
+                bookerPhone: input.bookerPhone ?? null,
+                idempotencyKey: input.idempotencyKey ?? null,
+            },
+        });
+
+        // Where the history starts. No `fromStartAt`: there was no before.
+        // The actor is whoever made it by hand; a booker who did it
+        // themselves leaves it empty.
+        await tx.bookingEvent.create({
+            data: {
+                bookingId: booking.id,
+                organizationId,
+                type: BookingEventType.Booked,
+                toStartAt: startAt,
+                ...(by.actorUserId ? { actorUserId: by.actorUserId } : {}),
+            },
+            select: { id: true },
+        });
+
+        // Transactional outbox: a committed booking always has a queued
+        // notification job. The handler never landed: the worker dead-letters
+        // booking.notify until one is registered (see
+        // jobs/job-consumers.spec.ts).
+        await tx.job.create({
+            data: {
+                organizationId,
+                type: "booking.notify",
+                payload: {
+                    bookingId: booking.id,
+                    serviceId,
+                    contactId: contact.id,
+                },
+            },
+        });
+
+        return booking;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

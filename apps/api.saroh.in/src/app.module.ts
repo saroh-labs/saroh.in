@@ -11,6 +11,7 @@ import { BillingModule } from "./modules/billing/billing.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CapabilitiesModule } from "./modules/capabilities/capabilities.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
+import { ClassPacksModule } from "./modules/class-packs/class-packs.module";
 import { CommunicationsModule } from "./modules/communications/communications.module";
 import { ContactsModule } from "./modules/contacts/contacts.module";
 import { ContentModule } from "./modules/content/content.module";
@@ -98,6 +99,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         DiscountsModule,
         InvoicesModule,
         SubscriptionsModule,
+        ClassPacksModule,
         ProductReviewsModule,
         EnquiryModule,
         ContactsModule,

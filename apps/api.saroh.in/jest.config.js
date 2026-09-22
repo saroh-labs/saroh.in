@@ -163,6 +163,7 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/periods.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
+        "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/product-reviews/**/*.spec.ts",
