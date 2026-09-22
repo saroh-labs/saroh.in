@@ -19,6 +19,13 @@ export const SERVICE_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export type ServiceStatus = (typeof SERVICE_STATUSES)[number];
 
 /**
+ * Where a service happens (ADR-007). ONLINE carries a meeting link that the
+ * person who booked is shown; IN_PERSON has none.
+ */
+export const LOCATION_TYPES = ["IN_PERSON", "ONLINE"] as const;
+export type LocationType = (typeof LOCATION_TYPES)[number];
+
+/**
  * How an appointment went (#241). Declared here beside the other closed sets
  * so the DTO can validate against it without importing the service, which
  * imports this file.
@@ -88,6 +95,21 @@ export class CreateServiceDto {
     @IsString()
     @MaxLength(64)
     siteId?: string;
+
+    @IsOptional()
+    @IsIn(LOCATION_TYPES)
+    locationType?: LocationType;
+
+    /**
+     * The link an online service's bookers join by. https only; checked in
+     * the service, which also clears it when the service goes back to in
+     * person. `null` clears it.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(500)
+    meetingUrl?: string | null;
 }
 
 /** Update a Service (PATCH semantics — every field optional). */
@@ -145,6 +167,21 @@ export class UpdateServiceDto {
     @IsOptional()
     @IsIn(SERVICE_STATUSES)
     status?: ServiceStatus;
+
+    @IsOptional()
+    @IsIn(LOCATION_TYPES)
+    locationType?: LocationType;
+
+    /**
+     * The link an online service's bookers join by. https only; checked in
+     * the service, which also clears it when the service goes back to in
+     * person. `null` clears it.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(500)
+    meetingUrl?: string | null;
 }
 
 /**

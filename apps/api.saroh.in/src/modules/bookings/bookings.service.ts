@@ -26,6 +26,7 @@ import type {
     AvailabilityRuleDto,
     BookingOutcome,
     CreateServiceDto,
+    LocationType,
     UpdateServiceDto,
 } from "./dto";
 import { FixedWindowRateLimiter } from "./rate-limiter";
@@ -136,6 +137,10 @@ export class BookingsService {
         if (dto.siteId) {
             await this.requireOwnedSite(ctx, dto.siteId);
         }
+        const location = resolveLocation(
+            dto.locationType ?? "IN_PERSON",
+            dto.meetingUrl ?? null,
+        );
 
         return prisma.service.create({
             data: {
@@ -150,6 +155,7 @@ export class BookingsService {
                 priceCents: dto.priceCents ?? null,
                 currency: dto.currency ?? null,
                 timezone: dto.timezone,
+                ...location,
                 status: "ACTIVE",
             },
         });
@@ -207,6 +213,17 @@ export class BookingsService {
         if (dto.currency !== undefined) data.currency = dto.currency;
         if (dto.timezone !== undefined) data.timezone = dto.timezone;
         if (dto.status !== undefined) data.status = dto.status;
+        if (dto.locationType !== undefined || dto.meetingUrl !== undefined) {
+            Object.assign(
+                data,
+                resolveLocation(
+                    dto.locationType ?? (service.locationType as LocationType),
+                    dto.meetingUrl !== undefined
+                        ? dto.meetingUrl
+                        : service.meetingUrl,
+                ),
+            );
+        }
 
         return prisma.service.update({ where: { id: service.id }, data });
     }
@@ -1149,6 +1166,10 @@ export class BookingsService {
                 timezone: service.timezone,
                 priceCents: service.priceCents,
                 currency: service.currency,
+                // Frozen like the rest: a link changed later reaches new
+                // bookings, never the ones already made (ADR-007).
+                locationType: service.locationType,
+                meetingUrl: service.meetingUrl,
             },
             slot: {
                 startAt: startAt.toISOString(),
@@ -1260,4 +1281,85 @@ export class BookingsService {
             throw new NotFoundException("Site not found");
         }
     }
+}
+
+/**
+ * Where a service happens, checked as a pair. An online service needs an
+ * https link — it is shown to everyone who books, so nothing that could run
+ * script or send them somewhere unencrypted. Going back to in person drops
+ * the link rather than leaving a credential lying in the row.
+ */
+export function resolveLocation(
+    locationType: LocationType,
+    meetingUrl: string | null,
+): { locationType: LocationType; meetingUrl: string | null } {
+    if (locationType === "IN_PERSON") {
+        return { locationType, meetingUrl: null };
+    }
+    if (!meetingUrl) {
+        throw new BadRequestException({
+            message: "An online service needs a meeting link",
+            details: { field: "meetingUrl" },
+        });
+    }
+    let parsed: URL;
+    try {
+        parsed = new URL(meetingUrl);
+    } catch {
+        throw new BadRequestException({
+            message: "That meeting link is not a web address",
+            details: { field: "meetingUrl" },
+        });
+    }
+    if (parsed.protocol !== "https:") {
+        throw new BadRequestException({
+            message: "A meeting link must start with https://",
+            details: { field: "meetingUrl" },
+        });
+    }
+    return { locationType, meetingUrl: parsed.toString() };
+}
+
+/**
+ * What a public booking answers with (ADR-007): the booker's own booking and
+ * nothing else — never the row, which carries the organization, the contact
+ * and the IP hash. Read from the booking's frozen snapshot, so the first
+ * answer and an idempotent replay are the same shape and the same link.
+ */
+export interface PublicBooking {
+    reference: string;
+    startAt: string;
+    endAt: string;
+    serviceName: string;
+    online: boolean;
+    meetingUrl: string | null;
+}
+
+export function toPublicBooking(booking: {
+    id: string;
+    startAt: Date;
+    endAt: Date;
+    snapshot: unknown;
+}): PublicBooking {
+    const service = (
+        booking.snapshot as {
+            service?: {
+                name?: unknown;
+                locationType?: unknown;
+                meetingUrl?: unknown;
+            };
+        } | null
+    )?.service;
+    const online = service?.locationType === "ONLINE";
+    return {
+        reference: booking.id,
+        startAt: booking.startAt.toISOString(),
+        endAt: booking.endAt.toISOString(),
+        serviceName: typeof service?.name === "string" ? service.name : "",
+        online,
+        meetingUrl:
+            online && typeof service.meetingUrl === "string"
+                ? service.meetingUrl
+                : null,
+    };
 }
