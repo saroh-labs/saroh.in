@@ -40,14 +40,22 @@ export type InvoiceSource = (typeof INVOICE_SOURCES)[number];
 /** Issued invoices fall due this many days after issue unless told otherwise. */
 export const DEFAULT_DUE_DAYS = 7;
 
+/**
+ * Issued and past its due date: the one rule for "overdue", used by the
+ * invoice's standing, the owed sums, and a subscription's overdue badge.
+ */
+export function isPastDue(
+    row: { status: string; dueAt: Date | null },
+    now: Date,
+): boolean {
+    return row.status === "ISSUED" && row.dueAt !== null && row.dueAt < now;
+}
+
 export function invoiceStanding(
     row: { status: string; dueAt: Date | null },
     now: Date,
 ): InvoiceStanding {
-    if (row.status === "ISSUED" && row.dueAt && row.dueAt < now) {
-        return "OVERDUE";
-    }
-    return row.status as InvoiceStanding;
+    return isPastDue(row, now) ? "OVERDUE" : (row.status as InvoiceStanding);
 }
 
 /** The `where` for one list view. `now` splits Issued from Overdue. */

@@ -243,7 +243,8 @@ describe("BookingsService.book — capacity-one reservation", () => {
             ...SERVICE,
             availabilityRules: RULES,
         });
-        bookingFindUnique.mockResolvedValue({ id: "bk_prev" });
+        const prev = { id: "bk_prev", bookerEmail: "jane@example.com" };
+        bookingFindUnique.mockResolvedValue(prev);
 
         const res = await service.book(
             "svc_1",
@@ -251,9 +252,48 @@ describe("BookingsService.book — capacity-one reservation", () => {
             "iphash",
         );
 
-        expect(res).toEqual({ id: "bk_prev" });
+        expect(res).toEqual(prev);
         expect(transaction).not.toHaveBeenCalled();
         expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("replays a key only to the booker who made it", async () => {
+        const service = new BookingsService();
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            availabilityRules: RULES,
+        });
+        bookingFindUnique.mockResolvedValue({
+            id: "bk_prev",
+            bookerEmail: "someone.else@example.com",
+        });
+        await expect(
+            service.book(
+                "svc_1",
+                baseInput({ idempotencyKey: "idem_1" }),
+                "iphash",
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("counts a replay against the rate limit, so keys cannot be probed freely", async () => {
+        const service = new BookingsService(
+            new FixedWindowRateLimiter(1, 60_000),
+        );
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            availabilityRules: RULES,
+        });
+        bookingFindUnique.mockResolvedValue({
+            id: "bk_prev",
+            bookerEmail: "jane@example.com",
+        });
+        const input = baseInput({ idempotencyKey: "idem_1" });
+        await service.book("svc_1", input, "same_ip");
+        await expect(
+            service.book("svc_1", input, "same_ip"),
+        ).rejects.toMatchObject({ status: 429 });
     });
 
     it("backstops an idempotency race: catches P2002 and replays the winner", async () => {
@@ -1373,6 +1413,12 @@ describe("toPublicBooking — what a booker is answered with", () => {
         // The service's link has since changed; this booking keeps its own.
         const view = toPublicBooking(booking);
         expect(view.meetingUrl).toBe("https://meet.example.com/yoga");
+    });
+
+    it("has no link once the booking is cancelled", () => {
+        expect(
+            toPublicBooking({ ...booking, status: "CANCELLED" }),
+        ).toMatchObject({ online: true, meetingUrl: null });
     });
 
     it("has no link for an in-person booking, or one made before links existed", () => {

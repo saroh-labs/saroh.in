@@ -14,6 +14,7 @@ import {
  */
 function makeFake() {
     const calls: string[] = [];
+    const txOptions: unknown[] = [];
     let lastGuc: unknown;
 
     const delegate = (via: string) => ({
@@ -47,8 +48,9 @@ function makeFake() {
         lead: delegate("base"),
         $executeRaw: execRaw("base"),
         $queryRaw: queryRaw("base"),
-        $transaction: (arg: unknown) => {
+        $transaction: (arg: unknown, options?: unknown) => {
             calls.push("base.$transaction");
+            txOptions.push(options);
             if (typeof arg === "function") {
                 return (arg as (t: typeof tx) => unknown)(tx);
             }
@@ -58,6 +60,7 @@ function makeFake() {
     return {
         proxy: createRlsProxy(base as unknown as PrismaClient),
         calls,
+        txOptions,
         guc: () => lastGuc,
     };
 }
@@ -165,5 +168,22 @@ describe("createRlsProxy", () => {
             "tx.lead.findMany",
         ]);
         expect(guc()).toBe("org_9");
+    });
+
+    it("keeps the caller's isolation level when it sets the GUC", async () => {
+        process.env.RLS_ENFORCEMENT = "1";
+        const { proxy, txOptions } = makeFake();
+        const p = proxy as unknown as {
+            $transaction: (
+                fn: (tx: unknown) => Promise<unknown>,
+                options?: unknown,
+            ) => Promise<unknown>;
+        };
+        await runInOrgContext("org_9", () =>
+            p.$transaction(() => Promise.resolve(), {
+                isolationLevel: "Serializable",
+            }),
+        );
+        expect(txOptions).toEqual([{ isolationLevel: "Serializable" }]);
     });
 });

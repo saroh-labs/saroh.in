@@ -27,6 +27,7 @@ const base = {
     currency: "INR",
     latestInvoice: null,
     oldestUnpaid: null,
+    startsAt: null,
 };
 
 describe("nextLine", () => {
@@ -55,6 +56,16 @@ describe("nextLine", () => {
                 cancelledAt: "2026-09-10T08:00:00.000Z",
             }),
         ).toBe("Ended 10 Sept");
+    });
+
+    it("says when one that has not begun starts", () => {
+        expect(
+            nextLine({
+                ...base,
+                nextRenewalAt: "2026-10-01T00:00:00.000Z",
+                startsAt: "2026-10-01T00:00:00.000Z",
+            }),
+        ).toBe("Starts 1 Oct");
     });
 
     it("reads the date in the subscription's own timezone", () => {
@@ -185,7 +196,7 @@ describe("explainStart", () => {
 
     it("explains a start still ahead", () => {
         expect(explainStart("2026-10-01", "MONTH", "2026-09-24")).toBe(
-            "The first invoice is issued now, for 1 Oct to 31 Oct. It renews on the 1st after that.",
+            "Nothing is billed until then. The first invoice is issued on 1 Oct, for 1 Oct to 31 Oct, and it renews on the 1st after that.",
         );
     });
 });

@@ -17,7 +17,7 @@ import type {
     VoidInvoiceDto,
 } from "./dto";
 import type { InvoiceSource } from "./invoice-state";
-import { DEFAULT_DUE_DAYS, viewWhere } from "./invoice-state";
+import { DEFAULT_DUE_DAYS, isPastDue, viewWhere } from "./invoice-state";
 import { nextInvoiceNumber } from "./numbering";
 import type { InvoiceRow, InvoiceViewModel } from "./serialize";
 import {
@@ -139,7 +139,7 @@ export class InvoicesService {
                     ? { subscriptionId: who.subscriptionId }
                     : {}),
             },
-            select: { currency: true, total: true, dueAt: true },
+            select: { status: true, currency: true, total: true, dueAt: true },
         });
         const byCurrency = new Map<string, number>();
         let overdueCount = 0;
@@ -148,7 +148,7 @@ export class InvoicesService {
                 r.currency,
                 (byCurrency.get(r.currency) ?? 0) + toCents(r.total.toString()),
             );
-            if (r.dueAt && r.dueAt < now) overdueCount += 1;
+            if (isPastDue(r, now)) overdueCount += 1;
         }
         return {
             unpaidCount: rows.length,
@@ -268,15 +268,35 @@ export class InvoicesService {
         authorize(ctx, "invoice:write");
         const current = await this.read(ctx.organizationId, id);
         this.assertDraft(current.status, "issued again");
-        if (!current.contact) {
-            fieldError("Choose who to bill before issuing", "contactId");
-        }
-        const contactId = current.contact.id;
 
         await prisma.$transaction(async (tx) => {
-            const billTo = await this.billTo(tx, ctx.organizationId, contactId);
-            const number = await nextInvoiceNumber(tx, ctx.organizationId);
+            // Read the draft again under its lock: an edit that landed since
+            // the read above (a new contact, a new due date) is what goes out,
+            // not a mix of the old bill-to and the new contact.
+            await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${id} AND "organizationId" = ${ctx.organizationId} FOR UPDATE`;
+            const draft = await tx.invoice.findFirst({
+                where: { id, organizationId: ctx.organizationId },
+                select: { status: true, contactId: true, dueAt: true },
+            });
+            if (!draft) notFound();
+            this.assertDraft(draft.status, "issued again");
+            if (!draft.contactId) {
+                fieldError("Choose who to bill before issuing", "contactId");
+            }
             const issuedAt = new Date();
+            // An invoice is never born overdue.
+            if (draft.dueAt && draft.dueAt <= issuedAt) {
+                fieldError(
+                    "The due date has passed. Pick a later one, or clear it to give them the usual time.",
+                    "dueAt",
+                );
+            }
+            const billTo = await this.billTo(
+                tx,
+                ctx.organizationId,
+                draft.contactId,
+            );
+            const number = await nextInvoiceNumber(tx, ctx.organizationId);
             const { count } = await tx.invoice.updateMany({
                 where: {
                     id,
@@ -287,11 +307,11 @@ export class InvoicesService {
                     status: "ISSUED",
                     number,
                     issuedAt,
-                    dueAt: current.dueAt
-                        ? new Date(current.dueAt)
-                        : new Date(
-                              issuedAt.getTime() + DEFAULT_DUE_DAYS * DAY_MS,
-                          ),
+                    dueAt:
+                        draft.dueAt ??
+                        new Date(
+                            issuedAt.getTime() + DEFAULT_DUE_DAYS * DAY_MS,
+                        ),
                     ...billTo,
                 },
             });

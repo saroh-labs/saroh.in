@@ -15,6 +15,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { forWhat, invoiceMoney } from "@/lib/invoices/money";
 import type { Invoice } from "@/lib/invoices/service";
 import { billedTo, invoiceStatus } from "@/lib/invoices/status";
+import { LIST_LIMIT } from "@/lib/lists/capped";
 
 /**
  * The tabs, after the "Saroh Billing and Classes" design. They never
@@ -47,11 +48,14 @@ const FILTERS: DataFilter<Invoice>[] = [
  */
 export function InvoicesScreen({
     invoices,
+    truncated = false,
     businessName,
     canWrite,
     initialFilterId,
 }: {
     invoices: Invoice[];
+    /** The newest read hit its cap: older paid and void ones are not here. */
+    truncated?: boolean;
     businessName: string;
     canWrite: boolean;
     initialFilterId?: string;
@@ -197,6 +201,9 @@ export function InvoicesScreen({
                 }}
             />
             <p className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
+                {truncated
+                    ? `Showing the newest ${LIST_LIMIT} invoices and every unpaid one; older paid and voided invoices are not listed. `
+                    : null}
                 Numbers are {businessName}&apos;s own run, from INV-0001. A
                 voided invoice keeps its number.
             </p>

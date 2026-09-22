@@ -51,6 +51,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { InvoicesService } from "../invoices/invoices.service";
+import { resolveCapabilities } from "../organizations/organization-policy";
 import { ClassPacksService } from "./class-packs.service";
 
 type Mocked = Record<string, jest.Mock>;
@@ -231,6 +232,21 @@ describe("making a pack", () => {
         await expect(
             service.createPack(owner, { ...INPUT, serviceIds: [] }),
         ).rejects.toBeInstanceOf(BadRequestException);
+    });
+});
+
+describe("who sees the invoice", () => {
+    it("gives the invoice id only to a role that may read invoices", async () => {
+        expect((await service.getPurchase(owner, "pp_1")).invoiceId).toBe(
+            "inv_1",
+        );
+        const desk: OrganizationContext = {
+            ...owner,
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", ["pack:read"]),
+        };
+        expect((await service.getPurchase(desk, "pp_1")).invoiceId).toBeNull();
     });
 });
 

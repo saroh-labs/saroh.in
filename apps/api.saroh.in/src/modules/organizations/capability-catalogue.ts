@@ -217,7 +217,11 @@ export const CAPABILITIES: readonly Capability[] = [
         label: "Run courses and enrol people",
         note: "Enrolling books every session of the course for that person.",
     },
-    { action: "pack:read", group: "schedule", label: "See class packs" },
+    {
+        action: "pack:read",
+        group: "schedule",
+        label: "See class packs and who bought them",
+    },
     {
         action: "pack:write",
         group: "schedule",
@@ -235,7 +239,7 @@ export const CAPABILITIES: readonly Capability[] = [
     {
         action: "subscription:read",
         group: "money",
-        label: "See memberships and plans",
+        label: "See memberships and plans, with what each owes",
     },
     {
         action: "subscription:write",

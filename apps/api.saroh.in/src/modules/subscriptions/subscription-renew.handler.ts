@@ -11,8 +11,11 @@ export { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
 /** How often the job looks for subscriptions that are due. */
 export const RENEW_EVERY_MS = 60 * 60 * 1000;
 
-/** Subscriptions renewed per run; a full batch runs again straight away. */
+/** Subscriptions fetched at a time. */
 export const RENEW_BATCH = 200;
+
+/** Batches per run; past that, the next run starts straight away. */
+export const RENEW_ROUNDS = 25;
 
 /**
  * Issues each subscription period's invoice on its renewal date (ADR-007).
@@ -57,33 +60,17 @@ export class SubscriptionRenewHandler {
         }
     };
 
-    /** Renew what is due now. True when the batch was full and more may wait. */
+    /**
+     * Renew what is due now, batch after batch. True when it stopped with
+     * more still waiting, so the next run starts straight away.
+     *
+     * A subscription is looked at once per run: one that fails is left for
+     * the next run rather than fetched again. Without that, a batch's worth
+     * that always fail would sit at the head of every query, ahead of
+     * everyone else's renewals, and the run would never get past them.
+     */
     async renewDue(now: Date): Promise<boolean> {
-        const due = await prisma.customerSubscription.findMany({
-            where: {
-                currentPeriodEnd: { lte: now },
-                OR: [
-                    {
-                        status: "ACTIVE",
-                        organization: {
-                            organizationModules: {
-                                none: PAYMENTS_SWITCHED_OFF,
-                            },
-                        },
-                    },
-                    // Ending bills nothing, so it goes ahead with Payments
-                    // off, and for a paused one set to end.
-                    {
-                        status: { in: ["ACTIVE", "PAUSED"] },
-                        cancelAtPeriodEnd: true,
-                    },
-                ],
-            },
-            orderBy: { currentPeriodEnd: "asc" },
-            take: RENEW_BATCH,
-            select: { id: true, organizationId: true },
-        });
-
+        const seen: string[] = [];
         const counts = {
             renewed: 0,
             advanced: 0,
@@ -91,20 +78,50 @@ export class SubscriptionRenewHandler {
             skipped: 0,
             failed: 0,
         };
-        for (const sub of due) {
-            try {
-                counts[await this.subscriptions.renewOne(sub.id, now)] += 1;
-            } catch (error) {
-                counts.failed += 1;
-                this.logger.error(
-                    `Subscription ${sub.id} (organization ${sub.organizationId}) did not renew: ${String(error)}`,
-                );
+        let more = true;
+        for (let round = 0; round < RENEW_ROUNDS && more; round += 1) {
+            const due = await prisma.customerSubscription.findMany({
+                where: {
+                    currentPeriodEnd: { lte: now },
+                    ...(seen.length > 0 ? { id: { notIn: [...seen] } } : {}),
+                    OR: [
+                        {
+                            status: "ACTIVE",
+                            organization: {
+                                organizationModules: {
+                                    none: PAYMENTS_SWITCHED_OFF,
+                                },
+                            },
+                        },
+                        // Ending bills nothing, so it goes ahead with Payments
+                        // off, and for a paused one set to end.
+                        {
+                            status: { in: ["ACTIVE", "PAUSED"] },
+                            cancelAtPeriodEnd: true,
+                        },
+                    ],
+                },
+                orderBy: { currentPeriodEnd: "asc" },
+                take: RENEW_BATCH,
+                select: { id: true, organizationId: true },
+            });
+            for (const sub of due) {
+                seen.push(sub.id);
+                try {
+                    counts[await this.subscriptions.renewOne(sub.id, now)] += 1;
+                } catch (error) {
+                    counts.failed += 1;
+                    this.logger.error(
+                        `Subscription ${sub.id} (organization ${sub.organizationId}) did not renew: ${String(error)}`,
+                    );
+                }
             }
+            more = due.length === RENEW_BATCH;
         }
-        if (due.length > 0) {
+        if (seen.length > 0) {
             this.logger.log(`Subscription renewals: ${JSON.stringify(counts)}`);
         }
-        return due.length === RENEW_BATCH;
+        return more;
     }
 
     /**

@@ -10,11 +10,12 @@ import { DateTime, IANAZone } from "luxon";
 
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { isPastDue } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
 import { assertPaymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import type {
     CancelSubscriptionDto,
     ListPlansQueryDto,
@@ -32,6 +33,19 @@ const LIST_LIMIT = 500;
 
 function fieldError(message: string, field: string): never {
     throw new BadRequestException({ message, details: { field } });
+}
+
+/**
+ * Someone who may see subscriptions but not invoices still sees what each
+ * owes — that is the subscription's standing — but not which invoices, whose
+ * pages they could not open anyway.
+ */
+function forViewer(
+    ctx: OrganizationContext,
+    view: SubscriptionView,
+): SubscriptionView {
+    if (allows(ctx, "invoice:read")) return view;
+    return { ...view, oldestUnpaid: null, latestInvoice: null };
 }
 
 /** One live subscription per person per plan (the partial unique index). */
@@ -75,6 +89,8 @@ export interface SubscriptionView {
     currentPeriodEnd: string;
     /** When the next invoice is issued; null when nothing will renew. */
     nextRenewalAt: string | null;
+    /** A start still ahead: nothing is billed until then. */
+    startsAt: string | null;
     /** When it stops, if it was cancelled to run out at period end. */
     endsAt: string | null;
     pausedAt: string | null;
@@ -295,12 +311,14 @@ export class SubscriptionsService {
             rows.map((r) => r.id),
         );
         const now = new Date();
-        return rows.map((r) => this.view(r, invoices.get(r.id), now));
+        return rows.map((r) =>
+            forViewer(ctx, this.view(r, invoices.get(r.id), now)),
+        );
     }
 
     async get(ctx: OrganizationContext, id: string): Promise<SubscriptionView> {
         authorize(ctx, "subscription:read");
-        return this.read(ctx.organizationId, id);
+        return this.read(ctx, id);
     }
 
     /**
@@ -349,12 +367,14 @@ export class SubscriptionsService {
         if (!anchor.isValid) fieldError("That is not a date", "startDate");
 
         const interval = plan.interval as Interval;
-        const period = periodContaining(
-            anchor.toJSDate(),
-            interval,
-            timezone,
-            new Date(),
-        );
+        // A start still ahead bills nothing yet. Its period is empty and ends
+        // at the start, so the renewal job issues the first invoice on the
+        // day — not today, due before they have begun.
+        const now = new Date();
+        const startsLater = anchor.toJSDate() > now;
+        const period = startsLater
+            ? { start: anchor.toJSDate(), end: anchor.toJSDate() }
+            : periodContaining(anchor.toJSDate(), interval, timezone, now);
         const price = toMoneyString(plan.price);
 
         const live = await prisma.customerSubscription.count({
@@ -387,17 +407,19 @@ export class SubscriptionsService {
                     },
                     select: { id: true },
                 });
-                await this.invoicePeriod(tx, {
-                    organizationId,
-                    subscriptionId: created.id,
-                    contactId: contact.id,
-                    planName: plan.name,
-                    price,
-                    currency: plan.currency,
-                    timezone,
-                    period,
-                    createdByUserId: ctx.userId,
-                });
+                if (!startsLater) {
+                    await this.invoicePeriod(tx, {
+                        organizationId,
+                        subscriptionId: created.id,
+                        contactId: contact.id,
+                        planName: plan.name,
+                        price,
+                        currency: plan.currency,
+                        timezone,
+                        period,
+                        createdByUserId: ctx.userId,
+                    });
+                }
                 return created.id;
             })
             .catch((err: unknown) => {
@@ -407,7 +429,7 @@ export class SubscriptionsService {
                 }
                 throw err;
             });
-        return this.read(organizationId, id);
+        return this.read(ctx, id);
     }
 
     /** Stop renewing until resumed. The period already invoiced is kept. */
@@ -430,7 +452,7 @@ export class SubscriptionsService {
                 data: { status: "PAUSED", pausedAt: new Date() },
             });
         });
-        return this.read(ctx.organizationId, id);
+        return this.read(ctx, id);
     }
 
     /**
@@ -538,7 +560,7 @@ export class SubscriptionsService {
                 createdByUserId: ctx.userId,
             });
         });
-        return this.read(ctx.organizationId, id);
+        return this.read(ctx, id);
     }
 
     async cancel(
@@ -571,7 +593,7 @@ export class SubscriptionsService {
                 data: { cancelAtPeriodEnd: true },
             });
         });
-        return this.read(ctx.organizationId, id);
+        return this.read(ctx, id);
     }
 
     /** Take back a cancel-at-period-end before the period runs out. */
@@ -592,7 +614,7 @@ export class SubscriptionsService {
                 data: { cancelAtPeriodEnd: false },
             });
         });
-        return this.read(ctx.organizationId, id);
+        return this.read(ctx, id);
     }
 
     /**
@@ -603,8 +625,17 @@ export class SubscriptionsService {
      */
     async renewals(ctx: OrganizationContext): Promise<RenewalsView> {
         authorize(ctx, "subscription:read");
-        const midnight = new Date();
-        midnight.setUTCHours(0, 0, 0, 0);
+        // "Today" is the business's day, not UTC's: in Kolkata, UTC midnight
+        // is half past five in the morning.
+        const profile = await prisma.businessProfile.findUnique({
+            where: { organizationId: ctx.organizationId },
+            select: { timezone: true },
+        });
+        const zone =
+            profile?.timezone && IANAZone.isValidZone(profile.timezone)
+                ? profile.timezone
+                : "UTC";
+        const midnight = DateTime.now().setZone(zone).startOf("day").toJSDate();
         const [last, next, issuedToday] = await Promise.all([
             prisma.job.findFirst({
                 where: { type: SUBSCRIPTION_RENEW_TYPE, status: "DONE" },
@@ -762,16 +793,17 @@ export class SubscriptionsService {
     }
 
     private async read(
-        organizationId: string,
+        ctx: OrganizationContext,
         id: string,
     ): Promise<SubscriptionView> {
+        const { organizationId } = ctx;
         const row = await prisma.customerSubscription.findFirst({
             where: { id, organizationId },
             select: SUBSCRIPTION_SELECT,
         });
         if (!row) notFound("Subscription");
         const invoices = await this.invoicesFor(organizationId, [id]);
-        return this.view(row, invoices.get(id), new Date());
+        return forViewer(ctx, this.view(row, invoices.get(id), new Date()));
     }
 
     private async readPlan(
@@ -841,9 +873,7 @@ export class SubscriptionsService {
     ): SubscriptionView {
         const unpaid = invoices?.unpaid ?? [];
         const latest = invoices?.latest ?? null;
-        const pastDue = unpaid.filter(
-            (u) => u.dueAt !== null && u.dueAt < now,
-        ).length;
+        const pastDue = unpaid.filter((u) => isPastDue(u, now)).length;
         const renews = row.status === "ACTIVE" && !row.cancelAtPeriodEnd;
         const oldest = unpaid.length > 0 ? unpaid[0] : null;
         return {
@@ -862,6 +892,13 @@ export class SubscriptionsService {
             currentPeriodStart: row.currentPeriodStart.toISOString(),
             currentPeriodEnd: row.currentPeriodEnd.toISOString(),
             nextRenewalAt: renews ? row.currentPeriodEnd.toISOString() : null,
+            // Only a subscription that has not begun has an empty period.
+            startsAt:
+                row.status !== "CANCELLED" &&
+                row.currentPeriodStart.getTime() ===
+                    row.currentPeriodEnd.getTime()
+                    ? row.currentPeriodStart.toISOString()
+                    : null,
             endsAt:
                 row.status === "ACTIVE" && row.cancelAtPeriodEnd
                     ? row.currentPeriodEnd.toISOString()
@@ -892,7 +929,8 @@ export class SubscriptionsService {
                 : null,
             // A resume re-anchors a subscription later, so the anchor is
             // its start only while it is the earlier of the two.
-            startedAt: (row.anchorAt < row.createdAt
+            startedAt: (row.anchorAt < row.createdAt ||
+            row.currentPeriodStart.getTime() === row.currentPeriodEnd.getTime()
                 ? row.anchorAt
                 : row.createdAt
             ).toISOString(),

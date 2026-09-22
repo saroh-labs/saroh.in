@@ -2,6 +2,8 @@ import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
+import type { CappedList } from "@/lib/lists/capped";
+import { withLive } from "@/lib/lists/capped";
 
 /**
  * Invoices a business issues (ADR-007) — read and written through the
@@ -86,10 +88,16 @@ export interface PaymentInput {
     paidAt?: string;
 }
 
-export async function listInvoices(): Promise<Invoice[]> {
+/** The newest invoices, and every unpaid one however old (see `withLive`). */
+export async function listInvoices(): Promise<CappedList<Invoice>> {
     const base = await orgBase();
-    if (!base) return [];
-    return (await getJson<Invoice[]>(`${base}/invoices`)) ?? [];
+    if (!base) return { rows: [], truncated: false };
+    const [newest, issued, overdue] = await Promise.all([
+        getJson<Invoice[]>(`${base}/invoices`),
+        getJson<Invoice[]>(`${base}/invoices?view=issued`),
+        getJson<Invoice[]>(`${base}/invoices?view=overdue`),
+    ]);
+    return withLive(newest ?? [], issued ?? [], overdue ?? []);
 }
 
 export async function getInvoice(id: string): Promise<Invoice | null> {

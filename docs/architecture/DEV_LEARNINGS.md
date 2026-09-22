@@ -399,3 +399,19 @@ blocks never hit this, because they load in an effect after mount.
 `LIVE_DATA_PREVIEWS`. Anything formatted for the viewer's zone or locale
 waits for the browser.
 **Category**: site blocks · `packages/site-blocks/src/block-fixture-preview.tsx`
+
+## Database — row-level security quietly dropped Serializable (ADR-007 review)
+
+**Problem**: A booking's last-seat check and a class pack's last-class check
+were only safe because they run as Serializable transactions. Under
+`RLS_ENFORCEMENT`, they would have run at Read Committed, and two races each
+taking the last one could both have committed.
+**Root cause**: The RLS proxy turns a service's `prisma.$transaction(fn,
+options)` into its own transaction that sets the organization first, and
+dropped `options`, so `isolationLevel` never reached Postgres. Enforcement is
+off by default, so no test or environment ever showed it.
+**Fix**: `withGuc` passes the caller's options through (`rls-proxy.ts`), and
+`rls-proxy.test.ts` checks that the isolation level arrives. When wrapping a
+Prisma call, carry every argument through, not just the one you are adding
+to.
+**Category**: database · `packages/database/src/rls-proxy.ts`

@@ -35,7 +35,8 @@ function ymd(d: Date): string {
  * spreadsheet — and the help under it says, in words, which period is
  * invoiced now and that the ones before are not billed.
  *
- * The first invoice is issued as they subscribe, so the button says so.
+ * The first invoice is issued as they subscribe, so the button says so —
+ * unless the start is still ahead, when it waits for that day.
  * The subscription keeps the browser's timezone for its renewal days.
  */
 export function SubscribeDialog({
@@ -63,6 +64,7 @@ export function SubscribeDialog({
 
     const plan = active.find((p) => p.id === planId);
     const person = contacts.find((c) => c.id === contactId);
+    const startsLater = start ? ymd(start) > ymd(new Date()) : false;
     const help =
         plan && start
             ? explainStart(ymd(start), plan.interval, ymd(new Date()))
@@ -81,7 +83,9 @@ export function SubscribeDialog({
         setBusy(false);
         if (!res.ok) return showError(res.error);
         showSuccess(
-            `${person?.name ?? "They"} subscribed to ${plan.name} — the first invoice is issued`,
+            res.data.startsAt
+                ? `${person?.name ?? "They"} subscribed to ${plan.name} — the first invoice goes out when they start`
+                : `${person?.name ?? "They"} subscribed to ${plan.name} — the first invoice is issued`,
         );
         onOpenChange(false);
         setContactId("");
@@ -166,7 +170,11 @@ export function SubscribeDialog({
                         disabled={busy || active.length === 0}
                         onClick={() => void save()}
                     >
-                        {busy ? "Subscribing…" : "Subscribe and invoice"}
+                        {busy
+                            ? "Subscribing…"
+                            : startsLater
+                              ? "Subscribe"
+                              : "Subscribe and invoice"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
