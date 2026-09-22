@@ -31,6 +31,11 @@ src/
   modules; `modules/capabilities/module-annotations.spec.ts` pins which routes
   are gated and which must never be. A new controller in a gated domain gets the
   decorator and an entry in that spec.
+- **Current** — A route that needs its module switched on but not its setup
+  finished adds `@IgnoreModuleReadiness()` beside `@RequireModule`: the guard
+  then refuses only on the gates (who may, module on, rollout, entitlement),
+  not on readiness blockers such as `PAYMENTS_NO_PROVIDER`. Invoices use it —
+  a business that records cash by hand never connects a provider (ADR-007).
 - **Current** — Handlers take `@OrgContext() ctx: OrganizationContext` and pass it
   on.
 - **Current** — **Authorization happens in the service:**

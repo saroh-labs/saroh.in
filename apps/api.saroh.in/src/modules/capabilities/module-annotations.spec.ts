@@ -51,6 +51,7 @@ const CLASS_LEVEL: Record<string, string> = {
     "products/products.controller.ts": "COMMERCE",
     "products/product-details.controller.ts": "COMMERCE",
     "imports/imports.controller.ts": "COMMERCE",
+    "invoices/invoices.controller.ts": "PAYMENTS",
 };
 
 /**
@@ -136,6 +137,17 @@ describe("module enforcement rollout (#117)", () => {
 
     // The half that matters most: these are the routes that must keep working
     // when a merchant switches a capability off.
+    /*
+     * Invoices sit under Payments but need no provider: an invoice paid in
+     * cash is recorded by hand (ADR-007). Without the opt-out, switching
+     * enforcement on would refuse every business that never connected one.
+     */
+    it("lets invoices through while Payments has no provider connected", () => {
+        expect(source("invoices/invoices.controller.ts")).toContain(
+            "@IgnoreModuleReadiness()",
+        );
+    });
+
     it.each(Object.entries(NEVER))("%s is never gated — %s", (file) => {
         expect(source(file)).not.toContain("@RequireModule(");
     });
