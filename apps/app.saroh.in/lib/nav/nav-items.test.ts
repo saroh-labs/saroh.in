@@ -586,3 +586,33 @@ describe("Billing (ADR-007)", () => {
         expect(navRoleCan("MEMBER", "invoice:write")).toBe(false);
     });
 });
+
+describe("Courses (ADR-007), its own module", () => {
+    it("offers an owner Courses once the Courses module is on", () => {
+        expect(
+            hrefs(
+                navFor({
+                    role: "OWNER",
+                    moduleKeys: ["APPOINTMENTS", "COURSES"],
+                }),
+            ),
+        ).toContain("/courses");
+    });
+
+    it("leaves it out where only Appointments is on", () => {
+        expect(
+            hrefs(navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS"] })),
+        ).not.toContain("/courses");
+    });
+
+    it("does not offer it to a member, who may not read courses", () => {
+        expect(
+            hrefs(
+                navFor({
+                    role: "MEMBER",
+                    moduleKeys: ["APPOINTMENTS", "COURSES"],
+                }),
+            ),
+        ).not.toContain("/courses");
+    });
+});

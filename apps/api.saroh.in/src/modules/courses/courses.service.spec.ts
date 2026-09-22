@@ -38,6 +38,7 @@ jest.mock("@saroh/database", () => {
             booking: { groupBy: jest.fn() },
             contact: { findFirst: jest.fn() },
             service: { findFirst: jest.fn() },
+            organizationModule: { findFirst: jest.fn() },
             $transaction: jest.fn(
                 (fn: (t: typeof tx) => unknown, _opts?: unknown) => fn(tx),
             ),
@@ -59,6 +60,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { BookingsService } from "../bookings/bookings.service";
 import type { InvoicesService } from "../invoices/invoices.service";
+import { resolveCapabilities } from "../organizations/organization-policy";
 import { CoursesService } from "./courses.service";
 
 type Mocked = Record<string, jest.Mock>;
@@ -152,7 +154,14 @@ const ENROLLMENT_ROW = {
     createdAt: at("2026-09-22T10:00:00Z"),
     course: { id: "course_1", name: "Beginners' wheel" },
     contact: CONTACT,
-    invoices: [{ id: "inv_1" }],
+    invoices: [
+        {
+            id: "inv_1",
+            number: "INV-0001",
+            status: "PAID",
+            dueAt: at("2026-09-29T00:00:00Z"),
+        },
+    ],
 };
 
 beforeEach(() => {
@@ -171,6 +180,7 @@ beforeEach(() => {
     db.courseEnrollment!.findMany!.mockResolvedValue([]);
     db.courseEnrollment!.findFirst!.mockResolvedValue(ENROLLMENT_ROW);
     db.booking!.groupBy!.mockResolvedValue([]);
+    db.organizationModule!.findFirst!.mockResolvedValue(null);
     reserveInTx.mockResolvedValue({ id: "bk" });
     issueInTx.mockResolvedValue({ id: "inv_1", number: "INV-0001" });
 });
@@ -547,6 +557,50 @@ describe("making and changing a course", () => {
             service.update(owner, "course_1", { status: "ARCHIVED" }),
         ).rejects.toThrow("Close it instead");
         expect(tx.course!.update).not.toHaveBeenCalled();
+    });
+});
+
+describe("the course page", () => {
+    it("counts who is booked on each session, and says whether enrolling invoices", async () => {
+        const start = at("2026-10-06T17:30:00Z");
+        db.course!.findFirst!.mockResolvedValue({
+            ...COURSE_ROW,
+            sessions: [
+                {
+                    id: "ses_1",
+                    startAt: start,
+                    endAt: at("2026-10-06T19:30:00Z"),
+                },
+            ],
+        });
+        db.booking!.groupBy!.mockImplementation((args: { by: string[] }) =>
+            Promise.resolve(
+                args.by[0] === "startAt"
+                    ? [{ startAt: start, _count: { _all: 7 } }]
+                    : [],
+            ),
+        );
+        db.courseEnrollment!.findMany!.mockResolvedValue([ENROLLMENT_ROW]);
+        const detail = await service.get(owner, "course_1");
+        expect(detail.sessions[0]).toMatchObject({ id: "ses_1", booked: 7 });
+        expect(detail.invoicesOnEnrol).toBe(true);
+        expect(detail.enrollments[0]!.invoice).toEqual({
+            id: "inv_1",
+            number: "INV-0001",
+            standing: "PAID",
+        });
+    });
+
+    it("leaves the invoice off for a role that may not read invoices", async () => {
+        db.courseEnrollment!.findMany!.mockResolvedValue([ENROLLMENT_ROW]);
+        const desk: OrganizationContext = {
+            ...owner,
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", ["course:read"]),
+        };
+        const detail = await service.get(desk, "course_1");
+        expect(detail.enrollments[0]!.invoice).toBeNull();
     });
 });
 

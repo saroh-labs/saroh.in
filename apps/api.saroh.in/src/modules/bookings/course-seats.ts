@@ -9,7 +9,8 @@ import type { Interval } from "./availability";
  * yet count as taken on each of its sessions, so a public booker cannot fill
  * a session the course is still selling. An enrolled person's seat is a real
  * booking and counts as that. A course that is closed, a draft or archived
- * holds nothing beyond its bookings.
+ * holds nothing beyond its bookings, and neither does any course while its
+ * business has Courses switched off.
  */
 
 type Db = Pick<Prisma.TransactionClient, "courseSession">;
@@ -31,7 +32,21 @@ async function heldSessions(
         where: {
             startAt: { lt: to },
             endAt: { gt: from },
-            course: { serviceId, status: "OPEN" },
+            course: {
+                serviceId,
+                status: "OPEN",
+                // With Courses switched off nobody can enrol, so an open
+                // course has nothing to hold seats for. A missing row counts
+                // as on, as for Payments (enforcement ships dark).
+                organization: {
+                    organizationModules: {
+                        none: {
+                            moduleKey: "COURSES",
+                            status: { not: "ENABLED" },
+                        },
+                    },
+                },
+            },
         },
         select: {
             startAt: true,

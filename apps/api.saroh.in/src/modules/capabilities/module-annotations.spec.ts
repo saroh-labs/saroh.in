@@ -54,7 +54,7 @@ const CLASS_LEVEL: Record<string, string> = {
     "invoices/invoices.controller.ts": "PAYMENTS",
     "subscriptions/subscriptions.controller.ts": "PAYMENTS",
     "class-packs/class-packs.controller.ts": "APPOINTMENTS",
-    "courses/courses.controller.ts": "APPOINTMENTS",
+    "courses/courses.controller.ts": "COURSES",
 };
 
 /**

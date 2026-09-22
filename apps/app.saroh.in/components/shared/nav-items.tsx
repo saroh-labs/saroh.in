@@ -7,6 +7,7 @@ import {
     Building2,
     CalendarClock,
     Globe,
+    GraduationCap,
     Home,
     KanbanSquare,
     Plug,
@@ -75,9 +76,11 @@ export type NavAction =
     // page only has to add the row.
     | "subscription:read"
     | "invoice:read"
-    // "New invoice" and "Subscribe someone" in the command menu make one.
+    // "New invoice", "Subscribe someone" and "New course" in the command
+    // menu make one.
     | "invoice:write"
     | "subscription:write"
+    | "course:write"
     | "course:read"
     | "pack:read";
 
@@ -109,6 +112,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "pack:read",
         "invoice:write",
         "subscription:write",
+        "course:write",
     ],
     ADMIN: [
         "site:read",
@@ -128,6 +132,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "pack:read",
         "invoice:write",
         "subscription:write",
+        "course:write",
     ],
     MEMBER: ["site:read", "member:read", "module:read", "store:read"],
     REVIEWER: ["site:read"],
@@ -394,6 +399,15 @@ export const NAV_GROUPS: NavGroup[] = [
                 label: "Services",
                 icon: Briefcase,
                 moduleKey: "APPOINTMENTS",
+            },
+            // Courses is its own module (ADR-007): a business that takes
+            // bookings need not run courses, so it has its own switch and row.
+            {
+                href: "/courses",
+                label: "Courses",
+                icon: GraduationCap,
+                moduleKey: "COURSES",
+                action: "course:read",
             },
             {
                 href: "/contacts",

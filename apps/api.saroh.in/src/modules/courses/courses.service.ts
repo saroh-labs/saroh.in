@@ -13,6 +13,8 @@ import {
     BookingEventType,
     BookingsService,
 } from "../bookings/bookings.service";
+import type { InvoiceStanding } from "../invoices/invoice-state";
+import { invoiceStanding } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
@@ -55,6 +57,11 @@ export interface SessionView {
     endAt: string;
 }
 
+/** A session on the course page: with how many are booked on it. */
+export interface SessionDetail extends SessionView {
+    booked: number;
+}
+
 export interface CourseView {
     id: string;
     service: {
@@ -62,6 +69,8 @@ export interface CourseView {
         name: string;
         capacity: number;
         durationMinutes: number;
+        /** The zone its sessions are read in. */
+        timezone: string;
     };
     name: string;
     description: string | null;
@@ -91,12 +100,19 @@ export interface EnrollmentView {
     upcoming: number;
     cancelledAt: string | null;
     /** The invoice for it; null with Payments off, or to a role without invoices. */
-    invoiceId: string | null;
+    invoice: {
+        id: string;
+        number: string | null;
+        standing: InvoiceStanding;
+    } | null;
     createdAt: string;
 }
 
-export interface CourseDetail extends CourseView {
+export interface CourseDetail extends Omit<CourseView, "sessions"> {
+    sessions: SessionDetail[];
     enrollments: EnrollmentView[];
+    /** Whether enrolling someone now issues an invoice (Payments is on). */
+    invoicesOnEnrol: boolean;
 }
 
 const COURSE_SELECT = {
@@ -115,6 +131,7 @@ const COURSE_SELECT = {
             name: true,
             capacity: true,
             durationMinutes: true,
+            timezone: true,
         },
     },
     sessions: {
@@ -141,7 +158,7 @@ const ENROLLMENT_SELECT = {
         where: { status: { not: "VOID" } },
         orderBy: { createdAt: "desc" },
         take: 1,
-        select: { id: true },
+        select: { id: true, number: true, status: true, dueAt: true },
     },
 } satisfies Prisma.CourseEnrollmentSelect;
 
@@ -197,14 +214,36 @@ export class CoursesService {
             orderBy: [{ status: "asc" }, { createdAt: "asc" }],
             select: ENROLLMENT_SELECT,
         });
-        const upcoming = await this.upcomingByEnrollment(
-            enrollments.map((e) => e.id),
+        const [upcoming, booked, invoicesOnEnrol] = await Promise.all([
+            this.upcomingByEnrollment(enrollments.map((e) => e.id)),
+            // A course's bookings share its session's start.
+            prisma.booking.groupBy({
+                by: ["startAt"],
+                where: {
+                    status: "CONFIRMED",
+                    courseEnrollment: { courseId: id },
+                },
+                _count: { _all: true },
+            }),
+            paymentsOn(prisma, ctx.organizationId),
+        ]);
+        const bookedAt = new Map(
+            booked.map((b) => [b.startAt.getTime(), b._count._all]),
         );
+        const now = new Date();
+        const view = courseView(row, now);
         return {
-            ...courseView(row, new Date()),
+            ...view,
+            sessions: row.sessions.map((s) => ({
+                id: s.id,
+                startAt: s.startAt.toISOString(),
+                endAt: s.endAt.toISOString(),
+                booked: bookedAt.get(s.startAt.getTime()) ?? 0,
+            })),
             enrollments: enrollments.map((e) =>
-                enrollmentView(ctx, e, upcoming.get(e.id) ?? 0),
+                enrollmentView(ctx, e, upcoming.get(e.id) ?? 0, now),
             ),
+            invoicesOnEnrol,
         };
     }
 
@@ -486,7 +525,10 @@ export class CoursesService {
             select: ENROLLMENT_SELECT,
         });
         const upcoming = await this.upcomingByEnrollment(rows.map((r) => r.id));
-        return rows.map((r) => enrollmentView(ctx, r, upcoming.get(r.id) ?? 0));
+        const now = new Date();
+        return rows.map((r) =>
+            enrollmentView(ctx, r, upcoming.get(r.id) ?? 0, now),
+        );
     }
 
     /**
@@ -763,7 +805,7 @@ export class CoursesService {
         });
         if (!row) notFound("Enrolment");
         const upcoming = await this.upcomingByEnrollment([id]);
-        return enrollmentView(ctx, row, upcoming.get(id) ?? 0);
+        return enrollmentView(ctx, row, upcoming.get(id) ?? 0, new Date());
     }
 
     /** Booked sessions still to come, per enrolment. */
@@ -913,7 +955,9 @@ function enrollmentView(
     ctx: OrganizationContext,
     row: EnrollmentRow,
     upcoming: number,
+    now: Date,
 ): EnrollmentView {
+    const invoice = allows(ctx, "invoice:read") ? row.invoices[0] : undefined;
     return {
         id: row.id,
         course: row.course,
@@ -927,8 +971,12 @@ function enrollmentView(
         currency: row.currency,
         upcoming,
         cancelledAt: row.cancelledAt?.toISOString() ?? null,
-        invoiceId: allows(ctx, "invoice:read")
-            ? (row.invoices[0]?.id ?? null)
+        invoice: invoice
+            ? {
+                  id: invoice.id,
+                  number: invoice.number,
+                  standing: invoiceStanding(invoice, now),
+              }
             : null,
         createdAt: row.createdAt.toISOString(),
     };

@@ -79,6 +79,7 @@ export class ModuleReadinessRegistry {
             this.website(),
             this.crm(),
             this.appointments(),
+            this.courses(),
             this.commerce(),
             this.payments(),
             this.communications(),
@@ -172,6 +173,36 @@ export class ModuleReadinessRegistry {
                     );
                 return active();
             },
+            deactivationBlockers: () => Promise.resolve([]),
+        };
+    }
+
+    private courses(): ModuleReadinessAdapter {
+        return {
+            key: "COURSES",
+            evaluate: async ({ organizationId }) => {
+                const [all, open] = await Promise.all([
+                    this.db.course.count({ where: { organizationId } }),
+                    this.db.course.count({
+                        where: { organizationId, status: "OPEN" },
+                    }),
+                ]);
+                if (all === 0)
+                    return setup(
+                        "COURSES_NO_COURSE",
+                        "Make a course to start taking enrolments.",
+                        "/courses/new",
+                    );
+                if (open === 0)
+                    return setup(
+                        "COURSES_NONE_OPEN",
+                        "Open a course to take enrolments.",
+                        "/courses",
+                    );
+                return active();
+            },
+            // Turning Courses off keeps every course, enrolment and booked
+            // session; it only stops new enrolments.
             deactivationBlockers: () => Promise.resolve([]),
         };
     }

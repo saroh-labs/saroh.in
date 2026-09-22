@@ -12,6 +12,7 @@ import {
     CalendarPlus,
     CircleHelp,
     Globe,
+    GraduationCap,
     Receipt,
     ReceiptText,
     Repeat,
@@ -127,6 +128,13 @@ const ACTIONS: {
         label: "New service",
         icon: CalendarPlus,
         moduleKey: "APPOINTMENTS",
+    },
+    {
+        href: "/courses/new",
+        label: "New course",
+        icon: GraduationCap,
+        moduleKey: "COURSES",
+        action: "course:write",
     },
     {
         href: "/sites/new",

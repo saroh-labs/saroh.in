@@ -32,6 +32,7 @@ export const MODULE_KEYS = [
     "WEBSITE",
     "CRM",
     "APPOINTMENTS",
+    "COURSES",
     "COMMERCE",
     "PAYMENTS",
     "COMMUNICATIONS",
@@ -142,6 +143,22 @@ export const MODULES: readonly ModuleDescriptor[] = [
         rolloutFlag: FlagKey.MODULE_APPOINTMENTS,
         readinessAdapter: "APPOINTMENTS",
         deactivationPolicy: "APPOINTMENTS",
+    },
+    {
+        // A course's sessions are bookings on a service, so it rides on
+        // Appointments; a business that takes bookings need not run courses
+        // (ADR-007).
+        key: "COURSES",
+        label: "Courses",
+        description:
+            "Fixed-date courses: a run of sessions with seats and a price. Enrolling someone books every session.",
+        rootRoutes: ["/courses"],
+        requiredAction: "course:read",
+        dependencies: ["APPOINTMENTS"],
+        projectSelectable: true,
+        rolloutFlag: FlagKey.MODULE_COURSES,
+        readinessAdapter: "COURSES",
+        deactivationPolicy: "COURSES",
     },
     {
         key: "COMMERCE",
