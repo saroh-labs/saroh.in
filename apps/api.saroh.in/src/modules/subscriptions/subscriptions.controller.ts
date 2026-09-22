@@ -103,6 +103,12 @@ export class SubscriptionsController {
         return this.subscriptions.list(ctx, query);
     }
 
+    /** Declared before `:subscriptionId`, or "renewals" would be read as an id. */
+    @Get("renewals")
+    renewals(@OrgContext() ctx: OrganizationContext) {
+        return this.subscriptions.renewals(ctx);
+    }
+
     @Get(":subscriptionId")
     get(
         @OrgContext() ctx: OrganizationContext,

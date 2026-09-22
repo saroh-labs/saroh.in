@@ -14,6 +14,7 @@ import {
     Globe,
     Receipt,
     ReceiptText,
+    Repeat,
     Store,
     Target,
     UserRound,
@@ -134,6 +135,13 @@ const ACTIONS: {
         moduleKey: "WEBSITE",
         action: "site:create",
         limit: "website",
+    },
+    {
+        href: "/subscriptions?subscribe=1",
+        label: "Subscribe someone",
+        icon: Repeat,
+        moduleKey: "PAYMENTS",
+        action: "subscription:write",
     },
     {
         href: "/invoices/new",

@@ -3,9 +3,10 @@ import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { PAYMENTS_SWITCHED_OFF } from "../invoices/payments-on";
+import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
 import { SubscriptionsService } from "./subscriptions.service";
 
-export const SUBSCRIPTION_RENEW_TYPE = "subscription.renew";
+export { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
 
 /** How often the job looks for subscriptions that are due. */
 export const RENEW_EVERY_MS = 60 * 60 * 1000;
