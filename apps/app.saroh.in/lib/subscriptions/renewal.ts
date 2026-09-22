@@ -15,6 +15,7 @@ type Sub = Pick<
     | "status"
     | "timezone"
     | "nextRenewalAt"
+    | "startsAt"
     | "endsAt"
     | "pausedAt"
     | "cancelledAt"
@@ -58,7 +59,7 @@ export function standing(sub: Pick<Sub, "status" | "overdue">): Standing {
     return sub.status;
 }
 
-/** The "Next" column: "Renews 1 Oct", "Ends 1 Oct", "Paused since 5 Sep". */
+/** The "Next" column: "Starts 1 Oct", "Renews 1 Oct", "Ends 1 Oct", "Paused since 5 Sep". */
 export function nextLine(sub: Sub): string {
     const tz = sub.timezone;
     if (sub.status === "CANCELLED") {
@@ -69,6 +70,7 @@ export function nextLine(sub: Sub): string {
             ? `Paused since ${day(sub.pausedAt, tz)}`
             : "Paused";
     }
+    if (sub.startsAt) return `Starts ${day(sub.startsAt, tz)}`;
     if (sub.endsAt) return `Ends ${day(sub.endsAt, tz)}`;
     return sub.nextRenewalAt ? `Renews ${day(sub.nextRenewalAt, tz)}` : "—";
 }
@@ -207,7 +209,10 @@ export function explainStart(
             ? `every ${new Intl.DateTimeFormat(DISPLAY_LOCALE, { timeZone: "UTC", weekday: "long" }).format(new Date(toUtc(anchor)))}`
             : `on the ${ordinal(anchor.d)}`;
 
-    if (toUtc(anchor) >= toUtc(now) || n === 0) {
+    if (toUtc(anchor) > toUtc(now)) {
+        return `Nothing is billed until then. The first invoice is issued on ${short(start)}, for ${span}, and it renews ${renews} after that.`;
+    }
+    if (n === 0) {
         return `The first invoice is issued now, for ${span}. It renews ${renews} after that.`;
     }
     const kept =

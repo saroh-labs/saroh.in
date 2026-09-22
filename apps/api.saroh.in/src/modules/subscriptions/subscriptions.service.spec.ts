@@ -51,6 +51,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { InvoicesService } from "../invoices/invoices.service";
+import { resolveCapabilities } from "../organizations/organization-policy";
 import { SubscriptionsService } from "./subscriptions.service";
 
 type Mocked = Record<string, jest.Mock>;
@@ -221,6 +222,25 @@ describe("subscribing", () => {
         await expect(attempt).rejects.toBeInstanceOf(ConflictException);
         await expect(attempt).rejects.toThrow("Payments is switched off");
         expect(tx.customerSubscription!.create).not.toHaveBeenCalled();
+    });
+
+    it("bills nothing yet for a start still ahead; its first invoice waits for the day", async () => {
+        // Today is 22 Sep; they start on 1 Oct.
+        await service.subscribe(owner, {
+            contactId: "c_1",
+            planId: "plan_1",
+            startDate: "2026-10-01",
+        });
+        expect(tx.customerSubscription!.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    anchorAt: at("2026-10-01T00:00:00Z"),
+                    currentPeriodStart: at("2026-10-01T00:00:00Z"),
+                    currentPeriodEnd: at("2026-10-01T00:00:00Z"),
+                }),
+            }),
+        );
+        expect(issueInTx).not.toHaveBeenCalled();
     });
 
     it("refuses an archived plan", async () => {
@@ -464,6 +484,21 @@ describe("renewal", () => {
         );
     });
 
+    it("issues the first invoice on the day a later start arrives", async () => {
+        tx.customerSubscription!.findUnique!.mockResolvedValue(
+            sub({
+                anchorAt: at("2026-10-01T00:00:00Z"),
+                currentPeriodStart: at("2026-10-01T00:00:00Z"),
+                currentPeriodEnd: at("2026-10-01T00:00:00Z"),
+            }),
+        );
+        await expect(service.renewOne("sub_1", now)).resolves.toBe("renewed");
+        expect(issueInTx.mock.calls[0]![2]).toMatchObject({
+            periodStart: at("2026-10-01T00:00:00Z"),
+            periodEnd: at("2026-11-01T00:00:00Z"),
+        });
+    });
+
     it("skips months it missed and bills only the current one", async () => {
         await service.renewOne("sub_1", at("2027-01-10T00:00:00Z"));
         expect(issueInTx).toHaveBeenCalledTimes(1);
@@ -585,6 +620,33 @@ describe("what a subscription owes", () => {
         });
     });
 
+    it("tells a role without invoices what is owed, but not which invoices", async () => {
+        db.invoice!.findMany!.mockResolvedValue([
+            {
+                id: "inv_1",
+                number: "INV-0001",
+                status: "ISSUED",
+                subscriptionId: "sub_1",
+                total: decimal("1200"),
+                dueAt: at("2026-09-08T00:00:00Z"),
+                paidAt: null,
+            },
+        ]);
+        const desk: OrganizationContext = {
+            ...owner,
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", ["subscription:read"]),
+        };
+        const view = await service.get(desk, "sub_1");
+        expect(view).toMatchObject({
+            overdue: true,
+            unpaidTotal: "1200.00",
+            oldestUnpaid: null,
+            latestInvoice: null,
+        });
+    });
+
     it("dates a moved-over member from the start they were given", async () => {
         db.customerSubscription!.findFirst!.mockResolvedValue(
             sub({
@@ -643,6 +705,18 @@ describe("renewals", () => {
                 createdByUserId: null,
             }),
         );
+    });
+
+    it("counts today from the business's own midnight", async () => {
+        // 22 Sep, 10:00 UTC is 15:30 in Kolkata; its day began 21 Sep 18:30 UTC.
+        db.businessProfile!.findUnique!.mockResolvedValue({
+            timezone: "Asia/Kolkata",
+        });
+        (db.invoice as Mocked).count!.mockResolvedValue(0);
+        await service.renewals(owner);
+        expect(
+            (db.invoice as Mocked).count!.mock.calls[0]![0].where.issuedAt,
+        ).toEqual({ gte: at("2026-09-21T18:30:00Z") });
     });
 
     it("is refused to a Member", async () => {

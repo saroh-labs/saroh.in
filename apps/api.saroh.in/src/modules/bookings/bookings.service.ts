@@ -820,7 +820,21 @@ export class BookingsService {
             startAt.getTime() + service.durationMinutes * 60_000,
         );
 
-        // 3. Idempotency pre-check — replay an existing booking unchanged.
+        // 3. Rate-limit per (service, hashed IP). Cheap abuse guard. Before
+        //    the replay too, so replays cannot be used to probe for keys.
+        if (ipHash) {
+            const allowed = this.rateLimiter.take(`${serviceId}:${ipHash}`);
+            if (!allowed) {
+                throw new HttpException(
+                    "Too many booking attempts — please slow down and try again shortly",
+                    429,
+                );
+            }
+        }
+
+        // 4. Idempotency pre-check — replay an existing booking unchanged, but
+        //    only to the same booker: a key alone does not hand over someone
+        //    else's booking (or its meeting link).
         if (input.idempotencyKey) {
             const existing = await prisma.booking.findUnique({
                 where: {
@@ -830,17 +844,16 @@ export class BookingsService {
                     },
                 },
             });
-            if (existing) return existing;
-        }
-
-        // 4. Rate-limit per (service, hashed IP). Cheap abuse guard.
-        if (ipHash) {
-            const allowed = this.rateLimiter.take(`${serviceId}:${ipHash}`);
-            if (!allowed) {
-                throw new HttpException(
-                    "Too many booking attempts — please slow down and try again shortly",
-                    429,
-                );
+            if (existing) {
+                if (
+                    (existing.bookerEmail ?? "").toLowerCase() !==
+                    input.bookerEmail.trim().toLowerCase()
+                ) {
+                    throw new ConflictException(
+                        "That booking was already made. Refresh the page and book again.",
+                    );
+                }
+                return existing;
             }
         }
 
@@ -1423,6 +1436,7 @@ export function toPublicBooking(booking: {
     startAt: Date;
     endAt: Date;
     snapshot: unknown;
+    status?: string;
 }): PublicBooking {
     const service = (
         booking.snapshot as {
@@ -1440,8 +1454,12 @@ export function toPublicBooking(booking: {
         endAt: booking.endAt.toISOString(),
         serviceName: typeof service?.name === "string" ? service.name : "",
         online,
+        // A cancelled booking no longer holds a place in the class, so it no
+        // longer carries the way in.
         meetingUrl:
-            online && typeof service.meetingUrl === "string"
+            online &&
+            booking.status !== "CANCELLED" &&
+            typeof service.meetingUrl === "string"
                 ? service.meetingUrl
                 : null,
     };

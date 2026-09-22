@@ -34,6 +34,7 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { invoiceMoney } from "@/lib/invoices/money";
+import { LIST_LIMIT } from "@/lib/lists/capped";
 import {
     cancelSubscription,
     keepSubscription,
@@ -106,6 +107,7 @@ const since = (iso: string) => {
  */
 export function SubscriptionsScreen({
     subscriptions,
+    truncated = false,
     plans,
     contacts,
     renewals,
@@ -114,6 +116,8 @@ export function SubscriptionsScreen({
     openSubscribe,
 }: {
     subscriptions: Subscription[];
+    /** The newest read hit its cap: older cancelled ones are not here. */
+    truncated?: boolean;
     plans: Plan[];
     contacts: ContactOption[];
     /** Null when it could not be read: the line is left out. */
@@ -289,6 +293,12 @@ export function SubscriptionsScreen({
                     ) : undefined,
                 }}
             />
+            {truncated ? (
+                <p className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
+                    Showing the newest {LIST_LIMIT} subscriptions and every
+                    active or paused one; older cancelled ones are not listed.
+                </p>
+            ) : null}
 
             {canWrite ? (
                 <SubscribeDialog

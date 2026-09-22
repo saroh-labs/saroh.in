@@ -3,6 +3,7 @@
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
+        $queryRaw: jest.fn(),
         invoice: {
             create: jest.fn(),
             updateMany: jest.fn(),
@@ -249,6 +250,17 @@ describe("drafts", () => {
 });
 
 describe("issuing", () => {
+    // The draft as read again under its lock.
+    const draft = (over: Record<string, unknown> = {}) => ({
+        status: "DRAFT",
+        contactId: "c_1",
+        dueAt: null,
+        ...over,
+    });
+    beforeEach(() => {
+        tx.invoice!.findFirst!.mockResolvedValue(draft());
+    });
+
     it("numbers the invoice, copies the bill-to and makes it due in seven days", async () => {
         await service.issue(owner, "inv_1");
 
@@ -282,11 +294,36 @@ describe("issuing", () => {
     });
 
     it("keeps a due date the merchant chose", async () => {
-        const due = new Date("2026-10-15T00:00:00Z");
-        db.invoice.findFirst!.mockResolvedValue(row({ dueAt: due }));
+        const due = new Date(Date.now() + 10 * 86_400_000);
+        tx.invoice!.findFirst!.mockResolvedValue(draft({ dueAt: due }));
         await service.issue(owner, "inv_1");
         expect(tx.invoice!.updateMany!.mock.calls[0]![0].data.dueAt).toEqual(
             due,
+        );
+    });
+
+    it("refuses a due date that has already passed, rather than issue it overdue", async () => {
+        tx.invoice!.findFirst!.mockResolvedValue(
+            draft({ dueAt: new Date(Date.now() - 86_400_000) }),
+        );
+        const attempt = service.issue(owner, "inv_1");
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toThrow("The due date has passed");
+        expect(tx.invoiceSequence!.upsert).not.toHaveBeenCalled();
+    });
+
+    it("bills whoever the draft names under its lock, not an earlier read", async () => {
+        // The first read saw c_1; an edit to c_2 landed before the lock.
+        tx.invoice!.findFirst!.mockResolvedValue(draft({ contactId: "c_2" }));
+        await service.issue(owner, "inv_1");
+        expect(tx.$queryRaw).toHaveBeenCalled();
+        expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+            tx.invoice!.findFirst!.mock.invocationCallOrder[0]!,
+        );
+        expect(tx.contact!.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ id: "c_2" }),
+            }),
         );
     });
 
@@ -595,13 +632,24 @@ describe("lists and what is owed", () => {
 
     it("adds up unpaid invoices per currency and counts the overdue", async () => {
         db.invoice.findMany!.mockResolvedValue([
-            { currency: "INR", total: decimal("1200"), dueAt: new Date(0) },
             {
+                status: "ISSUED",
+                currency: "INR",
+                total: decimal("1200"),
+                dueAt: new Date(0),
+            },
+            {
+                status: "ISSUED",
                 currency: "INR",
                 total: decimal("0.5"),
                 dueAt: new Date(Date.now() + 86_400_000),
             },
-            { currency: "USD", total: decimal("40"), dueAt: null },
+            {
+                status: "ISSUED",
+                currency: "USD",
+                total: decimal("40"),
+                dueAt: null,
+            },
         ]);
         await expect(
             service.owed(owner, { contactId: "c_1" }),

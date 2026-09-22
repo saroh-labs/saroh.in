@@ -2,6 +2,8 @@ import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
+import type { CappedList } from "@/lib/lists/capped";
+import { withLive } from "@/lib/lists/capped";
 
 /**
  * Plans and the people on them (ADR-007), through the org-nested
@@ -36,6 +38,8 @@ export interface Subscription {
     currentPeriodStart: string;
     currentPeriodEnd: string;
     nextRenewalAt: string | null;
+    /** A start still ahead: nothing is billed until then. */
+    startsAt: string | null;
     endsAt: string | null;
     pausedAt: string | null;
     cancelledAt: string | null;
@@ -81,10 +85,16 @@ export interface SubscribeInput {
     timezone?: string;
 }
 
-export async function listSubscriptions(): Promise<Subscription[]> {
+/** The newest subscriptions, and every active or paused one (see `withLive`). */
+export async function listSubscriptions(): Promise<CappedList<Subscription>> {
     const base = await orgBase();
-    if (!base) return [];
-    return (await getJson<Subscription[]>(`${base}/subscriptions`)) ?? [];
+    if (!base) return { rows: [], truncated: false };
+    const [newest, active, paused] = await Promise.all([
+        getJson<Subscription[]>(`${base}/subscriptions`),
+        getJson<Subscription[]>(`${base}/subscriptions?status=ACTIVE`),
+        getJson<Subscription[]>(`${base}/subscriptions?status=PAUSED`),
+    ]);
+    return withLive(newest ?? [], active ?? [], paused ?? []);
 }
 
 export async function listPlans(): Promise<Plan[]> {

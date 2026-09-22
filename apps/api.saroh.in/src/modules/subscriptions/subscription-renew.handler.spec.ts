@@ -111,7 +111,7 @@ describe("subscription.renew", () => {
         });
     });
 
-    it("runs again straight away when the batch was full", async () => {
+    it("runs again straight away when every batch it may take was full", async () => {
         findMany.mockResolvedValue(
             Array.from({ length: RENEW_BATCH }, (_, i) => ({
                 id: `sub_${i}`,
@@ -120,6 +120,32 @@ describe("subscription.renew", () => {
         );
         await handler.handle(JOB);
         expect(jobCreate.mock.calls[0]![0].data.runAt).toEqual(new Date());
+    });
+
+    it("keeps going past a batch that failed, and never fetches those again this run", async () => {
+        const batch = Array.from({ length: RENEW_BATCH }, (_, i) => ({
+            id: `bad_${i}`,
+            organizationId: "org_1",
+        }));
+        findMany
+            .mockResolvedValueOnce(batch)
+            .mockResolvedValueOnce([{ id: "good", organizationId: "org_2" }]);
+        renewOne.mockImplementation((id: string) =>
+            id === "good"
+                ? Promise.resolve("renewed")
+                : Promise.reject(new Error("broken")),
+        );
+        await handler.handle(JOB);
+
+        expect(findMany).toHaveBeenCalledTimes(2);
+        expect(findMany.mock.calls[1]![0].where.id).toEqual({
+            notIn: batch.map((b) => b.id),
+        });
+        expect(renewOne).toHaveBeenCalledWith("good", expect.any(Date));
+        // It got to the end, so the next run is the usual hour away.
+        expect(jobCreate.mock.calls[0]![0].data.runAt).toEqual(
+            new Date(Date.now() + RENEW_EVERY_MS),
+        );
     });
 
     it("never throws, even when it cannot read what is due", async () => {

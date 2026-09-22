@@ -43,7 +43,7 @@ export default async function NewInvoicePage() {
                 <InvoiceForm
                     contacts={contacts}
                     // The currency the business last invoiced in.
-                    defaultCurrency={invoices.at(0)?.currency ?? "INR"}
+                    defaultCurrency={invoices.rows.at(0)?.currency ?? "INR"}
                 />
             </div>
         </PageContainer>

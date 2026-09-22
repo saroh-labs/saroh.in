@@ -13,7 +13,7 @@ import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import type {
     ListPacksQueryDto,
     ListPurchasesQueryDto,
@@ -324,7 +324,7 @@ export class ClassPacksService {
             }
             return purchase.id;
         });
-        return this.readPurchase(organizationId, id);
+        return this.readPurchase(ctx, id);
     }
 
     async listPurchases(
@@ -343,7 +343,7 @@ export class ClassPacksService {
             select: PURCHASE_SELECT,
         });
         const now = new Date();
-        return rows.map((r) => this.purchaseView(r, now));
+        return rows.map((r) => this.purchaseView(r, now, ctx));
     }
 
     async getPurchase(
@@ -351,7 +351,7 @@ export class ClassPacksService {
         id: string,
     ): Promise<PurchaseView> {
         authorize(ctx, "pack:read");
-        return this.readPurchase(ctx.organizationId, id);
+        return this.readPurchase(ctx, id);
     }
 
     // — Using a pack on a booking ——————————————————————————————————
@@ -444,7 +444,7 @@ export class ClassPacksService {
         }
         return {
             bookingId: booking.id,
-            purchase: await this.readPurchase(ctx.organizationId, purchaseId),
+            purchase: await this.readPurchase(ctx, purchaseId),
         };
     }
 
@@ -500,15 +500,15 @@ export class ClassPacksService {
     }
 
     private async readPurchase(
-        organizationId: string,
+        ctx: OrganizationContext,
         id: string,
     ): Promise<PurchaseView> {
         const row = await prisma.packPurchase.findFirst({
-            where: { id, organizationId },
+            where: { id, organizationId: ctx.organizationId },
             select: PURCHASE_SELECT,
         });
         if (!row) notFound("Class pack purchase");
-        return this.purchaseView(row, new Date());
+        return this.purchaseView(row, new Date(), ctx);
     }
 
     /** Unexpired purchases with a class left, per pack. */
@@ -570,7 +570,15 @@ export class ClassPacksService {
         };
     }
 
-    private purchaseView(row: PurchaseRow, now: Date): PurchaseView {
+    /**
+     * Someone who may see packs but not invoices is not handed the invoice
+     * id — its page would not open for them.
+     */
+    private purchaseView(
+        row: PurchaseRow,
+        now: Date,
+        ctx: OrganizationContext,
+    ): PurchaseView {
         const used = row._count.redemptions;
         const left = Math.max(0, row.credits - used);
         const standing: PurchaseStanding =
@@ -594,7 +602,9 @@ export class ClassPacksService {
             price: toMoneyString(row.price),
             currency: row.currency,
             expiresAt: row.expiresAt.toISOString(),
-            invoiceId: row.invoices[0]?.id ?? null,
+            invoiceId: allows(ctx, "invoice:read")
+                ? (row.invoices[0]?.id ?? null)
+                : null,
             createdAt: row.createdAt.toISOString(),
         };
     }

@@ -22,12 +22,13 @@ export default async function SubscriptionsPage({
     searchParams: Promise<{ view?: string; subscribe?: string }>;
 }) {
     await requireSession();
-    const [subscriptions, plans, organization, params] = await Promise.all([
-        listSubscriptions(),
-        listPlans(),
-        resolveActiveOrganization(),
-        searchParams,
-    ]);
+    const [{ rows: subscriptions, truncated }, plans, organization, params] =
+        await Promise.all([
+            listSubscriptions(),
+            listPlans(),
+            resolveActiveOrganization(),
+            searchParams,
+        ]);
     const canWrite = organization?.actions
         ? organization.actions.includes("subscription:write")
         : organization?.role === "OWNER" || organization?.role === "ADMIN";
@@ -40,6 +41,7 @@ export default async function SubscriptionsPage({
         <PageContainer width="full">
             <SubscriptionsScreen
                 subscriptions={subscriptions}
+                truncated={truncated}
                 plans={plans}
                 contacts={contacts}
                 renewals={renewals}
