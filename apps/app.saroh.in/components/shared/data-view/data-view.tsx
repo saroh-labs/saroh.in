@@ -412,7 +412,7 @@ export function DataView<TRow>({
             ) : mode === "table" ? (
                 // Horizontal scroll is on the wrapper, never the page: a table
                 // that widens the document breaks every other element on it.
-                <div className="overflow-x-auto rounded-[11px] border border-border">
+                <div className="overflow-x-auto rounded-[11px] border border-border bg-card">
                     <table className="w-full border-collapse text-[13.5px]">
                         <thead>
                             {/* A faint head fill and a stronger rule, as the
@@ -660,7 +660,7 @@ export function DataView<TRow>({
                 // List: the whole row is the target, which is what one-handed
                 // and gloved use needs. Detail columns are dropped, not hidden
                 // behind a disclosure nobody taps.
-                <ul className="divide-y rounded-xl border border-border">
+                <ul className="divide-y rounded-xl border border-border bg-card">
                     {visible.map((row, rowIndex) => {
                         // `.at()` rather than a destructure: a caller could
                         // declare only `detail` columns, leaving this empty,

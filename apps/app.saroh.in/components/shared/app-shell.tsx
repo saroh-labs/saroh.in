@@ -163,8 +163,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 />
                 {/* The working area is white and the rail sits on Paper: the
                 product spends white surfaces, and the page you work on is
-                the raised one (brand file §5, and the applied screens). */}
-                <div className="flex min-w-0 flex-1 flex-col bg-card">
+                the raised one (brand file §5, and the applied screens). In
+                dark it is the ground, as on the marketing site: the tables
+                and cards on it are what rise, a surface step up. */}
+                <div className="flex min-w-0 flex-1 flex-col bg-card dark:bg-background">
                     {/*
                      * `tabIndex={-1}` makes this a valid focus target: following the
                      * skip link must MOVE focus, not just scroll, or the next Tab

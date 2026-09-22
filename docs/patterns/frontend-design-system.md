@@ -94,6 +94,12 @@
   no shadow, and `Button` and `Input` carry none. Shadows are Ink at low alpha,
   never black, and are for overlays that float above content: raised 8%, menu
   10%, modal 14%. On dark, depth comes from a surface step instead.
+- **Current** — **The work area is white in light and the ground in dark.**
+  In light the rail sits on Paper and the page you work on is the raised white
+  card. In dark it is the ground (`--background`), as on the marketing site,
+  and the tables and cards on it are the step up (`--card`). So a table
+  container carries `bg-card` itself, not relying on the page behind it
+  (`app-shell.tsx`, `data-view.tsx`).
 - **Current** — **Button sizes are 32 / 38 / 45px** (`sm`, `default`, `lg`),
   set explicitly and weight 600. **Disabled is one treatment for every
   variant:** the `disabled` surface with an Ink 500 label that still clears
