@@ -55,6 +55,7 @@ the right-hand files **before** writing code.
 | Change `schema.prisma`, add a model, or store money                                                        | `docs/patterns/backend-data-and-money.md` · `.agents/skills/saroh-migrations/SKILL.md`         |
 | Touch roles, membership, invitations, organization context, capability gates, entitlements or staff access | `docs/patterns/backend-auth-and-access.md` · `.agents/skills/saroh-module-capability/SKILL.md` |
 | Enqueue a background job, or write or register a handler                                                   | `docs/patterns/backend-jobs.md`                                                                |
+| Touch invoices, subscriptions, the renewal job, courses or class packs                                     | `docs/patterns/backend-billing-and-classes.md` · ADR-007                                       |
 | Call a payment, billing, messaging or storage provider, or receive a webhook                               | `docs/patterns/backend-integrations.md`                                                        |
 | Add an environment variable, an environment check or a feature flag                                        | `docs/patterns/devops-environments-and-flags.md`                                               |
 | Handle a credential, or find one where it should not be                                                    | `docs/patterns/devops-secrets.md`                                                              |

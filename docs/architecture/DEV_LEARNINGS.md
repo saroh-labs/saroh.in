@@ -413,7 +413,9 @@ off by default, so no test or environment ever showed it.
 **Fix**: `withGuc` passes the caller's options through (`rls-proxy.ts`), and
 `rls-proxy.test.ts` checks that the isolation level arrives. When wrapping a
 Prisma call, carry every argument through, not just the one you are adding
-to.
+to. The course and pack writes also take a
+row lock on the course, the purchase or the booking before counting, so they
+stay correct even if the isolation level is ever lost again.
 **Category**: database · `packages/database/src/rls-proxy.ts`
 
 ## Database — deleting a contact on a course was refused (ADR-007, U7)

@@ -1,6 +1,6 @@
 # ADR-007 — Subscriptions, invoices, online classes, courses and class packs
 
-**Status:** Proposed — 2026-09-22
+**Status:** Accepted — 2026-09-22 (DEC-019)
 **Builds on:** [ADR-001](./ADR-001-organization-tenant-root.md) (Organization is the tenant root) · [ADR-003](./ADR-003-organization-modules.md) (modules) · [ADR-006](./ADR-006-one-storefront-one-website.md) (one storefront, one website) · DEC-010 (merchant payments run on the business's own providers)
 
 ---
