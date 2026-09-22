@@ -8,6 +8,10 @@ import {
 import type { Prisma, PrismaClient } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import {
+    CAPTURED_NEEDS_REFUND,
+    ONLINE_PAYMENT_METHOD,
+} from "../invoices/invoice-state";
 import type { PaymentStatus } from "../orders/dto";
 import { assertPaymentTransition } from "../orders/order-state";
 import { PaymentsService } from "../payments/payments.service";
@@ -34,16 +38,28 @@ export interface WebhookResult {
     changed: boolean;
 }
 
-/** A row loaded from `paymentIntent` for reconciliation (narrow select). */
+/**
+ * A row loaded from `paymentIntent` for reconciliation. Exactly one of
+ * `orderId` / `invoiceId` is set (a CHECK constraint says so); `invoiceId`
+ * may be absent on rows read by code that predates invoice intents.
+ */
 interface IntentRow {
     id: string;
     organizationId: string;
     provider: string;
-    orderId: string;
+    orderId: string | null;
+    invoiceId?: string | null;
+    providerIntentId?: string | null;
     status: string;
     amountCents: number;
     currency: string;
 }
+
+/** What the provider is called on an invoice paid through it. */
+const PROVIDER_LABEL: Record<string, string> = {
+    RAZORPAY: "Razorpay",
+    CASHFREE: "Cashfree",
+};
 
 /**
  * Signed webhook inbox + exactly-once reconciliation (S5-003).
@@ -198,19 +214,46 @@ export class WebhooksService {
         );
         if (!intent) return { applied: false };
 
+        // An invoice's pay link (U13): the same outcomes, applied to the
+        // invoice instead of an order.
+        if (intent.invoiceId) {
+            const invoiceId = intent.invoiceId;
+            switch (event.outcome) {
+                case "SUCCEEDED":
+                    return this.applyInvoiceSuccess(
+                        tx,
+                        intent,
+                        invoiceId,
+                        event,
+                    );
+                case "FAILED":
+                    return this.applyIntentFailure(tx, intent);
+                case "REFUNDED":
+                    return this.settleRefund(tx, intent, event);
+                default:
+                    return { applied: false };
+            }
+        }
+
+        const orderId = intent.orderId;
+        if (!orderId) return { applied: false };
         switch (event.outcome) {
             case "SUCCEEDED":
-                return this.applySuccess(tx, intent, event);
+                return this.applySuccess(tx, intent, orderId, event);
             case "FAILED":
-                return this.applyFailure(tx, intent);
+                return this.applyFailure(tx, intent, orderId);
             case "REFUNDED":
-                return this.applyRefund(tx, intent, event);
+                return this.applyRefund(tx, intent, orderId, event);
             default:
                 return { applied: false };
         }
     }
 
-    /** Resolve the PaymentIntent by provider intent id, else by merchant order id. */
+    /**
+     * Resolve the PaymentIntent by provider intent id, else by the merchant
+     * reference we submitted at create — an Order's id or, for a pay link,
+     * an Invoice's.
+     */
     private async findIntent(
         tx: Tx,
         provider: string,
@@ -229,7 +272,14 @@ export class WebhooksService {
         }
         if (event.orderRef) {
             const byOrder = (await tx.paymentIntent.findFirst({
-                where: { organizationId, provider, orderId: event.orderRef },
+                where: {
+                    organizationId,
+                    provider,
+                    OR: [
+                        { orderId: event.orderRef },
+                        { invoiceId: event.orderRef },
+                    ],
+                },
                 orderBy: { createdAt: "desc" },
             })) as IntentRow | null;
             return byOrder;
@@ -240,12 +290,13 @@ export class WebhooksService {
     private async applySuccess(
         tx: Tx,
         intent: IntentRow,
+        orderId: string,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
         // Order.paymentStatus → PAID FIRST, ROUTED through the state machine; an
         // illegal move throws BEFORE any intent/attempt write. A same→same
         // target (already PAID) is a guard-free no-op.
-        let applied = await this.moveOrderPayment(tx, intent.orderId, "PAID");
+        let applied = await this.moveOrderPayment(tx, orderId, "PAID");
 
         if (intent.status !== "SUCCEEDED") {
             await tx.paymentIntent.update({
@@ -272,79 +323,175 @@ export class WebhooksService {
     private async applyFailure(
         tx: Tx,
         intent: IntentRow,
+        orderId: string,
     ): Promise<{ applied: boolean }> {
-        let applied = false;
+        let { applied } = await this.applyIntentFailure(tx, intent);
+        // Move Order UNPAID→FAILED only. A stray failure after a capture (PAID)
+        // is IGNORED rather than forced through an illegal transition.
+        const order = await tx.order.findUnique({
+            where: { id: orderId },
+            select: { paymentStatus: true },
+        });
+        if (order?.paymentStatus === "UNPAID") {
+            const changed = await this.moveOrderPayment(tx, orderId, "FAILED");
+            applied = applied || changed;
+        }
+        return { applied };
+    }
+
+    /**
+     * A failed attempt moves the intent only. An invoice stays as it was —
+     * the customer can try again from the same link.
+     */
+    private async applyIntentFailure(
+        tx: Tx,
+        intent: IntentRow,
+    ): Promise<{ applied: boolean }> {
         // Never override a succeeded intent with a late failure.
         if (intent.status !== "SUCCEEDED" && intent.status !== "FAILED") {
             await tx.paymentIntent.update({
                 where: { id: intent.id },
                 data: { status: "FAILED" },
             });
-            applied = true;
+            return { applied: true };
         }
-        // Move Order UNPAID→FAILED only. A stray failure after a capture (PAID)
-        // is IGNORED rather than forced through an illegal transition.
-        const order = await tx.order.findUnique({
-            where: { id: intent.orderId },
-            select: { paymentStatus: true },
-        });
-        if (order?.paymentStatus === "UNPAID") {
-            const changed = await this.moveOrderPayment(
-                tx,
-                intent.orderId,
-                "FAILED",
-            );
-            applied = applied || changed;
-        }
-        return { applied };
+        return { applied: false };
     }
 
     private async applyRefund(
         tx: Tx,
         intent: IntentRow,
+        orderId: string,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
         // Order.paymentStatus → REFUNDED via the state machine FIRST (PAID→
         // REFUNDED); an illegal move (e.g. UNPAID→REFUNDED) throws before any
         // refund write. Already REFUNDED is a guard-free no-op.
-        let applied = await this.moveOrderPayment(
-            tx,
-            intent.orderId,
-            "REFUNDED",
-        );
+        const moved = await this.moveOrderPayment(tx, orderId, "REFUNDED");
+        const { applied } = await this.settleRefund(tx, intent, event);
+        return { applied: moved || applied };
+    }
 
-        // Settle the PaymentRefund idempotently: PENDING→SUCCEEDED once, or
-        // create SUCCEEDED if the refund originated outside our initiate flow.
-        if (event.providerRefundId) {
-            const existing = await tx.paymentRefund.findFirst({
-                where: {
-                    organizationId: intent.organizationId,
-                    providerRefundId: event.providerRefundId,
+    /**
+     * Settle the PaymentRefund idempotently: PENDING→SUCCEEDED once, or create
+     * SUCCEEDED if the refund originated outside our initiate flow (a refund
+     * made in the provider's own dashboard). For an invoice this is the whole
+     * of a refund: the invoice keeps its PAID or VOID status and the workspace
+     * reads the refund from here.
+     */
+    private async settleRefund(
+        tx: Tx,
+        intent: IntentRow,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
+        if (!event.providerRefundId) return { applied: false };
+        const existing = await tx.paymentRefund.findFirst({
+            where: {
+                organizationId: intent.organizationId,
+                providerRefundId: event.providerRefundId,
+            },
+        });
+        if (existing) {
+            if (existing.status !== "SUCCEEDED") {
+                await tx.paymentRefund.update({
+                    where: { id: existing.id },
+                    data: { status: "SUCCEEDED" },
+                });
+                return { applied: true };
+            }
+            return { applied: false };
+        }
+        await tx.paymentRefund.create({
+            data: {
+                organizationId: intent.organizationId,
+                paymentIntentId: intent.id,
+                amountCents: intent.amountCents,
+                currency: intent.currency,
+                status: "SUCCEEDED",
+                providerRefundId: event.providerRefundId,
+            },
+        });
+        return { applied: true };
+    }
+
+    /**
+     * Money arrived for an invoice's pay link (U13).
+     *
+     * Under the invoice's row lock — so a hand-recorded payment or a void
+     * racing this webhook is seen, not overwritten — an ISSUED invoice
+     * becomes PAID, recorded as paid online through the provider. An invoice
+     * that is already PAID (cash at the counter, a second tab) or VOID is
+     * left exactly as it is: the intent still SUCCEEDED, because the money
+     * was taken, and the capture is recorded as needing a refund, which the
+     * workspace surfaces on Home and on the invoice.
+     *
+     * An intent already SUCCEEDED means this payment was settled by an
+     * earlier event (Razorpay sends `payment.captured` and `order.paid` for
+     * one payment), so it is a no-op — never a second "needs a refund".
+     */
+    private async applyInvoiceSuccess(
+        tx: Tx,
+        intent: IntentRow,
+        invoiceId: string,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
+        if (intent.status === "SUCCEEDED") return { applied: false };
+
+        await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoiceId} AND "organizationId" = ${intent.organizationId} FOR UPDATE`;
+        const invoice = await tx.invoice.findFirst({
+            where: { id: invoiceId, organizationId: intent.organizationId },
+            select: { status: true },
+        });
+
+        await tx.paymentIntent.update({
+            where: { id: intent.id },
+            data: { status: "SUCCEEDED" },
+        });
+
+        const providerRef = event.providerPaymentRef ?? null;
+        if (invoice?.status === "ISSUED") {
+            await tx.invoice.update({
+                where: { id: invoiceId },
+                data: {
+                    status: "PAID",
+                    paidAt: new Date(),
+                    paymentMethod: ONLINE_PAYMENT_METHOD,
+                    paymentReference:
+                        providerRef ?? intent.providerIntentId ?? null,
+                    paymentNote: `Paid online through ${
+                        PROVIDER_LABEL[intent.provider] ?? intent.provider
+                    }`,
                 },
             });
-            if (existing) {
-                if (existing.status !== "SUCCEEDED") {
-                    await tx.paymentRefund.update({
-                        where: { id: existing.id },
-                        data: { status: "SUCCEEDED" },
-                    });
-                    applied = true;
-                }
-            } else {
-                await tx.paymentRefund.create({
+            if (providerRef) {
+                await tx.paymentAttempt.create({
                     data: {
                         organizationId: intent.organizationId,
                         paymentIntentId: intent.id,
-                        amountCents: intent.amountCents,
-                        currency: intent.currency,
-                        status: "SUCCEEDED",
-                        providerRefundId: event.providerRefundId,
+                        provider: intent.provider,
+                        providerRef,
+                        status: "CAPTURED",
                     },
                 });
-                applied = true;
             }
+            return { applied: true };
         }
-        return { applied };
+
+        const found = invoice?.status ?? "MISSING";
+        await tx.paymentAttempt.create({
+            data: {
+                organizationId: intent.organizationId,
+                paymentIntentId: intent.id,
+                provider: intent.provider,
+                providerRef,
+                status: CAPTURED_NEEDS_REFUND,
+                rawResponse: { invoiceStatus: found },
+            },
+        });
+        this.logger.warn(
+            `Payment captured for invoice ${invoiceId} while it was ${found}; recorded as needing a refund`,
+        );
+        return { applied: true };
     }
 
     /**

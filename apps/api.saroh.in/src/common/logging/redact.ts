@@ -94,6 +94,7 @@ export function redactObject(value: unknown, depth = 0): unknown {
  */
 const TOKEN_PATHS = [
     /^(\/public\/product-reviews\/)[^/?#]+/,
+    /^(\/public\/invoices\/)[^/?#]+/,
     /^(\/public\/sites\/preview\/)[^/?#]+/,
 ];
 

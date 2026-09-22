@@ -19,6 +19,34 @@ export type InvoiceStatus = "DRAFT" | "ISSUED" | "PAID" | "VOID";
 export type InvoiceStanding = "DRAFT" | "ISSUED" | "OVERDUE" | "PAID" | "VOID";
 export type InvoiceSource = "MANUAL" | "SUBSCRIPTION" | "COURSE" | "PACK";
 export type PaymentMethod = "CASH" | "UPI" | "BANK_TRANSFER" | "CARD" | "OTHER";
+/**
+ * How a payment is stored: one of the ways it is recorded by hand, or ONLINE
+ * — paid through the invoice's pay link, written by the payment webhook and
+ * never offered in Record a payment.
+ */
+export type StoredPaymentMethod = PaymentMethod | "ONLINE";
+
+/** One payment taken online through the invoice's pay link. */
+export interface InvoiceOnlinePayment {
+    id: string;
+    provider: string;
+    amount: string;
+    currency: string;
+    at: string;
+    /**
+     * False when it came in after the invoice was already paid or void: the
+     * money was taken but not applied, and is owed back to the customer.
+     */
+    applied: boolean;
+    refund: "NONE" | "PENDING" | "REFUNDED";
+}
+
+/** On the detail read: can a pay link take payment, and is one out. */
+export interface InvoiceOnline {
+    providerConnected: boolean;
+    payLinkActive: boolean;
+    payments: InvoiceOnlinePayment[];
+}
 
 export interface InvoiceLine {
     id: string;
@@ -47,7 +75,7 @@ export interface Invoice {
     voidedAt: string | null;
     voidReason: string | null;
     payment: {
-        method: PaymentMethod;
+        method: StoredPaymentMethod;
         reference: string | null;
         note: string | null;
     } | null;
@@ -71,6 +99,8 @@ export interface Invoice {
     } | null;
     /** On a detail read only. */
     lines?: InvoiceLine[];
+    /** On the detail read only; absent from an API that predates pay links. */
+    online?: InvoiceOnline;
 }
 
 export interface InvoiceInput {
@@ -181,5 +211,19 @@ export function recordPayment(id: string, input: PaymentInput) {
         "POST",
         input,
         "Could not record that payment.",
+    );
+}
+
+/**
+ * Make the invoice's pay link. The answer is the only time the link is seen —
+ * the API keeps only a hash of it — so asking again makes a new one and the
+ * one shared before stops working.
+ */
+export function createPayLink(id: string) {
+    return send<{ url: string }>(
+        `${at(id)}/pay-link`,
+        "POST",
+        {},
+        "Could not make a pay link.",
     );
 }

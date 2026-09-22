@@ -6,6 +6,8 @@ import { OrganizationsModule } from "../organizations/organizations.module";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
 import { providerFactoryProvider } from "./providers/provider.factory";
+import { PublicInvoicesController } from "./public-invoices.controller";
+import { PublicInvoicesService } from "./public-invoices.service";
 import { PublicPaymentsController } from "./public-payments.controller";
 
 /**
@@ -17,8 +19,17 @@ import { PublicPaymentsController } from "./public-payments.controller";
  */
 @Module({
     imports: [forwardRef(() => OrganizationsModule), CapabilitiesModule],
-    controllers: [PaymentsController, PublicPaymentsController],
-    providers: [PaymentsService, providerFactoryProvider, OrganizationGuard],
+    controllers: [
+        PaymentsController,
+        PublicPaymentsController,
+        PublicInvoicesController,
+    ],
+    providers: [
+        PaymentsService,
+        PublicInvoicesService,
+        providerFactoryProvider,
+        OrganizationGuard,
+    ],
     exports: [PaymentsService],
 })
 export class PaymentsModule {}

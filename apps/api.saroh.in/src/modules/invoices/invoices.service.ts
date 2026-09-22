@@ -17,9 +17,19 @@ import type {
     VoidInvoiceDto,
 } from "./dto";
 import type { InvoiceSource } from "./invoice-state";
-import { DEFAULT_DUE_DAYS, isPastDue, viewWhere } from "./invoice-state";
+import {
+    CAPTURED_NEEDS_REFUND,
+    DEFAULT_DUE_DAYS,
+    isPastDue,
+    viewWhere,
+} from "./invoice-state";
 import { nextInvoiceNumber } from "./numbering";
-import type { InvoiceRow, InvoiceViewModel } from "./serialize";
+import { mintPayToken } from "./pay-token";
+import type {
+    InvoiceOnlineView,
+    InvoiceRow,
+    InvoiceViewModel,
+} from "./serialize";
 import {
     contactName,
     INVOICE_DETAIL_SELECT,
@@ -104,9 +114,58 @@ export class InvoicesService {
         return rows.map((r) => serializeInvoice(r as InvoiceRow, now));
     }
 
+    /**
+     * One invoice, with what the workspace needs to offer its pay link: is a
+     * provider connected, is a link out, and what came in online.
+     */
     async get(ctx: OrganizationContext, id: string): Promise<InvoiceViewModel> {
         authorize(ctx, "invoice:read");
-        return this.read(ctx.organizationId, id);
+        const invoice = await this.read(ctx.organizationId, id);
+        return {
+            ...invoice,
+            online: await this.online(ctx.organizationId, id),
+        };
+    }
+
+    /**
+     * Make the invoice's pay link (U13) and hand it over — the only time the
+     * token is ever seen, since only its hash is kept. Asking again makes a
+     * new link, and the one before stops working: that is both "copy the
+     * link" the first time and "new link" after it.
+     *
+     * Only an issued invoice has a link, and only a business with a
+     * connected provider can take the payment behind it.
+     */
+    async createPayLink(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<{ token: string }> {
+        authorize(ctx, "invoice:write");
+        const current = await this.read(ctx.organizationId, id);
+        if (current.status !== "ISSUED") {
+            throw new ConflictException(
+                current.status === "DRAFT"
+                    ? "Issue the invoice before sharing a pay link."
+                    : this.notIssued(current.status, "paid"),
+            );
+        }
+        const connected = await prisma.merchantPaymentProvider.count({
+            where: { organizationId: ctx.organizationId, status: "CONNECTED" },
+        });
+        if (connected === 0) {
+            throw new ConflictException(
+                "Connect a payment provider to take payment online.",
+            );
+        }
+        const { token, tokenHash } = mintPayToken();
+        const { count } = await prisma.invoice.updateMany({
+            where: { id, organizationId: ctx.organizationId, status: "ISSUED" },
+            data: { payTokenHash: tokenHash },
+        });
+        if (count === 0) {
+            throw new ConflictException("This invoice changed. Reload it.");
+        }
+        return { token };
     }
 
     /**
@@ -513,13 +572,73 @@ export class InvoicesService {
         if (row.status !== "ISSUED") {
             throw new ConflictException(this.notIssued(row.status, "voided"));
         }
+        // A void invoice is not to be paid, so its pay link stops working.
         const { count } = await tx.invoice.updateMany({
             where: { id, organizationId, status: "ISSUED" },
-            data: { status: "VOID", voidedAt: new Date(), voidReason: reason },
+            data: {
+                status: "VOID",
+                voidedAt: new Date(),
+                voidReason: reason,
+                payTokenHash: null,
+            },
         });
         if (count === 0) {
             throw new ConflictException("This invoice changed. Reload it.");
         }
+    }
+
+    /**
+     * Money taken online for this invoice. A payment that arrived after the
+     * invoice was already paid or void is not applied to it and is shown as
+     * needing a refund until the provider reports one.
+     */
+    private async online(
+        organizationId: string,
+        invoiceId: string,
+    ): Promise<InvoiceOnlineView> {
+        const [connected, link, intents] = await Promise.all([
+            prisma.merchantPaymentProvider.count({
+                where: { organizationId, status: "CONNECTED" },
+            }),
+            prisma.invoice.findFirst({
+                where: { id: invoiceId, organizationId },
+                select: { payTokenHash: true },
+            }),
+            prisma.paymentIntent.findMany({
+                where: { organizationId, invoiceId, status: "SUCCEEDED" },
+                orderBy: { createdAt: "asc" },
+                select: {
+                    id: true,
+                    provider: true,
+                    amountCents: true,
+                    currency: true,
+                    updatedAt: true,
+                    attempts: {
+                        where: { status: CAPTURED_NEEDS_REFUND },
+                        select: { id: true },
+                        take: 1,
+                    },
+                    refunds: { select: { status: true } },
+                },
+            }),
+        ]);
+        return {
+            providerConnected: connected > 0,
+            payLinkActive: Boolean(link?.payTokenHash),
+            payments: intents.map((i) => ({
+                id: i.id,
+                provider: i.provider,
+                amount: fromCents(i.amountCents),
+                currency: i.currency,
+                at: i.updatedAt.toISOString(),
+                applied: i.attempts.length === 0,
+                refund: i.refunds.some((r) => r.status === "SUCCEEDED")
+                    ? "REFUNDED"
+                    : i.refunds.some((r) => r.status === "PENDING")
+                      ? "PENDING"
+                      : "NONE",
+            })),
+        };
     }
 
     /** The name and email the invoice keeps, whatever happens to the contact. */

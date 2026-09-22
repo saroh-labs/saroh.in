@@ -172,6 +172,32 @@ export interface InvoiceViewModel {
     } | null;
     /** On a detail read only. */
     lines?: InvoiceLineView[];
+    /** On `GET /invoices/:id` only: the pay link and money taken online. */
+    online?: InvoiceOnlineView;
+}
+
+/** One payment taken online through the invoice's pay link (U13). */
+export interface InvoiceOnlinePayment {
+    id: string;
+    provider: string;
+    /** Major units, as a string. */
+    amount: string;
+    currency: string;
+    at: string;
+    /**
+     * False when it came in after the invoice was already paid or void: it
+     * was captured but not applied, and is owed back to the customer.
+     */
+    applied: boolean;
+    refund: "NONE" | "PENDING" | "REFUNDED";
+}
+
+export interface InvoiceOnlineView {
+    /** A provider is connected, so a pay link can take payment. */
+    providerConnected: boolean;
+    /** A link is out; the token itself is never read back. */
+    payLinkActive: boolean;
+    payments: InvoiceOnlinePayment[];
 }
 
 /** "Asha Rao", or the email when the contact has no name. */

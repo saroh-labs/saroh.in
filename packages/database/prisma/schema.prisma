@@ -2617,19 +2617,25 @@ model MerchantPaymentProvider {
   @@index([organizationId])
 }
 
-// PaymentIntent — an intent to collect a SERVER-CALCULATED amount for an Order.
+// PaymentIntent — an intent to collect a SERVER-CALCULATED amount for an Order
+// or, through its pay link, an Invoice (ADR-007, U13). Exactly one of
+// `orderId` / `invoiceId` is set: the migration adds a CHECK constraint
+// ("PaymentIntent_one_target") that Prisma cannot express here.
 model PaymentIntent {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   provider         String // which MerchantPaymentProvider
   providerIntentId String? // the provider's order/intent id, set after create
 
-  amountCents Int // server-calculated from the Order; minor units
+  amountCents Int // server-calculated from the Order or Invoice; minor units
   currency    String
 
   // CREATED → REQUIRES_PAYMENT → PROCESSING → SUCCEEDED | FAILED | CANCELLED
@@ -2644,8 +2650,10 @@ model PaymentIntent {
   updatedAt DateTime @updatedAt
 
   @@unique([orderId, idempotencyKey])
+  @@unique([invoiceId, idempotencyKey])
   @@index([organizationId])
   @@index([orderId])
+  @@index([invoiceId])
   @@index([provider, providerIntentId])
 }
 
@@ -2660,7 +2668,9 @@ model PaymentAttempt {
 
   provider    String
   providerRef String? // provider payment id
-  status      String // CREATED | AUTHORIZED | CAPTURED | FAILED
+  // CREATED | AUTHORIZED | CAPTURED | FAILED, or CAPTURED_NEEDS_REFUND: money
+  // taken on an invoice that was already paid or void when it arrived.
+  status      String
   rawResponse Json? // provider response (sanitized), for audit
 
   createdAt DateTime @default(now())
@@ -3356,12 +3366,12 @@ model CustomerSubscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([organizationId])
-  @@index([contactId])
-  @@index([status, currentPeriodEnd])
   // One live subscription per person per plan: a second is a double-click,
   // and it would bill them twice every period.
   @@unique([planId, contactId], map: "CustomerSubscription_one_live_per_person", where: raw("status <> 'CANCELLED'"))
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([status, currentPeriodEnd])
 }
 
 // A bill. DRAFT → ISSUED → PAID, or VOID. An issued invoice never changes: a
@@ -3416,7 +3426,13 @@ model Invoice {
 
   createdByUserId String?
 
-  lines InvoiceLine[]
+  // The pay link (U13): the SHA-256 of a random token, never the token.
+  // Minted when a link is first asked for, replaced by a new one, cleared on
+  // void and when the contact is deleted. Null means no link works.
+  payTokenHash String? @unique
+
+  lines          InvoiceLine[]
+  paymentIntents PaymentIntent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

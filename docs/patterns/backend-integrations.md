@@ -43,7 +43,13 @@ a note saying so.
 - **Current** — **Stored provider payloads are for verification and audit,**
   never read on a serving path (`WebhookEvent.payload`).
 - **Current** — **The server derives amounts.** A payment intent's amount comes
-  from the Order, never from the request.
+  from the Order or, for an invoice pay link, the Invoice — never from the
+  request. The public invoice intent route reads its body by hand, so an
+  amount sent anyway is ignored rather than refused (ADR-007).
+- **Current** — **Money that arrives for something already settled is kept,
+  not lost.** A webhook success on a paid or void invoice marks the intent
+  SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises
+  until a refund is recorded.
 - **Current** — **Consent gates the send.** A revoked consent makes a message
   `SUPPRESSED`: no job, no delivery.
 - **Current** — **Storage keys are server-derived and tenant-scoped**
