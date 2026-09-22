@@ -16,13 +16,15 @@ so you can use, modify and self-host it, including to run your own business
 
 ## Watch it
 
-[![The Saroh workspace, filmed](docs/demos/tour/poster.jpg)](docs/demos/tour/saroh-tour.mp4)
+https://github.com/user-attachments/assets/196ad18e-6507-4cb5-bdb8-8848e5ef4d00
 
-**[A four-minute tour](docs/demos/tour/saroh-tour.mp4)** of the workspace, with
+**A four-minute tour** of the workspace, with
 voice-over: a shop's products and orders, a gym's members, memberships and
 invoices, a yoga studio's courses and class packs, a team and its roles, and
 the same person seeing less as a member of staff. Filmed from the running
-product against the showcase seed, so every screen is real.
+product against the showcase seed, so every screen is real. The film is in the
+repository too, at
+[`docs/demos/tour/saroh-tour.mp4`](docs/demos/tour/saroh-tour.mp4).
 
 ## What it does
 
