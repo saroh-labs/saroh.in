@@ -54,7 +54,11 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { BookingsService, type BookInput } from "./bookings.service";
+import {
+    BookingsService,
+    type BookInput,
+    toPublicBooking,
+} from "./bookings.service";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 
 const serviceFindUnique = prisma.service.findUnique as jest.Mock;
@@ -1208,5 +1212,148 @@ describe("BookingsService.bookByHand — a booking the merchant makes (#384)", (
             }),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(serviceFindUnique).not.toHaveBeenCalled();
+    });
+});
+
+describe("online classes (ADR-007)", () => {
+    const serviceUpdate = prisma.service.update as jest.Mock;
+    const ONLINE = {
+        ...SERVICE,
+        locationType: "ONLINE",
+        meetingUrl: "https://meet.example.com/yoga",
+    };
+    const create = (over: Record<string, unknown>) =>
+        new BookingsService().createService(ctx(), {
+            name: "Evening yoga",
+            durationMinutes: 60,
+            timezone: "UTC",
+            ...over,
+        });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        serviceCreate.mockResolvedValue(ONLINE);
+        serviceUpdate.mockResolvedValue(ONLINE);
+    });
+
+    it("creates an online service with its https link", async () => {
+        await create({
+            locationType: "ONLINE",
+            meetingUrl: "https://meet.example.com/yoga",
+        });
+        expect(serviceCreate.mock.calls[0][0].data).toMatchObject({
+            locationType: "ONLINE",
+            meetingUrl: "https://meet.example.com/yoga",
+        });
+    });
+
+    it("keeps an in-person service free of a link, even if one is sent", async () => {
+        await create({ meetingUrl: "https://meet.example.com/yoga" });
+        expect(serviceCreate.mock.calls[0][0].data).toMatchObject({
+            locationType: "IN_PERSON",
+            meetingUrl: null,
+        });
+    });
+
+    it.each([
+        ["no link", undefined],
+        ["an http link", "http://meet.example.com/yoga"],
+        ["a script", "javascript:alert(1)"],
+        ["not a web address", "meet dot example"],
+    ])("refuses an online service with %s", async (_label, meetingUrl) => {
+        await expect(
+            create({ locationType: "ONLINE", meetingUrl }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(serviceCreate).not.toHaveBeenCalled();
+    });
+
+    it("drops the link when a service goes back to in person", async () => {
+        serviceFindUnique.mockResolvedValue(ONLINE);
+        await new BookingsService().updateService(ctx(), "svc_1", {
+            locationType: "IN_PERSON",
+        });
+        expect(serviceUpdate.mock.calls[0][0].data).toMatchObject({
+            locationType: "IN_PERSON",
+            meetingUrl: null,
+        });
+    });
+
+    it("changes the link of an online service without restating the type", async () => {
+        serviceFindUnique.mockResolvedValue(ONLINE);
+        await new BookingsService().updateService(ctx(), "svc_1", {
+            meetingUrl: "https://meet.example.com/new-room",
+        });
+        expect(serviceUpdate.mock.calls[0][0].data).toMatchObject({
+            locationType: "ONLINE",
+            meetingUrl: "https://meet.example.com/new-room",
+        });
+    });
+
+    it("refuses to clear the link of a service that stays online", async () => {
+        serviceFindUnique.mockResolvedValue(ONLINE);
+        await expect(
+            new BookingsService().updateService(ctx(), "svc_1", {
+                meetingUrl: null,
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("freezes the link onto the booking", async () => {
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue({
+            ...ONLINE,
+            availabilityRules: RULES,
+        });
+        await new BookingsService().book("svc_1", baseInput(), "iphash");
+        expect(
+            bookingCreate.mock.calls[0][0].data.snapshot.service,
+        ).toMatchObject({
+            locationType: "ONLINE",
+            meetingUrl: "https://meet.example.com/yoga",
+        });
+    });
+});
+
+describe("toPublicBooking — what a booker is answered with", () => {
+    const booking = {
+        id: "bk_1",
+        organizationId: "org_SVC",
+        contactId: "contact_1",
+        ipHash: "iphash",
+        startAt: new Date(START),
+        endAt: new Date("2026-07-20T10:00:00.000Z"),
+        snapshot: {
+            service: {
+                name: "Evening yoga",
+                locationType: "ONLINE",
+                meetingUrl: "https://meet.example.com/yoga",
+            },
+        },
+    };
+
+    it("is the booker's own booking and nothing internal", () => {
+        expect(toPublicBooking(booking)).toEqual({
+            reference: "bk_1",
+            startAt: START,
+            endAt: "2026-07-20T10:00:00.000Z",
+            serviceName: "Evening yoga",
+            online: true,
+            meetingUrl: "https://meet.example.com/yoga",
+        });
+    });
+
+    it("reads the link frozen at booking, not the service as it is now", () => {
+        // The service's link has since changed; this booking keeps its own.
+        const view = toPublicBooking(booking);
+        expect(view.meetingUrl).toBe("https://meet.example.com/yoga");
+    });
+
+    it("has no link for an in-person booking, or one made before links existed", () => {
+        expect(
+            toPublicBooking({
+                ...booking,
+                snapshot: { service: { name: "Consult" } },
+            }),
+        ).toMatchObject({ online: false, meetingUrl: null });
     });
 });
