@@ -50,6 +50,26 @@ describe("invoiceStatus", () => {
         ).toBe("Void");
     });
 
+    it("agrees with the due date shown in a timezone behind UTC", () => {
+        // Due 25 Sep, end of day in New York: 04:59 on the 26th in UTC.
+        const dueAt = "2026-09-26T03:59:59.999Z";
+        // 24 Sep, 9pm in New York.
+        const eveningBefore = new Date("2026-09-25T01:00:00Z");
+        expect(
+            invoiceStatus({ standing: "ISSUED", dueAt }, eveningBefore).detail,
+        ).toBe("Due tomorrow");
+        // 25 Sep, 9pm in New York: still the due day.
+        const dueEvening = new Date("2026-09-26T01:00:00Z");
+        expect(
+            invoiceStatus({ standing: "ISSUED", dueAt }, dueEvening).detail,
+        ).toBe("Due today");
+        // 26 Sep, 10am in New York: a day late.
+        const nextMorning = new Date("2026-09-26T14:00:00Z");
+        expect(
+            invoiceStatus({ standing: "OVERDUE", dueAt }, nextMorning).detail,
+        ).toBe("1 day overdue");
+    });
+
     it("says overdue by one day in the singular", () => {
         expect(
             invoiceStatus(

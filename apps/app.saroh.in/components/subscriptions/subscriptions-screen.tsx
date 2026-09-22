@@ -43,11 +43,10 @@ import {
 import {
     checkedLine,
     intervalWords,
-    latestInvoiceNote,
     nextLine,
-    owedLine,
     periodEndDay,
     renewalsLate,
+    rowInvoice,
     standing,
 } from "@/lib/subscriptions/renewal";
 import type { Plan, Renewals, Subscription } from "@/lib/subscriptions/service";
@@ -185,28 +184,25 @@ export function SubscriptionsScreen({
         },
         {
             id: "invoice",
-            header: "Latest invoice",
+            header: "Invoice",
             priority: "detail",
             width: "210px",
             cell: (s) => {
-                const note = latestInvoiceNote(s);
-                const owed = owedLine(s);
-                return s.latestInvoice ? (
+                const inv = rowInvoice(s);
+                return inv ? (
                     <span className="min-w-0">
                         <Link
-                            href={`/invoices/${s.latestInvoice.id}`}
+                            href={`/invoices/${inv.id}`}
                             className={
                                 s.overdue
                                     ? "block font-mono text-[12.5px] text-destructive-subtle-foreground underline-offset-4 hover:underline"
                                     : "block font-mono text-[12.5px] underline-offset-4 hover:underline"
                             }
                         >
-                            {s.latestInvoice.number}
+                            {inv.number}
                         </Link>
                         <span className="block text-[11.5px] text-muted-foreground">
-                            {s.overdueCount >= 2 && owed
-                                ? `${owed} — pause or cancel?`
-                                : note}
+                            {inv.note}
                         </span>
                     </span>
                 ) : (

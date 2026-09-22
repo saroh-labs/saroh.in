@@ -19,20 +19,17 @@ export interface StatusView {
 
 const DAY = 86_400_000;
 
-/** Whole calendar days from `now` to `iso`, by UTC date. */
-function daysUntil(iso: string, now: Date): number {
-    const due = new Date(iso);
-    const a = Date.UTC(
-        due.getUTCFullYear(),
-        due.getUTCMonth(),
-        due.getUTCDate(),
-    );
-    const b = Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-    );
-    return Math.round((a - b) / DAY);
+/**
+ * The due date is stored as the end of the chosen day in the timezone of
+ * whoever set it, so counting whole days between instants — not UTC calendar
+ * dates — keeps these words on the same day the date beside them shows.
+ */
+function daysLeft(iso: string, now: Date): number {
+    return Math.floor((Date.parse(iso) - now.getTime()) / DAY);
+}
+
+function daysLate(iso: string, now: Date): number {
+    return Math.ceil((now.getTime() - Date.parse(iso)) / DAY);
 }
 
 export function invoiceStatus(
@@ -47,7 +44,7 @@ export function invoiceStatus(
         case "VOID":
             return { label: "Void", variant: "neutral", detail: null };
         case "OVERDUE": {
-            const late = invoice.dueAt ? -daysUntil(invoice.dueAt, now) : 0;
+            const late = invoice.dueAt ? daysLate(invoice.dueAt, now) : 0;
             return {
                 label: "Overdue",
                 variant: "error",
@@ -61,7 +58,7 @@ export function invoiceStatus(
             if (!invoice.dueAt) {
                 return { label: "Issued", variant: "info", detail: null };
             }
-            const d = daysUntil(invoice.dueAt, now);
+            const d = daysLeft(invoice.dueAt, now);
             return {
                 label: "Issued",
                 variant: "info",

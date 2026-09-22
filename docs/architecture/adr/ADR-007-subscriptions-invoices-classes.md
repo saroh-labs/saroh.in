@@ -66,6 +66,20 @@ business pays Saroh). To keep the two apart in code and in conversation:
   current period runs out. Pausing skips renewals until resumed.
 - No card-on-file, no auto-debit. Mandates (UPI AutoPay, e-NACH) are a later
   decision with provider approval behind it.
+- **With Payments off, subscribing someone is refused** (a 409 that says to
+  turn Payments on), and so is resuming a pause past its paid period. A
+  subscription is only its invoices, so one without them would be a list that
+  says "Active" while nothing is billed. Renewals for that business wait until
+  Payments is back on; a subscription set to end still ends. (Decided
+  2026-09-22, from the ADR-007 code review.)
+- A subscription set to end at its period end ends then even if it was paused
+  meanwhile; resuming it after that date does not bill it again.
+- The subscriptions list points each row at the **oldest unpaid invoice while
+  any is overdue** — the one to chase first — and at the latest otherwise.
+  (Decided 2026-09-22.)
+- Deleting a contact takes their subscriptions and packs with it, and cancels
+  their future bookings paid with those packs, in one transaction; the
+  workspace says what went. Invoices stay under their bill-to snapshot.
 
 ### Invoices — simple
 

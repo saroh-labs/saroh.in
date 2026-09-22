@@ -1,12 +1,12 @@
-// The renewal job: it renews what is due, never throws, and always leaves
-// the next run waiting. The database and the service are mocked.
+// The renewal job: it renews what is due, throws only when it cannot leave
+// the next run waiting, and a chain check restarts it. Database and service mocked.
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     return {
         ...actual,
         prisma: {
             customerSubscription: { findMany: jest.fn() },
-            job: { create: jest.fn() },
+            job: { create: jest.fn(), count: jest.fn() },
         },
     };
 });
@@ -23,6 +23,7 @@ import type { SubscriptionsService } from "./subscriptions.service";
 
 const findMany = prisma.customerSubscription.findMany as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
+const jobCount = prisma.job.count as jest.Mock;
 
 const renewOne = jest.fn();
 const handler = new SubscriptionRenewHandler({
@@ -49,21 +50,29 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers());
 
 describe("subscription.renew", () => {
-    it("asks only for active, due subscriptions in businesses with Payments on", async () => {
+    it("asks for due subscriptions with Payments on, and any set to end", async () => {
         await handler.handle(JOB);
         expect(findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
-                    status: "ACTIVE",
                     currentPeriodEnd: { lte: new Date("2026-10-01T02:00:00Z") },
-                    organization: {
-                        organizationModules: {
-                            none: {
-                                moduleKey: "PAYMENTS",
-                                status: { not: "ENABLED" },
+                    OR: [
+                        {
+                            status: "ACTIVE",
+                            organization: {
+                                organizationModules: {
+                                    none: {
+                                        moduleKey: "PAYMENTS",
+                                        status: { not: "ENABLED" },
+                                    },
+                                },
                             },
                         },
-                    },
+                        {
+                            status: { in: ["ACTIVE", "PAUSED"] },
+                            cancelAtPeriodEnd: true,
+                        },
+                    ],
                 },
                 take: RENEW_BATCH,
             }),
@@ -121,11 +130,51 @@ describe("subscription.renew", () => {
 
     it("treats a run already waiting as scheduled", async () => {
         jobCreate.mockRejectedValue(duplicate());
-        await expect(handler.schedule(new Date())).resolves.toBeUndefined();
+        await expect(handler.schedule(new Date())).resolves.toBe(true);
     });
 
     it("does not throw when scheduling fails for another reason", async () => {
         jobCreate.mockRejectedValue(new Error("connection refused"));
-        await expect(handler.schedule(new Date())).resolves.toBeUndefined();
+        await expect(handler.schedule(new Date())).resolves.toBe(false);
+    });
+
+    it("throws when it cannot leave the next run waiting, so this one is retried", async () => {
+        jobCreate.mockRejectedValue(new Error("connection refused"));
+        await expect(handler.handle(JOB)).rejects.toThrow(
+            "Could not schedule the next subscription renewal run",
+        );
+    });
+
+    it("finishes quietly when the next run is already waiting", async () => {
+        jobCreate.mockRejectedValue(duplicate());
+        await expect(handler.handle(JOB)).resolves.toBeUndefined();
+    });
+});
+
+describe("the chain check", () => {
+    it("leaves a live chain alone", async () => {
+        jobCount.mockResolvedValue(1);
+        await handler.ensureScheduled();
+        expect(jobCount).toHaveBeenCalledWith({
+            where: {
+                type: SUBSCRIPTION_RENEW_TYPE,
+                status: { in: ["PENDING", "PROCESSING"] },
+            },
+        });
+        expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("starts a stopped chain now", async () => {
+        jobCount.mockResolvedValue(0);
+        await handler.ensureScheduled();
+        expect(jobCreate.mock.calls[0]![0].data).toMatchObject({
+            type: SUBSCRIPTION_RENEW_TYPE,
+            runAt: new Date(),
+        });
+    });
+
+    it("never throws", async () => {
+        jobCount.mockRejectedValue(new Error("connection refused"));
+        await expect(handler.ensureScheduled()).resolves.toBeUndefined();
     });
 });

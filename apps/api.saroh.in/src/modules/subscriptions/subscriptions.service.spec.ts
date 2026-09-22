@@ -13,6 +13,7 @@ jest.mock("@saroh/database", () => {
             findUnique: jest.fn(),
         },
         invoice: { findFirst: jest.fn() },
+        organizationModule: { findFirst: jest.fn() },
     };
     return {
         ...actual,
@@ -125,6 +126,7 @@ beforeEach(() => {
     tx.customerSubscription!.findFirst!.mockResolvedValue(sub());
     tx.customerSubscription!.findUnique!.mockResolvedValue(sub());
     tx.invoice!.findFirst!.mockResolvedValue(null);
+    tx.organizationModule!.findFirst!.mockResolvedValue(null);
 });
 
 afterEach(() => jest.useRealTimers());
@@ -178,6 +180,17 @@ describe("subscribing", () => {
         expect(data.timezone).toBe("Asia/Kolkata");
         // 22 Sep 00:00 in Kolkata.
         expect(data.anchorAt).toEqual(at("2026-09-21T18:30:00Z"));
+    });
+
+    it("is refused while Payments is off: a subscription is its invoices", async () => {
+        tx.organizationModule!.findFirst!.mockResolvedValue({ id: "m_1" });
+        const attempt = service.subscribe(owner, {
+            planId: "plan_1",
+            contactId: "c_1",
+        });
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toThrow("Payments is switched off");
+        expect(tx.customerSubscription!.create).not.toHaveBeenCalled();
     });
 
     it("refuses an archived plan", async () => {
@@ -276,6 +289,49 @@ describe("pause and resume", () => {
         expect(issueInTx.mock.calls[0]![2].periodStart).toEqual(
             at("2026-10-20T00:00:00Z"),
         );
+    });
+
+    it("ends one set to end with its period, rather than billing another", async () => {
+        jest.setSystemTime(at("2026-10-20T15:00:00Z"));
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-05T09:00:00Z"),
+                cancelAtPeriodEnd: true,
+            }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(tx.customerSubscription!.update).toHaveBeenCalledWith({
+            where: { id: "sub_1" },
+            data: {
+                status: "CANCELLED",
+                pausedAt: null,
+                cancelledAt: at("2026-10-01T00:00:00Z"),
+                cancelAtPeriodEnd: false,
+            },
+        });
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("refuses a restart that would bill while Payments is off", async () => {
+        jest.setSystemTime(at("2026-10-20T15:00:00Z"));
+        tx.organizationModule!.findFirst!.mockResolvedValue({ id: "m_1" });
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ status: "PAUSED", pausedAt: at("2026-09-05T09:00:00Z") }),
+        );
+        await expect(service.resume(owner, "sub_1")).rejects.toThrow(
+            "Payments is switched off",
+        );
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("still resumes inside a paid period while Payments is off", async () => {
+        jest.setSystemTime(at("2026-09-10T09:00:00Z"));
+        tx.organizationModule!.findFirst!.mockResolvedValue({ id: "m_1" });
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ status: "PAUSED", pausedAt: at("2026-09-05T09:00:00Z") }),
+        );
+        await expect(service.resume(owner, "sub_1")).resolves.toBeDefined();
     });
 
     it("takes the row lock before reading, scoped to the business", async () => {
@@ -381,9 +437,26 @@ describe("renewal", () => {
             where: { id: "sub_1" },
             data: {
                 status: "CANCELLED",
+                pausedAt: null,
                 cancelledAt: at("2026-10-01T00:00:00Z"),
                 cancelAtPeriodEnd: false,
             },
+        });
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("ends a paused one that was set to end, without an invoice", async () => {
+        tx.customerSubscription!.findUnique!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-10T00:00:00Z"),
+                cancelAtPeriodEnd: true,
+            }),
+        );
+        await expect(service.renewOne("sub_1", now)).resolves.toBe("ended");
+        expect(tx.customerSubscription!.update).toHaveBeenCalledWith({
+            where: { id: "sub_1" },
+            data: expect.objectContaining({ status: "CANCELLED" }),
         });
         expect(issueInTx).not.toHaveBeenCalled();
     });

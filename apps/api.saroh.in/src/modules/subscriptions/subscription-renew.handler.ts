@@ -23,12 +23,16 @@ export const RENEW_BATCH = 200;
  * racing a run, two instances starting — collapses into the one that is
  * already waiting, and the chain never forks.
  *
- * The handler never throws. A subscription that fails to renew is logged and
- * tried again on the next run; if the handler threw, the worker would retry
- * and then dead-letter the job, and the chain would stop.
+ * A subscription that fails to renew is logged and tried again on the next
+ * run — that never makes the handler throw, since retrying and then
+ * dead-lettering the run would stop the chain. The one thing it throws for is
+ * failing to enqueue the next run: then this run is retried with backoff, as
+ * the pending one, which keeps the chain alive through a database blip.
+ * `ensureScheduled`, on a timer, starts it again if even that runs out.
  *
- * Businesses with Payments switched off are skipped until it is back on:
- * disabling a module stops new activity (ADR-003).
+ * Businesses with Payments switched off are skipped until it is back on —
+ * disabling a module stops new activity (ADR-003) — except that a
+ * subscription set to end still ends, paused or not.
  */
 @Injectable()
 export class SubscriptionRenewHandler {
@@ -45,18 +49,35 @@ export class SubscriptionRenewHandler {
                 `Renewal run failed before it finished: ${String(error)}`,
             );
         }
-        await this.schedule(new Date(Date.now() + (full ? 0 : RENEW_EVERY_MS)));
+        const next = new Date(Date.now() + (full ? 0 : RENEW_EVERY_MS));
+        if (!(await this.schedule(next))) {
+            throw new Error(
+                "Could not schedule the next subscription renewal run; retrying this one",
+            );
+        }
     };
 
     /** Renew what is due now. True when the batch was full and more may wait. */
     async renewDue(now: Date): Promise<boolean> {
         const due = await prisma.customerSubscription.findMany({
             where: {
-                status: "ACTIVE",
                 currentPeriodEnd: { lte: now },
-                organization: {
-                    organizationModules: { none: PAYMENTS_SWITCHED_OFF },
-                },
+                OR: [
+                    {
+                        status: "ACTIVE",
+                        organization: {
+                            organizationModules: {
+                                none: PAYMENTS_SWITCHED_OFF,
+                            },
+                        },
+                    },
+                    // Ending bills nothing, so it goes ahead with Payments
+                    // off, and for a paused one set to end.
+                    {
+                        status: { in: ["ACTIVE", "PAUSED"] },
+                        cancelAtPeriodEnd: true,
+                    },
+                ],
             },
             orderBy: { currentPeriodEnd: "asc" },
             take: RENEW_BATCH,
@@ -90,8 +111,9 @@ export class SubscriptionRenewHandler {
      * Enqueue the next run unless one is already waiting. Written as a create
      * that expects to lose: the partial unique index refuses a second PENDING
      * row, and that refusal (P2002) is the "already scheduled" answer.
+     * Never throws; false when no run could be left waiting.
      */
-    async schedule(runAt: Date): Promise<void> {
+    async schedule(runAt: Date): Promise<boolean> {
         try {
             await prisma.job.create({
                 data: {
@@ -100,15 +122,42 @@ export class SubscriptionRenewHandler {
                     runAt,
                 },
             });
+            return true;
         } catch (error) {
             if (
                 error instanceof Prisma.PrismaClientKnownRequestError &&
                 error.code === "P2002"
             ) {
-                return;
+                return true;
             }
             this.logger.error(
                 `Could not schedule the next subscription renewal run: ${String(error)}`,
+            );
+            return false;
+        }
+    }
+
+    /**
+     * The safety net: when no run is waiting or in progress — the chain was
+     * dead-lettered, or never started because the database was down at boot —
+     * enqueue one now. Never throws.
+     */
+    async ensureScheduled(): Promise<void> {
+        try {
+            const live = await prisma.job.count({
+                where: {
+                    type: SUBSCRIPTION_RENEW_TYPE,
+                    status: { in: ["PENDING", "PROCESSING"] },
+                },
+            });
+            if (live > 0) return;
+            this.logger.warn(
+                "No subscription renewal run was waiting; starting the chain again",
+            );
+            await this.schedule(new Date());
+        } catch (error) {
+            this.logger.error(
+                `Could not check the subscription renewal chain: ${String(error)}`,
             );
         }
     }

@@ -37,6 +37,7 @@ export const INVOICE_SELECT = {
     packPurchaseId: true,
     reissuedFromId: true,
     reissues: { select: { id: true }, take: 1 },
+    createdByUserId: true,
     createdAt: true,
     updatedAt: true,
 } as const;
@@ -105,6 +106,7 @@ export interface InvoiceRow {
     packPurchaseId: string | null;
     reissuedFromId: string | null;
     reissues: { id: string }[];
+    createdByUserId: string | null;
     createdAt: Date;
     updatedAt: Date;
     lines?: {
@@ -158,6 +160,8 @@ export interface InvoiceViewModel {
     reissuedFromId: string | null;
     /** The draft that replaced this one, when it was voided and reissued. */
     reissuedAsId: string | null;
+    /** Issued by Saroh, not a person: a subscription renewal. */
+    issuedAutomatically: boolean;
     createdAt: string;
     updatedAt: string;
     /** What it is for, from its first line; on lists and details alike. */
@@ -228,6 +232,8 @@ export function serializeInvoice(
         packPurchaseId: row.packPurchaseId,
         reissuedFromId: row.reissuedFromId,
         reissuedAsId: row.reissues[0]?.id ?? null,
+        issuedAutomatically:
+            row.status !== "DRAFT" && row.createdByUserId === null,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
         summary: first

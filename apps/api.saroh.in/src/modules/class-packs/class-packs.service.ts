@@ -5,7 +5,7 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { Prisma as PrismaNamespace, prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -391,16 +391,57 @@ export class ClassPacksService {
         }
         const { contactId } = booking;
 
-        const { purchaseId } = await prisma.$transaction((tx) =>
-            redeemPackInTx(tx, {
-                organizationId: ctx.organizationId,
-                bookingId: booking.id,
-                contactId,
-                serviceId: booking.serviceId,
-                startAt: booking.startAt,
-                purchaseId: dto.packPurchaseId,
-            }),
-        );
+        // Serializable, like booking with a pack: two spends of the same
+        // pack's last class — one here, one from booking — must not both
+        // commit, and Postgres only catches that between serializable
+        // transactions. The booking is locked too, so a cancel racing this
+        // cannot leave a class spent on a cancelled booking. A lost race is
+        // tried once more, so the answer says what is true now — usually
+        // that the class has gone.
+        const spend = () =>
+            prisma.$transaction(
+                async (tx) => {
+                    const [locked] = await tx.$queryRaw<
+                        ({ status: string } | undefined)[]
+                    >`SELECT status FROM "Booking" WHERE id = ${booking.id} FOR UPDATE`;
+                    if (locked?.status !== "CONFIRMED") {
+                        throw new ConflictException(
+                            "Only a confirmed booking can be paid with a class pack.",
+                        );
+                    }
+                    return redeemPackInTx(tx, {
+                        organizationId: ctx.organizationId,
+                        bookingId: booking.id,
+                        contactId,
+                        serviceId: booking.serviceId,
+                        startAt: booking.startAt,
+                        purchaseId: dto.packPurchaseId,
+                    });
+                },
+                {
+                    isolationLevel:
+                        PrismaNamespace.TransactionIsolationLevel.Serializable,
+                },
+            );
+        const code = (err: unknown) => (err as { code?: string }).code;
+        let purchaseId: string;
+        try {
+            try {
+                ({ purchaseId } = await spend());
+            } catch (err) {
+                if (code(err) !== "P2034") throw err;
+                ({ purchaseId } = await spend());
+            }
+        } catch (err) {
+            // P2034 twice over, or P2002: another pack went on this booking
+            // at the same moment.
+            if (code(err) === "P2034" || code(err) === "P2002") {
+                throw new ConflictException(
+                    "That changed while you were paying. Refresh and try again.",
+                );
+            }
+            throw err;
+        }
         return {
             bookingId: booking.id,
             purchase: await this.readPurchase(ctx.organizationId, purchaseId),

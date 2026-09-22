@@ -57,6 +57,8 @@ export interface Invoice {
     packPurchaseId: string | null;
     reissuedFromId: string | null;
     reissuedAsId: string | null;
+    /** Issued by Saroh, not a person: a subscription renewal. */
+    issuedAutomatically: boolean;
     createdAt: string;
     updatedAt: string;
     /** Its first line and how many there are: what it is for, in a list. */

@@ -1,4 +1,4 @@
-import type { OnModuleInit } from "@nestjs/common";
+import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -18,10 +18,14 @@ import {
 } from "./subscriptions.controller";
 import { SubscriptionsService } from "./subscriptions.service";
 
+/** How often the renewal chain is checked for a stop. */
+const CHAIN_CHECK_MS = 15 * 60 * 1000;
+
 /**
  * Plans, the people on them, and the job that invoices each period
  * (ADR-007). On start-up it registers the renewal handler and makes sure a
- * run is waiting — the job reschedules itself from then on.
+ * run is waiting — the job reschedules itself from then on, and a timer
+ * restarts the chain if it ever stops.
  */
 @Module({
     imports: [
@@ -38,7 +42,9 @@ import { SubscriptionsService } from "./subscriptions.service";
     ],
     exports: [SubscriptionsService],
 })
-export class SubscriptionsModule implements OnModuleInit {
+export class SubscriptionsModule implements OnModuleInit, OnModuleDestroy {
+    private chainCheck?: ReturnType<typeof setInterval>;
+
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly renew: SubscriptionRenewHandler,
@@ -51,5 +57,13 @@ export class SubscriptionsModule implements OnModuleInit {
         // Never throws: a database that is not up yet must not stop the API
         // booting. The next start, or the next run, schedules it.
         await this.renew.schedule(new Date());
+        this.chainCheck = setInterval(() => {
+            void this.renew.ensureScheduled();
+        }, CHAIN_CHECK_MS);
+        this.chainCheck.unref();
+    }
+
+    onModuleDestroy(): void {
+        clearInterval(this.chainCheck);
     }
 }

@@ -374,6 +374,15 @@ function StatusNote({ invoice }: { invoice: Invoice }) {
         text = invoice.payment?.note
             ? `Recorded by hand: ${invoice.payment.note}`
             : "Recorded by hand. Nothing was charged through Saroh.";
+    } else if (invoice.issuedAutomatically) {
+        text = (
+            <>
+                Issued automatically · not sent. Saroh made this at the
+                subscription&apos;s renewal and doesn&apos;t send it. Print it
+                and hand it over. Payment taken at the counter goes on with{" "}
+                <strong className="text-foreground">Record a payment</strong>.
+            </>
+        );
     } else {
         text = (
             <>
