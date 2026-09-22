@@ -10,7 +10,7 @@ import { useState } from "react";
 import { OptionSelect } from "@/components/shared/option-select";
 import { sendMessage } from "@/lib/messages/actions";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
-import { MESSAGE_CHANNELS } from "@/lib/messages/constants";
+import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
 
 /**
  * Compose + send a message to a lead's contact (S6-002). Picks a channel
@@ -84,7 +84,7 @@ export function MessageComposer({
                     onValueChange={setChannel}
                     options={MESSAGE_CHANNELS.map((c) => ({
                         value: c,
-                        label: c,
+                        label: CHANNEL_LABEL[c],
                     }))}
                     className="w-40"
                 />

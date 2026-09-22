@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
+import { LEAD_STATUS } from "@/lib/crm/format";
 import { updateLead } from "@/lib/leads/actions";
 import type { LeadStatus } from "@/lib/leads/service";
 
@@ -46,7 +47,10 @@ export function LeadStatusControl({
                 value={status}
                 disabled={busy}
                 onValueChange={(v) => void onChange(v)}
-                options={STATUSES.map((s) => ({ value: s, label: s }))}
+                options={STATUSES.map((s) => ({
+                    value: s,
+                    label: LEAD_STATUS[s].label,
+                }))}
                 className="w-40"
             />
         </div>
