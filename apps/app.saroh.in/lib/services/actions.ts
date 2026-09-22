@@ -2,6 +2,7 @@
 
 import type {
     AvailabilityRuleInput,
+    BookByHandInput,
     BookingOutcome,
     CreateServiceInput,
     Service,
@@ -10,6 +11,7 @@ import type {
 } from "./service";
 import {
     archiveService as archiveServiceApi,
+    bookByHand as bookByHandApi,
     cancelBooking as cancelBookingApi,
     createService as createServiceApi,
     listAvailability as listAvailabilityApi,
@@ -28,6 +30,10 @@ import {
  * control, the site editor's service picker) call these — never the api or the
  * DB directly.
  */
+
+export async function bookByHand(serviceId: string, input: BookByHandInput) {
+    return bookByHandApi(serviceId, input);
+}
 
 export async function createService(input: CreateServiceInput) {
     return createServiceApi(input);

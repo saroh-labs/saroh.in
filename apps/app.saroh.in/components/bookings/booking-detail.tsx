@@ -41,12 +41,19 @@ export function BookingDetailView({
     // `find`, not `moved[0]`: indexing is typed as always-present here, and
     // this must actually be optional — most bookings have never been moved.
     const firstMove = booking.events.find((e) => e.type === "RESCHEDULED");
+    // Someone on the team made it by hand (#384): it is FOR the booker, and
+    // BY them. A booker who used the booking page made it themselves.
+    const madeBy = booking.events.find((e) => e.type === "BOOKED")?.actor?.name;
 
     return (
         <main className="mx-auto w-full max-w-4xl p-6 sm:p-8">
             <PageHeader
                 title={service.name}
-                description={`Booked by ${bookerLabel(booking)}.`}
+                description={
+                    madeBy
+                        ? `Booked for ${bookerLabel(booking)} by ${madeBy}.`
+                        : `Booked by ${bookerLabel(booking)}.`
+                }
                 actions={
                     <div className="flex flex-wrap items-center gap-2">
                         <Button asChild variant="ghost" size="sm">

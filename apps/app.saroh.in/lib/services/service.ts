@@ -400,6 +400,27 @@ export function recordBookingOutcome(
 }
 
 /** Move a booking to another slot (#121). */
+/** Who a booking made by hand is for: a contact, or someone new. */
+export type BookByHandInput = { startAt: string; idempotencyKey?: string } & (
+    { contactId: string } | { bookerEmail: string; bookerName?: string }
+);
+
+/**
+ * Book someone in by hand (#384): the same open-slot and capacity rules as
+ * the booking page, with the history naming who made it.
+ */
+export function bookByHand(
+    serviceId: string,
+    input: BookByHandInput,
+): Promise<CrmResult<Booking>> {
+    return send<Booking>(
+        `/${serviceId}/bookings`,
+        "POST",
+        input,
+        "Could not make the booking",
+    );
+}
+
 export function rescheduleBooking(
     bookingId: string,
     startAt: string,
