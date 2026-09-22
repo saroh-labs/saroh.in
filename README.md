@@ -26,19 +26,75 @@ product against the showcase seed, so every screen is real.
 
 ## What it does
 
-A business turns on the parts it needs. Each part is a module that can be
-switched on or off.
+A business turns on the parts it needs; each is a module it can switch on or
+off. One login can hold several businesses, and the workspace changes shape
+with the one you are in.
 
-| Area                 | What a business does there                                                                                                                                |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Website**          | Pages, posts, publishing, custom domains and draft previews. The site carries the business's brand, never Saroh's                                         |
-| **Schedule**         | Services, availability, bookings, rescheduling and outcomes. Classes can run in person or online, and class packs are sold ahead and spent as people book |
-| **Courses**          | A course is a fixed set of sessions. Enrolling someone books every session and sends one invoice                                                          |
-| **Sell**             | Catalogue, storefront, orders, customers, discounts and CSV import                                                                                        |
-| **Contacts & leads** | Everyone the business knows, plus leads, a pipeline and follow-ups                                                                                        |
-| **Billing**          | Plans, subscriptions that renew on their own, and invoices, paid by hand or through a pay link on the business's own payment provider                     |
-| **Insights**         | Site views, enquiries and sales over the last 7, 30 or 90 days                                                                                            |
-| **Team**             | Owners, admins, members and reviewers. Each role sees only what it may use                                                                                |
+### Website
+
+Pages built from blocks — hero, services, booking, enquiry form, gallery, FAQ,
+testimonials, rich text — plus posts, and publishing when it is ready. A site
+can take a custom domain and verify it, and a draft can be shared as a private
+preview link. Someone can be invited purely to review a site: they comment and
+approve, and see nothing else of the business. Merchant sites carry the
+business's own brand, never Saroh's.
+
+### Schedule
+
+Services carry their price, length, capacity and the hours they are open.
+People book from the business's own site; a class can be in person or online
+with a meeting link sent to whoever books. Bookings can be moved, cancelled, or
+marked with how they went, and the business is told when one arrives.
+
+### Courses and class packs
+
+A course is a fixed set of sessions sold as one thing: enrolling someone books
+them into every session still to come and invoices them once. Adding a session
+later books everyone already on it, and an open course holds its unsold seats
+so a walk-in cannot take them.
+
+A class pack is classes bought ahead — ten classes to use within ninety days,
+say. Selling one issues its invoice; booking spends a class; cancelling gives
+it back; the balance is counted, never stored.
+
+### Sell
+
+A catalogue with variants, SKUs and categories, and stock that knows what is
+already promised to an order and warns before it runs low. Products and
+customers can be brought in by CSV. Orders move forward only, one confirmed
+step at a time, and can be printed. Payment is recorded by hand or taken
+online through the business's own provider. Discount codes take a percentage
+or an amount off, across the shop or limited to one storefront, collection or
+product. After delivery a customer can be invited to review what they bought.
+
+### Billing
+
+Plans and the memberships on them: subscriptions renew on their own, can be
+paused, resumed, ended at the period's end or cancelled, and each renewal
+writes its invoice. Invoices run from INV-0001 with no gaps, carry tax and due
+dates, and are paid by hand or through a pay link on the business's own
+provider. Overdue is worked out, never stored, and the money a person owes
+shows on their contact page.
+
+### Contacts and leads
+
+Everyone the business knows, and where they came from. Leads carry their value
+and stage, with a pipeline board to move them along and follow-up tasks so
+nothing waits on an enquiry nobody opened. A contact's page gathers their
+leads, membership, packs, courses and invoices in one place.
+
+### Team and access
+
+Owner, admin, member and reviewer, and a business can invent its own role and
+tick exactly what it reaches. People are invited by email to one business only.
+A role that cannot reach a page is refused it by address, not merely shown a
+shorter menu.
+
+### Insights and the rest
+
+Site visits, enquiries and sales over the last 7, 30 or 90 days. Home says what
+needs doing today across everything at once. Alongside: notifications, payment
+and messaging providers, and the modules themselves.
 
 Messaging (with each contact's consent, over the business's own providers) and
 automations exist in the API but have no workspace screens yet. Platform staff
@@ -56,8 +112,8 @@ pnpm --filter @saroh/database db:seed:showcase && pnpm dev:app
 
 Open https://app.saroh.localhost and sign in as `demo@saroh.dev` /
 `demo-password-123`. The showcase gives that login a gym, a yoga studio, a
-clinic and a shop to look around. Every step is explained in
-[setup-instructions.md](setup-instructions.md).
+clinic and a shop to look around — the same businesses as the film above. Every
+step is explained in [setup-instructions.md](setup-instructions.md).
 
 ## How it is built
 
