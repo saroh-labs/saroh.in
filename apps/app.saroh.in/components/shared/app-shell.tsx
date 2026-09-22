@@ -73,10 +73,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         // working rail, and this renders on every page.
         getHome().catch(() => null),
         /*
-         * The merchant's own sites, hung under Website in the rail.
+         * The merchant's own sites, for the command palette's jump to one.
          *
-         * Non-fatal like the counts: a rail without the tree is still a working
-         * rail, and this renders on every screen in the app. It joins the same
+         * Non-fatal like the counts: a palette without them still works, and
+         * this renders on every screen in the app. It joins the same
          * Promise.all rather than being awaited after, so it costs the slowest
          * of four round trips instead of adding a fifth in series.
          */
@@ -99,8 +99,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
     /*
      * Only what the nav needs crosses the boundary. `SiteSummary` carries a
-     * publication pointer, a style blob and timestamps; the rail wants a name
-     * and an id, and shipping the rest to three client components on every page
+     * publication pointer, a style blob and timestamps; the palette wants a name
+     * and an id, and shipping the rest to a client component on every page
      * would be paying for it in the payload on every navigation.
      */
     const navSites = sites.map((site) => ({ id: site.id, name: site.name }));
@@ -141,7 +141,6 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 unread={unread}
                 moduleKeys={moduleKeys}
                 counts={counts}
-                sites={navSites}
             />
             <div className="flex min-h-0 flex-1">
                 <AppSidebar
@@ -150,7 +149,6 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     role={activeOrg?.role ?? null}
                     actions={activeOrg?.actions ?? null}
                     counts={counts}
-                    sites={navSites}
                 />
                 {/* The working area is white and the rail sits on Paper: the
                 product spends white surfaces, and the page you work on is

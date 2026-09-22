@@ -28,7 +28,7 @@ export default function Error({
             title="Couldn't open the editor"
             description="Your published site is unaffected — this is the editor failing to load."
             backHref="/sites"
-            backLabel="Back to your sites"
+            backLabel="Back to Website"
         />
     );
 }

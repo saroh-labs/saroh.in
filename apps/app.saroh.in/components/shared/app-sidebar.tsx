@@ -62,7 +62,6 @@ export function AppSidebar({
     role = null,
     actions = null,
     counts,
-    sites = [],
 }: {
     unread?: number;
     /** `null` = availability unknown; see `filterNavGroups`. */
@@ -76,11 +75,9 @@ export function AppSidebar({
     actions?: readonly string[] | null;
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
-    /** The merchant's own sites, hung under Website. */
-    sites?: { id: string; name: string }[];
 }) {
     const pathname = usePathname();
-    const groups = navFor({ role, actions, moduleKeys, sites });
+    const groups = navFor({ role, actions, moduleKeys });
     const iconRail = useIconRail();
     const [flyoutFor, setFlyoutFor] = useState<string | null>(null);
 

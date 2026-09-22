@@ -36,7 +36,7 @@ export default async function NewSitePage() {
                 title="Only owners and admins can create a site"
                 description="You can open and read the websites you have been given access to. An owner or admin can create a new one."
                 backHref="/sites"
-                backLabel="Back to your sites"
+                backLabel="Back to Website"
             />
         );
     }

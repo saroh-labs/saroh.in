@@ -1180,7 +1180,7 @@ export function SiteEditor({
                     className="flex min-w-0 items-center gap-2 text-sm"
                 >
                     <Link
-                        href="/sites"
+                        href={`/sites/${siteId}/pages`}
                         title={address ?? undefined}
                         className="flex min-w-0 shrink items-center gap-1 rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
