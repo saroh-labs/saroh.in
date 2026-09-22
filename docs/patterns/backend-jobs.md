@@ -42,6 +42,17 @@
   enquiry enqueues `enquiry.notify` and `automation.run` separately.
 - **Adopted** — **Never enqueue a job the handler will no-op on.** Gap:
   `booking.notify`.
+- **Current** — **Recurring work is a self-rescheduling job** — there is no
+  scheduler (`subscription.renew`, ADR-007). Each run ends by enqueueing the
+  next; a partial unique index allows one PENDING run of the type, and
+  `schedule()` inserts expecting to lose — P2002 means "already scheduled".
+  The handler logs and continues past a failing item (it must not dead-letter
+  the chain), but throws when it cannot enqueue the next run so the worker
+  retries it. A timer (`ensureScheduled`) restarts a chain found with nothing
+  PENDING or PROCESSING, and boot does the same. A run works through batches
+  and never re-fetches an id it has tried, so a batch that always fails cannot
+  starve the rest. Compare `runAt` in UTC: the columns are
+  timestamp-without-timezone (`DEV_LEARNINGS.md`).
 - **Current** — **Payloads carry ids, not data;** the handler re-reads current
   state and handles "it was deleted" (`enquiry-notify.handler.ts`).
 - **Adopted** — **Advisory locks have a registry.** None are in use; add the
