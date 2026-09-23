@@ -10,7 +10,8 @@ import * as api from "./service";
 /** Thin: the API decides who may, and what a subscription may become. */
 
 function refresh() {
-    revalidatePath("/billing/subscriptions");
+    // "layout", so each subscription's own page is refreshed with the list.
+    revalidatePath("/billing/subscriptions", "layout");
     revalidatePath("/billing/plans");
     revalidatePath("/billing/invoices");
 }
@@ -62,6 +63,19 @@ export async function cancelSubscription(
     }
     refresh();
     return res;
+}
+
+export async function skipCollection(id: string, date: string) {
+    return then(api.skipCollection(id, date));
+}
+export async function unskipCollection(id: string, date: string) {
+    return then(api.unskipCollection(id, date));
+}
+export async function changePlan(id: string, planId: string) {
+    return then(api.changePlan(id, planId));
+}
+export async function cancelPlanChange(id: string) {
+    return then(api.cancelPlanChange(id));
 }
 
 export async function createPlan(input: PlanInput) {
