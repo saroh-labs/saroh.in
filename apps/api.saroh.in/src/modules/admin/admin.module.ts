@@ -5,13 +5,20 @@ import { PlatformPermissionGuard } from "../../common/guards/platform-permission
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { BillingModule } from "../billing/billing.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
+import { DomainsModule } from "../domains/domains.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
+import { HealthModule } from "../health/health.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { WebhooksModule } from "../webhooks/webhooks.module";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminFlagsService } from "./admin-flags.service";
+import { AdminHealthService } from "./admin-health.service";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
+import { AdminMachineryController } from "./admin-machinery.controller";
+import { AdminMachineryService } from "./admin-machinery.service";
 import { AdminMetricsService } from "./admin-metrics.service";
+import { AdminOperationsService } from "./admin-operations.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsController } from "./admin-organizations.controller";
 import { AdminOrganizationsService } from "./admin-organizations.service";
@@ -33,12 +40,16 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         BillingModule,
         CapabilitiesModule,
         OrganizationsModule,
+        DomainsModule,
+        HealthModule,
+        WebhooksModule,
     ],
     controllers: [
         AdminController,
         AdminOrganizationsController,
         AdminStaffController,
         AdminPeopleController,
+        AdminMachineryController,
     ],
     providers: [
         IdempotencyService,
@@ -51,6 +62,9 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminLifecycleService,
         AdminStaffService,
         AdminPeopleService,
+        AdminMachineryService,
+        AdminOperationsService,
+        AdminHealthService,
         PlatformAdminGuard,
         PlatformPermissionGuard,
         OrganizationAccessSessionGuard,

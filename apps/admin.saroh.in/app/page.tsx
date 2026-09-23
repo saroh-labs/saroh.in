@@ -11,12 +11,15 @@ import { StatCard } from "@saroh/ui/stat-card";
 
 import { AdminShell } from "@/components/admin-shell";
 import { NotAuthorized } from "@/components/not-authorized";
+import { HealthBoard } from "@/components/operations/health-board";
 import { getMetrics, getStaffIdentity } from "@/lib/control-plane";
+import { formatDateTime } from "@/lib/format";
+import { getHealth } from "@/lib/machinery";
 import { requireSession } from "@/lib/session";
 
 /**
- * Overview — how the instance is doing, in aggregate. The health board takes
- * the console's front door when it lands (plan U9).
+ * The console's front door: the health board (plan U9), then how the
+ * instance is doing in aggregate.
  *
  * Aggregates only, by design: the API's metrics endpoint returns counts and
  * group-bys, never a tenant's records. Per-tenant inspection stays a separate,
@@ -36,17 +39,34 @@ export default async function DashboardPage() {
     const staff = await getStaffIdentity();
     if (!staff) return <NotAuthorized email={session.user.email} />;
 
-    const metrics = await getMetrics();
+    const [metrics, health] = await Promise.all([
+        getMetrics(),
+        getHealth().catch(() => null),
+    ]);
     if (!metrics) return <NotAuthorized email={session.user.email} />;
 
     return (
         <AdminShell staff={staff}>
             <PageContainer width="wide">
                 <PageHeader
-                    breadcrumb={["Instance", "Overview"]}
-                    title="Overview"
-                    description="Totals across every business on this instance. No business's own records are shown here."
+                    breadcrumb={["Instance", "Health"]}
+                    title="Health"
+                    description={
+                        health
+                            ? `Checked ${formatDateTime(health.checkedAt)}. Each check keeps its place whether it is working or not.`
+                            : "Whether the machinery behind this instance is working."
+                    }
                 />
+
+                <HealthBoard board={health} />
+
+                <h2 className="pt-2 font-display text-[20px] font-semibold tracking-[-0.02em]">
+                    This instance
+                </h2>
+                <p className="-mt-4 text-[13.5px] text-muted-foreground">
+                    Totals across every business. No business&rsquo;s own
+                    records are shown here.
+                </p>
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard

@@ -308,3 +308,63 @@ export class ChangeMemberRoleDto extends OperatorReasonDto {
     @MaxLength(80)
     role!: string;
 }
+
+/** The targets of a dry run. */
+export class OperationTargetsDto {
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(500)
+    @IsString({ each: true })
+    ids!: string[];
+}
+
+/** The targets of a bulk operation, with its reason and idempotency key. */
+export class StartOperationDto extends OperatorReasonDto {
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(500)
+    @IsString({ each: true })
+    ids!: string[];
+}
+
+export class ListJobsDto {
+    @IsOptional()
+    @IsIn(["PENDING", "PROCESSING", "DONE", "FAILED"])
+    status?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    type?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    organizationId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+}
+
+export class ListWebhooksDto {
+    @IsOptional()
+    @IsIn(["RECEIVED", "PROCESSED", "FAILED", "IGNORED"])
+    status?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(60)
+    provider?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    organizationId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+}
