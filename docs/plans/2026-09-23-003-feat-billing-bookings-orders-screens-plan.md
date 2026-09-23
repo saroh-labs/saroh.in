@@ -500,6 +500,8 @@ flowchart TB
 **Verification:**
 - Screens rendered on the seed match the designs' sample numbers closely enough to film; Rye's invoices match the design's paper line by line.
 
+> **Pulse half done — #494** (merged). `seed/showcase/pulse.ts`: 4 staff (Karan Mehta linked to the demo owner), 32 weekly-hours rows, time off, extra hours, booking rules; plans and packs to the design (Standard ₹2,500 / 8 classes, Off-peak ₹1,600 / 4, Yearly ₹25,000 / 8; packs 5 / ₹2,200 / 60 days, 10 / ₹4,000 / 90 days, First 3 ₹999 archived); one-to-one bookings by person with 4 Unassigned this week; class places paid by membership / pack / online / desk; 7 late cancels, 44 no-shows; 11 failed renewals, 9 paused, 1 plan change; packs expiring and expired; 4 contact notes. `check.ts` gains paid-with, allowance, late-cancel and staff-clash checks. Reseeded into saroh-dev (after `db:seed:reset`, with the user's OK). Rye & Co. half follows U5.
+
 ---
 
 ### U10. Invoices list
