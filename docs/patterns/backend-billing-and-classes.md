@@ -8,7 +8,8 @@
 ## Invoices — **Current**
 
 - **States:** DRAFT → ISSUED → PAID or VOID, and a void one can be reissued
-  (a GST-registered business credits instead of voiding — below).
+  (a GST-registered business credits instead of voiding — below — and an
+  issued invoice credited in full reads CREDITED).
   Overdue is derived — `isPastDue` in `modules/invoices/invoice-state.ts` is the
   one rule, used by the invoice's standing, the owed sums and subscriptions.
   Never store it.
@@ -25,7 +26,7 @@
   `invoice:read`; a subscription or pack view without it still says what is
   owed, not which invoices.
 
-## Invoices for orders, corrections and GST — **Adopted** (ADR-008, DEC-023)
+## Invoices for orders, corrections and GST — **Current** (ADR-008, DEC-023)
 
 - **One invoice per order**, and per paid online booking — idempotent on the
   order (or booking) id, created inside the payment reconciliation or by the
@@ -50,6 +51,20 @@
   notes on their own series; the full number ≤ 16 characters; never renumber
   an existing invoice.
 - **Tax settings are Owner/Admin only.**
+- **Where it lives:** the maths is pure — `invoices/gst.ts` (split, spread,
+  place of supply), `invoices/gst-states.ts` (state codes, GSTIN checks),
+  `invoices/numbering.ts` (`seriesFor`), `invoices/order-invoice.ts` (what an
+  order's invoice, a credit note and an edit's correction say). Writes go
+  through `invoices/order-invoicing.ts` on the caller's transaction:
+  `ensureOrderInvoice` (order row lock, then the partial unique index
+  `Invoice_one_per_order`), `creditNoteForRefund` (unique on
+  `paymentRefundId`, so the refund path and the refund webhook make one),
+  `correctOrderInvoiceForEdit`, `creditRestOfOrder`. Never write an order's
+  `Invoice` rows anywhere else.
+- **Every owed or spent sum over invoices spreads `OWED_WHERE`**
+  (`invoice-state.ts`): no order paper, no credit notes.
+- **A registered business's `Order.tax` is informational** — the GST inside
+  the total, never added to it (`gstInsideOrder`).
 
 ## Paying an invoice from a link — **Current**
 
