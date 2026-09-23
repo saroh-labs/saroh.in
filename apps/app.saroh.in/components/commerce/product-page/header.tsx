@@ -60,7 +60,9 @@ export function ProductHeader({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <nav
                     aria-label="Breadcrumb"
-                    className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-[12px] text-muted-foreground"
+                    // A basis, so on a phone the crumbs take their own row rather
+                    // than squeezing under the note beside them.
+                    className="flex min-w-0 flex-[1_1_240px] flex-wrap items-center gap-2 text-[12px] text-muted-foreground"
                 >
                     {crumbs.map((crumb, i) => (
                         <span key={i} className="flex items-center gap-2">
@@ -80,7 +82,7 @@ export function ProductHeader({
                 </nav>
                 <span
                     id="shop-link-why"
-                    className="max-w-[300px] text-[12px] text-muted-foreground"
+                    className="min-w-0 max-w-[300px] text-pretty text-[12px] text-muted-foreground"
                 >
                     {live
                         ? "The shop's product page arrives with the website."

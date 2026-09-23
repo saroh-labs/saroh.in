@@ -704,6 +704,15 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
     - The before-you-finish commands in `AGENTS.md` all pass.
     - Screenshots of each state are attached to the epic.
 
+> **Done — #472.** `e2e/tests/product-editor.spec.ts` walks the film on Leela & Loom — create, three Volume variants, stock for each, three photos by address (no storage on a test stack), publish, the product page — on desk and phone, deleting what it made before and after; it and four-scenes pass (21). The spec found that every product and settings refusal read "Something went wrong": the API's error filter dropped the `field` services throw beside `message`, and the app read `message` from the wrong level. The filter now carries it as `details.field` and both readers use `toFailure`. Variants now flag a price above the MRP before Save, and a refused save names the refusal rather than blaming the connection. The film script leaves MRP empty for that reason (it is gitignored, so local). DEC-022 and `frontend-forms.md` are written. Browser pass: no screen of the fourteen scrolls sideways at 320, 390 or 1440; dark mode checked on the editor, product page and settings at 390, which found and fixed two phone squeezes (the description's footer note, the product page's breadcrumb). Before-you-finish commands all green, `test:int` 120 suites. **Not done:** the Reviewer and Member walks (Leela & Loom has no seeded reviewer or member) and a broken-API "failed" pass; screenshots are not attached to the epic.
+
+## What shipped
+
+- **Screens:** the product page (overview, variants and stock, photos, orders, reviews, discounts; team and customer views; four quick sheets; archived banner), product settings (categories, options, custom fields, allergens, SKUs, defaults) and editor v2 (eight sections, each saving on its own, Save all, jump nav, leave guard).
+- **API:** per-variant stock and promised counts, option values on variants, the photo set with variant photos, SKU patterns, custom fields, allergens, `archivedAt`, section PATCH with merged shop switches; refusals carry their field.
+- **Data:** migrations `20260924100000_catalogue_extras`, `20260924110000_allergen_fk`, `20260924120000_product_archived_at` (plus the earlier units'); the Leela & Loom showcase store.
+- **Deferred:** the 30-day purge of deleted custom fields; other app services (customers, members, stores, content, imports, organizations) still read `message` at the top level and show "Something went wrong" for a refusal — the same one-line move to `toFailure`.
+
 ## Risks
 
 - **Changing order stock moves (U3) touches money-adjacent code.** Mitigation: specs first for each transition, including legacy null-variant lines, and the existing order-state suites kept green.

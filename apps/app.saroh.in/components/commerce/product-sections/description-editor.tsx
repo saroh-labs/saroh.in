@@ -332,7 +332,7 @@ export function DescriptionEditor({
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-b-[10px] border-t bg-muted/30 px-[11px] py-[7px] text-[11px] text-muted-foreground">
                 <span
                     className={cn(
-                        "min-w-0 flex-1 text-pretty leading-[1.45]",
+                        "min-w-0 flex-[1_1_200px] text-pretty leading-[1.45]",
                         over && "text-destructive",
                     )}
                 >
