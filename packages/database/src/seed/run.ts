@@ -1201,20 +1201,45 @@ export async function deleteSeeded(
         // classes spent from packs first; plans and packs are `Restrict` from
         // what was sold on them, so they go after the sales.
         () => prisma.invoiceLine.deleteMany({ where }),
+        // Corrections (credit notes, supplementary invoices) before the
+        // invoices they correct (ADR-008).
+        () =>
+            prisma.invoice.deleteMany({
+                where: { ...where, relatedInvoiceId: { not: null } },
+            }),
         () => prisma.invoice.deleteMany({ where }),
         () => prisma.packRedemption.deleteMany({ where }),
+        // An order's money and timeline (U5, U6): cascade from the order, but
+        // written with seeded ids, so removed and counted explicitly.
+        () => prisma.paymentRefundLine.deleteMany({ where }),
+        () => prisma.paymentRefund.deleteMany({ where }),
+        () => prisma.paymentAttempt.deleteMany({ where }),
+        () => prisma.paymentIntent.deleteMany({ where }),
+        () => prisma.orderEvent.deleteMany({ where }),
         // Reviews hang off the order line they were left for (#471).
         () => prisma.productReview.deleteMany({ where }),
         () => prisma.reviewInvitation.deleteMany({ where }),
         () => prisma.orderItem.deleteMany({ where }),
         () => prisma.order.deleteMany({ where }),
+        // A customer's link to a contact, and the allergens a note names:
+        // before the storefront, whose allergen list a note's allergens
+        // hold on to (NoAction) — so a store cannot go while a note names one.
+        () => prisma.customerIdentityLink.deleteMany({ where }),
+        () =>
+            prisma.contactNoteAllergen.deleteMany({
+                where: { noteId: { startsWith: prefix } },
+            }),
+        () => prisma.subscriptionSkip.deleteMany({ where }),
         () => prisma.inventory.deleteMany({ where }),
         // Products v2: stock per variant and photos before what they hang off;
         // option values after the variants that choose them (Restrict).
         () => prisma.variantInventory.deleteMany({ where }),
         () => prisma.productVariant.deleteMany({ where }),
         () => prisma.productImage.deleteMany({ where }),
+        // What a product contains, then the store's allergen list (U8).
+        () => prisma.productAllergen.deleteMany({ where }),
         () => prisma.product.deleteMany({ where }),
+        () => prisma.storeAllergen.deleteMany({ where }),
         () => prisma.productOptionValue.deleteMany({ where }),
         () => prisma.productOption.deleteMany({ where }),
         () => prisma.catalogueDefaults.deleteMany({ where }),
