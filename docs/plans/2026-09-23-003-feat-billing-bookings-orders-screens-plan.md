@@ -726,6 +726,8 @@ flowchart TB
 **Verification:**
 - Side by side for Rye & Co. and Pulse Fitness.
 
+> **Done — #502** (merged). `/calendar` (Home › Calendar in the rail; on a phone it takes the second tab while you're on it, else after Sell): layer switches with counts (a layer empty all month is hidden unless it is the lead or failed), per-day "to act on" chip then per-layer counts, takings bar (money roles; everything taken that day), day panel by layer (12 per layer, then "N more"), desk panel / sheet at 760–1100 / dots-and-list on phones. Fixed in the feed: an order's own invoice is its order — not on the Invoices layer, not counted twice in takings (post-U5 double count); booking lines read what · who, then with whom · how paid. Checked side by side with Playwright (Rye and Pulse, 1440/390, light/dark; 320 no scroll; 1024 sheet; a failed layer; a failed read); a Pulse Member sees only bookings and classes. Open: subscription links go to the list until U13's detail lands (`lib/calendar/layers.ts`); Rye's counter Member sees no orders layer (orders need `order:read`).
+
 ---
 
 ### U18. Customer Detail
