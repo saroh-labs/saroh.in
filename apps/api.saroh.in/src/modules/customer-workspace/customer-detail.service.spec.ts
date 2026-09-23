@@ -255,6 +255,43 @@ describe("CustomerDetailService", () => {
         });
     });
 
+    it("lists its linked orders' invoices, and counts spent and owed without them (ADR-008)", async () => {
+        const { svc, db } = make();
+
+        await svc.detail(OWNER, "c1");
+
+        const calls = (db.invoice.findMany as jest.Mock).mock.calls.map(
+            (c: [{ where: Record<string, unknown> }]) => c[0].where,
+        );
+        // The list: billed to the contact, or an order of a linked customer.
+        expect(calls).toContainEqual({
+            organizationId: "org_1",
+            OR: [
+                { contactId: "c1" },
+                { order: { customerId: { in: ["cust_1"] } } },
+            ],
+        });
+        // What is owed leaves every order's paper and credit note out.
+        expect(calls).toContainEqual(
+            expect.objectContaining({
+                status: "ISSUED",
+                orderId: null,
+                kind: { not: "CREDIT_NOTE" },
+            }),
+        );
+        // Spent: paid orders are summed on the orders; paid invoices only
+        // when they are not an order's own.
+        expect(
+            (db.invoice.groupBy as jest.Mock).mock.calls[0][0].where,
+        ).toEqual(
+            expect.objectContaining({
+                status: "PAID",
+                orderId: null,
+                kind: { not: "CREDIT_NOTE" },
+            }),
+        );
+    });
+
     it("offers an unlinked same-email store customer only as a possible match", async () => {
         const { svc, db } = make();
         db.customerIdentityLink.findMany.mockResolvedValue([]);

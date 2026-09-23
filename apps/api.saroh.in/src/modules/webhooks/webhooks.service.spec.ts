@@ -12,6 +12,15 @@ jest.mock("../../env", () => ({
     },
 }));
 
+// The order's invoice and credit notes (ADR-008, U5) are written by
+// order-invoicing, specced on its own; here each call is recorded.
+jest.mock("../invoices/order-invoicing", () => ({
+    ensureOrderInvoice: jest.fn().mockResolvedValue(null),
+    creditNoteForRefund: jest.fn().mockResolvedValue(null),
+    creditRestOfOrder: jest.fn().mockResolvedValue(undefined),
+    settleSupplementaryInvoices: jest.fn().mockResolvedValue(0),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
@@ -45,6 +54,12 @@ import { NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import {
+    creditNoteForRefund,
+    creditRestOfOrder,
+    ensureOrderInvoice,
+    settleSupplementaryInvoices,
+} from "../invoices/order-invoicing";
 import { encryptSecret } from "../payments/crypto";
 import { PaymentsService } from "../payments/payments.service";
 import {
@@ -421,6 +436,121 @@ describe("WebhooksService refund settlement", () => {
         expect(result).toEqual({ status: "ignored", changed: false });
         expect(refundUpdate).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
+    });
+});
+
+describe("WebhooksService — the order's invoice (ADR-008)", () => {
+    const ensure = ensureOrderInvoice as jest.Mock;
+    const creditNote = creditNoteForRefund as jest.Mock;
+    const creditRest = creditRestOfOrder as jest.Mock;
+    const settleSupplementary = settleSupplementaryInvoices as jest.Mock;
+
+    it("a verified payment makes the order's invoice once, in its transaction; the replayed delivery makes none", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        orderFindUnique.mockResolvedValue({ paymentStatus: "UNPAID" });
+        const raw = bodyOf({ providerPaymentRef: "pay_1" });
+        const headers = { "x-fake-signature": sign(raw) };
+
+        whCreate.mockResolvedValueOnce({ id: "wh_1" });
+        await service.handle("razorpay", "org_1", raw, headers);
+        expect(ensure).toHaveBeenCalledTimes(1);
+        expect(ensure).toHaveBeenCalledWith(expect.anything(), "order_1", {
+            method: "ONLINE",
+            reference: "pay_1",
+        });
+
+        jest.clearAllMocks();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockRejectedValueOnce({ code: "P2002" });
+        await service.handle("razorpay", "org_1", raw, headers);
+        expect(ensure).not.toHaveBeenCalled();
+    });
+
+    it("a second event for a payment already settled makes no invoice", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockResolvedValue({ id: "wh_2" });
+        intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
+        orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
+        const raw = bodyOf({
+            providerEventId: "evt_2",
+            eventType: "order.paid",
+        });
+        await service.handle("razorpay", "org_1", raw, {
+            "x-fake-signature": sign(raw),
+        });
+        expect(ensure).not.toHaveBeenCalled();
+        expect(settleSupplementary).not.toHaveBeenCalled();
+    });
+
+    it("an edit's difference paid on a paid order settles its supplementary invoice", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockResolvedValue({ id: "wh_3" });
+        intentFindFirst.mockResolvedValue({ ...INTENT, id: "pi_2" });
+        orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
+        const raw = bodyOf({ providerEventId: "evt_3" });
+        await service.handle("razorpay", "org_1", raw, {
+            "x-fake-signature": sign(raw),
+        });
+        expect(ensure).not.toHaveBeenCalled();
+        expect(settleSupplementary).toHaveBeenCalledWith(
+            expect.anything(),
+            "order_1",
+        );
+    });
+
+    it("a refund makes its credit note; the last of it credits the rest", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockResolvedValue({ id: "wh_4" });
+        intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
+        orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
+        refundFindFirst.mockResolvedValue({ id: "rf_1", status: "PENDING" });
+        intentFindMany.mockResolvedValue([
+            { amountCents: 4250, refunds: [{ amountCents: 4250 }] },
+        ]);
+        const raw = bodyOf({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerRefundId: "rfnd_1",
+        });
+        await service.handle("razorpay", "org_1", raw, {
+            "x-fake-signature": sign(raw),
+        });
+        expect(creditNote).toHaveBeenCalledWith(expect.anything(), "rf_1");
+        expect(creditRest).toHaveBeenCalledWith(
+            expect.anything(),
+            "order_1",
+            "Refunded",
+            null,
+        );
+    });
+
+    it("a partial refund makes its credit note and leaves the rest of the invoice", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockResolvedValue({ id: "wh_5" });
+        intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
+        orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
+        // A refund made in the provider's dashboard: created here.
+        refundFindFirst.mockResolvedValue(null);
+        refundCreate.mockResolvedValue({ id: "rf_new" });
+        intentFindMany.mockResolvedValue([
+            { amountCents: 4250, refunds: [{ amountCents: 1500 }] },
+        ]);
+        const raw = bodyOf({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerRefundId: "rfnd_9",
+        });
+        await service.handle("razorpay", "org_1", raw, {
+            "x-fake-signature": sign(raw),
+        });
+        expect(creditNote).toHaveBeenCalledWith(expect.anything(), "rf_new");
+        expect(creditRest).not.toHaveBeenCalled();
     });
 });
 

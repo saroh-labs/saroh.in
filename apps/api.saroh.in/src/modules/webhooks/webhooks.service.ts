@@ -12,6 +12,12 @@ import {
     CAPTURED_NEEDS_REFUND,
     ONLINE_PAYMENT_METHOD,
 } from "../invoices/invoice-state";
+import {
+    creditNoteForRefund,
+    creditRestOfOrder,
+    ensureOrderInvoice,
+    settleSupplementaryInvoices,
+} from "../invoices/order-invoicing";
 import type { PaymentStatus } from "../orders/dto";
 import { assertPaymentTransition } from "../orders/order-state";
 import { PaymentsService } from "../payments/payments.service";
@@ -379,7 +385,23 @@ export class WebhooksService {
         // Order.paymentStatus → PAID FIRST, ROUTED through the state machine; an
         // illegal move throws BEFORE any intent/attempt write. A same→same
         // target (already PAID) is a guard-free no-op.
-        let applied = await this.moveOrderPayment(tx, orderId, "PAID");
+        const paidNow = await this.moveOrderPayment(tx, orderId, "PAID");
+        let applied = paidNow;
+
+        // The order's invoice (ADR-008), made once, in this transaction: a
+        // failed reconciliation leaves no invoice and no number behind, and
+        // a replayed or second delivery finds the one already made.
+        if (paidNow) {
+            await ensureOrderInvoice(tx, orderId, {
+                method: "ONLINE",
+                reference:
+                    event.providerPaymentRef ?? intent.providerIntentId ?? null,
+            });
+        } else if (intent.status !== "SUCCEEDED") {
+            // A second payment on a paid order — an edit's difference —
+            // settles the supplementary invoice that edit wrote.
+            await settleSupplementaryInvoices(tx, orderId);
+        }
 
         if (intent.status !== "SUCCEEDED") {
             await tx.paymentIntent.update({
@@ -459,7 +481,15 @@ export class WebhooksService {
         if (current !== "REFUNDED" && current !== "PAID") {
             assertPaymentTransition(current, "REFUNDED");
         }
-        const { applied } = await this.settleRefund(tx, intent, event);
+        const { applied, refundId } = await this.settleRefund(
+            tx,
+            intent,
+            event,
+        );
+        // The refund's credit note on the order's invoice (ADR-008) — made
+        // here when the refund started outside Saroh, or when the refund
+        // path could not make it; keyed on the refund, so never twice.
+        if (refundId) await creditNoteForRefund(tx, refundId);
         // A refund by line is partial (ADR-008, U6): the order moves to
         // REFUNDED only once every rupee taken has gone back. Until then it
         // stays PAID and reads "partly refunded", derived from the sums.
@@ -467,6 +497,9 @@ export class WebhooksService {
             current === "PAID" && (await this.fullyRefunded(tx, orderId))
                 ? await this.moveOrderPayment(tx, orderId, "REFUNDED")
                 : false;
+        // Refunded in full: whatever of the invoice no refund credited is
+        // credited now, and it reads CREDITED.
+        if (moved) await creditRestOfOrder(tx, orderId, "Refunded", null);
         return { applied: moved || applied };
     }
 
@@ -505,8 +538,8 @@ export class WebhooksService {
         tx: Tx,
         intent: IntentRow,
         event: NormalizedWebhookEvent,
-    ): Promise<{ applied: boolean }> {
-        if (!event.providerRefundId) return { applied: false };
+    ): Promise<{ applied: boolean; refundId: string | null }> {
+        if (!event.providerRefundId) return { applied: false, refundId: null };
         const existing = await tx.paymentRefund.findFirst({
             where: {
                 organizationId: intent.organizationId,
@@ -519,11 +552,11 @@ export class WebhooksService {
                     where: { id: existing.id },
                     data: { status: "SUCCEEDED" },
                 });
-                return { applied: true };
+                return { applied: true, refundId: existing.id };
             }
-            return { applied: false };
+            return { applied: false, refundId: existing.id };
         }
-        await tx.paymentRefund.create({
+        const created = await tx.paymentRefund.create({
             data: {
                 organizationId: intent.organizationId,
                 paymentIntentId: intent.id,
@@ -533,7 +566,7 @@ export class WebhooksService {
                 providerRefundId: event.providerRefundId,
             },
         });
-        return { applied: true };
+        return { applied: true, refundId: created.id };
     }
 
     /**

@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { rateToBps } from "../invoices/gst";
 import type { OrderItemInput } from "./dto";
 
 /** Money helpers — integer-cents math so totals never drift on floats. */
@@ -13,6 +14,29 @@ export interface PricedLine {
     quantity: number;
     priceCents: number;
     categoryId: string | null;
+}
+
+/**
+ * The lines with the GST rate each product's price includes (ADR-008), for
+ * the informational `Order.tax` of a GST-registered business.
+ */
+export async function withGstRates(
+    lines: readonly {
+        productId: string;
+        quantity: number;
+        priceCents: number;
+    }[],
+): Promise<{ quantity: number; unitCents: number; rateBps: number | null }[]> {
+    const products = await prisma.product.findMany({
+        where: { id: { in: [...new Set(lines.map((l) => l.productId))] } },
+        select: { id: true, gstRate: true },
+    });
+    const rate = new Map(products.map((p) => [p.id, rateToBps(p.gstRate)]));
+    return lines.map((l) => ({
+        quantity: l.quantity,
+        unitCents: l.priceCents,
+        rateBps: rate.get(l.productId) ?? null,
+    }));
 }
 
 /**

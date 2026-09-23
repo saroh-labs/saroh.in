@@ -10,7 +10,11 @@ import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { InvoiceStanding } from "../invoices/invoice-state";
-import { invoiceStanding, isPastDue } from "../invoices/invoice-state";
+import {
+    invoiceStanding,
+    isPastDue,
+    OWED_WHERE,
+} from "../invoices/invoice-state";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { ContactNoteView } from "./contact-notes.service";
 import { loadContactNotes, notedAllergens } from "./contact-notes.service";
@@ -148,6 +152,10 @@ export interface DetailInvoice {
     status: string;
     standing: InvoiceStanding;
     source: string;
+    /** INVOICE | CREDIT_NOTE | SUPPLEMENTARY (ADR-008). */
+    kind: string;
+    /** Set on an order's paper: it is counted on the order, not here. */
+    orderId: string | null;
     total: string;
     currency: string;
     issuedAt: string | null;
@@ -238,22 +246,31 @@ const UPCOMING = 20;
 const PAST = 30;
 
 /**
- * The invoices that are an order's own (ADR-008, U5) are left out of spent and
- * owed — the order already counts that money. Until U5 adds `Invoice.orderId`
- * no invoice is an order's, so nothing is excluded.
- *
- * SEAM (U5): return `{ orderId: null }` here, and widen {@link invoicesOf} to
- * the linked orders' invoices.
+ * The invoices that are an order's own (ADR-008) — and credit notes — are
+ * left out of spent and owed: the order already counts that money, so a sum
+ * that took them too would count each rupee twice.
  */
-const NOT_AN_ORDER_INVOICE = {} as const;
+const NOT_AN_ORDER_INVOICE = OWED_WHERE;
 
 /**
- * Whose invoices these are: billed to the contact. SEAM (U5): once invoices
- * carry `orderId`, also `{ orderId: { in: linkedOrderIds } }` — the invoices
- * of orders placed through a linked store customer.
+ * Whose invoices these are: billed to the contact, and the invoices of
+ * orders placed through a store customer linked to it (ADR-008) — its
+ * orders' paper, listed with the rest but counted once, on the order.
  */
-function invoicesOf(organizationId: string, contactId: string) {
-    return { organizationId, contactId };
+function invoicesOf(
+    organizationId: string,
+    contactId: string,
+    linkedCustomerIds: readonly string[] = [],
+) {
+    return linkedCustomerIds.length > 0
+        ? {
+              organizationId,
+              OR: [
+                  { contactId },
+                  { order: { customerId: { in: [...linkedCustomerIds] } } },
+              ],
+          }
+        : { organizationId, contactId };
 }
 
 /** "1234.50" → 123450, by digits: no float touches the cent. */
@@ -413,7 +430,11 @@ export class CustomerDetailService {
                 : skip,
             wants.invoices
                 ? attempt("invoices", () =>
-                      this.readInvoices(organizationId, contactId),
+                      this.readInvoices(
+                          organizationId,
+                          contactId,
+                          links?.map((l) => l.customerId) ?? [],
+                      ),
                   )
                 : skip,
             wants.packs
@@ -779,9 +800,13 @@ export class CustomerDetailService {
         }));
     }
 
-    private async readInvoices(organizationId: string, contactId: string) {
+    private async readInvoices(
+        organizationId: string,
+        contactId: string,
+        linkedCustomerIds: readonly string[] = [],
+    ) {
         const now = new Date();
-        const where = invoicesOf(organizationId, contactId);
+        const where = invoicesOf(organizationId, contactId, linkedCustomerIds);
         const [rows, unpaid, paid] = await Promise.all([
             this.db.invoice.findMany({
                 where,
@@ -792,6 +817,8 @@ export class CustomerDetailService {
                     number: true,
                     status: true,
                     source: true,
+                    kind: true,
+                    orderId: true,
                     total: true,
                     currency: true,
                     issuedAt: true,
@@ -827,6 +854,8 @@ export class CustomerDetailService {
                 status: i.status,
                 standing: invoiceStanding(i, now),
                 source: i.source,
+                kind: i.kind,
+                orderId: i.orderId,
                 total: toMoneyString(i.total),
                 currency: i.currency,
                 issuedAt: i.issuedAt?.toISOString() ?? null,

@@ -5,6 +5,8 @@ jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
         invoice: { findFirst: jest.fn(), updateMany: jest.fn() },
+        // Unregistered: a receipt may be voided (ADR-008).
+        businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     return {
         ...actual,
@@ -96,7 +98,14 @@ describe("making a pay link", () => {
 
         expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/); // 256 bits, base64url
         expect(db.invoice.updateMany).toHaveBeenCalledWith({
-            where: { id: "inv_1", organizationId: "org_1", status: "ISSUED" },
+            // Never an order's invoice or a credit note (ADR-008).
+            where: {
+                id: "inv_1",
+                organizationId: "org_1",
+                status: "ISSUED",
+                orderId: null,
+                kind: { not: "CREDIT_NOTE" },
+            },
             data: { payTokenHash: hashPayToken(token) },
         });
         expect(JSON.stringify(db.invoice.updateMany?.mock.calls)).not.toContain(
@@ -156,7 +165,14 @@ describe("making a pay link", () => {
 
 describe("revoking a pay link", () => {
     it("clears the token when the invoice is voided", async () => {
-        tx.invoice?.findFirst?.mockResolvedValue({ status: "ISSUED" });
+        tx.invoice?.findFirst?.mockResolvedValue({
+            status: "ISSUED",
+            kind: "INVOICE",
+            orderId: null,
+            bookingId: null,
+            sellerGstin: null,
+        });
+        tx.businessProfile?.findUnique?.mockResolvedValue(null);
         tx.invoice?.updateMany?.mockResolvedValue({ count: 1 });
 
         await service.voidInvoice(owner, "inv_1", { reason: "Wrong amount" });

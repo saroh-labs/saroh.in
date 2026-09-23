@@ -3,12 +3,14 @@ import {
     ConflictException,
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
 } from "@nestjs/common";
 import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { creditNoteForRefund } from "../invoices/order-invoicing";
 import type {
     LineRefundRequest,
     PlannedLineRefund,
@@ -273,6 +275,8 @@ function redact(row: MerchantPaymentProvider): RedactedProvider {
  */
 @Injectable()
 export class PaymentsService {
+    private readonly logger = new Logger(PaymentsService.name);
+
     constructor(
         @Inject(PROVIDER_FACTORY) private readonly factory: ProviderFactory,
     ) {}
@@ -746,8 +750,25 @@ export class PaymentsService {
                 amountCents: reserved.amountCents,
             },
         });
-        // TODO(U5): a credit note for the refunded lines (or, for an edit,
-        // for the difference), referencing the order's invoice (ADR-008).
+        // A credit note for the refunded lines, against the order's invoice
+        // (ADR-008), once the provider has taken the refund. One per refund
+        // row, keyed on it, so the refund webhook finding it already made
+        // makes no second. An edit's difference is skipped: the edit wrote
+        // its own. A failure here never undoes a refund the provider took —
+        // the webhook's reconciliation makes the note instead.
+        for (const row of settled) {
+            try {
+                await prisma.$transaction((tx) =>
+                    creditNoteForRefund(tx, row.id),
+                );
+            } catch (err) {
+                this.logger.warn(
+                    `Refund ${row.id} taken; its credit note waits for the webhook: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
         return refundResult(settled);
     }
 

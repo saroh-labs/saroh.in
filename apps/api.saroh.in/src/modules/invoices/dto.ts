@@ -49,6 +49,21 @@ export class InvoiceLineDto {
     @Transform(trim)
     @Matches(MONEY, { message: MONEY_MESSAGE })
     unitPrice!: string;
+
+    /**
+     * GST the price includes, in percent ("18"), on a registered business's
+     * tax invoice (ADR-008). Checked against GST's rates in the service.
+     */
+    @IsOptional()
+    @Transform(trimOrOmit)
+    @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
+    gstRate?: string;
+
+    /** HSN (goods) or SAC (services): four to eight digits. */
+    @IsOptional()
+    @Transform(trimOrOmit)
+    @Matches(/^\d{4,8}$/, { message: "An HSN or SAC code is 4 to 8 digits" })
+    hsnSac?: string;
 }
 
 /**
@@ -85,6 +100,43 @@ export class InvoiceInputDto {
     @IsOptional()
     @IsISO8601()
     dueAt?: string | null;
+
+    /**
+     * A registered buyer's GSTIN, printed on the tax invoice (ADR-008). ""
+     * clears it. Checked (shape, state, check character) in the service.
+     */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toUpperCase() : value,
+    )
+    @IsString()
+    @MaxLength(15)
+    billToGstin?: string;
+
+    /**
+     * The buyer's state — a GST state code or its name. It is the place of
+     * supply: another state than the business's is IGST. "" clears it.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(60)
+    billToState?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(500)
+    billToAddress?: string;
+}
+
+/** Cancel an issued invoice with a credit note for all of it (ADR-008). */
+export class CreditInvoiceDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "Say why it is being cancelled" })
+    @MaxLength(500)
+    reason!: string;
 }
 
 export class VoidInvoiceDto {

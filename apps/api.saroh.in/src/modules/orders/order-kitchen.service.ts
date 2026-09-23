@@ -10,6 +10,11 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { gstInsideOrder } from "../invoices/order-invoice";
+import {
+    correctOrderInvoiceForEdit,
+    loadTaxProfile,
+} from "../invoices/order-invoicing";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
@@ -19,7 +24,12 @@ import {
     applyInventoryTransition,
     phaseOf,
 } from "./order-inventory";
-import { fromCents, priceOrderLines, toCents } from "./order-pricing";
+import {
+    fromCents,
+    priceOrderLines,
+    toCents,
+    withGstRates,
+} from "./order-pricing";
 import type { OrderReadDto } from "./order-read";
 import { serializeOrderRead } from "./order-read";
 import { canEditItems, planStageMove, planUndo } from "./order-stage";
@@ -314,6 +324,15 @@ export class OrderKitchenService {
             }
 
             const changes: string[] = [];
+            // What changed, line by line, for the invoice's correction
+            // (ADR-008): the order's issued invoice is never edited.
+            const corrections: {
+                orderItemId: string | null;
+                productId: string;
+                description: string;
+                deltaQuantity: number;
+                unitCents: number;
+            }[] = [];
             let subtotalCents = toCents(order.subtotal.toString());
 
             for (const change of dto.lines ?? []) {
@@ -334,6 +353,14 @@ export class OrderKitchenService {
                 if (delta === 0) continue;
                 const unit = toCents(item.price.toString());
                 subtotalCents += delta * unit;
+                corrections.push({
+                    // A removed line is deleted below; its credit names none.
+                    orderItemId: change.quantity === 0 ? null : item.id,
+                    productId: item.productId,
+                    description: item.product.name,
+                    deltaQuantity: delta,
+                    unitCents: unit,
+                });
                 if (change.quantity === 0) {
                     await applyInventoryTransition(
                         tx,
@@ -358,23 +385,30 @@ export class OrderKitchenService {
             if (added.length > 0) {
                 const created = [];
                 for (const line of added) {
-                    created.push(
-                        await tx.orderItem.create({
-                            data: {
-                                orderId: order.id,
-                                productId: line.productId,
-                                variantId: line.variantId,
-                                quantity: line.quantity,
-                                price: fromCents(line.priceCents),
-                            },
-                            select: {
-                                id: true,
-                                productId: true,
-                                variantId: true,
-                                quantity: true,
-                            },
-                        }),
-                    );
+                    const item = await tx.orderItem.create({
+                        data: {
+                            orderId: order.id,
+                            productId: line.productId,
+                            variantId: line.variantId,
+                            quantity: line.quantity,
+                            price: fromCents(line.priceCents),
+                        },
+                        select: {
+                            id: true,
+                            productId: true,
+                            variantId: true,
+                            quantity: true,
+                            product: { select: { name: true } },
+                        },
+                    });
+                    created.push(item);
+                    corrections.push({
+                        orderItemId: item.id,
+                        productId: line.productId,
+                        description: item.product.name,
+                        deltaQuantity: line.quantity,
+                        unitCents: line.priceCents,
+                    });
                     subtotalCents += line.priceCents * line.quantity;
                 }
                 await applyInventoryTransition(
@@ -400,13 +434,17 @@ export class OrderKitchenService {
             }
 
             const oldTotalCents = toCents(order.total.toString());
+            // A GST-registered business's prices include GST: its `tax` is
+            // the GST inside the total, worked out again, never added
+            // (ADR-008). Anyone else's add-on tax stays what it was.
+            const profile = await loadTaxProfile(tx, ctx.organizationId);
             // The discount stays what it was when the order was placed, and
             // never takes the total below zero. (A percentage code is not
             // re-rated on an edit; the merchant sees the new total first.)
             const totalCents = Math.max(
                 0,
                 subtotalCents +
-                    toCents(order.tax.toString()) +
+                    (profile.registered ? 0 : toCents(order.tax.toString())) +
                     toCents(order.shipping.toString()) -
                     toCents(order.discount.toString()),
             );
@@ -448,6 +486,36 @@ export class OrderKitchenService {
             if (dto.address !== undefined) changes.push("address changed");
             if (touchesNotes) changes.push("notes changed");
 
+            let gstCents: number | null = null;
+            if (profile.registered && (touchesItems || touchesDelivery)) {
+                const items = await tx.orderItem.findMany({
+                    where: { orderId: order.id },
+                    select: { productId: true, quantity: true, price: true },
+                });
+                const address =
+                    dto.address === null
+                        ? null
+                        : (dto.address?.state ?? order.deliveryState);
+                gstCents = gstInsideOrder(
+                    await withGstRates(
+                        items.map((i) => ({
+                            productId: i.productId,
+                            quantity: i.quantity,
+                            priceCents: toCents(i.price.toString()),
+                        })),
+                    ),
+                    {
+                        shippingCents: toCents(order.shipping.toString()),
+                        discountCents: toCents(order.discount.toString()),
+                        deliveryState:
+                            (dto.fulfilment ?? order.fulfilment) === "DELIVERY"
+                                ? address
+                                : null,
+                        profile,
+                    },
+                );
+            }
+
             await tx.order.update({
                 where: { id: order.id },
                 data: {
@@ -457,6 +525,7 @@ export class OrderKitchenService {
                               total: fromCents(totalCents),
                           }
                         : {}),
+                    ...(gstCents !== null ? { tax: fromCents(gstCents) } : {}),
                     ...(dto.fulfilment ? { fulfilment: dto.fulfilment } : {}),
                     ...address,
                     ...(touchesNotes ? { notes: dto.notes ?? null } : {}),
@@ -509,11 +578,20 @@ export class OrderKitchenService {
                 },
                 select: { id: true },
             });
-            // TODO(U5): an issued order invoice is never edited. A total
-            // that went UP issues a supplementary invoice for the
-            // difference; one that went DOWN, a credit note — both
-            // referencing the order's invoice (ADR-008). Hook here, with
-            // `differenceCents` and this event's id.
+            // An issued order invoice is never edited (ADR-008): added units
+            // make a supplementary invoice, removed ones a credit note, both
+            // referencing it. Nothing when the order has no invoice yet —
+            // an unpaid order's invoice, when it comes, is the edited order.
+            if (touchesItems && corrections.length > 0) {
+                await correctOrderInvoiceForEdit(tx, {
+                    orderId: order.id,
+                    changes: corrections,
+                    note: changes.length > 0 ? changes.join("; ") : null,
+                    createdByUserId: ctx.userId,
+                    // Still to be taken on the order: settled when it is.
+                    settled: settleCents <= 0,
+                });
+            }
             return {
                 id: order.id,
                 eventId: event.id,
