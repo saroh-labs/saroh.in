@@ -15,7 +15,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ActivationEvents } from "../analytics/activation-events";
 import { redeemPackInTx, reversePackInTx } from "../class-packs/redeem-pack";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type {
     AvailabilityRuleWindow,
@@ -35,6 +35,8 @@ import {
     withinIntervals,
     workingIntervals,
 } from "./availability";
+import type { PersonDiary } from "./booking-calendar";
+import { groupDiaries } from "./booking-calendar";
 import {
     bookingWindowRefusal,
     isLateCancel,
@@ -53,6 +55,7 @@ import type {
 import { FixedWindowRateLimiter } from "./rate-limiter";
 import {
     businessTimezone,
+    businessZone,
     loadPeople,
     serviceStaff,
 } from "./staff-availability";
@@ -154,6 +157,62 @@ const bookingDetailInclude = {
 export type BookingDetail = Prisma.BookingGetPayload<{
     include: typeof bookingDetailInclude;
 }>;
+
+/** What the bookings calendar reads per booking (see {@link DiaryRow}). */
+const diarySelect = {
+    id: true,
+    serviceId: true,
+    startAt: true,
+    endAt: true,
+    timezone: true,
+    status: true,
+    outcome: true,
+    bookerName: true,
+    bookerEmail: true,
+    bookerPhone: true,
+    createdAt: true,
+    cancelledAt: true,
+    cancelledLate: true,
+    paidWith: true,
+    subscriptionId: true,
+    service: {
+        select: {
+            id: true,
+            name: true,
+            timezone: true,
+            capacity: true,
+            durationMinutes: true,
+            priceCents: true,
+            currency: true,
+        },
+    },
+    // Name and email only: `booking:read` is not `contact:read`.
+    contact: {
+        select: { id: true, firstName: true, lastName: true, email: true },
+    },
+    staff: { select: { id: true, name: true } },
+    packRedemption: {
+        select: {
+            reversedAt: true,
+            purchase: { select: { pack: { select: { name: true } } } },
+        },
+    },
+} satisfies Prisma.BookingSelect;
+
+/** The widest range the bookings calendar reads at once: two years. */
+const MAX_CALENDAR_RANGE_MS = 731 * 86_400_000;
+
+/** The bookings calendar (U4): diaries by person over a range. */
+export interface BookingsCalendar {
+    from: string;
+    to: string;
+    /** The business's zone — where "a day" on the calendar is. */
+    timezone: string;
+    /** Whether prices were included for this viewer. */
+    money: boolean;
+    /** One per person, then Unassigned when anything has no person. */
+    diaries: PersonDiary[];
+}
 
 /**
  * Bookable Services, availability and the transactional public booking command
@@ -749,6 +808,70 @@ export class BookingsService {
                 staff: { select: { id: true, name: true } },
             },
         });
+    }
+
+    /**
+     * The bookings calendar in one read (U4): every booking overlapping
+     * `[from, to)`, grouped by the person who takes it, class starts gathered
+     * into sessions with their places and how each was paid. Replaces the
+     * app's fan-out over every service. `booking:read`.
+     *
+     * Every active person gets a diary, booked or not — the calendar draws a
+     * column for each; with `staffId`, only theirs (another org's is a 404).
+     * Prices only with `payment:read` (DEC-020): a Member sees the diary and
+     * the people on it, not the money.
+     */
+    async calendarBookings(
+        ctx: OrganizationContext,
+        query: { from: string; to: string; staffId?: string },
+    ): Promise<BookingsCalendar> {
+        authorize(ctx, "booking:read");
+        const from = new Date(query.from);
+        const to = new Date(query.to);
+        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+            throw new BadRequestException("from and to must be dates.");
+        }
+        if (to <= from) {
+            throw new BadRequestException("to must be after from.");
+        }
+        if (to.getTime() - from.getTime() > MAX_CALENDAR_RANGE_MS) {
+            throw new BadRequestException(
+                "A bookings range can be at most two years.",
+            );
+        }
+        const organizationId = ctx.organizationId;
+        const staffId = query.staffId;
+        const [people, rows, zone] = await Promise.all([
+            prisma.staffMember.findMany({
+                where: staffId
+                    ? { id: staffId, organizationId }
+                    : { organizationId, status: "ACTIVE" },
+                orderBy: [{ name: "asc" }, { id: "asc" }],
+                select: { id: true, name: true, title: true },
+            }),
+            prisma.booking.findMany({
+                where: {
+                    organizationId,
+                    startAt: { lt: to },
+                    endAt: { gt: from },
+                    ...(staffId ? { staffId } : {}),
+                },
+                orderBy: [{ startAt: "asc" }, { createdAt: "asc" }],
+                select: diarySelect,
+            }),
+            businessZone(prisma, organizationId),
+        ]);
+        if (staffId && people.length === 0) {
+            throw new NotFoundException("Staff member not found");
+        }
+        const money = allows(ctx, "payment:read");
+        return {
+            from: from.toISOString(),
+            to: to.toISOString(),
+            timezone: zone.zone,
+            money,
+            diaries: groupDiaries(rows, people, money),
+        };
     }
 
     /**

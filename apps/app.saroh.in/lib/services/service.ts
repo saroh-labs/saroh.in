@@ -137,6 +137,21 @@ export interface BookingWithService extends Booking {
     service: { id: string; name: string; timezone: string } | null;
 }
 
+// The calendar read's shape and its pure shaping live in ./booking-calendar,
+// which client components can import; re-exported so server callers have one
+// place to look.
+import type { BookingsCalendar } from "./booking-calendar";
+import { flattenCalendar } from "./booking-calendar";
+
+export { flattenCalendar } from "./booking-calendar";
+export type {
+    BookingsCalendar,
+    ClassSession,
+    DiaryBooking,
+    PaidWith,
+    PersonDiary,
+} from "./booking-calendar";
+
 export interface CreateServiceInput {
     name: string;
     description?: string;
@@ -302,30 +317,48 @@ export async function listAvailability(
 }
 
 /**
- * Every booking across the org's services, each joined with its owning
- * Service (name + timezone), sorted by slot ascending — the shape the owner
- * calendar renders. The api exposes bookings per-service, so this fans out over
- * the org's services and merges. Empty when there is no active org.
+ * The bookings calendar over `[from, to)` in one read (U4): a diary per
+ * person, Unassigned last, class starts as sessions with who is booked and
+ * how each paid. Null when it could not be read — a failed read is never an
+ * empty one (`frontend-error-feedback.md`).
+ */
+export async function readBookingsCalendar(
+    fromISO: string,
+    toISO: string,
+    staffId?: string,
+): Promise<BookingsCalendar | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const query = new URLSearchParams({ from: fromISO, to: toISO });
+    if (staffId) query.set("staffId", staffId);
+    try {
+        const res = await apiFetch(
+            `${base}/services/bookings?${query.toString()}`,
+        );
+        if (!res.ok) return null;
+        return (await res.json()) as BookingsCalendar;
+    } catch {
+        return null;
+    }
+}
+
+/** How far back and ahead the bookings register reads: a year each way. */
+const REGISTER_REACH_MS = 365 * 86_400_000;
+
+/**
+ * Every booking across the org's services within a year either side of now,
+ * each with its Service (name + timezone), sorted by slot ascending — the
+ * shape the bookings register renders. One read of the calendar (U4) instead
+ * of a fan-out over every service. Empty when there is no active org or the
+ * read fails.
  */
 export async function listAllBookings(): Promise<BookingWithService[]> {
-    const services = await listServices();
-    if (services.length === 0) return [];
-
-    const perService = await Promise.all(
-        services.map(async (service) => {
-            const bookings = await listServiceBookings(service.id);
-            return bookings.map<BookingWithService>((booking) => ({
-                ...booking,
-                service: {
-                    id: service.id,
-                    name: service.name,
-                    timezone: service.timezone,
-                },
-            }));
-        }),
+    const now = Date.now();
+    const calendar = await readBookingsCalendar(
+        new Date(now - REGISTER_REACH_MS).toISOString(),
+        new Date(now + REGISTER_REACH_MS).toISOString(),
     );
-
-    return perService.flat().sort((a, b) => a.startAt.localeCompare(b.startAt));
+    return calendar ? flattenCalendar(calendar) : [];
 }
 
 /**

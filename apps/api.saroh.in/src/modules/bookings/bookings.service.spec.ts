@@ -43,6 +43,7 @@ jest.mock("@saroh/database", () => {
         // Staff (U3): nobody takes a service and there are no booking rules
         // unless a test says so — every business before staff existed.
         staffService: { findMany: jest.fn().mockResolvedValue([]) },
+        staffMember: { findMany: jest.fn().mockResolvedValue([]) },
         bookingRules: { findUnique: jest.fn().mockResolvedValue(null) },
         staffHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
@@ -1907,5 +1908,205 @@ describe("cancelling inside the free-cancellation window (U3)", () => {
             cancelledLate: true,
         });
         expect(db.packRedemption!.updateMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("the bookings calendar in one read (U4)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const staffFindMany = (
+        prisma as unknown as { staffMember: { findMany: jest.Mock } }
+    ).staffMember.findMany;
+
+    const RANGE = {
+        from: "2026-07-20T00:00:00.000Z",
+        to: "2026-07-27T00:00:00.000Z",
+    };
+    const PT = { id: "st_1", name: "Asha", title: "Trainer" };
+
+    function row(over: Record<string, unknown> = {}) {
+        return {
+            id: "bk_1",
+            serviceId: "svc_1",
+            startAt: new Date("2026-07-20T09:00:00Z"),
+            endAt: new Date("2026-07-20T10:00:00Z"),
+            timezone: "UTC",
+            status: "CONFIRMED",
+            outcome: null,
+            bookerName: null,
+            bookerEmail: "jane@example.com",
+            bookerPhone: null,
+            createdAt: new Date("2026-07-01T00:00:00Z"),
+            cancelledAt: null,
+            cancelledLate: false,
+            paidWith: null,
+            subscriptionId: null,
+            service: {
+                id: "svc_1",
+                name: "Personal training",
+                timezone: "UTC",
+                capacity: 1,
+                durationMinutes: 60,
+                priceCents: 150000,
+                currency: "INR",
+            },
+            contact: null,
+            staff: { id: "st_1", name: "Asha" },
+            packRedemption: null,
+            ...over,
+        };
+    }
+
+    const SPIN = {
+        id: "svc_spin",
+        name: "Spin",
+        timezone: "UTC",
+        capacity: 12,
+        durationMinutes: 45,
+        priceCents: 50000,
+        currency: "INR",
+    };
+
+    it("groups by person, with an Unassigned diary for bookings nobody takes", async () => {
+        staffFindMany.mockResolvedValue([PT]);
+        bookingFindMany.mockResolvedValue([
+            row(),
+            row({ id: "bk_2", staff: null }),
+        ]);
+
+        const res = await new BookingsService().calendarBookings(ctx(), RANGE);
+
+        expect(res.timezone).toBe("UTC");
+        expect(res.diaries.map((d) => d.person?.name ?? "Unassigned")).toEqual([
+            "Asha",
+            "Unassigned",
+        ]);
+        expect(res.diaries[0].bookings.map((b) => b.id)).toEqual(["bk_1"]);
+        expect(res.diaries[1].bookings.map((b) => b.id)).toEqual(["bk_2"]);
+        // Scoped to the org and the range, never to an id the caller sent.
+        expect(bookingFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_SVC",
+                    startAt: { lt: new Date(RANGE.to) },
+                    endAt: { gt: new Date(RANGE.from) },
+                },
+            }),
+        );
+    });
+
+    it("gathers a class start into one session: places, who, and how each paid", async () => {
+        staffFindMany.mockResolvedValue([PT]);
+        const at = { serviceId: "svc_spin", service: SPIN };
+        bookingFindMany.mockResolvedValue([
+            row({
+                ...at,
+                id: "m",
+                paidWith: "MEMBERSHIP",
+                subscriptionId: "sub_1",
+            }),
+            row({
+                ...at,
+                id: "p",
+                packRedemption: {
+                    reversedAt: null,
+                    purchase: { pack: { name: "10 classes" } },
+                },
+            }),
+            row({ ...at, id: "d", paidWith: "DESK" }),
+            row({ ...at, id: "x", status: "CANCELLED", paidWith: "PAID" }),
+        ]);
+
+        const res = await new BookingsService().calendarBookings(ctx(), RANGE);
+        const [session] = res.diaries[0].classes;
+
+        expect(session.capacity).toBe(12);
+        expect(session.taken).toBe(3);
+        expect(session.staff).toEqual({ id: "st_1", name: "Asha" });
+        expect(
+            session.bookings.map((b) => [b.id, b.paidWith, b.packName]),
+        ).toEqual([
+            ["m", "MEMBERSHIP", null],
+            ["p", "PACK", "10 classes"],
+            ["d", "DESK", null],
+            ["x", "PAID", null],
+        ]);
+        expect(res.diaries[0].bookings).toEqual([]);
+    });
+
+    it("a Member sees the diary and the people on it, but no prices (DEC-020)", async () => {
+        staffFindMany.mockResolvedValue([PT]);
+        bookingFindMany.mockResolvedValue([row()]);
+
+        const res = await new BookingsService().calendarBookings(
+            ctx({ role: "MEMBER" }),
+            RANGE,
+        );
+
+        expect(res.money).toBe(false);
+        const [booking] = res.diaries[0].bookings;
+        expect(booking.bookerEmail).toBe("jane@example.com");
+        expect(booking.service).not.toHaveProperty("priceCents");
+        expect(booking.service).not.toHaveProperty("currency");
+    });
+
+    it("an owner gets the prices", async () => {
+        staffFindMany.mockResolvedValue([PT]);
+        bookingFindMany.mockResolvedValue([row()]);
+
+        const res = await new BookingsService().calendarBookings(ctx(), RANGE);
+
+        expect(res.money).toBe(true);
+        expect(res.diaries[0].bookings[0].service.priceCents).toBe(150000);
+    });
+
+    it("one person's diary: filtered to them; someone else's is a 404", async () => {
+        staffFindMany.mockResolvedValue([PT]);
+        bookingFindMany.mockResolvedValue([row()]);
+        await new BookingsService().calendarBookings(ctx(), {
+            ...RANGE,
+            staffId: "st_1",
+        });
+        expect(staffFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: "st_1", organizationId: "org_SVC" },
+            }),
+        );
+        expect(bookingFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ staffId: "st_1" }),
+            }),
+        );
+
+        staffFindMany.mockResolvedValue([]);
+        await expect(
+            new BookingsService().calendarBookings(ctx(), {
+                ...RANGE,
+                staffId: "st_other",
+            }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("refuses a backwards or over-long range", async () => {
+        const service = new BookingsService();
+        await expect(
+            service.calendarBookings(ctx(), { from: RANGE.to, to: RANGE.from }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            service.calendarBookings(ctx(), {
+                from: "2020-01-01T00:00:00Z",
+                to: "2026-01-01T00:00:00Z",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(bookingFindMany).not.toHaveBeenCalled();
+    });
+
+    it("a reviewer, who reads no bookings, is refused", async () => {
+        await expect(
+            new BookingsService().calendarBookings(
+                ctx({ role: "REVIEWER" }),
+                RANGE,
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
     });
 });
