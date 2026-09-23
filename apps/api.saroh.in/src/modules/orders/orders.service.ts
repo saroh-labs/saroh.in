@@ -91,6 +91,7 @@ export class OrdersService {
     async listForOrganization(
         organizationId: string,
         filter?: { storeId?: string },
+        view: { kitchenOnly?: boolean } = {},
     ) {
         const orders = await prisma.order.findMany({
             where: {
@@ -104,7 +105,7 @@ export class OrdersService {
                 _count: { select: { items: true } },
             },
         });
-        return orders.map(serializeOrganizationOrder);
+        return orders.map((o) => serializeOrganizationOrder(o, view));
     }
 
     async get(storeId: string, orderId: string, userId: string) {

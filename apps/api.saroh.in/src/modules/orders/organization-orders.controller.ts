@@ -16,7 +16,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { EditOrderDto, MoveStageDto, UndoStageDto } from "./dto";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { OrdersService } from "./orders.service";
@@ -59,13 +59,23 @@ export class OrganizationOrdersController {
         // names, emails and totals across every storefront. This line was
         // missing when the screen first shipped, and a Reviewer, brought in to
         // look at one website, could list every order in the business.
-        authorize(ctx, "order:read");
-        return this.orders.listForOrganization(ctx.organizationId, {
-            // Narrows within the organization; it cannot widen past it.
-            // `??` would keep an empty string, which would filter on a
-            // storefront that cannot exist and return nothing.
-            storeId: storeId === "" ? undefined : storeId,
-        });
+        //
+        // `order:stage` reaches it too (DEC-024): a Member at the counter
+        // needs the list to open the order in front of them. They get the
+        // kitchen's view of it — no totals and no customer emails — the same
+        // line the order read draws.
+        const full = allows(ctx, "order:read");
+        if (!full && !allows(ctx, "order:stage")) authorize(ctx, "order:read");
+        return this.orders.listForOrganization(
+            ctx.organizationId,
+            {
+                // Narrows within the organization; it cannot widen past it.
+                // `??` would keep an empty string, which would filter on a
+                // storefront that cannot exist and return nothing.
+                storeId: storeId === "" ? undefined : storeId,
+            },
+            { kitchenOnly: !full },
+        );
     }
 
     /** One order as Order Detail shows it; money only with a money read. */

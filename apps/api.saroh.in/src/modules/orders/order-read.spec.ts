@@ -206,4 +206,75 @@ describe("amountDueCents", () => {
             ),
         ).toBe(0);
     });
+
+    it("names each line's allergens by kind, and the customer's confirmed contact", () => {
+        const read = serializeOrderRead(
+            {
+                ...base,
+                customer: {
+                    id: "cus_1",
+                    email: "priya@example.in",
+                    firstName: "Priya",
+                    lastName: "Raman",
+                    phone: null,
+                    identityLinks: [{ contactId: "con_1" }],
+                    orders: [{ createdAt: at }],
+                    _count: { orders: 6 },
+                },
+                items: [
+                    {
+                        ...base.items[0],
+                        product: {
+                            name: "Seeded rye",
+                            allergens: [
+                                {
+                                    kind: "CONTAINS",
+                                    allergen: { id: "al_g", name: "Gluten" },
+                                },
+                                {
+                                    kind: "MAY_CONTAIN",
+                                    allergen: { id: "al_s", name: "Sesame" },
+                                },
+                            ],
+                        },
+                    },
+                ],
+            },
+            opts(false),
+        );
+        expect(read.items[0].allergens).toEqual({
+            contains: [{ id: "al_g", name: "Gluten" }],
+            mayContain: [{ id: "al_s", name: "Sesame" }],
+        });
+        expect(read.customer).toEqual(
+            expect.objectContaining({
+                contactId: "con_1",
+                orderCount: 6,
+                firstOrderAt: at,
+            }),
+        );
+        // The kitchen's view still has no inbox in it.
+        expect(read.customer).not.toHaveProperty("email");
+    });
+
+    it("says a customer is unlinked rather than guessing by email", () => {
+        const read = serializeOrderRead(
+            {
+                ...base,
+                customer: {
+                    id: "cus_1",
+                    email: "priya@example.in",
+                    firstName: "Priya",
+                    lastName: null,
+                    phone: null,
+                },
+            },
+            opts(true),
+        );
+        expect(read.customer?.contactId).toBeNull();
+        expect(read.items[0].allergens).toEqual({
+            contains: [],
+            mayContain: [],
+        });
+    });
 });

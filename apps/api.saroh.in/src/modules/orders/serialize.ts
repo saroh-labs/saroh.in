@@ -158,7 +158,8 @@ export interface OrganizationOrderDto {
     orderId: string;
     /** REFUNDED | CANCELLED | FULFILLED | UNFULFILLED — see `orderStanding`. */
     standing: ReturnType<typeof orderStanding>;
-    total: string;
+    /** Null in the kitchen's view (`order:stage` without `order:read`). */
+    total: string | null;
     currency: string;
     placedAt: Date;
     itemCount: number;
@@ -166,7 +167,8 @@ export interface OrganizationOrderDto {
     customer: {
         id: string;
         name: string | null;
-        email: string;
+        /** Left out of the kitchen's view. */
+        email?: string;
     } | null;
 }
 
@@ -195,7 +197,9 @@ interface RawOrganizationOrder {
  */
 export function serializeOrganizationOrder(
     order: RawOrganizationOrder,
+    view: { kitchenOnly?: boolean } = {},
 ): OrganizationOrderDto {
+    const kitchen = view.kitchenOnly === true;
     const name = [order.customer?.firstName, order.customer?.lastName]
         .filter(Boolean)
         .join(" ")
@@ -204,7 +208,7 @@ export function serializeOrganizationOrder(
         id: order.id,
         orderId: order.orderId,
         standing: orderStanding(order.status, order.paymentStatus),
-        total: toMoneyString(order.total),
+        total: kitchen ? null : toMoneyString(order.total),
         currency: order.currency,
         placedAt: order.createdAt,
         itemCount: order._count.items,
@@ -213,7 +217,7 @@ export function serializeOrganizationOrder(
             ? {
                   id: order.customerId,
                   name: name || null,
-                  email: order.customer.email,
+                  ...(kitchen ? {} : { email: order.customer.email }),
               }
             : null,
     };
