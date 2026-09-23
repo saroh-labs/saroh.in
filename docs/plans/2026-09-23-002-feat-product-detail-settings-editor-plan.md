@@ -631,6 +631,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 - **Approach:** a new store starts with no list (a food business adds the usual eight in one step: "Add the common food allergens"); removal refused while any product lists it, with the count.
 - **Test scenarios:** duplicate refused ignoring case; in use can't be removed and names how many; a product with none says nothing on the shop; counts split contains / may contain.
 
+> **Done — #483.** Tables from `20260924100000_catalogue_extras`, and `20260924110000_allergen_fk` makes a product's allergen link NO ACTION so a storefront's delete never trips over its cascade order (the chain replays from empty). API `/stores/:id/allergens` (list with contains / may-contain counts, add one or the common eight, remove — refused in use with the count); the section PATCH takes `contains` / `mayContain` (each replaces its kind; one allergen is never in both) and the product read returns them. 3 DB tests. App: the Allergens tab (an empty store offers "Add the common food allergens"), Contains / May contain chips in the editor's "How to use and ingredients" when the store has a list, with the line customers read, and "Contains gluten. May contain nuts." on the product page and in the preview (`allergenLine`, tested). Verified in the browser: the empty state, the common eight added (then removed — Leela & Loom sells no food). The editor chips were not seen in the browser: neither demo store has an allergen list; they are covered by typecheck and the API's tests.
+
 ### U16. SKU pattern — suggestion, preview and clash check
 
 - **Goal:** R6c end to end.
