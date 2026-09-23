@@ -167,6 +167,14 @@ function bookerLabel(b: {
     return "Booking";
 }
 
+/** How a booking was paid (U3), as the day panel says it. */
+const PAID_WITH: Record<string, string> = {
+    MEMBERSHIP: "Membership",
+    PACK: "Class pack",
+    PAID: "Paid online",
+    DESK: "At the desk",
+};
+
 type Unavailable = CalendarUnavailable[];
 
 @Injectable()
@@ -809,6 +817,7 @@ export class CalendarService {
                 startAt: true,
                 status: true,
                 outcome: true,
+                paidWith: true,
                 bookerName: true,
                 bookerEmail: true,
                 service: { select: { name: true } },
@@ -829,10 +838,16 @@ export class CalendarService {
                         : b.outcome === "ATTENDED"
                           ? "attended"
                           : "booked",
-                title: bookerLabel(b),
-                subtitle: [b.service.name, b.staff?.name]
-                    .filter(Boolean)
-                    .join(" · "),
+                // "Personal training · Asha Rao", then "With Ravi · Paid
+                // online" — what it is and who, then with whom and how paid.
+                title: `${b.service.name} · ${bookerLabel(b)}`,
+                subtitle:
+                    [
+                        b.staff ? `With ${b.staff.name}` : null,
+                        b.paidWith ? PAID_WITH[b.paidWith] : null,
+                    ]
+                        .filter(Boolean)
+                        .join(" · ") || null,
                 at: b.startAt.toISOString(),
                 link: { type: "booking" as const, id: b.id },
             },

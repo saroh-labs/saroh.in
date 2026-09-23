@@ -279,6 +279,7 @@ describe("CalendarService.month", () => {
                     startAt: new Date("2026-09-08T04:30:00Z"),
                     status: "CONFIRMED",
                     outcome: null,
+                    paidWith: "PACK",
                     bookerName: null,
                     bookerEmail: null,
                     service: { name: "Physio" },
@@ -292,8 +293,8 @@ describe("CalendarService.month", () => {
         expect(res.layers).toEqual(["bookings", "classes"]);
         expect(res).not.toHaveProperty("takings");
         expect(res.days[7].layers.bookings?.items[0]).toMatchObject({
-            title: "Asha Rao",
-            subtitle: "Physio · Ravi",
+            title: "Physio · Asha Rao",
+            subtitle: "With Ravi · Class pack",
             link: { type: "booking", id: "bk_1" },
         });
         for (const d of res.days) {
