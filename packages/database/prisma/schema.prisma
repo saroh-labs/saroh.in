@@ -232,7 +232,7 @@ model Organization {
   subscriptionSkips     SubscriptionSkip[]
   invoices              Invoice[]
   invoiceLines          InvoiceLine[]
-  invoiceSequence       InvoiceSequence?
+  invoiceSequences      InvoiceSequence[]
   courses               Course[]
   courseSessions        CourseSession[]
   courseEnrollments     CourseEnrollment[]
@@ -271,6 +271,18 @@ model BusinessProfile {
   // subscription snapshots for its renewal dates. Null until the business
   // sets it; the subscribe flow asks when it is missing.
   timezone String?
+
+  // GST (ADR-008, U5). A registered business issues tax invoices; its GSTIN
+  // is `taxId`, checked against `gstState` (a two-digit GST state code, e.g.
+  // "29" Karnataka) when registration is switched on. Unregistered: receipts.
+  gstRegistered   Boolean  @default(false)
+  gstState        String?
+  // The invoice number's prefix ("RC" → RC/26-27/0001 when registered,
+  // RC-0001 when not). Null: the legacy INV series.
+  invoicePrefix   String?
+  // Delivery on an order's invoice is a taxed line: this rate and SAC.
+  deliveryGstRate Decimal  @default(18) @db.Decimal(5, 2)
+  deliverySacCode String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -616,6 +628,11 @@ model Product {
   returnsMode  String   @default("STOREFRONT") // STOREFRONT | OWN
   returnsText  String?
   shopFields   Json     @default("{}")
+
+  // GST (ADR-008, U5): the rate the price includes and the HSN code, printed
+  // on a registered business's tax invoice. Null rate: not set (0% on paper).
+  gstRate Decimal? @db.Decimal(5, 2)
+  hsnCode String?
 
   // SEO — stored and edited; the website renders them later (#473).
   seoTitle       String?
@@ -1063,6 +1080,10 @@ model Order {
 
   events OrderEvent[]
 
+  // Its invoice, and the credit notes and supplementary invoices that
+  // correct it (ADR-008, U5). The order stays the ledger.
+  invoices Invoice[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1102,6 +1123,9 @@ model OrderItem {
 
   // What has been refunded of this line (U6): caps the next line refund.
   refundLines PaymentRefundLine[]
+
+  // The invoice lines that bill it (U5): a line refund credits these.
+  invoiceLines InvoiceLine[]
 
   @@index([orderId])
   @@index([variantId])
@@ -2952,6 +2976,10 @@ model Service {
   priceCents Int? // optional price, minor units
   currency   String? // ISO 4217 when priced
 
+  // GST (ADR-008, U5): the rate the price includes and the SAC code.
+  gstRate Decimal? @db.Decimal(5, 2)
+  sacCode String?
+
   // IANA timezone the AvailabilityRules are expressed in, e.g. "Asia/Kolkata".
   timezone String
 
@@ -3068,6 +3096,9 @@ model Booking {
   // Cancelled inside the business's free-cancellation window: a class paid
   // with a pack or a membership keeps the class used (U3).
   cancelledLate Boolean @default(false)
+
+  // A paid online booking's own invoice (ADR-008).
+  invoices Invoice[]
 
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
@@ -3368,6 +3399,9 @@ model PaymentRefund {
 
   // The order lines this refund covers, when it was asked for by line.
   lines PaymentRefundLine[]
+
+  // The credit note this refund made on the order's invoice (U5).
+  creditNote Invoice?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4141,8 +4175,27 @@ model Invoice {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  number String? // INV-0001…, assigned on issue; null while DRAFT
-  status String  @default("DRAFT") // DRAFT | ISSUED | PAID | VOID
+  number String? // INV-0001, RC/26-27/0001, PF-0001…; assigned on issue, null while DRAFT
+  // DRAFT | ISSUED | PAID | VOID | CREDITED. CREDITED: an issued invoice a
+  // credit note cancelled in full (ADR-008) — a registered business never voids.
+  status String  @default("DRAFT")
+
+  // INVOICE | CREDIT_NOTE | SUPPLEMENTARY (ADR-008). A credit note (down) or
+  // a supplementary invoice (up) corrects `relatedInvoiceId`, never edits it.
+  kind             String    @default("INVOICE")
+  relatedInvoiceId String?
+  relatedInvoice   Invoice?  @relation("InvoiceCorrection", fields: [relatedInvoiceId], references: [id], onDelete: SetNull)
+  corrections      Invoice[] @relation("InvoiceCorrection")
+
+  // What it bills when it is not hand-written: an order (one INVOICE per
+  // order; the order is the ledger, so it has no pay link) or a paid online
+  // booking. A credit note made by a refund names the refund.
+  orderId         String?
+  order           Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  bookingId       String?
+  booking         Booking?       @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  paymentRefundId String?        @unique
+  paymentRefund   PaymentRefund? @relation(fields: [paymentRefundId], references: [id], onDelete: SetNull)
 
   // Who it is billed to. The name and email are copied on issue, so an
   // invoice reads the same after the contact is edited or deleted.
@@ -4150,6 +4203,21 @@ model Invoice {
   contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
   billToName  String?
   billToEmail String?
+  // A registered buyer's GSTIN, their state (GST state code) and address.
+  billToGstin   String?
+  billToState   String?
+  billToAddress String?
+
+  // GST, frozen on issue (ADR-008). `sellerGstin` set = a tax invoice; null
+  // = a receipt. Place of supply is a GST state code; `taxType` INTRA (CGST +
+  // SGST) or INTER (IGST).
+  sellerGstin   String?
+  sellerState   String?
+  placeOfSupply String?
+  taxType       String?
+  cgst          Decimal @default(0) @db.Decimal(12, 2)
+  sgst          Decimal @default(0) @db.Decimal(12, 2)
+  igst          Decimal @default(0) @db.Decimal(12, 2)
 
   currency String
   subtotal Decimal @db.Decimal(12, 2)
@@ -4201,9 +4269,16 @@ model Invoice {
   // One live invoice per subscription period: the renewal job's idempotency
   // key. Voided invoices are left out, so a voided period can be reissued.
   @@unique([subscriptionId, periodStart], map: "Invoice_one_live_per_period", where: raw("status <> 'VOID'"))
+  // One invoice per order and per booking (ADR-008): the idempotency key of
+  // the payment reconciliation. Corrections are other kinds.
+  @@unique([orderId], map: "Invoice_one_per_order", where: raw("kind = 'INVOICE'"))
+  @@unique([bookingId], map: "Invoice_one_per_booking", where: raw("kind = 'INVOICE'"))
   @@index([organizationId, status])
   @@index([contactId])
   @@index([subscriptionId])
+  @@index([orderId])
+  @@index([bookingId])
+  @@index([relatedInvoiceId])
 }
 
 model InvoiceLine {
@@ -4217,20 +4292,44 @@ model InvoiceLine {
   description String
   quantity    Int
   unitPrice   Decimal @db.Decimal(12, 2)
+  // What the line comes to: quantity × unit price less its discount. On a
+  // tax invoice this includes GST (prices include it).
   amount      Decimal @db.Decimal(12, 2)
+
+  // The order discount's share of this line, spread before tax (ADR-008).
+  discount Decimal @default(0) @db.Decimal(12, 2)
+
+  // GST, derived from `amount` and frozen (ADR-008). Null on a receipt.
+  hsnSac       String?
+  gstRate      Decimal? @db.Decimal(5, 2)
+  taxableValue Decimal? @db.Decimal(12, 2)
+  cgst         Decimal  @default(0) @db.Decimal(12, 2)
+  sgst         Decimal  @default(0) @db.Decimal(12, 2)
+  igst         Decimal  @default(0) @db.Decimal(12, 2)
+
+  // The order line it bills, so a line refund credits the right line.
+  orderItemId String?
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
 
   @@index([invoiceId])
   @@index([organizationId])
+  @@index([orderItemId])
 }
 
 // The last invoice number a business issued. Allocated with one
 // insert-or-increment statement on the issuing transaction, so numbers never
 // repeat and the first invoice needs no row to exist beforehand.
+// One counter per business and series (ADR-008): "INV" (the legacy series
+// every business had), "RC" / "RCCN" when unregistered, "RC/26-27" /
+// "RCCN/26-27" per financial year when registered.
 model InvoiceSequence {
-  organizationId String       @id
+  organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  series         String       @default("INV")
   lastNumber     Int          @default(0)
   updatedAt      DateTime     @updatedAt
+
+  @@id([organizationId, series])
 }
 
 // A fixed series of dated sessions on one service, sold once.
