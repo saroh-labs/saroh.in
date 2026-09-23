@@ -902,11 +902,17 @@ export class BookingsService {
      * inside the window it stays used and the booking says it was cancelled
      * late (a membership's class then counts against its month too). With no
      * rule, every cancel is in time — as before the rules existed.
+     *
+     * `returnCredit` is the business cancelling rather than the customer —
+     * a whole class called off (U15). The rule protects the business from a
+     * customer dropping out late; it never takes a class from someone whose
+     * class was cancelled on them.
      */
     async cancelBooking(
         ctx: OrganizationContext,
         bookingId: string,
         now: Date = new Date(),
+        options: { returnCredit?: boolean } = {},
     ): Promise<Booking> {
         authorize(ctx, "booking:write");
 
@@ -915,7 +921,8 @@ export class BookingsService {
             return booking;
         }
         const rules = await loadBookingRules(prisma, ctx.organizationId);
-        const late = isLateCancel(booking.startAt, now, rules);
+        const late =
+            !options.returnCredit && isLateCancel(booking.startAt, now, rules);
         return prisma.$transaction(async (tx) => {
             const cancelled = await tx.booking.update({
                 where: { id: booking.id },

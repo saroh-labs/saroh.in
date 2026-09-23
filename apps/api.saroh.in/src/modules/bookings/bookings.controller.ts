@@ -219,11 +219,18 @@ export class BookingsController {
         return this.bookings.recordOutcome(ctx, bookingId, dto.outcome);
     }
 
+    /**
+     * `?returnCredit=true` when the business calls it off (a whole class):
+     * the class paid for goes back even inside the free-cancellation window.
+     */
     @Delete("bookings/:bookingId")
     cancelBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
+        @Query("returnCredit") returnCredit?: string,
     ): Promise<Booking> {
-        return this.bookings.cancelBooking(ctx, bookingId);
+        return this.bookings.cancelBooking(ctx, bookingId, undefined, {
+            returnCredit: returnCredit === "true",
+        });
     }
 }

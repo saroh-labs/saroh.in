@@ -1931,6 +1931,20 @@ describe("cancelling inside the free-cancellation window (U3)", () => {
         });
         expect(db.packRedemption!.updateMany).not.toHaveBeenCalled();
     });
+
+    it("the business calling a class off gives the class back, even inside it", async () => {
+        await new BookingsService().cancelBooking(
+            ctx(),
+            "bk_1",
+            new Date("2026-07-20T01:00:00Z"),
+            { returnCredit: true },
+        );
+        expect(bookingUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "CANCELLED",
+            cancelledLate: false,
+        });
+        expect(db.packRedemption!.updateMany).toHaveBeenCalled();
+    });
 });
 
 describe("the bookings calendar in one read (U4)", () => {
