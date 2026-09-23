@@ -160,9 +160,6 @@ export async function undoDefaults(storeId: string, saved: DefaultsSaveResult) {
     );
 }
 
-// ---- SKU pattern ----
-
-/** The preview as the pattern is typed; null when it could not be read. */
 /** The editor's prefill when a new product's category changes. */
 export async function effectiveDefaults(
     storeId: string,
@@ -171,6 +168,9 @@ export async function effectiveDefaults(
     return getEffectiveDefaults(storeId, categoryId);
 }
 
+// ---- SKU pattern ----
+
+/** The preview as the pattern is typed; null when it could not be read. */
 export async function previewSkuPattern(storeId: string, pattern: string) {
     return getSkuPreview(storeId, pattern);
 }

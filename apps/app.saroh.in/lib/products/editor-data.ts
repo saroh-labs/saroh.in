@@ -1,3 +1,5 @@
+import { unstable_rethrow } from "next/navigation";
+
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { canWriteProducts } from "@/lib/products/access";
 import { listCategories, listOptions } from "@/lib/products/service";
@@ -40,7 +42,12 @@ export async function loadEditorContext(
         getSkuSettings(store.id, product?.id).catch(() => null),
         listAllergens(store.id).catch(() => null),
         getEffectiveDefaults(store.id, product?.categoryId ?? null).catch(
-            () => null,
+            (error: unknown) => {
+                // A forbidden() or redirect from the read is the page's to
+                // handle, not a failure to fall back from.
+                unstable_rethrow(error);
+                return null;
+            },
         ),
     ]);
     return {
