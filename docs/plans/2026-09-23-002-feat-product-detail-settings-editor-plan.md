@@ -519,6 +519,18 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
     - Plurals are correct at 0, 1 and n.
 - **Verification:** the browser pass in U13.
 
+### U7b. The product page — the 2026-09-23 design update
+
+- **Goal:** what the updated Product Detail design added after U7 shipped.
+- **Changes:**
+    - **Archived:** a banner under the header, "Archived on {date}. It is not sold and its page does not open. Past orders, reviews and stock history are kept below.", with "Restore as a draft" (Undo); archived copy on the pill, the visibility row and the Customer view line. Needs `Product.archivedAt`, set when the status becomes ARCHIVED and cleared when it leaves.
+    - **Per-variant drawer:** "No open orders for this size." / "Couldn't load orders. Stock figures above are still right." (no orders listed while they failed), and "No reviews from people who bought this size yet."
+    - **Customer links:** a customer's name in the Orders tab and on a review opens the customer (the overview returns `customerId` with each order and review).
+    - **Promised line:** "Nothing is promised to an open order." when nothing is.
+    - **Custom field rows** in "Everything about it" arrive with U14.
+    - **API:** a product's option can't change while it has variants ("Remove the variants first to sell it by {name} instead.").
+- **Test scenarios:** archiving sets `archivedAt`, restoring clears it; the option change is refused with variants and allowed without; the overview returns customer ids; the drawer's three new lines in the browser.
+
 ### U8. The product page: quick-edit sheets and the Customer view
 
 - **Goal:** R3 and R4.
@@ -534,6 +546,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
     - Covered by U13's walkthrough: save a sheet, then Undo; close a changed sheet and choose Keep editing; switch team notes off.
 
 ### U9. Editor v2: the shell, and Basics through SEO
+
+> **Design update (2026-09-23):** the Made by card gains "More about it" — the custom fields of the product's category (U14), each tagged On the shop / Team only, saved with that section, with a "Manage fields" link.
 
 - **Goal:** R10–R14, R16, R17, R20 and R21 for those sections.
 - **Files:**
@@ -558,6 +572,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 - **Verification:** the browser pass in U13.
 
 ### U10. Editor v2: Photos, Variants, Stock
+
+> **Design update (2026-09-23):** a variant's value is a select of the product option's values from Settings → Options (a value another variant has is disabled, "— already a variant"; "Pick a size" first); the option can't change once variants exist (a toast says to remove the variants first); new row errors "“{value}” is not a {option} in Settings → Options. Pick one, or add it there." and "Two variants are both {value}."; add-row notes "No values for {option} yet — add them in Settings → Options." and "Every {option} is already a variant. Add another value in Settings → Options."; a failed variants save keeps the section unsaved with "Couldn't save variants — the connection dropped. The product itself is saved and your changes are still here." and a "Try again" button; the SKU placeholder follows the store's pattern (U16).
 
 - **Goal:** R15, R18 and R19.
 - **Files:**
