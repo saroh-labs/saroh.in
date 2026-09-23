@@ -17,12 +17,15 @@ jest.mock("@saroh/database", () => {
     // line recorded; none recorded here, and the product counts no stock.
     const orderItem = { findUnique: jest.fn().mockResolvedValue(null) };
     const $queryRaw = jest.fn().mockResolvedValue([]);
+    // A status change is a step on the order's timeline (ADR-008).
+    const orderEvent = { create: jest.fn() };
     return {
         prisma: {
             order,
             inventory,
+            orderEvent,
             $transaction: jest.fn((cb) =>
-                cb({ order, inventory, orderItem, $queryRaw }),
+                cb({ order, inventory, orderItem, orderEvent, $queryRaw }),
             ),
         },
     };
@@ -39,6 +42,7 @@ const orderFindFirst = prisma.order.findFirst as jest.Mock;
 const orderUpdate = prisma.order.update as jest.Mock;
 const inventoryFindUnique = prisma.inventory.findUnique as jest.Mock;
 const txMock = prisma.$transaction as jest.Mock;
+const eventCreate = prisma.orderEvent.create as jest.Mock;
 
 const STORE = "store_1";
 const USER = "user_1";
@@ -185,6 +189,66 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
 
         expect(txMock).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
+    });
+
+    it("keeps the kitchen stage in step and logs the change on the timeline", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "PROCESSING",
+            paymentStatus: "PAID",
+            stage: "READY",
+            fulfilment: "COLLECT",
+            organizationId: ORG,
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+
+        await service.updateStatus(STORE, ORDER, USER, { status: "SHIPPED" });
+
+        // Shipped means a courier took it, whatever it was meant to be.
+        expect(orderUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    status: "SHIPPED",
+                    stage: "HANDED_TO_COURIER",
+                    fulfilment: "DELIVERY",
+                }),
+            }),
+        );
+        expect(eventCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                kind: "STATUS",
+                actorUserId: USER,
+                fromStatus: "PROCESSING",
+                toStatus: "SHIPPED",
+                fromStage: "READY",
+                toStage: "HANDED_TO_COURIER",
+            }),
+        });
+    });
+
+    it("collects a PROCESSING order straight to DELIVERED (ADR-008)", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "PROCESSING",
+            paymentStatus: "PAID",
+            stage: "READY",
+            fulfilment: "COLLECT",
+            organizationId: ORG,
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+
+        await service.updateStatus(STORE, ORDER, USER, { status: "DELIVERED" });
+
+        expect(orderUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    status: "DELIVERED",
+                    stage: "COLLECTED",
+                }),
+            }),
+        );
     });
 
     it("still 404s a missing order before any lifecycle check", async () => {

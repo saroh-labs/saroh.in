@@ -42,6 +42,10 @@ module.exports = {
         // @saroh/database), so keep them out of the DB-backed run. The legacy
         // DB-backed orders.service.spec.ts still runs here.
         "<rootDir>/src/modules/orders/order-state.spec.ts",
+        "<rootDir>/src/modules/orders/order-stage.spec.ts",
+        "<rootDir>/src/modules/orders/order-refunds.spec.ts",
+        "<rootDir>/src/modules/orders/order-read.spec.ts",
+        "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         // The waitlist spec mocks Prisma (pure unit test) and runs in the
         // default/unit project — keep it out of the DB-backed run.

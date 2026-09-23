@@ -92,6 +92,10 @@ export class PaymentsController {
         @Param("orderId") orderId: string,
         @Body() dto: RefundOrderDto,
     ) {
-        return this.payments.initiateRefund(ctx, orderId, dto.reason);
+        return this.payments.initiateRefund(ctx, orderId, {
+            reason: dto.reason,
+            lines: dto.lines,
+            idempotencyKey: dto.idempotencyKey,
+        });
     }
 }

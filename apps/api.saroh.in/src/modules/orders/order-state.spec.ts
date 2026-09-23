@@ -13,6 +13,27 @@ import {
 
 describe("order-state (pure lifecycle state machine)", () => {
     describe("status transitions", () => {
+        // Characterization: the whole table as it stands, written out so any
+        // widening is a visible, deliberate edit here.
+        it("pins the status transition table", () => {
+            expect(STATUS_TRANSITIONS).toEqual({
+                PENDING: ["PROCESSING", "CANCELLED"],
+                PROCESSING: ["SHIPPED", "DELIVERED", "CANCELLED"],
+                SHIPPED: ["DELIVERED"],
+                DELIVERED: [],
+                CANCELLED: [],
+            });
+        });
+
+        it("pins the payment transition table", () => {
+            expect(PAYMENT_TRANSITIONS).toEqual({
+                UNPAID: ["PAID", "FAILED"],
+                FAILED: ["PAID"],
+                PAID: ["REFUNDED"],
+                REFUNDED: [],
+            });
+        });
+
         it("allows every legal status transition", () => {
             for (const from of ORDER_STATUSES) {
                 for (const to of STATUS_TRANSITIONS[from]) {
@@ -69,6 +90,13 @@ describe("order-state (pure lifecycle state machine)", () => {
                 expect(res.message).toContain("PROCESSING");
                 expect(res.field).toBe("status");
             }
+        });
+
+        it("a collection order goes from PROCESSING straight to DELIVERED (ADR-008)", () => {
+            expect(canTransitionStatus("PROCESSING", "DELIVERED")).toBe(true);
+            // Still no way back, and no skipping the work.
+            expect(canTransitionStatus("DELIVERED", "PROCESSING")).toBe(false);
+            expect(canTransitionStatus("PENDING", "DELIVERED")).toBe(false);
         });
 
         it("a SHIPPED order can be delivered but never cancelled", () => {

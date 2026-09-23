@@ -137,6 +137,12 @@ export const CAPABILITIES: readonly Capability[] = [
     { action: "store:delete", group: "sell", label: "Delete a storefront" },
     { action: "order:read", group: "sell", label: "See orders" },
     { action: "order:write", group: "sell", label: "Change orders" },
+    {
+        action: "order:stage",
+        group: "sell",
+        label: "Move orders through the kitchen",
+        note: "Sees what to make and who it is for, never what anyone paid.",
+    },
     { action: "discount:read", group: "sell", label: "See discount codes" },
     {
         action: "product-review:read",

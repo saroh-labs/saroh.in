@@ -17,18 +17,15 @@ import type {
     PaymentStatus,
     UpdateOrderDto,
 } from "./dto";
-import type { OrderLine } from "./order-inventory";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
+import { fromCents, priceOrderLines, toCents } from "./order-pricing";
+import { stageForStatus } from "./order-stage";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
 import {
     serializeOrderDetail,
     serializeOrderSummary,
     serializeOrganizationOrder,
 } from "./serialize";
-
-/** Money helpers — integer-cents math so totals never drift on floats. */
-const toCents = (s: string) => Math.round(Number(s) * 100);
-const fromCents = (c: number) => (c / 100).toFixed(2);
 
 const CUSTOMER_SELECT = {
     select: { email: true, firstName: true, lastName: true },
@@ -142,60 +139,7 @@ export class OrdersService {
             });
         }
 
-        // Snapshot each line's price from what was bought: the variant's own
-        // price when it has one, else the product's. A product with variants
-        // is bought as one of them, so its line must say which.
-        const lines: (Omit<OrderLine, "id"> & {
-            priceCents: number;
-            categoryId: string | null;
-        })[] = [];
-        for (const item of dto.items) {
-            const product = await prisma.product.findFirst({
-                where: { id: item.productId, storeId },
-                // The category too: a collection code matches on it.
-                select: {
-                    name: true,
-                    price: true,
-                    categoryId: true,
-                    variants: { select: { id: true, price: true } },
-                },
-            });
-            if (!product) {
-                throw new BadRequestException({
-                    message: "Unknown product in order",
-                    field: "items",
-                });
-            }
-            let unitPrice = product.price.toString();
-            let variantId: string | null = null;
-            if (product.variants.length > 0) {
-                const variant = product.variants.find(
-                    (v) => v.id === item.variantId,
-                );
-                if (!variant) {
-                    throw new BadRequestException({
-                        message: item.variantId
-                            ? `That option of ${product.name} no longer exists.`
-                            : `Choose which one of ${product.name} is being bought.`,
-                        field: "items",
-                    });
-                }
-                variantId = variant.id;
-                if (variant.price) unitPrice = variant.price.toString();
-            } else if (item.variantId) {
-                throw new BadRequestException({
-                    message: `${product.name} has no options to choose from.`,
-                    field: "items",
-                });
-            }
-            lines.push({
-                productId: item.productId,
-                variantId,
-                quantity: item.quantity,
-                priceCents: toCents(unitPrice),
-                categoryId: product.categoryId,
-            });
-        }
+        const lines = await priceOrderLines(storeId, dto.items);
 
         // An order is taken in its storefront's currency. The form never sent
         // one, so every order fell to the column's USD — a rupee shop's
@@ -274,6 +218,20 @@ export class OrdersService {
             shipping: fromCents(shippingCents),
             discount: fromCents(discountCents),
             total: fromCents(totalCents),
+            // The kitchen flow (ADR-008): collected unless said otherwise.
+            fulfilment: dto.fulfilment ?? "COLLECT",
+            notes: dto.notes ?? null,
+            ...(dto.address
+                ? {
+                      deliveryName: dto.address.name ?? null,
+                      deliveryPhone: dto.address.phone ?? null,
+                      deliveryLine1: dto.address.line1,
+                      deliveryLine2: dto.address.line2 ?? null,
+                      deliveryCity: dto.address.city,
+                      deliveryState: dto.address.state,
+                      deliveryPostalCode: dto.address.postalCode,
+                  }
+                : {}),
             items: {
                 create: lines.map((l) => ({
                     productId: l.productId,
@@ -382,6 +340,9 @@ export class OrdersService {
                 id: true,
                 status: true,
                 paymentStatus: true,
+                stage: true,
+                fulfilment: true,
+                organizationId: true,
                 items: {
                     select: {
                         id: true,
@@ -426,6 +387,14 @@ export class OrdersService {
                     phaseOf(dto.status as string),
                 );
             }
+            // The kitchen stage follows a status set here, so the next
+            // kitchen step is not refused as out of step (ADR-008).
+            const kitchen = statusChanging
+                ? stageForStatus(nextStatus, {
+                      stage: order.stage,
+                      fulfilment: order.fulfilment,
+                  })
+                : null;
             await tx.order.update({
                 where: { id: orderId },
                 data: {
@@ -433,8 +402,24 @@ export class OrdersService {
                     ...(dto.paymentStatus
                         ? { paymentStatus: dto.paymentStatus }
                         : {}),
+                    ...(kitchen ?? {}),
                 },
             });
+            if (statusChanging && order.organizationId) {
+                // On the order's timeline too, as a step outside the kitchen.
+                await tx.orderEvent.create({
+                    data: {
+                        organizationId: order.organizationId,
+                        orderId,
+                        kind: "STATUS",
+                        actorUserId: userId,
+                        fromStage: order.stage,
+                        toStage: kitchen?.stage ?? order.stage,
+                        fromStatus: order.status,
+                        toStatus: nextStatus,
+                    },
+                });
+            }
         });
         return { id: orderId };
     }

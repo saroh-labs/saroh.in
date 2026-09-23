@@ -9,6 +9,16 @@ import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type {
+    LineRefundRequest,
+    PlannedLineRefund,
+    RefundableLine,
+} from "../orders/order-refunds";
+import {
+    allocateAcrossPayments,
+    planLineRefund,
+    planRemainingLines,
+} from "../orders/order-refunds";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { decryptSecret, encryptSecret } from "./crypto";
@@ -31,7 +41,22 @@ export interface ConnectProviderInput {
     webhookSecret?: string;
 }
 
-/** The client-safe result of initiating a refund — NO secret, ever. */
+/** What a merchant asks to refund (U6). Never an amount. */
+export interface RefundRequest {
+    reason?: string;
+    /** Lines and how many of each; none means everything left. */
+    lines?: LineRefundRequest[];
+    /** A retry with the same key returns the first refund. */
+    idempotencyKey?: string;
+}
+
+/**
+ * The client-safe result of initiating a refund — NO secret, ever.
+ *
+ * The top-level fields describe the first refund row (the shape before
+ * U6); `amountCents` is the whole refund. A refund that had to come back
+ * from two payments lists both in `refunds`.
+ */
 export interface InitiateRefundResult {
     refundId: string;
     paymentIntentId: string;
@@ -40,6 +65,84 @@ export interface InitiateRefundResult {
     amountCents: number;
     currency: string;
     status: string;
+    refunds: {
+        id: string;
+        paymentIntentId: string;
+        amountCents: number;
+        status: string;
+        providerRefundId: string | null;
+    }[];
+    /** The lines this refund covers, with the amount worked out for each. */
+    lines: { itemId: string; quantity: number; amountCents: number }[];
+}
+
+interface RefundRow {
+    id: string;
+    paymentIntentId: string;
+    amountCents: number;
+    currency: string;
+    status: string;
+    providerRefundId: string | null;
+    paymentIntent: { provider: string };
+    lines: { orderItemId: string; quantity: number; amountCents: number }[];
+}
+
+function refundResult(rows: RefundRow[]): InitiateRefundResult {
+    const [first] = rows;
+    return {
+        refundId: first.id,
+        paymentIntentId: first.paymentIntentId,
+        provider: first.paymentIntent.provider,
+        providerRefundId: first.providerRefundId,
+        amountCents: rows.reduce((s, r) => s + r.amountCents, 0),
+        currency: first.currency,
+        status: first.status,
+        refunds: rows.map((r) => ({
+            id: r.id,
+            paymentIntentId: r.paymentIntentId,
+            amountCents: r.amountCents,
+            status: r.status,
+            providerRefundId: r.providerRefundId,
+        })),
+        lines: rows.flatMap((r) =>
+            r.lines.map((l) => ({
+                itemId: l.orderItemId,
+                quantity: l.quantity,
+                amountCents: l.amountCents,
+            })),
+        ),
+    };
+}
+
+/**
+ * An order's lines with what has already been refunded of each — pending or
+ * settled, never failed. Read inside the refund's transaction, under the
+ * order's row lock.
+ */
+async function refundableLines(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+): Promise<RefundableLine[]> {
+    const items = await tx.orderItem.findMany({
+        where: { orderId },
+        orderBy: { id: "asc" },
+        select: {
+            id: true,
+            quantity: true,
+            price: true,
+            refundLines: {
+                where: { paymentRefund: { status: { not: "FAILED" } } },
+                select: { quantity: true, amountCents: true },
+            },
+        },
+    });
+    return items.map((i) => ({
+        id: i.id,
+        quantity: i.quantity,
+        unitCents: totalToCents(i.price),
+        refundedQuantity: i.refundLines.reduce((s, r) => s + r.quantity, 0),
+        refundedCents: i.refundLines.reduce((s, r) => s + r.amountCents, 0),
+    }));
 }
 
 /** A REDACTED provider view — safe to return; never carries secret material. */
@@ -310,88 +413,342 @@ export class PaymentsService {
     }
 
     /**
-     * Initiate a refund against an Order's SUCCEEDED payment (S5-003).
-     * `payment:manage`.
+     * Refund an Order's money, by line or in full (S5-003; ADR-008, U6).
+     * `payment:manage` — a Member never refunds.
      *
-     * - The Order must belong to `ctx.organizationId` (else 404).
-     * - The Order must have a SUCCEEDED PaymentIntent (else 400) — you can only
-     *   refund money that was actually collected.
-     * - `amountCents` is taken from the intent (server-authoritative) — never
-     *   from client input.
-     * - Calls the provider refund API and records a PENDING {@link PaymentRefund}.
-     *   The Order.paymentStatus is NOT moved here; it flips to REFUNDED only when
-     *   the provider's refund webhook is reconciled (via the state machine).
+     * - The Order must belong to `ctx.organizationId` (else 404) and have a
+     *   SUCCEEDED payment (else 400) — only money actually collected goes
+     *   back.
+     * - The amount is worked out HERE: with `lines`, what each chosen line
+     *   paid for the chosen quantity, capped at what is left of the line;
+     *   with none, everything still refundable. Never from client input.
+     * - Two phases. Under the order's row lock the refund is RESERVED — the
+     *   PaymentRefund rows (PENDING, with the lines they cover) and the
+     *   timeline step are written — so two racing requests cannot both see
+     *   the same money left. The provider is called after that commits; a
+     *   refused call marks the rows FAILED, which frees the lines again.
+     * - Idempotent by `idempotencyKey`: a retry with the same key returns
+     *   the refund the first one made, even while it is in flight.
+     * - Order.paymentStatus is NOT moved here. The refund webhook settles it,
+     *   and moves the order to REFUNDED only when every rupee taken has gone
+     *   back; until then the order reads "partly refunded" (derived).
      */
     async initiateRefund(
         ctx: OrganizationContext,
         orderId: string,
-        reason?: string,
+        input: RefundRequest = {},
     ): Promise<InitiateRefundResult> {
         authorize(ctx, "payment:manage");
-
         const order = await this.requireOwnedOrder(ctx, orderId);
-
-        const intent = await prisma.paymentIntent.findFirst({
-            where: {
-                orderId: order.id,
-                organizationId: ctx.organizationId,
-                status: "SUCCEEDED",
+        const lines = input.lines;
+        return this.refundOrder(ctx, order, {
+            idempotencyKey: input.idempotencyKey,
+            reason: input.reason ?? null,
+            forEdit: false,
+            plan: async (tx) => {
+                const refundable = await refundableLines(tx, order.id);
+                const discountCents = totalToCents(order.discount);
+                if (lines && lines.length > 0) {
+                    const planned = planLineRefund(
+                        refundable,
+                        discountCents,
+                        lines,
+                    );
+                    return {
+                        amountCents: planned.reduce(
+                            (s, l) => s + l.amountCents,
+                            0,
+                        ),
+                        lines: planned,
+                    };
+                }
+                // In full: whatever is left of the payments, recorded
+                // against whatever is left of the lines.
+                return {
+                    amountCents: "REMAINING",
+                    lines: planRemainingLines(refundable, discountCents),
+                };
             },
-            orderBy: { createdAt: "desc" },
         });
-        if (!intent?.providerIntentId) {
-            throw new BadRequestException(
-                "Order has no successful payment to refund",
-            );
+    }
+
+    /**
+     * Hand back a fixed amount because the order was edited down before
+     * anyone started on it (U6). `payment:manage`; the caller has already
+     * lowered the order total. No lines: nothing that was bought is being
+     * refunded — the order simply costs less now.
+     */
+    async refundOrderDifference(
+        ctx: OrganizationContext,
+        orderId: string,
+        amountCents: number,
+        idempotencyKey: string,
+    ): Promise<InitiateRefundResult> {
+        authorize(ctx, "payment:manage");
+        const order = await this.requireOwnedOrder(ctx, orderId);
+        return this.refundOrder(ctx, order, {
+            idempotencyKey,
+            reason: "Order changed before preparing",
+            forEdit: true,
+            plan: () => Promise.resolve({ amountCents, lines: [] }),
+        });
+    }
+
+    /**
+     * Take the difference when an order is edited up after it was paid (U6):
+     * a new payment on the ORDER for exactly that amount — the order stays
+     * the ledger for its own payments. `payment:manage`. Idempotent by key.
+     */
+    async createDifferenceIntent(
+        ctx: OrganizationContext,
+        orderId: string,
+        amountCents: number,
+        idempotencyKey: string,
+    ): Promise<CreateIntentResult> {
+        authorize(ctx, "payment:manage");
+        const order = await this.requireOwnedOrder(ctx, orderId);
+        if (amountCents <= 0) {
+            throw new BadRequestException("Nothing more to take on this order");
+        }
+        return this.createIntentFor(
+            ctx.organizationId,
+            {
+                kind: "order",
+                id: order.id,
+                amountCents,
+                currency: order.currency,
+            },
+            idempotencyKey,
+            async () => {
+                const settings = await prisma.storeSettings.findUnique({
+                    where: { storeId: order.storeId },
+                    select: { checkoutProvider: true },
+                });
+                return this.resolveConnectedProvider(
+                    ctx.organizationId,
+                    settings?.checkoutProvider ?? undefined,
+                );
+            },
+        );
+    }
+
+    /** The shared two-phase refund core — see {@link initiateRefund}. */
+    private async refundOrder(
+        ctx: OrganizationContext,
+        order: { id: string },
+        opts: {
+            idempotencyKey?: string;
+            reason: string | null;
+            forEdit: boolean;
+            plan: (tx: Prisma.TransactionClient) => Promise<{
+                amountCents: number | "REMAINING";
+                lines: PlannedLineRefund[];
+            }>;
+        },
+    ): Promise<InitiateRefundResult> {
+        const rawKey = opts.idempotencyKey?.trim();
+        const key = rawKey && rawKey.length > 0 ? rawKey : null;
+        const findByKey = (client: Prisma.TransactionClient, k: string) =>
+            client.paymentRefund.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    idempotencyKey: k,
+                    paymentIntent: { orderId: order.id },
+                },
+                include: {
+                    paymentIntent: { select: { provider: true } },
+                    lines: {
+                        select: {
+                            orderItemId: true,
+                            quantity: true,
+                            amountCents: true,
+                        },
+                    },
+                },
+                orderBy: { createdAt: "asc" },
+            });
+
+        if (key) {
+            const replay = await findByKey(prisma, key);
+            if (replay.length > 0) return refundResult(replay);
         }
 
-        const providerRow = await this.requireOwnedProvider(
-            ctx.organizationId,
-            intent.provider,
-        );
+        const reserved = await prisma.$transaction(async (tx) => {
+            // The order's row lock: every refund of this order queues here,
+            // so the money left is read by one request at a time.
+            await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${order.id} FOR UPDATE`;
+            if (key) {
+                // The racing twin of this request may have reserved while we
+                // waited for the lock.
+                const replay = await findByKey(tx, key);
+                if (replay.length > 0) return { replay, done: true as const };
+            }
 
-        // The provider payment id captured from the success webhook (needed by
-        // e.g. Razorpay to book the refund). Null-safe: some providers refund
-        // against the order id alone.
-        const attempt = await prisma.paymentAttempt.findFirst({
-            where: {
-                paymentIntentId: intent.id,
-                providerRef: { not: null },
-            },
-            orderBy: { createdAt: "desc" },
+            const payments = await tx.paymentIntent.findMany({
+                where: {
+                    orderId: order.id,
+                    organizationId: ctx.organizationId,
+                    status: "SUCCEEDED",
+                },
+                orderBy: { createdAt: "asc" },
+                include: {
+                    refunds: {
+                        where: { status: { not: "FAILED" } },
+                        select: { amountCents: true },
+                    },
+                },
+            });
+            const refundable = payments
+                .filter((p) => p.providerIntentId)
+                .map((p) => ({
+                    id: p.id,
+                    intent: p,
+                    leftCents:
+                        p.amountCents -
+                        p.refunds.reduce((s, r) => s + r.amountCents, 0),
+                }));
+            if (refundable.length === 0) {
+                throw new BadRequestException(
+                    "Order has no successful payment to refund",
+                );
+            }
+
+            const plan = await opts.plan(tx);
+            const amountCents =
+                plan.amountCents === "REMAINING"
+                    ? refundable.reduce(
+                          (s, p) => s + Math.max(0, p.leftCents),
+                          0,
+                      )
+                    : plan.amountCents;
+            if (amountCents <= 0) {
+                throw new BadRequestException(
+                    "Nothing is left to refund on this order",
+                );
+            }
+            // The order-level cap: never more than was taken and not yet
+            // handed back, whatever the lines add up to.
+            const split = allocateAcrossPayments(refundable, amountCents);
+
+            const rows = [];
+            for (const [i, part] of split.entries()) {
+                rows.push(
+                    await tx.paymentRefund.create({
+                        data: {
+                            organizationId: ctx.organizationId,
+                            paymentIntentId: part.payment.id,
+                            amountCents: part.amountCents,
+                            currency: part.payment.intent.currency,
+                            status: "PENDING",
+                            reason: opts.reason,
+                            idempotencyKey: key,
+                            forEdit: opts.forEdit,
+                            // The lines ride on the first row; a refund
+                            // split across two payments is still one
+                            // request for these lines.
+                            ...(i === 0 && plan.lines.length > 0
+                                ? {
+                                      lines: {
+                                          create: plan.lines.map((l) => ({
+                                              organizationId:
+                                                  ctx.organizationId,
+                                              orderItemId: l.itemId,
+                                              quantity: l.quantity,
+                                              amountCents: l.amountCents,
+                                          })),
+                                      },
+                                  }
+                                : {}),
+                        },
+                        include: {
+                            paymentIntent: { select: { provider: true } },
+                            lines: {
+                                select: {
+                                    orderItemId: true,
+                                    quantity: true,
+                                    amountCents: true,
+                                },
+                            },
+                        },
+                    }),
+                );
+            }
+            return { rows, split, amountCents, done: false as const };
         });
 
-        const credentials = this.openCredentials(providerRow);
-        const provider = this.factory.get(providerRow.provider);
-        const result = await provider.refund({
-            providerIntentId: intent.providerIntentId,
-            providerPaymentRef: attempt?.providerRef ?? null,
-            amountCents: intent.amountCents,
-            currency: intent.currency,
-            credentials,
-        });
+        if (reserved.done) return refundResult(reserved.replay);
 
-        const refund = await prisma.paymentRefund.create({
+        // Phase two: the provider, outside the lock.
+        const settled = [];
+        for (const [i, part] of reserved.split.entries()) {
+            const row = reserved.rows[i];
+            const intent = part.payment.intent;
+            try {
+                const providerRow = await this.requireOwnedProvider(
+                    ctx.organizationId,
+                    intent.provider,
+                );
+                // The provider payment id captured from the success webhook
+                // (Razorpay books the refund against it). Null-safe: some
+                // providers refund against the order id alone.
+                const attempt = await prisma.paymentAttempt.findFirst({
+                    where: {
+                        paymentIntentId: intent.id,
+                        providerRef: { not: null },
+                    },
+                    orderBy: { createdAt: "desc" },
+                });
+                const result = await this.factory
+                    .get(providerRow.provider)
+                    .refund({
+                        providerIntentId: intent.providerIntentId ?? "",
+                        providerPaymentRef: attempt?.providerRef ?? null,
+                        amountCents: part.amountCents,
+                        currency: intent.currency,
+                        credentials: this.openCredentials(providerRow),
+                    });
+                settled.push(
+                    await prisma.paymentRefund.update({
+                        where: { id: row.id },
+                        data: { providerRefundId: result.providerRefundId },
+                        include: {
+                            paymentIntent: { select: { provider: true } },
+                            lines: {
+                                select: {
+                                    orderItemId: true,
+                                    quantity: true,
+                                    amountCents: true,
+                                },
+                            },
+                        },
+                    }),
+                );
+            } catch (err) {
+                // Nothing went back: free the money and the lines again, and
+                // say so. A retry needs a new key — this one's answer is this
+                // failure.
+                await prisma.paymentRefund.update({
+                    where: { id: row.id },
+                    data: { status: "FAILED" },
+                });
+                throw err;
+            }
+        }
+        // On the timeline once the provider has taken it — a refused refund
+        // is not a step the order went through.
+        await prisma.orderEvent.create({
             data: {
                 organizationId: ctx.organizationId,
-                paymentIntentId: intent.id,
-                amountCents: intent.amountCents,
-                currency: intent.currency,
-                status: "PENDING",
-                providerRefundId: result.providerRefundId,
-                reason: reason ?? null,
+                orderId: order.id,
+                kind: "REFUND",
+                actorUserId: ctx.userId,
+                note: opts.reason,
+                amountCents: reserved.amountCents,
             },
         });
-
-        return {
-            refundId: refund.id,
-            paymentIntentId: intent.id,
-            provider: providerRow.provider,
-            providerRefundId: refund.providerRefundId,
-            amountCents: refund.amountCents,
-            currency: refund.currency,
-            status: refund.status,
-        };
+        // TODO(U5): a credit note for the refunded lines (or, for an edit,
+        // for the difference), referencing the order's invoice (ADR-008).
+        return refundResult(settled);
     }
 
     /**
