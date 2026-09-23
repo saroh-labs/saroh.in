@@ -12,9 +12,9 @@ import type {
     NavRole,
 } from "@/components/shared/nav-items";
 import {
-    NOTIFICATIONS_HREF,
     isNavChildCurrent,
-    isNavItemActive,
+    isNavSectionActive,
+    navCountFor,
     navFor,
     showsGroupLabel,
 } from "@/components/shared/nav-items";
@@ -25,7 +25,7 @@ import {
  * Three widths, as the workspace design sets them (brand file §21):
  * above 1100px the full 238px rail; from 760 to 1100 a 64px icon rail, where
  * labels, group headings and counts are announced but not drawn; below 760 no
- * rail at all — `MobileNav`'s drawer carries the same nav.
+ * rail at all — the phone `TabBar` and its sheet carry the same nav.
  *
  * A section's children are REMOVED on the icon rail rather than hidden, which
  * would leave controls in the tab order that nobody can see. They are reached
@@ -130,7 +130,7 @@ export function AppSidebar({
                             </p>
                         )}
                         {group.items.map((item) => {
-                            const active = isNavItemActive(pathname, item.href);
+                            const active = isNavSectionActive(pathname, item);
                             /*
                              * Only the DEEPEST match says "page" — and the
                              * deepest is now two levels down, since a site's
@@ -173,10 +173,11 @@ export function AppSidebar({
                             // Notifications counts unread; everything else
                             // counts work waiting. Both mean "something here
                             // wants you", so both are drawn the same way.
-                            const waiting =
-                                item.href === NOTIFICATIONS_HREF
-                                    ? unread
-                                    : (counts?.[item.href] ?? 0);
+                            const waiting = navCountFor(
+                                item.href,
+                                counts,
+                                unread,
+                            );
                             const hasChildren = Boolean(item.children?.length);
                             const flyoutOpen = openFlyout === item.href;
                             return (
@@ -221,7 +222,7 @@ export function AppSidebar({
                                                     // Tighter rows than the drawer's: this
                                                     // rail is `lg`-and-up only, so it is
                                                     // always driven by a pointer, and the
-                                                    // 44px touch target that MobileNav needs
+                                                    // 44px touch target the tab bar needs
                                                     // would only spread twelve items over a
                                                     // screen's worth of height here.
                                                     // `wk-nav` grows a brand bar on the

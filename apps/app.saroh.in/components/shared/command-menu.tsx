@@ -30,7 +30,7 @@ import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 
 import type { NavAction, NavRole } from "./nav-items";
-import { navCan, navFor } from "./nav-items";
+import { WEBSITE_HREF, navCan, navFor } from "./nav-items";
 
 const OPEN_EVENT = "saroh:open-command";
 
@@ -416,9 +416,40 @@ export function CommandMenu({
                     const groupMatches = group.label
                         ? matches(group.label)
                         : false;
-                    const items = group.items.filter(
-                        (item) => groupMatches || matches(item.label),
-                    );
+                    /*
+                     * A section's pages are destinations too — Services and
+                     * Courses live under Bookings now, and before they did
+                     * they were rows of their own here. They carry the
+                     * section's icon, and match on its name, so "bookings"
+                     * finds the whole section. Website's children are the
+                     * merchant's sites, which have their own group below.
+                     */
+                    const entries = group.items.flatMap((item) => {
+                        const own = {
+                            key: item.href,
+                            href: item.href,
+                            label: item.label,
+                            icon: item.icon,
+                            hit: groupMatches || matches(item.label),
+                        };
+                        if (item.href === WEBSITE_HREF) return [own];
+                        const pages = (item.children ?? []).flatMap((child) =>
+                            child.href && !child.create
+                                ? [
+                                      {
+                                          key: `${item.href}>${child.href}`,
+                                          href: child.href,
+                                          label: child.label,
+                                          icon: item.icon,
+                                          hit:
+                                              own.hit || matches(child.label),
+                                      },
+                                  ]
+                                : [],
+                        );
+                        return [own, ...pages];
+                    });
+                    const items = entries.filter((entry) => entry.hit);
                     if (items.length === 0) return null;
                     return (
                         <CommandGroup key={i} heading={group.label ?? "Go to"}>
@@ -426,8 +457,8 @@ export function CommandMenu({
                                 const Icon = item.icon;
                                 return (
                                     <CommandItem
-                                        key={item.href}
-                                        value={item.href}
+                                        key={item.key}
+                                        value={item.key}
                                         onSelect={() => go(item.href)}
                                     >
                                         <Icon className="mr-2 size-4 shrink-0 text-muted-foreground" />
@@ -449,6 +480,9 @@ export function CommandMenu({
                     const leaves: { label: string; href: string }[] = [];
                     for (const group of groups) {
                         for (const item of group.items) {
+                            // Only Website's children are sites; a
+                            // section's pages are listed with it above.
+                            if (item.href !== WEBSITE_HREF) continue;
                             for (const child of item.children ?? []) {
                                 if (child.href) {
                                     leaves.push({

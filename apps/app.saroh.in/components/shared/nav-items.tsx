@@ -3,18 +3,15 @@ import {
     BarChart3,
     Bell,
     Blocks,
-    Briefcase,
     Building2,
     CalendarClock,
     Globe,
-    GraduationCap,
     Home,
     KanbanSquare,
     Plug,
     ReceiptText,
     Store,
     Target,
-    Ticket,
     Users,
 } from "lucide-react";
 
@@ -22,8 +19,8 @@ import { mayAddWebsite } from "@/lib/business-limits";
 
 /**
  * Single source of truth for the primary navigation, shared by the desktop
- * `AppSidebar`, the mobile `MobileNav` drawer and the command menu, so the three
- * can never drift. Home is an ungrouped anchor.
+ * `AppSidebar`, the phone `TabBar` (and its sheet) and the command menu, so the
+ * three can never drift. Home is an ungrouped anchor.
  *
  * Only routes that exist today are listed — no speculative destinations. The
  * proposed IA in `docs/product-transformation/information-architecture.md` §2
@@ -221,6 +218,12 @@ export interface NavChild {
     href?: string;
     label: string;
     create?: boolean;
+    /**
+     * The capability this page belongs to, when its section spans more than
+     * one — Bookings holds Appointments pages and Courses. Filtered exactly
+     * like {@link NavItem.moduleKey}.
+     */
+    moduleKey?: string;
     /** One level further: what a site holds — its content and its settings. */
     children?: NavChild[];
 }
@@ -379,15 +382,58 @@ export const NAV_GROUPS: NavGroup[] = [
                     },
                 ],
             },
-            // Billing (ADR-007): money a business is owed by a person —
-            // memberships and the invoices for them — under Payments, after
-            // the "Saroh Billing and Classes" design. Its pages nest like
-            // Sell's; each unit adds its row once its page exists.
+            // Bookings: "what is booked?" and "what can be booked?" as one
+            // section, after the "Saroh Bookings" design. They used to be four
+            // rows of their own (Schedule, Services, Courses, Class packs);
+            // the design nests them, as Sell nests its screens. Every address
+            // is unchanged — the section is presentation only.
+            //
+            // No `moduleKey` on the section itself: Courses is its own module
+            // (ADR-007), so a business may run courses without taking
+            // appointments. Each child carries its own key; a section whose
+            // every child is filtered away is dropped whole, and one whose
+            // landing page was filtered away lands on its first survivor
+            // (see `landOnFirstChild`).
             {
-                // The section, like Sell's `/commerce`: every Billing page is
-                // under it, so the rail opens and marks Billing on any of them.
+                href: "/bookings",
+                label: "Bookings",
+                icon: CalendarClock,
+                children: [
+                    {
+                        href: "/bookings",
+                        label: "Calendar",
+                        moduleKey: "APPOINTMENTS",
+                    },
+                    {
+                        href: "/services",
+                        label: "Services",
+                        moduleKey: "APPOINTMENTS",
+                    },
+                    {
+                        href: "/courses",
+                        label: "Courses",
+                        moduleKey: "COURSES",
+                        action: "course:read",
+                    },
+                    // Booked time sold ahead (ADR-007).
+                    {
+                        href: "/class-packs",
+                        label: "Class packs",
+                        moduleKey: "APPOINTMENTS",
+                        action: "pack:read",
+                    },
+                ],
+            },
+            // Payments (ADR-007): money a business is owed by a person —
+            // memberships and the invoices for them, after the "Saroh Billing
+            // and Classes" design. The rail says Payments; the addresses stay
+            // `/billing/*`, which is where the old Billing links still land.
+            {
+                // The section, like Sell's `/commerce`: every Payments page is
+                // under it, so the rail opens and marks Payments on any of
+                // them. `/billing` itself redirects to Subscriptions.
                 href: "/billing",
-                label: "Billing",
+                label: "Payments",
                 icon: ReceiptText,
                 moduleKey: "PAYMENTS",
                 children: [
@@ -397,51 +443,18 @@ export const NAV_GROUPS: NavGroup[] = [
                         action: "subscription:read",
                     },
                     {
-                        href: "/billing/plans",
-                        label: "Plans",
-                        action: "subscription:read",
-                    },
-                    {
                         href: "/billing/invoices",
                         label: "Invoices",
                         action: "invoice:read",
                     },
+                    // Not in the design's section, but a plan is what a
+                    // subscription is made from and it has no other path.
+                    {
+                        href: "/billing/plans",
+                        label: "Plans",
+                        action: "subscription:read",
+                    },
                 ],
-            },
-            // Two destinations, two questions: "what is booked?" and "what can
-            // be booked?". They lost their own BOOKINGS heading in the regroup;
-            // the ordering keeps them adjacent so the pair still reads as one
-            // idea.
-            {
-                href: "/bookings",
-                label: "Schedule",
-                icon: CalendarClock,
-                moduleKey: "APPOINTMENTS",
-            },
-            {
-                href: "/services",
-                label: "Services",
-                icon: Briefcase,
-                moduleKey: "APPOINTMENTS",
-            },
-            // Courses is its own module (ADR-007): a business that takes
-            // bookings need not run courses, so it has its own switch and row.
-            {
-                href: "/courses",
-                label: "Courses",
-                icon: GraduationCap,
-                moduleKey: "COURSES",
-                action: "course:read",
-            },
-            // Class packs: booked time sold ahead, so under Appointments —
-            // but its own row, not nested under Schedule (ADR-007, 2026-09-22):
-            // Schedule and Services stay where merchants already find them.
-            {
-                href: "/class-packs",
-                label: "Class packs",
-                icon: Ticket,
-                moduleKey: "APPOINTMENTS",
-                action: "pack:read",
             },
             {
                 href: "/contacts",
@@ -552,7 +565,7 @@ export const NAV_GROUPS: NavGroup[] = [
  * its job. Groups without a `moduleKey` (Home, Notifications) are always kept.
  */
 /** The Website destination, the one that grows a tree today. */
-const WEBSITE_HREF = "/sites";
+export const WEBSITE_HREF = "/sites";
 
 /**
  * Hang the merchant's own sites under Website — for the command palette.
@@ -660,15 +673,23 @@ export function navRowsForModule(moduleKey: string): string[] {
     const rows: string[] = [];
     for (const group of NAV_GROUPS) {
         for (const item of group.items) {
-            if ((item.moduleKey ?? group.moduleKey) !== moduleKey) continue;
-            rows.push(item.label);
+            const own = item.moduleKey ?? group.moduleKey;
             // A section's screens count as rows: turning Commerce off takes
             // Storefronts, Products and Customers with it, and the merchant
-            // should be told the names they navigate by.
-            for (const child of item.children ?? []) {
-                // A child that repeats its parent's destination is the section
-                // landing page, not a second row.
-                if (child.href !== item.href) rows.push(child.label);
+            // should be told the names they navigate by. A section that spans
+            // modules (Bookings) names the ones this module owns.
+            const children = (item.children ?? []).filter(
+                (child) => (child.moduleKey ?? own) === moduleKey,
+            );
+            if (own !== moduleKey && children.length === 0) continue;
+            if (own === moduleKey) rows.push(item.label);
+            for (const child of children) {
+                // A child that repeats its parent's destination AND name is
+                // the section landing page, not a second row.
+                if (child.href === item.href && child.label === item.label) {
+                    continue;
+                }
+                rows.push(child.label);
             }
         }
     }
@@ -688,7 +709,19 @@ export function filterNavGroups(
             .filter((group) => allowed(group.moduleKey))
             .map((group) => ({
                 ...group,
-                items: group.items.filter((item) => allowed(item.moduleKey)),
+                items: group.items.flatMap((item) => {
+                    if (!allowed(item.moduleKey)) return [];
+                    if (!item.children?.some((c) => c.moduleKey)) {
+                        return [item];
+                    }
+                    const children = item.children.filter((child) =>
+                        allowed(child.moduleKey),
+                    );
+                    // A section every page of which belongs to a module
+                    // this business does not have is not offered at all.
+                    if (children.length === 0) return [];
+                    return [landOnFirstChild(item, children)];
+                }),
             }))
             // A heading with nothing under it is worse than no heading: it names a
             // capability the merchant does not have and then shows them nothing.
@@ -727,10 +760,30 @@ export function filterNavGroupsByRole(
                 if (item.children.length > 0 && children.length === 0) {
                     return [];
                 }
-                return [{ ...item, children }];
+                return [landOnFirstChild(item, children)];
             }),
         }))
         .filter((group) => group.items.length > 0);
+}
+
+/**
+ * A section with its children narrowed, still landing somewhere real.
+ *
+ * Bookings lands on its Calendar, which is also its first child. A business
+ * with Courses but not Appointments keeps the section for Courses — and a
+ * section row that still pointed at `/bookings` would open a capability it
+ * does not have. So when the child that WAS the landing page is gone, the
+ * section lands on the first page left. A section whose address is a page of
+ * its own (Sell's `/commerce`) keeps it.
+ */
+function landOnFirstChild(item: NavItem, children: NavChild[]): NavItem {
+    const landedOnChild = item.children?.some((c) => c.href === item.href);
+    const stillThere = children.some((c) => c.href === item.href);
+    const first = children.find((c) => c.href)?.href;
+    if (landedOnChild && !stillThere && first) {
+        return { ...item, href: first, children };
+    }
+    return { ...item, children };
 }
 
 /**
@@ -799,8 +852,42 @@ export function isNavItemActive(pathname: string, href: string): boolean {
     return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
+/**
+ * Is this row — or, for a section, any page in it — where you are?
+ *
+ * A section's pages need not live under its own address: Bookings is
+ * `/bookings`, and its Services and Courses are `/services` and `/courses`.
+ * Matching the section's address alone left the rail dark on half of it.
+ */
+export function isNavSectionActive(
+    pathname: string,
+    item: Pick<NavItem, "href" | "children">,
+): boolean {
+    return (
+        isNavItemActive(pathname, item.href) ||
+        (item.children ?? []).some((child) =>
+            isNavChildCurrent(pathname, child.href),
+        )
+    );
+}
+
 /** The Notifications item carries a live unread badge; identify it by route. */
 export const NOTIFICATIONS_HREF = "/notifications";
+
+/**
+ * What is waiting behind one destination: unread for Notifications, the Home
+ * read model's count for anything else. The rail, the tab bar and its sheet
+ * all read it here, so they cannot count differently.
+ */
+export function navCountFor(
+    href: string | undefined,
+    counts: NavCounts | undefined,
+    unread: number,
+): number {
+    if (!href) return 0;
+    if (href === NOTIFICATIONS_HREF) return unread;
+    return counts?.[href] ?? 0;
+}
 
 /**
  * Work waiting behind a destination, keyed by route.
