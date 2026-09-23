@@ -29,6 +29,7 @@ import {
     planPacks,
     planSubscriptions,
 } from "./billing";
+import { checkBoutique, seedBoutique } from "./boutique";
 import { checkShowcase } from "./check";
 import type { OrderStatus, PaymentStatus, SellableProduct } from "./commerce";
 import { planOrders, toPaise, upsertCatalog } from "./commerce";
@@ -154,6 +155,10 @@ export async function seedShowcase(): Promise<void> {
             prefix: sid("nw", ""),
         },
     ];
+    // The beauty & dresses boutique the products screens are filmed in (#471).
+    businesses.push(
+        await seedBoutique({ prisma, now, demoUserId: ctx.demoUserId }),
+    );
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -163,6 +168,7 @@ export async function seedShowcase(): Promise<void> {
     }
 
     const counts = await checkShowcase(prisma, now, businesses);
+    await checkBoutique(prisma);
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(

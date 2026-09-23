@@ -1203,11 +1203,21 @@ export async function deleteSeeded(
         () => prisma.invoiceLine.deleteMany({ where }),
         () => prisma.invoice.deleteMany({ where }),
         () => prisma.packRedemption.deleteMany({ where }),
+        // Reviews hang off the order line they were left for (#471).
+        () => prisma.productReview.deleteMany({ where }),
+        () => prisma.reviewInvitation.deleteMany({ where }),
         () => prisma.orderItem.deleteMany({ where }),
         () => prisma.order.deleteMany({ where }),
         () => prisma.inventory.deleteMany({ where }),
+        // Products v2: stock per variant and photos before what they hang off;
+        // option values after the variants that choose them (Restrict).
+        () => prisma.variantInventory.deleteMany({ where }),
         () => prisma.productVariant.deleteMany({ where }),
+        () => prisma.productImage.deleteMany({ where }),
         () => prisma.product.deleteMany({ where }),
+        () => prisma.productOptionValue.deleteMany({ where }),
+        () => prisma.productOption.deleteMany({ where }),
+        () => prisma.catalogueDefaults.deleteMany({ where }),
         () => prisma.category.deleteMany({ where }),
         () => prisma.customer.deleteMany({ where }),
         // Posts hang off a Site (ADR-004), so they clear before the sites do —

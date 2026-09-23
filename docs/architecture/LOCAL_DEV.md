@@ -60,7 +60,7 @@ contacts, 16 leads, 3 services, 10 bookings, 12 products, 10 orders and 3 sites
 ### Showcase (the product film's world)
 
 ```bash
-pnpm --filter @saroh/database db:seed:showcase   # base seed, then five businesses on top
+pnpm --filter @saroh/database db:seed:showcase   # base seed, then six businesses on top
 pnpm --filter @saroh/database db:seed:reset      # removes both
 ```
 
@@ -82,6 +82,16 @@ businesses, each with one published site at `<slug>.saroh.app.localhost`:
 - **CarePoint Clinic**: doctors' appointments (one of them by video) and 260
   patients, about 340 bookings. No Payments, so no billing.
 - **Lumen Studio** (a design studio): 30 leads and 3 posts.
+- **Leela & Loom** (a beauty and dresses boutique, owned by `demo@saroh.dev`;
+  #471): the store the products screens are filmed in. Thirty products —
+  skincare for women and men, and women's dresses — with 3–5 photos each
+  (free-licence Unsplash images, credited, loaded by address), MRP beside most
+  prices, variants by Volume, Shade, Size or Colour with stock counted per
+  variant (one sold out, a few low, eight open orders holding stock), and 81
+  verified-purchase reviews behind delivered orders — some replied to, one
+  hidden. Its catalogue is fixed; its orders and reviews are rewritten each
+  run and checked (`checkBoutique`). Before filming, run
+  `node scripts/check-demo-images.mjs` to confirm every photo still loads.
 
 Every business keeps time in Asia/Kolkata (`BusinessProfile.timezone`). The
 showcase code is in `packages/database/src/seed/showcase/`. It uses a seeded

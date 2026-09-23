@@ -47,7 +47,7 @@ export async function checkShowcase(
     const fail = (what: string, rows: Row[]) => {
         if (rows.length > 0) {
             failures.push(
-                `${what}: ${rows.length} — e.g. ${JSON.stringify(rows.slice(0, 3))}`,
+                `${what}: ${rows.length} — e.g. ${JSON.stringify(rows.slice(0, 3), (_k, v: unknown) => (typeof v === "bigint" ? Number(v) : v))}`,
             );
         }
     };
