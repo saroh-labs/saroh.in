@@ -29,8 +29,8 @@ import type { Service } from "@/lib/services/service";
 import { addExtraHours, removeExtraHours } from "@/lib/staff/actions";
 import type { StaffView } from "@/lib/staff/types";
 
-import { btn } from "./booking-quick-look";
 import { Chip, Eyebrow } from "./parts";
+import { btn } from "./quick-look-types";
 
 export interface GapTarget {
     staff: StaffView;

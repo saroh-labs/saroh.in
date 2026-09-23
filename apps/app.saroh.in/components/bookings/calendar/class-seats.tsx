@@ -19,12 +19,12 @@ import {
     whoFor,
 } from "@/lib/services/diary";
 
+import { StatePill } from "./parts";
 import type {
     HeldFor,
     QuickLookActions,
     QuickLookContext,
-} from "./booking-quick-look";
-import { StatePill } from "./parts";
+} from "./quick-look-types";
 
 const HOUR = 3_600_000;
 

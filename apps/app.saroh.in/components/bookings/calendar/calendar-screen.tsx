@@ -39,7 +39,6 @@ import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 
 import { AgendaList, AgendaMonth } from "./agenda-month";
-import type { QuickLookActions } from "./booking-quick-look";
 import { BookingQuickLook } from "./booking-quick-look";
 import { DayByPerson } from "./day-by-person";
 import type { GapTarget } from "./new-booking-from-gap";
@@ -47,6 +46,7 @@ import { NewBookingFromGap } from "./new-booking-from-gap";
 import type { HoursTarget } from "./open-hours-dialog";
 import { OpenHoursDialog } from "./open-hours-dialog";
 import { BookingsTopBar } from "./parts";
+import type { QuickLookActions } from "./quick-look-types";
 import { useHeld } from "./use-held";
 import { WeekView } from "./week-view";
 
