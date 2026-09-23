@@ -3,6 +3,8 @@ import {
     Body,
     Controller,
     Get,
+    Header,
+    HttpCode,
     Ip,
     Param,
     Post,
@@ -10,9 +12,14 @@ import {
 } from "@nestjs/common";
 import { createHash } from "node:crypto";
 
+import type { HoldState } from "./booking-hold";
+import { holdState } from "./booking-hold";
 import type {
     AvailableSlot,
     PublicBooking,
+    PublicBookingPage,
+    PublicDays,
+    PublicHold,
     PublicService,
     PublicStaff,
 } from "./bookings.service";
@@ -80,6 +87,41 @@ export class PublicBookingsController {
     }
 
     /**
+     * The booking page's next two weeks for a service (U19): each day open or
+     * not, with its free starts — or, for a class, every session with its
+     * places left. People by display name and opaque id only.
+     */
+    @Get(":serviceId/days")
+    @Header("Cache-Control", "no-store")
+    days(@Param("serviceId") serviceId: string): Promise<PublicDays> {
+        return this.bookings.publicDays(serviceId);
+    }
+
+    /**
+     * Where a pay-now hold stands (U19), by the pay token its booking
+     * answered with: what the page polls while its booker pays.
+     */
+    @Get("holds/:token")
+    @Header("Cache-Control", "no-store")
+    @Header("Referrer-Policy", "no-referrer")
+    @Header("X-Robots-Tag", "noindex, nofollow")
+    hold(@Param("token") token: string, @Ip() ip: string): Promise<PublicHold> {
+        return this.bookings.publicHold(token, hashIp(ip));
+    }
+
+    /** Let a pay-now hold go before its time (U19). */
+    @Post("holds/:token/release")
+    @HttpCode(200)
+    @Header("Cache-Control", "no-store")
+    @Header("Referrer-Policy", "no-referrer")
+    release(
+        @Param("token") token: string,
+        @Ip() ip: string,
+    ): Promise<PublicHold> {
+        return this.bookings.releasePublicHold(token, hashIp(ip));
+    }
+
+    /**
      * Who takes a service: a display name and an opaque id each (U3). Never
      * their hours, and never whether or why they are off.
      */
@@ -101,12 +143,8 @@ export class PublicBookingsController {
         @Param("serviceId") serviceId: string,
         @Body() dto: BookServiceDto,
         @Ip() ip: string,
-    ): Promise<PublicBooking> {
-        const ipHash = ip
-            ? createHash("sha256").update(ip).digest("hex")
-            : undefined;
-
-        const booking = await this.bookings.book(
+    ): Promise<PublicBookingResult> {
+        const { booking, payToken } = await this.bookings.bookOnline(
             serviceId,
             {
                 startAt: dto.startAt,
@@ -115,9 +153,52 @@ export class PublicBookingsController {
                 bookerPhone: dto.bookerPhone,
                 idempotencyKey: dto.idempotencyKey,
                 staffId: dto.staffId,
+                pay: dto.pay,
             },
-            ipHash,
+            hashIp(ip),
         );
-        return toPublicBooking(booking);
+        const state = holdState(booking, new Date());
+        return {
+            ...toPublicBooking(booking),
+            state,
+            // Who it is with, by name, and how it is paid — the booker's own
+            // booking, so nothing here is anyone else's.
+            holdExpiresAt:
+                state === "HELD"
+                    ? (booking.holdExpiresAt?.toISOString() ?? null)
+                    : null,
+            payToken,
+        };
     }
+}
+
+/**
+ * The booker's own booking (ADR-007), where it stands (U19), and for a
+ * pay-now hold the token that pays it and reads it — handed over this once.
+ */
+export type PublicBookingResult = PublicBooking & {
+    state: HoldState;
+    holdExpiresAt: string | null;
+    payToken: string | null;
+};
+
+/**
+ * The PUBLIC read of a site's booking page (U19), under `/public/sites` like
+ * the site's other public reads — guardless, and only what a visitor may see:
+ * the services it offers, who takes them by name, the booking rules.
+ */
+@Controller("public/sites")
+export class PublicBookingPageController {
+    constructor(private readonly bookings: BookingsService) {}
+
+    @Get(":siteId/booking")
+    @Header("Cache-Control", "no-store")
+    page(@Param("siteId") siteId: string): Promise<PublicBookingPage> {
+        return this.bookings.publicBookingPage(siteId);
+    }
+}
+
+/** The caller's address, hashed at once — the raw IP never leaves here. */
+function hashIp(ip: string | undefined): string | undefined {
+    return ip ? createHash("sha256").update(ip).digest("hex") : undefined;
 }

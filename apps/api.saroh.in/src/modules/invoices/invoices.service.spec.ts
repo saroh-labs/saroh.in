@@ -640,6 +640,8 @@ describe("lists and what is owed", () => {
         const where = db.invoice.findMany!.mock.calls[0]![0].where;
         expect(where).toEqual({
             organizationId: "org_1",
+            // A pay-now hold's unnumbered draft is not the business's (U19).
+            NOT: { source: "BOOKING", number: null },
             status: "ISSUED",
             dueAt: { lt: expect.any(Date) },
             contactId: "c_1",

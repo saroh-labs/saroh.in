@@ -37,8 +37,16 @@ jest.mock("@saroh/database", () => {
     };
 });
 
+// The hold's own rules are `booking-hold.spec.ts`'s; here only what the
+// webhook does with its answer (U19).
+jest.mock("../bookings/booking-hold", () => ({
+    confirmHoldInTx: jest.fn(),
+}));
+
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
+
+import { confirmHoldInTx } from "../bookings/booking-hold";
 
 import { encryptSecret } from "../payments/crypto";
 import { PaymentsService } from "../payments/payments.service";
@@ -153,7 +161,7 @@ describe("webhook success on an invoice intent", () => {
         expect(lockCall).toBeLessThan(readCall ?? 0);
         expect(invoiceFindFirst).toHaveBeenCalledWith({
             where: { id: "inv_1", organizationId: "org_1" },
-            select: { status: true },
+            select: { status: true, source: true },
         });
         expect(invoiceUpdate).toHaveBeenCalledWith({
             where: { id: "inv_1" },
@@ -358,5 +366,90 @@ describe("webhook refund on an invoice intent", () => {
         expect(refundUpdate).not.toHaveBeenCalled();
         expect(refundCreate).not.toHaveBeenCalled();
         expect(whUpdate).toHaveBeenCalled();
+    });
+});
+
+describe("webhook success on a pay-now hold's invoice (U19)", () => {
+    const confirmHold = confirmHoldInTx as jest.Mock;
+
+    it("confirms the booking through the hold, and records the capture", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({
+            status: "DRAFT",
+            source: "BOOKING",
+        });
+        confirmHold.mockResolvedValue("confirmed");
+
+        const result = await deliver(bodyOf());
+
+        expect(result).toEqual({ status: "processed", changed: true });
+        expect(confirmHold).toHaveBeenCalledWith(expect.anything(), {
+            invoiceId: "inv_1",
+            organizationId: "org_1",
+            now: expect.any(Date),
+            payment: {
+                paymentMethod: "ONLINE",
+                paymentReference: "pay_1",
+                paymentNote: "Paid online through Razorpay",
+            },
+        });
+        // The hold numbers and pays its own invoice; the webhook does not.
+        expect(invoiceUpdate).not.toHaveBeenCalled();
+        expect(intentUpdate).toHaveBeenCalledWith({
+            where: { id: "pi_inv_1" },
+            data: { status: "SUCCEEDED" },
+        });
+        expect(attemptCreate.mock.calls[0][0].data).toMatchObject({
+            status: "CAPTURED",
+            providerRef: "pay_1",
+        });
+    });
+
+    it("owes the money back when the place went to someone else", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({
+            status: "DRAFT",
+            source: "BOOKING",
+        });
+        confirmHold.mockResolvedValue("released");
+
+        await deliver(bodyOf());
+
+        expect(invoiceUpdate).not.toHaveBeenCalled();
+        expect(attemptCreate.mock.calls[0][0].data).toMatchObject({
+            status: "CAPTURED_NEEDS_REFUND",
+            rawResponse: { invoiceStatus: "RELEASED_HOLD" },
+        });
+    });
+
+    it("owes back a payment for a hold already released (its draft voided)", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({
+            status: "VOID",
+            source: "BOOKING",
+        });
+
+        await deliver(bodyOf());
+
+        expect(confirmHold).not.toHaveBeenCalled();
+        expect(attemptCreate.mock.calls[0][0].data).toMatchObject({
+            status: "CAPTURED_NEEDS_REFUND",
+            rawResponse: { invoiceStatus: "VOID" },
+        });
+    });
+
+    it("leaves a hand-written draft to the old rule: owed back, nothing confirmed", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({
+            status: "DRAFT",
+            source: "MANUAL",
+        });
+
+        await deliver(bodyOf());
+
+        expect(confirmHold).not.toHaveBeenCalled();
+        expect(attemptCreate.mock.calls[0][0].data).toMatchObject({
+            status: "CAPTURED_NEEDS_REFUND",
+        });
     });
 });

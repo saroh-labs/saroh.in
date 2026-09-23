@@ -198,10 +198,14 @@ describe("BookingsService.book — capacity-one reservation", () => {
         expect(created.startAt.toISOString()).toBe(START);
         expect(created.endAt.toISOString()).toBe("2026-07-20T10:00:00.000Z");
 
-        // The in-tx capacity re-count targets CONFIRMED overlaps of this slot.
+        // The in-tx capacity re-count targets the places taken in this slot:
+        // confirmed bookings and pay-now holds still inside their time (U19).
         expect(bookingCount.mock.calls[0][0].where).toMatchObject({
             serviceId: "svc_1",
-            status: "CONFIRMED",
+            OR: [
+                { status: "CONFIRMED" },
+                { status: "PENDING", holdExpiresAt: { gt: expect.any(Date) } },
+            ],
         });
 
         // Outbox job.
@@ -760,7 +764,10 @@ describe("BookingsService.rescheduleBooking", () => {
         // slot that overlaps where it already is: it would collide with itself.
         expect(bookingCount.mock.calls[0][0].where).toMatchObject({
             id: { not: "bk_1" },
-            status: "CONFIRMED",
+            OR: [
+                { status: "CONFIRMED" },
+                { status: "PENDING", holdExpiresAt: { gt: expect.any(Date) } },
+            ],
         });
     });
 
@@ -1696,7 +1703,10 @@ describe("staff on bookings (U3)", () => {
         expect(bookingCount).toHaveBeenCalledTimes(1);
         expect(bookingCount.mock.calls[0][0].where).toMatchObject({
             staffId: "staff_asha",
-            status: "CONFIRMED",
+            OR: [
+                { status: "CONFIRMED" },
+                { status: "PENDING", holdExpiresAt: { gt: expect.any(Date) } },
+            ],
         });
         // Her row is locked before counting.
         expect(prisma.$queryRaw).toHaveBeenCalled();

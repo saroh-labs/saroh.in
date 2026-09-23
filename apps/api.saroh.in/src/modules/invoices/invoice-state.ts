@@ -1,3 +1,5 @@
+import type { Prisma } from "@saroh/database";
+
 /**
  * What an invoice is, as the merchant reads it.
  *
@@ -10,6 +12,7 @@
  * GST-registered business never voids an issued invoice; it credits it, and
  * the invoice keeps its number and its lines.
  */
+
 export const INVOICE_STATUSES = [
     "DRAFT",
     "ISSUED",
@@ -76,6 +79,16 @@ export const INVOICE_SOURCES = [
     "BOOKING",
 ] as const;
 export type InvoiceSource = (typeof INVOICE_SOURCES)[number];
+
+/**
+ * Leaves out a pay-now hold's invoice (U19) until it is paid: a draft the
+ * booking page made, with no number yet, that is either paid within 15
+ * minutes (and numbered) or voided when its hold runs out. It is not the
+ * business's draft to edit, and an abandoned one is not paper at all.
+ */
+export const NOT_A_BOOKING_HOLD = {
+    NOT: { source: "BOOKING", number: null },
+} satisfies Prisma.InvoiceWhereInput;
 
 /** Issued invoices fall due this many days after issue unless told otherwise. */
 export const DEFAULT_DUE_DAYS = 7;

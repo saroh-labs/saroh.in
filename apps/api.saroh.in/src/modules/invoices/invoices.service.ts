@@ -24,6 +24,7 @@ import {
     CAPTURED_NEEDS_REFUND,
     DEFAULT_DUE_DAYS,
     isPastDue,
+    NOT_A_BOOKING_HOLD,
     OWED_WHERE,
     viewWhere,
 } from "./invoice-state";
@@ -126,6 +127,7 @@ export class InvoicesService {
         const rows = await prisma.invoice.findMany({
             where: {
                 organizationId: ctx.organizationId,
+                ...NOT_A_BOOKING_HOLD,
                 ...(query.view ? viewWhere(query.view, now) : {}),
                 ...(query.contactId ? { contactId: query.contactId } : {}),
                 ...(query.subscriptionId

@@ -79,9 +79,11 @@ describe("PublicBookingsController.book (ADR-007)", () => {
     };
 
     it("answers with the booker-safe shape, and a replay answers the same", async () => {
-        const book = jest.fn().mockResolvedValue(row);
+        const bookOnline = jest
+            .fn()
+            .mockResolvedValue({ booking: row, payToken: null });
         const controller = new PublicBookingsController({
-            book,
+            bookOnline,
         } as unknown as BookingsService);
 
         const first = await controller.book("svc_1", dto, "1.2.3.4");
@@ -91,12 +93,20 @@ describe("PublicBookingsController.book (ADR-007)", () => {
         expect(first).toEqual(replay);
         expect(Object.keys(first).sort()).toEqual([
             "endAt",
+            "holdExpiresAt",
             "meetingUrl",
             "online",
+            "payToken",
             "reference",
             "serviceName",
             "startAt",
+            "state",
         ]);
+        expect(first).toMatchObject({
+            state: "CONFIRMED",
+            holdExpiresAt: null,
+            payToken: null,
+        });
         expect(JSON.stringify(first)).not.toMatch(/org_1|contact_1|hash/);
     });
 });

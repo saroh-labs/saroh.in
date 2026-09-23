@@ -300,6 +300,15 @@ export class BookServiceDto {
     @IsString()
     @MaxLength(64)
     staffId?: string;
+
+    /**
+     * How the booking page's booker pays (U19): NOW holds the place while
+     * they pay online, DESK books it to pay on the day. Absent: as before.
+     * There is no amount — the price is the service's, read on the server.
+     */
+    @IsOptional()
+    @IsIn(["NOW", "DESK"])
+    pay?: "NOW" | "DESK";
 }
 
 /**

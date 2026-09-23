@@ -84,6 +84,15 @@ describe("redactUrl", () => {
         );
     });
 
+    it("hides a pay-now hold's token (U19)", () => {
+        expect(redactUrl("/public/services/holds/tok_ABC-123")).toBe(
+            "/public/services/holds/[token]",
+        );
+        expect(redactUrl("/public/services/holds/tok_ABC-123/release")).toBe(
+            "/public/services/holds/[token]/release",
+        );
+    });
+
     it("leaves every other path alone", () => {
         expect(redactUrl("/organizations/org_1/orders")).toBe(
             "/organizations/org_1/orders",

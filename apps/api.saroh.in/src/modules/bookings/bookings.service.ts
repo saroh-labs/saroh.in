@@ -9,12 +9,14 @@ import {
 } from "@nestjs/common";
 import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
-import { IANAZone } from "luxon";
+import { DateTime, IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { redeemPackInTx, reversePackInTx } from "../class-packs/redeem-pack";
 import { isGstRate } from "../invoices/gst";
+import { hashPayToken } from "../invoices/pay-token";
+import { paymentsOn } from "../invoices/payments-on";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { allows, authorize } from "../organizations/organization-policy";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
@@ -28,6 +30,7 @@ import type {
 import {
     availableSlots,
     countOverlapping,
+    enumerateSlots,
     intersectIntervals,
     isPersonSlotStart,
     isValidSlotStart,
@@ -38,6 +41,17 @@ import {
 } from "./availability";
 import type { PersonDiary } from "./booking-calendar";
 import { groupDiaries } from "./booking-calendar";
+import type { HoldState } from "./booking-hold";
+import {
+    createHoldInvoiceInTx,
+    holdExpiry,
+    holdsPlace,
+    holdState,
+    isExpiredHold,
+    releaseHoldInTx,
+    renewHoldTokenInTx,
+} from "./booking-hold";
+import type { BookingRulesValue } from "./booking-rules";
 import {
     bookingWindowRefusal,
     isLateCancel,
@@ -71,6 +85,12 @@ export interface BookInput {
     idempotencyKey?: string;
     /** The person asked for (U3); absent means whoever is free. */
     staffId?: string;
+    /**
+     * How the booking page's booker pays (U19): NOW holds the place for
+     * 15 minutes (`HOLD_MINUTES`) while they pay online, DESK books it to
+     * pay on the day. Absent — the one-service booking block — books as before.
+     */
+    pay?: "NOW" | "DESK";
 }
 
 /**
@@ -106,6 +126,8 @@ export interface ReserveWith {
     perPerson: boolean;
     paidWith?: PaidWith | null;
     subscriptionId?: string | null;
+    /** A pay-now hold (U19): PENDING, holding its place until then. */
+    holdUntil?: Date | null;
 }
 
 /**
@@ -167,6 +189,7 @@ const diarySelect = {
     endAt: true,
     timezone: true,
     status: true,
+    holdExpiresAt: true,
     outcome: true,
     bookerName: true,
     bookerEmail: true,
@@ -251,6 +274,64 @@ export interface PublicService {
     currency: string | null;
 }
 
+/** How many days the booking page offers (U19). */
+const PUBLIC_DAYS = 14;
+
+/** A start on the booking page (U19). `placesLeft` is a class's only. */
+export interface PublicStart {
+    startAt: string;
+    endAt: string;
+    staffId: string | null;
+    staffName: string | null;
+    placesLeft: number | null;
+}
+
+export interface PublicDay {
+    /** `YYYY-MM-DD` in the business's zone. */
+    date: string;
+    open: boolean;
+    starts: PublicStart[];
+}
+
+/** One service's next two weeks on the booking page (U19). */
+export interface PublicDays {
+    timezone: string;
+    kind: "one" | "class";
+    capacity: number;
+    days: PublicDay[];
+}
+
+/** What a site's booking page opens with (U19). No internal fields. */
+export interface PublicBookingPage {
+    businessName: string;
+    /** False when the business has Appointments switched off. */
+    open: boolean;
+    timezone: string;
+    /** Whether pay now is on offer: Payments on and a provider connected. */
+    payOnline: boolean;
+    rules: BookingRulesValue;
+    services: {
+        id: string;
+        name: string;
+        description: string | null;
+        durationMinutes: number;
+        kind: "one" | "class";
+        capacity: number;
+        priceCents: number | null;
+        currency: string | null;
+        online: boolean;
+        /** Who takes it, by display name. */
+        staff: string[];
+    }[];
+}
+
+/** A pay-now hold, as the booking page polls it (U19). */
+export interface PublicHold {
+    state: HoldState;
+    holdExpiresAt: string | null;
+    booking: PublicBooking;
+}
+
 /** A service's GST rate (ADR-008): one GST has, or null to clear it. */
 function serviceGstRate(rate: string | null | undefined): string | null {
     if (rate === undefined || rate === null) return null;
@@ -276,6 +357,12 @@ export class BookingsService {
         private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(),
         @Optional() private readonly activation?: ActivationEvents,
     ) {}
+
+    /**
+     * Reads and releases of a pay-now hold, per hashed IP: the page polls
+     * every few seconds while its booker pays, a scraper does more.
+     */
+    private readonly holdLimiter = new FixedWindowRateLimiter(40, 60_000);
 
     // ── Service CRUD ───────────────────────────────────────────────────────
 
@@ -578,6 +665,264 @@ export class BookingsService {
     }
 
     /**
+     * The booking page's next two weeks for one service (U19), day by day in
+     * the business's zone: whether it is open that day, and its starts.
+     *
+     * A one-to-one lists its free starts, each with the first person free
+     * then (by name — the page shows who before the booker confirms). A class
+     * (a service with more than one place) lists every session inside the
+     * booking rules with its places left, full ones included, so the page can
+     * say Full. A day is open when the hours alone would offer a start on it
+     * — the service's rules, or its people's weekly and one-off hours — and it
+     * is inside book-ahead; nothing about who is booked or off is used for
+     * that, so a day someone is off reads Full, never why.
+     */
+    async publicDays(
+        serviceId: string,
+        now: Date = new Date(),
+    ): Promise<PublicDays> {
+        const { service, rules } = await this.loadBookableService(serviceId);
+        const [bookingRules, zone, staffing] = await Promise.all([
+            loadBookingRules(prisma, service.organizationId),
+            businessTimezone(prisma, service.organizationId),
+            this.staffing(service),
+        ]);
+        const first = DateTime.fromJSDate(now, { zone }).startOf("day");
+        const from = first.toJSDate();
+        const to = first.plus({ days: PUBLIC_DAYS }).toJSDate();
+        const names = new Map(staffing.people.map((p) => [p.id, p.name]));
+        const availService = this.toAvailabilityService(service);
+        // Never a start that has begun; then the business's own rules.
+        const bookable = (startAt: Date) =>
+            startAt > now && withinBookingWindow(startAt, now, bookingRules);
+        const kind: PublicDays["kind"] = service.capacity > 1 ? "class" : "one";
+
+        // What the hours alone offer (open days), and what is free now.
+        let hours: Slot[];
+        let starts: PublicStart[];
+        if (staffing.perPerson && staffing.zone) {
+            const people = await loadPeople(
+                prisma,
+                staffing.people.map((p) => p.id),
+                from,
+                to,
+            );
+            hours = staffSlots(
+                availService,
+                rules,
+                people.map((p) => ({ ...p, busy: [], timeOff: [] })),
+                staffing.zone,
+                from,
+                to,
+            );
+            starts = staffSlots(
+                availService,
+                rules,
+                people,
+                staffing.zone,
+                from,
+                to,
+            )
+                .filter((slot) => bookable(slot.startAt))
+                .map((slot) => {
+                    const staffId = slot.staffIds[0] ?? null;
+                    return {
+                        startAt: slot.startAt.toISOString(),
+                        endAt: slot.endAt.toISOString(),
+                        staffId,
+                        staffName: staffId
+                            ? (names.get(staffId) ?? null)
+                            : null,
+                        placesLeft: null,
+                    };
+                });
+        } else {
+            hours = enumerateSlots(availService, rules, from, to);
+            const busy = await this.busyOverlapping(service.id, from, to);
+            const [instructor] = staffing.people as (
+                Staffing["people"][number] | undefined
+            )[];
+            starts = hours
+                .filter((slot) => bookable(slot.startAt))
+                .map((slot) => {
+                    const left =
+                        service.capacity - countOverlapping(slot, busy);
+                    return {
+                        startAt: slot.startAt.toISOString(),
+                        endAt: slot.endAt.toISOString(),
+                        staffId: instructor?.id ?? null,
+                        staffName: instructor?.name ?? null,
+                        placesLeft: kind === "class" ? Math.max(0, left) : null,
+                        free: left > 0,
+                    };
+                })
+                // A one-to-one lists only what is free; a class, every session.
+                .filter((start) => kind === "class" || start.free)
+                .map(({ free: _free, ...start }) => start);
+        }
+
+        const aheadEnd =
+            bookingRules.bookAheadDays === null
+                ? null
+                : now.getTime() + bookingRules.bookAheadDays * 86_400_000;
+        const days: PublicDay[] = [];
+        for (let i = 0; i < PUBLIC_DAYS; i += 1) {
+            const day = first.plus({ days: i });
+            const dayFrom = day.toMillis();
+            const dayTo = day.plus({ days: 1 }).toMillis();
+            const inDay = (iso: string | Date) => {
+                const t = new Date(iso).getTime();
+                return t >= dayFrom && t < dayTo;
+            };
+            days.push({
+                date: day.toISODate() ?? "",
+                open:
+                    hours.some((slot) => inDay(slot.startAt)) &&
+                    (aheadEnd === null || dayFrom <= aheadEnd),
+                starts: starts.filter((start) => inDay(start.startAt)),
+            });
+        }
+        return { timezone: zone, kind, capacity: service.capacity, days };
+    }
+
+    /**
+     * What a site's booking page opens with (U19): the business, the services
+     * it may offer (active, of this site or of no site, Appointments on), who
+     * takes each — names only — the booking rules and whether it can take
+     * payment online. A site that is not published is a 404, like its pages.
+     */
+    async publicBookingPage(siteId: string): Promise<PublicBookingPage> {
+        const site = await prisma.site.findFirst({
+            where: {
+                id: siteId,
+                deletedAt: null,
+                currentPublicationId: { not: null },
+            },
+            select: {
+                organizationId: true,
+                organization: { select: { name: true } },
+            },
+        });
+        if (!site) throw new NotFoundException("Site not found");
+        const organizationId = site.organizationId;
+        const open = await appointmentsOpen(organizationId);
+        const [services, rules, zone, online] = await Promise.all([
+            open
+                ? prisma.service.findMany({
+                      where: {
+                          organizationId,
+                          deletedAt: null,
+                          status: "ACTIVE",
+                          OR: [{ siteId: null }, { siteId }],
+                      },
+                      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                      select: {
+                          id: true,
+                          name: true,
+                          description: true,
+                          durationMinutes: true,
+                          capacity: true,
+                          priceCents: true,
+                          currency: true,
+                          locationType: true,
+                          staffServices: {
+                              where: { staff: { status: "ACTIVE" } },
+                              select: { staff: { select: { name: true } } },
+                          },
+                      },
+                  })
+                : Promise.resolve([]),
+            loadBookingRules(prisma, organizationId),
+            businessTimezone(prisma, organizationId),
+            this.takesOnlinePayment(organizationId),
+        ]);
+        return {
+            businessName: site.organization.name,
+            open,
+            timezone: zone,
+            payOnline: online,
+            rules,
+            services: services.map((svc) => ({
+                id: svc.id,
+                name: svc.name,
+                description: svc.description,
+                durationMinutes: svc.durationMinutes,
+                kind: svc.capacity > 1 ? "class" : "one",
+                capacity: svc.capacity,
+                priceCents: svc.priceCents,
+                currency: svc.currency,
+                online: svc.locationType === "ONLINE",
+                staff: svc.staffServices
+                    .map((row) => row.staff.name)
+                    .sort((a, b) => a.localeCompare(b)),
+            })),
+        };
+    }
+
+    /**
+     * A pay-now hold, by its pay token (U19): what the booking page polls
+     * while the customer pays. The booking as the booker sees it, and where
+     * the hold stands. An unknown or cleared token is a 404.
+     */
+    async publicHold(
+        token: string,
+        ipHash: string | undefined,
+        now: Date = new Date(),
+    ): Promise<PublicHold> {
+        if (ipHash && !this.holdLimiter.take(ipHash)) {
+            throw new HttpException(
+                "Too many requests. Try again shortly.",
+                429,
+            );
+        }
+        const booking = await this.holdBooking(token);
+        return {
+            state: holdState(booking, now),
+            holdExpiresAt: booking.holdExpiresAt?.toISOString() ?? null,
+            booking: toPublicBooking(booking),
+        };
+    }
+
+    /**
+     * Let a hold go before its time (U19): the customer chose to pay at the
+     * desk instead, or the payment could not start. Only a hold still
+     * PENDING is released; anything else is answered as it stands.
+     */
+    async releasePublicHold(
+        token: string,
+        ipHash: string | undefined,
+        now: Date = new Date(),
+    ): Promise<PublicHold> {
+        if (ipHash && !this.holdLimiter.take(ipHash)) {
+            throw new HttpException(
+                "Too many requests. Try again shortly.",
+                429,
+            );
+        }
+        const found = await this.holdBooking(token);
+        await prisma.$transaction((tx) => releaseHoldInTx(tx, found.id, now));
+        const booking = await prisma.booking.findUniqueOrThrow({
+            where: { id: found.id },
+        });
+        return {
+            state: holdState(booking, now),
+            holdExpiresAt: booking.holdExpiresAt?.toISOString() ?? null,
+            booking: toPublicBooking(booking),
+        };
+    }
+
+    private async holdBooking(token: string): Promise<Booking> {
+        const invoice = await prisma.invoice.findUnique({
+            where: { payTokenHash: hashPayToken(token) },
+            select: { source: true, booking: true },
+        });
+        if (invoice?.source !== "BOOKING" || !invoice.booking) {
+            throw new NotFoundException("Booking not found");
+        }
+        return invoice.booking;
+    }
+
+    /**
      * Open slots over `[from, to)`. A one-to-one somebody takes gets them per
      * person (U3); anything else from the service's own rules and capacity,
      * exactly as before — with its instructors named when it has any.
@@ -859,6 +1204,7 @@ export class BookingsService {
         }
         const organizationId = ctx.organizationId;
         const staffId = query.staffId;
+        const now = new Date();
         const [people, rows, zone] = await Promise.all([
             prisma.staffMember.findMany({
                 where: staffId
@@ -888,7 +1234,17 @@ export class BookingsService {
             to: to.toISOString(),
             timezone: zone.zone,
             money,
-            diaries: groupDiaries(rows, people, money),
+            // A pay-now hold whose time ran out holds nothing (U19), even
+            // before the sweep job has cancelled it.
+            diaries: groupDiaries(
+                rows.map((row) =>
+                    isExpiredHold(row, now)
+                        ? { ...row, status: "CANCELLED" }
+                        : row,
+                ),
+                people,
+                money,
+            ),
         };
     }
 
@@ -1155,7 +1511,7 @@ export class BookingsService {
                         const taken = await tx.booking.count({
                             where: {
                                 serviceId: service.id,
-                                status: "CONFIRMED",
+                                ...holdsPlace(new Date()),
                                 startAt: { lt: endAt },
                                 endAt: { gt: startAt },
                                 // Itself is not a competitor for its own seat.
@@ -1278,6 +1634,25 @@ export class BookingsService {
         input: BookInput,
         ipHash: string | undefined,
     ): Promise<Booking> {
+        return (await this.bookOnline(serviceId, input, ipHash)).booking;
+    }
+
+    /**
+     * {@link book}, and what the booking page needs back from it (U19): for
+     * pay now, the hold's pay token — handed over once, as a pay link is.
+     *
+     * Pay now needs a price, Payments on and a connected provider; the amount
+     * is the service's price, read here, never the client's. The booking is
+     * PENDING and holds its place for 15 minutes (`HOLD_MINUTES`) with a draft
+     * invoice for it (`booking-hold.ts`); the provider's webhook confirms it.
+     * Pay at the desk books it CONFIRMED with nothing charged.
+     */
+    async bookOnline(
+        serviceId: string,
+        input: BookInput,
+        ipHash: string | undefined,
+        now: Date = new Date(),
+    ): Promise<{ booking: Booking; payToken: string | null }> {
         // 1. Load the Service. Org is derived from HERE, never the client.
         const { service, rules } = await this.loadBookableService(serviceId);
         await assertOrganizationOpen(service.organizationId);
@@ -1301,13 +1676,17 @@ export class BookingsService {
         }
         const refusal = bookingWindowRefusal(
             startAt,
-            new Date(),
+            now,
             await loadBookingRules(prisma, service.organizationId),
         );
         if (refusal) throw new BadRequestException(refusal);
         const endAt = new Date(
             startAt.getTime() + service.durationMinutes * 60_000,
         );
+        // Pay now is refused before anything is held: no price, or no way
+        // for this business to take the money online.
+        const price =
+            input.pay === "NOW" ? await this.onlinePrice(service) : null;
 
         // 3. Rate-limit per (service, hashed IP). Cheap abuse guard. Before
         //    the replay too, so replays cannot be used to probe for keys.
@@ -1333,17 +1712,7 @@ export class BookingsService {
                     },
                 },
             });
-            if (existing) {
-                if (
-                    (existing.bookerEmail ?? "").toLowerCase() !==
-                    input.bookerEmail.trim().toLowerCase()
-                ) {
-                    throw new ConflictException(
-                        "That booking was already made. Refresh the page and book again.",
-                    );
-                }
-                return existing;
-            }
+            if (existing) return this.replay(existing, input, now);
         }
 
         // 5. Who it is with (U3) — after the replay, so a retried request is
@@ -1356,17 +1725,122 @@ export class BookingsService {
             input.staffId,
             "public",
         );
+        if (input.pay === "DESK") person.paidWith = "DESK";
 
-        // 6. Atomic, serializable reservation (see the method doc for WHY).
-        return this.reserve(
+        // 6. Atomic, serializable reservation (see the method doc for WHY) —
+        //    with the hold's invoice in the same transaction for pay now.
+        // Written inside the transaction; a holder, since a closure's write
+        // is invisible to the narrowing that follows.
+        const made: { payToken: string | null } = { payToken: null };
+        const also = price
+            ? {
+                  onRace: "This slot is fully booked",
+                  inTx: async (
+                      tx: Prisma.TransactionClient,
+                      booking: Booking,
+                  ) => {
+                      if (!booking.contactId) return;
+                      const hold = await createHoldInvoiceInTx(tx, {
+                          organizationId: service.organizationId,
+                          bookingId: booking.id,
+                          contactId: booking.contactId,
+                          billToName: booking.bookerName,
+                          billToEmail: booking.bookerEmail ?? "",
+                          service: {
+                              name: service.name,
+                              priceCents: price.cents,
+                              currency: price.currency,
+                              timezone: service.timezone,
+                              gstRate: service.gstRate,
+                              sacCode: service.sacCode,
+                          },
+                          startAt,
+                      });
+                      made.payToken = hold.payToken;
+                  },
+              }
+            : undefined;
+        if (price) person.holdUntil = holdExpiry(now);
+        const booking = await this.reserve(
             service,
             startAt,
             endAt,
             input,
             { source: `booking:service:${serviceId}`, actorUserId: null },
-            undefined,
+            also,
             person,
         );
+        // An idempotency race replays the winner, which made its own token.
+        if (price && !made.payToken && booking.status === "PENDING") {
+            return this.replay(booking, input, now);
+        }
+        return { booking, payToken: made.payToken };
+    }
+
+    /**
+     * An idempotent replay, to the same booker only. A hold still inside its
+     * time gets a fresh pay token (only the first one's hash was kept).
+     */
+    private async replay(
+        existing: Booking,
+        input: BookInput,
+        now: Date = new Date(),
+    ): Promise<{ booking: Booking; payToken: string | null }> {
+        if (
+            (existing.bookerEmail ?? "").toLowerCase() !==
+            input.bookerEmail.trim().toLowerCase()
+        ) {
+            throw new ConflictException(
+                "That booking was already made. Refresh the page and book again.",
+            );
+        }
+        if (holdState(existing, now) !== "HELD") {
+            return { booking: existing, payToken: null };
+        }
+        const payToken = await prisma.$transaction((tx) =>
+            renewHoldTokenInTx(tx, existing.id),
+        );
+        return { booking: existing, payToken };
+    }
+
+    /**
+     * What pay now charges for a service: its price, when it has one and the
+     * business can take money online (Payments on, a provider connected).
+     */
+    private async onlinePrice(
+        service: Service,
+    ): Promise<{ cents: number; currency: string }> {
+        if (
+            !service.priceCents ||
+            service.priceCents <= 0 ||
+            !service.currency
+        ) {
+            throw new BadRequestException({
+                message:
+                    "This has no price to pay online. Book it to pay at the desk.",
+                field: "pay",
+            });
+        }
+        if (!(await this.takesOnlinePayment(service.organizationId))) {
+            throw new ConflictException({
+                message:
+                    "This business isn't taking payment online right now. Book it to pay at the desk.",
+                field: "pay",
+            });
+        }
+        return { cents: service.priceCents, currency: service.currency };
+    }
+
+    /** Payments on, and a provider connected to take the money. */
+    private async takesOnlinePayment(organizationId: string): Promise<boolean> {
+        const [on, provider] = await Promise.all([
+            paymentsOn(prisma, organizationId),
+            prisma.merchantPaymentProvider.findFirst({
+                where: { organizationId, status: "CONNECTED" },
+                select: { id: true },
+            }),
+        ]);
+        return on && provider !== null;
     }
 
     /**
@@ -1686,7 +2160,7 @@ export class BookingsService {
             const confirmed = await tx.booking.count({
                 where: {
                     serviceId,
-                    status: "CONFIRMED",
+                    ...holdsPlace(new Date()),
                     startAt: { lt: endAt },
                     endAt: { gt: startAt },
                 },
@@ -1738,7 +2212,9 @@ export class BookingsService {
                 startAt,
                 endAt,
                 timezone: service.timezone,
-                status: "CONFIRMED",
+                // A pay-now booking holds its place until paid (U19).
+                status: person?.holdUntil ? "PENDING" : "CONFIRMED",
+                holdExpiresAt: person?.holdUntil ?? null,
                 snapshot: snapshot as Prisma.InputJsonValue,
                 bookerName: input.bookerName ?? null,
                 bookerEmail: email,
@@ -1817,7 +2293,7 @@ export class BookingsService {
         const clashes = await tx.booking.count({
             where: {
                 staffId: person.staffId,
-                status: "CONFIRMED",
+                ...holdsPlace(new Date()),
                 startAt: { lt: endAt },
                 endAt: { gt: startAt },
                 ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
@@ -1876,7 +2352,10 @@ export class BookingsService {
         return [...confirmed, ...held];
     }
 
-    /** Confirmed bookings overlapping `[from, to)` for a service (for capacity checks). */
+    /**
+     * Bookings taking a place over `[from, to)` for a service (for capacity
+     * checks): confirmed ones, and pay-now holds still inside their time.
+     */
     private async confirmedOverlapping(
         serviceId: string,
         from: Date,
@@ -1885,7 +2364,7 @@ export class BookingsService {
         return prisma.booking.findMany({
             where: {
                 serviceId,
-                status: "CONFIRMED",
+                ...holdsPlace(new Date()),
                 startAt: { lt: to },
                 endAt: { gt: from },
             },
