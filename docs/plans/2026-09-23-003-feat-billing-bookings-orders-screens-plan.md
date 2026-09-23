@@ -827,6 +827,8 @@ U20.
 
 ## Sources & References
 
+- **Epic:** #506 — units U1–U20 are #486–#505 in order
+
 - Design project `1fef6fb9-c3b1-4c04-bfc2-86d09cb32a65`: `Saroh Invoices`, `Saroh Invoice Detail`, `Saroh Subscriptions`, `Saroh Subscription Detail`, `Saroh Bookings`, `Saroh Business Calendar`, `Saroh Customer Detail`, `Saroh Order Detail`, `Saroh Book Pulse Fitness`, `SarohTabBar` (`.dc.html`), `handoff-products.md`, `saroh-fixtures.js`, `saroh-order-flow.js`, `saroh-mobile-nav.js`
 - `docs/architecture/adr/ADR-007-subscriptions-invoices-classes.md`, `docs/plans/2026-09-22-001-feat-subscriptions-invoices-classes-plan.md`, `docs/plans/2026-09-23-002-feat-product-detail-settings-editor-plan.md`
 - `docs/patterns/backend-billing-and-classes.md`, `docs/patterns/saroh-product.md`, `docs/patterns/backend-auth-and-access.md`
