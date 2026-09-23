@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 
 import {
     formatDayHeading,
+    formatMoment,
     formatShortDate,
     formatShortDateTime,
 } from "@/lib/format/datetime";
@@ -48,7 +49,16 @@ export function ViewerDate({
      * `datetime` adds the time, for a timeline where the hour matters.
      */
     variant?:
-        "short" | "heading" | "datetime" | "dayMonth" | "dayMonthLong" | "time";
+        | "short"
+        | "heading"
+        | "datetime"
+        | "dayMonth"
+        | "dayMonthLong"
+        | "time"
+        // "Today, 09:14" — a step on a timeline (Order Detail).
+        | "moment"
+        // "August 2026".
+        | "monthYear";
     className?: string;
 }) {
     const timeZone = useSyncExternalStore(
@@ -58,28 +68,36 @@ export function ViewerDate({
     );
 
     const text =
-        variant === "heading"
-            ? formatDayHeading(iso, timeZone)
-            : variant === "datetime"
-              ? formatShortDateTime(iso, timeZone)
-              : variant === "dayMonth"
-                ? // "18 Sep" — a stat tile's figure, where the year is noise. Three
-                  // letters every month (ICU writes "Sept"), as the design does.
-                  dayMonth(iso, timeZone)
-                : variant === "dayMonthLong"
-                  ? // "2 September" — said in a sentence.
-                    new Intl.DateTimeFormat("en-GB", {
-                        day: "numeric",
-                        month: "long",
-                        timeZone,
-                    }).format(new Date(iso))
-                  : variant === "time"
-                    ? new Intl.DateTimeFormat("en-GB", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          timeZone,
-                      }).format(new Date(iso))
-                    : formatShortDate(iso, timeZone);
+        variant === "moment"
+            ? formatMoment(iso, timeZone)
+            : variant === "monthYear"
+              ? new Intl.DateTimeFormat("en-GB", {
+                    month: "long",
+                    year: "numeric",
+                    timeZone,
+                }).format(new Date(iso))
+              : variant === "heading"
+                ? formatDayHeading(iso, timeZone)
+                : variant === "datetime"
+                  ? formatShortDateTime(iso, timeZone)
+                  : variant === "dayMonth"
+                    ? // "18 Sep" — a stat tile's figure, where the year is noise. Three
+                      // letters every month (ICU writes "Sept"), as the design does.
+                      dayMonth(iso, timeZone)
+                    : variant === "dayMonthLong"
+                      ? // "2 September" — said in a sentence.
+                        new Intl.DateTimeFormat("en-GB", {
+                            day: "numeric",
+                            month: "long",
+                            timeZone,
+                        }).format(new Date(iso))
+                      : variant === "time"
+                        ? new Intl.DateTimeFormat("en-GB", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              timeZone,
+                          }).format(new Date(iso))
+                        : formatShortDate(iso, timeZone);
 
     return (
         // `<time dateTime>` carries the exact instant regardless of how the

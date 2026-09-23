@@ -675,13 +675,45 @@ const READ_INCLUDE = {
             firstName: true,
             lastName: true,
             phone: true,
+            // The contact it is confirmed as — the oldest link, so the
+            // answer does not move when a second is made.
+            identityLinks: {
+                orderBy: { createdAt: "asc" },
+                take: 1,
+                select: { contactId: true },
+            },
+            orders: {
+                orderBy: { createdAt: "asc" },
+                take: 1,
+                select: { createdAt: true },
+            },
+            _count: { select: { orders: true } },
         },
     },
     items: {
         orderBy: { id: "asc" },
         include: {
-            product: { select: { name: true } },
-            variant: { select: { title: true } },
+            product: {
+                select: {
+                    name: true,
+                    image: true,
+                    allergens: {
+                        orderBy: { allergen: { position: "asc" } },
+                        select: {
+                            kind: true,
+                            allergen: { select: { id: true, name: true } },
+                        },
+                    },
+                },
+            },
+            variant: {
+                select: {
+                    title: true,
+                    sku: true,
+                    image: true,
+                    photo: { select: { url: true } },
+                },
+            },
             refundLines: {
                 where: { paymentRefund: { status: { not: "FAILED" } } },
                 select: { quantity: true, amountCents: true },

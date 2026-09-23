@@ -36,11 +36,28 @@ export interface OrderEventDto {
     amountCents?: number | null;
 }
 
+/** One allergen from the storefront's own list (#483), by id and name. */
+export interface AllergenRef {
+    id: string;
+    name: string;
+}
+
 export interface OrderLineDto {
     id: string;
     productId: string;
     name: string | null;
     variantTitle: string | null;
+    /** The variant's SKU, where the line names a variant. */
+    sku: string | null;
+    /** The variant's photo, else the product's cover. */
+    imageUrl: string | null;
+    /**
+     * What the product says it contains and may contain, as it says it NOW —
+     * the allergy banner checks these ids against the customer's notes
+     * (ADR-008, "notes carry structured allergens"). Kitchen data, so every
+     * role that reads the order gets it.
+     */
+    allergens: { contains: AllergenRef[]; mayContain: AllergenRef[] };
     quantity: number;
     /** Units refunded so far (pending or settled). */
     refundedQuantity: number;
@@ -71,6 +88,12 @@ export interface OrderMoneyDto {
     refunded: string;
     /** Still to collect: an order edited up, or never paid. */
     due: string;
+    /**
+     * Paid, with no payment taken through a provider: the money moved
+     * outside Saroh (cash at the counter, a transfer) and was recorded by
+     * hand, so `paid` is the order's total rather than the provider sum.
+     */
+    recordedByHand: boolean;
     discountCode: { code: string; rule: string } | null;
 }
 
@@ -92,6 +115,17 @@ export interface OrderReadDto {
         phone: string | null;
         /** Only with `order:read` — the kitchen needs a name, not an inbox. */
         email?: string;
+        /**
+         * The contact this store customer is confirmed as (a
+         * `CustomerIdentityLink`), where one is — the key to the customer
+         * read, whose notes name allergens. Null when unlinked: an email
+         * match is never taken as the same person (ADR-008).
+         */
+        contactId: string | null;
+        /** Orders this customer has placed here, this one included. */
+        orderCount: number;
+        /** When their first order was placed. */
+        firstOrderAt: Date | null;
     } | null;
     /** Null when no address was ever given. */
     deliveryAddress: DeliveryAddressDto | null;
@@ -158,14 +192,29 @@ export interface RawOrderRead {
         firstName: string | null;
         lastName: string | null;
         phone: string | null;
+        identityLinks?: { contactId: string }[];
+        orders?: { createdAt: Date }[];
+        _count?: { orders: number };
     } | null;
     items: {
         id: string;
         productId: string;
         quantity: number;
         price: DecimalLike;
-        product: { name: string } | null;
-        variant: { title: string } | null;
+        product: {
+            name: string;
+            image?: string | null;
+            allergens?: {
+                kind: string;
+                allergen: { id: string; name: string };
+            }[];
+        } | null;
+        variant: {
+            title: string;
+            sku?: string;
+            image?: string | null;
+            photo?: { url: string } | null;
+        } | null;
         refundLines: { quantity: number; amountCents: number }[];
     }[];
     events: {
@@ -220,6 +269,17 @@ function ruleOf(r: NonNullable<RawOrderRead["discountRedemption"]>): string {
         : "Amount off";
 }
 
+/** A product's allergen rows, split by kind and in the list's own order. */
+export function allergensOf(
+    rows: { kind: string; allergen: { id: string; name: string } }[],
+): OrderLineDto["allergens"] {
+    const pick = (kind: string) =>
+        rows
+            .filter((r) => r.kind === kind)
+            .map((r) => ({ id: r.allergen.id, name: r.allergen.name }));
+    return { contains: pick("CONTAINS"), mayContain: pick("MAY_CONTAIN") };
+}
+
 /** The step an Undo would reverse now, if any. */
 export function undoableStep(
     events: RawOrderRead["events"],
@@ -246,6 +306,11 @@ export function serializeOrderRead(
         (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
         0,
     );
+    // Recorded by hand: marked paid with no provider payment behind it.
+    const byHand =
+        (order.paymentStatus === "PAID" ||
+            order.paymentStatus === "REFUNDED") &&
+        order.paymentIntents.length === 0;
     const stage = order.stage as OrderStage;
     const address: DeliveryAddressDto = {
         name: order.deliveryName,
@@ -285,6 +350,10 @@ export function serializeOrderRead(
                   name: name || null,
                   phone: order.customer.phone,
                   ...(opts.fullRead ? { email: order.customer.email } : {}),
+                  contactId:
+                      order.customer.identityLinks?.[0]?.contactId ?? null,
+                  orderCount: order.customer._count?.orders ?? 1,
+                  firstOrderAt: order.customer.orders?.[0]?.createdAt ?? null,
               }
             : null,
         deliveryAddress: hasAddress ? address : null,
@@ -295,6 +364,13 @@ export function serializeOrderRead(
             productId: i.productId,
             name: i.product?.name ?? null,
             variantTitle: i.variant?.title ?? null,
+            sku: i.variant?.sku ?? null,
+            imageUrl:
+                i.variant?.photo?.url ??
+                i.variant?.image ??
+                i.product?.image ??
+                null,
+            allergens: allergensOf(i.product?.allergens ?? []),
             quantity: i.quantity,
             refundedQuantity: i.refundLines.reduce((s, r) => s + r.quantity, 0),
             ...(opts.money ? { price: toMoneyString(i.price) } : {}),
@@ -341,9 +417,14 @@ export function serializeOrderRead(
                   shipping: toMoneyString(order.shipping),
                   discount: toMoneyString(order.discount),
                   total: toMoneyString(order.total),
-                  paid: money(capturedCents),
+                  paid: byHand
+                      ? toMoneyString(order.total)
+                      : money(capturedCents),
                   refunded: money(refundedCents),
-                  due: money(amountDueCents(order, capturedCents)),
+                  due: byHand
+                      ? "0.00"
+                      : money(amountDueCents(order, capturedCents)),
+                  recordedByHand: byHand,
                   discountCode: order.discountRedemption
                       ? {
                             code: order.discountRedemption.code,

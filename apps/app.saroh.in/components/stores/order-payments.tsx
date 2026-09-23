@@ -1,18 +1,7 @@
 import { formatMoney } from "@/lib/format/money";
 import { formatStatus } from "@/lib/format/status";
+import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
-
-/**
- * Whether the order's payment can be sent back through its provider: paid,
- * with a charge that succeeded. A payment recorded by hand has no charge to
- * reverse, so it is refunded by hand as well.
- */
-export function isRefundable(summary: OrderPaymentsSummary | null): boolean {
-    return (
-        summary?.paymentStatus === "PAID" &&
-        summary.intents.some((i) => i.status === "SUCCEEDED")
-    );
-}
 
 /**
  * Every attempt to take payment for an order, and every refund against it —
@@ -43,8 +32,8 @@ export function OrderPayments({
             {intents.map((intent) => (
                 <li key={intent.id} className="flex flex-col gap-1.5">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[12.5px]">
-                        <span className="font-medium capitalize">
-                            {intent.provider}
+                        <span className="font-medium">
+                            {providerName(intent.provider)}
                         </span>
                         <span className="flex items-center gap-2">
                             <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:text-muted-foreground">

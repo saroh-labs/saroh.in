@@ -110,12 +110,25 @@ describe("seats", () => {
         const sell = nav.tabs.find((t) => t.label === "Sell");
         expect(sell?.section).toBe(true);
         expect(sell?.href).toBe("/commerce/orders");
-        // A Member reads no orders: Sell opens on Products for them.
+        // A Member moves orders through the kitchen (DEC-024), so Sell opens
+        // on Orders for them too; a role that can do neither lands on
+        // Products.
         const member = buildMobileNav({
             groups: navFor({ role: "MEMBER", moduleKeys: ["COMMERCE"] }),
             pathname: "/",
         });
         expect(member.tabs.find((t) => t.label === "Sell")?.href).toBe(
+            "/commerce/orders",
+        );
+        const shelves = buildMobileNav({
+            groups: navFor({
+                role: "MEMBER",
+                actions: ["store:read"],
+                moduleKeys: ["COMMERCE"],
+            }),
+            pathname: "/",
+        });
+        expect(shelves.tabs.find((t) => t.label === "Sell")?.href).toBe(
             "/commerce/products",
         );
     });

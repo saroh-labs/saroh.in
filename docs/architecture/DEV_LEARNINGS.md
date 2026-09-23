@@ -447,3 +447,19 @@ globs. `app.saroh.in` scans `app/`, `components/`, `pages/`, `src/` and
 keeps the tone numbers. Any whole class string a component picks from a map
 has to live in a scanned folder.
 **Category**: frontend · `apps/app.saroh.in/components/calendar/tones.ts`
+
+## Frontend — a worktree's app under another portless name refused every Server Action (U14)
+
+**Problem**: Running a worktree's `app.saroh.in` as
+`https://orders-app.saroh.localhost` rendered pages fine, but every button that
+called a Server Action failed with "An unexpected response was received from
+the server", and nothing reached the API.
+**Root cause**: The auth middleware (`packages/auth/src/middleware.ts`) refuses
+a POST whose `Origin` is not in `BETTER_AUTH_TRUSTED_ORIGINS` with a 403
+"Untrusted request origin". The app's `.env` lists only
+`https://app.saroh.localhost`.
+**Fix**: Start the second app with its own origin added —
+`BETTER_AUTH_TRUSTED_ORIGINS=…,https://orders-app.saroh.localhost` (and
+`API_URL` for its own API). No code change; reads work either way, which is
+why it looks like a bug in the screen.
+**Category**: local dev · `packages/auth/src/middleware.ts`

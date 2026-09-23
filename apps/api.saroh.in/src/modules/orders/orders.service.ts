@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
     Optional,
@@ -64,7 +65,7 @@ export class OrdersService {
     ) {}
 
     async list(storeId: string, userId: string) {
-        await this.stores.getForUser(storeId, userId);
+        await this.requireOrderRead(storeId, userId);
         const orders = await prisma.order.findMany({
             where: { storeId },
             orderBy: { createdAt: "desc" },
@@ -91,6 +92,7 @@ export class OrdersService {
     async listForOrganization(
         organizationId: string,
         filter?: { storeId?: string },
+        view: { kitchenOnly?: boolean } = {},
     ) {
         const orders = await prisma.order.findMany({
             where: {
@@ -104,11 +106,11 @@ export class OrdersService {
                 _count: { select: { items: true } },
             },
         });
-        return orders.map(serializeOrganizationOrder);
+        return orders.map((o) => serializeOrganizationOrder(o, view));
     }
 
     async get(storeId: string, orderId: string, userId: string) {
-        await this.stores.getForUser(storeId, userId);
+        await this.requireOrderRead(storeId, userId);
         const order = await prisma.order.findFirst({
             where: { id: orderId, storeId },
             include: {
@@ -516,6 +518,30 @@ export class OrdersService {
                 ruleAmount: applied.ruleAmount,
             },
         });
+    }
+
+    /**
+     * Reading a storefront's orders — with their totals — takes `order:read`,
+     * not only a way into the store. Commerce opened to `order:stage` for the
+     * kitchen (DEC-024), and a Member holds that and `store:read` but no money
+     * read: without this, this older read handed them every order's prices,
+     * which the organization-scoped read Order Detail uses leaves out.
+     *
+     * It refuses exactly the kitchen's roles — `order:stage` without
+     * `order:read` — so everyone who reached it before (and a legacy store
+     * grant, which has no membership to ask) is unchanged.
+     */
+    private async requireOrderRead(storeId: string, userId: string) {
+        await this.stores.getForUser(storeId, userId);
+        const [stage, read] = await Promise.all([
+            this.stores.memberAllows(storeId, userId, "order:stage"),
+            this.stores.memberAllows(storeId, userId, "order:read"),
+        ]);
+        if (stage && !read) {
+            throw new ForbiddenException(
+                "Your role doesn't include reading this storefront's orders.",
+            );
+        }
     }
 
     private async requireWrite(

@@ -110,6 +110,20 @@ describe("OrdersService.listForOrganization", () => {
         });
     });
 
+    it("leaves totals and emails out of the kitchen's view", async () => {
+        const orders = await service().listForOrganization(
+            "org_1",
+            {},
+            { kitchenOnly: true },
+        );
+
+        expect(orders[0]!.total).toBeNull();
+        expect(orders[0]!.customer).toEqual({
+            id: "cus_1",
+            name: "Priya Raman",
+        });
+    });
+
     it("puts the newest order first", async () => {
         await service().listForOrganization("org_1");
 

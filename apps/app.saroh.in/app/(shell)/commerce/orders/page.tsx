@@ -1,6 +1,7 @@
 import { PageContainer } from "@/components/shared/page-container";
 import { OrdersScreen } from "@/components/stores/orders-screen";
 import { listBusinessOrders } from "@/lib/orders/business-service";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
 
@@ -25,11 +26,17 @@ export default async function OrdersPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [orders, stores, { view }] = await Promise.all([
+    const [orders, stores, { view }, organization] = await Promise.all([
         listBusinessOrders(),
         listBusinessStores(),
         searchParams,
+        resolveActiveOrganization(),
     ]);
+    // A Member reaches the list through `order:stage` alone (DEC-024) and
+    // gets the kitchen's view of it.
+    const fullRead = organization?.actions
+        ? organization.actions.includes("order:read")
+        : organization?.role !== "MEMBER";
 
     return (
         <PageContainer width="full">
@@ -37,6 +44,7 @@ export default async function OrdersPage({
                 orders={orders}
                 stores={stores.map((s) => ({ id: s.id, name: s.name }))}
                 initialFilterId={typeof view === "string" ? view : undefined}
+                kitchen={!fullRead}
             />
         </PageContainer>
     );

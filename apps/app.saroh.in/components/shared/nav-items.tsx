@@ -65,6 +65,10 @@ export type NavAction =
     // every storefront. Not in the read-only floor, so a Member or Reviewer
     // is not offered a row the API would refuse them.
     | "order:read"
+    // Moving an order through the kitchen (DEC-024): a Member holds it, and
+    // reaches the Orders list and an order's page through it — the kitchen's
+    // view, without money.
+    | "order:stage"
     // Leads and the pipeline (Owner and Admin by default; a Member reads
     // contacts, not the sales funnel).
     | "lead:read"
@@ -116,6 +120,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "org:settings:read",
         "provider:read",
         "order:read",
+        "order:stage",
         "discount:read",
         "store:read",
         "subscription:read",
@@ -140,6 +145,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "org:settings:read",
         "provider:read",
         "order:read",
+        "order:stage",
         "discount:read",
         "store:read",
         "subscription:read",
@@ -162,6 +168,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "contact:read",
         "booking:read",
         "service:read",
+        "order:stage",
     ],
     REVIEWER: ["site:read"],
 };
@@ -174,10 +181,17 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
  * itself on a failed read is worse than one that offers a destination the
  * server then refuses.
  */
-export function navRoleCan(role: NavRole | null, action: NavAction): boolean {
+export function navRoleCan(
+    role: NavRole | null,
+    action: NavAction | readonly NavAction[],
+): boolean {
     if (role === null) return true;
-    return REACHABLE[role].includes(action);
+    return anyOf(action).some((a) => REACHABLE[role].includes(a));
 }
+
+/** A destination some of whose actions reach it: any one will do. */
+const anyOf = (action: NavAction | readonly NavAction[]) =>
+    typeof action === "string" ? [action] : action;
 
 /**
  * May this actor reach something that needs `action`?
@@ -199,9 +213,10 @@ export function navRoleCan(role: NavRole | null, action: NavAction): boolean {
  */
 export function navCan(
     actor: { role: NavRole | null; actions?: readonly string[] | null },
-    action: NavAction,
+    action: NavAction | readonly NavAction[],
 ): boolean {
-    if (actor.actions) return actor.actions.includes(action);
+    const { actions } = actor;
+    if (actions) return anyOf(action).some((a) => actions.includes(a));
     return navRoleCan(actor.role, action);
 }
 
@@ -215,7 +230,8 @@ export function navCan(
  */
 export interface NavChild {
     /** What the actor must be able to do to reach it; see {@link navRoleCan}. */
-    action?: NavAction;
+    /** Any one of several will do, e.g. Orders: `order:read` or `order:stage`. */
+    action?: NavAction | readonly NavAction[];
     /**
      * Absent for a row that only NAMES something — a site whose real
      * destinations are the rows beneath it. A label row is not a link, so
@@ -378,7 +394,9 @@ export const NAV_GROUPS: NavGroup[] = [
                     {
                         href: "/commerce/orders",
                         label: "Orders",
-                        action: "order:read",
+                        // A Member at the counter reaches it through the
+                        // kitchen (DEC-024) and sees no money on it.
+                        action: ["order:read", "order:stage"],
                     },
                     {
                         href: "/commerce/products",

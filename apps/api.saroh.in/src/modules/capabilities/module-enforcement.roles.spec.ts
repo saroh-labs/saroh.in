@@ -110,14 +110,17 @@ describe("ModuleEnforcementGuard by role, with enforcement on", () => {
         async (role) => {
             for (const key of MODULE_KEYS) {
                 const result = guardFor(key).canActivate(asRole(role));
-                // A Member reaches the diary (booking:read) as well as the
-                // website; everything else answers it with a 404.
+                // A Member reaches the diary (booking:read), the website, and
+                // Commerce through the kitchen (order:stage, DEC-024);
+                // everything else answers it with a 404.
                 const reach =
                     role === "OWNER" ||
                     role === "ADMIN" ||
                     key === "WEBSITE" ||
                     (role === "MEMBER" &&
-                        (key === "APPOINTMENTS" || key === "CRM"));
+                        (key === "APPOINTMENTS" ||
+                            key === "CRM" ||
+                            key === "COMMERCE"));
                 if (reach) {
                     await expect(result).resolves.toBe(true);
                 } else {
