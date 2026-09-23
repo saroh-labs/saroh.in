@@ -127,6 +127,13 @@ model Organization {
   // (R2); this is the tenant-scoped metadata index.
   media Media[]
 
+  // Products v2 (#460): photos, per-variant stock, store options, defaults.
+  productImages     ProductImage[]
+  variantInventory  VariantInventory[]
+  productOptions    ProductOption[]
+  productOptionVals ProductOptionValue[]
+  catalogueDefaults CatalogueDefaults[]
+
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
   sites            Site[]
@@ -416,6 +423,9 @@ model Media {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Products that show this object. Taking it off a product never deletes it.
+  productImages ProductImage[]
+
   @@index([organizationId])
 }
 
@@ -476,6 +486,9 @@ model Store {
   discountReach DiscountStore[]
 
   productReviews ProductReview[]
+
+  productOptions    ProductOption[]
+  catalogueDefaults CatalogueDefaults[]
 
   @@index([slug])
   @@index([createdAt])
@@ -553,20 +566,51 @@ model Product {
   name        String
   slug        String
   description String? @db.Text
+  // The cover, mirrored from the first ProductImage so lists, orders and
+  // imports keep reading one string. Written only through the photo set.
   image       String?
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
 
-  price    Decimal @db.Decimal(10, 2)
-  currency String  @default("USD")
+  price    Decimal  @db.Decimal(10, 2)
+  // The printed / compare-at price, shown struck through. At or above price.
+  mrp      Decimal? @db.Decimal(10, 2)
+  currency String   @default("USD")
 
   status String @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+
+  // Details (products v2). Each customer-facing one has a switch in
+  // shopFields: { howToUse, materials, keyPoints, maker, warranty, returns }.
+  howToUse     String?
+  materials    String?  @db.Text
+  keyPoints    String[] @default([])
+  madeHere     Boolean  @default(true)
+  maker        String?
+  madeIn       String?
+  supplierCode String? // team only, never on the shop
+  warranty     String?
+  returnsMode  String   @default("STOREFRONT") // STOREFRONT | OWN
+  returnsText  String?
+  shopFields   Json     @default("{}")
+
+  // SEO — stored and edited; the website renders them later (#473).
+  seoTitle       String?
+  seoDescription String?
+  seoImageId     String?
+  seoImage       ProductImage? @relation("ProductSeoImage", fields: [seoImageId], references: [id], onDelete: SetNull)
+
+  // The one store option its variants are chosen by ("Customers choose by").
+  optionId String?
+  option   ProductOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
 
   // Relations
   variants   ProductVariant[]
   orderItems OrderItem[]
+  // Product-level stock: only while the product has no variants. With
+  // variants, each keeps its own VariantInventory and this row is gone.
   inventory  Inventory?
+  images     ProductImage[]   @relation("ProductImages")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -579,6 +623,7 @@ model Product {
   @@index([storeId])
   @@index([categoryId])
   @@index([organizationId])
+  @@index([optionId])
 }
 
 model ProductVariant {
@@ -589,12 +634,116 @@ model ProductVariant {
   sku   String
   title String // e.g., "Red / Large"
 
-  price Decimal? @db.Decimal(10, 2)
+  price Decimal? @db.Decimal(10, 2) // null = the product's
+  mrp   Decimal? @db.Decimal(10, 2) // null = the product's
   image String?
+
+  // Its value of the product's option; deleting a value in use is refused.
+  optionValueId String?
+  optionValue   ProductOptionValue? @relation(fields: [optionValueId], references: [id], onDelete: Restrict)
+  // The product photo shown when someone picks it; null = the cover.
+  imageId       String?
+  photo         ProductImage?       @relation("VariantPhoto", fields: [imageId], references: [id], onDelete: SetNull)
+  position      Int                 @default(0)
+
+  inventory  VariantInventory?
+  orderItems OrderItem[]
 
   createdAt DateTime @default(now())
 
   @@unique([productId, sku])
+  @@index([optionValueId])
+}
+
+// A product's photos, in the order customers see them; position 0 is the
+// cover. At most five (enforced by the API). Taking one off deletes this row,
+// never the Media object behind it.
+model ProductImage {
+  id             String       @id @default(cuid())
+  productId      String
+  product        Product      @relation("ProductImages", fields: [productId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  url      String
+  mediaId  String?
+  media    Media?  @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  alt      String  @default("")
+  width    Int?
+  height   Int?
+  position Int
+
+  // Photographer credit, for images from a licensed library (e.g. Unsplash).
+  creditName String?
+  creditUrl  String?
+
+  createdAt DateTime @default(now())
+
+  variants    ProductVariant[] @relation("VariantPhoto")
+  seoProducts Product[]        @relation("ProductSeoImage")
+
+  @@index([productId, position])
+  @@index([organizationId])
+}
+
+// Store-wide variant option names ("Size", "Shade") and their values.
+model ProductOption {
+  id             String       @id @default(cuid())
+  storeId        String
+  store          Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name     String
+  position Int    @default(0)
+
+  values   ProductOptionValue[]
+  products Product[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([storeId, name])
+  @@index([organizationId])
+}
+
+model ProductOptionValue {
+  id             String        @id @default(cuid())
+  optionId       String
+  option         ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  value    String
+  position Int    @default(0)
+
+  variants ProductVariant[]
+
+  @@unique([optionId, value])
+  @@index([organizationId])
+}
+
+// What a new product starts with. key "all" is All products; otherwise the
+// key is the category's id and a null field falls through to "all".
+model CatalogueDefaults {
+  id             String       @id @default(cuid())
+  storeId        String
+  store          Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  key        String
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  howToUse      String?
+  lowStockAlert Int?
+  returnsMode   String? // STOREFRONT | OWN
+  returnsText   String?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, key])
+  @@index([organizationId])
 }
 
 model Category {
@@ -615,6 +764,7 @@ model Category {
   createdAt DateTime @default(now())
 
   discountReach DiscountCategory[]
+  defaults      CatalogueDefaults[]
 
   @@unique([storeId, slug])
   @@index([storeId])
@@ -640,6 +790,27 @@ model Inventory {
   updatedAt DateTime @updatedAt
 
   @@index([storeId])
+  @@index([organizationId])
+}
+
+// Stock for one variant. A product with variants counts here, one row per
+// variant; its total is the sum. Orders reserve and commit against the
+// variant their line names.
+model VariantInventory {
+  id             String         @id @default(cuid())
+  variantId      String         @unique
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  productId      String
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  quantity      Int @default(0)
+  reserved      Int @default(0) // promised to open orders; only Orders moves it
+  lowStockAlert Int @default(10)
+
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
   @@index([organizationId])
 }
 
@@ -763,12 +934,18 @@ model OrderItem {
   productId String
   product   Product @relation(fields: [productId], references: [id])
 
+  // The variant bought. Null on lines from before per-variant stock, and on
+  // products without variants; those move the product's own stock.
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
   quantity Int
   price    Decimal @db.Decimal(10, 2)
 
   review ProductReview?
 
   @@index([orderId])
+  @@index([variantId])
 }
 
 // ============================================================================

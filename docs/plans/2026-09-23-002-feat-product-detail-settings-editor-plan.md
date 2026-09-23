@@ -226,13 +226,12 @@ These are noted here, and each gets a line in the epic, so none is lost:
 
 ### Data and money
 
-- **KD1. Stock per variant.** `Inventory` gains a nullable variant. A product has either one product-level row (no variants) or one row per variant.
-    - Adding the first variant carries the product's on-hand count to that variant in the same transaction.
-    - Removing the last variant carries it back.
+- **KD1. Stock per variant.** It lives in its own table, `VariantInventory` (one row per variant: on hand, promised, warn at). `Inventory` stays the product-level row, 1:1 as before.
+    - A product counts per variant once it has `VariantInventory` rows. Otherwise it counts on its product row, exactly as today.
+    - Switching a product to per-variant stock moves its on-hand count into the variants. The product row keeps only what legacy orders already promised, so releasing an old order still lands on the right row. Promised for the product = the product row's promised + the sum of the variants'.
     - Removing a variant with promised stock is refused, and the reason is written out.
-    - `OrderItem` gains a nullable variant. `applyInventoryTransition` moves the variant's row when there is one, and otherwise moves the product's.
-    - Existing orders keep a null variant and move product stock as they do today.
-    - _Why:_ the design calls a single count dishonest once sizes exist. Keeping the product-level row for simple products means nothing already sold changes behaviour.
+    - `OrderItem` gains a nullable variant. `applyInventoryTransition` moves the variant's row when the line names one, and the product's row otherwise.
+    - _Why:_ the design calls a single count dishonest once sizes exist. A separate table keeps every existing `product.inventory` read and order transition working unchanged, and needs no backfill guesswork about which size an old count belonged to.
 - **KD2. An ordered photo table.** `ProductImage` holds product, organization, url, optional `mediaId`, alt, width, height, position and optional credit (name and link).
     - At most 5 per product, enforced by the API.
     - `Product.image` stays as a denormalised cover (position 0) so the list screen, orders and imports keep working. It is removed in a later two-deploy change, as the migration rules require.
@@ -328,6 +327,8 @@ Products list ─► /products/[id]  (product page: Team view tabs | Customer vi
 Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo store and verification (U12–U13). U12 can start once U1 lands. It is the fixture every screen is checked against.
 
 ### U1. Schema: variant stock, product photos, details and SEO, options, defaults
+
+> **Done — #460.** Migration `20260923150000_products_v2`: MRP on product and variant; details, shop switches and SEO on product; `ProductImage`, `ProductOption`, `ProductOptionValue`, `CatalogueDefaults`, `VariantInventory`; `OrderItem.variantId`. RLS `org_isolation` on all five new tables. The backfill turns `Product.image` into the cover photo and orders variants by creation. Verified: `db:verify:replay` clean; RLS checked as a non-superuser (another org reads 0 rows, a cross-org insert is refused); the backfill checked on seeded rows; API typecheck and 1,414 integration tests green.
 
 - **Goal:** the model holds everything in R22–R24.
 - **Files:**
