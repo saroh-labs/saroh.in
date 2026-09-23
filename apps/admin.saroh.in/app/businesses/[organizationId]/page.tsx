@@ -20,6 +20,11 @@ import { NotesPanel } from "@/components/business/notes-panel";
 import { OpenAccess } from "@/components/business/open-access";
 import { PlanActions, RevokeLimit } from "@/components/business/plan-actions";
 import { Facts, Panel } from "@/components/panel";
+import {
+    ChangeRole,
+    InvitationActions,
+    RemoveMember,
+} from "@/components/people/person-actions";
 import type { BusinessRow, BusinessView, PlanOption } from "@/lib/businesses";
 import {
     getBusinessSummary,
@@ -155,6 +160,9 @@ function Business({
     const lifecycleWrite = can(staff, "organization:lifecycle:write");
     const subscriptionWrite = can(staff, "subscription:override");
     const modulesWrite = can(staff, "organization:modules:write");
+    const peopleWrite =
+        can(staff, "organization:people:write") &&
+        can(staff, "organization:pii:read");
 
     return (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -167,7 +175,7 @@ function Business({
                     {(people) => (
                         <div className="grid gap-4">
                             <div className="overflow-x-auto">
-                                <table className="w-full min-w-[480px] text-sm">
+                                <table className="w-full min-w-[560px] text-sm">
                                     <thead>
                                         <tr className="border-b text-left text-[12px] uppercase tracking-[0.08em] text-muted-foreground">
                                             <th className="py-2 pr-3 font-semibold">
@@ -176,64 +184,130 @@ function Business({
                                             <th className="py-2 pr-3 font-semibold">
                                                 Role
                                             </th>
-                                            <th className="py-2 font-semibold">
+                                            <th className="py-2 pr-3 font-semibold">
                                                 Email
                                             </th>
+                                            {peopleWrite && (
+                                                <th className="py-2 font-semibold">
+                                                    <span className="sr-only">
+                                                        Actions
+                                                    </span>
+                                                </th>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {people.members.map((member) => (
-                                            <tr
-                                                key={member.membershipId}
-                                                className="border-b last:border-0"
-                                            >
-                                                <td className="py-2 pr-3">
-                                                    {member.name ?? (
-                                                        <span className="text-muted-foreground">
-                                                            No name
-                                                        </span>
+                                        {people.members.map((member) => {
+                                            const label =
+                                                member.name ??
+                                                member.email ??
+                                                "this person";
+                                            return (
+                                                <tr
+                                                    key={member.membershipId}
+                                                    className="border-b last:border-0"
+                                                >
+                                                    <td className="py-2 pr-3">
+                                                        {member.name ?? (
+                                                            <span className="text-muted-foreground">
+                                                                No name
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 pr-3">
+                                                        {asWords(member.role)}
+                                                    </td>
+                                                    <td className="py-2 pr-3">
+                                                        {member.email ? (
+                                                            <span className="break-all">
+                                                                {member.email}
+                                                                {!member.emailVerified && (
+                                                                    <span className="text-muted-foreground">
+                                                                        {" "}
+                                                                        · not
+                                                                        verified
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">
+                                                                Hidden
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    {peopleWrite && (
+                                                        <td className="py-1">
+                                                            <div className="flex justify-end gap-1">
+                                                                <ChangeRole
+                                                                    organizationId={
+                                                                        id
+                                                                    }
+                                                                    userId={
+                                                                        member.userId
+                                                                    }
+                                                                    name={label}
+                                                                    role={
+                                                                        member.role
+                                                                    }
+                                                                />
+                                                                <RemoveMember
+                                                                    organizationId={
+                                                                        id
+                                                                    }
+                                                                    userId={
+                                                                        member.userId
+                                                                    }
+                                                                    name={label}
+                                                                    business={
+                                                                        facts.name
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </td>
                                                     )}
-                                                </td>
-                                                <td className="py-2 pr-3">
-                                                    {asWords(member.role)}
-                                                </td>
-                                                <td className="py-2">
-                                                    {member.email ? (
-                                                        <span className="break-all">
-                                                            {member.email}
-                                                            {!member.emailVerified && (
-                                                                <span className="text-muted-foreground">
-                                                                    {" "}
-                                                                    · not
-                                                                    verified
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">
-                                                            Hidden
-                                                        </span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
                             {people.invitations.length > 0 && (
-                                <p className="text-sm text-muted-foreground">
-                                    {plural(
-                                        people.invitations.length,
-                                        "invitation",
-                                    )}{" "}
-                                    waiting:{" "}
-                                    {people.invitations
-                                        .map(
-                                            (invite) =>
-                                                `${invite.email ?? "hidden"} as ${asWords(invite.role)}`,
-                                        )
-                                        .join("; ")}
-                                </p>
+                                <div className="grid gap-2">
+                                    <p className="text-sm font-medium">
+                                        {plural(
+                                            people.invitations.length,
+                                            "invitation",
+                                        )}{" "}
+                                        waiting
+                                    </p>
+                                    <ul className="grid gap-1.5">
+                                        {people.invitations.map((invite) => (
+                                            <li
+                                                key={invite.id}
+                                                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                                            >
+                                                <span className="min-w-0 break-all">
+                                                    {invite.email ?? "Hidden"}{" "}
+                                                    as {asWords(invite.role)} ·
+                                                    expires{" "}
+                                                    {formatDate(
+                                                        invite.expiresAt,
+                                                    )}
+                                                </span>
+                                                {peopleWrite && (
+                                                    <InvitationActions
+                                                        organizationId={id}
+                                                        invitationId={invite.id}
+                                                        label={
+                                                            invite.email ??
+                                                            "this person"
+                                                        }
+                                                    />
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             )}
                         </div>
                     )}

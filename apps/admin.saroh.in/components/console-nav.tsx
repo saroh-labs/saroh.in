@@ -1,5 +1,12 @@
 import type { LucideIcon } from "lucide-react";
-import { Building2, Gauge, Rocket, ScrollText } from "lucide-react";
+import {
+    Building2,
+    Gauge,
+    Rocket,
+    ScrollText,
+    ShieldCheck,
+    Users,
+} from "lucide-react";
 
 import type { AdminPermission } from "@/lib/control-plane";
 
@@ -39,6 +46,12 @@ const GROUPS: ConsoleNavGroup[] = [
                 permission: "organization:read",
             },
             {
+                href: "/people",
+                label: "People",
+                icon: Users,
+                permission: "organization:pii:read",
+            },
+            {
                 href: "/flags",
                 label: "Releases",
                 icon: Rocket,
@@ -49,6 +62,17 @@ const GROUPS: ConsoleNavGroup[] = [
                 label: "Audit trail",
                 icon: ScrollText,
                 permission: "audit:read",
+            },
+        ],
+    },
+    {
+        label: "Access",
+        items: [
+            {
+                href: "/team",
+                label: "Team",
+                icon: ShieldCheck,
+                permission: "staff:read",
             },
         ],
     },

@@ -143,6 +143,66 @@ describe("AdminController permission assignments", () => {
     );
 });
 
+describe("Admin console permission assignments", () => {
+    const perms = (name: string) => {
+        const route = routeHandlers().find((r) => r.name === name);
+        return route ? permissionsOf(route.handler) : undefined;
+    };
+
+    it.each(["suspend", "reinstate", "scheduleDeletion"] as const)(
+        "protects %s with lifecycle write",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.OrganizationLifecycleWrite,
+            ]);
+        },
+    );
+
+    it.each(["changePlan", "trial", "raiseLimit", "revokeLimit"] as const)(
+        "protects %s with subscription override",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.SubscriptionOverride,
+            ]);
+        },
+    );
+
+    it.each(["setModule", "repairModules"] as const)(
+        "protects %s with modules write",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.OrganizationModulesWrite,
+            ]);
+        },
+    );
+
+    it("keeps the business page behind view-as", () => {
+        expect(perms("viewOrganization")).toEqual([
+            AdminPermission.OrganizationViewAs,
+        ]);
+    });
+
+    it.each(["grant", "amend", "revoke"] as const)(
+        "lets only a staff granter %s staff",
+        (method) => {
+            expect(perms(method)).toEqual([AdminPermission.StaffGrant]);
+        },
+    );
+
+    it.each([
+        "endSessions",
+        "changeRole",
+        "removeMember",
+        "resendInvitation",
+        "withdrawInvitation",
+    ] as const)("needs personal data and people write for %s", (method) => {
+        expect(perms(method)).toEqual([
+            AdminPermission.OrganizationPiiRead,
+            AdminPermission.OrganizationPeopleWrite,
+        ]);
+    });
+});
+
 describe("AdminController staff identity", () => {
     it("returns the server-resolved roles and permissions to the admin shell", () => {
         const controller = new AdminController(

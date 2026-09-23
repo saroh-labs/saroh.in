@@ -19,8 +19,10 @@ import { useId, useState, useTransition } from "react";
 export interface OperatorSubmit {
     reason: string;
     idempotencyKey: string;
-    /** Every named field inside `fields`, as text. */
+    /** Every named field inside `fields`, as text (the last value of each). */
     values: Partial<Record<string, string>>;
+    /** The whole form, for a field with several values (checkboxes). */
+    form: FormData;
 }
 
 /**
@@ -88,8 +90,9 @@ export function OperatorDialog({
     }
 
     function submit(form: HTMLFormElement) {
+        const data = new FormData(form);
         const values: Record<string, string> = {};
-        new FormData(form).forEach((value, name) => {
+        data.forEach((value, name) => {
             if (typeof value === "string") values[name] = value;
         });
         setError(null);
@@ -98,6 +101,7 @@ export function OperatorDialog({
                 reason: reason.trim(),
                 idempotencyKey: key,
                 values,
+                form: data,
             });
             if (!result.ok) {
                 setError(result.error ?? "That did not work. Nothing changed.");

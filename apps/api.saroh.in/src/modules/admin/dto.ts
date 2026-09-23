@@ -1,8 +1,13 @@
 import { Transform, Type } from "class-transformer";
 import {
+    ArrayMaxSize,
+    ArrayMinSize,
+    IsArray,
     IsBoolean,
+    IsEmail,
     IsIn,
     IsInt,
+    IsISO8601,
     IsOptional,
     IsString,
     Max,
@@ -244,4 +249,62 @@ export class ListOrganizationsDto {
     @Min(1)
     @Max(100)
     limit?: number;
+}
+
+/** Grant staff access to someone with a Saroh account. */
+export class GrantStaffDto {
+    @Transform(trim)
+    @IsEmail()
+    @MaxLength(320)
+    email!: string;
+
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(6)
+    @IsString({ each: true })
+    roles!: string[];
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(4, { message: "Give a reason for this change" })
+    @MaxLength(500)
+    reason!: string;
+
+    @IsOptional()
+    @IsISO8601()
+    expiresAt?: string;
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(8)
+    @MaxLength(200)
+    idempotencyKey!: string;
+}
+
+/** Set exactly which roles a staff member holds, and until when. */
+export class AmendStaffDto extends OperatorReasonDto {
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(6)
+    @IsString({ each: true })
+    roles!: string[];
+
+    /** An ISO date, or absent for no expiry. */
+    @IsOptional()
+    @IsISO8601()
+    expiresAt?: string;
+}
+
+export class SearchPeopleDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(2)
+    @MaxLength(200)
+    q!: string;
+}
+
+export class ChangeMemberRoleDto extends OperatorReasonDto {
+    @IsString()
+    @MaxLength(80)
+    role!: string;
 }
