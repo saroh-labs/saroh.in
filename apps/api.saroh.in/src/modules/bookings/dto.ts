@@ -34,6 +34,13 @@ export type LocationType = (typeof LOCATION_TYPES)[number];
 export const BOOKING_OUTCOMES = ["ATTENDED", "NO_SHOW"] as const;
 export type BookingOutcome = (typeof BOOKING_OUTCOMES)[number];
 
+/**
+ * How a booking was paid (U3): a membership's monthly classes, a class pack,
+ * paid for, or to be paid at the desk. Null on bookings nobody said about.
+ */
+export const PAID_WITH = ["MEMBERSHIP", "PACK", "PAID", "DESK"] as const;
+export type PaidWith = (typeof PAID_WITH)[number];
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -250,6 +257,15 @@ export class BookServiceDto {
     @IsString()
     @MaxLength(128)
     idempotencyKey?: string;
+
+    /**
+     * The person to book with (U3), by the opaque id the availability read
+     * gave. Absent: whoever is free.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    staffId?: string;
 }
 
 /**
@@ -304,6 +320,25 @@ export class BookByHandDto {
     @IsString()
     @MaxLength(64)
     packPurchaseId?: string;
+
+    /** Who takes it (U3). Absent: whoever is free, or the class's instructor. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    staffId?: string;
+
+    /**
+     * How it is paid (U3). PACK is the same as `useClassPack`; MEMBERSHIP
+     * needs `subscriptionId` and uses one of that month's classes.
+     */
+    @IsOptional()
+    @IsIn(PAID_WITH)
+    paidWith?: PaidWith;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    subscriptionId?: string;
 }
 
 /**

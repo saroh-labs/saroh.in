@@ -136,8 +136,9 @@ export class BookingsController {
         @Param("serviceId") serviceId: string,
         @Query("from") from: string,
         @Query("to") to: string,
+        @Query("staffId") staffId?: string,
     ) {
-        return this.bookings.availability(ctx, serviceId, from, to);
+        return this.bookings.availability(ctx, serviceId, from, to, staffId);
     }
 
     // ── Bookings ────────────────────────────────────────────────────────────

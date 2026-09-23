@@ -22,17 +22,41 @@ import type {
     AvailabilityService,
     Interval,
     Slot,
+    StaffSlot,
 } from "./availability";
-import { availableSlots, isValidSlotStart } from "./availability";
+import {
+    availableSlots,
+    countOverlapping,
+    intersectIntervals,
+    isPersonSlotStart,
+    isValidSlotStart,
+    staffSlots,
+    weeklyIntervals,
+    withinIntervals,
+    workingIntervals,
+} from "./availability";
+import {
+    bookingWindowRefusal,
+    isLateCancel,
+    loadBookingRules,
+    withinBookingWindow,
+} from "./booking-rules";
 import { courseSeatIntervals, courseSeatsHeld } from "./course-seats";
 import type {
     AvailabilityRuleDto,
     BookingOutcome,
     CreateServiceDto,
     LocationType,
+    PaidWith,
     UpdateServiceDto,
 } from "./dto";
 import { FixedWindowRateLimiter } from "./rate-limiter";
+import {
+    businessTimezone,
+    loadPeople,
+    serviceStaff,
+} from "./staff-availability";
+import { useMembershipInTx } from "./use-membership";
 
 /** The validated public booking command input (see {@link BookServiceDto}). */
 export interface BookInput {
@@ -41,6 +65,43 @@ export interface BookInput {
     bookerEmail: string;
     bookerPhone?: string;
     idempotencyKey?: string;
+    /** The person asked for (U3); absent means whoever is free. */
+    staffId?: string;
+}
+
+/**
+ * A free time, and — when somebody takes the service — who (U3). For a
+ * one-to-one it is everyone free for that start; for a class, its
+ * instructor, shown beside it.
+ */
+export type AvailableSlot = Slot & { staffIds?: string[] };
+
+/** Who takes a service, as the booking page may show them: a name and an id. */
+export interface PublicStaff {
+    id: string;
+    name: string;
+}
+
+/**
+ * How a service is staffed (U3). `perPerson` is a one-to-one somebody takes:
+ * each person is their own diary, so capacity is theirs rather than the
+ * service's. A class keeps its own times and capacity; its people are its
+ * instructors, for display and clash checks only.
+ */
+interface Staffing {
+    people: { id: string; name: string }[];
+    perPerson: boolean;
+    /** The business's zone — staff hours are wall-clock times in it. */
+    zone: string | null;
+}
+
+/** Who a booking is with and how it is paid, for {@link BookingsService.reserveInTx}. */
+export interface ReserveWith {
+    staffId: string | null;
+    staffName?: string;
+    perPerson: boolean;
+    paidWith?: PaidWith | null;
+    subscriptionId?: string | null;
 }
 
 /**
@@ -86,6 +147,8 @@ const bookingDetailInclude = {
             },
         },
     },
+    // Who takes it (U3) — the name the diary shows, never their hours.
+    staff: { select: { id: true, name: true } },
 } satisfies Prisma.BookingInclude;
 
 export type BookingDetail = Prisma.BookingGetPayload<{
@@ -388,21 +451,15 @@ export class BookingsService {
         serviceId: string,
         fromISO: string,
         toISO: string,
-    ): Promise<Slot[]> {
+        staffId?: string,
+    ): Promise<AvailableSlot[]> {
         authorize(ctx, "service:read");
         const service = await this.requireOwnedService(ctx, serviceId);
         const { from, to } = this.parseRange(fromISO, toISO);
         const rules = await prisma.availabilityRule.findMany({
             where: { serviceId },
         });
-        const busy = await this.busyOverlapping(serviceId, from, to);
-        return availableSlots(
-            this.toAvailabilityService(service),
-            rules,
-            from,
-            to,
-            busy,
-        );
+        return this.openSlots(service, rules, from, to, staffId);
     }
 
     /**
@@ -410,22 +467,201 @@ export class BookingsService {
      * the ACTIVE service of an organization with Appointments on (404/410
      * otherwise) and returns open slots for the range. The org is never
      * surfaced.
+     *
+     * The business's booking rules apply here (U3): nothing sooner than the
+     * latest-booking rule or further ahead than book-ahead is offered. People
+     * appear only as opaque ids — never when or why someone is off.
      */
     async publicAvailability(
         serviceId: string,
         fromISO: string,
         toISO: string,
-    ): Promise<Slot[]> {
+        staffId?: string,
+        now: Date = new Date(),
+    ): Promise<AvailableSlot[]> {
         const { service, rules } = await this.loadBookableService(serviceId);
         const { from, to } = this.parseRange(fromISO, toISO);
-        const busy = await this.busyOverlapping(serviceId, from, to);
-        return availableSlots(
-            this.toAvailabilityService(service),
-            rules,
-            from,
-            to,
-            busy,
+        const [slots, bookingRules] = await Promise.all([
+            this.openSlots(service, rules, from, to, staffId),
+            loadBookingRules(prisma, service.organizationId),
+        ]);
+        return slots.filter((slot) =>
+            withinBookingWindow(slot.startAt, now, bookingRules),
         );
+    }
+
+    /**
+     * Who takes a public service, for the booking page's "with whom" step
+     * (U3): a display name and an opaque id per person, nothing else.
+     */
+    async publicServiceStaff(serviceId: string): Promise<PublicStaff[]> {
+        await this.loadBookableService(serviceId);
+        const people = await serviceStaff(prisma, serviceId);
+        return people.map(({ id, name }) => ({ id, name }));
+    }
+
+    /**
+     * Open slots over `[from, to)`. A one-to-one somebody takes gets them per
+     * person (U3); anything else from the service's own rules and capacity,
+     * exactly as before — with its instructors named when it has any.
+     */
+    private async openSlots(
+        service: Service,
+        rules: AvailabilityRuleWindow[],
+        from: Date,
+        to: Date,
+        staffId?: string,
+    ): Promise<AvailableSlot[]> {
+        const staffing = await this.staffing(service);
+        if (staffId && !staffing.people.some((p) => p.id === staffId)) {
+            throw new BadRequestException({
+                message: "That person doesn't take this service.",
+                field: "staffId",
+            });
+        }
+        const availService = this.toAvailabilityService(service);
+        if (staffing.perPerson && staffing.zone) {
+            const ids = staffId
+                ? [staffId]
+                : staffing.people.map((person) => person.id);
+            const people = await loadPeople(prisma, ids, from, to);
+            const slots: StaffSlot[] = staffSlots(
+                availService,
+                rules,
+                people,
+                staffing.zone,
+                from,
+                to,
+            );
+            return slots;
+        }
+        const busy = await this.busyOverlapping(service.id, from, to);
+        const slots = availableSlots(availService, rules, from, to, busy);
+        if (staffing.people.length === 0) return slots;
+        const instructors = staffId
+            ? [staffId]
+            : staffing.people.map((person) => person.id);
+        return slots.map((slot) => ({ ...slot, staffIds: instructors }));
+    }
+
+    /** How a service is staffed — see {@link Staffing}. */
+    private async staffing(service: Service): Promise<Staffing> {
+        const people = await serviceStaff(prisma, service.id);
+        const perPerson = service.capacity === 1 && people.length > 0;
+        return {
+            people,
+            perPerson,
+            zone: perPerson
+                ? await businessTimezone(prisma, service.organizationId)
+                : null,
+        };
+    }
+
+    /**
+     * Who a booking at `startAt` is with (U3), or null for a service nobody
+     * takes. A one-to-one needs the start to be one of the person's free
+     * starts — the named one, or the first person free; a class is taken by
+     * the named instructor or its first. A merchant is told why a named
+     * person cannot (booked or not working); a public booker only that the
+     * time is not available, so time off never leaves the business.
+     */
+    private async resolvePerson(
+        service: Service,
+        rules: AvailabilityRuleWindow[],
+        staffing: Staffing,
+        startAt: Date,
+        requested: string | undefined,
+        audience: "public" | "team",
+        excludeBookingId?: string,
+    ): Promise<ReserveWith> {
+        const named = requested
+            ? staffing.people.find((p) => p.id === requested)
+            : undefined;
+        if (requested && !named) {
+            throw new BadRequestException({
+                message: "That person doesn't take this service.",
+                field: "staffId",
+            });
+        }
+        if (staffing.people.length === 0) {
+            return { staffId: null, perPerson: false };
+        }
+        if (!staffing.perPerson || !staffing.zone) {
+            const instructor = named ?? staffing.people[0];
+            return {
+                staffId: instructor.id,
+                staffName: instructor.name,
+                perPerson: false,
+            };
+        }
+
+        const availService = this.toAvailabilityService(service);
+        const candidates = named ? [named] : staffing.people;
+        const endAt = new Date(
+            startAt.getTime() + service.durationMinutes * 60_000,
+        );
+        const people = await loadPeople(
+            prisma,
+            candidates.map((p) => p.id),
+            startAt,
+            endAt,
+            excludeBookingId,
+        );
+        // loadPeople answers in the order asked, so each person is the
+        // candidate at the same place.
+        for (const [index, person] of people.entries()) {
+            if (
+                isPersonSlotStart(
+                    availService,
+                    rules,
+                    person,
+                    staffing.zone,
+                    startAt,
+                )
+            ) {
+                const found = candidates[index];
+                return {
+                    staffId: found.id,
+                    staffName: found.name,
+                    perPerson: true,
+                };
+            }
+        }
+
+        if (named && audience === "team") {
+            const person = people[0];
+            const slot = { startAt, endAt };
+            if (countOverlapping(slot, person.busy) > 0) {
+                throw new ConflictException({
+                    message: `${named.name} is already booked then.`,
+                    field: "staffId",
+                });
+            }
+            let windows = workingIntervals(
+                person,
+                staffing.zone,
+                startAt,
+                endAt,
+            );
+            if (rules.length > 0) {
+                windows = intersectIntervals(
+                    windows,
+                    weeklyIntervals(rules, service.timezone, startAt, endAt),
+                );
+            }
+            if (!withinIntervals(slot, windows)) {
+                throw new BadRequestException({
+                    message: `${named.name} isn't working then.`,
+                    field: "staffId",
+                });
+            }
+        }
+        throw new BadRequestException({
+            message: named
+                ? `That time isn't available with ${named.name}. Pick another time.`
+                : "That time is not an open slot for this service",
+            field: "startAt",
+        });
     }
 
     /**
@@ -509,6 +745,8 @@ export class BookingsService {
                         email: true,
                     },
                 },
+                // Who takes it (U3); null on bookings made before staff.
+                staff: { select: { id: true, name: true } },
             },
         });
     }
@@ -517,10 +755,17 @@ export class BookingsService {
      * Cancel a booking: set status CANCELLED + `cancelledAt`, freeing the slot.
      * Authorizes `booking:write`; cross-tenant/missing → 404. Idempotent — an
      * already-cancelled booking is returned unchanged.
+     *
+     * The business's free-cancellation rule decides what happens to a class
+     * that was paid for (U3): cancelled in time, a pack's class goes back;
+     * inside the window it stays used and the booking says it was cancelled
+     * late (a membership's class then counts against its month too). With no
+     * rule, every cancel is in time — as before the rules existed.
      */
     async cancelBooking(
         ctx: OrganizationContext,
         bookingId: string,
+        now: Date = new Date(),
     ): Promise<Booking> {
         authorize(ctx, "booking:write");
 
@@ -528,13 +773,20 @@ export class BookingsService {
         if (booking.status === "CANCELLED") {
             return booking;
         }
+        const rules = await loadBookingRules(prisma, ctx.organizationId);
+        const late = isLateCancel(booking.startAt, now, rules);
         return prisma.$transaction(async (tx) => {
             const cancelled = await tx.booking.update({
                 where: { id: booking.id },
-                data: { status: "CANCELLED", cancelledAt: new Date() },
+                data: {
+                    status: "CANCELLED",
+                    cancelledAt: now,
+                    cancelledLate: late,
+                },
             });
-            // A class paid for with a pack goes back to it (ADR-007).
-            await reversePackInTx(tx, booking.id);
+            // A class paid for with a pack goes back to it (ADR-007) —
+            // unless it was cancelled too late to (U3).
+            if (!late) await reversePackInTx(tx, booking.id);
             // The slot it was cancelled OUT of, so the history reads as a
             // sequence rather than a list of states with the times missing.
             await tx.bookingEvent.create({
@@ -717,10 +969,39 @@ export class BookingsService {
             where: { serviceId: service.id },
         });
         const availService = this.toAvailabilityService(service);
-        if (!isValidSlotStart(availService, rules, startAt)) {
-            throw new BadRequestException(
-                "That is not a bookable slot for this service",
+        // A booking with a person moves within that person's diary (U3):
+        // one-to-one, to one of their free starts; a class, on the class's
+        // own grid with its instructor checked for a clash.
+        const staffing = booking.staffId
+            ? await this.staffing(service)
+            : { people: [], perPerson: false, zone: null };
+        let person: ReserveWith = { staffId: null, perPerson: false };
+        if (booking.staffId && staffing.perPerson) {
+            person = await this.resolvePerson(
+                service,
+                rules,
+                staffing,
+                startAt,
+                booking.staffId,
+                "team",
+                booking.id,
             );
+        } else {
+            if (!isValidSlotStart(availService, rules, startAt)) {
+                throw new BadRequestException(
+                    "That is not a bookable slot for this service",
+                );
+            }
+            if (booking.staffId) {
+                const instructor = staffing.people.find(
+                    (p) => p.id === booking.staffId,
+                );
+                person = {
+                    staffId: booking.staffId,
+                    staffName: instructor?.name,
+                    perPerson: false,
+                };
+            }
         }
         const endAt = new Date(
             startAt.getTime() + service.durationMinutes * 60_000,
@@ -729,27 +1010,37 @@ export class BookingsService {
         try {
             return await prisma.$transaction(
                 async (tx) => {
-                    const taken = await tx.booking.count({
-                        where: {
-                            serviceId: service.id,
-                            status: "CONFIRMED",
-                            startAt: { lt: endAt },
-                            endAt: { gt: startAt },
-                            // Itself is not a competitor for its own seat.
-                            id: { not: booking.id },
-                        },
-                    });
-                    const held = await courseSeatsHeld(
+                    if (!person.perPerson) {
+                        const taken = await tx.booking.count({
+                            where: {
+                                serviceId: service.id,
+                                status: "CONFIRMED",
+                                startAt: { lt: endAt },
+                                endAt: { gt: startAt },
+                                // Itself is not a competitor for its own seat.
+                                id: { not: booking.id },
+                            },
+                        });
+                        const held = await courseSeatsHeld(
+                            tx,
+                            service.id,
+                            startAt,
+                            endAt,
+                        );
+                        if (taken + held >= service.capacity) {
+                            throw new ConflictException(
+                                "That slot is fully booked",
+                            );
+                        }
+                    }
+                    await this.assertPersonFreeInTx(
                         tx,
+                        person,
                         service.id,
                         startAt,
                         endAt,
+                        booking.id,
                     );
-                    if (taken + held >= service.capacity) {
-                        throw new ConflictException(
-                            "That slot is fully booked",
-                        );
-                    }
                     // A class paid with a pack is only paid while the pack
                     // is good on the day (ADR-007): the same rule as spending.
                     const paid = await tx.packRedemption.findFirst({
@@ -850,17 +1141,29 @@ export class BookingsService {
         const { service, rules } = await this.loadBookableService(serviceId);
         await assertOrganizationOpen(service.organizationId);
 
-        // 2. Validate the requested instant is a real, aligned slot start.
+        // 2. Validate the requested instant is a real, aligned slot start —
+        //    with a person when somebody takes the service (U3) — and
+        //    inside the business's booking rules.
         const startAt = new Date(input.startAt);
         if (Number.isNaN(startAt.getTime())) {
             throw new BadRequestException("startAt is not a valid instant");
         }
         const availService = this.toAvailabilityService(service);
-        if (!isValidSlotStart(availService, rules, startAt)) {
+        const staffing = await this.staffing(service);
+        if (
+            !staffing.perPerson &&
+            !isValidSlotStart(availService, rules, startAt)
+        ) {
             throw new BadRequestException(
                 "startAt is not a bookable slot for this service",
             );
         }
+        const refusal = bookingWindowRefusal(
+            startAt,
+            new Date(),
+            await loadBookingRules(prisma, service.organizationId),
+        );
+        if (refusal) throw new BadRequestException(refusal);
         const endAt = new Date(
             startAt.getTime() + service.durationMinutes * 60_000,
         );
@@ -902,11 +1205,27 @@ export class BookingsService {
             }
         }
 
-        // 5. Atomic, serializable reservation (see the method doc for WHY).
-        return this.reserve(service, startAt, endAt, input, {
-            source: `booking:service:${serviceId}`,
-            actorUserId: null,
-        });
+        // 5. Who it is with (U3) — after the replay, so a retried request is
+        //    not refused by the person its own first attempt booked.
+        const person = await this.resolvePerson(
+            service,
+            rules,
+            staffing,
+            startAt,
+            input.staffId,
+            "public",
+        );
+
+        // 6. Atomic, serializable reservation (see the method doc for WHY).
+        return this.reserve(
+            service,
+            startAt,
+            endAt,
+            input,
+            { source: `booking:service:${serviceId}`, actorUserId: null },
+            undefined,
+            person,
+        );
     }
 
     /**
@@ -937,12 +1256,41 @@ export class BookingsService {
             idempotencyKey?: string;
             useClassPack?: boolean;
             packPurchaseId?: string;
+            staffId?: string;
+            paidWith?: PaidWith;
+            subscriptionId?: string;
         },
     ): Promise<Booking> {
         authorize(ctx, "booking:write");
-        const withPack = dto.useClassPack === true || !!dto.packPurchaseId;
-        // Spending someone's prepaid classes is its own power (ADR-007).
+        const withPack =
+            dto.useClassPack === true ||
+            !!dto.packPurchaseId ||
+            dto.paidWith === "PACK";
+        if (withPack && dto.paidWith && dto.paidWith !== "PACK") {
+            throw new BadRequestException({
+                message:
+                    "A booking is paid one way. Choose a pack or another way, not both.",
+                field: "paidWith",
+            });
+        }
+        const withMembership = dto.paidWith === "MEMBERSHIP";
+        if (withMembership && !dto.subscriptionId) {
+            throw new BadRequestException({
+                message: "Choose the membership this class comes out of.",
+                field: "subscriptionId",
+            });
+        }
+        if (!withMembership && dto.subscriptionId) {
+            throw new BadRequestException({
+                message:
+                    "A membership pays only a booking paid with a membership.",
+                field: "subscriptionId",
+            });
+        }
+        // Spending someone's prepaid classes is its own power (ADR-007) —
+        // a pack's, or a membership's month (U3).
         if (withPack) authorize(ctx, "pack:write");
+        if (withMembership) authorize(ctx, "subscription:write");
 
         const { service, rules } = await this.loadBookableService(serviceId);
         if (service.organizationId !== ctx.organizationId) {
@@ -953,7 +1301,9 @@ export class BookingsService {
         if (Number.isNaN(startAt.getTime())) {
             throw new BadRequestException("startAt is not a valid instant");
         }
+        const staffing = await this.staffing(service);
         if (
+            !staffing.perPerson &&
             !isValidSlotStart(
                 this.toAvailabilityService(service),
                 rules,
@@ -1016,15 +1366,37 @@ export class BookingsService {
             booker.idempotencyKey = dto.idempotencyKey;
         }
 
+        const person = await this.resolvePerson(
+            service,
+            rules,
+            staffing,
+            startAt,
+            dto.staffId,
+            "team",
+        );
+        const paidWith: PaidWith | null = withPack
+            ? "PACK"
+            : (dto.paidWith ?? null);
+
         return this.reserve(
             service,
             startAt,
             endAt,
             booker,
             { source: "manual", actorUserId: ctx.userId },
-            withPack
+            withPack || withMembership
                 ? {
                       inTx: async (tx, booking) => {
+                          if (withMembership) {
+                              await useMembershipInTx(tx, {
+                                  organizationId: ctx.organizationId,
+                                  bookingId: booking.id,
+                                  contactId: booking.contactId ?? "",
+                                  subscriptionId: dto.subscriptionId ?? "",
+                                  startAt,
+                              });
+                              return;
+                          }
                           await redeemPackInTx(tx, {
                               organizationId: ctx.organizationId,
                               bookingId: booking.id,
@@ -1036,11 +1408,19 @@ export class BookingsService {
                               purchaseId: dto.packPurchaseId,
                           });
                       },
-                      // It may have been the pack's last class rather than
-                      // the slot, so this says only that something changed.
+                      // It may have been the pack's (or the month's) last
+                      // class rather than the slot, so this says only that
+                      // something changed.
                       onRace: "That changed while you were booking. Try again.",
                   }
                 : undefined,
+            {
+                ...person,
+                paidWith,
+                subscriptionId: withMembership
+                    ? (dto.subscriptionId ?? null)
+                    : null,
+            },
         );
     }
 
@@ -1069,6 +1449,7 @@ export class BookingsService {
             ) => Promise<void>;
             onRace: string;
         },
+        person?: ReserveWith,
     ): Promise<Booking> {
         const serviceId = service.id;
         const organizationId = service.organizationId;
@@ -1084,6 +1465,8 @@ export class BookingsService {
                         endAt,
                         input,
                         by,
+                        undefined,
+                        person,
                     );
                     if (also) await also.inTx(tx, booking);
                     return booking;
@@ -1148,33 +1531,47 @@ export class BookingsService {
         input: BookInput,
         by: ReserveBy,
         course?: { courseId: string; enrollmentId: string },
+        person?: ReserveWith,
     ): Promise<Booking> {
         const serviceId = service.id;
         const organizationId = service.organizationId;
         const email = input.bookerEmail.trim().toLowerCase();
         const snapshot = this.buildSnapshot(service, input, startAt, endAt);
 
-        // Authoritative capacity gate — re-counted INSIDE the tx.
-        const confirmed = await tx.booking.count({
-            where: {
+        // Authoritative capacity gate — re-counted INSIDE the tx. A
+        // one-to-one somebody takes is capacity per person (U3), checked
+        // below; everything else counts the service's seats as before.
+        if (!(person?.perPerson && person.staffId)) {
+            const confirmed = await tx.booking.count({
+                where: {
+                    serviceId,
+                    status: "CONFIRMED",
+                    startAt: { lt: endAt },
+                    endAt: { gt: startAt },
+                },
+            });
+            // Seats an open course still holds count as taken (ADR-007) —
+            // other courses' seats, for a course's own booking: its unsold
+            // seats are the ones it is filling.
+            const held = await courseSeatsHeld(
+                tx,
                 serviceId,
-                status: "CONFIRMED",
-                startAt: { lt: endAt },
-                endAt: { gt: startAt },
-            },
-        });
-        // Seats an open course still holds count as taken (ADR-007) — other
-        // courses' seats, for a course's own booking: its unsold seats are
-        // the ones it is filling.
-        const held = await courseSeatsHeld(
-            tx,
-            serviceId,
-            startAt,
-            endAt,
-            course?.courseId,
-        );
-        if (confirmed + held >= service.capacity) {
-            throw new ConflictException("This slot is fully booked");
+                startAt,
+                endAt,
+                course?.courseId,
+            );
+            if (confirmed + held >= service.capacity) {
+                throw new ConflictException("This slot is fully booked");
+            }
+        }
+        if (person) {
+            await this.assertPersonFreeInTx(
+                tx,
+                person,
+                serviceId,
+                startAt,
+                endAt,
+            );
         }
 
         const contact = await tx.contact.upsert({
@@ -1207,6 +1604,13 @@ export class BookingsService {
                 bookerPhone: input.bookerPhone ?? null,
                 idempotencyKey: input.idempotencyKey ?? null,
                 courseEnrollmentId: course?.enrollmentId ?? null,
+                ...(person
+                    ? {
+                          staffId: person.staffId,
+                          paidWith: person.paidWith ?? null,
+                          subscriptionId: person.subscriptionId ?? null,
+                      }
+                    : {}),
             },
         });
 
@@ -1248,6 +1652,44 @@ export class BookingsService {
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
+
+    /**
+     * One person, one place at a time (U3): inside the booking transaction,
+     * refuse when they already have a confirmed booking overlapping — on any
+     * service. The person's row is locked first, so two bookings racing for
+     * the same person queue on it and the second sees the first.
+     *
+     * For a class, the other places in the SAME session (same service, same
+     * start) are not a clash — they are the class. `excludeBookingId` is a
+     * booking being moved, which is not its own competitor.
+     */
+    private async assertPersonFreeInTx(
+        tx: Prisma.TransactionClient,
+        person: ReserveWith,
+        serviceId: string,
+        startAt: Date,
+        endAt: Date,
+        excludeBookingId?: string,
+    ): Promise<void> {
+        if (!person.staffId) return;
+        await tx.$queryRaw`SELECT id FROM "StaffMember" WHERE id = ${person.staffId} FOR UPDATE`;
+        const clashes = await tx.booking.count({
+            where: {
+                staffId: person.staffId,
+                status: "CONFIRMED",
+                startAt: { lt: endAt },
+                endAt: { gt: startAt },
+                ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
+                ...(person.perPerson ? {} : { NOT: { serviceId, startAt } }),
+            },
+        });
+        if (clashes > 0) {
+            throw new ConflictException({
+                message: `${person.staffName ?? "That person"} is already booked then.`,
+                field: "staffId",
+            });
+        }
+    }
 
     /**
      * Load an ACTIVE, non-deleted bookable service + its rules, or throw

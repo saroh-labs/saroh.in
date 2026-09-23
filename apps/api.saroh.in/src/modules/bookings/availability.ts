@@ -226,3 +226,323 @@ export function isValidSlotStart(
         (slot) => slot.startAt.getTime() === startAt.getTime(),
     );
 }
+
+// ── Per-person availability (U3) ───────────────────────────────────────────
+//
+// A service somebody takes gets its free times from each person's working
+// time: their weekly hours plus any one-off extra hours, minus time off,
+// intersected with the service's own weekly rules when it has any. Slots step
+// from the start of each resulting window, so "Mon 6–12, 60 minutes" offers
+// 6:00 … 11:00. A person already booked — on any service — is not free.
+//
+// Hours are authored in the BUSINESS's timezone; a service's rules in its
+// own. Both become absolute intervals before they meet, so they agree even
+// where the two zones differ, and every local ⇆ absolute step goes through
+// luxon, so a DST change moves the instants and not the wall-clock hours.
+
+/** One-off hours on a calendar date (`YYYY-MM-DD`, local to the zone). */
+export interface DatedWindow {
+    date: string;
+    startMinute: number;
+    endMinute: number;
+}
+
+/** Everything the engine needs to know about one person. */
+export interface StaffAvailabilityInput {
+    id: string;
+    /** Weekly working hours, in the business timezone. */
+    hours: AvailabilityRuleWindow[];
+    /** One-off extra hours on given dates, in the business timezone. */
+    extraHours: DatedWindow[];
+    /** Absolute time off. */
+    timeOff: Interval[];
+    /** Absolute confirmed bookings of this person, on any service. */
+    busy: Interval[];
+}
+
+/** A free start, and who is free to take it. */
+export interface StaffSlot extends Slot {
+    staffIds: string[];
+}
+
+const MINUTE = 60_000;
+
+/**
+ * A local minute-of-day (0–1440) on a calendar day, as an absolute instant.
+ * 1440 is the next day's midnight — a window that runs to the end of the day.
+ */
+function localMinuteToUtc(
+    day: DateTime,
+    minuteOfDay: number,
+    zone: string,
+): Date | null {
+    if (minuteOfDay >= 1440) {
+        return localToUtc(day.plus({ days: 1 }), 0, zone);
+    }
+    return localToUtc(day, minuteOfDay, zone);
+}
+
+/** Sort and union overlapping or touching intervals. */
+export function mergeIntervals(list: Interval[]): Interval[] {
+    const sorted = [...list]
+        .filter((i) => i.endAt.getTime() > i.startAt.getTime())
+        .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+    const out: Interval[] = [];
+    for (const next of sorted) {
+        const last = out[out.length - 1];
+        if (out.length > 0 && next.startAt.getTime() <= last.endAt.getTime()) {
+            if (next.endAt.getTime() > last.endAt.getTime()) {
+                out[out.length - 1] = {
+                    startAt: last.startAt,
+                    endAt: next.endAt,
+                };
+            }
+        } else {
+            out.push({ startAt: next.startAt, endAt: next.endAt });
+        }
+    }
+    return out;
+}
+
+/** `a` with every part covered by `b` taken out. */
+export function subtractIntervals(a: Interval[], b: Interval[]): Interval[] {
+    const cuts = mergeIntervals(b);
+    const out: Interval[] = [];
+    for (const piece of mergeIntervals(a)) {
+        let start = piece.startAt.getTime();
+        const end = piece.endAt.getTime();
+        for (const cut of cuts) {
+            const cs = cut.startAt.getTime();
+            const ce = cut.endAt.getTime();
+            if (ce <= start || cs >= end) continue;
+            if (cs > start) {
+                out.push({ startAt: new Date(start), endAt: new Date(cs) });
+            }
+            start = Math.max(start, ce);
+            if (start >= end) break;
+        }
+        if (start < end) {
+            out.push({ startAt: new Date(start), endAt: new Date(end) });
+        }
+    }
+    return out;
+}
+
+/** The parts covered by both `a` and `b`. */
+export function intersectIntervals(a: Interval[], b: Interval[]): Interval[] {
+    const left = mergeIntervals(a);
+    const right = mergeIntervals(b);
+    const out: Interval[] = [];
+    let i = 0;
+    let j = 0;
+    while (i < left.length && j < right.length) {
+        const l = left[i];
+        const r = right[j];
+        const start = Math.max(l.startAt.getTime(), r.startAt.getTime());
+        const end = Math.min(l.endAt.getTime(), r.endAt.getTime());
+        if (start < end) {
+            out.push({ startAt: new Date(start), endAt: new Date(end) });
+        }
+        if (l.endAt.getTime() < r.endAt.getTime()) i += 1;
+        else j += 1;
+    }
+    return out;
+}
+
+/** Whether `inner` lies wholly inside one of `windows`. */
+export function withinIntervals(inner: Interval, windows: Interval[]): boolean {
+    return mergeIntervals(windows).some(
+        (w) =>
+            w.startAt.getTime() <= inner.startAt.getTime() &&
+            w.endAt.getTime() >= inner.endAt.getTime(),
+    );
+}
+
+/**
+ * Weekly windows as absolute intervals on every local day touching
+ * `[from, to)` — plus a day either side, so a window is never cut at the
+ * range's edge (a cut window would step from the cut, off the grid).
+ */
+export function weeklyIntervals(
+    windows: AvailabilityRuleWindow[],
+    zone: string,
+    from: Date,
+    to: Date,
+): Interval[] {
+    if (!IANAZone.isValidZone(zone)) {
+        throw new Error(`Invalid IANA timezone "${zone}"`);
+    }
+    const out: Interval[] = [];
+    let day = DateTime.fromJSDate(from, { zone })
+        .startOf("day")
+        .minus({ days: 1 });
+    const lastDay = DateTime.fromJSDate(to, { zone })
+        .startOf("day")
+        .plus({ days: 1 });
+    while (day <= lastDay) {
+        const dow = schemaDayOfWeek(day);
+        for (const w of windows) {
+            if (w.dayOfWeek !== dow) continue;
+            const startAt = localMinuteToUtc(day, w.startMinute, zone);
+            const endAt = localMinuteToUtc(day, w.endMinute, zone);
+            if (startAt && endAt && endAt > startAt) {
+                out.push({ startAt, endAt });
+            }
+        }
+        day = day.plus({ days: 1 });
+    }
+    return out;
+}
+
+/** One-off dated windows as absolute intervals. */
+export function datedIntervals(
+    windows: DatedWindow[],
+    zone: string,
+): Interval[] {
+    const out: Interval[] = [];
+    for (const w of windows) {
+        const day = DateTime.fromISO(w.date, { zone }).startOf("day");
+        if (!day.isValid) continue;
+        const startAt = localMinuteToUtc(day, w.startMinute, zone);
+        const endAt = localMinuteToUtc(day, w.endMinute, zone);
+        if (startAt && endAt && endAt > startAt) out.push({ startAt, endAt });
+    }
+    return out;
+}
+
+/**
+ * When a person is at work over `[from, to)` (padded a day either side):
+ * weekly hours and extra hours together, time off taken out.
+ */
+export function workingIntervals(
+    person: Pick<StaffAvailabilityInput, "hours" | "extraHours" | "timeOff">,
+    zone: string,
+    from: Date,
+    to: Date,
+): Interval[] {
+    const on = [
+        ...weeklyIntervals(person.hours, zone, from, to),
+        ...datedIntervals(person.extraHours, zone),
+    ];
+    return subtractIntervals(mergeIntervals(on), person.timeOff);
+}
+
+/**
+ * Back-to-back starts inside each window, stepping from the window's start
+ * by `step` minutes; a slot is kept only when its whole booking fits in the
+ * window and in `[from, to]`.
+ */
+export function slotsInIntervals(
+    windows: Interval[],
+    durationMinutes: number,
+    stepMinutes: number,
+    from: Date,
+    to: Date,
+): Slot[] {
+    if (durationMinutes <= 0 || stepMinutes <= 0) return [];
+    const out: Slot[] = [];
+    for (const w of mergeIntervals(windows)) {
+        const end = w.endAt.getTime();
+        for (
+            let start = w.startAt.getTime();
+            start + durationMinutes * MINUTE <= end;
+            start += stepMinutes * MINUTE
+        ) {
+            const slotEnd = start + durationMinutes * MINUTE;
+            if (start >= from.getTime() && slotEnd <= to.getTime()) {
+                out.push({
+                    startAt: new Date(start),
+                    endAt: new Date(slotEnd),
+                });
+            }
+        }
+    }
+    return out;
+}
+
+/**
+ * One person's free starts for a one-to-one service over `[from, to)`:
+ * their working time (in `zone`), intersected with the service's own weekly
+ * rules when it has any, less anything they are already booked for.
+ */
+export function personSlots(
+    service: AvailabilityService,
+    serviceRules: AvailabilityRuleWindow[],
+    person: StaffAvailabilityInput,
+    zone: string,
+    from: Date,
+    to: Date,
+): Slot[] {
+    let windows = workingIntervals(person, zone, from, to);
+    if (serviceRules.length > 0) {
+        windows = intersectIntervals(
+            windows,
+            weeklyIntervals(serviceRules, service.timezone, from, to),
+        );
+    }
+    return slotsInIntervals(
+        windows,
+        service.durationMinutes,
+        stepMinutes(service),
+        from,
+        to,
+    ).filter((slot) => countOverlapping(slot, person.busy) === 0);
+}
+
+/**
+ * Free starts for a one-to-one service somebody takes, over `[from, to)`,
+ * each naming everyone free for it — chronological.
+ */
+export function staffSlots(
+    service: AvailabilityService,
+    serviceRules: AvailabilityRuleWindow[],
+    people: StaffAvailabilityInput[],
+    zone: string,
+    from: Date,
+    to: Date,
+): StaffSlot[] {
+    const byStart = new Map<number, StaffSlot>();
+    for (const person of people) {
+        const slots = personSlots(
+            service,
+            serviceRules,
+            person,
+            zone,
+            from,
+            to,
+        );
+        for (const slot of slots) {
+            const key = slot.startAt.getTime();
+            const found = byStart.get(key);
+            if (found) found.staffIds.push(person.id);
+            else byStart.set(key, { ...slot, staffIds: [person.id] });
+        }
+    }
+    return [...byStart.values()].sort(
+        (a, b) => a.startAt.getTime() - b.startAt.getTime(),
+    );
+}
+
+/**
+ * Is `startAt` one of this person's free starts for the service? The same
+ * geometry the listing uses, so nothing can be booked that was not offered.
+ */
+export function isPersonSlotStart(
+    service: AvailabilityService,
+    serviceRules: AvailabilityRuleWindow[],
+    person: StaffAvailabilityInput,
+    zone: string,
+    startAt: Date,
+): boolean {
+    const endAt = new Date(
+        startAt.getTime() + service.durationMinutes * MINUTE,
+    );
+    return personSlots(
+        service,
+        serviceRules,
+        person,
+        zone,
+        startAt,
+        endAt,
+    ).some((slot) => slot.startAt.getTime() === startAt.getTime());
+}
