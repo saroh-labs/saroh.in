@@ -125,7 +125,12 @@ describe("OrganizationContextService.listForUser", () => {
             },
             {
                 role: "MEMBER",
-                organization: { id: "org_2", name: "Beta", slug: "beta" },
+                organization: {
+                    id: "org_2",
+                    name: "Beta",
+                    slug: "beta",
+                    lifecycleStatus: "SUSPENDED",
+                },
             },
         ]);
 
@@ -133,7 +138,14 @@ describe("OrganizationContextService.listForUser", () => {
 
         expect(result).toMatchObject([
             { id: "org_1", name: "Acme", slug: "acme", role: "OWNER" },
-            { id: "org_2", name: "Beta", slug: "beta", role: "MEMBER" },
+            {
+                id: "org_2",
+                name: "Beta",
+                slug: "beta",
+                role: "MEMBER",
+                // So the person's list can say why it is not taking changes.
+                lifecycleStatus: "SUSPENDED",
+            },
         ]);
         // Each membership carries what the actor may do there, so the rail
         // renders what the API allows instead of a map compiled into it.

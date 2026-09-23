@@ -16,6 +16,7 @@
     "@saroh/ui": "workspace:*",
     "@t3-oss/env-nextjs": "^0.13.11",
     "better-auth": "^1.6.26",
+    "lucide-react": "catalog:",
     "next": "catalog:next16",
     "react": "catalog:react19",
     "react-dom": "catalog:react19",

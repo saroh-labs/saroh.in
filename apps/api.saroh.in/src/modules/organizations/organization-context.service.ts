@@ -29,6 +29,12 @@ export interface UserOrganization {
      * rather than what a compiled-in map guesses.
      */
     actions: string[];
+    /**
+     * `ACTIVE`, or the state an operator put it in (`SUSPENDED`,
+     * `PENDING_DELETION`), so the person's list of businesses can say why one
+     * is not taking changes.
+     */
+    lifecycleStatus: string;
 }
 
 /** Minimal Organization identity returned alongside a resolved context. */
@@ -123,7 +129,14 @@ export class OrganizationContextService {
             where: { userId },
             select: {
                 role: true,
-                organization: { select: { id: true, name: true, slug: true } },
+                organization: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        lifecycleStatus: true,
+                    },
+                },
             },
             orderBy: { organization: { name: "asc" } },
         });
@@ -176,6 +189,7 @@ export class OrganizationContextService {
                 actions: [
                     ...resolveCapabilities(membership.role, own?.actions),
                 ],
+                lifecycleStatus: membership.organization.lifecycleStatus,
             };
         });
     }
