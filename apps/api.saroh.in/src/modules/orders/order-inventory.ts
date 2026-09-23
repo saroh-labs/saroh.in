@@ -21,9 +21,12 @@ import type { Prisma } from "@saroh/database";
 
 export type StockPhase = "RESERVED" | "COMMITTED" | "RELEASED";
 
+/** The statuses whose orders hold a reservation (phaseOf → RESERVED). */
+export const RESERVING_STATUSES = ["PENDING", "PROCESSING"] as const;
+
 export function phaseOf(status: string): StockPhase {
     switch (status) {
-        case "PENDING":
+        case "PENDING": // RESERVING_STATUSES
         case "PROCESSING":
             return "RESERVED";
         case "SHIPPED":

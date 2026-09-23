@@ -10,10 +10,12 @@ import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
 import {
+    checkProductAllergens,
     productAllergensFor,
     saveProductAllergens,
 } from "../catalogue/allergens.service";
 import {
+    checkProductFieldValues,
     productFieldsFor,
     saveProductFieldValues,
 } from "../catalogue/fields.service";
@@ -26,6 +28,7 @@ import type {
     ProductStatus,
     UpdateProductDto,
 } from "./dto";
+import { promisesToMove } from "./open-promises";
 import {
     assertDetailsCoherent,
     assertMrpAtOrAbovePrice,
@@ -71,6 +74,29 @@ function cleanDescription(value: string | null | undefined): string | null {
 }
 
 /**
+ * Whether a write failed on the one unique a product has besides its id:
+ * its address in the store. Anything else is rethrown, not called a clash.
+ */
+function isSlugClash(error: unknown): boolean {
+    if (typeof error !== "object" || error === null) return false;
+    const { code, meta } = error as { code?: unknown; meta?: unknown };
+    if (code !== "P2002") return false;
+    // Driver adapters don't always name the target; when it is named, it
+    // must be the slug.
+    return meta === undefined || JSON.stringify(meta).includes("slug");
+}
+
+/** Never null over the wire in a patch: a null there means "not sent". */
+const REQUIRED_IN_PATCH = new Set<keyof PatchProductDto>([
+    "name",
+    "slug",
+    "price",
+    "status",
+    "madeHere",
+    "returnsMode",
+]);
+
+/**
  * Product catalog data layer. Authorization is delegated to StoresService so
  * the same membership rules apply everywhere: reads require store access
  * (getForUser throws 404 for non-members — no existence leak), writes require
@@ -101,8 +127,17 @@ export class ProductsService {
                 // the product is known by, and its stock.
                 _count: { select: { variants: true } },
                 // Every variant, briefly: an order is taken for one of them.
+                // Its stock too, for a product that counts per variant.
                 variants: {
-                    select: { id: true, sku: true, title: true, price: true },
+                    select: {
+                        id: true,
+                        sku: true,
+                        title: true,
+                        price: true,
+                        inventory: {
+                            select: { quantity: true, lowStockAlert: true },
+                        },
+                    },
                     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                 },
                 inventory: { select: { quantity: true, lowStockAlert: true } },
@@ -121,11 +156,21 @@ export class ProductsService {
         if (!product) {
             throw new NotFoundException("Product not found");
         }
-        const [customFields, allergens] = await Promise.all([
+        const detail = serializeProductDetail(product);
+        const [customFields, allergens, variantPromises] = await Promise.all([
             productFieldsFor(storeId, product.id, product.categoryId),
             productAllergensFor(product.id),
+            // Still counting as a whole: what each variant will take with it
+            // when it switches, so the editor can seed the counts.
+            detail.stockMode === "product" && product.variants.length > 0
+                ? promisesToMove(
+                      prisma,
+                      product.id,
+                      product.inventory?.reserved ?? 0,
+                  )
+                : Promise.resolve({}),
         ]);
-        return { ...serializeProductDetail(product), customFields, allergens };
+        return { ...detail, customFields, allergens, variantPromises };
     }
 
     async create(storeId: string, userId: string, dto: CreateProductDto) {
@@ -148,6 +193,17 @@ export class ProductsService {
             returnsText: dto.returnsText ?? null,
         });
         const shopFields = cleanShopFields(dto.shopFields ?? {});
+        // Checked before the product exists, so a refused value or allergen
+        // never leaves a half-made product behind.
+        if (organizationId) {
+            if (dto.customFields)
+                await checkProductFieldValues(storeId, dto.customFields);
+            if (dto.contains || dto.mayContain)
+                await checkProductAllergens(storeId, {
+                    contains: dto.contains,
+                    mayContain: dto.mayContain,
+                });
+        }
 
         let createdId: string;
         try {
@@ -182,7 +238,8 @@ export class ProductsService {
                 },
             });
             createdId = product.id;
-        } catch {
+        } catch (error) {
+            if (!isSlugClash(error)) throw error;
             throw new ConflictException({
                 message: "That slug is already taken",
                 field: "slug",
@@ -237,7 +294,7 @@ export class ProductsService {
                 data: {
                     name: dto.name,
                     slug,
-                    description: dto.description ?? null,
+                    description: cleanDescription(dto.description),
                     image: dto.image ?? null,
                     categoryId: dto.categoryId ?? null,
                     price: dto.price,
@@ -257,7 +314,8 @@ export class ProductsService {
                 },
             });
             return { id: productId };
-        } catch {
+        } catch (error) {
+            if (!isSlugClash(error)) throw error;
             throw new ConflictException({
                 message: "That slug is already taken",
                 field: "slug",
@@ -296,11 +354,15 @@ export class ProductsService {
                 _count: { select: { variants: true } },
             },
         });
+
         if (!current) {
             throw new NotFoundException("Product not found");
         }
 
-        const has = (key: keyof PatchProductDto) => dto[key] !== undefined;
+        const has = (key: keyof PatchProductDto) =>
+            REQUIRED_IN_PATCH.has(key)
+                ? dto[key] != null
+                : dto[key] !== undefined;
         const data: Record<string, unknown> = {};
 
         if (has("name")) data.name = dto.name;
@@ -317,20 +379,31 @@ export class ProductsService {
         }
         if (has("optionId")) {
             // Each variant's value belongs to the option it was made under;
-            // switching would orphan them all.
+            // switching would orphan them all. A product from before options
+            // (none set, no variant with a value) may take its first one.
+            const next = dto.optionId ?? null;
+            // Any variant made under an option ties the product to it;
+            // variants from before options (no value) don't.
+            const firstOption =
+                current.optionId === null &&
+                next !== null &&
+                (await prisma.productVariant.count({
+                    where: { productId, optionValueId: { not: null } },
+                })) === 0;
             if (
-                (dto.optionId ?? null) !== current.optionId &&
-                current._count.variants > 0
+                next !== current.optionId &&
+                current._count.variants > 0 &&
+                !firstOption
             ) {
-                const next = dto.optionId
+                const option = next
                     ? await prisma.productOption.findFirst({
-                          where: { id: dto.optionId, storeId },
+                          where: { id: next, storeId },
                           select: { name: true },
                       })
                     : null;
                 throw new ConflictException({
-                    message: next
-                        ? `Remove the variants first to sell it by ${next.name.toLowerCase()} instead.`
+                    message: option
+                        ? `Remove the variants first to sell it by ${option.name.toLowerCase()} instead.`
                         : "Remove the variants first to sell it without an option.",
                     field: "optionId",
                 });
@@ -410,7 +483,8 @@ export class ProductsService {
         if (Object.keys(data).length > 0) {
             try {
                 await prisma.product.update({ where: { id: productId }, data });
-            } catch {
+            } catch (error) {
+                if (!isSlugClash(error)) throw error;
                 throw new ConflictException({
                     message: "That address is already used by another product",
                     field: "slug",

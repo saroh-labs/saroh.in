@@ -145,4 +145,10 @@ export class RestoreCategoryDto {
     @ValidateNested()
     @Type(() => CategoryDefaultsInput)
     defaults?: CategoryDefaultsInput | null;
+    /** Custom fields shown for it; only this store's live ones come back. */
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(200)
+    @IsString({ each: true })
+    fieldIds?: string[];
 }

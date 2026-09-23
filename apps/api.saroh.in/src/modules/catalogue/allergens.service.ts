@@ -181,6 +181,25 @@ export async function productAllergensFor(
     };
 }
 
+/** Every id is on this storefront's list; checked before anything is written. */
+export async function checkProductAllergens(
+    storeId: string,
+    input: { contains?: string[]; mayContain?: string[] },
+): Promise<void> {
+    const ids = [...(input.contains ?? []), ...(input.mayContain ?? [])];
+    if (ids.length === 0) return;
+    const found = await prisma.storeAllergen.count({
+        where: { storeId, id: { in: ids } },
+    });
+    if (found !== new Set(ids).size) {
+        throw new BadRequestException({
+            message:
+                "An allergen in the list is not on this storefront's list.",
+            field: "allergens",
+        });
+    }
+}
+
 /**
  * The section PATCH's `contains` / `mayContain`: allergen ids of this
  * storefront. Each list given replaces that kind; one allergen can't be in
@@ -193,17 +212,7 @@ export async function saveProductAllergens(
     input: { contains?: string[]; mayContain?: string[] },
 ): Promise<void> {
     if (!input.contains && !input.mayContain) return;
-    const ids = [...(input.contains ?? []), ...(input.mayContain ?? [])];
-    const found = await prisma.storeAllergen.count({
-        where: { storeId, id: { in: ids } },
-    });
-    if (found !== new Set(ids).size) {
-        throw new BadRequestException({
-            message:
-                "An allergen in the list is not on this storefront's list.",
-            field: "allergens",
-        });
-    }
+    await checkProductAllergens(storeId, input);
     const contains = new Set(input.contains ?? []);
     await prisma.$transaction(async (tx) => {
         for (const [kind, list] of [

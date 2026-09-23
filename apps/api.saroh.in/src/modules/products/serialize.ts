@@ -289,8 +289,36 @@ interface RawProductListItem extends RawProduct {
         sku: string;
         title: string;
         price: DecimalLike | null;
+        inventory?: { quantity: number; lowStockAlert: number } | null;
     }[];
     inventory: { quantity: number; lowStockAlert: number } | null;
+}
+
+/**
+ * The row's stock. Counted per variant, it is the variants' sum (plus what
+ * the product's own row still holds for old orders, as stockTotals adds it)
+ * warning at the lowest variant's level; otherwise the product's own row.
+ */
+function listStock(
+    product: RawProductListItem,
+): { quantity: number; lowStockAlert: number } | null {
+    const rows = product.variants.flatMap((v) =>
+        v.inventory ? [v.inventory] : [],
+    );
+    if (rows.length === 0) {
+        return product.inventory
+            ? {
+                  quantity: product.inventory.quantity,
+                  lowStockAlert: product.inventory.lowStockAlert,
+              }
+            : null;
+    }
+    return {
+        quantity:
+            rows.reduce((n, r) => n + r.quantity, 0) +
+            (product.inventory?.quantity ?? 0),
+        lowStockAlert: Math.min(...rows.map((r) => r.lowStockAlert)),
+    };
 }
 
 export function serializeProductListItem(
@@ -306,12 +334,7 @@ export function serializeProductListItem(
             title: v.title,
             price: v.price ? toMoneyString(v.price) : null,
         })),
-        inventory: product.inventory
-            ? {
-                  quantity: product.inventory.quantity,
-                  lowStockAlert: product.inventory.lowStockAlert,
-              }
-            : null,
+        inventory: listStock(product),
     };
 }
 

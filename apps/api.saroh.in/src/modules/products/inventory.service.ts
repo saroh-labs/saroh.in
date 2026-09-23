@@ -9,6 +9,7 @@ import type {
     UpdateInventoryDto,
     UpdateVariantStockDto,
 } from "./inventory.dto";
+import { promisesToMove } from "./open-promises";
 import { ProductsService } from "./products.service";
 
 export interface StockView {
@@ -32,10 +33,14 @@ export interface StockView {
  * `reserved` belongs to Orders and is read-only here; this service sets
  * on-hand counts and warning levels.
  *
- * Switching to per-variant stock is one save of every variant's count. The
- * product's row is kept, holding exactly what open orders from before the
- * switch still promise (quantity = reserved), so releasing or fulfilling
- * those orders lands on stock that exists.
+ * Switching to per-variant stock is one save of every variant's count, and
+ * every unit is counted once. Open orders that name a variant take their
+ * promise with them: it becomes that variant's `reserved`, inside the count
+ * the merchant gives it. The product's row is kept for lines that name no
+ * variant, holding exactly what they promise (quantity = reserved), so
+ * releasing or fulfilling any open order lands on the row it now sits on.
+ * The editor seeds the counts to match: each variant starts at what it
+ * promises, the first also at what was free to sell.
  */
 @Injectable()
 export class InventoryService {
@@ -143,19 +148,29 @@ export class InventoryService {
                 field: "variants",
             });
         }
-        for (const input of dto.variants) {
-            const current = byId.get(input.variantId);
-            const promised = current?.inventory?.reserved ?? 0;
-            if (input.quantity < promised) {
-                throw new BadRequestException({
-                    message: `${current?.title ?? "A variant"} has ${promised} promised to open orders — on hand can't go below that.`,
-                    field: "variants",
-                });
-            }
-        }
+        const firstSwitch = variants.every((v) => !v.inventory);
 
         await prisma.$transaction(async (tx) => {
+            const own = await tx.inventory.findUnique({
+                where: { productId },
+                select: { reserved: true },
+            });
+            // On the switch, what open orders promise per variant moves
+            // off the product's row and onto the variant's.
+            const moving = firstSwitch
+                ? await promisesToMove(tx, productId, own?.reserved ?? 0)
+                : {};
             for (const input of dto.variants) {
+                const current = byId.get(input.variantId);
+                const promised = firstSwitch
+                    ? (moving[input.variantId] ?? 0)
+                    : (current?.inventory?.reserved ?? 0);
+                if (input.quantity < promised) {
+                    throw new BadRequestException({
+                        message: `${current?.title ?? "A variant"} has ${promised} promised to open orders — on hand can't go below that.`,
+                        field: "variants",
+                    });
+                }
                 await tx.variantInventory.upsert({
                     where: { variantId: input.variantId },
                     create: {
@@ -163,6 +178,7 @@ export class InventoryService {
                         productId,
                         organizationId,
                         quantity: input.quantity,
+                        reserved: promised,
                         lowStockAlert: input.lowStockAlert,
                     },
                     update: {
@@ -171,15 +187,14 @@ export class InventoryService {
                     },
                 });
             }
-            // The product's own row now holds only what old orders promise.
-            const own = await tx.inventory.findUnique({
-                where: { productId },
-                select: { reserved: true },
-            });
+            // The product's own row now holds only what lines without a
+            // variant promise.
             if (own) {
+                const moved = Object.values(moving).reduce((n, q) => n + q, 0);
+                const left = own.reserved - moved;
                 await tx.inventory.update({
                     where: { productId },
-                    data: { quantity: own.reserved },
+                    data: { quantity: left, reserved: left },
                 });
             }
         });

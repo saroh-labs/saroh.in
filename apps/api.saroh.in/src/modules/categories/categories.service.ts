@@ -30,6 +30,8 @@ export interface CategoryRemoval {
     productIds: string[];
     /** Its own defaults, which went with it; null when it had none. */
     defaults: CategoryDefaultsSnapshot | null;
+    /** Custom fields that were shown for it; their links went with it. */
+    fieldIds: string[];
 }
 
 export interface CategoryDefaultsSnapshot {
@@ -217,6 +219,24 @@ export class CategoriesService {
                     parentId: dto.parentId ?? null,
                 },
             });
+            // The custom fields shown for it, where each still exists here.
+            if (dto.fieldIds && dto.fieldIds.length > 0) {
+                const fields = await tx.productField.findMany({
+                    where: {
+                        storeId,
+                        deletedAt: null,
+                        id: { in: dto.fieldIds },
+                    },
+                    select: { id: true },
+                });
+                await tx.productFieldCategory.createMany({
+                    data: fields.map((f) => ({
+                        fieldId: f.id,
+                        categoryId: category.id,
+                    })),
+                    skipDuplicates: true,
+                });
+            }
             if (dto.defaults && organizationId) {
                 await tx.catalogueDefaults.create({
                     data: {
@@ -256,6 +276,7 @@ export class CategoriesService {
                 slug: true,
                 parentId: true,
                 _count: { select: { children: true, discountReach: true } },
+                fields: { select: { fieldId: true } },
                 defaults: {
                     select: {
                         howToUse: true,
@@ -303,6 +324,7 @@ export class CategoriesService {
             movedTo: intoId,
             productIds,
             defaults: category.defaults[0] ?? null,
+            fieldIds: category.fields.map((f) => f.fieldId),
         };
     }
 

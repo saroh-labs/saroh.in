@@ -7,6 +7,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { sanitizeRichHtml } from "../sites/sanitize";
 import { StoresService } from "../stores/stores.service";
 import { CsvFormatError, parseCsv } from "./csv";
 import type { ApplyImportDto, PreviewImportDto } from "./dto";
@@ -229,7 +230,11 @@ export class ImportsService {
             const slug = row.key;
             const data = {
                 name: required(row, "name"),
-                description: v.description ?? null,
+                // Rendered as HTML on the product page and the shop, so it
+                // is cleaned here as every editor save cleans it.
+                description: v.description
+                    ? sanitizeRichHtml(v.description).trim() || null
+                    : null,
                 image: v.image ?? null,
                 price: required(row, "price"),
                 currency: v.currency ?? "USD",

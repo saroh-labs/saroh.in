@@ -302,6 +302,16 @@ export class CatalogueService {
         return { entries: await this.entries(storeId) };
     }
 
+    /** The editor's prefill, for someone who can read the store. */
+    async effectiveForUser(
+        storeId: string,
+        userId: string,
+        categoryId: string | null,
+    ): Promise<Effective> {
+        await this.stores.getForUser(storeId, userId);
+        return this.effective(storeId, categoryId);
+    }
+
     /** What a new product in `categoryId` starts with (the editor's prefill). */
     async effective(
         storeId: string,

@@ -165,6 +165,20 @@ export class CatalogueController {
         return this.catalogue.get(storeId, user.id);
     }
 
+    /** What a new product in this category starts with. */
+    @Get("catalogue/defaults/effective")
+    effectiveDefaults(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Query("categoryId") categoryId?: string,
+    ) {
+        return this.catalogue.effectiveForUser(
+            storeId,
+            user.id,
+            categoryId?.trim() ? categoryId : null,
+        );
+    }
+
     @Put("catalogue/defaults")
     saveDefaults(
         @CurrentUser() user: AuthUser,

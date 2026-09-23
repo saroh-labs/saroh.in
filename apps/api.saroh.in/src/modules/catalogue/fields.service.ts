@@ -278,14 +278,17 @@ export async function productFieldsFor(
  * field's type, "" or null clearing it. A field from another storefront, or
  * a deleted one, is refused.
  */
-export async function saveProductFieldValues(
+/**
+ * Check custom field values without writing: every id is one of this
+ * storefront's live fields and every value suits its type. Create runs it
+ * before the product exists, so a refused value never leaves one behind.
+ */
+export async function checkProductFieldValues(
     storeId: string,
-    productId: string,
-    organizationId: string,
     values: Record<string, string | null>,
-): Promise<void> {
+): Promise<{ fieldId: string; value: string | null }[]> {
     const ids = Object.keys(values);
-    if (ids.length === 0) return;
+    if (ids.length === 0) return [];
     const fields = await prisma.productField.findMany({
         where: { storeId, deletedAt: null, id: { in: ids } },
         select: { id: true, name: true, type: true },
@@ -296,7 +299,7 @@ export async function saveProductFieldValues(
             field: "customFields",
         });
     }
-    const cleaned = fields.map((f) => {
+    return fields.map((f) => {
         const check = checkFieldValue(asType(f.type), f.name, values[f.id]);
         if (!check.ok) {
             throw new BadRequestException({
@@ -306,6 +309,16 @@ export async function saveProductFieldValues(
         }
         return { fieldId: f.id, value: check.value };
     });
+}
+
+export async function saveProductFieldValues(
+    storeId: string,
+    productId: string,
+    organizationId: string,
+    values: Record<string, string | null>,
+): Promise<void> {
+    const cleaned = await checkProductFieldValues(storeId, values);
+    if (cleaned.length === 0) return;
     await prisma.$transaction(
         cleaned.map(({ fieldId, value }) =>
             value === null
