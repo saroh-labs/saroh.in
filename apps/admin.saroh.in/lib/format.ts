@@ -64,3 +64,9 @@ export function camelToWords(key: string): string {
 export function plural(count: number, one: string, other = `${one}s`): string {
     return `${count} ${count === 1 ? one : other}`;
 }
+
+/** Today in the operator's time, as YYYY-MM-DD, for comparing with a date-only value. */
+export function todayIso(now: Date = new Date()): string {
+    const offset = now.getTimezoneOffset() * 60_000;
+    return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}

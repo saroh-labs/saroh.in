@@ -402,3 +402,38 @@ export async function sendReviewInvitationEmail(
         return "failed";
     }
 }
+
+/**
+ * Invite someone off the waitlist to create their account (admin console
+ * U11). Awaited, like the review invitation: a person is only marked invited
+ * once their email has left, so the waitlist never claims an invitation that
+ * nobody received. Without SMTP it prints only in development.
+ */
+export async function sendWaitlistInvitationEmail(
+    to: string,
+    signupUrl: string,
+): Promise<EmailOutcome> {
+    if (!transporter) {
+        if (env.NODE_ENV === "development") {
+            console.info(`[Waitlist invite] (no SMTP) ${to}: ${signupUrl}`);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to,
+            subject: "Your Saroh account is ready to create",
+            html: actionEmail(
+                "You're in",
+                "You asked to hear when Saroh was ready for you. It is: create your account with this email address and set up your business.",
+                signupUrl,
+                "Create your account",
+            ),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}

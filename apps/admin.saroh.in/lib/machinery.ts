@@ -9,7 +9,7 @@ export interface HealthCheck {
     label: string;
     state: CheckState;
     summary: string;
-    action?: { label: string; href: string };
+    action?: { label: string; consoleHref: string };
 }
 
 export interface HealthBoard {

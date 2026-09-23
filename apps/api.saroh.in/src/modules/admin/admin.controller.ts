@@ -23,7 +23,12 @@ import { AdminFlagsService } from "./admin-flags.service";
 import { AdminMetricsService } from "./admin-metrics.service";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
-import { ClearFlagOverrideDto, ListAdminAuditDto, SetFlagDto } from "./dto";
+import {
+    ClearFlagOverrideDto,
+    ExplainFlagDto,
+    ListAdminAuditDto,
+    SetFlagDto,
+} from "./dto";
 
 /**
  * The Saroh control plane (S1-012) — the API behind admin.saroh.in.
@@ -81,6 +86,19 @@ export class AdminController {
     @RequireAdminPermission(AdminPermission.FlagsRead)
     async history(@Param("flagKey") flagKey: string) {
         return this.flags.history(assertKnownFlag(flagKey));
+    }
+
+    /**
+     * Why one business sees the value it sees for a flag (R16): the resolver's
+     * own reasoning, so the answer is exactly what the code does.
+     */
+    @Get("flags/:flagKey/explain")
+    @RequireAdminPermission(AdminPermission.FlagsRead)
+    explain(@Param("flagKey") flagKey: string, @Query() query: ExplainFlagDto) {
+        return this.flags.explain(
+            assertKnownFlag(flagKey),
+            query.organizationId,
+        );
     }
 
     @Get("audit")

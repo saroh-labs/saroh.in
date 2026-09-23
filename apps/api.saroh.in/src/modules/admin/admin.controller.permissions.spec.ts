@@ -117,7 +117,7 @@ describe("AdminController permission assignments", () => {
         ]);
     });
 
-    it.each(["listFlags", "history"] as const)(
+    it.each(["listFlags", "history", "explain"] as const)(
         "protects %s with flag read",
         (method) => {
             expect(perms(method)).toEqual([AdminPermission.FlagsRead]);
@@ -199,6 +199,20 @@ describe("Admin console permission assignments", () => {
         expect(perms(method)).toEqual([
             AdminPermission.OrganizationPiiRead,
             AdminPermission.OrganizationPeopleWrite,
+        ]);
+    });
+});
+
+describe("Waitlist permissions", () => {
+    const perms = (name: string) => {
+        const route = routeHandlers().find((r) => r.name === name);
+        return route ? permissionsOf(route.handler) : undefined;
+    };
+
+    it("needs personal data and its own permission to invite", () => {
+        expect(perms("invite")).toEqual([
+            AdminPermission.OrganizationPiiRead,
+            AdminPermission.WaitlistInvite,
         ]);
     });
 });

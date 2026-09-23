@@ -14,8 +14,11 @@ export interface HealthCheck {
     state: CheckState;
     /** The figure or fact behind the state, in words. */
     summary: string;
-    /** What to do about it, when there is something to do. */
-    action?: { label: string; href: string };
+    /**
+     * What to do about it, when there is something to do. `consoleHref` is a
+     * route in the admin console, checked by `check:routes`.
+     */
+    action?: { label: string; consoleHref: string };
 }
 
 const MINUTE = 60;
@@ -123,7 +126,8 @@ export class AdminHealthService {
                       summary: `No renewal run is scheduled, and ${live} memberships are waiting on one.`,
                       action: {
                           label: "Open the job queue",
-                          href: "/operations/jobs?type=subscription.renew",
+                          consoleHref:
+                              "/operations/jobs?type=subscription.renew",
                       },
                   };
         }
@@ -133,7 +137,8 @@ export class AdminHealthService {
                 summary: `The last renewal run failed: ${renewal.lastError ?? "no error recorded"}.`,
                 action: {
                     label: "Retry it",
-                    href: "/operations/jobs?type=subscription.renew&status=FAILED",
+                    consoleHref:
+                        "/operations/jobs?type=subscription.renew&status=FAILED",
                 },
             };
         }
@@ -144,7 +149,7 @@ export class AdminHealthService {
                 summary: `The next renewal run is ${Math.round(lateBy / MINUTE)} minutes late — is the worker running?`,
                 action: {
                     label: "Open the job queue",
-                    href: "/operations/jobs",
+                    consoleHref: "/operations/jobs",
                 },
             };
         }
@@ -177,7 +182,7 @@ export class AdminHealthService {
                 ? {
                       action: {
                           label: `See ${queue.failed} failed`,
-                          href: "/operations/jobs?status=FAILED",
+                          consoleHref: "/operations/jobs?status=FAILED",
                       },
                   }
                 : {}),
@@ -199,7 +204,7 @@ export class AdminHealthService {
                 ? {
                       action: {
                           label: "See failed deliveries",
-                          href: "/operations/webhooks?status=FAILED",
+                          consoleHref: "/operations/webhooks?status=FAILED",
                       },
                   }
                 : {}),
@@ -229,7 +234,10 @@ export class AdminHealthService {
         return {
             state: (problems > 0 ? "warn" : "ok") as CheckState,
             summary: `${parts.join(", ")}.`,
-            action: { label: "Open providers", href: "/operations/providers" },
+            action: {
+                label: "Open providers",
+                consoleHref: "/operations/providers",
+            },
         };
     }
 
@@ -243,7 +251,7 @@ export class AdminHealthService {
             : {
                   state: "unmeasured" as const,
                   summary:
-                      "No object storage is configured on this instance, so uploads are off.",
+                      "No object storage is configured, so uploads are held in memory and lost on every restart.",
               };
     }
 

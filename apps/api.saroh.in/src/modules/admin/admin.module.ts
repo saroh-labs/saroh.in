@@ -26,6 +26,8 @@ import { AdminPeopleController } from "./admin-people.controller";
 import { AdminPeopleService } from "./admin-people.service";
 import { AdminStaffController } from "./admin-staff.controller";
 import { AdminStaffService } from "./admin-staff.service";
+import { AdminWaitlistController } from "./admin-waitlist.controller";
+import { AdminWaitlistService } from "./admin-waitlist.service";
 import { AdminController } from "./admin.controller";
 import { OrganizationAccessSessionGuard } from "./organization-access-session.guard";
 
@@ -50,6 +52,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminStaffController,
         AdminPeopleController,
         AdminMachineryController,
+        AdminWaitlistController,
     ],
     providers: [
         IdempotencyService,
@@ -65,6 +68,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminMachineryService,
         AdminOperationsService,
         AdminHealthService,
+        AdminWaitlistService,
         PlatformAdminGuard,
         PlatformPermissionGuard,
         OrganizationAccessSessionGuard,

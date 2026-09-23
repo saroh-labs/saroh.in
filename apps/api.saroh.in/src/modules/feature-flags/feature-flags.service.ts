@@ -23,6 +23,17 @@ export interface EffectiveFlag {
  * `enabledByDefault` > false. Every mutation writes an immutable
  * FeatureFlagAudit row in the same transaction as the upsert.
  */
+/** A flag's value for one business, and where it came from. */
+export interface FlagExplanation {
+    value: boolean;
+    /**
+     * `OVERRIDE`: this business's own setting. `DEFAULT`: the value for
+     * everyone. `UNCONFIGURED`: no global row, so off. `UNKNOWN_KEY`: not a
+     * registered flag, so off.
+     */
+    source: "OVERRIDE" | "DEFAULT" | "UNCONFIGURED" | "UNKNOWN_KEY";
+}
+
 @Injectable()
 export class FeatureFlagService {
     private readonly logger = new Logger(FeatureFlagService.name);
@@ -33,11 +44,27 @@ export class FeatureFlagService {
      * Unknown keys fail closed to false and log a warning.
      */
     async isEnabled(key: FlagKey, organizationId?: string): Promise<boolean> {
+        return (await this.explain(key, organizationId)).value;
+    }
+
+    /**
+     * Why a flag has the value it has for one business — the resolver itself,
+     * returning its reasoning with its answer. `isEnabled` is this, so the
+     * admin console's inspector cannot disagree with what the code does.
+     *
+     * Precedence: the business's own override, then the global default, then
+     * off. A key the registry does not know, and a registered key with no
+     * global row, both fail closed.
+     */
+    async explain(
+        key: string,
+        organizationId?: string,
+    ): Promise<FlagExplanation> {
         if (!isKnownFlagKey(key)) {
             this.logger.warn(
                 `isEnabled called with unknown flag key "${String(key)}" — defaulting to false`,
             );
-            return false;
+            return { value: false, source: "UNKNOWN_KEY" };
         }
 
         if (organizationId) {
@@ -48,7 +75,7 @@ export class FeatureFlagService {
                 select: { enabled: true },
             });
             if (override) {
-                return override.enabled;
+                return { value: override.enabled, source: "OVERRIDE" };
             }
         }
 
@@ -61,10 +88,10 @@ export class FeatureFlagService {
             this.logger.warn(
                 `Flag "${key}" has no global definition row — defaulting to false`,
             );
-            return false;
+            return { value: false, source: "UNCONFIGURED" };
         }
 
-        return flag.enabledByDefault;
+        return { value: flag.enabledByDefault, source: "DEFAULT" };
     }
 
     /**

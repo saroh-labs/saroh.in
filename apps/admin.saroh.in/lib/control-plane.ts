@@ -34,6 +34,13 @@ export interface PlatformMetrics {
 
 export interface AdminFlag {
     key: string;
+    /** What it is for, who owns it, and when it should go. */
+    metadata: {
+        purpose: string;
+        owner: string;
+        reviewBy: string;
+        removeWhen: string;
+    };
     /** `null` = never configured, which is NOT the same as disabled. */
     enabledByDefault: boolean | null;
     overrides: {
@@ -117,15 +124,14 @@ export type AdminPermission =
     | "webhooks:replay"
     | "providers:read"
     | "providers:recheck"
-    | "incidents:read"
-    | "incidents:write"
     | "subscription:read"
     | "subscription:override"
     | "flags:read"
     | "flags:publish"
     | "staff:read"
     | "staff:grant"
-    | "audit:read";
+    | "audit:read"
+    | "waitlist:invite";
 
 export type ControlPlaneResult<T> =
     { ok: true; data: T } | { ok: false; error: string };
@@ -203,6 +209,21 @@ export async function adminWrite<T = unknown>(
     }
     const text = await res.text();
     return { ok: true, data: (text ? JSON.parse(text) : null) as T };
+}
+
+export interface FlagExplanation {
+    value: boolean;
+    source: "OVERRIDE" | "DEFAULT" | "UNCONFIGURED" | "UNKNOWN_KEY";
+}
+
+/** Why a business sees the value it sees for a flag, from the resolver itself. */
+export function explainFlag(
+    flagKey: string,
+    organizationId: string,
+): Promise<FlagExplanation | null> {
+    return getJson<FlagExplanation>(
+        `/flags/${encodeURIComponent(flagKey)}/explain?organizationId=${encodeURIComponent(organizationId)}`,
+    );
 }
 
 export function flagHistory(flagKey: string): Promise<FlagChange[] | null> {

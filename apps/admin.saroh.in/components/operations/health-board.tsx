@@ -34,7 +34,7 @@ export function HealthBoard({ board }: { board: Board | null }) {
                     <p className="text-sm leading-relaxed">{check.summary}</p>
                     {check.action && (
                         <Link
-                            href={check.action.href}
+                            href={check.action.consoleHref}
                             className={`${buttonVariants({ variant: "ghost", size: "sm" })} justify-self-start`}
                         >
                             {check.action.label}

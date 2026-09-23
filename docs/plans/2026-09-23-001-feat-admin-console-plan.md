@@ -1,7 +1,7 @@
 ---
 title: "feat: The admin console — one operator surface for the whole instance"
 type: feat
-status: active
+status: completed
 date: 2026-09-23
 origin: docs/plans/2026-07-27-admin-control-plane-design.md
 supersedes:
@@ -401,6 +401,38 @@ deferrals), `docs/architecture/adr/` if the framing warrants an ADR,
 
 Each phase is independently useful, and each ends with the console honestly
 representing what exists — no screen for a capability that is not there.
+
+## What shipped, and where it differs from this plan
+
+All twelve units landed, each with its API, permission, tests and screen.
+Where the build departed from the text above:
+
+- **U1** — no accent override (D7): the design's accent is the base dark
+  Saffron. `PageContainer` moved into `@saroh/ui` alongside `DataView`, which
+  moved in U3 with its first console screen.
+- **U2** — the permission is the existing `staff:grant`, not `staff:write`.
+  The last-owner rule is checked on the outcome of every change, not per route:
+  the instance never goes from a lasting Platform Owner to none.
+- **U4** — people's email addresses come back only to a PII reader; operator
+  page views are left out of "what operators did" (they are still in the trail).
+- **U5** — suspension leaves the business's site up and its reads open; it
+  refuses workspace writes and public enquiries, bookings and payments.
+  "Repair" re-runs the module backfill for one business. Nothing yet deletes a
+  business when its retention window ends — the date is shown, and the final
+  step is manual (DEC-021).
+- **U6** — changes go through the business's own members service with an
+  operator context. The admin-ledger entry for these lands just after the
+  business's own change rather than in its transaction; if it cannot be
+  written the request fails loudly.
+- **U8** — "recheck" is a live DNS verification of a waiting domain; payment
+  and messaging health are read from stored connection state.
+- **U9** — version reads the newest applied migration (the build reports no
+  release number); failed sign-ins are "not measured here" because nothing
+  records them.
+- **U11** — a signup is marked invited only once its email left. Needs the new
+  `ACCOUNTS_URL` outside development. A new permission, `waitlist:invite`.
+- **Vocabulary** — `incidents:read` and `incidents:write` were removed:
+  incidents stayed deferred and nothing required them.
 
 ## Sources
 

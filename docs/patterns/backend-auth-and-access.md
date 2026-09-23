@@ -19,6 +19,8 @@
 | Is the capability switched on?       | The API                         | `ModuleEnforcementGuard` and `@RequireModule` (ADR-003)                                                        |
 | Does the plan allow it?              | Entitlements                    | `EntitlementService` (`check`, `can`)                                                                          |
 | Is this person Saroh staff?          | The API                         | `PlatformAdminGuard`, `PlatformPermissionGuard`                                                                |
+| May this operator do this?           | The permission vocabulary       | `admin-permissions.ts` (code); grants in `PlatformAdminRoleAssignment` (data)                                  |
+| Is this business open for activity?  | Its lifecycle                   | `assertOrganizationOpen` (`organization-lifecycle.gate.ts`), in `OrganizationGuard` and public writes          |
 
 The frontends, `admin.saroh.in` included, decide none of these. They render
 what the API allows.
@@ -93,6 +95,36 @@ what the API allows.
   Prisma into the bundle (ESLint).
 - **Current** — **Local sign-in needs portless and `BETTER_AUTH_TRUSTED_ORIGINS`**
   (`docs/architecture/LOCAL_DEV.md`; `docs/architecture/DEV_LEARNINGS.md`, #222).
+- **Current** — **Every admin controller is `@AdminRoutes()`** (admin console
+  plan, 2026-09-23): authenticated, staff, the route's declared permission
+  (fail-closed), then — only on routes that ask — a support-access session.
+  `admin.controller.permissions.spec.ts` reads every controller the admin module
+  registers and fails a route that declares no permission.
+- **Current** — **The staff vocabulary is code; grants are data** (plan D3).
+  Adding a permission or changing what a role may do is a pull request to
+  `admin-permissions.ts`, identical on every instance. Every permission is
+  reachable — a permission nothing requires is removed, not kept for later.
+  Granting, changing and revoking happen in the console (`/team`), never in
+  SQL; assignments are append-only; no change may leave the instance without
+  a Platform Owner whose ownership does not expire.
+- **Current** — **Cross-tenant reads live only behind the admin guards** (plan
+  D2). The admin services (`admin-organizations`, `admin-people`,
+  `admin-machinery`, `admin-waitlist`, `admin-metrics`) read across every
+  business with no organization context, so the `org_isolation` policies take
+  their permissive branch. Each says **CROSS-TENANT READ** in its doc comment,
+  returns what decides whether to act — never a business's customers, orders
+  or messages — and reads personal data only behind `organization:pii:read`.
+  A tenant path never calls one.
+- **Current** — **Operators act through the business's own services, as
+  themselves.** A module change, a role change or a removal goes through
+  `ModuleLifecycleService` / `OrganizationMembersService` with an operator
+  context (`roleKey: "platform-operator"`, the operator's own `userId`), so the
+  business's rules hold (it always keeps an owner) and its audit stream names
+  the operator. There is no write-mode view-as.
+- **Current** — **A suspended or closing business takes no new activity.**
+  `OrganizationGuard` refuses writes and the public enquiry, booking and
+  payment paths refuse outright; reads still pass and the site stays up, so its
+  people can see what happened and take their data.
 - **Adopted** — **Write business rules down.** Plan limits, role actions and what
   a disabled module preserves belong in the ADRs and runbooks
   (`docs/architecture/runbooks/MODULE_ROLLOUT.md`), not only in code.

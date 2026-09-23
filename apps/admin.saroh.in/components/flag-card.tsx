@@ -34,10 +34,13 @@ export function FlagCard({
     flag,
     organizations,
     canPublish,
+    today,
 }: {
     flag: AdminFlag;
     organizations: AdminOrganization[];
     canPublish: boolean;
+    /** Today, as YYYY-MM-DD, from the server — to say a review is overdue. */
+    today: string;
 }) {
     const [reason, setReason] = useState("");
     const [targetOrg, setTargetOrg] = useState("");
@@ -92,6 +95,22 @@ export function FlagCard({
                         {flag.enabledByDefault === null
                             ? "No global row exists, so this flag resolves to off for everyone."
                             : "Organization overrides win over this global default."}
+                    </p>
+                    <p className="mt-3 max-w-[68ch] text-sm">
+                        {flag.metadata.purpose}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
+                        <span>Owned by {flag.metadata.owner}</span>
+                        <span aria-hidden>·</span>
+                        <span>
+                            Review for deletion by {flag.metadata.reviewBy}
+                        </span>
+                        {flag.metadata.reviewBy < today && (
+                            <Badge variant="warning">Review overdue</Badge>
+                        )}
+                    </div>
+                    <p className="mt-1 max-w-[68ch] text-[13px] text-muted-foreground">
+                        Can go when: {flag.metadata.removeWhen}
                     </p>
                 </div>
                 <div className="flex min-w-0 flex-wrap gap-2">

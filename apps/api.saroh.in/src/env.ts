@@ -52,6 +52,10 @@ const envSchema = z.object({
     // customer opens there — product review invitations. Unset: the local
     // renderer in development, the production one everywhere else.
     RENDERER_URL: z.string().url().optional(),
+    // The sign-in app's own address (accounts), for links someone opens to
+    // create their account — waitlist invitations. Unset: the local accounts
+    // app in development, and no invitation link anywhere else.
+    ACCOUNTS_URL: z.string().url().optional(),
 
     // Object storage (S2-008 — media uploads via @saroh/object-storage).
     // All optional: when the R2 credentials below are absent the media module

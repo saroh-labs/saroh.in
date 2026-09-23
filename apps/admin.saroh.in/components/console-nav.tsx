@@ -7,6 +7,7 @@ import {
     Rocket,
     ScrollText,
     ShieldCheck,
+    UserPlus,
     Users,
     Webhook,
 } from "lucide-react";
@@ -99,6 +100,12 @@ const GROUPS: ConsoleNavGroup[] = [
                 label: "Team",
                 icon: ShieldCheck,
                 permission: "staff:read",
+            },
+            {
+                href: "/waitlist",
+                label: "Waitlist",
+                icon: UserPlus,
+                permission: "organization:pii:read",
             },
         ],
     },

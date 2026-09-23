@@ -368,3 +368,34 @@ export class ListWebhooksDto {
     @MaxLength(200)
     cursor?: string;
 }
+
+export class ExplainFlagDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    organizationId?: string;
+}
+
+export class ListWaitlistDto {
+    @IsOptional()
+    @IsIn(["waiting", "invited"])
+    state?: "waiting" | "invited";
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    source?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+}
+
+export class InviteWaitlistDto extends OperatorReasonDto {
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(200)
+    @IsString({ each: true })
+    ids!: string[];
+}

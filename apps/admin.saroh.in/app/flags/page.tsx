@@ -3,12 +3,15 @@ import { PageHeader } from "@saroh/ui/page-header";
 
 import { AdminShell } from "@/components/admin-shell";
 import { FlagCard } from "@/components/flag-card";
+import { FlagInspector } from "@/components/flag-inspector";
 import { NotAuthorized } from "@/components/not-authorized";
 import {
+    explainFlag,
     getStaffIdentity,
     listFlags,
     listOrganizations,
 } from "@/lib/control-plane";
+import { todayIso } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 
 /**
@@ -22,7 +25,11 @@ import { requireSession } from "@/lib/session";
  */
 export const metadata = { title: "Releases" };
 
-export default async function FlagsPage() {
+export default async function FlagsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ flag?: string; organizationId?: string }>;
+}) {
     const session = await requireSession();
 
     const staff = await getStaffIdentity();
@@ -31,10 +38,17 @@ export default async function FlagsPage() {
         return <NotAuthorized email={session.user.email} />;
     }
 
-    const [flags, organizations] = await Promise.all([
+    const selected = await searchParams;
+    const [flags, organizations, explanation] = await Promise.all([
         listFlags(),
         listOrganizations(),
+        selected.flag && selected.organizationId
+            ? explainFlag(selected.flag, selected.organizationId).catch(
+                  () => null,
+              )
+            : null,
     ]);
+    const today = todayIso();
     if (!flags || !organizations) {
         return <NotAuthorized email={session.user.email} />;
     }
@@ -48,6 +62,13 @@ export default async function FlagsPage() {
                     description="A business's own setting wins over the default for everyone, which wins over off. Every change records who made it and why."
                 />
 
+                <FlagInspector
+                    flags={flags}
+                    organizations={organizations}
+                    selected={selected}
+                    explanation={explanation}
+                />
+
                 <div className="grid gap-4">
                     {flags.map((flag) => (
                         <FlagCard
@@ -57,6 +78,7 @@ export default async function FlagsPage() {
                             canPublish={staff.permissions.includes(
                                 "flags:publish",
                             )}
+                            today={today}
                         />
                     ))}
                 </div>

@@ -35,6 +35,7 @@
     "globalPassThroughEnv": [
         "PORT",
         "APP_URL",
+        "ACCOUNTS_URL",
         "CORS_ORIGIN",
         "EMAIL_FROM",
         "SENDER_EMAIL_ID",

@@ -163,12 +163,12 @@ export default async function PersonPage({
                                 {person.sessions.map((session) => (
                                     <li
                                         key={session.id}
-                                        className="grid gap-0.5 border-l-2 border-border pl-3"
+                                        className="grid min-w-0 gap-0.5 border-l-2 border-border pl-3"
                                     >
                                         <span className="break-words">
                                             {describeAgent(session.userAgent)}
                                         </span>
-                                        <span className="font-mono text-[12px] text-muted-foreground">
+                                        <span className="break-all font-mono text-[12px] text-muted-foreground">
                                             {session.ipAddress ??
                                                 "unknown address"}{" "}
                                             · active{" "}
