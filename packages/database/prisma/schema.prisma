@@ -104,6 +104,8 @@ model Organization {
   // Explicit customer identity links (#120): a user-confirmed connection between
   // a CRM Contact and a commerce Customer. Never an automatic merge.
   customerIdentityLinks CustomerIdentityLink[]
+  contactNotes          ContactNote[]
+  contactNoteAllergens  ContactNoteAllergen[]
 
   // Saved list views (#124): per-actor, per-resource named filter sets.
   savedViews SavedView[]
@@ -827,7 +829,9 @@ model StoreAllergen {
 
   createdAt DateTime @default(now())
 
-  products ProductAllergen[]
+  products     ProductAllergen[]
+  // Customers' notes that name it (U8). Removing it is refused while any do.
+  contactNotes ContactNoteAllergen[]
 
   @@index([storeId])
   @@index([organizationId])
@@ -1852,6 +1856,47 @@ model CustomerIdentityLink {
   @@index([organizationId])
 }
 
+// ContactNote: what the team has written down about a person (U8, ADR-008).
+// Free text, plus the allergens it names as ids from the storefront's own
+// allergen list — structured, not typed, so an order's allergy banner matches
+// a product's "Contains" / "May contain" exactly rather than by spelling.
+// Rooted on the Contact (every business kind has one); deleted with it.
+model ContactNote {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  body String @default("")
+
+  allergens ContactNoteAllergen[]
+
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([contactId, createdAt])
+  @@index([organizationId])
+}
+
+// One allergen a note names. NoAction on the allergen, as ProductAllergen:
+// removing an allergen from the list is refused in the API while a note names
+// it, so an allergy is never dropped from a customer's record in passing.
+model ContactNoteAllergen {
+  noteId         String
+  note           ContactNote   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  allergenId     String
+  allergen       StoreAllergen @relation(fields: [allergenId], references: [id], onDelete: NoAction)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, allergenId])
+  @@index([allergenId])
+  @@index([organizationId])
+}
+
 // SavedView: a per-actor, per-resource named set of list filters (#124). The
 // `filters` payload is the SHAREABLE URL query contract (search/filter/sort/
 // page) — plain JSON, NEVER raw SQL — so a saved view can never smuggle an
@@ -2486,6 +2531,9 @@ model Contact {
   invoices          Invoice[]
   packPurchases     PackPurchase[]
   courseEnrollments CourseEnrollment[]
+
+  // What the team has written down about this person (U8).
+  notes ContactNote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
