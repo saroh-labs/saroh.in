@@ -13,6 +13,27 @@ import {
 
 describe("order-state (pure lifecycle state machine)", () => {
     describe("status transitions", () => {
+        // Characterization: the whole table as it stands, written out so any
+        // widening is a visible, deliberate edit here.
+        it("pins the status transition table", () => {
+            expect(STATUS_TRANSITIONS).toEqual({
+                PENDING: ["PROCESSING", "CANCELLED"],
+                PROCESSING: ["SHIPPED", "CANCELLED"],
+                SHIPPED: ["DELIVERED"],
+                DELIVERED: [],
+                CANCELLED: [],
+            });
+        });
+
+        it("pins the payment transition table", () => {
+            expect(PAYMENT_TRANSITIONS).toEqual({
+                UNPAID: ["PAID", "FAILED"],
+                FAILED: ["PAID"],
+                PAID: ["REFUNDED"],
+                REFUNDED: [],
+            });
+        });
+
         it("allows every legal status transition", () => {
             for (const from of ORDER_STATUSES) {
                 for (const to of STATUS_TRANSITIONS[from]) {
