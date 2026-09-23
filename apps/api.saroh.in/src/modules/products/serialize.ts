@@ -7,6 +7,7 @@
  */
 
 import { toMoneyString } from "../../common/money";
+import { sanitizeRichHtml } from "../sites/sanitize";
 
 interface DecimalLike {
     toString(): string;
@@ -247,13 +248,26 @@ export function serializeVariant(variant: RawVariant): VariantDto {
     };
 }
 
+/**
+ * The description is merchant HTML: kept to what the shop can render. Run on
+ * every save, and again on every read, so a row written before saves were
+ * cleaned never reaches a page raw.
+ */
+export function cleanDescription(
+    value: string | null | undefined,
+): string | null {
+    if (value == null) return null;
+    const clean = sanitizeRichHtml(value).trim();
+    return clean === "" ? null : clean;
+}
+
 export function serializeProduct(product: RawProduct): ProductDto {
     return {
         id: product.id,
         storeId: product.storeId,
         name: product.name,
         slug: product.slug,
-        description: product.description,
+        description: cleanDescription(product.description),
         image: product.image,
         categoryId: product.categoryId,
         price: toMoneyString(product.price),
@@ -296,7 +310,8 @@ interface RawProductListItem extends RawProduct {
 
 /**
  * The row's stock. Counted per variant, it is the variants' sum (plus what
- * the product's own row still holds for old orders, as stockTotals adds it)
+ * the product's own row still holds for lines without a variant, as
+ * stockTotals adds it)
  * warning at the lowest variant's level; otherwise the product's own row.
  */
 function listStock(

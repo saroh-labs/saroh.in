@@ -52,9 +52,9 @@ export interface StockTotals {
 
 /**
  * The whole product: the sum of its variants, plus whatever the product's own
- * row still holds. In variant mode that row carries only promises made by
- * orders from before the product counted per variant, so its promised adds
- * in but its on-hand is zero.
+ * row still holds. In variant mode that row carries only what open order
+ * lines without a variant promise (on hand = promised), so it adds nothing
+ * to what can be sold.
  */
 export function stockTotals(
     lines: StockLine[],

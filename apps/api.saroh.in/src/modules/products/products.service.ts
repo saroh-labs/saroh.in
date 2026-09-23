@@ -19,7 +19,6 @@ import {
     productFieldsFor,
     saveProductFieldValues,
 } from "../catalogue/fields.service";
-import { sanitizeRichHtml } from "../sites/sanitize";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
 import type {
@@ -35,6 +34,7 @@ import {
     cleanShopFields,
 } from "./product-rules";
 import {
+    cleanDescription,
     readShopFields,
     serializeProductDetail,
     serializeProductListItem,
@@ -64,13 +64,6 @@ export const PRODUCT_DETAIL_INCLUDE = {
 /** Key points are one line each: trimmed, and blank lines dropped. */
 function cleanKeyPoints(points: string[] | undefined): string[] {
     return (points ?? []).map((p) => p.trim()).filter((p) => p !== "");
-}
-
-/** The description is merchant HTML: kept to what the shop can render. */
-function cleanDescription(value: string | null | undefined): string | null {
-    if (value == null) return null;
-    const clean = sanitizeRichHtml(value).trim();
-    return clean === "" ? null : clean;
 }
 
 /**
