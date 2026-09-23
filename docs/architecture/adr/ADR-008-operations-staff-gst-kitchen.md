@@ -163,7 +163,9 @@ reports.
   timeline is these events.
 - **The transition table widens once:** PROCESSING → DELIVERED, for a collected
   order. A move backwards happens only as an **Undo of the last step**, by its
-  event, within a server-side time limit; it reverses that step's stock rows.
+  event, within a server-side time limit (ten minutes, settled in U6:
+  `UNDO_WINDOW_MS` in `orders/order-stage.ts`); it reverses that step's stock
+  rows.
 - **Refunds become partial.** A line refund is capped at what is paid and not
   yet refunded on that line, taken under the order's row lock and idempotent,
   so a retry returns the same refund. "Partly refunded" is derived from refund
