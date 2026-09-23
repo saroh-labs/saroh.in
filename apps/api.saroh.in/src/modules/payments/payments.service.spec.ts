@@ -22,15 +22,23 @@ jest.mock("@saroh/database", () => {
         paymentIntent: {
             findUnique: jest.fn(),
             findFirst: jest.fn(),
+            findMany: jest.fn(),
             create: jest.fn(),
         },
         paymentAttempt: {
             create: jest.fn(),
             findFirst: jest.fn(),
         },
-        paymentRefund: { create: jest.fn() },
+        paymentRefund: {
+            create: jest.fn(),
+            findMany: jest.fn(),
+            update: jest.fn(),
+        },
+        orderItem: { findMany: jest.fn() },
+        orderEvent: { create: jest.fn() },
         order: { findUnique: jest.fn() },
         storeSettings: { findUnique: jest.fn() },
+        $queryRaw: jest.fn(),
     };
     return {
         ...actual,
@@ -441,33 +449,94 @@ describe("PaymentsService.getWebhookSecret", () => {
 });
 
 describe("PaymentsService.initiateRefund", () => {
-    beforeEach(() => jest.clearAllMocks());
+    const refundFindMany = prisma.paymentRefund.findMany as jest.Mock;
+    const refundUpdate = prisma.paymentRefund.update as jest.Mock;
+    const intentFindMany = prisma.paymentIntent.findMany as jest.Mock;
+    const itemFindMany = prisma.orderItem.findMany as jest.Mock;
+    const eventCreate = prisma.orderEvent.create as jest.Mock;
+    const queryRaw = prisma.$queryRaw as jest.Mock;
 
-    const ORDER = { id: "order_1", organizationId: "org_1" };
+    const ORDER = {
+        id: "order_1",
+        organizationId: "org_1",
+        discount: "0.00",
+        currency: "INR",
+    };
+    const PAYMENT = {
+        id: "pi_1",
+        provider: "RAZORPAY",
+        providerIntentId: "prov_intent_1",
+        status: "SUCCEEDED",
+        amountCents: 4250,
+        currency: "INR",
+        refunds: [] as { amountCents: number }[],
+    };
+    // Three lines: 2 × 10.00, 1 × 15.00, 1 × 7.50 = 42.50.
+    const LINES = [
+        { id: "li_a", quantity: 2, price: "10.00", refundLines: [] },
+        { id: "li_b", quantity: 1, price: "15.00", refundLines: [] },
+        { id: "li_c", quantity: 1, price: "7.50", refundLines: [] },
+    ];
 
-    it("validates a SUCCEEDED intent, calls the provider, and records a PENDING refund", async () => {
-        const { service, fake } = makeService();
+    /** Echo a created refund row back as Prisma would, with its includes. */
+    function echoCreate() {
+        let n = 0;
+        const made = new Map<string, object>();
+        refundCreate.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) => {
+                n += 1;
+                const lines = (
+                    data.lines as
+                        | {
+                              create: {
+                                  orderItemId: string;
+                                  quantity: number;
+                                  amountCents: number;
+                              }[];
+                          }
+                        | undefined
+                )?.create;
+                const row = {
+                    id: `rf_${n}`,
+                    paymentIntentId: data.paymentIntentId,
+                    amountCents: data.amountCents,
+                    currency: data.currency,
+                    status: data.status,
+                    providerRefundId: null,
+                    paymentIntent: { provider: "RAZORPAY" },
+                    lines: lines ?? [],
+                };
+                made.set(row.id, row);
+                return Promise.resolve(row);
+            },
+        );
+        refundUpdate.mockImplementation(
+            ({ where, data }: { where: { id: string }; data: object }) =>
+                Promise.resolve({ ...made.get(where.id), ...data }),
+        );
+    }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
         orderFindUnique.mockResolvedValue(ORDER);
-        intentFindFirst.mockResolvedValue({
-            id: "pi_1",
-            provider: "RAZORPAY",
-            providerIntentId: "prov_intent_1",
-            status: "SUCCEEDED",
-            amountCents: 4250,
-            currency: "INR",
-        });
+        refundFindMany.mockResolvedValue([]);
+        intentFindMany.mockResolvedValue([PAYMENT]);
+        itemFindMany.mockResolvedValue(LINES);
         providerFindUnique.mockResolvedValue(connectedRow());
         attemptFindFirst.mockResolvedValue({ providerRef: "pay_1" });
-        refundCreate.mockResolvedValue({
-            id: "rf_1",
-            providerRefundId: "fake_refund_prov_intent_1",
-            amountCents: 4250,
-            currency: "INR",
-            status: "PENDING",
+        queryRaw.mockResolvedValue([]);
+        echoCreate();
+    });
+
+    it("with no lines, refunds everything left under the order's row lock and records a PENDING refund", async () => {
+        const { service, fake } = makeService();
+
+        const result = await service.initiateRefund(ctx(), "order_1", {
+            reason: "oops",
         });
 
-        const result = await service.initiateRefund(ctx(), "order_1", "oops");
-
+        // The order row is locked before anything is read or written.
+        expect(queryRaw).toHaveBeenCalledTimes(1);
         // Provider refund was called with the server-derived amount + payment ref.
         expect(fake.refundCalls).toHaveLength(1);
         expect(fake.refundCalls[0]).toEqual(
@@ -478,24 +547,160 @@ describe("PaymentsService.initiateRefund", () => {
                 currency: "INR",
             }),
         );
-        // A PENDING refund is recorded; settlement happens later via the webhook.
-        expect(refundCreate).toHaveBeenCalledWith({
+        expect(refundCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    organizationId: "org_1",
+                    paymentIntentId: "pi_1",
+                    amountCents: 4250,
+                    status: "PENDING",
+                    reason: "oops",
+                }),
+            }),
+        );
+        // Every line is recorded as refunded, so no line refund can follow.
+        expect(result.lines).toEqual([
+            { itemId: "li_a", quantity: 2, amountCents: 2000 },
+            { itemId: "li_b", quantity: 1, amountCents: 1500 },
+            { itemId: "li_c", quantity: 1, amountCents: 750 },
+        ]);
+        expect(result.amountCents).toBe(4250);
+        expect(result.status).toBe("PENDING");
+        expect(eventCreate).toHaveBeenCalledWith({
             data: expect.objectContaining({
-                organizationId: "org_1",
-                paymentIntentId: "pi_1",
+                kind: "REFUND",
                 amountCents: 4250,
-                status: "PENDING",
-                providerRefundId: "fake_refund_prov_intent_1",
-                reason: "oops",
+                actorUserId: "user_1",
             }),
         });
-        expect(result.status).toBe("PENDING");
+    });
+
+    it("refunds the chosen lines only, for the amount the server works out", async () => {
+        const { service, fake } = makeService();
+
+        const result = await service.initiateRefund(ctx(), "order_1", {
+            lines: [
+                { itemId: "li_a", quantity: 1 },
+                { itemId: "li_c", quantity: 1 },
+            ],
+        });
+
+        expect(fake.refundCalls[0].amountCents).toBe(1750);
+        expect(result.amountCents).toBe(1750);
+        expect(result.lines).toEqual([
+            { itemId: "li_a", quantity: 1, amountCents: 1000 },
+            { itemId: "li_c", quantity: 1, amountCents: 750 },
+        ]);
+    });
+
+    it("refuses a line refund above what is left of the line, and refunds nothing", async () => {
+        const { service, fake } = makeService();
+        itemFindMany.mockResolvedValue([
+            {
+                ...LINES[0],
+                // One of the two was refunded already.
+                refundLines: [{ quantity: 1, amountCents: 1000 }],
+            },
+            LINES[1],
+            LINES[2],
+        ]);
+
+        await expect(
+            service.initiateRefund(ctx(), "order_1", {
+                lines: [{ itemId: "li_a", quantity: 2 }],
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(refundCreate).not.toHaveBeenCalled();
+        expect(fake.refundCalls).toHaveLength(0);
+    });
+
+    it("a retry with the same key returns the first refund and makes no second", async () => {
+        const { service, fake } = makeService();
+        refundFindMany.mockResolvedValue([
+            {
+                id: "rf_1",
+                paymentIntentId: "pi_1",
+                amountCents: 1000,
+                currency: "INR",
+                status: "PENDING",
+                providerRefundId: "fake_refund_prov_intent_1",
+                paymentIntent: { provider: "RAZORPAY" },
+                lines: [
+                    { orderItemId: "li_a", quantity: 1, amountCents: 1000 },
+                ],
+            },
+        ]);
+
+        const result = await service.initiateRefund(ctx(), "order_1", {
+            lines: [{ itemId: "li_a", quantity: 1 }],
+            idempotencyKey: "tap-1",
+        });
+
+        expect(result.refundId).toBe("rf_1");
+        expect(result.amountCents).toBe(1000);
+        expect(refundCreate).not.toHaveBeenCalled();
+        expect(fake.refundCalls).toHaveLength(0);
+    });
+
+    it("the racing twin finds the first refund once it holds the lock", async () => {
+        const { service, fake } = makeService();
+        const first = {
+            id: "rf_1",
+            paymentIntentId: "pi_1",
+            amountCents: 1000,
+            currency: "INR",
+            status: "PENDING",
+            providerRefundId: null,
+            paymentIntent: { provider: "RAZORPAY" },
+            lines: [],
+        };
+        // Nothing before the lock; the twin's row once inside it.
+        refundFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([first]);
+
+        const result = await service.initiateRefund(ctx(), "order_1", {
+            lines: [{ itemId: "li_a", quantity: 1 }],
+            idempotencyKey: "tap-1",
+        });
+
+        expect(result.refundId).toBe("rf_1");
+        expect(refundCreate).not.toHaveBeenCalled();
+        expect(fake.refundCalls).toHaveLength(0);
+    });
+
+    it("refuses when everything has already gone back", async () => {
+        const { service } = makeService();
+        intentFindMany.mockResolvedValue([
+            { ...PAYMENT, refunds: [{ amountCents: 4250 }] },
+        ]);
+
+        await expect(
+            service.initiateRefund(ctx(), "order_1"),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(refundCreate).not.toHaveBeenCalled();
+    });
+
+    it("marks the refund FAILED when the provider refuses it, freeing the lines", async () => {
+        const { service, fake } = makeService();
+        jest.spyOn(fake, "refund").mockRejectedValueOnce(
+            new Error("provider down"),
+        );
+
+        await expect(
+            service.initiateRefund(ctx(), "order_1", {
+                lines: [{ itemId: "li_b", quantity: 1 }],
+            }),
+        ).rejects.toThrow("provider down");
+        expect(refundUpdate).toHaveBeenCalledWith({
+            where: { id: "rf_1" },
+            data: { status: "FAILED" },
+        });
+        // Not a step the order went through.
+        expect(eventCreate).not.toHaveBeenCalled();
     });
 
     it("rejects with 400 when the order has no SUCCEEDED intent", async () => {
         const { service, fake } = makeService();
-        orderFindUnique.mockResolvedValue(ORDER);
-        intentFindFirst.mockResolvedValue(null);
+        intentFindMany.mockResolvedValue([]);
 
         await expect(
             service.initiateRefund(ctx(), "order_1"),

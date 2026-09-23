@@ -74,7 +74,8 @@ const PROVIDER_LABEL: Record<string, string> = {
  *     `(provider, providerEventId)` is UNIQUE. A duplicate delivery hits P2002
  *     and returns a 200 no-op — this is the exactly-once guarantee.
  *  3. RECONCILE — inside a `$transaction`, the event is mapped to a PaymentIntent
- *     and applied: SUCCEEDED→PAID, FAILED, refund→REFUNDED. Every Order
+ *     and applied: SUCCEEDED→PAID, FAILED, refund→REFUNDED once refunded in
+ *     full (a partial refund leaves the order PAID — ADR-008). Every Order
  *     paymentStatus move goes through {@link assertPaymentTransition}, and a
  *     same→same target is a guard-free no-op, so money state moves at most once
  *     even if the same event somehow reaches reconcile twice.
@@ -205,9 +206,7 @@ export class WebhooksService {
      * twice. The row claims its own replay (FAILED → RECEIVED) before it
      * runs, so two operators replaying at once cannot both run it.
      */
-    async replay(
-        eventId: string,
-    ): Promise<{
+    async replay(eventId: string): Promise<{
         status: "processed" | "ignored" | "failed" | "skipped";
         detail?: string;
     }> {
@@ -448,12 +447,51 @@ export class WebhooksService {
         orderId: string,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
-        // Order.paymentStatus → REFUNDED via the state machine FIRST (PAID→
-        // REFUNDED); an illegal move (e.g. UNPAID→REFUNDED) throws before any
-        // refund write. Already REFUNDED is a guard-free no-op.
-        const moved = await this.moveOrderPayment(tx, orderId, "REFUNDED");
+        // Guard FIRST: a refund on an order that was never paid (UNPAID→
+        // REFUNDED) is illegal and throws before any refund write. PAID and
+        // already-REFUNDED orders pass.
+        const order = await tx.order.findUnique({
+            where: { id: orderId },
+            select: { paymentStatus: true },
+        });
+        if (!order) return { applied: false };
+        const current = order.paymentStatus as PaymentStatus;
+        if (current !== "REFUNDED" && current !== "PAID") {
+            assertPaymentTransition(current, "REFUNDED");
+        }
         const { applied } = await this.settleRefund(tx, intent, event);
+        // A refund by line is partial (ADR-008, U6): the order moves to
+        // REFUNDED only once every rupee taken has gone back. Until then it
+        // stays PAID and reads "partly refunded", derived from the sums.
+        const moved =
+            current === "PAID" && (await this.fullyRefunded(tx, orderId))
+                ? await this.moveOrderPayment(tx, orderId, "REFUNDED")
+                : false;
         return { applied: moved || applied };
+    }
+
+    /**
+     * Whether every successful payment on an order has been refunded in
+     * full — settled refunds only, so a refund still in flight does not
+     * close the order early.
+     */
+    private async fullyRefunded(tx: Tx, orderId: string): Promise<boolean> {
+        const payments = await tx.paymentIntent.findMany({
+            where: { orderId, status: "SUCCEEDED" },
+            select: {
+                amountCents: true,
+                refunds: {
+                    where: { status: "SUCCEEDED" },
+                    select: { amountCents: true },
+                },
+            },
+        });
+        const captured = payments.reduce((s, p) => s + p.amountCents, 0);
+        const refunded = payments.reduce(
+            (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
+            0,
+        );
+        return captured > 0 && refunded >= captured;
     }
 
     /**
