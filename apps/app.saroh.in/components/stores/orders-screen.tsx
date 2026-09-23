@@ -104,11 +104,18 @@ export function OrdersScreen({
     orders,
     stores,
     initialFilterId,
+    kitchen = false,
 }: {
     orders: BusinessOrder[];
     stores: { id: string; name: string }[];
     /** From `?view=`, so a link from Home lands on the right tab. */
     initialFilterId?: string;
+    /**
+     * The kitchen's view (a Member, through `order:stage`): no totals, no
+     * export and no New order — the API sends no money, and taking an order
+     * is not theirs to do.
+     */
+    kitchen?: boolean;
 }) {
     const [storeId, setStoreId] = useState<string | null>(null);
     const many = stores.length > 1;
@@ -118,7 +125,7 @@ export function OrdersScreen({
         [orders, storeId],
     );
 
-    const columns: DataColumn<BusinessOrder>[] = [
+    const allColumns: DataColumn<BusinessOrder>[] = [
         {
             id: "order",
             header: "Order",
@@ -176,10 +183,13 @@ export function OrdersScreen({
             numeric: true,
             money: true,
             width: "128px",
-            sortValue: (o) => Number(o.total),
+            sortValue: (o) => Number(o.total ?? 0),
             cell: (o) => formatMoneyMajor(o.total, o.currency),
         },
     ];
+    const columns = kitchen
+        ? allColumns.filter((c) => c.id !== "total")
+        : allColumns;
 
     return (
         <>
@@ -188,7 +198,7 @@ export function OrdersScreen({
                 title="Orders"
                 className="mb-0"
                 actions={
-                    stores.length > 0 ? (
+                    stores.length > 0 && !kitchen ? (
                         <>
                             <Button
                                 variant="outline"

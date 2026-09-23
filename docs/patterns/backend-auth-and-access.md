@@ -60,6 +60,13 @@ what the API allows.
   items, stage, notes, allergens, customer name — with money figures left out
   by the API, and moves its stage or undoes the last step. Refunds and edits
   to items or address stay `order:write` / `payment:manage` (Owner/Admin).
+  **Current** since U14: a module may name several `requiredAction`s, any one
+  of which reaches it, and Commerce takes `order:read` or `order:stage`, so a
+  Member reaches Sell → Orders (the list comes back without totals or emails)
+  and Order Detail (`GET organizations/:org/orders/:id`). The older
+  store-scoped order list and read send totals, so they refuse a role with
+  `order:stage` but no `order:read`. A new read inside Commerce must ask for
+  its own action; the module gate no longer implies `order:read`.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,
