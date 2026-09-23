@@ -212,4 +212,77 @@ test.describe("product editor", () => {
             await removeProducts(page.request, name);
         }
     });
+
+    test("says a price above the MRP before Save, and a refusal in the API's words", async ({
+        page,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        const taken = `Neem Face Wash ${testInfo.project.name}`;
+        const name = `Kumkumadi Night Cream ${testInfo.project.name}`;
+
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        await removeProducts(page.request, taken);
+        await removeProducts(page.request, name);
+
+        try {
+            // A product whose address the new one will try to take.
+            const made = await page.request.post(api(""), {
+                headers: orgHeader,
+                data: { name: taken, price: "299", currency: "INR" },
+            });
+            expect(made.ok()).toBe(true);
+            const { id: takenId } = (await made.json()) as { id: string };
+            const takenRes = await page.request.get(api(`/${takenId}`), {
+                headers: orgHeader,
+            });
+            const { slug: takenSlug } = (await takenRes.json()) as {
+                slug: string;
+            };
+
+            // 1. A cream with an MRP of 799.
+            await page.goto(`/commerce/products/new?storefront=${STORE}`);
+            await page.locator("#pe-name").fill(name);
+            await page.locator("#pe-price").fill("649");
+            await page.locator("#pe-mrp").fill("799");
+            await page.getByRole("button", { name: "Create draft" }).click();
+            await page.waitForURL(/\/commerce\/products\/[^/]+\/edit/);
+            await expect(page.getByText("All changes saved")).toBeVisible();
+
+            // 2. A size priced above the MRP is refused on the add row,
+            // before anything is sent.
+            const variants = page.getByRole("region", { name: "Variants" });
+            await variants
+                .getByRole("button", { name: "Add variants" })
+                .click();
+            await variants
+                .getByRole("combobox", { name: "New variant Volume" })
+                .click();
+            await page
+                .getByRole("option", { name: "30 ml", exact: true })
+                .click();
+            await variants
+                .getByLabel("New variant price, blank uses the product's")
+                .fill("1099");
+            await expect(
+                variants.getByText(/Above the MRP of ₹799/),
+            ).toBeVisible();
+            await expect(
+                variants.getByRole("button", { name: "Add to list" }),
+            ).toBeDisabled();
+
+            // 3. An address another product has: only the API knows, and
+            // the card says what it said.
+            const basics = page.getByRole("region", { name: "Basics" });
+            await page.locator("#pe-slug").fill(takenSlug);
+            await basics.getByRole("button", { name: "Save basics" }).click();
+            await expect(
+                basics.getByText("That slug is already taken"),
+            ).toBeVisible();
+            await expect(page.getByText("Something went wrong")).toHaveCount(0);
+        } finally {
+            await removeProducts(page.request, name);
+            await removeProducts(page.request, taken);
+        }
+    });
 });

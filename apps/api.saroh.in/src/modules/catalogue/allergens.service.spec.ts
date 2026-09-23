@@ -21,6 +21,7 @@ describe("Allergens (DB)", () => {
     let orgId = "";
     let storeId = "";
     let loafId = "";
+    let otherStoreId = "";
 
     beforeAll(async () => {
         ownerId = (
@@ -50,8 +51,12 @@ describe("Allergens (DB)", () => {
 
     afterAll(async () => {
         await prisma.product.deleteMany({ where: { storeId } });
-        await prisma.storeAllergen.deleteMany({ where: { storeId } });
-        await prisma.store.deleteMany({ where: { id: storeId } });
+        await prisma.storeAllergen.deleteMany({
+            where: { storeId: { in: [storeId, otherStoreId] } },
+        });
+        await prisma.store.deleteMany({
+            where: { id: { in: [storeId, otherStoreId] } },
+        });
         await prisma.organization.deleteMany({ where: { id: orgId } });
         await prisma.user.deleteMany({ where: { id: ownerId } });
     });
@@ -103,5 +108,35 @@ describe("Allergens (DB)", () => {
             id: soy,
             name: "Soy",
         });
+    });
+
+    it("refuses another storefront's allergen, and creates nothing when it does", async () => {
+        otherStoreId = (
+            await stores.createForUser(ownerId, orgId, {
+                name: "Allergen Store Two",
+                slug: `allergen-two-${tag}`,
+            })
+        ).id;
+        const [mustard] = await allergens.add(otherStoreId, ownerId, [
+            "Mustard",
+        ]);
+        await expect(
+            products.patch(storeId, loafId, ownerId, {
+                contains: [mustard.id],
+            }),
+        ).rejects.toThrow(/not on this storefront's list/);
+        await expect(
+            products.create(storeId, ownerId, {
+                name: "Mustard rye",
+                price: "380",
+                currency: "INR",
+                contains: [mustard.id],
+            }),
+        ).rejects.toThrow(/not on this storefront's list/);
+        expect(
+            await prisma.product.count({
+                where: { storeId, name: "Mustard rye" },
+            }),
+        ).toBe(0);
     });
 });

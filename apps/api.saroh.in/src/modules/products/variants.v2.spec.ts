@@ -311,4 +311,125 @@ describe("Variants and stock per variant (DB)", () => {
         });
         expect(own).toEqual({ quantity: 10, reserved: 3 });
     });
+
+    describe("switching to a count per variant with orders open", () => {
+        let tonerId = "";
+        const t: Record<string, string> = {};
+        const own = (productId: string) =>
+            prisma.inventory.findUniqueOrThrow({
+                where: { productId },
+                select: { quantity: true, reserved: true },
+            });
+
+        beforeAll(async () => {
+            tonerId = (
+                await products.create(storeId, ownerId, {
+                    name: "Rose Toner",
+                    price: "450",
+                    currency: "INR",
+                    optionId: sizeOptionId,
+                })
+            ).id;
+            for (const size of ["S", "M"]) {
+                t[size] = (
+                    await variants.create(storeId, tonerId, ownerId, {
+                        sku: `RT-${size}`,
+                        title: size,
+                        optionValueId: values[size],
+                    })
+                ).id;
+            }
+            await inventory.upsert(storeId, tonerId, ownerId, {
+                quantity: 10,
+            });
+        });
+
+        it("an order placed while counting as a whole moves to its variant, counted once", async () => {
+            const order = await orders.create(storeId, ownerId, {
+                customerId,
+                items: [{ productId: tonerId, variantId: t.S, quantity: 2 }],
+            });
+            expect(await own(tonerId)).toEqual({ quantity: 10, reserved: 2 });
+            // What the editor seeds the switch from.
+            const detail = await products.get(storeId, tonerId, ownerId);
+            expect(detail.variantPromises).toEqual({ [t.S]: 2 });
+
+            await expect(
+                inventory.setVariants(storeId, tonerId, ownerId, {
+                    variants: [
+                        { variantId: t.S, quantity: 1, lowStockAlert: 2 },
+                        { variantId: t.M, quantity: 0, lowStockAlert: 2 },
+                    ],
+                }),
+            ).rejects.toThrow("S has 2 promised to open orders");
+
+            // S starts at what was free (8) plus its own promise (2).
+            await inventory.setVariants(storeId, tonerId, ownerId, {
+                variants: [
+                    { variantId: t.S, quantity: 10, lowStockAlert: 2 },
+                    { variantId: t.M, quantity: 0, lowStockAlert: 2 },
+                ],
+            });
+            expect(await stockOf(t.S)).toEqual({ quantity: 10, reserved: 2 });
+            expect(await own(tonerId)).toEqual({ quantity: 0, reserved: 0 });
+
+            // Shipping it lands on the variant's row, never below zero.
+            await orders.updateStatus(storeId, order.id, ownerId, {
+                status: "PROCESSING",
+            });
+            await orders.updateStatus(storeId, order.id, ownerId, {
+                status: "SHIPPED",
+            });
+            expect(await stockOf(t.S)).toEqual({ quantity: 8, reserved: 0 });
+            expect(await own(tonerId)).toEqual({ quantity: 0, reserved: 0 });
+        });
+
+        it("refuses a count below what a variant has promised since", async () => {
+            await orders.create(storeId, ownerId, {
+                customerId,
+                items: [{ productId: tonerId, variantId: t.S, quantity: 3 }],
+            });
+            const refused = inventory.setVariants(storeId, tonerId, ownerId, {
+                variants: [
+                    { variantId: t.S, quantity: 2, lowStockAlert: 2 },
+                    { variantId: t.M, quantity: 0, lowStockAlert: 2 },
+                ],
+            });
+            await expect(refused).rejects.toThrow(BadRequestException);
+            await expect(refused).rejects.toThrow(
+                "S has 3 promised to open orders — on hand can't go below that.",
+            );
+        });
+    });
+
+    describe("an option for a product from before options", () => {
+        it("takes its first option, then refuses a switch", async () => {
+            const oil = (
+                await products.create(storeId, ownerId, {
+                    name: "Hair Oil",
+                    price: "350",
+                    currency: "INR",
+                })
+            ).id;
+            // A variant from before options: a title, no value.
+            await variants.create(storeId, oil, ownerId, {
+                sku: "HO-100",
+                title: "M",
+            });
+            const after = await products.patch(storeId, oil, ownerId, {
+                optionId: sizeOptionId,
+            });
+            expect(after.optionId).toBe(sizeOptionId);
+
+            const scent = await prisma.productOption.create({
+                data: { storeId, organizationId: orgId, name: "Scent" },
+            });
+            await expect(
+                products.patch(storeId, oil, ownerId, { optionId: scent.id }),
+            ).rejects.toThrow(ConflictException);
+            await expect(
+                products.patch(storeId, oil, ownerId, { optionId: null }),
+            ).rejects.toThrow(/without an option/);
+        });
+    });
 });

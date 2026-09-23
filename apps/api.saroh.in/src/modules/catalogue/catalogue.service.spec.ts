@@ -167,6 +167,91 @@ describe("Catalogue settings (DB)", () => {
                 categories.remove(storeId, dresses, ownerId),
             ).rejects.toThrow(/discount code applies to Dresses/);
         });
+
+        it("refuses a category as its own parent, and a loop", async () => {
+            await expect(
+                categories.update(storeId, faceCare, ownerId, {
+                    name: "Face Care",
+                    slug: "face-care",
+                    parentId: faceCare,
+                }),
+            ).rejects.toThrow(/its own parent/);
+            const toners = (
+                await categories.create(storeId, ownerId, {
+                    name: "Toners",
+                    parentId: faceCare,
+                })
+            ).id;
+            await expect(
+                categories.update(storeId, faceCare, ownerId, {
+                    name: "Face Care",
+                    slug: "face-care",
+                    parentId: toners,
+                }),
+            ).rejects.toThrow(/category loop/);
+            await expect(
+                categories.remove(storeId, faceCare, ownerId),
+            ).rejects.toThrow(/sub-categories first/);
+        });
+
+        it("Undo of a delete brings back its defaults and its custom fields", async () => {
+            const toners = await prisma.category.findFirstOrThrow({
+                where: { storeId, name: "Toners" },
+                select: { id: true },
+            });
+            await prisma.catalogueDefaults.create({
+                data: {
+                    storeId,
+                    organizationId: orgId,
+                    key: toners.id,
+                    categoryId: toners.id,
+                    howToUse: "Pat onto clean skin.",
+                    lowStockAlert: 4,
+                },
+            });
+            const field = await prisma.productField.create({
+                data: {
+                    storeId,
+                    organizationId: orgId,
+                    name: "Skin type",
+                    categories: { create: { categoryId: toners.id } },
+                },
+            });
+
+            const removal = await categories.remove(
+                storeId,
+                toners.id,
+                ownerId,
+            );
+            expect(removal.defaults).toMatchObject({
+                howToUse: "Pat onto clean skin.",
+                lowStockAlert: 4,
+            });
+            expect(removal.fieldIds).toEqual([field.id]);
+
+            const restored = await categories.restore(storeId, ownerId, {
+                name: removal.name,
+                slug: removal.slug,
+                parentId: removal.parentId,
+                movedTo: removal.movedTo,
+                productIds: removal.productIds,
+                defaults: removal.defaults,
+                // One that is not this store's field is left out.
+                fieldIds: [...removal.fieldIds, "not-a-field"],
+            });
+            expect(
+                await prisma.catalogueDefaults.findFirst({
+                    where: { storeId, key: restored.id },
+                    select: { howToUse: true, lowStockAlert: true },
+                }),
+            ).toEqual({ howToUse: "Pat onto clean skin.", lowStockAlert: 4 });
+            expect(
+                await prisma.productFieldCategory.findMany({
+                    where: { categoryId: restored.id },
+                    select: { fieldId: true },
+                }),
+            ).toEqual([{ fieldId: field.id }]);
+        });
     });
 
     describe("options", () => {

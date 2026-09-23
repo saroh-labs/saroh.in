@@ -1,19 +1,31 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    basicsFrom,
+    basicsPatch,
     basicsProblem,
     basicsSchema,
     descriptionPatch,
+    detailsFrom,
+    detailsPatch,
     isEmptyHtml,
+    madeByFrom,
+    madeByPatch,
     madeBySchema,
     partitionSections,
+    photosFrom,
+    photosInput,
+    samePhotos,
     savedMessage,
     saveHint,
     seoFallback,
+    seoFrom,
+    seoPatch,
     slugify,
     splitLines,
     trimMoney,
 } from "./editor-sections";
+import type { ProductDetail } from "./service";
 
 describe("product editor sections", () => {
     it("makes an address from a name", () => {
@@ -151,5 +163,196 @@ describe("the editor's header and Save all", () => {
         expect(basicsProblem({ ...ok, mrp: "500" }, false)).toBe(
             "MRP can't be lower than the price it sells for.",
         );
+    });
+});
+
+/** A saved product with only what the sections read filled in. */
+function product(over: Partial<ProductDetail> = {}): ProductDetail {
+    return {
+        id: "p1",
+        name: "Rose Hydra Serum",
+        slug: "rose-hydra-serum",
+        description: null,
+        image: null,
+        categoryId: "c1",
+        price: "799.00",
+        mrp: "999.50",
+        currency: "INR",
+        status: "DRAFT",
+        variants: [],
+        customFields: [],
+        allergens: { contains: [], mayContain: [] },
+        inventory: null,
+        howToUse: "Two drops, morning and night.",
+        materials: null,
+        keyPoints: [],
+        madeHere: false,
+        maker: "Kumkumadi Labs",
+        madeIn: "Pune",
+        supplierCode: null,
+        warranty: null,
+        returnsMode: "OWN",
+        returnsText: "Unopened, within 7 days.",
+        shopFields: { materials: false, madeIn: false },
+        seoTitle: null,
+        seoDescription: "Rose water serum.",
+        seoImageId: "img2",
+        optionId: null,
+        images: [],
+        stockMode: "product",
+        variantPromises: {},
+        option: null,
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:00.000Z",
+        ...over,
+    };
+}
+
+describe("each section's values and patch", () => {
+    it("basics: money as typed, and blanks sent as none", () => {
+        const values = basicsFrom(product());
+        expect(values).toEqual({
+            name: "Rose Hydra Serum",
+            slug: "rose-hydra-serum",
+            price: "799",
+            mrp: "999.50",
+            categoryId: "c1",
+        });
+        expect(
+            basicsPatch({
+                ...values,
+                name: "  Rose Serum ",
+                mrp: " ",
+                categoryId: "",
+            }),
+        ).toEqual({
+            name: "Rose Serum",
+            slug: "rose-hydra-serum",
+            price: "799",
+            mrp: null,
+            categoryId: null,
+        });
+        expect(
+            basicsFrom(product({ mrp: null, categoryId: null })),
+        ).toMatchObject({ mrp: "", categoryId: "" });
+    });
+
+    it("details: a missing switch reads as shown, and only its own switches go", () => {
+        const values = detailsFrom(product());
+        expect(values).toEqual({
+            howToUse: "Two drops, morning and night.",
+            materials: "",
+            showHowToUse: true,
+            showMaterials: false,
+        });
+        expect(detailsPatch({ ...values, howToUse: "   " })).toEqual({
+            howToUse: null,
+            materials: null,
+            shopFields: { howToUse: true, materials: false },
+        });
+    });
+
+    it("made by: the maker and where are cleared when it is made here", () => {
+        const values = madeByFrom(product());
+        expect(values).toMatchObject({
+            madeHere: false,
+            maker: "Kumkumadi Labs",
+            madeIn: "Pune",
+            returnsMode: "OWN",
+            returnsText: "Unopened, within 7 days.",
+            showMadeIn: false,
+            showMaker: true,
+        });
+        expect(madeByPatch(values)).toMatchObject({
+            madeHere: false,
+            maker: "Kumkumadi Labs",
+            madeIn: "Pune",
+            returnsText: "Unopened, within 7 days.",
+        });
+        expect(
+            madeByPatch({
+                ...values,
+                madeHere: true,
+                returnsMode: "STOREFRONT",
+            }),
+        ).toMatchObject({
+            madeHere: true,
+            maker: null,
+            madeIn: null,
+            returnsMode: "STOREFRONT",
+            returnsText: null,
+        });
+    });
+
+    it("seo: blanks are none, so the name and description fill in", () => {
+        const values = seoFrom(product());
+        expect(values).toEqual({
+            seoTitle: "",
+            seoDescription: "Rose water serum.",
+            seoImageId: "img2",
+        });
+        expect(seoPatch({ ...values, seoImageId: "" })).toEqual({
+            seoTitle: null,
+            seoDescription: "Rose water serum.",
+            seoImageId: null,
+        });
+    });
+
+    it("photos: kept ones by id, new ones by where they came from", () => {
+        const drafts = photosFrom([
+            {
+                id: "img1",
+                url: "https://cdn.example.test/rose-1.jpg",
+                mediaId: "m1",
+                alt: "The bottle",
+                width: 800,
+                height: 600,
+                position: 0,
+                creditName: null,
+                creditUrl: null,
+            },
+        ]);
+        const added = [
+            ...drafts,
+            {
+                mediaId: "m2",
+                url: "https://cdn.example.test/rose-2.jpg",
+                alt: "",
+                width: 1200,
+                height: null,
+                creditName: null,
+                creditUrl: null,
+            },
+            {
+                url: "https://images.example.test/rose-3.jpg",
+                alt: "On a shelf",
+                width: null,
+                height: null,
+                creditName: "A. Photographer",
+                creditUrl: "https://example.test/a",
+            },
+        ];
+        expect(photosInput(added)).toEqual([
+            { id: "img1", alt: "The bottle" },
+            {
+                mediaId: "m2",
+                alt: "",
+                width: 1200,
+                creditName: null,
+                creditUrl: null,
+            },
+            {
+                url: "https://images.example.test/rose-3.jpg",
+                alt: "On a shelf",
+                creditName: "A. Photographer",
+                creditUrl: "https://example.test/a",
+            },
+        ]);
+        expect(samePhotos(drafts, photosFrom([]))).toBe(false);
+        expect(samePhotos(added, [...added])).toBe(true);
+        expect(samePhotos(added, [added[1], added[0], added[2]])).toBe(false);
+        expect(
+            samePhotos(drafts, [{ ...drafts[0], alt: "Another word" }]),
+        ).toBe(false);
     });
 });
