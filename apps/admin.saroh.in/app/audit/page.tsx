@@ -1,6 +1,8 @@
 import { Button, buttonVariants } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { PageContainer } from "@saroh/ui/page-container";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { AdminAuditTable } from "@/components/admin-audit-table";
@@ -9,7 +11,7 @@ import { NotAuthorized } from "@/components/not-authorized";
 import { getStaffIdentity, listAudit } from "@/lib/control-plane";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Platform audit" };
+export const metadata = { title: "Audit trail" };
 
 interface AuditSearchParams {
     cursor?: string;
@@ -42,38 +44,31 @@ export default async function AuditPage({
 
     return (
         <AdminShell staff={staff}>
-            <main className="mx-auto max-w-7xl p-6 sm:p-8">
-                <div className="flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                            Governance
-                        </p>
-                        <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-                            Platform audit
-                        </h1>
-                        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                            Immutable staff activity across the control plane.
-                            Sensitive request metadata is never displayed.
-                        </p>
-                    </div>
-                    {(query.actorUserId !== undefined ||
-                        query.organizationId !== undefined ||
-                        query.action !== undefined) && (
-                        <Link
-                            href="/audit"
-                            className={buttonVariants({
-                                variant: "ghost",
-                                size: "sm",
-                            })}
-                        >
-                            Clear filters
-                        </Link>
-                    )}
-                </div>
+            <PageContainer width="wide">
+                <PageHeader
+                    breadcrumb={["Instance", "Audit trail"]}
+                    title="What operators did"
+                    description="Every operator action on this instance, and none can be edited. Sensitive request details are never shown."
+                    actions={
+                        (query.actorUserId !== undefined ||
+                            query.organizationId !== undefined ||
+                            query.action !== undefined) && (
+                            <Link
+                                href="/audit"
+                                className={buttonVariants({
+                                    variant: "ghost",
+                                    size: "sm",
+                                })}
+                            >
+                                Clear filters
+                            </Link>
+                        )
+                    }
+                />
 
                 <form
                     action="/audit"
-                    className="my-6 grid gap-3 rounded-lg border bg-muted/30 p-4 sm:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_auto]"
+                    className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_auto]"
                 >
                     <FilterField
                         label="Actor ID"
@@ -97,7 +92,7 @@ export default async function AuditPage({
                 </form>
 
                 <AdminAuditTable page={page} query={query} />
-            </main>
+            </PageContainer>
         </AdminShell>
     );
 }

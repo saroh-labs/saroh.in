@@ -39,6 +39,8 @@ import { PublicInvitationsController } from "./public-invitations.controller";
         OrganizationMembersService,
         OrganizationRolesService,
     ],
-    exports: [OrganizationContextModule],
+    // The members service is exported for the admin console, whose operators
+    // change a person's place in a business under the business's own rules.
+    exports: [OrganizationContextModule, OrganizationMembersService],
 })
 export class OrganizationsModule {}

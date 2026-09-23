@@ -10,5 +10,8 @@ import { HealthService } from "./health.service";
 @Module({
     controllers: [HealthController],
     providers: [HealthService],
+    // Exported for the admin console's health board, which reads the same
+    // readiness checks the load balancer does.
+    exports: [HealthService],
 })
 export class HealthModule {}

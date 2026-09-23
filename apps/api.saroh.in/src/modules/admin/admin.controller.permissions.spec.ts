@@ -11,13 +11,26 @@ import { IDENTITY_ONLY } from "../../common/decorators/identity-only.decorator";
 import { REQUIRE_ADMIN_PERMISSIONS } from "../../common/decorators/require-admin-permission.decorator";
 import { AdminPermission } from "./admin-permissions";
 import { AdminController } from "./admin.controller";
+import { AdminModule } from "./admin.module";
 
 /* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access */
 
 type Handler = (...args: never[]) => unknown;
 
 /**
- * Every route on the controller, discovered from Nest's own routing metadata.
+ * Every controller the admin module registers, read from Nest's own module
+ * metadata — so a controller added to the module is covered the moment it is
+ * registered, without anyone remembering to list it here.
+ */
+function adminControllers(): (new (...args: never[]) => unknown)[] {
+    return Reflect.getMetadata("controllers", AdminModule) as (new (
+        ...args: never[]
+    ) => unknown)[];
+}
+
+/**
+ * Every route on every admin controller, discovered from Nest's own routing
+ * metadata.
  *
  * This used to be a hand-written union of eleven method names, which meant the
  * contract only covered routes somebody remembered to add to it — the twelfth
@@ -26,33 +39,35 @@ type Handler = (...args: never[]) => unknown;
  * it is declared, whether or not anyone updates this file.
  */
 function routeHandlers(): { name: string; handler: Handler }[] {
-    const proto = AdminController.prototype as unknown as Record<
-        string,
-        Handler
-    >;
-    return Object.getOwnPropertyNames(proto)
-        .filter((name) => name !== "constructor")
-        .map((name) => ({ name, handler: proto[name] as Handler }))
-        .filter(
-            ({ handler }) =>
-                Reflect.getMetadata(PATH_METADATA, handler) !== undefined,
-        );
+    return adminControllers().flatMap((controller) => {
+        const proto = controller.prototype as unknown as Record<
+            string,
+            Handler
+        >;
+        return Object.getOwnPropertyNames(proto)
+            .filter((name) => name !== "constructor")
+            .map((name) => ({ name, handler: proto[name] as Handler }))
+            .filter(
+                ({ handler }) =>
+                    Reflect.getMetadata(PATH_METADATA, handler) !== undefined,
+            );
+    });
 }
 
 const permissionsOf = (handler: Handler): AdminPermission[] | undefined =>
     Reflect.getMetadata(REQUIRE_ADMIN_PERMISSIONS, handler) as
-        | AdminPermission[]
-        | undefined;
+        AdminPermission[] | undefined;
 
 const isIdentityOnly = (handler: Handler): boolean =>
     Reflect.getMetadata(IDENTITY_ONLY, handler) === true;
 
-describe("AdminController authorization contract", () => {
+describe("Admin console authorization contract", () => {
     it("discovers every route from the router, not from a list in this file", () => {
         const names = routeHandlers().map((r) => r.name);
         // A floor, not an exact count: this must not need editing when a route
         // is added, or it becomes the hand-maintained list it replaced.
         expect(names.length).toBeGreaterThanOrEqual(11);
+        expect(adminControllers().length).toBeGreaterThanOrEqual(2);
         expect(names).toContain("me");
     });
 
@@ -102,7 +117,7 @@ describe("AdminController permission assignments", () => {
         ]);
     });
 
-    it.each(["listFlags", "history"] as const)(
+    it.each(["listFlags", "history", "explain"] as const)(
         "protects %s with flag read",
         (method) => {
             expect(perms(method)).toEqual([AdminPermission.FlagsRead]);
@@ -126,6 +141,80 @@ describe("AdminController permission assignments", () => {
             expect(perms(method)).toEqual([AdminPermission.FlagsPublish]);
         },
     );
+});
+
+describe("Admin console permission assignments", () => {
+    const perms = (name: string) => {
+        const route = routeHandlers().find((r) => r.name === name);
+        return route ? permissionsOf(route.handler) : undefined;
+    };
+
+    it.each(["suspend", "reinstate", "scheduleDeletion"] as const)(
+        "protects %s with lifecycle write",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.OrganizationLifecycleWrite,
+            ]);
+        },
+    );
+
+    it.each(["changePlan", "trial", "raiseLimit", "revokeLimit"] as const)(
+        "protects %s with subscription override",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.SubscriptionOverride,
+            ]);
+        },
+    );
+
+    it.each(["setModule", "repairModules"] as const)(
+        "protects %s with modules write",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.OrganizationModulesWrite,
+            ]);
+        },
+    );
+
+    it("keeps the business page behind view-as", () => {
+        expect(perms("viewOrganization")).toEqual([
+            AdminPermission.OrganizationViewAs,
+        ]);
+    });
+
+    it.each(["grant", "amend", "revoke"] as const)(
+        "lets only a staff granter %s staff",
+        (method) => {
+            expect(perms(method)).toEqual([AdminPermission.StaffGrant]);
+        },
+    );
+
+    it.each([
+        "endSessions",
+        "changeRole",
+        "removeMember",
+        "resendInvitation",
+        "withdrawInvitation",
+    ] as const)("needs personal data and people write for %s", (method) => {
+        expect(perms(method)).toEqual([
+            AdminPermission.OrganizationPiiRead,
+            AdminPermission.OrganizationPeopleWrite,
+        ]);
+    });
+});
+
+describe("Waitlist permissions", () => {
+    const perms = (name: string) => {
+        const route = routeHandlers().find((r) => r.name === name);
+        return route ? permissionsOf(route.handler) : undefined;
+    };
+
+    it("needs personal data and its own permission to invite", () => {
+        expect(perms("invite")).toEqual([
+            AdminPermission.OrganizationPiiRead,
+            AdminPermission.WaitlistInvite,
+        ]);
+    });
 });
 
 describe("AdminController staff identity", () => {

@@ -1,12 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import type { FlagKey } from "../feature-flags/flags";
-import { FLAG_KEYS } from "../feature-flags/flags";
+import type { FlagKey, FlagMetadata } from "../feature-flags/flags";
+import { FLAG_KEYS, FLAG_METADATA } from "../feature-flags/flags";
 
 /** One flag as the control plane sees it: the global default + who overrides it. */
 export interface AdminFlagView {
     key: FlagKey;
+    /** What it is for, who owns it, and when it should go (R16). */
+    metadata: FlagMetadata;
     /**
      * The global default. `null` means NO FeatureFlag row exists yet — which is
      * not the same as `false`: the flag has never been configured, and
@@ -53,6 +55,7 @@ export class AdminFlagsService {
 
         return FLAG_KEYS.map((key) => ({
             key,
+            metadata: FLAG_METADATA[key],
             enabledByDefault: defaultByKey.get(key) ?? null,
             overrides: overrides
                 .filter((row) => row.flagKey === key)

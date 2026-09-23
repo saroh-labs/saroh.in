@@ -9,6 +9,7 @@ import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { decryptSecret, encryptSecret } from "./crypto";
 import type {
@@ -431,6 +432,7 @@ export class PaymentsService {
         options: { idempotencyKey?: string; provider?: string } = {},
     ): Promise<CreateIntentResult> {
         const order = await this.requirePayableOrder(orderId);
+        await assertOrganizationOpen(order.organizationId);
         return this.createIntentInternal(order.organizationId, order, options);
     }
 

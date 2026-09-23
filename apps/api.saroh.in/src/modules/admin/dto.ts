@@ -1,7 +1,13 @@
 import { Transform, Type } from "class-transformer";
 import {
+    ArrayMaxSize,
+    ArrayMinSize,
+    IsArray,
     IsBoolean,
+    IsEmail,
+    IsIn,
     IsInt,
+    IsISO8601,
     IsOptional,
     IsString,
     Max,
@@ -119,4 +125,277 @@ export class RevokeAdminAccessSessionDto {
     @MinLength(8)
     @MaxLength(200)
     idempotencyKey!: string;
+}
+
+/** Every operator write carries a reason and an idempotency key. */
+export class OperatorReasonDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(4, { message: "Give a reason for this change" })
+    @MaxLength(500)
+    reason!: string;
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(8)
+    @MaxLength(200)
+    idempotencyKey!: string;
+}
+
+/** Destructive lifecycle changes are confirmed by typing the business's name. */
+export class ConfirmedOperatorDto extends OperatorReasonDto {
+    @IsString()
+    @MaxLength(200)
+    confirmName!: string;
+}
+
+export class ScheduleDeletionDto extends ConfirmedOperatorDto {
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(7)
+    @Max(90)
+    retentionDays?: number;
+}
+
+export class ChangePlanDto extends OperatorReasonDto {
+    @IsString()
+    @MaxLength(200)
+    planId!: string;
+}
+
+export class TrialDto extends OperatorReasonDto {
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(90)
+    days!: number;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    planId?: string;
+}
+
+export class RaiseLimitDto extends OperatorReasonDto {
+    @IsString()
+    @MaxLength(80)
+    key!: string;
+
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(1_000_000)
+    value!: number;
+
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(365)
+    days!: number;
+}
+
+export class SetModuleDto extends OperatorReasonDto {
+    @IsBoolean()
+    enabled!: boolean;
+}
+
+export class AddNoteDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(2)
+    @MaxLength(4000)
+    body!: string;
+}
+
+/** The business directory's query string. */
+export class ListOrganizationsDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    q?: string;
+
+    @IsOptional()
+    @IsIn(["ACTIVE", "SUSPENDED", "PENDING_DELETION", "DELETED_RETAINED"])
+    lifecycle?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(80)
+    plan?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(80)
+    module?: string;
+
+    @IsOptional()
+    @IsIn(["attention"])
+    health?: "attention";
+
+    /** `picker`: the flag screen's id/name/slug list, unpaged. */
+    @IsOptional()
+    @IsIn(["picker"])
+    for?: "picker";
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100)
+    limit?: number;
+}
+
+/** Grant staff access to someone with a Saroh account. */
+export class GrantStaffDto {
+    @Transform(trim)
+    @IsEmail()
+    @MaxLength(320)
+    email!: string;
+
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(6)
+    @IsString({ each: true })
+    roles!: string[];
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(4, { message: "Give a reason for this change" })
+    @MaxLength(500)
+    reason!: string;
+
+    @IsOptional()
+    @IsISO8601()
+    expiresAt?: string;
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(8)
+    @MaxLength(200)
+    idempotencyKey!: string;
+}
+
+/** Set exactly which roles a staff member holds, and until when. */
+export class AmendStaffDto extends OperatorReasonDto {
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(6)
+    @IsString({ each: true })
+    roles!: string[];
+
+    /** An ISO date, or absent for no expiry. */
+    @IsOptional()
+    @IsISO8601()
+    expiresAt?: string;
+}
+
+export class SearchPeopleDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(2)
+    @MaxLength(200)
+    q!: string;
+}
+
+export class ChangeMemberRoleDto extends OperatorReasonDto {
+    @IsString()
+    @MaxLength(80)
+    role!: string;
+}
+
+/** The targets of a dry run. */
+export class OperationTargetsDto {
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(500)
+    @IsString({ each: true })
+    ids!: string[];
+}
+
+/** The targets of a bulk operation, with its reason and idempotency key. */
+export class StartOperationDto extends OperatorReasonDto {
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(500)
+    @IsString({ each: true })
+    ids!: string[];
+}
+
+export class ListJobsDto {
+    @IsOptional()
+    @IsIn(["PENDING", "PROCESSING", "DONE", "FAILED"])
+    status?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    type?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    organizationId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+}
+
+export class ListWebhooksDto {
+    @IsOptional()
+    @IsIn(["RECEIVED", "PROCESSED", "FAILED", "IGNORED"])
+    status?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(60)
+    provider?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    organizationId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+}
+
+export class ExplainFlagDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    organizationId?: string;
+}
+
+export class ListWaitlistDto {
+    @IsOptional()
+    @IsIn(["waiting", "invited"])
+    state?: "waiting" | "invited";
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    source?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+}
+
+export class InviteWaitlistDto extends OperatorReasonDto {
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(200)
+    @IsString({ each: true })
+    ids!: string[];
 }

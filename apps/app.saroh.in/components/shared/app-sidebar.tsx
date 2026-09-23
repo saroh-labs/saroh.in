@@ -89,7 +89,9 @@ export function AppSidebar({
     return (
         // Sticky so the rail stays put on a long page. Without
         // it the aside is only as tall as the flex row, and navigation scrolls
-        // away the moment a list runs past one viewport.
+        // away the moment a list runs past one viewport. Its nav scrolls on its
+        // own when the rail is taller than the window, and `overscroll-contain`
+        // keeps that scroll from running on into the page.
         <aside
             aria-label="Workspace"
             // Below the 61px top bar, which carries the mark now.
@@ -107,7 +109,7 @@ export function AppSidebar({
              */}
             <nav
                 aria-label="Primary"
-                className="flex flex-1 flex-col gap-px overflow-y-auto px-2.5 py-3 max-[1100px]:px-2"
+                className="flex flex-1 flex-col gap-px overflow-y-auto overscroll-contain px-2.5 py-3 max-[1100px]:px-2"
             >
                 {groups.map((group, index) => (
                     <div

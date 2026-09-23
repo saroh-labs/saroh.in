@@ -10,7 +10,14 @@ export const AdminRole = {
 
 export type AdminRole = (typeof AdminRole)[keyof typeof AdminRole];
 
-/** Closed permission vocabulary enforced by the `/admin` API. */
+/**
+ * Closed permission vocabulary enforced by the `/admin` API.
+ *
+ * Every permission here is reachable: an endpoint requires it. A permission
+ * nothing requires is a promise the console cannot keep, so it is removed
+ * rather than kept for later (the incidents pair went this way when
+ * incidents were deferred; see the admin console plan).
+ */
 export const AdminPermission = {
     PlatformRead: "platform:read",
     OrganizationRead: "organization:read",
@@ -25,8 +32,6 @@ export const AdminPermission = {
     WebhooksReplay: "webhooks:replay",
     ProvidersRead: "providers:read",
     ProvidersRecheck: "providers:recheck",
-    IncidentsRead: "incidents:read",
-    IncidentsWrite: "incidents:write",
     SubscriptionRead: "subscription:read",
     SubscriptionOverride: "subscription:override",
     FlagsRead: "flags:read",
@@ -34,6 +39,7 @@ export const AdminPermission = {
     StaffRead: "staff:read",
     StaffGrant: "staff:grant",
     AuditRead: "audit:read",
+    WaitlistInvite: "waitlist:invite",
 } as const;
 
 export type AdminPermission =
@@ -51,6 +57,7 @@ const ROLE_PERMISSIONS = {
         AdminPermission.OrganizationPiiRead,
         AdminPermission.OrganizationPeopleWrite,
         AdminPermission.OrganizationViewAs,
+        AdminPermission.WaitlistInvite,
     ],
     [AdminRole.Operations]: [
         AdminPermission.PlatformRead,
@@ -62,8 +69,6 @@ const ROLE_PERMISSIONS = {
         AdminPermission.WebhooksReplay,
         AdminPermission.ProvidersRead,
         AdminPermission.ProvidersRecheck,
-        AdminPermission.IncidentsRead,
-        AdminPermission.IncidentsWrite,
     ],
     [AdminRole.Billing]: [
         AdminPermission.PlatformRead,
@@ -83,7 +88,6 @@ const ROLE_PERMISSIONS = {
         AdminPermission.JobsRead,
         AdminPermission.WebhooksRead,
         AdminPermission.ProvidersRead,
-        AdminPermission.IncidentsRead,
         AdminPermission.SubscriptionRead,
         AdminPermission.FlagsRead,
         AdminPermission.StaffRead,

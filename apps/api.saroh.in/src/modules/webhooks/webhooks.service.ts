@@ -195,6 +195,90 @@ export class WebhooksService {
     }
 
     /**
+     * Run a stored delivery through reconciliation again (admin console U8).
+     *
+     * Only a FAILED delivery is replayed: one that was PROCESSED or IGNORED
+     * already had its effect decided, and replaying it could apply a payment
+     * twice. The payload is the one verified when it arrived — it is never
+     * re-sent by anyone — and every money effect below checks the state it
+     * moves from, so a replay that races a live delivery changes nothing
+     * twice. The row claims its own replay (FAILED → RECEIVED) before it
+     * runs, so two operators replaying at once cannot both run it.
+     */
+    async replay(
+        eventId: string,
+    ): Promise<{
+        status: "processed" | "ignored" | "failed" | "skipped";
+        detail?: string;
+    }> {
+        const stored = await prisma.webhookEvent.findUnique({
+            where: { id: eventId },
+            select: {
+                id: true,
+                provider: true,
+                organizationId: true,
+                payload: true,
+                status: true,
+            },
+        });
+        if (!stored) return { status: "skipped", detail: "Delivery not found" };
+        if (stored.status !== "FAILED") {
+            return {
+                status: "skipped",
+                detail: `Already ${stored.status.toLowerCase()}; only a failed delivery is replayed`,
+            };
+        }
+        if (!stored.organizationId) {
+            return {
+                status: "skipped",
+                detail: "Delivery belongs to no business",
+            };
+        }
+
+        const claimed = await prisma.webhookEvent.updateMany({
+            where: { id: stored.id, status: "FAILED" },
+            data: { status: "RECEIVED", error: null },
+        });
+        if (claimed.count === 0) {
+            return {
+                status: "skipped",
+                detail: "Another replay took it first",
+            };
+        }
+
+        const organizationId = stored.organizationId;
+        try {
+            const provider = this.factory.get(stored.provider);
+            const event = provider.parseEvent({
+                payload: stored.payload,
+                headers: {},
+            });
+            const { applied } = await prisma.$transaction((tx) =>
+                this.reconcile(tx, provider.name, organizationId, event),
+            );
+            await prisma.webhookEvent.update({
+                where: { id: stored.id },
+                data: {
+                    status: applied ? "PROCESSED" : "IGNORED",
+                    processedAt: new Date(),
+                },
+            });
+            return { status: applied ? "processed" : "ignored" };
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            await prisma.webhookEvent.update({
+                where: { id: stored.id },
+                data: {
+                    status: "FAILED",
+                    error: message,
+                    processedAt: new Date(),
+                },
+            });
+            return { status: "failed", detail: message };
+        }
+    }
+
+    /**
      * Map a verified event to a PaymentIntent and apply its money effect. Pure
      * of HTTP/secret concerns. Returns `{ applied }` — whether any state moved.
      */

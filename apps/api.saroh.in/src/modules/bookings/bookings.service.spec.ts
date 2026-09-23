@@ -6,6 +6,8 @@
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
+        // The lifecycle gate: no row means "not closed" (organization-lifecycle.gate.ts).
+        organization: { findUnique: jest.fn().mockResolvedValue(null) },
         service: {
             findUnique: jest.fn(),
             findMany: jest.fn(),

@@ -197,68 +197,80 @@ export async function backfillOrganizationModules(
     const results: OrganizationBackfillResult[] = [];
 
     for (const org of organizations) {
-        const result = await client.$transaction(async (tx) => {
-            const evidence = await deriveModuleEvidence(tx, org.id);
-            const enabled = withDependencies(evidence);
-
-            const now = new Date();
-            const rows = MODULE_KEYS.map((moduleKey) => {
-                const isEnabled = enabled.has(moduleKey);
-                return {
-                    organizationId: org.id,
-                    moduleKey,
-                    status: isEnabled ? "ENABLED" : "DISABLED",
-                    enabledAt: isEnabled ? now : null,
-                    // System backfill — no human actor.
-                    enabledByUserId: null,
-                };
-            });
-
-            // Never overwrite a pre-existing explicit installation row.
-            const created = await tx.organizationModule.createMany({
-                data: rows,
-                skipDuplicates: true,
-            });
-
-            // One system audit event per Organization, listing derived evidence.
-            await tx.auditEvent.create({
-                data: {
-                    action: "organization.modules.backfill",
-                    actorUserId: "system:module-backfill",
-                    organizationId: org.id,
-                    outcome: "SUCCESS",
-                    metadata: {
-                        evidence: [...evidence],
-                        enabled: [...enabled],
-                    },
-                },
-            });
-
-            // Requery + compare: every module has exactly one row, no dupes.
-            const stored = await tx.organizationModule.findMany({
-                where: { organizationId: org.id },
-                select: { moduleKey: true },
-            });
-            const storedKeys = new Set(stored.map((r) => r.moduleKey));
-            if (
-                stored.length !== MODULE_KEYS.length ||
-                storedKeys.size !== MODULE_KEYS.length
-            ) {
-                throw new Error(
-                    `backfill verification failed for organization ${org.id}: expected ${MODULE_KEYS.length} distinct module rows, got ${stored.length}`,
-                );
-            }
-
-            return {
-                organizationId: org.id,
-                evidence: [...evidence],
-                enabled: [...enabled],
-                createdRows: created.count,
-            } satisfies OrganizationBackfillResult;
-        });
+        const result = await client.$transaction((tx) =>
+            backfillOneOrganization(tx, org.id),
+        );
 
         results.push(result);
     }
 
     return { organizations: organizations.length, results };
+}
+
+/**
+ * Backfill one Organization inside the caller's transaction. Idempotent: it
+ * only creates the rows that are missing, so it is also how the admin console
+ * repairs one business whose installation rows are incomplete.
+ */
+export async function backfillOneOrganization(
+    tx: BackfillClient,
+    organizationId: string,
+): Promise<OrganizationBackfillResult> {
+    const evidence = await deriveModuleEvidence(tx, organizationId);
+    const enabled = withDependencies(evidence);
+
+    const now = new Date();
+    const rows = MODULE_KEYS.map((moduleKey) => {
+        const isEnabled = enabled.has(moduleKey);
+        return {
+            organizationId,
+            moduleKey,
+            status: isEnabled ? "ENABLED" : "DISABLED",
+            enabledAt: isEnabled ? now : null,
+            // System backfill — no human actor.
+            enabledByUserId: null,
+        };
+    });
+
+    // Never overwrite a pre-existing explicit installation row.
+    const created = await tx.organizationModule.createMany({
+        data: rows,
+        skipDuplicates: true,
+    });
+
+    // One system audit event per Organization, listing derived evidence.
+    await tx.auditEvent.create({
+        data: {
+            action: "organization.modules.backfill",
+            actorUserId: "system:module-backfill",
+            organizationId,
+            outcome: "SUCCESS",
+            metadata: {
+                evidence: [...evidence],
+                enabled: [...enabled],
+            },
+        },
+    });
+
+    // Requery + compare: every module has exactly one row, no dupes.
+    const stored = await tx.organizationModule.findMany({
+        where: { organizationId: organizationId },
+        select: { moduleKey: true },
+    });
+    const storedKeys = new Set(stored.map((r) => r.moduleKey));
+    if (
+        stored.length !== MODULE_KEYS.length ||
+        storedKeys.size !== MODULE_KEYS.length
+    ) {
+        throw new Error(
+            `backfill verification failed for organization ${organizationId}: expected ${MODULE_KEYS.length} distinct module rows, got ${stored.length}`,
+        );
+    }
+
+    return {
+        organizationId,
+        evidence: [...evidence],
+        enabled: [...enabled],
+        createdRows: created.count,
+    } satisfies OrganizationBackfillResult;
 }

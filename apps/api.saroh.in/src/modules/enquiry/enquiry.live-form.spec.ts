@@ -19,6 +19,8 @@ jest.mock("@saroh/database", () => {
     return {
         ...actual,
         prisma: {
+            // The lifecycle gate: no row means "not closed" (organization-lifecycle.gate.ts).
+            organization: { findUnique: jest.fn().mockResolvedValue(null) },
             ...client,
             $transaction: jest.fn((cb: (tx: typeof client) => unknown) =>
                 cb(client),

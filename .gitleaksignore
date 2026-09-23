@@ -29,3 +29,10 @@ a04cd3486ee98ef36c06ce32e7c982cb882ca429:.gitleaksignore:generic-api-key:8
 # reasoning, identical entropy (3.60) under the same catch-all rule — and a new
 # fingerprint, because a fingerprint is pinned to commit, path and line.
 ad86c5a44e20d53db5a5353bf969a795cc4e8c9d:.github/workflows/ci.yml:generic-api-key:254
+
+# Idempotency keys in the admin operations spec. Each is a short made-up test
+# fixture: a word, a dash and a run of digits, passed to the service under
+# test. No service issues or accepts it. Flagged by generic-api-key because the
+# property it is assigned to has "key" in its name.
+22c37cf52b66179a5b1d3fe4853c89b8445d1f57:apps/api.saroh.in/src/modules/admin/admin-operations.service.spec.ts:generic-api-key:166
+22c37cf52b66179a5b1d3fe4853c89b8445d1f57:apps/api.saroh.in/src/modules/admin/admin-operations.service.spec.ts:generic-api-key:189

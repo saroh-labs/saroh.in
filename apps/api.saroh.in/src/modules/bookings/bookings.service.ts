@@ -14,6 +14,7 @@ import { IANAZone } from "luxon";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { redeemPackInTx, reversePackInTx } from "../class-packs/redeem-pack";
+import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type {
@@ -847,6 +848,7 @@ export class BookingsService {
     ): Promise<Booking> {
         // 1. Load the Service. Org is derived from HERE, never the client.
         const { service, rules } = await this.loadBookableService(serviceId);
+        await assertOrganizationOpen(service.organizationId);
 
         // 2. Validate the requested instant is a real, aligned slot start.
         const startAt = new Date(input.startAt);
