@@ -87,6 +87,29 @@ describe("serializeOrderRead", () => {
         });
     });
 
+    it("lists the order's paper only for a role that reads invoices (ADR-008)", () => {
+        const paper = [
+            {
+                id: "inv_1",
+                number: "RC/26-27/0001",
+                kind: "INVOICE",
+                status: "PAID",
+            },
+            {
+                id: "cn_1",
+                number: "RCCN/26-27/0001",
+                kind: "CREDIT_NOTE",
+                status: "ISSUED",
+            },
+        ];
+        const withPaper = { ...base, invoices: paper };
+        expect(serializeOrderRead(withPaper, opts(true)).invoices).toBeNull();
+        expect(
+            serializeOrderRead(withPaper, { ...opts(true), invoiceRead: true })
+                .invoices,
+        ).toEqual(paper);
+    });
+
     it("carries the address with its state, for delivery and for GST", () => {
         expect(serializeOrderRead(base, opts(false)).deliveryAddress).toEqual(
             expect.objectContaining({

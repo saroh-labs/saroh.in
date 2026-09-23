@@ -96,6 +96,7 @@ export class OrderKitchenService {
         return serializeOrderRead(order, {
             money: allows(ctx, "payment:read"),
             fullRead: allows(ctx, "order:read"),
+            invoiceRead: allows(ctx, "invoice:read"),
             actors: new Map(actors.map((a) => [a.id, a.name])),
             now: new Date(),
         });
@@ -688,6 +689,11 @@ const READ_INCLUDE = {
         },
     },
     events: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+    // The order's invoice and its corrections (ADR-008).
+    invoices: {
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true, number: true, kind: true, status: true },
+    },
     paymentIntents: {
         where: { status: "SUCCEEDED" },
         select: {

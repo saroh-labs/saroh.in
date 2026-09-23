@@ -110,6 +110,20 @@ export interface OrderReadDto {
     };
     /** Null for a role without a money read. */
     money: OrderMoneyDto | null;
+    /**
+     * The order's paper (ADR-008): its invoice, then the credit notes and
+     * supplementary invoices that correct it. Null for a role without
+     * `invoice:read` — invoice ids and numbers go only to it.
+     */
+    invoices: OrderInvoiceDto[] | null;
+}
+
+export interface OrderInvoiceDto {
+    id: string;
+    number: string | null;
+    /** INVOICE | CREDIT_NOTE | SUPPLEMENTARY */
+    kind: string;
+    status: string;
 }
 
 export interface RawOrderRead {
@@ -137,6 +151,7 @@ export interface RawOrderRead {
     deliveryState: string | null;
     deliveryPostalCode: string | null;
     store: { id: string; name: string };
+    invoices?: OrderInvoiceDto[];
     customer: {
         id: string;
         email: string;
@@ -186,6 +201,8 @@ export interface ReadOptions {
     money: boolean;
     /** The caller holds `order:read` (customer email). */
     fullRead: boolean;
+    /** The caller holds `invoice:read` (the order's paper). */
+    invoiceRead?: boolean;
     /** Names for the people on the timeline. */
     actors: ReadonlyMap<string, string | null>;
     now: Date;
@@ -315,6 +332,7 @@ export function serializeOrderRead(
                 paymentStatus: order.paymentStatus,
             }),
         },
+        invoices: opts.invoiceRead ? (order.invoices ?? []) : null,
         money: opts.money
             ? {
                   currency: order.currency,
