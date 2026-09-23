@@ -1360,10 +1360,13 @@ async function writeInvoices(
         p.invoiceLine.createMany({ data }),
     );
     const lastNumber = Math.max(rows.lastNumber, ...handNumbers);
+    // The seeded numbers are INV-000n: the legacy series (ADR-008).
     await p.invoiceSequence.upsert({
-        where: { organizationId: orgId },
+        where: {
+            organizationId_series: { organizationId: orgId, series: "INV" },
+        },
         update: { lastNumber },
-        create: { organizationId: orgId, lastNumber },
+        create: { organizationId: orgId, series: "INV", lastNumber },
     });
 }
 
