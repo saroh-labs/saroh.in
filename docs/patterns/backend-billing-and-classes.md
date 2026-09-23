@@ -82,6 +82,25 @@
 - **Renewal** is the self-rescheduling `subscription.renew` job
   (`backend-jobs.md`); `renewOne` takes the row lock and is idempotent per
   period (partial unique index on live invoices per period).
+- **Collections** (plan 2026-09-23-003, U7) are dated from the subscription's
+  collection weekday in its own timezone, within each period — a monthly plan
+  can collect weekly (`subscriptions/collections.ts`, the one source for any
+  read of collections, the month feed included). A skip is one local date in
+  `SubscriptionSkip`, future only, with Undo while it is still to come.
+- **A skip saves a charge only when it empties the period.** Plans are priced
+  per period, never per collection, so skipping one of several collections is
+  a pickup skip (no proration). A period whose every collection was skipped
+  before it was invoiced advances unbilled (`uncharged`); undoing such a skip
+  invoices the period then. A skip after the period's invoice leaves the
+  invoice alone.
+- **Plan change from the next renewal:** `pendingPlanId`, applied by the
+  renewal (or by a resume that starts a new period) at the new plan's price,
+  currency and interval — a new interval starts its chain where the old
+  period ended. Undo clears it; cancelling now drops it; archived plans are
+  refused.
+- **Payment failed** is derived — the latest invoice unpaid past due — never
+  stored. "Retry now" mints a new pay link for that invoice, replacing the
+  old one; nothing is charged.
 
 ## Courses and class packs — **Current**
 

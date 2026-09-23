@@ -1,11 +1,15 @@
 import { Transform } from "class-transformer";
 import {
     IsIn,
+    IsInt,
     IsOptional,
     IsString,
     Matches,
+    Max,
     MaxLength,
+    Min,
     MinLength,
+    ValidateIf,
 } from "class-validator";
 
 import type { Interval } from "./periods";
@@ -87,6 +91,52 @@ export class SubscribeDto {
     @IsString()
     @MaxLength(64)
     timezone?: string;
+
+    /** ISO weekday they collect on (1 Monday … 7 Sunday); none for a membership. */
+    @IsOptional()
+    @IsInt({ message: "Choose a collection day" })
+    @Min(1, { message: "Choose a collection day" })
+    @Max(7, { message: "Choose a collection day" })
+    collectionWeekday?: number;
+
+    /** What they collect, as the screen shows it: "1 sourdough loaf". */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(120)
+    collectionNote?: string;
+}
+
+/**
+ * The collection schedule. A null weekday stops collections; changing the
+ * day drops the skips still to come, which were for the old day.
+ */
+export class CollectionScheduleDto {
+    @ValidateIf((_, v) => v !== null)
+    @IsInt({ message: "Choose a collection day" })
+    @Min(1, { message: "Choose a collection day" })
+    @Max(7, { message: "Choose a collection day" })
+    weekday!: number | null;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(120)
+    note?: string | null;
+}
+
+/** One collection, by its date in the subscription's timezone. */
+export class SkipCollectionDto {
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+        message: "A collection date is YYYY-MM-DD",
+    })
+    date!: string;
+}
+
+/** The plan to move to at the next renewal. */
+export class ChangePlanDto {
+    @IsString()
+    planId!: string;
 }
 
 export class CancelSubscriptionDto {

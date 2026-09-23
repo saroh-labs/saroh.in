@@ -91,6 +91,9 @@ run has tested your migration; before `migration-replay` existed, it never had.
   Give each a `map:` name. Generate the SQL with `prisma migrate diff
 --from-schema <old> --to-schema prisma/schema.prisma --script` and the replay
   check stays clean (first used in `20260922120000_subscriptions_invoices_classes`).
+  Set `DATABASE_URL` (any Postgres URL; nothing connects) when you run it:
+  without one `prisma.config.js` attaches no datasource, the schema engine
+  refuses to start, and the command prints nothing and exits 0.
 - **Run the replay check before you commit**, not after review. It takes under a
   minute and it is the only thing that looks at the file you wrote.
 - **The guard is not an obstacle.** `DATABASE_TARGET_CONFIRM` exists so a
