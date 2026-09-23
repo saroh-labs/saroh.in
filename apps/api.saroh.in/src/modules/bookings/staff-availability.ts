@@ -24,21 +24,24 @@ export const FALLBACK_TIMEZONE = "Asia/Kolkata";
 
 const DAY = 86_400_000;
 
+/** Where a business's zone came from — the calendars say which they used. */
+export type ZoneSource = "business" | "service" | "fallback";
+
 /**
  * The zone a business keeps its hours in: its own setting, else the zone of
  * its first active service, else India. Staff hours are wall-clock times in
- * this zone.
+ * this zone, and the calendars (U4) bucket days in it.
  */
-export async function businessTimezone(
-    db: Db,
+export async function businessZone(
+    db: Pick<Db, "businessProfile" | "service">,
     organizationId: string,
-): Promise<string> {
+): Promise<{ zone: string; source: ZoneSource }> {
     const profile = await db.businessProfile.findUnique({
         where: { organizationId },
         select: { timezone: true },
     });
     if (profile?.timezone && IANAZone.isValidZone(profile.timezone)) {
-        return profile.timezone;
+        return { zone: profile.timezone, source: "business" };
     }
     const first = await db.service.findFirst({
         where: { organizationId, deletedAt: null, status: "ACTIVE" },
@@ -46,9 +49,17 @@ export async function businessTimezone(
         select: { timezone: true },
     });
     if (first?.timezone && IANAZone.isValidZone(first.timezone)) {
-        return first.timezone;
+        return { zone: first.timezone, source: "service" };
     }
-    return FALLBACK_TIMEZONE;
+    return { zone: FALLBACK_TIMEZONE, source: "fallback" };
+}
+
+/** {@link businessZone}, the zone alone. */
+export async function businessTimezone(
+    db: Pick<Db, "businessProfile" | "service">,
+    organizationId: string,
+): Promise<string> {
+    return (await businessZone(db, organizationId)).zone;
 }
 
 /** Who takes a service: active people only, in a stable order. */

@@ -40,6 +40,10 @@ module.exports = {
         "<rootDir>/src/modules/feature-flags/**/*.spec.ts",
         // #119 Home aggregator: pure ranking with mocked availability + counts.
         "<rootDir>/src/modules/home/**/*.spec.ts",
+        // U4 Business Calendar: the pure month bucketing and schedules, and
+        // the per-layer service with mocked availability + Prisma.
+        // calendar.db.spec.ts needs Postgres and runs in integration.
+        "<rootDir>/src/modules/calendar/**/*.spec.ts",
         // #123 provider health: state derivation + credential redaction, mocked
         // Prisma.
         "<rootDir>/src/modules/provider-health/**/*.spec.ts",

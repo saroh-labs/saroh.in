@@ -362,3 +362,21 @@ export class RecordOutcomeDto {
     @IsIn(BOOKING_OUTCOMES)
     outcome!: BookingOutcome;
 }
+
+/**
+ * The bookings calendar's range (U4): `[from, to)` as ISO instants, and
+ * optionally one person's diary. Query text, so nothing is converted.
+ */
+export class BookingsRangeQueryDto {
+    @IsISO8601()
+    from!: string;
+
+    @IsISO8601()
+    to!: string;
+
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    staffId?: string;
+}
