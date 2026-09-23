@@ -30,6 +30,19 @@ export interface TaxSettings {
     deliverySac: string | null;
 }
 
+/**
+ * The registered address printed on invoices (CGST rule 46). Its state is
+ * the GST state — the same as `tax.state`.
+ */
+export interface RegisteredAddress {
+    line1: string | null;
+    line2: string | null;
+    city: string | null;
+    postalCode: string | null;
+    state: string | null;
+    stateName: string | null;
+}
+
 export interface OrganizationSettings {
     id: string;
     name: string;
@@ -39,6 +52,8 @@ export interface OrganizationSettings {
     tradingSince: string | null;
     /** Absent only from an API older than GST (U5). */
     tax?: TaxSettings;
+    /** Absent only from an API older than the registered address. */
+    registeredAddress?: RegisteredAddress;
 }
 
 export interface TaxSettingsInput {
@@ -53,6 +68,10 @@ export interface OrganizationSettingsInput {
     name?: string;
     profile?: Partial<Record<keyof OrganizationProfile, string>>;
     tax?: TaxSettingsInput;
+    /** "" clears a line; the state goes as `tax.state`. */
+    registeredAddress?: Partial<
+        Record<"line1" | "line2" | "city" | "postalCode", string>
+    >;
 }
 
 /** A refusal names the field it is about when the API says which. */

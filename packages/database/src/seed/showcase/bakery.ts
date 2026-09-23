@@ -103,6 +103,19 @@ export const gstin = (state: string, pan: string) =>
 
 export const RYE_GSTIN = gstin(GST.state, GST.pan);
 
+/**
+ * The registered address — the shop on Hill Road the storefront names — and
+ * how an invoice prints it (CGST rule 46). Its state is `GST.state`.
+ */
+export const RYE_ADDRESS = {
+    addressLine1: "3 Hill Road",
+    addressLine2: "Indiranagar",
+    city: "Bengaluru",
+    postalCode: "560038",
+} as const;
+export const RYE_ADDRESS_PRINTED =
+    "3 Hill Road, Indiranagar, Bengaluru 560038, Karnataka";
+
 const STATE_CODES: Record<string, string> = {
     Karnataka: "29",
     Goa: "30",
@@ -619,6 +632,7 @@ export async function seedBakery(
         timezone: TIMEZONE,
         gstRegistered: true,
         gstState: GST.state,
+        ...RYE_ADDRESS,
         invoicePrefix: GST.prefix,
         deliveryGstRate: bpsToRate(GST.deliveryRateBps),
         deliverySacCode: GST.deliverySac,
@@ -2360,6 +2374,7 @@ async function writeDocuments(prisma: Db, orgId: string, docs: DocSpec[]) {
             billToAddress: d.billTo.address,
             sellerGstin: RYE_GSTIN,
             sellerState: GST.state,
+            sellerAddress: RYE_ADDRESS_PRINTED,
             placeOfSupply: d.placeOfSupply,
             taxType: inter ? "INTER" : "INTRA",
             cgst: rupees(cgst),

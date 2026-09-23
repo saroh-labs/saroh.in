@@ -231,14 +231,132 @@ describe("OrganizationSettingsService", () => {
                 await service.update(ctx("ADMIN"), {
                     profile: { taxId: "29AAGCR4375J1ZU" },
                     tax: { registered: true, invoicePrefix: "rc" },
+                    registeredAddress: {
+                        line1: "14 Hill Road",
+                        city: "Bengaluru",
+                        postalCode: "560 038",
+                    },
                 });
                 expect(profileUpsert).toHaveBeenCalledWith(
                     expect.objectContaining({
                         update: {
                             taxId: "29AAGCR4375J1ZU",
+                            addressLine1: "14 Hill Road",
+                            city: "Bengaluru",
+                            postalCode: "560038",
                             gstRegistered: true,
                             gstState: "29",
                             invoicePrefix: "RC",
+                        },
+                    }),
+                );
+            });
+
+            it("refuses registering without a registered address, on the missing field", async () => {
+                const attempt = service.update(ctx(), {
+                    profile: { taxId: "29AAGCR4375J1ZU" },
+                    tax: { registered: true },
+                });
+                await expect(attempt).rejects.toBeInstanceOf(
+                    BadRequestException,
+                );
+                await expect(attempt).rejects.toMatchObject({
+                    response: { details: { field: "addressLine1" } },
+                });
+                await expect(
+                    service.update(ctx(), {
+                        profile: { taxId: "29AAGCR4375J1ZU" },
+                        tax: { registered: true },
+                        registeredAddress: {
+                            line1: "14 Hill Road",
+                            postalCode: "560038",
+                        },
+                    }),
+                ).rejects.toMatchObject({
+                    response: { details: { field: "city" } },
+                });
+                expect(prisma.$transaction).not.toHaveBeenCalled();
+            });
+
+            it("refuses clearing the address of a registered business", async () => {
+                profileFindUnique.mockResolvedValue({
+                    gstRegistered: true,
+                    gstState: "29",
+                    taxId: "29AAGCR4375J1ZU",
+                    country: "IN",
+                    addressLine1: "14 Hill Road",
+                    addressLine2: null,
+                    city: "Bengaluru",
+                    postalCode: "560038",
+                });
+                await expect(
+                    service.update(ctx(), {
+                        registeredAddress: { postalCode: "" },
+                    }),
+                ).rejects.toMatchObject({
+                    response: { details: { field: "postalCode" } },
+                });
+                expect(profileUpsert).not.toHaveBeenCalled();
+            });
+
+            it("refuses a PIN that is not six digits for an Indian business", async () => {
+                profileFindUnique.mockResolvedValue({
+                    gstRegistered: false,
+                    gstState: null,
+                    taxId: null,
+                    country: "IN",
+                    addressLine1: null,
+                    addressLine2: null,
+                    city: null,
+                    postalCode: null,
+                });
+                for (const postalCode of [
+                    "56003",
+                    "5600381",
+                    "056003",
+                    "SW1A 1AA",
+                ]) {
+                    await expect(
+                        service.update(ctx(), {
+                            registeredAddress: {
+                                line1: "14 Hill Road",
+                                city: "Bengaluru",
+                                postalCode,
+                            },
+                        }),
+                    ).rejects.toMatchObject({
+                        response: { details: { field: "postalCode" } },
+                    });
+                }
+                expect(profileUpsert).not.toHaveBeenCalled();
+            });
+
+            it("keeps any postal code for a business outside India, unregistered", async () => {
+                profileFindUnique.mockResolvedValue({
+                    gstRegistered: false,
+                    gstState: null,
+                    taxId: null,
+                    country: "GB",
+                    addressLine1: null,
+                    addressLine2: null,
+                    city: null,
+                    postalCode: null,
+                });
+                await service.update(ctx(), {
+                    registeredAddress: {
+                        line1: "1 Mall",
+                        line2: "",
+                        city: "London",
+                        postalCode: "SW1A 1AA",
+                    },
+                });
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        update: {
+                            addressLine1: "1 Mall",
+                            addressLine2: null,
+                            city: "London",
+                            postalCode: "SW1A 1AA",
                         },
                     }),
                 );
@@ -327,9 +445,22 @@ describe("OrganizationSettingsService", () => {
                         invoicePrefix: "RC",
                         deliveryGstRate: { toString: () => "18.00" },
                         deliverySacCode: "996813",
+                        addressLine1: "14 Hill Road",
+                        addressLine2: "Indiranagar",
+                        city: "Bengaluru",
+                        postalCode: "560038",
                     },
                 });
                 const settings = await service.get(ctx());
+                expect(settings.registeredAddress).toEqual({
+                    line1: "14 Hill Road",
+                    line2: "Indiranagar",
+                    city: "Bengaluru",
+                    postalCode: "560038",
+                    state: "29",
+                    stateName: "Karnataka",
+                });
+                expect(settings.profile).not.toHaveProperty("addressLine1");
                 expect(settings.tax).toEqual({
                     registered: true,
                     state: "29",

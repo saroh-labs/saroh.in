@@ -21,6 +21,12 @@ import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import {
+    ADDRESS_API_KEY,
+    ADDRESS_KEYS,
+    RegisteredAddressFields,
+    registeredAddressShape,
+} from "@/components/organizations/registered-address-fields";
 import { CountrySelect } from "@/components/shared/country-select";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
@@ -31,6 +37,7 @@ import {
     PREFIX_SHAPE,
     rateOption,
 } from "@/lib/invoices/gst";
+import { addressProblems } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
@@ -66,6 +73,8 @@ const formSchema = z
                 (v) => v === "" || isHsnSac(v),
                 "A SAC code is 4 to 8 digits.",
             ),
+        // The registered address (CGST rule 46); its state is gstState.
+        ...registeredAddressShape,
     })
     .refine(
         (v) =>
@@ -76,7 +85,12 @@ const formSchema = z
             message:
                 "A GST-registered business puts its 15-character GSTIN here.",
         },
-    );
+    )
+    .superRefine((v, ctx) => {
+        for (const { path, message } of addressProblems(v)) {
+            ctx.addIssue({ code: "custom", path: [path], message });
+        }
+    });
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -96,6 +110,10 @@ const FIELD_OF: Record<string, keyof FormValues> = {
     invoicePrefix: "invoicePrefix",
     deliveryRate: "deliveryRate",
     deliverySac: "deliverySac",
+    addressLine1: "addressLine1",
+    addressLine2: "addressLine2",
+    city: "city",
+    postalCode: "postalCode",
     name: "name",
     timezone: "name",
 };
@@ -151,6 +169,10 @@ function valuesOf(settings: OrganizationSettings): FormValues {
         invoicePrefix: settings.tax?.invoicePrefix ?? "",
         deliveryRate: settings.tax?.deliveryRate ?? "18",
         deliverySac: settings.tax?.deliverySac ?? "",
+        addressLine1: settings.registeredAddress?.line1 ?? "",
+        addressLine2: settings.registeredAddress?.line2 ?? "",
+        city: settings.registeredAddress?.city ?? "",
+        postalCode: settings.registeredAddress?.postalCode ?? "",
     };
 }
 
@@ -207,6 +229,12 @@ export function OrganizationSettingsForm({
                 ? { deliverySac: values.deliverySac.trim() }
                 : {}),
         };
+        const registeredAddress = Object.fromEntries(
+            ADDRESS_KEYS.filter((key) => dirtyFields[key]).map((key) => [
+                ADDRESS_API_KEY[key],
+                values[key].trim(),
+            ]),
+        );
         // Turning registration on checks the GSTIN, so send it with it.
         if (values.gstRegistered && dirtyFields.gstRegistered) {
             profile.taxId = values.taxId?.trim().toUpperCase() ?? "";
@@ -216,6 +244,9 @@ export function OrganizationSettingsForm({
             ...(dirtyFields.name ? { name: values.name.trim() } : {}),
             ...(Object.keys(profile).length > 0 ? { profile } : {}),
             ...(Object.keys(tax).length > 0 ? { tax } : {}),
+            ...(Object.keys(registeredAddress).length > 0
+                ? { registeredAddress }
+                : {}),
         });
 
         if (!result.ok) {
@@ -425,14 +456,17 @@ export function OrganizationSettingsForm({
                                     />
                                 </FormControl>
                                 <FormDescription>
-                                    Where the business is registered. A sale to
-                                    another state is IGST. Left unset, it is
-                                    read from the GSTIN.
+                                    The state of the registered address, and the
+                                    one the business is GST-registered in. A
+                                    sale to another state is IGST. Left unset,
+                                    it is read from the GSTIN.
                                 </FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
+
+                    <RegisteredAddressFields canEdit={canEdit} />
 
                     <FormField
                         control={form.control}

@@ -4,6 +4,7 @@ import {
     buildCreditNote,
     buildManualInvoice,
     buildOrderInvoice,
+    formatSellerAddress,
     orderBillTo,
 } from "./order-invoice";
 
@@ -15,6 +16,7 @@ const RYE: TaxProfile = {
     timezone: "Asia/Kolkata",
     deliveryRateBps: 1800,
     deliverySac: "996813",
+    address: "14 Hill Road, Indiranagar, Bengaluru 560038, Karnataka",
 };
 
 const UNREGISTERED: TaxProfile = {
@@ -153,6 +155,7 @@ describe("a credit note", () => {
         return {
             sellerGstin: doc.sellerGstin,
             sellerState: doc.sellerState,
+            sellerAddress: doc.sellerAddress,
             placeOfSupply: doc.placeOfSupply,
             taxType: doc.taxType,
             tax: String(doc.taxCents / 100),
@@ -195,6 +198,7 @@ describe("an edit's correction", () => {
             {
                 sellerGstin: RYE.gstin,
                 sellerState: "29",
+                sellerAddress: RYE.address,
                 placeOfSupply: "29",
                 taxType: "INTRA",
             },
@@ -262,5 +266,69 @@ describe("a hand-written invoice", () => {
         expect(doc.sellerGstin).toBeNull();
         expect(doc.taxCents).toBe(10800);
         expect(doc.totalCents).toBe(610800);
+    });
+});
+
+describe("the seller's registered address (CGST rule 46)", () => {
+    it("prints as one line, its state named", () => {
+        expect(
+            formatSellerAddress({
+                addressLine1: "14 Hill Road",
+                addressLine2: " ",
+                city: "Bengaluru",
+                postalCode: "560038",
+                stateName: "Karnataka",
+            }),
+        ).toBe("14 Hill Road, Bengaluru 560038, Karnataka");
+        expect(
+            formatSellerAddress({
+                addressLine1: null,
+                addressLine2: null,
+                city: "Bengaluru",
+                postalCode: null,
+                stateName: null,
+            }),
+        ).toBeNull();
+    });
+
+    it("is frozen on a tax invoice, a receipt, and the paper that corrects them", () => {
+        const doc = buildOrderInvoice(order(), RYE);
+        expect(doc.sellerAddress).toBe(RYE.address);
+        expect(buildOrderInvoice(order(), UNREGISTERED).sellerAddress).toBe(
+            RYE.address,
+        );
+        const manual = buildManualInvoice(
+            [
+                {
+                    description: "Cake",
+                    quantity: 1,
+                    unitCents: 50000,
+                    rateBps: 500,
+                    code: "1905",
+                },
+            ],
+            RYE,
+            null,
+            0,
+        );
+        expect(manual.sellerAddress).toBe(RYE.address);
+        // The correction carries the original's address, not today's.
+        const cn = buildCreditNote(
+            {
+                sellerGstin: doc.sellerGstin,
+                sellerState: doc.sellerState,
+                sellerAddress:
+                    "Old Shop, 1 MG Road, Bengaluru 560001, Karnataka",
+                placeOfSupply: doc.placeOfSupply,
+                taxType: doc.taxType,
+                tax: "0",
+                total: (doc.totalCents / 100).toFixed(2),
+                lines: [],
+            },
+            1000,
+        );
+        expect(cn.sellerAddress).toBe(
+            "Old Shop, 1 MG Road, Bengaluru 560001, Karnataka",
+        );
     });
 });

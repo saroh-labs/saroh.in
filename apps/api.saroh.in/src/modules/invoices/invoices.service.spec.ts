@@ -754,7 +754,13 @@ describe("GST (ADR-008)", () => {
         timezone: "Asia/Kolkata",
         deliveryGstRate: decimal("18"),
         deliverySacCode: "996813",
+        addressLine1: "14 Hill Road",
+        addressLine2: "Indiranagar",
+        city: "Bengaluru",
+        postalCode: "560038",
     };
+    const RYE_ADDRESS =
+        "14 Hill Road, Indiranagar, Bengaluru 560038, Karnataka";
     const registered = () => {
         db.businessProfile.findUnique!.mockResolvedValue(RYE_PROFILE);
         tx.businessProfile!.findUnique!.mockResolvedValue(RYE_PROFILE);
@@ -894,7 +900,25 @@ describe("GST (ADR-008)", () => {
         const data = tx.invoice!.updateMany!.mock.calls[0]![0].data;
         expect(data.number).toBe(`RC/${fy}/0001`);
         expect(data.sellerGstin).toBe("29AAGCR4375J1ZU");
+        // The registered address is frozen with the GSTIN (CGST rule 46).
+        expect(data.sellerAddress).toBe(RYE_ADDRESS);
         expect(data.cgst).toBe("9.00");
+    });
+
+    it("an issued invoice reads the address it was issued with, never today's", () => {
+        // The read is the frozen column alone: it never consults the
+        // business profile, so a move after issue cannot reach the paper.
+        const issued = row({ status: "ISSUED", sellerAddress: RYE_ADDRESS });
+        expect(
+            serializeInvoice(issued as never, new Date()).sellerAddress,
+        ).toBe(RYE_ADDRESS);
+        // A draft prints today's address, so it shows none of its own.
+        expect(
+            serializeInvoice(
+                row({ status: "DRAFT", sellerAddress: RYE_ADDRESS }) as never,
+                new Date(),
+            ).sellerAddress,
+        ).toBeNull();
     });
 
     it("an unregistered business issues a receipt with no GST columns", async () => {

@@ -124,6 +124,11 @@ export interface Invoice {
     order?: { id: string; number: string } | null;
     bookingId?: string | null;
     gst?: InvoiceGst | null;
+    /**
+     * The business's registered address as it was on issue (CGST rule 46);
+     * null on a draft, which prints today's.
+     */
+    sellerAddress?: string | null;
     currency: string;
     subtotal: string;
     tax: string;

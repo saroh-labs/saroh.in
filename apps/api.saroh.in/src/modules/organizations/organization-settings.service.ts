@@ -12,9 +12,17 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
-import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
-import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
-import { prefixProblem } from "../invoices/numbering";
+import type {
+    RegisteredAddressView,
+    TaxSettingsView,
+} from "./business-tax-settings";
+import {
+    addressView,
+    TAX_CURRENT_SELECT,
+    taxChanges,
+    taxView,
+    touchesTax,
+} from "./business-tax-settings";
 import type { UpdateOrganizationDto } from "./dto";
 import { authorize } from "./organization-policy";
 
@@ -38,26 +46,12 @@ export interface OrganizationSettings {
     tradingSince: string | null;
     /** GST (ADR-008). The GSTIN is `profile.taxId`. */
     tax: TaxSettingsView;
+    /**
+     * The registered address printed on invoices. Its state is the GST
+     * state (`tax.state`) — one field, registered or not.
+     */
+    registeredAddress: RegisteredAddressView;
 }
-
-export interface TaxSettingsView {
-    registered: boolean;
-    /** A GST state code, e.g. "29", and its name. */
-    state: string | null;
-    stateName: string | null;
-    invoicePrefix: string | null;
-    /** The GST rate on delivery, in percent ("18"). */
-    deliveryRate: string;
-    deliverySac: string | null;
-}
-
-type TaxData = Partial<{
-    gstRegistered: boolean;
-    gstState: string | null;
-    invoicePrefix: string | null;
-    deliveryGstRate: string;
-    deliverySacCode: string | null;
-}>;
 
 /** What the settings read selects from the profile. */
 const PROFILE_SELECT = {
@@ -73,6 +67,10 @@ const PROFILE_SELECT = {
     invoicePrefix: true,
     deliveryGstRate: true,
     deliverySacCode: true,
+    addressLine1: true,
+    addressLine2: true,
+    city: true,
+    postalCode: true,
 } as const;
 
 interface ProfileRow {
@@ -88,35 +86,37 @@ interface ProfileRow {
     invoicePrefix: string | null;
     deliveryGstRate: { toString(): string };
     deliverySacCode: string | null;
-}
-
-function taxView(p: ProfileRow | null): TaxSettingsView {
-    const bps = rateToBps(p?.deliveryGstRate ?? "18") ?? 1800;
-    return {
-        registered: p?.gstRegistered ?? false,
-        state: p?.gstState ?? null,
-        stateName: stateName(p?.gstState),
-        invoicePrefix: p?.invoicePrefix ?? null,
-        deliveryRate: bpsToRate(bps),
-        deliverySac: p?.deliverySacCode ?? null,
-    };
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city: string | null;
+    postalCode: string | null;
 }
 
 function splitProfile(p: ProfileRow | null) {
-    if (!p) return { profile: null, tax: taxView(null) };
+    if (!p) {
+        return {
+            profile: null,
+            tax: taxView(null),
+            registeredAddress: addressView(null),
+        };
+    }
     const {
         gstRegistered: _r,
         gstState: _s,
         invoicePrefix: _p,
         deliveryGstRate: _d,
         deliverySacCode: _c,
+        addressLine1: _a1,
+        addressLine2: _a2,
+        city: _ci,
+        postalCode: _pc,
         ...profile
     } = p;
-    return { profile, tax: taxView(p) };
-}
-
-function taxError(message: string, field: string): never {
-    throw new BadRequestException({ message, details: { field } });
+    return {
+        profile,
+        tax: taxView(p),
+        registeredAddress: addressView(p),
+    };
 }
 
 const PROFILE_FIELDS = [
@@ -220,11 +220,21 @@ export class OrganizationSettingsService {
                 details: { field: "timezone" },
             });
         }
-        const taxData = await this.taxChanges(
-            ctx.organizationId,
-            dto.tax,
-            profileData.taxId,
-        );
+        const taxSent = {
+            tax: dto.tax,
+            taxId: profileData.taxId,
+            country: profileData.country,
+            address: dto.registeredAddress,
+        };
+        const taxData = touchesTax(taxSent)
+            ? taxChanges(
+                  await prisma.businessProfile.findUnique({
+                      where: { organizationId: ctx.organizationId },
+                      select: TAX_CURRENT_SELECT,
+                  }),
+                  taxSent,
+              )
+            : {};
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
             ...Object.keys(profileData),
@@ -291,81 +301,6 @@ export class OrganizationSettingsService {
             ...splitProfile(settings.businessProfile),
             tradingSince: await this.firstOrderAt(ctx.organizationId),
         };
-    }
-
-    /**
-     * The GST settings a PATCH asks for, checked against what is stored
-     * (ADR-008). Registering needs a GSTIN — the profile's tax ID, sent in the
-     * same PATCH or already saved — in the register's shape, with its check
-     * character, from the state chosen (or, with none chosen, its own). A
-     * registered business cannot clear its GSTIN. The prefix keeps every
-     * number within GST's 16 characters.
-     */
-    private async taxChanges(
-        organizationId: string,
-        tax: UpdateOrganizationDto["tax"],
-        taxIdSent: string | undefined,
-    ): Promise<TaxData> {
-        if (!tax && taxIdSent === undefined) return {};
-        const current = await prisma.businessProfile.findUnique({
-            where: { organizationId },
-            select: { gstRegistered: true, gstState: true, taxId: true },
-        });
-        const data: TaxData = {};
-
-        let state = current?.gstState ?? null;
-        if (tax?.state !== undefined) {
-            if (tax.state === "") {
-                state = null;
-            } else {
-                state = stateCode(tax.state);
-                if (!state) taxError("That is not a state we know", "gstState");
-            }
-            data.gstState = state;
-        }
-        const registered = tax?.registered ?? current?.gstRegistered ?? false;
-        if (tax?.registered !== undefined) data.gstRegistered = registered;
-
-        const gstin = (taxIdSent ?? current?.taxId ?? "").trim().toUpperCase();
-        if (registered) {
-            if (!gstin) {
-                taxError(
-                    "A GST-registered business needs its GSTIN in Tax ID.",
-                    "taxId",
-                );
-            }
-            if (!state) {
-                state = gstin.slice(0, 2);
-                data.gstState = state;
-            }
-            const problem = gstinProblem(gstin, state);
-            if (problem) taxError(problem, "taxId");
-        }
-
-        if (tax?.invoicePrefix !== undefined) {
-            const prefix = tax.invoicePrefix.toUpperCase();
-            if (prefix === "") {
-                data.invoicePrefix = null;
-            } else {
-                const problem = prefixProblem(prefix);
-                if (problem) taxError(problem, "invoicePrefix");
-                data.invoicePrefix = prefix;
-            }
-        }
-        if (tax?.deliveryRate !== undefined) {
-            if (!isGstRate(tax.deliveryRate)) {
-                taxError(
-                    `${tax.deliveryRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
-                    "deliveryRate",
-                );
-            }
-            data.deliveryGstRate = tax.deliveryRate;
-        }
-        if (tax?.deliverySac !== undefined) {
-            data.deliverySacCode =
-                tax.deliverySac === "" ? null : tax.deliverySac;
-        }
-        return data;
     }
 
     private async read(organizationId: string): Promise<OrganizationSettings> {

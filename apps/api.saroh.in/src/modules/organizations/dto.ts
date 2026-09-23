@@ -147,6 +147,38 @@ export class TaxSettingsDto {
 }
 
 /**
+ * The business's registered address (CGST rule 46: a tax invoice names the
+ * supplier's address). Its state is the GST state (`tax.state`), so the two
+ * can never disagree. "" clears a line. The service checks the PIN (six
+ * digits, India) and refuses a GST-registered business without an address.
+ */
+export class RegisteredAddressDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(120)
+    line1?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(120)
+    line2?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(60)
+    city?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(12)
+    postalCode?: string;
+}
+
+/**
  * Payload for `PATCH /organizations/:organizationId`. Both fields are optional
  * so a caller can rename the org, edit the business profile, or both.
  *
@@ -175,4 +207,10 @@ export class UpdateOrganizationDto {
     @ValidateNested()
     @Type(() => TaxSettingsDto)
     tax?: TaxSettingsDto;
+
+    /** The registered address, printed on invoices (ADR-008). */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => RegisteredAddressDto)
+    registeredAddress?: RegisteredAddressDto;
 }

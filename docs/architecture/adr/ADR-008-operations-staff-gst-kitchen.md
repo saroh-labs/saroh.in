@@ -125,6 +125,15 @@ Rules, rule 46.
   timezone (else Asia/Kolkata). An issued invoice credited in full reads
   **CREDITED**. The GST maths is `invoices/gst.ts`; an order's paper is
   written by `invoices/order-invoicing.ts`.
+- **The registered address** (rule 46 names the supplier's address).
+  `BusinessProfile` gains `addressLine1`, `addressLine2` (optional), `city`
+  and `postalCode`. Its state is **`gstState`, registered or not** — one
+  field, so the address and the GSTIN's state cannot disagree, and an
+  unregistered business sets the same State field. Registering is refused
+  without a first line, city and PIN; an Indian PIN is six digits. Every
+  issued paper (tax invoice, receipt, credit note, supplementary) copies it as
+  one printed line into `Invoice.sellerAddress`, like the GSTIN; a correction
+  takes its original's. A draft prints today's address.
 
 **Consequences.** Tax settings are Owner/Admin only. The tax maths lives in one
 pure module, built test-first from worked examples.

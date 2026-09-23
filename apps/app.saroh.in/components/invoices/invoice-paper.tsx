@@ -19,7 +19,8 @@ export function paperTitle(
 
 /**
  * The invoice as the customer receives it, after "Saroh Invoice Detail": a
- * tax invoice for a GST-registered business — the seller's GSTIN and state,
+ * tax invoice for a GST-registered business — the seller's legal name,
+ * registered address (frozen on issue, like the GSTIN), GSTIN and state,
  * who it is billed to (with their GSTIN when they are registered), the place
  * of supply, HSN/SAC and rate on every line, taxable value and CGST + SGST
  * or IGST — or a receipt for a business that is not registered.
@@ -50,6 +51,21 @@ export function InvoicePaper({
             : gst?.sellerState
               ? `State ${gst.sellerState}`
               : null;
+    // CGST rule 46: the supplier's address. Issued paper prints the one
+    // frozen on it; a draft, today's.
+    const sellerAddress =
+        i.status === "DRAFT"
+            ? (business?.address ?? null)
+            : (i.sellerAddress ?? null);
+    const legalName =
+        business?.legalName && business.legalName !== businessName
+            ? business.legalName
+            : null;
+    const sellerLines = [
+        legalName,
+        sellerAddress,
+        business?.email ?? null,
+    ].filter((x): x is string => Boolean(x));
     const address = i.billTo?.address ?? i.billToGst?.address ?? null;
     const buyerGstin = i.billTo?.gstin ?? i.billToGst?.gstin ?? null;
     const typedTax = !gst && Number(i.tax) > 0;
@@ -82,16 +98,11 @@ export function InvoicePaper({
                         {businessName}
                     </p>
                     <p className="mt-[3px] text-[12px] leading-[1.5] text-muted-foreground">
-                        {[
-                            business?.legalName &&
-                            business.legalName !== businessName
-                                ? business.legalName
-                                : null,
-                            business?.email,
-                        ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        {business?.legalName || business?.email ? <br /> : null}
+                        {sellerLines.map((line) => (
+                            <span key={line} className="block">
+                                {line}
+                            </span>
+                        ))}
                         {gst || gstin
                             ? `GSTIN ${gstin ?? ""}${sellerState ? ` · ${sellerState}` : ""}`
                             : "Not registered for GST"}

@@ -275,13 +275,23 @@ model BusinessProfile {
   // GST (ADR-008, U5). A registered business issues tax invoices; its GSTIN
   // is `taxId`, checked against `gstState` (a two-digit GST state code, e.g.
   // "29" Karnataka) when registration is switched on. Unregistered: receipts.
-  gstRegistered   Boolean  @default(false)
-  gstState        String?
+  // `gstState` is also the state of the registered address below, registered
+  // or not — one field, so the address and the GSTIN can never disagree.
+  gstRegistered Boolean @default(false)
+  gstState      String?
+
+  // The registered address (CGST rule 46: a tax invoice names the supplier's
+  // address). Required once GST-registered; its state is `gstState`. Copied
+  // onto each invoice at issue (`Invoice.sellerAddress`).
+  addressLine1    String?
+  addressLine2    String?
+  city            String?
+  postalCode      String?
   // The invoice number's prefix ("RC" → RC/26-27/0001 when registered,
   // RC-0001 when not). Null: the legacy INV series.
   invoicePrefix   String?
   // Delivery on an order's invoice is a taxed line: this rate and SAC.
-  deliveryGstRate Decimal  @default(18) @db.Decimal(5, 2)
+  deliveryGstRate Decimal @default(18) @db.Decimal(5, 2)
   deliverySacCode String?
 
   createdAt DateTime @default(now())
@@ -4199,10 +4209,10 @@ model Invoice {
 
   // Who it is billed to. The name and email are copied on issue, so an
   // invoice reads the same after the contact is edited or deleted.
-  contactId   String?
-  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  billToName  String?
-  billToEmail String?
+  contactId     String?
+  contact       Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  billToName    String?
+  billToEmail   String?
   // A registered buyer's GSTIN, their state (GST state code) and address.
   billToGstin   String?
   billToState   String?
@@ -4213,6 +4223,9 @@ model Invoice {
   // SGST) or INTER (IGST).
   sellerGstin   String?
   sellerState   String?
+  // The business's registered address as printed, frozen on issue like the
+  // GSTIN: settings edited later never change issued paper.
+  sellerAddress String?
   placeOfSupply String?
   taxType       String?
   cgst          Decimal @default(0) @db.Decimal(12, 2)

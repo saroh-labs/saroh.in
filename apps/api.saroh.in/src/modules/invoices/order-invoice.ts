@@ -29,6 +29,11 @@ export interface TaxProfile {
     timezone: string | null;
     deliveryRateBps: number;
     deliverySac: string | null;
+    /**
+     * The registered address as it prints ("12 Hill Road, Bandra West,
+     * Mumbai 400050, Maharashtra"); null until the business gives one.
+     */
+    address: string | null;
 }
 
 export interface OrderForInvoice {
@@ -76,6 +81,8 @@ export interface BuiltDocument {
     taxType: TaxType | null;
     sellerGstin: string | null;
     sellerState: string | null;
+    /** The business's address, frozen with the rest of the paper. */
+    sellerAddress: string | null;
 }
 
 export interface BillTo {
@@ -193,6 +200,7 @@ export function buildOrderInvoice(
         taxType,
         sellerGstin: profile.registered ? profile.gstin : null,
         sellerState: profile.registered ? profile.state : null,
+        sellerAddress: profile.address,
     });
 }
 
@@ -202,7 +210,11 @@ export function finish(
     addOnTaxCents: number,
     gst: Pick<
         BuiltDocument,
-        "placeOfSupply" | "taxType" | "sellerGstin" | "sellerState"
+        | "placeOfSupply"
+        | "taxType"
+        | "sellerGstin"
+        | "sellerState"
+        | "sellerAddress"
     >,
 ): BuiltDocument {
     const sum = (pick: (l: GstLine) => number) =>
@@ -236,6 +248,7 @@ export interface IssuedLine {
 export interface Original {
     sellerGstin: string | null;
     sellerState: string | null;
+    sellerAddress: string | null;
     placeOfSupply: string | null;
     taxType: string | null;
     tax: Money;
@@ -249,6 +262,7 @@ function gstOf(original: Original) {
         taxType: (original.taxType as TaxType | null) ?? null,
         sellerGstin: original.sellerGstin,
         sellerState: original.sellerState,
+        sellerAddress: original.sellerAddress,
     };
 }
 
@@ -351,7 +365,11 @@ export function buildCreditNote(
 export function buildCorrection(
     original: Pick<
         Original,
-        "sellerGstin" | "sellerState" | "placeOfSupply" | "taxType"
+        | "sellerGstin"
+        | "sellerState"
+        | "sellerAddress"
+        | "placeOfSupply"
+        | "taxType"
     >,
     changes: {
         description: string;
@@ -372,6 +390,7 @@ export function buildCorrection(
         taxType: (original.taxType as TaxType | null) ?? null,
         sellerGstin: original.sellerGstin,
         sellerState: original.sellerState,
+        sellerAddress: original.sellerAddress,
     });
 }
 
@@ -388,7 +407,7 @@ export function buildManualInvoice(
         rateBps: number | null;
         code: string | null;
     }[],
-    profile: Pick<TaxProfile, "registered" | "gstin" | "state">,
+    profile: Pick<TaxProfile, "registered" | "gstin" | "state" | "address">,
     billToState: string | null,
     typedTaxCents: number,
 ): BuiltDocument {
@@ -399,6 +418,7 @@ export function buildManualInvoice(
             taxType: null,
             sellerGstin: null,
             sellerState: null,
+            sellerAddress: profile.address,
         });
     }
     const pos = placeOfSupply({
@@ -413,7 +433,31 @@ export function buildManualInvoice(
         taxType,
         sellerGstin: profile.gstin,
         sellerState: profile.state,
+        sellerAddress: profile.address,
     });
+}
+
+/**
+ * The registered address as one printed line: "line 1, line 2, city PIN,
+ * state". Null without a first line — a half-typed address is not printed.
+ */
+export function formatSellerAddress(a: {
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city: string | null;
+    postalCode: string | null;
+    stateName: string | null;
+}): string | null {
+    if (!a.addressLine1?.trim()) return null;
+    return [
+        a.addressLine1,
+        a.addressLine2,
+        [a.city, a.postalCode].filter((x) => x?.trim()).join(" "),
+        a.stateName,
+    ]
+        .map((x) => x?.trim() ?? "")
+        .filter((x) => x !== "")
+        .join(", ");
 }
 
 /** Normalises a typed state for the bill-to: a code, or null. */

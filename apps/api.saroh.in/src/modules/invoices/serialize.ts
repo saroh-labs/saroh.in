@@ -57,6 +57,7 @@ export const INVOICE_SELECT = {
     billToAddress: true,
     sellerGstin: true,
     sellerState: true,
+    sellerAddress: true,
     placeOfSupply: true,
     taxType: true,
     cgst: true,
@@ -156,6 +157,7 @@ export interface InvoiceRow {
     billToAddress?: string | null;
     sellerGstin?: string | null;
     sellerState?: string | null;
+    sellerAddress?: string | null;
     placeOfSupply?: string | null;
     taxType?: string | null;
     cgst?: Money;
@@ -248,6 +250,11 @@ export interface InvoiceViewModel {
         address: string | null;
     };
     gst: InvoiceGstView | null;
+    /**
+     * The business's registered address as it was when this was issued
+     * (CGST rule 46); null on a draft, which prints today's.
+     */
+    sellerAddress: string | null;
     currency: string;
     subtotal: string;
     tax: string;
@@ -368,6 +375,8 @@ export function serializeInvoice(
             state: row.billToState ?? null,
             address: row.billToAddress ?? null,
         },
+        sellerAddress:
+            row.status === "DRAFT" ? null : (row.sellerAddress ?? null),
         gst: row.sellerGstin
             ? {
                   sellerGstin: row.sellerGstin,

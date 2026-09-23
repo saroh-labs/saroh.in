@@ -1,8 +1,10 @@
 import { apiFetch, orgBase } from "@/lib/api/http";
+import { printedAddress } from "@/lib/organizations/registered-address";
+import type { RegisteredAddress } from "@/lib/organizations/settings-service";
 
 /**
  * The business's GST standing and what its paper prints at the top: name,
- * legal name, contact email, GSTIN and state. Read from the OWNER/ADMIN
+ * legal name, registered address, contact email, GSTIN and state. Read from the OWNER/ADMIN
  * settings endpoint; a role that may read invoices but not settings gets
  * null, and the screens leave those lines off rather than fail.
  */
@@ -13,6 +15,11 @@ export interface InvoiceBusiness {
     registered: boolean;
     gstin: string | null;
     state: { code: string; name: string | null } | null;
+    /**
+     * The registered address as it prints today — a draft shows this; an
+     * issued invoice prints the one frozen on it.
+     */
+    address: string | null;
 }
 
 export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
@@ -33,6 +40,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
             state: string | null;
             stateName: string | null;
         };
+        registeredAddress?: RegisteredAddress;
     };
     const registered = s.tax?.registered ?? false;
     return {
@@ -44,6 +52,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
         state: s.tax?.state
             ? { code: s.tax.state, name: s.tax.stateName }
             : null,
+        address: printedAddress(s.registeredAddress),
     };
 }
 

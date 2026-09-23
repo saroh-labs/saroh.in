@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { bpsToRate, rateToBps } from "./gst";
+import { stateName } from "./gst-states";
 import type { InvoiceKind } from "./numbering";
 import { nextInvoiceNumber, seriesFor } from "./numbering";
 import type {
@@ -13,6 +14,7 @@ import {
     buildCorrection,
     buildCreditNote,
     buildOrderInvoice,
+    formatSellerAddress,
     orderBillTo,
 } from "./order-invoice";
 import { fromCents, toCents } from "./totals";
@@ -50,6 +52,10 @@ export async function loadTaxProfile(
             timezone: true,
             deliveryGstRate: true,
             deliverySacCode: true,
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            postalCode: true,
         },
     });
     return {
@@ -60,6 +66,9 @@ export async function loadTaxProfile(
         timezone: p?.timezone ?? null,
         deliveryRateBps: rateToBps(p?.deliveryGstRate ?? "18") ?? 1800,
         deliverySac: p?.deliverySacCode ?? null,
+        address: p
+            ? formatSellerAddress({ ...p, stateName: stateName(p.gstState) })
+            : null,
     };
 }
 
@@ -105,6 +114,7 @@ export function documentColumns(doc: BuiltDocument) {
         taxType: doc.taxType,
         sellerGstin: doc.sellerGstin,
         sellerState: doc.sellerState,
+        sellerAddress: doc.sellerAddress,
     };
 }
 
@@ -246,6 +256,7 @@ const ORIGINAL_SELECT = {
     status: true,
     sellerGstin: true,
     sellerState: true,
+    sellerAddress: true,
     placeOfSupply: true,
     taxType: true,
     tax: true,
@@ -346,6 +357,7 @@ function asOriginal(row: OriginalRow): Original {
     return {
         sellerGstin: row.sellerGstin,
         sellerState: row.sellerState,
+        sellerAddress: row.sellerAddress,
         placeOfSupply: row.placeOfSupply,
         taxType: row.taxType,
         tax: row.tax,

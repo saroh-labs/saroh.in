@@ -73,6 +73,10 @@ beforeAll(async () => {
             timezone: "Asia/Kolkata",
             deliveryGstRate: "18",
             deliverySacCode: "996813",
+            addressLine1: "14 Hill Road",
+            addressLine2: "Indiranagar",
+            city: "Bengaluru",
+            postalCode: "560038",
         },
     });
     storeId = (
@@ -342,6 +346,38 @@ describe("an invoice for every order (real database)", () => {
 });
 
 describe("issued paper never changes (real database)", () => {
+    it("keeps the registered address it was issued with after the business moves", async () => {
+        const address =
+            "14 Hill Road, Indiranagar, Bengaluru 560038, Karnataka";
+        const order = await unpaidOrder();
+        await prisma.order.update({
+            where: { id: order.id },
+            data: { paymentStatus: "PAID" },
+        });
+        const made = await prisma.$transaction((tx) =>
+            ensureOrderInvoice(tx, order.id),
+        );
+        expect(made).not.toBeNull();
+        const id = made!.id;
+        expect(
+            (await prisma.invoice.findUniqueOrThrow({ where: { id } }))
+                .sellerAddress,
+        ).toBe(address);
+
+        await prisma.businessProfile.update({
+            where: { organizationId: rye.organizationId },
+            data: { addressLine1: "2 New Street", postalCode: "560001" },
+        });
+        try {
+            expect((await invoices.get(rye, id)).sellerAddress).toBe(address);
+        } finally {
+            await prisma.businessProfile.update({
+                where: { organizationId: rye.organizationId },
+                data: { addressLine1: "14 Hill Road", postalCode: "560038" },
+            });
+        }
+    });
+
     it("refuses to edit, delete or void a registered business's issued invoice; a credit note cancels it", async () => {
         const draft = await invoices.createDraft(rye, {
             contactId,

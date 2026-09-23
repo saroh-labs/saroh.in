@@ -1,5 +1,10 @@
 import type { Db } from "../helpers";
-import { gstin as gstinFor, RYE_GSTIN } from "./bakery";
+import {
+    gstin as gstinFor,
+    RYE_ADDRESS,
+    RYE_ADDRESS_PRINTED,
+    RYE_GSTIN,
+} from "./bakery";
 import { TIMEZONE } from "./data";
 import { istAt } from "./people";
 import type { Interval } from "./periods";
@@ -565,6 +570,10 @@ export async function checkRye(
             gstState: true,
             taxId: true,
             invoicePrefix: true,
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            postalCode: true,
         },
     });
     const gstin = profile?.taxId ?? "";
@@ -579,6 +588,23 @@ export async function checkRye(
             `the business is not GST-registered in Karnataka as RC: ${JSON.stringify(profile)}`,
         );
     }
+    if (
+        profile?.addressLine1 !== RYE_ADDRESS.addressLine1 ||
+        profile.addressLine2 !== RYE_ADDRESS.addressLine2 ||
+        profile.city !== RYE_ADDRESS.city ||
+        profile.postalCode !== RYE_ADDRESS.postalCode
+    ) {
+        failures.push(
+            `the business has no registered address on Hill Road: ${JSON.stringify(profile)}`,
+        );
+    }
+    fail(
+        "issued paper without the registered address it was issued with",
+        await prisma.$queryRaw<Row[]>`
+            SELECT id, number FROM "Invoice"
+            WHERE "organizationId" = ${orgId} AND number IS NOT NULL
+              AND "sellerAddress" IS DISTINCT FROM ${RYE_ADDRESS_PRINTED}`,
+    );
     const buyers = await prisma.invoice.findMany({
         where: { organizationId: orgId, billToGstin: { not: null } },
         select: { id: true, billToGstin: true, billToState: true },
