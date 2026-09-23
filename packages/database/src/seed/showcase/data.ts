@@ -913,8 +913,10 @@ export interface ShowcaseLead {
 export interface ShowcasePlan {
     name: string;
     description: string;
-    interval: "MONTH" | "QUARTER";
+    interval: "MONTH" | "QUARTER" | "YEAR";
     pricePaise: number;
+    /** A membership's classes a month (U3); absent: as many as they like. */
+    classesPerMonth?: number;
     /**
      * What it cost before the last price rise. A subscription keeps the price
      * it was sold at, so members who joined earlier still pay this.
@@ -1185,52 +1187,87 @@ export const PULSE: ShowcaseBusiness = {
             ],
             weight: 0.6,
         },
+        {
+            name: "Fitness assessment",
+            description:
+                "Forty-five minutes: posture, mobility, strength tests and body composition, written up with a plan.",
+            minutes: 45,
+            capacity: 1,
+            priceCents: 80_000,
+            rules: [{ days: [1, 2, 3, 4, 5, 6], from: "07:00", to: "10:00" }],
+            weight: 1.2,
+        },
     ],
-    bookings: 420,
+    bookings: 440,
     paymentProvider: "RAZORPAY",
     billing: {
+        // Memberships carry classes a month (U3): what a class booked on one
+        // takes from, and what the calendar counts against.
         plans: [
             {
-                name: "Monthly membership",
+                name: "Standard membership",
                 description:
-                    "Classes, the gym floor and a monthly review with a coach. Cancel with a month's notice.",
+                    "Eight classes a month, the gym floor and a monthly review with a coach. Cancel with a month's notice.",
                 interval: "MONTH",
                 pricePaise: 250_000,
                 earlier: { pricePaise: 220_000, beforeDaysAgo: 200 },
+                classesPerMonth: 8,
                 weight: 7,
             },
             {
-                name: "Quarterly membership",
+                name: "Off-peak membership",
                 description:
-                    "Everything in the monthly plan for three months, at a better rate.",
-                interval: "QUARTER",
-                pricePaise: 650_000,
+                    "Four classes a month, and the gym floor from 10am to 4pm on weekdays.",
+                interval: "MONTH",
+                pricePaise: 160_000,
+                classesPerMonth: 4,
                 weight: 3,
+            },
+            {
+                name: "Yearly membership",
+                description:
+                    "The standard membership for a year, paid once: two months free.",
+                interval: "YEAR",
+                pricePaise: 2_500_000,
+                classesPerMonth: 8,
+                weight: 2,
             },
         ],
         subscriptions: 120,
+        // The design's packs: two on sale, and a starter offer retired.
         packs: [
             {
-                name: "Personal training — 12 sessions",
+                name: "5 classes",
                 description:
-                    "Twelve one-hour sessions with a coach, on top of any membership.",
-                credits: 12,
-                validityDays: 120,
-                pricePaise: 1_440_000,
-                services: [0],
+                    "Five HIIT, yoga or strength classes, for people who would rather not join.",
+                credits: 5,
+                validityDays: 60,
+                pricePaise: 220_000,
+                services: [1, 2, 4],
+                status: "ACTIVE",
+                buyers: 10,
+            },
+            {
+                name: "10 classes",
+                description:
+                    "Ten classes at a better rate, with three months to use them.",
+                credits: 10,
+                validityDays: 90,
+                pricePaise: 400_000,
+                services: [1, 2, 4],
                 status: "ACTIVE",
                 buyers: 8,
             },
             {
-                name: "Class pack — 10 classes",
+                name: "First 3 classes",
                 description:
-                    "Ten HIIT or yoga classes for people who would rather not join.",
-                credits: 10,
-                validityDays: 60,
-                pricePaise: 450_000,
-                services: [1, 2],
-                status: "ACTIVE",
-                buyers: 14,
+                    "An introductory offer: three classes in your first month.",
+                credits: 3,
+                validityDays: 30,
+                pricePaise: 99_900,
+                services: [1, 2, 4],
+                status: "ARCHIVED",
+                buyers: 5,
             },
         ],
         courses: [

@@ -45,6 +45,7 @@ import {
     NORTHWIND_LEADS,
     NORTHWIND_NEW_CATEGORIES,
     NORTHWIND_NEW_PRODUCTS,
+    PULSE,
     RETIRED_BUSINESS_KEYS,
     ROLE_ACCOUNTS,
     SHOWCASE_BUSINESSES,
@@ -56,6 +57,8 @@ import {
 } from "./data";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
+import type { PulseCounts } from "./pulse";
+import { checkPulse, planPulse, upsertPulseStaff } from "./pulse";
 import { createRng } from "./random";
 
 /**
@@ -169,6 +172,10 @@ export async function seedShowcase(): Promise<void> {
 
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
+    const pulse = businesses.find((b) => b.name === PULSE.name);
+    const pulseCounts: PulseCounts | null = pulse
+        ? await checkPulse(prisma, pulse.id, now)
+        : null;
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -176,6 +183,10 @@ export async function seedShowcase(): Promise<void> {
         );
     }
     console.table(counts);
+    if (pulseCounts) {
+        console.log("[showcase] Pulse Fitness, as its films need it:");
+        console.table(pulseCounts);
+    }
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +
@@ -369,6 +380,7 @@ async function clearVolume(ctx: Context, key: string) {
     await p.submission.deleteMany({ where });
     await p.activity.deleteMany({ where });
     await p.lead.deleteMany({ where });
+    await p.contactNote.deleteMany({ where });
     await p.bookingEvent.deleteMany({ where });
     await p.booking.deleteMany({ where });
     await p.courseEnrollment.deleteMany({ where });
@@ -934,6 +946,31 @@ async function seedBusiness(
         createdAt,
     });
 
+    // Pulse Fitness's people, their hours and its booking rules (U9):
+    // structure, before the bookings that name who takes them.
+    const pulseStaff =
+        key === PULSE.key
+            ? await upsertPulseStaff(prisma, {
+                  orgId,
+                  now,
+                  createdAt,
+                  services,
+                  ownerMembershipId: (
+                      await prisma.membership.findUniqueOrThrow({
+                          where: {
+                              organizationId_userId: {
+                                  organizationId: orgId,
+                                  userId: ownerId,
+                              },
+                          },
+                          select: { id: true },
+                      })
+                  ).id,
+                  ownerUserId: ownerId,
+                  id: (...parts) => sid(key, ...parts),
+              })
+            : null;
+
     // Generated volume is rewritten whole, so clear it before anything below
     // writes some.
     await clearVolume(ctx, key);
@@ -1114,6 +1151,31 @@ async function seedBusiness(
             if (event.type === "BOOKED" && by) event.actorUserId = by;
         }
     }
+    const bookings = [...diary.bookings, ...(courses?.bookings ?? [])];
+    const events = [...diary.events, ...(courses?.events ?? [])];
+
+    // Pulse Fitness: who takes each booking, how each was paid, late cancels,
+    // the pack and membership states its films show, and notes (U9).
+    const pulse =
+        pulseStaff && biz.billing && packs && subscriptions
+            ? planPulse({
+                  now,
+                  orgId,
+                  id: (...parts) => sid(key, ...parts),
+                  rng: rngFor(key, "operations"),
+                  staff: pulseStaff,
+                  services,
+                  bookings,
+                  events,
+                  packs,
+                  packFixtures: biz.billing.packs,
+                  subscriptions,
+                  planFixtures: biz.billing.plans,
+                  contacts: billingCtx.contacts,
+                  pool: billingCtx.pool,
+                  team: teamIds,
+              })
+            : null;
 
     // A contact exists from the first thing they did.
     const contactRng = rngFor(key, "contacts");
@@ -1220,21 +1282,24 @@ async function seedBusiness(
             data: courses.enrollments,
         });
     }
-    const bookings = [...diary.bookings, ...(courses?.bookings ?? [])];
-    const events = [...diary.events, ...(courses?.events ?? [])];
+    // Plans and the people on them before the bookings: a class booked on a
+    // membership names its subscription.
+    if (biz.billing && packs && subscriptions) {
+        await writeCatalogue(ctx, packs, subscriptions);
+        await createInChunks(subscriptions.subscriptions, (data) =>
+            prisma.customerSubscription.createMany({ data }),
+        );
+    }
     await createInChunks(bookings, (data) =>
         prisma.booking.createMany({ data }),
     );
     await createInChunks(events, (data) =>
         prisma.bookingEvent.createMany({ data }),
     );
+    if (pulse) await prisma.contactNote.createMany({ data: pulse.notes });
 
     let sold = "";
     if (biz.billing && packs && subscriptions) {
-        await writeCatalogue(ctx, packs, subscriptions);
-        await createInChunks(subscriptions.subscriptions, (data) =>
-            prisma.customerSubscription.createMany({ data }),
-        );
         await prisma.packPurchase.createMany({ data: packs.purchases });
         await prisma.packRedemption.createMany({ data: packs.redemptions });
 
@@ -1294,6 +1359,7 @@ async function writeCatalogue(
                 price: plan.price,
                 currency: plan.currency,
                 interval: plan.interval,
+                classesPerMonth: plan.classesPerMonth,
                 status: plan.status,
                 updatedAt: plan.updatedAt,
             },
