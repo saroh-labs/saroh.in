@@ -52,8 +52,9 @@ export async function instanceApps(): Promise<InstanceApps | null> {
             {
                 key: "accounts",
                 name: "Your account",
-                description: "Your sign-in, profile and security.",
-                href: at("accounts", "/account"),
+                description:
+                    "Your businesses, your role in each, and your profile.",
+                href: at("accounts", "/businesses"),
             },
             {
                 key: "help",
