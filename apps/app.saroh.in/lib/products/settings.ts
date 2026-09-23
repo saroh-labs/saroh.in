@@ -149,3 +149,21 @@ export function getSkuPreview(
         `/stores/${storeId}/sku-pattern/preview?pattern=${encodeURIComponent(pattern)}`,
     );
 }
+
+// ---- Custom fields (#482) ----
+
+export type FieldType = "TEXT" | "NUMBER" | "DATE" | "YES_NO";
+
+export interface FieldView {
+    id: string;
+    name: string;
+    type: FieldType;
+    onShop: boolean;
+    position: number;
+    categoryIds: string[];
+    productCount: number;
+}
+
+export function listFields(storeId: string): Promise<FieldView[] | null> {
+    return getJson<FieldView[]>(`/stores/${storeId}/fields`);
+}

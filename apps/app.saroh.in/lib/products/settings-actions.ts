@@ -4,6 +4,8 @@ import type {
     CategoryRemoval,
     DefaultsEntry,
     DefaultsSaveResult,
+    FieldType,
+    FieldView,
     SkuSettings,
 } from "./settings";
 import { getSkuPreview, send } from "./settings";
@@ -172,4 +174,37 @@ export async function saveSkuPattern(
         pattern,
         suggest,
     });
+}
+
+// ---- Custom fields ----
+
+export async function addField(storeId: string, name: string, type: FieldType) {
+    return send<FieldView>(`${base(storeId)}/fields`, "POST", { name, type });
+}
+
+export async function updateField(
+    storeId: string,
+    fieldId: string,
+    patch: { name?: string; onShop?: boolean; categoryIds?: string[] },
+) {
+    return send<FieldView>(
+        `${base(storeId)}/fields/${encodeURIComponent(fieldId)}`,
+        "PATCH",
+        patch,
+    );
+}
+
+/** Soft: the values stay, and Undo restores it. */
+export async function removeField(storeId: string, fieldId: string) {
+    return send<{ id: string; name: string }>(
+        `${base(storeId)}/fields/${encodeURIComponent(fieldId)}`,
+        "DELETE",
+    );
+}
+
+export async function restoreField(storeId: string, fieldId: string) {
+    return send<FieldView>(
+        `${base(storeId)}/fields/${encodeURIComponent(fieldId)}/restore`,
+        "POST",
+    );
 }

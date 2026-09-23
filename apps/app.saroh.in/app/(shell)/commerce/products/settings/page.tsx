@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { CategoriesTab } from "@/components/commerce/product-settings/categories-tab";
 import { DefaultsTab } from "@/components/commerce/product-settings/defaults-tab";
+import { FieldsTab } from "@/components/commerce/product-settings/fields-tab";
 import { OptionsTab } from "@/components/commerce/product-settings/options-tab";
 import { ProductSettings } from "@/components/commerce/product-settings/product-settings";
 import { SkuTab } from "@/components/commerce/product-settings/sku-tab";
@@ -17,14 +18,21 @@ import {
     getCatalogue,
     getSkuPreview,
     getSkuSettings,
+    listFields,
 } from "@/lib/products/settings";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Product settings" };
 
-/** The tabs that are built; custom fields and allergens arrive with #482 and #483. */
-const BUILT: SettingsTab[] = ["categories", "options", "sku", "defaults"];
+/** The tabs that are built; allergens arrive with #483. */
+const BUILT: SettingsTab[] = [
+    "categories",
+    "options",
+    "fields",
+    "sku",
+    "defaults",
+];
 
 /**
  * Sell → Products → Settings (#470): one storefront's categories, the
@@ -62,7 +70,10 @@ export default async function ProductSettingsPage({
 
     const tab: SettingsTab =
         isSettingsTab(rawTab) && BUILT.includes(rawTab) ? rawTab : "categories";
-    const catalogue = await getCatalogue(store.id).catch(() => null);
+    const [catalogue, fields] = await Promise.all([
+        getCatalogue(store.id).catch(() => null),
+        listFields(store.id).catch(() => null),
+    ]);
     const sku =
         tab === "sku" ? await getSkuSettings(store.id).catch(() => null) : null;
     const skuPreview = sku
@@ -98,6 +109,7 @@ export default async function ProductSettingsPage({
                             count: catalogue.categories.length + 1,
                         },
                         { key: "options", count: catalogue.options.length },
+                        { key: "fields", count: fields?.length ?? 0 },
                         { key: "sku" },
                         { key: "defaults" },
                     ]}
@@ -109,6 +121,12 @@ export default async function ProductSettingsPage({
                         />
                     ) : tab === "options" ? (
                         <OptionsTab storeId={store.id} catalogue={catalogue} />
+                    ) : tab === "fields" ? (
+                        <FieldsTab
+                            storeId={store.id}
+                            catalogue={catalogue}
+                            fields={fields ?? []}
+                        />
                     ) : tab === "sku" ? (
                         <SkuTab
                             storeId={store.id}

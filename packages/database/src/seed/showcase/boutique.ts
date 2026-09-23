@@ -317,6 +317,9 @@ export async function seedBoutique(
     // --- discount codes: one on a category, one on everything, one ended
     await writeDiscounts(prisma, { storeId, orgId, now, categoryId });
 
+    // --- custom fields (#482): two on the shop, one for the team
+    await writeFields(prisma, { storeId, orgId, categoryId, placed });
+
     return { id: orgId, name: BOUTIQUE_NAME, prefix: sid("") };
 }
 
@@ -749,6 +752,98 @@ async function writeDiscounts(
             },
         },
     });
+}
+
+/**
+ * Three custom fields, so the editor's "More about it" and the shop's
+ * details have something real to show: skin type for serums and
+ * moisturisers, fabric care for dresses (both on the shop), and a supplier
+ * batch the team keeps for recalls.
+ */
+async function writeFields(
+    prisma: Db,
+    ctx: {
+        storeId: string;
+        orgId: string;
+        categoryId: Record<string, string>;
+        placed: Record<string, { productId: string }>;
+    },
+) {
+    const { storeId, orgId, categoryId, placed } = ctx;
+    // Values and category links go with their field (cascade).
+    await prisma.productField.deleteMany({
+        where: { id: { startsWith: sid("field") } },
+    });
+    const fields: {
+        key: string;
+        name: string;
+        onShop: boolean;
+        cats: string[];
+        values: Record<string, string>;
+    }[] = [
+        {
+            key: "skin",
+            name: "Skin type",
+            onShop: true,
+            cats: ["serums", "moisturisers"],
+            values: {
+                "vitamin-c-brightening-serum":
+                    "All skin types, including sensitive",
+                "niacinamide-clarifying-serum": "Oily and combination",
+                "hyaluronic-water-drop-serum": "Dry and dehydrated",
+                "oat-ceramide-gel-moisturiser": "Sensitive and barrier-damaged",
+            },
+        },
+        {
+            key: "fabric",
+            name: "Fabric care",
+            onShop: true,
+            cats: ["dresses"],
+            values: {
+                "belted-linen-shirt-dress": "Hand wash cold, line dry in shade",
+                "satin-slip-dress": "Dry clean only",
+                "floral-wrap-maxi-dress": "Machine wash cold, gentle cycle",
+            },
+        },
+        {
+            key: "batch",
+            name: "Supplier batch",
+            onShop: false,
+            cats: ["serums"],
+            values: {
+                "vitamin-c-brightening-serum": "VL-VC-2609",
+                "niacinamide-clarifying-serum": "VL-NC-2608",
+            },
+        },
+    ];
+    for (let i = 0; i < fields.length; i++) {
+        const f = fields[i];
+        await prisma.productField.create({
+            data: {
+                id: sid("field", f.key),
+                storeId,
+                organizationId: orgId,
+                name: f.name,
+                type: "TEXT",
+                onShop: f.onShop,
+                position: i,
+                categories: {
+                    create: f.cats.map((c) => ({
+                        id: sid("field", f.key, c),
+                        categoryId: categoryId[c],
+                    })),
+                },
+                values: {
+                    create: Object.entries(f.values).map(([slug, value]) => ({
+                        id: sid("field", f.key, slug),
+                        productId: placed[slug].productId,
+                        organizationId: orgId,
+                        value,
+                    })),
+                },
+            },
+        });
+    }
 }
 
 /** This business's volume, children first. Its catalogue stays. */

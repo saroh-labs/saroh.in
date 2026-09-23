@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     customersSee,
+    customFieldText,
     discountAmount,
     onTheShop,
     plural,
@@ -91,5 +92,14 @@ describe("product page display rules", () => {
     it("treats a detail with no switch as shown", () => {
         expect(onTheShop({}, "maker")).toBe(true);
         expect(onTheShop({ maker: false }, "maker")).toBe(false);
+    });
+
+    it("reads a custom field's value the way people say it", () => {
+        expect(customFieldText({ type: "YES_NO", value: "true" })).toBe("Yes");
+        expect(customFieldText({ type: "DATE", value: "2026-09-24" })).toBe(
+            "24 Sep 2026",
+        );
+        expect(customFieldText({ type: "NUMBER", value: "12" })).toBe("12");
+        expect(customFieldText({ type: "TEXT", value: null })).toBe("");
     });
 });

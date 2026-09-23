@@ -71,6 +71,8 @@ export interface ProductPageData {
     maker: string | null;
     warranty: string | null;
     returns: string | null;
+    /** The merchant's own fields switched on for the shop (#482), filled. */
+    extras?: { label: string; value: string }[];
     images: ProductPageImage[];
     optionName: string | null;
     variants: ProductPageVariant[];
@@ -213,6 +215,7 @@ export default function ProductPage({
         ...(product.returns
             ? [{ label: "Returns", value: product.returns }]
             : []),
+        ...(product.extras ?? []),
     ];
 
     return (

@@ -189,3 +189,34 @@ export function onTheShop(
 ): boolean {
     return fields[key] !== false;
 }
+
+const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+];
+
+/** A custom field's value as people read it: "Yes", "24 Sep 2026", "12". */
+export function customFieldText(f: {
+    type: "TEXT" | "NUMBER" | "DATE" | "YES_NO";
+    value: string | null;
+}): string {
+    if (f.value === null) return "";
+    if (f.type === "YES_NO") return f.value === "true" ? "Yes" : "No";
+    if (f.type === "DATE") {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f.value);
+        return m
+            ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1] ?? ""} ${m[1]}`
+            : f.value;
+    }
+    return f.value;
+}

@@ -4,13 +4,14 @@ import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { StoresModule } from "../stores/stores.module";
 import { CatalogueController } from "./catalogue.controller";
 import { CatalogueService } from "./catalogue.service";
+import { FieldsService } from "./fields.service";
 import { OptionsService } from "./options.service";
 import { SkuService } from "./sku.service";
 
 @Module({
     imports: [StoresModule, CapabilitiesModule],
     controllers: [CatalogueController],
-    providers: [CatalogueService, OptionsService, SkuService],
+    providers: [CatalogueService, OptionsService, SkuService, FieldsService],
     exports: [CatalogueService],
 })
 export class CatalogueModule {}

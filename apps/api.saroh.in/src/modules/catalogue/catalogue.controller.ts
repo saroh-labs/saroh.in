@@ -20,12 +20,15 @@ import { RequireModule } from "../capabilities/require-module.decorator";
 import { CatalogueService } from "./catalogue.service";
 import {
     AddOptionValueDto,
+    CreateFieldDto,
     CreateOptionDto,
     RenameOptionDto,
     SaveDefaultsDto,
     SaveSkuPatternDto,
     UndoDefaultsDto,
+    UpdateFieldDto,
 } from "./dto";
+import { FieldsService } from "./fields.service";
 import { OptionsService } from "./options.service";
 import { SkuService } from "./sku.service";
 
@@ -42,7 +45,58 @@ export class CatalogueController {
         private readonly catalogue: CatalogueService,
         private readonly options: OptionsService,
         private readonly sku: SkuService,
+        private readonly fields: FieldsService,
     ) {}
+
+    // ---- Custom fields (#482) ----
+
+    @Get("fields")
+    listFields(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+    ) {
+        return this.fields.list(storeId, user.id);
+    }
+
+    @Post("fields")
+    @HttpCode(201)
+    createField(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Body() dto: CreateFieldDto,
+    ) {
+        return this.fields.create(storeId, user.id, dto);
+    }
+
+    @Patch("fields/:fieldId")
+    updateField(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("fieldId") fieldId: string,
+        @Body() dto: UpdateFieldDto,
+    ) {
+        return this.fields.update(storeId, fieldId, user.id, dto);
+    }
+
+    /** Soft: its values are kept, and restore brings it back. */
+    @Delete("fields/:fieldId")
+    removeField(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("fieldId") fieldId: string,
+    ) {
+        return this.fields.remove(storeId, fieldId, user.id);
+    }
+
+    @Post("fields/:fieldId/restore")
+    @HttpCode(200)
+    restoreField(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("fieldId") fieldId: string,
+    ) {
+        return this.fields.restore(storeId, fieldId, user.id);
+    }
 
     /** The pattern, whether to suggest, and a product's number for {N}. */
     @Get("sku-pattern")

@@ -92,8 +92,19 @@ export interface Inventory {
     lowStockAlert: number;
 }
 
+/** A custom field (#482) as a product holds it. */
+export interface ProductCustomField {
+    id: string;
+    name: string;
+    type: "TEXT" | "NUMBER" | "DATE" | "YES_NO";
+    onShop: boolean;
+    value: string | null;
+}
+
 export interface ProductDetail extends Product {
     variants: Variant[];
+    /** The fields its category asks for, with its values. */
+    customFields: ProductCustomField[];
     inventory: Inventory | null;
     mrp: string | null;
     howToUse: string | null;
@@ -366,6 +377,8 @@ export interface ProductPatch {
     seoTitle?: string | null;
     seoDescription?: string | null;
     seoImageId?: string | null;
+    /** Custom fields: field id → value; "" or null clears it. */
+    customFields?: Record<string, string | null>;
 }
 
 export function patchProduct(

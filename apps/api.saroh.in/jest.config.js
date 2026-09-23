@@ -135,6 +135,7 @@ module.exports = {
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
+        "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
         "<rootDir>/src/modules/products/products.gate.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         // #173 — organization stamping on create; DB-free so CI catches a

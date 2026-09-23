@@ -1,8 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { DatePicker } from "@saroh/ui/date-picker";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
+import Link from "next/link";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import {
@@ -17,7 +20,8 @@ import {
     madeByPatch,
     madeBySchema,
 } from "@/lib/products/editor-sections";
-import type { ProductDetail } from "@/lib/products/service";
+import { productSettingsHref } from "@/lib/products/links";
+import type { ProductCustomField, ProductDetail } from "@/lib/products/service";
 
 import { useEditor, useSection } from "./editor-state";
 import { boxClass, FieldHelp, FieldLabel } from "./fields";
@@ -55,6 +59,19 @@ export function MadeBySection({
 }) {
     const { canWrite } = useEditor();
     const baseline = product ? madeByFrom(product) : EMPTY;
+    const fields = product?.customFields ?? [];
+    const baseCustom = customFrom(fields);
+    const customKey = JSON.stringify(baseCustom);
+    const [custom, setCustom] = useState(baseCustom);
+    const [seenCustom, setSeenCustom] = useState(customKey);
+    if (seenCustom !== customKey) {
+        setSeenCustom(customKey);
+        setCustom(baseCustom);
+    }
+    const customDirty = JSON.stringify(custom) !== customKey;
+    const customProblem =
+        fields.map((f) => fieldProblem(f, custom[f.id] ?? "")).find(Boolean) ??
+        "";
     const form = useForm<MadeByValues>({
         resolver: zodResolver(madeBySchema),
         values: baseline,
@@ -68,16 +85,18 @@ export function MadeBySection({
 
     useSection(
         "madeby",
-        { dirty: isDirty, problem: firstProblem(madeBySchema, v) },
+        {
+            dirty: isDirty || customDirty,
+            problem: firstProblem(madeBySchema, v) || customProblem,
+        },
         {
             save: async () => {
                 if (!product) return false;
                 const values = form.getValues();
-                const res = await patchProduct(
-                    storeId,
-                    product.id,
-                    madeByPatch(values),
-                );
+                const res = await patchProduct(storeId, product.id, {
+                    ...madeByPatch(values),
+                    ...(customDirty ? { customFields: custom } : {}),
+                });
                 if (!res.ok) {
                     if (res.field === "maker" || res.field === "returnsText")
                         form.setError(res.field, { message: res.error });
@@ -85,9 +104,13 @@ export function MadeBySection({
                     return false;
                 }
                 form.reset(values);
+                setCustom(custom);
                 return true;
             },
-            discard: () => form.reset(baseline),
+            discard: () => {
+                form.reset(baseline);
+                setCustom(baseCustom);
+            },
             collect: () => madeByPatch(form.getValues()),
         },
     );
@@ -289,6 +312,163 @@ export function MadeBySection({
                     ) : null}
                 </>
             ) : null}
+
+            {fields.length > 0 && product ? (
+                <MoreAboutIt
+                    fields={fields}
+                    values={custom}
+                    onChange={(id, value) =>
+                        setCustom((c) => ({ ...c, [id]: value }))
+                    }
+                    categoryName={product.category?.name ?? ""}
+                    manageHref={productSettingsHref(storeId, "fields")}
+                    disabled={ro}
+                />
+            ) : null}
         </SectionCard>
+    );
+}
+
+function customFrom(fields: ProductCustomField[]): Record<string, string> {
+    return Object.fromEntries(fields.map((f) => [f.id, f.value ?? ""]));
+}
+
+/** What a value must fix, in the API's words; "" when it is fine. */
+function fieldProblem(f: ProductCustomField, value: string): string {
+    const v = value.trim();
+    if (!v) return "";
+    if (f.type === "NUMBER" && !/^-?\d+(\.\d+)?$/.test(v))
+        return `${f.name} is a number.`;
+    if (f.type === "TEXT" && v.length > 200)
+        return `Keep ${f.name} under 200 characters.`;
+    return "";
+}
+
+const toDate = (v: string): Date | undefined => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+    return m
+        ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+        : undefined;
+};
+const fromDate = (d: Date | undefined): string =>
+    d
+        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+        : "";
+
+/**
+ * "More about it": the custom fields the product's category asks for (#482),
+ * each saying who sees it. Saved with this section.
+ */
+function MoreAboutIt({
+    fields,
+    values,
+    onChange,
+    categoryName,
+    manageHref,
+    disabled,
+}: {
+    fields: ProductCustomField[];
+    values: Record<string, string>;
+    onChange: (fieldId: string, value: string) => void;
+    categoryName: string;
+    manageHref: string;
+    disabled: boolean;
+}) {
+    return (
+        <div className="mt-[18px] border-t border-border/70 pt-3.5">
+            <div className="mb-2.5 flex flex-wrap items-baseline gap-2">
+                <span className="text-[12.5px] font-semibold">
+                    More about it
+                </span>
+                <span className="text-[11.5px] text-muted-foreground">
+                    Asked of everything in {categoryName}.
+                </span>
+                <Link
+                    href={manageHref}
+                    className="ml-auto text-[12px] text-brand hover:text-foreground"
+                >
+                    Manage fields
+                </Link>
+            </div>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+                {fields.map((f) => {
+                    const value = values[f.id] ?? "";
+                    const problem = fieldProblem(f, value);
+                    const id = `pe-field-${f.id}`;
+                    return (
+                        <div key={f.id} className="min-w-0">
+                            <FieldLabel
+                                htmlFor={f.type === "YES_NO" ? undefined : id}
+                                aside={
+                                    <span
+                                        className={cn(
+                                            "shrink-0 rounded-full px-[7px] py-px text-[11px] font-semibold",
+                                            f.onShop
+                                                ? "bg-success-subtle text-success-subtle-foreground"
+                                                : "bg-muted text-muted-foreground",
+                                        )}
+                                    >
+                                        {f.onShop ? "On the shop" : "Team only"}
+                                    </span>
+                                }
+                            >
+                                {f.name}
+                            </FieldLabel>
+                            {f.type === "DATE" ? (
+                                <DatePicker
+                                    id={id}
+                                    value={toDate(value)}
+                                    onValueChange={(d) =>
+                                        onChange(f.id, fromDate(d))
+                                    }
+                                    disabled={disabled}
+                                    aria-label={f.name}
+                                    className="h-9 w-full rounded-[8px] text-[13px]"
+                                />
+                            ) : f.type === "YES_NO" ? (
+                                <ChoicePills
+                                    label={f.name}
+                                    value={
+                                        value === "true"
+                                            ? "true"
+                                            : value === "false"
+                                              ? "false"
+                                              : ""
+                                    }
+                                    disabled={disabled}
+                                    onChange={(next) => onChange(f.id, next)}
+                                    options={[
+                                        { value: "true", label: "Yes" },
+                                        { value: "false", label: "No" },
+                                        { value: "", label: "Not said" },
+                                    ]}
+                                />
+                            ) : (
+                                <input
+                                    id={id}
+                                    value={value}
+                                    disabled={disabled}
+                                    inputMode={
+                                        f.type === "NUMBER"
+                                            ? "decimal"
+                                            : undefined
+                                    }
+                                    onChange={(e) =>
+                                        onChange(f.id, e.target.value)
+                                    }
+                                    aria-invalid={!!problem}
+                                    className={boxClass({ bad: !!problem })}
+                                />
+                            )}
+                            {problem ? (
+                                <FieldHelp className="mt-1.5" tone="bad">
+                                    {problem}
+                                </FieldHelp>
+                            ) : null}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
     );
 }

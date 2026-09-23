@@ -3,7 +3,7 @@ import { Card } from "@saroh/ui/card";
 import type { ReactNode } from "react";
 
 import type { ProductOverview } from "@/lib/products/overview-rules";
-import { onTheShop } from "@/lib/products/overview-rules";
+import { customFieldText, onTheShop } from "@/lib/products/overview-rules";
 
 import { SectionTitle } from "./overview-parts";
 import { SheetButton } from "./sheet-button";
@@ -91,6 +91,19 @@ export function ProductDetailsCard({
                             ? product.returnsText
                             : "The storefront's rule"}
                     </Row>
+                    {product.customFields.map((f) => (
+                        <Row
+                            key={f.id}
+                            label={f.name}
+                            shown={f.value === null ? null : f.onShop}
+                        >
+                            {f.value === null ? (
+                                <Muted>Not set.</Muted>
+                            ) : (
+                                customFieldText(f)
+                            )}
+                        </Row>
+                    ))}
                     <Row label="Address">
                         <span className="break-all font-mono text-[12px]">
                             /products/{product.slug}

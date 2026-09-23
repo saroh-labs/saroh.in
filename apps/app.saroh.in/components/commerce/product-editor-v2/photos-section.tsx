@@ -266,7 +266,7 @@ export function PhotosSection({
                                     aria-label={`What photo ${i + 1} shows, for people who can't see it`}
                                     className="-mx-1 h-6 w-[calc(100%+0.5rem)] truncate rounded-[5px] border border-transparent bg-transparent px-1 text-[11.5px] font-medium placeholder:font-normal placeholder:text-muted-foreground hover:border-border focus-visible:border-border focus-visible:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
                                 />
-                                <div className="mt-1 flex flex-wrap gap-[3px]">
+                                <div className="mt-1 flex gap-[3px] coarse:flex-wrap">
                                     <button
                                         type="button"
                                         className={tileBtn}

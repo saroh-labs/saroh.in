@@ -10,7 +10,7 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import type { EditorSection } from "@/lib/products/links";
 import { productEditHref, productHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
-import { onTheShop } from "@/lib/products/overview-rules";
+import { customFieldText, onTheShop } from "@/lib/products/overview-rules";
 
 /**
  * The Customer view: the product as its shop page shows it, drawn by the
@@ -244,6 +244,9 @@ export function toShopData(overview: ProductOverview): ProductPageData {
                   .filter(Boolean)
                   .join(", ") || null,
         warranty: shown("warranty") ? product.warranty : null,
+        extras: product.customFields
+            .filter((f) => f.onShop && f.value !== null)
+            .map((f) => ({ label: f.name, value: customFieldText(f) })),
         returns: shown("returns")
             ? product.returnsMode === "OWN"
                 ? product.returnsText

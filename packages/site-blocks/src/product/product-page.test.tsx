@@ -131,6 +131,19 @@ describe("ProductPage", () => {
         expect(screen.getByLabelText("Note 7")).toBeInTheDocument();
     });
 
+    it("lists the merchant's own fields shown on the shop", () => {
+        render(
+            <ProductPage
+                product={{
+                    ...dress,
+                    extras: [{ label: "Fabric care", value: "Dry clean only" }],
+                }}
+            />,
+        );
+        expect(screen.getByText("Fabric care")).toBeInTheDocument();
+        expect(screen.getByText("Dry clean only")).toBeInTheDocument();
+    });
+
     it("renders with no photos, no variants and no reviews", () => {
         render(
             <ProductPage

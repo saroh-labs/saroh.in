@@ -78,6 +78,11 @@ const nullableTrim = ({ value }: { value: unknown }) => {
  * text fields take "" or null to clear.
  */
 class ProductSectionFields {
+    /** Custom fields (#482): field id → value; "" or null clears it. */
+    @IsOptional()
+    @IsObject()
+    customFields?: Record<string, string | null>;
+
     @IsOptional()
     @Transform(nullableTrim)
     @ValidateIf((_o, v) => v !== null)

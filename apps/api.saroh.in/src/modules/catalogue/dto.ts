@@ -172,3 +172,35 @@ export class SaveSkuPatternDto {
     @IsBoolean()
     suggest!: boolean;
 }
+
+export class CreateFieldDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "A field needs a name." })
+    @MaxLength(40, { message: "Keep it under 40 characters." })
+    name!: string;
+
+    @IsIn(["TEXT", "NUMBER", "DATE", "YES_NO"], {
+        message: "Unknown field type",
+    })
+    type!: "TEXT" | "NUMBER" | "DATE" | "YES_NO";
+}
+
+export class UpdateFieldDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "A field needs a name." })
+    @MaxLength(40, { message: "Keep it under 40 characters." })
+    name?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    onShop?: boolean;
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(500)
+    @IsString({ each: true })
+    categoryIds?: string[];
+}

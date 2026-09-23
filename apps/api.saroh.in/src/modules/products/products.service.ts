@@ -9,6 +9,10 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import {
+    productFieldsFor,
+    saveProductFieldValues,
+} from "../catalogue/fields.service";
 import { sanitizeRichHtml } from "../sites/sanitize";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
@@ -113,7 +117,12 @@ export class ProductsService {
         if (!product) {
             throw new NotFoundException("Product not found");
         }
-        return serializeProductDetail(product);
+        const customFields = await productFieldsFor(
+            storeId,
+            product.id,
+            product.categoryId,
+        );
+        return { ...serializeProductDetail(product), customFields };
     }
 
     async create(storeId: string, userId: string, dto: CreateProductDto) {
@@ -137,6 +146,7 @@ export class ProductsService {
         });
         const shopFields = cleanShopFields(dto.shopFields ?? {});
 
+        let createdId: string;
         try {
             const product = await prisma.product.create({
                 data: {
@@ -167,19 +177,28 @@ export class ProductsService {
                     optionId: dto.optionId ?? null,
                 },
             });
-            if (organizationId) {
-                await this.activation?.firstProductCreated(
-                    organizationId,
-                    product.id,
-                );
-            }
-            return { id: product.id };
+            createdId = product.id;
         } catch {
             throw new ConflictException({
                 message: "That slug is already taken",
                 field: "slug",
             });
         }
+        if (organizationId) {
+            if (dto.customFields) {
+                await saveProductFieldValues(
+                    storeId,
+                    createdId,
+                    organizationId,
+                    dto.customFields,
+                );
+            }
+            await this.activation?.firstProductCreated(
+                organizationId,
+                createdId,
+            );
+        }
+        return { id: createdId };
     }
 
     async update(
@@ -239,7 +258,7 @@ export class ProductsService {
         userId: string,
         dto: PatchProductDto,
     ) {
-        await this.requireWrite(storeId, userId);
+        const organizationId = await this.requireWrite(storeId, userId);
         const current = await prisma.product.findFirst({
             where: { id: productId, storeId },
             select: {
@@ -323,6 +342,16 @@ export class ProductsService {
                 : current.returnsText,
         });
 
+        // Custom field values first: a value its type refuses stops the
+        // whole section before anything is written.
+        if (dto.customFields && organizationId) {
+            await saveProductFieldValues(
+                storeId,
+                productId,
+                organizationId,
+                dto.customFields,
+            );
+        }
         if (Object.keys(data).length > 0) {
             try {
                 await prisma.product.update({ where: { id: productId }, data });
