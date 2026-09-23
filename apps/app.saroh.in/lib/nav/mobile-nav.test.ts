@@ -139,6 +139,7 @@ describe("the sheet", () => {
         expect(bookings?.rows.map((r) => r.label)).toEqual([
             "Calendar",
             "Services",
+            "Availability",
             "Courses",
             "Class packs",
         ]);

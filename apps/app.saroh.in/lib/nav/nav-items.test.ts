@@ -658,8 +658,29 @@ describe("Class packs (ADR-007), a page under Bookings", () => {
         expect(bookings?.children?.map((c) => c.href)).toEqual([
             "/bookings",
             "/services",
+            "/bookings/availability",
             "/class-packs",
         ]);
+    });
+
+    it("lights Availability alone on its page, and Calendar on the rest", () => {
+        const kids = [
+            { href: "/bookings" },
+            { href: "/bookings/availability" },
+        ];
+        expect(
+            isNavChildCurrent("/bookings/availability", "/bookings", kids),
+        ).toBe(false);
+        expect(
+            isNavChildCurrent(
+                "/bookings/availability",
+                "/bookings/availability",
+                kids,
+            ),
+        ).toBe(true);
+        expect(isNavChildCurrent("/bookings/all", "/bookings", kids)).toBe(
+            true,
+        );
     });
 
     it("marks Class packs on its purchases and editor pages", () => {
@@ -756,6 +777,7 @@ describe("Bookings, a section across two modules", () => {
         expect(navRowsForModule("APPOINTMENTS")).toEqual([
             "Calendar",
             "Services",
+            "Availability",
             "Class packs",
         ]);
         expect(navRowsForModule("COURSES")).toEqual(["Courses"]);
