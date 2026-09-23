@@ -1,13 +1,14 @@
 import { badgeVariants } from "@saroh/ui/badge";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { DeleteCustomerMenu } from "@/components/customers/delete-customer-menu";
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { CustomerForm } from "@/components/stores/customer-form";
+import { contactForCustomer } from "@/lib/customer-workspace/detail";
 import { customerHref } from "@/lib/customers/links";
 import type { Customer, CustomerListItem } from "@/lib/customers/service";
 import { getCustomer, listCustomers } from "@/lib/customers/service";
@@ -37,6 +38,8 @@ const STANDING: Record<
  * share an email into one person. This page is one of those records — its
  * details are what that storefront knows — with the person's orders beside
  * it, and the other storefronts they buy at one click away.
+ *
+ * A record someone linked to a contact opens Customer Detail instead.
  */
 export default async function CustomerPage({
     params,
@@ -46,11 +49,15 @@ export default async function CustomerPage({
     searchParams: Promise<{ storefront?: string }>;
 }) {
     await requireSession();
-    const [{ customerId }, { storefront }, stores] = await Promise.all([
+    const [{ customerId }, { storefront }] = await Promise.all([
         params,
         searchParams,
-        listBusinessStores(),
     ]);
+    // Linked to a contact: the person's page is Customer Detail (U18), which
+    // reads this record's orders through the link. Unlinked, this page stands.
+    const contactId = await contactForCustomer(customerId);
+    if (contactId) redirect(`/customers/${encodeURIComponent(contactId)}`);
+    const stores = await listBusinessStores();
     const found = await findCustomer(stores, customerId, storefront);
     if (!found) notFound();
     const { store, customer } = found;

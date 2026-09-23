@@ -38,7 +38,12 @@ looks equivalent and is not:
 falls back to the `*.saroh.in` production list, so a return-to on a `.localhost`
 origin is correctly refused and sign-in lands on the app launcher instead of the
 page asked for (#222). The root `.env.example` has the value; an ad-hoc `turbo run dev`
-with your own env does not inherit it.
+with your own env does not inherit it. A second copy of the app under another
+portless name (a worktree's `customers-app.saroh`, say) must add its own origin
+to the list for both that app and the API it calls: the app's middleware answers
+every server action from an unlisted origin with `403 Untrusted request origin`,
+which the page only reports as "An unexpected response was received from the
+server".
 
 A **merchant's own site** hangs off the renderer's apex, so the seeded
 `northwind` site is https://northwind.saroh.app.localhost — that wildcard is

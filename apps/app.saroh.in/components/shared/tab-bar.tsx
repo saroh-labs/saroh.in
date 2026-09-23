@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import type { NavCounts, NavRole } from "@/components/shared/nav-items";
-import { navFor } from "@/components/shared/nav-items";
+import { navFor, navPathname } from "@/components/shared/nav-items";
 import { TabBarSheet } from "@/components/shared/tab-bar-sheet";
 import type { MobileTab } from "@/lib/nav/mobile-nav";
 import { buildMobileNav } from "@/lib/nav/mobile-nav";
@@ -42,10 +42,10 @@ export function TabBar({
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
 }) {
-    const pathname = usePathname();
+    const groups = navFor({ role, actions, moduleKeys });
     const nav = buildMobileNav({
-        groups: navFor({ role, actions, moduleKeys }),
-        pathname,
+        groups,
+        pathname: navPathname(usePathname(), groups),
         counts,
         unread,
     });

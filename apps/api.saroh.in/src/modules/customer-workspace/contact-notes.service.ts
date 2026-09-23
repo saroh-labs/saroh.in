@@ -27,6 +27,8 @@ export interface ContactNoteView {
     body: string;
     allergens: { id: string; name: string }[];
     createdByUserId: string | null;
+    /** Who wrote it, by name; null when they have no name or have left. */
+    author: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -58,6 +60,7 @@ function noteView(row: NoteRow): ContactNoteView {
         body: row.body,
         allergens: row.allergens.map((a) => a.allergen),
         createdByUserId: row.createdByUserId,
+        author: null,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
     };
@@ -74,7 +77,55 @@ export async function loadContactNotes(
         orderBy: { createdAt: "desc" },
         select: NOTE_SELECT,
     });
-    return rows.map(noteView);
+    return withAuthors(db, rows.map(noteView));
+}
+
+/** Put the writer's name on each note: the team reads "Nisha, 12 Sep". */
+async function withAuthors(
+    db: typeof prisma,
+    notes: ContactNoteView[],
+): Promise<ContactNoteView[]> {
+    const ids = [
+        ...new Set(
+            notes.map((n) => n.createdByUserId).filter((id) => id !== null),
+        ),
+    ];
+    if (ids.length === 0) return notes;
+    const users = await db.user.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true },
+    });
+    // A blank name is no name: the note then says who wrote it as "Team".
+    const names = new Map(
+        users.map((u) => [u.id, u.name?.trim() ? u.name.trim() : null]),
+    );
+    return notes.map((n) => ({
+        ...n,
+        author: n.createdByUserId
+            ? (names.get(n.createdByUserId) ?? null)
+            : null,
+    }));
+}
+
+/**
+ * The allergens a note may name: every storefront's list in the
+ * organization, one per name (the first storefront's id wins), in list order.
+ */
+export async function allergenChoices(
+    db: typeof prisma,
+    organizationId: string,
+): Promise<{ id: string; name: string }[]> {
+    const rows = await db.storeAllergen.findMany({
+        where: { organizationId },
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        select: { id: true, name: true },
+    });
+    const seen = new Map<string, { id: string; name: string }>();
+    for (const r of rows) {
+        const key = r.name.trim().toLowerCase();
+        if (!seen.has(key)) seen.set(key, r);
+    }
+    return [...seen.values()];
 }
 
 /** Every allergen the notes name, once, in the order first named. */
@@ -199,7 +250,8 @@ export class ContactNotesService {
             select: NOTE_SELECT,
         });
         if (!row) throw new NotFoundException("Note not found");
-        return noteView(row);
+        const views = await withAuthors(this.db, [noteView(row)]);
+        return views[0] ?? noteView(row);
     }
 
     private requireSomething(body: string, allergenIds: string[]): void {

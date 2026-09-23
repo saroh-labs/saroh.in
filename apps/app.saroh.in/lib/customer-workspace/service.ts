@@ -1,5 +1,6 @@
 import { toFailure } from "@/lib/api/failure";
-import { apiFetch, orgBase } from "@/lib/api/http";
+import type { CrmResult } from "@/lib/api/http";
+import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * Unified customer workspace data access (#120). Server-only. The workspace
@@ -64,4 +65,32 @@ export async function linkCustomer(
         ok: false,
         error: toFailure(data, "Could not link customer.").error,
     };
+}
+
+export interface NoteInput {
+    body: string;
+    allergenIds: string[];
+}
+
+/** Write a note about a customer; the API checks each allergen id. */
+export function createNote(
+    contactId: string,
+    input: NoteInput,
+): Promise<CrmResult<{ id: string }>> {
+    return mutate<{ id: string }>(
+        `/customers/${encodeURIComponent(contactId)}/notes`,
+        "POST",
+        input,
+        "Could not add the note.",
+    );
+}
+
+export function deleteNote(
+    contactId: string,
+    noteId: string,
+): Promise<CrmResult<{ ok: true }>> {
+    return destroy<{ ok: true }>(
+        `/customers/${encodeURIComponent(contactId)}/notes/${encodeURIComponent(noteId)}`,
+        "Could not delete the note.",
+    );
 }

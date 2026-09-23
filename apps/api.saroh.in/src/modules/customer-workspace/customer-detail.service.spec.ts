@@ -47,6 +47,21 @@ const ORDER = {
     currency: "INR",
     store: BAKERY,
     _count: { items: 3 },
+    fulfilment: "DELIVERY",
+    stage: "DELIVERED",
+    deliveryLine1: "14 Hill Road",
+    deliveryLine2: null,
+    deliveryCity: "Bengaluru",
+    deliveryState: "Karnataka",
+    deliveryPostalCode: "560038",
+    items: [
+        {
+            productId: "prod_1",
+            quantity: 2,
+            product: { name: "Sourdough loaf" },
+            variant: { title: "800g" },
+        },
+    ],
 };
 
 const BOOKING = {
@@ -56,8 +71,15 @@ const BOOKING = {
     timezone: "Asia/Kolkata",
     status: "CONFIRMED",
     outcome: null,
-    service: { id: "svc_1", name: "Spin class" },
-    packRedemption: { reversedAt: null },
+    paidWith: null,
+    subscriptionId: null,
+    cancelledLate: false,
+    service: { id: "svc_1", name: "Spin class", capacity: 12 },
+    staff: { id: "staff_1", name: "Vikram" },
+    packRedemption: {
+        reversedAt: null,
+        purchase: { pack: { name: "10 classes" } },
+    },
 };
 
 const SUBSCRIPTION = {
@@ -80,6 +102,7 @@ const PACK = {
     price: "3000",
     currency: "INR",
     expiresAt: FUTURE,
+    createdAt: LONG_AGO,
     pack: { id: "pack_1", name: "10 classes" },
     _count: { redemptions: 4 },
 };
@@ -94,6 +117,8 @@ const INVOICE = {
     issuedAt: PAST,
     dueAt: PAST,
     paidAt: PAST,
+    order: null,
+    subscription: { plan: { name: "Sourdough weekly" } },
 };
 
 type Views = { key: string; readiness: string }[];
@@ -150,16 +175,41 @@ function make(views: Views = ALL_ON) {
                 .fn()
                 .mockImplementation(({ where }) =>
                     Promise.resolve(
-                        where.outcome === "ATTENDED"
-                            ? 5
-                            : where.outcome === "NO_SHOW"
-                              ? 1
-                              : 7,
+                        where.subscriptionId
+                            ? 3
+                            : where.outcome === "ATTENDED"
+                              ? 5
+                              : where.outcome === "NO_SHOW"
+                                ? 1
+                                : where.cancelledLate
+                                  ? 2
+                                  : 7,
                     ),
                 ),
         },
         customerSubscription: {
             findMany: jest.fn().mockResolvedValue([SUBSCRIPTION]),
+            // No membership with classes a month, unless a test gives one.
+            findFirst: jest.fn().mockResolvedValue(null),
+        },
+        consent: {
+            findFirst: jest.fn().mockResolvedValue({
+                status: "GRANTED",
+                source: "checkout",
+                updatedAt: LONG_AGO,
+            }),
+        },
+        user: {
+            findMany: jest
+                .fn()
+                .mockResolvedValue([{ id: "user_1", name: "Nisha" }]),
+        },
+        storeAllergen: {
+            findMany: jest.fn().mockResolvedValue([
+                { id: "alg_nuts", name: "Nuts" },
+                { id: "alg_nuts_2", name: "nuts" },
+                { id: "alg_sesame", name: "Sesame" },
+            ]),
         },
         invoice: {
             findMany: jest.fn().mockImplementation(({ where }) =>
@@ -183,6 +233,12 @@ function make(views: Views = ALL_ON) {
                 ]),
         },
         packPurchase: { findMany: jest.fn().mockResolvedValue([PACK]) },
+        businessProfile: {
+            findUnique: jest
+                .fn()
+                .mockResolvedValue({ timezone: "Asia/Kolkata" }),
+        },
+        service: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const availability = {
         listViews: jest.fn().mockResolvedValue(views),
@@ -198,6 +254,7 @@ describe("CustomerDetailService", () => {
 
         expect(detail.contact.name).toBe("Asha Rao");
         expect(detail.money).toBe(true);
+        expect(detail.timezone).toBe("Asia/Kolkata");
         expect(detail.unavailable).toEqual([]);
 
         expect(detail.orders?.from).toBe("linked-customers");
@@ -227,9 +284,49 @@ describe("CustomerDetailService", () => {
             expect.objectContaining({ left: 6, standing: "ACTIVE" }),
         );
         expect(detail.bookings?.upcoming[0]).toEqual(
-            expect.objectContaining({ id: "bk_1", paidWithPack: true }),
+            expect.objectContaining({
+                id: "bk_1",
+                paidWithPack: true,
+                paidWith: "PACK",
+                packName: "10 classes",
+                isClass: true,
+                staff: { id: "staff_1", name: "Vikram" },
+                cancelledLate: false,
+            }),
         );
-        expect(detail.invoices?.rows[0].standing).toBe("PAID");
+        expect(detail.orders?.rows[0]).toEqual(
+            expect.objectContaining({
+                items: [
+                    {
+                        productId: "prod_1",
+                        name: "Sourdough loaf",
+                        variant: "800g",
+                        quantity: 2,
+                    },
+                ],
+                fulfilment: "DELIVERY",
+                delivery: "14 Hill Road, Bengaluru, Karnataka 560038",
+            }),
+        );
+        expect(detail.packs?.rows[0].boughtAt).toBe(LONG_AGO.toISOString());
+        expect(detail.notes?.rows[0].author).toBe("Nisha");
+        // One choice per allergen name, across storefronts.
+        expect(detail.notes?.allergenChoices).toEqual([
+            { id: "alg_nuts", name: "Nuts" },
+            { id: "alg_sesame", name: "Sesame" },
+        ]);
+        expect(detail.consent).toEqual({
+            status: "GRANTED",
+            source: "checkout",
+            at: LONG_AGO.toISOString(),
+        });
+        expect(detail.invoices?.rows[0]).toEqual(
+            expect.objectContaining({
+                standing: "PAID",
+                orderNumber: null,
+                planName: "Sourdough weekly",
+            }),
+        );
         expect(detail.notes?.rows[0].body).toBe("Severe nut allergy");
         expect(detail.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
 
@@ -238,12 +335,13 @@ describe("CustomerDetailService", () => {
             bookings: 7,
             attended: 5,
             noShows: 1,
-            lateCancels: null,
+            lateCancels: 2,
             classesLeft: {
                 total: 6,
                 packs: 6,
                 membership: null,
                 nextExpiry: FUTURE.toISOString(),
+                allowance: null,
             },
             // Paid orders plus paid invoices, each rupee once.
             spent: [{ currency: "INR", amount: "1650.00" }],
@@ -362,6 +460,57 @@ describe("CustomerDetailService", () => {
         expect(detail.stats.spent).toEqual([
             { currency: "INR", amount: "1200.00" },
         ]);
+    });
+
+    it("counts a membership's classes this month into classes left", async () => {
+        const { svc, db } = make();
+        db.customerSubscription.findFirst.mockResolvedValue({
+            id: "sub_m",
+            status: "ACTIVE",
+            timezone: "Asia/Kolkata",
+            plan: { name: "Monthly membership", classesPerMonth: 8 },
+        });
+
+        const detail = await svc.detail(OWNER, "c1");
+
+        expect(detail.stats.classesLeft).toEqual(
+            expect.objectContaining({
+                total: 11,
+                packs: 6,
+                membership: 5,
+                allowance: expect.objectContaining({
+                    subscriptionId: "sub_m",
+                    plan: "Monthly membership",
+                    perMonth: 8,
+                    used: 3,
+                    left: 5,
+                    paused: false,
+                }),
+            }),
+        );
+        // Counted as a booking with it is: confirmed or cancelled late.
+        const counted = (db.booking.count as jest.Mock).mock.calls
+            .map((c: [{ where: Record<string, unknown> }]) => c[0].where)
+            .find((w) => w.subscriptionId === "sub_m");
+        expect(counted?.OR).toEqual([
+            { status: "CONFIRMED" },
+            { cancelledLate: true },
+        ]);
+    });
+
+    it("leaves a paused membership no classes until it resumes", async () => {
+        const { svc, db } = make();
+        db.customerSubscription.findFirst.mockResolvedValue({
+            id: "sub_m",
+            status: "PAUSED",
+            timezone: "Asia/Kolkata",
+            plan: { name: "Monthly membership", classesPerMonth: 8 },
+        });
+
+        const detail = await svc.detail(OWNER, "c1");
+
+        expect(detail.stats.classesLeft?.allowance?.left).toBe(0);
+        expect(detail.stats.classesLeft?.total).toBe(6);
     });
 
     it("gives a Member no money and no billing blocks", async () => {

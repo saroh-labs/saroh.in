@@ -150,6 +150,24 @@ export class CustomerWorkspaceService {
         });
     }
 
+    /**
+     * The contact a store customer is linked to, if a person linked them
+     * (U18: the store customer's page opens Customer Detail). The oldest link
+     * wins when one customer was linked twice. Null when unlinked.
+     */
+    async contactFor(
+        ctx: OrganizationContext,
+        customerId: string,
+    ): Promise<{ contactId: string | null }> {
+        authorize(ctx, "contact:read");
+        const link = await this.db.customerIdentityLink.findFirst({
+            where: { organizationId: ctx.organizationId, customerId },
+            orderBy: { createdAt: "asc" },
+            select: { contactId: true },
+        });
+        return { contactId: link?.contactId ?? null };
+    }
+
     /** A chronological, module-gated activity timeline for one Contact. */
     async timeline(
         ctx: OrganizationContext,

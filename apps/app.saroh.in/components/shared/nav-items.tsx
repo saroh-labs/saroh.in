@@ -893,6 +893,34 @@ export function isNavChildCurrent(
     );
 }
 
+/**
+ * Pages that belong to a section without living under its address. Customer
+ * Detail (`/customers/:contactId`, U18) is rooted on the contact, so it is
+ * Sell › Customers where the business sells and Contacts where it does not:
+ * the first of its homes the actor's rail holds is where the rail says you
+ * are. Every other address is its own.
+ */
+const NAV_HOMES: readonly { prefix: string; homes: readonly string[] }[] = [
+    { prefix: "/customers/", homes: ["/commerce/customers", "/contacts"] },
+];
+
+export function navPathname(
+    pathname: string,
+    groups: readonly NavGroup[],
+): string {
+    const entry = NAV_HOMES.find((e) => pathname.startsWith(e.prefix));
+    if (!entry) return pathname;
+    const hrefs = new Set(
+        groups.flatMap((g) =>
+            g.items.flatMap((i) => [
+                i.href,
+                ...(i.children ?? []).map((c) => c.href),
+            ]),
+        ),
+    );
+    return entry.homes.find((h) => hrefs.has(h)) ?? pathname;
+}
+
 export function isNavItemActive(pathname: string, href: string): boolean {
     return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
