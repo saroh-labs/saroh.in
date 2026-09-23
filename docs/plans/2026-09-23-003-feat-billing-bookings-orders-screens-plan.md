@@ -770,6 +770,8 @@ flowchart TB
 **Verification:**
 - Side by side for both businesses.
 
+> **Done — #503** (merged). `/customers/[contactId]` is Customer Detail: tabs by business kind in `?tab=` (Rye: Overview, Orders, Subscriptions, Invoices, Notes; Pulse: Overview, Bookings, Membership, Invoices, Notes); notes with allergens from the store's list (Owner/Admin write, per the API rule), delete with Undo; "Possible match — link?" opens the existing link dialog; a linked store customer's page redirects here; per-source partial notice; Member sees no billing tabs, money or contact details. API read gained staff / paid-with / late-cancel on bookings, membership classes left this month, order lines and delivery, invoice order number and plan, note authors, offers consent, business timezone, and a customer → contact lookup. No merge (links only); consent Undo never invents a yes; Reviews / Courses tabs and rooms left out. `e2e/tests/customer-detail.spec.ts` 14/14 desk + phone.
+
 ---
 
 ### U19. The customer's booking page on a merchant site
