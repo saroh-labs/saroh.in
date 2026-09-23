@@ -243,6 +243,8 @@ flowchart TB
 **Verification:**
 - Rendered side by side with `SarohTabBar.dc.html` at 390 light/dark; nav test and four-scenes pass.
 
+> **Done — #487** (merged `677734a9`). Tab bar below 760px from the one nav source (`lib/nav/mobile-nav.ts`, 16 tests): four seats by preference (Home, current section, Sell/Calendar, Notifications), More sheet "Everything else" grouped by section with parent icons, Workspace group, footer note; focus to Close, trapped, Escape, focus back. Drawer deleted; rail, tab bar and command menu share one role/permission pair. Payments (Subscriptions, Invoices, Plans) and Bookings (Calendar, Services, Courses, Class packs) sections; a child may carry its own module key. `--tab-bar-inset` pads content, sticky bars and toasts. Shared `ReadOnlyNote`. Checked at 390 on Orders against the design (bar, badge, sheet). Tabs and rows are links; the bar sits at z-40 under dialogs; the current bar and badge use the Saffron fill (`highlight`).
+
 ---
 
 ### U3. Staff, their hours, time off and booking rules
