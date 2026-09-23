@@ -588,6 +588,8 @@ flowchart TB
 **Verification:**
 - Side by side with the design.
 
+> **Done — #497** (merged). `/billing/subscriptions` to the design: Active / Payment failed / Paused / Cancelled tabs with counts (tab in the address; old `?view=overdue` opens Payment failed), unpaid-renewals banner, "about ₹X a month", when renewals last ran and whether they make GST invoices or receipts; rows open a quick look (status, next charge, next 3 collections, last 3 charges) whose "Change it" links open the detail with the step ready; Subscribe someone and search kept. Quick look is in `components/subscriptions/` — folded into the shared shell when U10 merges.
+
 ---
 
 ### U13. Subscription Detail
@@ -614,6 +616,8 @@ flowchart TB
 
 **Verification:**
 - Side by side with the design; e2e green.
+
+> **Done — #498** (merged). `/billing/subscriptions/[id]`, layout 2a: next charge first, next collections with Skip / Undo, every charge linked to its invoice, customer (phone, allergies), plan and changes cards; pause, resume, change plan from next renewal, keep, cancel at period end — one call each with Undo; cancel today confirms; a failed renewal offers a fresh pay link (shown once), Record a payment, Pause instead, Cancel; loading / error / not found / no access / read-only. Copy that would be untrue changed (no "retried once", no "UPI Autopay"; card-update link → Record a payment); pause has no fixed lengths; changes card built from what the subscription records (no change log). `e2e/tests/subscriptions.spec.ts` 10/10 desk + phone, restores demo data. Calendar subscription links now open this page. Open: the subscription `retry` route returns a token without a URL (the app uses the invoice pay-link route instead).
 
 ---
 
