@@ -4,7 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
-import { Switch } from "@saroh/ui/switch";
 import { Textarea } from "@saroh/ui/textarea";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
@@ -75,7 +74,7 @@ export function DescriptionEditor({
         editable: !disabled,
         editorProps: {
             attributes: {
-                class: "prose prose-sm min-h-40 max-w-none px-3 py-2 focus:outline-none dark:prose-invert",
+                class: "prose prose-sm min-h-[150px] max-w-none px-[13px] py-3 text-[13.5px] leading-[1.6] focus:outline-none dark:prose-invert",
                 ...(id ? { id } : {}),
                 "aria-label": "Description",
                 "aria-multiline": "true",
@@ -135,7 +134,7 @@ export function DescriptionEditor({
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above
     if (!editor || !state) {
         return (
-            <div className="min-h-48 rounded-md border border-input bg-field" />
+            <div className="min-h-[220px] rounded-[10px] border border-border bg-card" />
         );
     }
     const chain = () => editor.chain().focus();
@@ -144,14 +143,14 @@ export function DescriptionEditor({
     return (
         <div
             className={cn(
-                "rounded-md border bg-field",
-                invalid || over ? "border-destructive" : "border-input",
+                "rounded-[10px] border bg-card",
+                invalid || over ? "border-destructive" : "border-border",
             )}
         >
             <div
                 role="toolbar"
                 aria-label="Formatting"
-                className="flex flex-wrap items-center gap-0.5 border-b p-1"
+                className="flex flex-wrap items-center gap-0.5 rounded-t-[10px] border-b bg-muted/30 px-1.5 py-[5px]"
             >
                 <Tool
                     label="Bold"
@@ -209,45 +208,11 @@ export function DescriptionEditor({
                     }
                 />
                 <Gap />
-                <div
-                    role="radiogroup"
-                    aria-label="Text style"
-                    className="flex gap-0.5"
-                >
-                    {(["text", "h2", "h3"] as const).map((s) => (
-                        <button
-                            key={s}
-                            type="button"
-                            role="radio"
-                            aria-checked={state.style === s}
-                            disabled={off}
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() =>
-                                s === "text"
-                                    ? chain().setParagraph().run()
-                                    : chain()
-                                          .toggleHeading({
-                                              level: s === "h2" ? 2 : 3,
-                                          })
-                                          .run()
-                            }
-                            className={cn(
-                                "h-7 rounded px-2 text-xs font-medium disabled:opacity-60 coarse:h-11",
-                                state.style === s
-                                    ? "bg-muted text-foreground"
-                                    : "text-muted-foreground hover:bg-muted",
-                            )}
-                        >
-                            {s === "text" ? "Text" : s.toUpperCase()}
-                        </button>
-                    ))}
-                </div>
-                <Gap />
                 <button
                     type="button"
                     aria-expanded={more}
                     onClick={() => setMore((m) => !m)}
-                    className="h-7 rounded px-2 text-xs font-medium text-muted-foreground hover:bg-muted coarse:h-11"
+                    className="mr-1 h-7 rounded-[7px] border border-border bg-card px-[9px] text-[11.5px] font-semibold text-foreground/75 hover:bg-muted coarse:h-11"
                 >
                     {more ? "Fewer" : "More"}
                 </button>
@@ -302,15 +267,55 @@ export function DescriptionEditor({
                         </Tool>
                     </>
                 ) : null}
-                <label className="ml-auto flex items-center gap-2 px-1 text-xs text-muted-foreground">
-                    <Switch
-                        checked={source}
-                        onCheckedChange={setSource}
-                        disabled={disabled}
-                        aria-label="Edit as HTML"
-                    />
+                <div
+                    role="radiogroup"
+                    aria-label="Text style"
+                    className="mr-1 flex gap-0.5"
+                >
+                    {(["text", "h2", "h3"] as const).map((s) => (
+                        <button
+                            key={s}
+                            type="button"
+                            role="radio"
+                            aria-checked={state.style === s}
+                            disabled={off}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() =>
+                                s === "text"
+                                    ? chain().setParagraph().run()
+                                    : chain()
+                                          .toggleHeading({
+                                              level: s === "h2" ? 2 : 3,
+                                          })
+                                          .run()
+                            }
+                            className={cn(
+                                "h-7 rounded-[7px] border px-2 text-[11.5px] font-semibold text-foreground/75 disabled:opacity-60 coarse:h-11",
+                                state.style === s
+                                    ? "border-foreground bg-muted"
+                                    : "border-border bg-card hover:bg-muted",
+                            )}
+                        >
+                            {s === "text" ? "Text" : s.toUpperCase()}
+                        </button>
+                    ))}
+                </div>
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={source}
+                    aria-label="Edit as HTML"
+                    disabled={disabled}
+                    onClick={() => setSource((v) => !v)}
+                    className={cn(
+                        "h-7 rounded-[7px] border px-[9px] text-[11.5px] font-semibold disabled:opacity-60 coarse:h-11",
+                        source
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border bg-card text-foreground/75 hover:bg-muted",
+                    )}
+                >
                     HTML
-                </label>
+                </button>
             </div>
             {source ? (
                 <Textarea
@@ -319,27 +324,30 @@ export function DescriptionEditor({
                     disabled={disabled}
                     rows={8}
                     aria-label="Description as HTML"
-                    className="rounded-none border-0 font-mono text-[12px] focus-visible:ring-0"
+                    className="min-h-[150px] rounded-none border-0 px-[13px] py-3 font-mono text-[12px] leading-[1.6] focus-visible:ring-0"
                 />
             ) : (
                 <EditorContent editor={editor} />
             )}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-3 py-1.5 text-[11.5px] text-muted-foreground">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-b-[10px] border-t bg-muted/30 px-[11px] py-[7px] text-[11px] text-muted-foreground">
                 <span
-                    className={cn("min-w-0 flex-1", over && "text-destructive")}
+                    className={cn(
+                        "min-w-0 flex-1 text-pretty leading-[1.45]",
+                        over && "text-destructive",
+                    )}
                 >
                     {over
                         ? "Over the limit. The count that matters is the markup, not the words."
                         : "Formatting the shop can't show is dropped on save, so the toolbar only offers what survives."}
                 </span>
-                <span className="tabular-nums">{plain} characters</span>
+                <span className="font-mono">{plain} characters</span>
                 <span
                     className={cn(
-                        "tabular-nums",
+                        "font-mono",
                         over && "font-semibold text-destructive",
                     )}
                 >
-                    {value.length.toLocaleString("en-IN")} / 5,000 markup
+                    {value.length} / 5000 markup
                 </span>
             </div>
         </div>
@@ -347,7 +355,7 @@ export function DescriptionEditor({
 }
 
 function Gap() {
-    return <span aria-hidden className="mx-0.5 h-[18px] w-px bg-border" />;
+    return <span aria-hidden className="mx-1 h-[18px] w-px bg-border" />;
 }
 
 function Tool({
@@ -373,10 +381,10 @@ function Tool({
             onMouseDown={(e) => e.preventDefault()}
             onClick={onClick}
             className={cn(
-                "grid size-7 place-items-center rounded disabled:opacity-60 coarse:size-11 [&_svg]:size-4",
+                "grid size-7 place-items-center rounded-[7px] border disabled:opacity-60 coarse:size-11 [&_svg]:size-[15px] [&_svg]:stroke-[1.9]",
                 pressed
-                    ? "bg-muted text-foreground ring-1 ring-foreground"
-                    : "text-muted-foreground hover:bg-muted",
+                    ? "border-foreground bg-muted text-foreground"
+                    : "border-transparent text-foreground/75 hover:bg-muted",
             )}
         >
             {children}
@@ -413,10 +421,10 @@ function LinkTool({
                     disabled={disabled}
                     onMouseDown={(e) => e.preventDefault()}
                     className={cn(
-                        "grid size-7 place-items-center rounded disabled:opacity-60 coarse:size-11 [&_svg]:size-4",
+                        "grid size-7 place-items-center rounded-[7px] border disabled:opacity-60 coarse:size-11 [&_svg]:size-[15px] [&_svg]:stroke-[1.9]",
                         active
-                            ? "bg-muted text-foreground ring-1 ring-foreground"
-                            : "text-muted-foreground hover:bg-muted",
+                            ? "border-foreground bg-muted text-foreground"
+                            : "border-transparent text-foreground/75 hover:bg-muted",
                     )}
                 >
                     <Link2 />

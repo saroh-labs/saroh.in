@@ -204,6 +204,21 @@ describe("Products v2: sections, photos, overview (DB)", () => {
             ).rejects.toThrow(/returns rule/);
         });
 
+        it("merges the shop switches each section sends", async () => {
+            // Two sections saved one after the other — Save all — each
+            // sending only its own switches.
+            await products.patch(storeId, productId, ownerId, {
+                shopFields: { warranty: false },
+            });
+            const after = await products.patch(storeId, productId, ownerId, {
+                shopFields: { materials: false },
+            });
+            expect(after.shopFields).toMatchObject({
+                warranty: false,
+                materials: false,
+            });
+        });
+
         it("sanitises the description", async () => {
             const after = await products.patch(storeId, productId, ownerId, {
                 description:

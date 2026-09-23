@@ -65,8 +65,8 @@ function valuesOf(p: ProductDetail): Values {
     };
 }
 
-function patchOf(v: Values, p: ProductDetail): ProductPatch {
-    const made = madeByPatch(v, p.shopFields);
+function patchOf(v: Values): ProductPatch {
+    const made = madeByPatch(v);
     return {
         status: v.status,
         categoryId: v.categoryId || null,
@@ -108,12 +108,8 @@ export function DetailsSheet({
     const firstError = Object.values(errors)[0]?.message;
 
     async function save(v: Values) {
-        const before = patchOf(valuesOf(product), product);
-        const res = await patchProduct(
-            storeId,
-            product.id,
-            patchOf(v, product),
-        );
+        const before = patchOf(valuesOf(product));
+        const res = await patchProduct(storeId, product.id, patchOf(v));
         if (!res.ok) {
             if (
                 res.field === "maker" ||

@@ -23,7 +23,11 @@ import {
     assertMrpAtOrAbovePrice,
     cleanShopFields,
 } from "./product-rules";
-import { serializeProductDetail, serializeProductListItem } from "./serialize";
+import {
+    readShopFields,
+    serializeProductDetail,
+    serializeProductListItem,
+} from "./serialize";
 
 /** Everything a product page or the editor needs about one product. */
 export const PRODUCT_DETAIL_INCLUDE = {
@@ -246,6 +250,7 @@ export class ProductsService {
                 maker: true,
                 returnsMode: true,
                 returnsText: true,
+                shopFields: true,
             },
         });
         if (!current) {
@@ -290,8 +295,14 @@ export class ProductsService {
         if (has("keyPoints")) data.keyPoints = cleanKeyPoints(dto.keyPoints);
         if (has("madeHere")) data.madeHere = dto.madeHere;
         if (has("returnsMode")) data.returnsMode = dto.returnsMode;
+        // Merged, not replaced: each section sends only the switches it
+        // shows, so two sections saved one after the other never undo each
+        // other's.
         if (has("shopFields"))
-            data.shopFields = cleanShopFields(dto.shopFields ?? {});
+            data.shopFields = {
+                ...readShopFields(current.shopFields),
+                ...cleanShopFields(dto.shopFields ?? {}),
+            };
         if (has("seoImageId")) {
             if (dto.seoImageId)
                 await this.assertImageOfProduct(productId, dto.seoImageId);

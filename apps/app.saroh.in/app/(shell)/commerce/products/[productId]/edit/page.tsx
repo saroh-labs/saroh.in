@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { ProductEditor } from "@/components/commerce/product-editor";
-import { PageContainer } from "@/components/shared/page-container";
+import { ProductEditorV2 } from "@/components/commerce/product-editor-v2/editor-shell";
 import { loadEditorContext } from "@/lib/products/editor-data";
 import { findProductStore } from "@/lib/products/overview";
 import { getProduct } from "@/lib/products/service";
@@ -11,8 +10,9 @@ import { listBusinessStores } from "@/lib/stores/service";
 export const metadata = { title: "Edit product" };
 
 /**
- * Sell → Products → one product → Edit. The full editor, one section per
- * part of the product; the product page links here, to the section it names.
+ * Sell → Products → one product → Edit. The full editor (#468, #469): every
+ * part of the product, each saved on its own. The product page links here,
+ * to the section it names.
  */
 export default async function EditProductPage({
     params,
@@ -34,14 +34,12 @@ export default async function EditProductPage({
 
     const context = await loadEditorContext(store);
     return (
-        <PageContainer width="full">
-            <ProductEditor
-                // A new product or a different one starts from its own saved
-                // values rather than the last one's edits.
-                key={product.id}
-                {...context}
-                product={product}
-            />
-        </PageContainer>
+        <ProductEditorV2
+            // A different product starts from its own saved values rather
+            // than the last one's edits.
+            key={product.id}
+            {...context}
+            product={product}
+        />
     );
 }

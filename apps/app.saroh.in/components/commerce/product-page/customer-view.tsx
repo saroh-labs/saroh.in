@@ -232,12 +232,17 @@ export function toShopData(overview: ProductOverview): ProductPageData {
         howToUse: shown("howToUse") ? product.howToUse : null,
         materials: shown("materials") ? product.materials : null,
         materialsLabel: "Ingredients or material",
-        maker: shown("maker")
-            ? product.madeHere
-                ? `${overview.storefront.name}`
-                : [product.maker, product.madeIn].filter(Boolean).join(", ") ||
-                  null
-            : null,
+        // Who makes it and where, each on its own switch.
+        maker: product.madeHere
+            ? shown("maker")
+                ? overview.storefront.name
+                : null
+            : [
+                  shown("maker") ? product.maker : null,
+                  shown("madeIn") ? product.madeIn : null,
+              ]
+                  .filter(Boolean)
+                  .join(", ") || null,
         warranty: shown("warranty") ? product.warranty : null,
         returns: shown("returns")
             ? product.returnsMode === "OWN"

@@ -3,6 +3,7 @@
 import type {
     CategoryInput,
     InventoryInput,
+    NewProductInput,
     ProductImageInput,
     ProductInput,
     ProductPatch,
@@ -32,7 +33,7 @@ import {
  * store membership + write role. The UI calls these, never api directly.
  */
 
-export async function createProduct(storeId: string, input: ProductInput) {
+export async function createProduct(storeId: string, input: NewProductInput) {
     return createProductApi(storeId, input);
 }
 

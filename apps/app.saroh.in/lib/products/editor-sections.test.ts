@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    basicsProblem,
     basicsSchema,
     descriptionPatch,
     isEmptyHtml,
     madeBySchema,
+    partitionSections,
+    savedMessage,
+    saveHint,
     seoFallback,
     slugify,
     splitLines,
@@ -58,6 +62,7 @@ describe("product editor sections", () => {
             returnsMode: "STOREFRONT" as const,
             returnsText: "",
             showMaker: true,
+            showMadeIn: true,
             showWarranty: true,
             showReturns: true,
         };
@@ -79,8 +84,17 @@ describe("product editor sections", () => {
             "Hyaluronic acid",
         ]);
         expect(
-            descriptionPatch({ description: "<p></p>", keyPoints: "a\n\nb" }),
-        ).toEqual({ description: null, keyPoints: ["a", "b"] });
+            descriptionPatch({
+                description: "<p></p>",
+                keyPoints: "a\n\nb",
+                showKeyPoints: false,
+            }),
+        ).toEqual({
+            description: null,
+            keyPoints: ["a", "b"],
+            // Only its own switch; the API merges it into the rest.
+            shopFields: { keyPoints: false },
+        });
     });
 
     it("says what SEO falls back to", () => {
@@ -94,5 +108,56 @@ describe("product editor sections", () => {
     it("shows money the way a merchant types it", () => {
         expect(trimMoney("799.00")).toBe("799");
         expect(trimMoney("24.50")).toBe("24.50");
+    });
+});
+
+describe("the editor's header and Save all", () => {
+    it("says what is saved, what is not, and what needs a fix", () => {
+        expect(saveHint([], [])).toBe("All changes saved");
+        expect(saveHint(["basics"], [])).toBe("Basics is unsaved");
+        expect(saveHint(["basics", "stock"], [])).toBe("2 sections unsaved");
+        expect(saveHint(["basics", "stock"], ["stock"])).toBe(
+            "2 sections unsaved · Stock needs a fix",
+        );
+        expect(
+            saveHint(["basics", "stock", "photos"], ["basics", "stock"]),
+        ).toBe("3 sections unsaved · Basics and Stock need a fix");
+    });
+
+    it("saves the sections that can, in page order, and leaves the rest", () => {
+        expect(
+            partitionSections(["stock", "basics", "description"], {
+                description: "Too long",
+            }),
+        ).toEqual({ savable: ["basics", "stock"], stuck: ["description"] });
+        expect(savedMessage(["basics"], [])).toBe("Basics saved.");
+        expect(savedMessage(["basics", "stock"], ["description"])).toBe(
+            "Saved basics, stock. Description needs a fix first.",
+        );
+    });
+
+    it("names the first thing Basics must fix", () => {
+        const ok = {
+            name: "Serum",
+            slug: "serum",
+            price: "799",
+            mrp: "",
+            categoryId: "",
+        };
+        expect(basicsProblem(ok, false)).toBe("");
+        expect(basicsProblem({ ...ok, name: " " }, false)).toBe(
+            "Add a name first.",
+        );
+        expect(basicsProblem({ ...ok, slug: "Bad Slug" }, false)).toBe(
+            "Fix the address first.",
+        );
+        // Creating makes the address from the name; it is never the problem.
+        expect(basicsProblem({ ...ok, slug: "" }, true)).toBe("");
+        expect(basicsProblem({ ...ok, price: "" }, false)).toBe(
+            "Add a price first.",
+        );
+        expect(basicsProblem({ ...ok, mrp: "500" }, false)).toBe(
+            "MRP can't be lower than the price it sells for.",
+        );
     });
 });

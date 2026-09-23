@@ -1,4 +1,4 @@
-import { ProductEditor } from "@/components/commerce/product-editor";
+import { ProductEditorV2 } from "@/components/commerce/product-editor-v2/editor-shell";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
 import { loadEditorContext } from "@/lib/products/editor-data";
@@ -32,11 +32,7 @@ export default async function NewProductPage({
 
     if (store) {
         const context = await loadEditorContext(store);
-        return (
-            <PageContainer width="full">
-                <ProductEditor {...context} />
-            </PageContainer>
-        );
+        return <ProductEditorV2 {...context} product={null} />;
     }
 
     return (

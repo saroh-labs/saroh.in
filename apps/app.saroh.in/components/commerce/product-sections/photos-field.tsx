@@ -6,7 +6,7 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showUndo } from "@saroh/ui/toast";
 import { ArrowLeft, ArrowRight, ImagePlus, Link2, Star, X } from "lucide-react";
-import { useId, useState, useTransition } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { MediaPicker } from "@/components/sites/media-picker";
 import { listLibrary } from "@/lib/media/actions";
@@ -284,10 +284,16 @@ function LibraryPanel({
     const [items, setItems] = useState<LibraryItem[] | null | "loading">(
         "loading",
     );
-    const [pending, start] = useTransition();
-    if (items === "loading" && !pending) {
-        start(async () => setItems(await listLibrary()));
-    }
+    // Read once, when the panel opens.
+    useEffect(() => {
+        let live = true;
+        void listLibrary().then((list) => {
+            if (live) setItems(list);
+        });
+        return () => {
+            live = false;
+        };
+    }, []);
     return (
         <div className="rounded-[10px] bg-muted p-3">
             <div className="mb-2 flex items-center justify-between">
@@ -353,7 +359,7 @@ function LibraryPanel({
     );
 }
 
-function AddressPanel({
+export function AddressPanel({
     onAdd,
 }: {
     onAdd: (url: string, alt: string) => void;

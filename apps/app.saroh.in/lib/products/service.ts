@@ -31,6 +31,7 @@ export type ShopFields = Partial<
         | "materials"
         | "keyPoints"
         | "maker"
+        | "madeIn"
         | "warranty"
         | "returns",
         boolean
@@ -210,7 +211,11 @@ export interface ProductInput {
     status?: ProductStatus;
 }
 
-export function createProduct(storeId: string, input: ProductInput) {
+/** A new product: its basics, and any of its sections at once (#461). */
+export type NewProductInput = ProductInput &
+    Omit<ProductPatch, "name" | "price">;
+
+export function createProduct(storeId: string, input: NewProductInput) {
     return mutate(`/stores/${storeId}/products`, "POST", input);
 }
 
@@ -252,6 +257,20 @@ export function updateCategory(
 
 export function deleteCategory(storeId: string, categoryId: string) {
     return mutate(`/stores/${storeId}/categories/${categoryId}`, "DELETE");
+}
+
+// ---- Options (Settings → Options) ----
+
+/** A way customers choose — Size, Shade — and the values it offers. */
+export interface ProductOptionView {
+    id: string;
+    name: string;
+    productCount: number;
+    values: { id: string; value: string; variantCount: number }[];
+}
+
+export function listOptions(storeId: string): Promise<ProductOptionView[]> {
+    return getList<ProductOptionView>(`/stores/${storeId}/options`);
 }
 
 // ---- Variants ----

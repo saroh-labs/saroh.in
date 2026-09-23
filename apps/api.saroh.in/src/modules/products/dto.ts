@@ -46,6 +46,7 @@ export const SHOP_FIELDS = [
     "materials",
     "keyPoints",
     "maker",
+    "madeIn",
     "warranty",
     "returns",
 ] as const;

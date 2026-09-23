@@ -152,6 +152,7 @@ export const descriptionSchema = z.object({
             (v) => splitLines(v).length <= LIMITS.keyPoints,
             `At most ${LIMITS.keyPoints} key points.`,
         ),
+    showKeyPoints: z.boolean(),
 });
 export type DescriptionValues = z.infer<typeof descriptionSchema>;
 
@@ -159,6 +160,7 @@ export function descriptionFrom(p: ProductDetail): DescriptionValues {
     return {
         description: p.description ?? "",
         keyPoints: p.keyPoints.join("\n"),
+        showKeyPoints: shown(p.shopFields, "keyPoints"),
     };
 }
 
@@ -166,6 +168,7 @@ export function descriptionPatch(v: DescriptionValues): ProductPatch {
     return {
         description: isEmptyHtml(v.description) ? null : v.description,
         keyPoints: splitLines(v.keyPoints),
+        shopFields: { keyPoints: v.showKeyPoints },
     };
 }
 
@@ -179,7 +182,6 @@ export const detailsSchema = z.object({
     materials: text(LIMITS.materials),
     showHowToUse: z.boolean(),
     showMaterials: z.boolean(),
-    showKeyPoints: z.boolean(),
 });
 export type DetailsValues = z.infer<typeof detailsSchema>;
 
@@ -189,22 +191,17 @@ export function detailsFrom(p: ProductDetail): DetailsValues {
         materials: p.materials ?? "",
         showHowToUse: shown(p.shopFields, "howToUse"),
         showMaterials: shown(p.shopFields, "materials"),
-        showKeyPoints: shown(p.shopFields, "keyPoints"),
     };
 }
 
-export function detailsPatch(
-    v: DetailsValues,
-    current: ShopFields,
-): ProductPatch {
+/** Only this section's switches: the API merges them into the rest. */
+export function detailsPatch(v: DetailsValues): ProductPatch {
     return {
         howToUse: nullIfEmpty(v.howToUse),
         materials: nullIfEmpty(v.materials),
         shopFields: {
-            ...current,
             howToUse: v.showHowToUse,
             materials: v.showMaterials,
-            keyPoints: v.showKeyPoints,
         },
     };
 }
@@ -221,6 +218,7 @@ export const madeBySchema = z
         returnsMode: z.enum(["STOREFRONT", "OWN"]),
         returnsText: text(LIMITS.returnsText),
         showMaker: z.boolean(),
+        showMadeIn: z.boolean(),
         showWarranty: z.boolean(),
         showReturns: z.boolean(),
     })
@@ -248,15 +246,13 @@ export function madeByFrom(p: ProductDetail): MadeByValues {
         returnsMode: p.returnsMode,
         returnsText: p.returnsText ?? "",
         showMaker: shown(p.shopFields, "maker"),
+        showMadeIn: shown(p.shopFields, "madeIn"),
         showWarranty: shown(p.shopFields, "warranty"),
         showReturns: shown(p.shopFields, "returns"),
     };
 }
 
-export function madeByPatch(
-    v: MadeByValues,
-    current: ShopFields,
-): ProductPatch {
+export function madeByPatch(v: MadeByValues): ProductPatch {
     return {
         madeHere: v.madeHere,
         maker: v.madeHere ? null : nullIfEmpty(v.maker),
@@ -267,8 +263,8 @@ export function madeByPatch(
         returnsText:
             v.returnsMode === "OWN" ? nullIfEmpty(v.returnsText) : null,
         shopFields: {
-            ...current,
             maker: v.showMaker,
+            madeIn: v.showMadeIn,
             warranty: v.showWarranty,
             returns: v.showReturns,
         },
@@ -468,4 +464,121 @@ export function suggestSku(productName: string, variantTitle: string): string {
         .toUpperCase();
     const head = initials || "SKU";
     return tail ? `${head}-${tail}` : `${head}-`;
+}
+
+// ---- The editor's sections, as the shell sees them ----
+
+/** Each part of the editor that saves on its own, top to bottom. */
+export const SECTION_ORDER = [
+    "basics",
+    "description",
+    "details",
+    "madeby",
+    "photos",
+    "visibility",
+    "variants",
+    "stock",
+] as const;
+export type SectionKey = (typeof SECTION_ORDER)[number];
+
+/** How a section is named where the editor talks about it. */
+export const SECTION_NAMES: Record<SectionKey, string> = {
+    basics: "Basics",
+    description: "Description",
+    details: "How to use and ingredients",
+    madeby: "Made by and returns",
+    photos: "Photos",
+    visibility: "Visibility",
+    variants: "Variants",
+    stock: "Stock",
+};
+
+/** The short labels of the section jumps under the header. */
+export const SECTION_JUMPS: Record<SectionKey, string> = {
+    basics: "Basics",
+    description: "Description",
+    details: "How to use",
+    madeby: "Made by",
+    photos: "Photos",
+    visibility: "Visibility",
+    variants: "Variants",
+    stock: "Stock",
+};
+
+/**
+ * What Basics must fix before it can save, in the words its bar uses — one
+ * line, the first thing wrong. Empty when it can save.
+ */
+export function basicsProblem(v: BasicsValues, creating: boolean): string {
+    const name = v.name.trim();
+    if (!name) return "Add a name first.";
+    if (v.name.length > LIMITS.name) return "The name is over 150 characters.";
+    if (!creating && !basicsSchema.safeParse(v).success) {
+        const slug = v.slug.trim();
+        if (!slug || slug.length > LIMITS.slug || !/^[a-z0-9-]+$/.test(slug))
+            return "Fix the address first.";
+    }
+    if (!v.price.trim()) return "Add a price first.";
+    if (!isMoney(v.price)) return "Price: a number with at most two decimals.";
+    if (v.mrp.trim() && !isMoney(v.mrp))
+        return "MRP: a number with at most two decimals.";
+    if (v.mrp.trim() && paise(v.mrp) < paise(v.price))
+        return "MRP can't be lower than the price it sells for.";
+    return "";
+}
+
+/** The first message a zod schema has for these values, or "". */
+export function firstProblem<T>(schema: z.ZodType<T>, values: T): string {
+    const r = schema.safeParse(values);
+    return r.success ? "" : (r.error.issues[0]?.message ?? "");
+}
+
+/**
+ * The line in the editor's header: what is saved, what is not, and what
+ * needs a fix before Save all can take it.
+ */
+export function saveHint(dirty: SectionKey[], stuck: SectionKey[]): string {
+    if (dirty.length === 0) return "All changes saved";
+    const head =
+        dirty.length === 1
+            ? `${SECTION_NAMES[dirty[0]]} is unsaved`
+            : `${dirty.length} sections unsaved`;
+    if (stuck.length === 0) return head;
+    return `${head} · ${joinAnd(stuck.map((k) => SECTION_NAMES[k]))} ${
+        stuck.length === 1 ? "needs" : "need"
+    } a fix`;
+}
+
+/** Save all takes the sections that can save and leaves the rest, said. */
+export function partitionSections(
+    dirty: SectionKey[],
+    problems: Partial<Record<SectionKey, string>>,
+): { savable: SectionKey[]; stuck: SectionKey[] } {
+    const ordered = SECTION_ORDER.filter((k) => dirty.includes(k));
+    return {
+        savable: ordered.filter((k) => !problems[k]),
+        stuck: ordered.filter((k) => !!problems[k]),
+    };
+}
+
+/** "Saved basics, description." — and what was left behind, if anything. */
+export function savedMessage(
+    saved: SectionKey[],
+    stuck: SectionKey[],
+    single?: string,
+): string {
+    const head =
+        saved.length === 1
+            ? (single ?? `${SECTION_NAMES[saved[0]]} saved.`)
+            : `Saved ${saved.map((k) => SECTION_NAMES[k].toLowerCase()).join(", ")}.`;
+    if (stuck.length === 0) return head;
+    return `${head} ${joinAnd(stuck.map((k) => SECTION_NAMES[k]))} ${
+        stuck.length === 1 ? "needs" : "need"
+    } a fix first.`;
+}
+
+/** "a, b and c". */
+export function joinAnd(items: string[]): string {
+    if (items.length <= 1) return items.join("");
+    return `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`;
 }
