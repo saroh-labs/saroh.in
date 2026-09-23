@@ -67,6 +67,15 @@ export const ignoreHTTPSErrors = Boolean(process.env.E2E_IGNORE_HTTPS_ERRORS);
  * itself; they are not a secret and must never be pointed at a real one — the
  * S0-003 guard and `DATABASE_TARGET_CONFIRM` exist to make that impossible.
  */
+/**
+ * A provider-paid order with three lines, for Order Detail's refund journey
+ * (a dev stack takes no provider payments, so it is opt-in).
+ */
+export const refundOrder = {
+    id: process.env.E2E_REFUND_ORDER_ID,
+    org: process.env.E2E_REFUND_ORG,
+};
+
 export const demoUser = {
     email: "demo@saroh.dev",
     password: "demo-password-123",
