@@ -39,10 +39,10 @@ const STATE: Record<
 };
 
 /**
- * Where a person lands after signing in: every business they belong to, the
- * role they hold in each, and the way into their own account. Choosing a
- * business happens here, one place for every app; the workspace's switcher
- * is only a shortcut to the same choice.
+ * Every business a person belongs to, the role they hold in each, and the way
+ * into their own account. Parked for now (2026-09-23): nothing links here yet
+ * and signing in still lands on `/apps`; the layout will be revisited before
+ * it becomes the place a person chooses a business.
  */
 export default async function BusinessesPage() {
     const result = await resolveServerSession(await headers());
@@ -56,8 +56,14 @@ export default async function BusinessesPage() {
         listBusinesses(),
         isStaff(),
     ]);
-    // Nobody to choose between yet: straight on to setting one up.
-    if (businesses.length === 0 && !staff) redirect(getOnboardingUrl());
+    // Nothing to choose between: no business means setting one up, and one
+    // business means opening it. Staff always stop here, since the console
+    // is one of their destinations.
+    if (!staff) {
+        if (businesses.length === 0) redirect(getOnboardingUrl());
+        const only = businesses.length === 1 ? businesses[0] : undefined;
+        if (only) redirect(openBusinessUrl(only.id));
+    }
 
     const owned = businesses.filter((b) => b.role === "OWNER");
     const invited = businesses.filter((b) => b.role !== "OWNER");

@@ -16,9 +16,9 @@ import { safeDestination } from "@saroh/auth/origins";
 export { safeDestination } from "@saroh/auth/origins";
 
 /** Where someone lands when there is nowhere better to send them. */
-export const DEFAULT_DESTINATION = "/businesses";
+export const DEFAULT_DESTINATION = "/apps";
 
-/** {@link safeDestination}, falling back to the person's businesses. */
+/** {@link safeDestination}, falling back to the app launcher. */
 export function safeReturnTo(redirect: string | string[] | undefined): string {
     return safeDestination(redirect) ?? DEFAULT_DESTINATION;
 }

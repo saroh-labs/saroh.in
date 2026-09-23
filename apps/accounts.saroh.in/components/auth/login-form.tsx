@@ -27,7 +27,7 @@ import { SocialButtons } from "@/components/auth/social-buttons";
  * happen to remember.
  */
 export function LoginForm({
-    returnTo = "/businesses",
+    returnTo = "/apps",
     invitedEmail,
 }: {
     returnTo?: string;
