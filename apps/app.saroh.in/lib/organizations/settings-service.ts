@@ -1,4 +1,5 @@
-import { apiFetch, getJson, orgBase, readError } from "@/lib/api/http";
+import { toFailure } from "@/lib/api/failure";
+import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 
 /**
  * Organization settings access (name + business profile).
@@ -56,13 +57,14 @@ export async function updateOrganizationSettings(
         method: "PATCH",
         body: JSON.stringify(input),
     });
-    const data = (await res.json().catch(() => null)) as
-        (OrganizationSettings & { message?: string; error?: string }) | null;
+    const data = (await res
+        .json()
+        .catch(() => null)) as OrganizationSettings | null;
 
     if (!res.ok || !data) {
         return {
             ok: false,
-            error: readError(data, "Could not save your organization."),
+            error: toFailure(data, "Could not save your organization.").error,
         };
     }
     return { ok: true, data };

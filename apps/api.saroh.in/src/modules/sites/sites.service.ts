@@ -1500,14 +1500,17 @@ export class SitesService {
                         key: claimKey(seenKeys, section.key),
                     };
                 }
+                // `details` is what the exception filter forwards: the
+                // editor points at the section by its index.
                 throw new BadRequestException({
                     message: `Section at index ${index} is invalid: ${result.error.message}`,
-                    index,
-                    section: {
-                        type: section.type,
-                        contractVersion: section.contractVersion,
+                    details: {
+                        index,
+                        section: {
+                            type: section.type,
+                            contractVersion: section.contractVersion,
+                        },
                     },
-                    error: result.error,
                 });
             }
             return {

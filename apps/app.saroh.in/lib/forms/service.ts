@@ -1,10 +1,10 @@
+import { toFailure } from "@/lib/api/failure";
 import {
     apiFetch,
     getActiveOrgId,
     getJson,
     getList,
     orgBase,
-    readError,
 } from "@/lib/api/http";
 
 /**
@@ -66,7 +66,7 @@ export interface EnsureFormInput {
 }
 
 // ---------------------------------------------------------------------------
-// Fetch plumbing (org-scoped base; shared apiFetch/readError from @/lib/api/http)
+// Fetch plumbing (org-scoped base; shared apiFetch from @/lib/api/http)
 // ---------------------------------------------------------------------------
 
 /** Base path for the active org's forms, or null when no org is active. */
@@ -88,12 +88,14 @@ async function createForm(
         method: "POST",
         body: JSON.stringify({ name: input.name, fields: input.fields }),
     });
-    const data = (await res.json().catch(() => null)) as
-        (Partial<Form> & { message?: string; error?: string }) | null;
+    const data = (await res.json().catch(() => null)) as Partial<Form> | null;
     if (res.ok && data?.id) {
         return { ok: true, data: { formId: data.id } };
     }
-    return { ok: false, error: readError(data, "Could not create the form") };
+    return {
+        ok: false,
+        error: toFailure(data, "Could not create the form").error,
+    };
 }
 
 /** PATCH an existing Form's name + fields so it matches the section. */
@@ -106,12 +108,14 @@ async function patchForm(
         method: "PATCH",
         body: JSON.stringify({ name: input.name, fields: input.fields }),
     });
-    const data = (await res.json().catch(() => null)) as
-        (Partial<Form> & { message?: string; error?: string }) | null;
+    const data = (await res.json().catch(() => null)) as Partial<Form> | null;
     if (res.ok && data?.id) {
         return { ok: true, data: { formId: data.id } };
     }
-    return { ok: false, error: readError(data, "Could not update the form") };
+    return {
+        ok: false,
+        error: toFailure(data, "Could not update the form").error,
+    };
 }
 
 /**

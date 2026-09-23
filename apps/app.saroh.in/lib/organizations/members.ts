@@ -1,12 +1,6 @@
+import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
-import {
-    apiFetch,
-    destroy,
-    getList,
-    mutate,
-    orgBase,
-    readError,
-} from "@/lib/api/http";
+import { apiFetch, destroy, getList, mutate, orgBase } from "@/lib/api/http";
 
 import type { OrganizationRole } from "./service";
 
@@ -129,11 +123,12 @@ export async function acceptInvitation(
         `/organization-invitations/${encodeURIComponent(token)}/accept`,
         { method: "POST" },
     );
-    const data = (await res.json().catch(() => null)) as
-        (AcceptedInvitation & { message?: string }) | null;
+    const data = (await res
+        .json()
+        .catch(() => null)) as AcceptedInvitation | null;
     if (res.ok && data) return { ok: true, data };
     return {
         ok: false,
-        error: readError(data, "That invitation could not be accepted."),
+        error: toFailure(data, "That invitation could not be accepted.").error,
     };
 }

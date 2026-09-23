@@ -80,7 +80,9 @@ export interface PostCategoryInput {
     slug?: string;
 }
 
-export type ResultField = "title" | "slug" | "name" | "categoryId";
+const RESULT_FIELDS = ["title", "slug", "name", "categoryId"] as const;
+
+export type ResultField = (typeof RESULT_FIELDS)[number];
 
 export type Result<T = { id: string }> =
     { ok: true; data: T } | { ok: false; error: string; field?: ResultField };
@@ -102,7 +104,10 @@ async function mutate<T = { id: string }>(
     const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
     const failure = toFailure(data, "Something went wrong");
-    return { ...failure, field: failure.field as ResultField | undefined };
+    return {
+        ...failure,
+        field: RESULT_FIELDS.find((f) => f === failure.field),
+    };
 }
 
 // ---- Posts ----

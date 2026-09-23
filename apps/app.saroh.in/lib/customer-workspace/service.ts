@@ -1,4 +1,5 @@
-import { apiFetch, orgBase, readError } from "@/lib/api/http";
+import { toFailure } from "@/lib/api/failure";
+import { apiFetch, orgBase } from "@/lib/api/http";
 
 /**
  * Unified customer workspace data access (#120). Server-only. The workspace
@@ -58,9 +59,9 @@ export async function linkCustomer(
         { method: "POST", body: JSON.stringify({ customerId }) },
     );
     if (res.ok) return { ok: true };
-    const data = (await res.json().catch(() => null)) as {
-        message?: string;
-        error?: string;
-    } | null;
-    return { ok: false, error: readError(data, "Could not link customer.") };
+    const data: unknown = await res.json().catch(() => null);
+    return {
+        ok: false,
+        error: toFailure(data, "Could not link customer.").error,
+    };
 }

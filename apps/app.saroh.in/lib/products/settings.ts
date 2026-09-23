@@ -1,6 +1,7 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson } from "@/lib/api/http";
-import type { Result, ResultField } from "@/lib/products/service";
+import type { Result } from "@/lib/products/service";
+import { resultField } from "@/lib/products/service";
 
 /**
  * Product settings (#470) — one storefront's categories, options and
@@ -103,7 +104,7 @@ export async function send<T>(
     const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
     const failure = toFailure(data, "That didn't save. Try again.");
-    return { ...failure, field: failure.field as ResultField | undefined };
+    return { ...failure, field: resultField(failure.field) };
 }
 
 // ---- Defaults a new product starts with ----

@@ -1,3 +1,4 @@
+import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
@@ -499,21 +500,26 @@ function readError(
     const body = (typeof data === "object" && data !== null ? data : {}) as {
         message?: unknown;
         error?: unknown;
-        index?: unknown;
     };
 
-    const nested =
+    const inner =
         typeof body.error === "object" && body.error !== null
-            ? (body.error as { message?: unknown }).message
+            ? (body.error as { message?: unknown; details?: unknown })
             : undefined;
 
-    const message = [nested, body.message, body.error].find(
+    const message = [inner?.message, body.message, body.error].find(
         (v): v is string => typeof v === "string" && v.trim() !== "",
     );
+    // A refused section names its position in `error.details.index`.
+    const details = (
+        typeof inner?.details === "object" && inner.details !== null
+            ? inner.details
+            : {}
+    ) as { index?: unknown };
 
     return {
         error: message ?? fallback,
-        index: typeof body.index === "number" ? body.index : undefined,
+        index: typeof details.index === "number" ? details.index : undefined,
     };
 }
 
@@ -573,9 +579,6 @@ export async function createSite(
     const data = (await res.json().catch(() => null)) as {
         siteId?: string;
         slug?: string;
-        message?: string;
-        error?: string;
-        field?: string;
     } | null;
     if (res.ok && data?.siteId) {
         return {
@@ -583,10 +586,14 @@ export async function createSite(
             data: { siteId: data.siteId, slug: data.slug ?? "" },
         };
     }
+    const failure = toFailure(data, "Could not create the site");
     return {
         ok: false,
-        field: data?.field,
-        ...readError(data, "Could not create the site"),
+        error: failure.error,
+        field:
+            failure.field === "name" || failure.field === "subdomain"
+                ? failure.field
+                : undefined,
     };
 }
 

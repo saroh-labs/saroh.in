@@ -154,32 +154,41 @@ export interface Category {
     _count: { products: number; children: number };
 }
 
-export type ResultField =
-    | "name"
-    | "slug"
-    | "price"
-    | "mrp"
-    | "categoryId"
-    | "optionId"
-    | "sku"
-    | "title"
-    | "parentId"
-    | "description"
-    | "howToUse"
-    | "materials"
-    | "keyPoints"
-    | "maker"
-    | "returnsText"
-    | "shopFields"
-    | "seoTitle"
-    | "seoDescription"
-    | "seoImageId"
-    | "images"
-    | "optionValueId"
-    | "imageId"
-    | "variants"
-    | "variantId"
-    | "quantity";
+/** The fields a refusal can be about, so a form can put it beside one. */
+const RESULT_FIELDS = [
+    "name",
+    "slug",
+    "price",
+    "mrp",
+    "categoryId",
+    "optionId",
+    "sku",
+    "title",
+    "parentId",
+    "description",
+    "howToUse",
+    "materials",
+    "keyPoints",
+    "maker",
+    "returnsText",
+    "shopFields",
+    "seoTitle",
+    "seoDescription",
+    "seoImageId",
+    "images",
+    "optionValueId",
+    "imageId",
+    "variants",
+    "variantId",
+    "quantity",
+] as const;
+
+export type ResultField = (typeof RESULT_FIELDS)[number];
+
+/** The API's `field`, if it is one of ours. */
+export function resultField(field?: string): ResultField | undefined {
+    return RESULT_FIELDS.find((f) => f === field);
+}
 
 export type Result<T = { ok: true }> =
     { ok: true; data: T } | { ok: false; error: string; field?: ResultField };
@@ -196,7 +205,7 @@ async function mutate<T = { id: string }>(
     const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
     const failure = toFailure(data, "Something went wrong");
-    return { ...failure, field: failure.field as ResultField | undefined };
+    return { ...failure, field: resultField(failure.field) };
 }
 
 // ---- Products ----
