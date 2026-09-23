@@ -531,6 +531,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
     - **API:** a product's option can't change while it has variants ("Remove the variants first to sell it by {name} instead.").
 - **Test scenarios:** archiving sets `archivedAt`, restoring clears it; the option change is refused with variants and allowed without; the overview returns customer ids; the drawer's three new lines in the browser.
 
+> **Done — #485.** `Product.archivedAt` (migration `20260924120000_product_archived_at`, backfilled from the last change), set on becoming archived and cleared on leaving; the banner with Restore as a draft and Undo; archived wording in the header; the promised line under the linked cards; the API refuses an option change while variants exist (the same option again passes). The drawer's lines and customer links came with the fidelity pass (#467), the custom field rows with #482. 2 DB tests. Verified in the browser on the archived Coffee & Walnut Face Scrub: the banner, restore and Undo.
+
 ### U8. The product page: quick-edit sheets and the Customer view
 
 - **Goal:** R3 and R4.
