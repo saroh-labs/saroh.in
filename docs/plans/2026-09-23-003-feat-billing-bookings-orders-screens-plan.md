@@ -287,6 +287,8 @@ flowchart TB
 **Verification:**
 - Migration replays; availability spec covers per-person windows; existing service-only bookings unchanged.
 
+> **Done — #488** (merged `41675203`). `StaffMember` (optional Membership link), `StaffService`, `StaffHours`, `StaffTimeOff`, `StaffExtraHours`, `BookingRules`; `Booking.staffId/paidWith/subscriptionId/cancelledLate`, `SubscriptionPlan.classesPerMonth`. Staff API under `organizations/:org/staff` (`service:read`/`service:write`); saving hours returns kept bookings outside them; time off returns affected bookings. One-to-one slots = staff windows ∩ service rules, capacity per person; classes keep their rules, instructor clash-checked; services nobody takes book as before. Person row locked for cross-service clash checks. Late cancel keeps the pack class (`cancelledLate`); membership bookings refuse past `classesPerMonth`. Public staff endpoint returns name + id only; public refusals never mention time off. Book-ahead/latest rules apply to the booking page, not merchant bookings; an empty class doesn't block its instructor; hours in the business timezone (fallback: first service's zone, then Asia/Kolkata). Migration `20260927100000_staff_and_hours` (RLS on six tables). DB specs await test:int.
+
 ---
 
 ### U4. One read of bookings, and one of the month
