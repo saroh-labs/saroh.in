@@ -5,6 +5,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@saroh/ui/card";
+import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import { StatCard } from "@saroh/ui/stat-card";
 
@@ -14,7 +15,8 @@ import { getMetrics, getStaffIdentity } from "@/lib/control-plane";
 import { requireSession } from "@/lib/session";
 
 /**
- * Platform dashboard — how Saroh itself is doing.
+ * Overview — how the instance is doing, in aggregate. The health board takes
+ * the console's front door when it lands (plan U9).
  *
  * Aggregates only, by design: the API's metrics endpoint returns counts and
  * group-bys, never a tenant's records. Per-tenant inspection stays a separate,
@@ -39,10 +41,11 @@ export default async function DashboardPage() {
 
     return (
         <AdminShell staff={staff}>
-            <main className="mx-auto max-w-6xl p-6 sm:p-8">
+            <PageContainer width="wide">
                 <PageHeader
-                    title="Platform"
-                    description="Aggregate health across every tenant. No customer records are shown here."
+                    breadcrumb={["Instance", "Overview"]}
+                    title="Overview"
+                    description="Totals across every business on this instance. No business's own records are shown here."
                 />
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -68,7 +71,7 @@ export default async function DashboardPage() {
                     />
                 </div>
 
-                <section className="mt-8 grid gap-6 lg:grid-cols-2">
+                <section className="grid gap-6 lg:grid-cols-2">
                     <Panel
                         title="Module adoption"
                         description="Organizations with each module enabled."
@@ -90,7 +93,7 @@ export default async function DashboardPage() {
                         }))}
                     />
                 </section>
-            </main>
+            </PageContainer>
         </AdminShell>
     );
 }

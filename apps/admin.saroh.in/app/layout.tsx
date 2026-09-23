@@ -1,4 +1,5 @@
 import "@saroh/ui/globals.css";
+import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 
@@ -34,10 +35,10 @@ const fontMono = localFont({
 
 export const metadata: Metadata = {
     title: {
-        default: "Saroh control",
-        template: "%s · Saroh control",
+        default: "Saroh console",
+        template: "%s · Saroh console",
     },
-    description: "Internal operations and governance control plane for Saroh.",
+    description: "The operator console for a Saroh instance.",
 };
 
 export default function RootLayout({
@@ -46,11 +47,26 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
+        // `suppressHydrationWarning`: next-themes writes the class on <html>
+        // before React hydrates, which is the point of it.
+        <html lang="en" suppressHydrationWarning>
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} font-sans`}
             >
-                {children}
+                {/* Dark by default and not by system preference: the console
+                    must never be mistaken for a merchant's workspace, and the
+                    workspace follows the system (plan D7). Same tokens, same
+                    Saffron — dark is the whole of the difference, so no
+                    accent is overridden. Light stays defined for a toggle
+                    later. */}
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="dark"
+                    enableSystem={false}
+                    disableTransitionOnChange
+                >
+                    {children}
+                </ThemeProvider>
             </body>
         </html>
     );

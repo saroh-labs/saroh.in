@@ -22,6 +22,7 @@ export * from "./hover-card";
 export * from "./input";
 export * from "./label";
 export * from "./menubar";
+export * from "./page-container";
 export * from "./page-header";
 export * from "./pagination";
 export * from "./popover";

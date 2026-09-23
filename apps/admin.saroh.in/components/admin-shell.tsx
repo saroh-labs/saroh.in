@@ -2,20 +2,22 @@ import { Badge } from "@saroh/ui/badge";
 import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
+import { ConsoleDrawer } from "@/components/console-drawer";
+import { ConsoleRail } from "@/components/console-rail";
 import { SignOutButton } from "@/components/sign-out-button";
 import type { StaffIdentity } from "@/lib/control-plane";
-
-const NAV = [
-    { href: "/", label: "Dashboard" },
-    { href: "/flags", label: "Releases", permission: "flags:read" },
-    { href: "/audit", label: "Audit", permission: "audit:read" },
-] as const;
+import { INSTANCE_HOST } from "@/lib/control-plane";
 
 /**
- * Chrome for the control plane. Deliberately plainer than app.saroh.in's shell:
- * this is an internal operations surface, and the visual distance from the
- * tenant product is a feature — an operator should never be unsure which of the
- * two they are looking at.
+ * Chrome for the console.
+ *
+ * It reuses the workspace's own parts — the rail at its three widths, the
+ * shared tokens, `PageHeader` on every screen — and is still unmistakably not
+ * a merchant surface, because it is dark by default and says what it is in the
+ * bar: the instance, and who you are on it
+ * (`docs/product-transformation/information-architecture.md`, and the plan's
+ * D7). Before this it was a top bar with no rail and no dark mode at all,
+ * which read as unfinished rather than as deliberately different.
  */
 export function AdminShell({
     staff,
@@ -24,53 +26,35 @@ export function AdminShell({
     staff: StaffIdentity;
     children: React.ReactNode;
 }) {
-    const visibleNavigation = NAV.filter(
-        (item) =>
-            !("permission" in item) ||
-            staff.permissions.includes(item.permission),
-    );
-
     return (
-        <div className="min-h-screen">
-            {/* A thin brand rule across the top: the cheapest possible signal
-                that this is the control plane and not a tenant workspace. */}
-            <div className="h-1 w-full bg-brand-surface" aria-hidden />
-            <header className="border-b bg-card px-4 sm:px-6">
-                <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3">
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-7 gap-y-3">
-                        <Link href="/" className="shrink-0">
-                            <Wordmark suffix="control" />
-                        </Link>
-                        <nav
-                            aria-label="Control plane"
-                            className="flex items-center gap-1"
-                        >
-                            {visibleNavigation.map((item) => (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors duration-fast ease-out hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                    {item.label}
-                                </Link>
-                            ))}
-                        </nav>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-3">
-                        <div className="hidden min-w-0 text-right sm:block">
-                            <p className="truncate text-sm">{staff.email}</p>
-                            <p className="truncate text-xs text-muted-foreground">
-                                {staff.roles.map(formatRole).join(" · ")}
-                            </p>
-                        </div>
-                        <SignOutButton />
-                    </div>
+        <div className="flex min-h-screen flex-col">
+            <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border px-3 sm:px-4">
+                <ConsoleDrawer permissions={staff.permissions} />
+                <Link href="/" className="shrink-0">
+                    <Wordmark suffix="console" />
+                </Link>
+                {/*
+                 * Which instance this is. On a self-hosted copy it is the
+                 * operator's own host, which is the whole point: the console
+                 * belongs to the instance it runs on, not to Saroh.
+                 */}
+                <span className="hidden min-w-0 truncate font-mono text-[12px] text-muted-foreground sm:block">
+                    {INSTANCE_HOST}
+                </span>
+                <div className="ml-auto flex min-w-0 items-center gap-3">
+                    <p className="hidden min-w-0 truncate text-[12px] text-muted-foreground md:block">
+                        {staff.email}
+                        <span aria-hidden> · </span>
+                        <span className="sr-only">, </span>
+                        {staff.roles.map(formatRole).join(" · ")}
+                    </p>
+                    <SignOutButton />
                 </div>
             </header>
 
             {staff.viaBootstrap && (
-                <div className="border-b border-warning/30 bg-warning-subtle px-4 py-2.5 sm:px-6">
-                    <div className="mx-auto flex max-w-7xl items-center gap-2.5 text-sm text-foreground">
+                <div className="border-b border-warning/30 bg-warning-subtle px-4 py-2.5">
+                    <div className="flex items-center gap-2.5 text-sm text-warning-subtle-foreground">
                         <Badge variant="outline" className="shrink-0">
                             Break-glass
                         </Badge>
@@ -83,7 +67,13 @@ export function AdminShell({
                 </div>
             )}
 
-            {children}
+            <div className="flex min-h-0 flex-1">
+                <ConsoleRail permissions={staff.permissions} />
+                {/* The work area steps up from the ground in dark, which is
+                    the design system's rule read in the console's direction.
+                    Not a <main>: each screen's `PageContainer` is that. */}
+                <div className="min-w-0 flex-1 bg-card/40">{children}</div>
+            </div>
         </div>
     );
 }

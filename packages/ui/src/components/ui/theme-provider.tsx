@@ -14,7 +14,9 @@ import { ThemeProvider as NextThemesProvider } from "next-themes";
  *  - accounts: intentionally a LIGHT card floating on a decorative dark
  *    backdrop — a deliberate design, not a theme (no provider needed).
  *  - docs/help: Nextra owns theming (`nextra-theme-docs`).
- *  - admin/sites/templates: minimal, light.
+ *  - admin: this provider, dark by default and not following the system, so
+ *    the operator console is never mistaken for a merchant's workspace.
+ *  - sites/templates: minimal, light.
  */
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
     return <NextThemesProvider {...props}>{children}</NextThemesProvider>;

@@ -185,9 +185,11 @@ no operator view of it. The gap is now costing time on every release.
 - **D6. `DataView` moves into `@saroh/ui`.** It lives in `app.saroh.in` today.
   The console needs the same list behaviour, and a second copy would drift. The
   move is mechanical; the workspace keeps a re-export so no screen changes.
-- **D7. The console's skin is a token override, not a second token set.** Same
-  token names, same components; `apps/admin.saroh.in` sets dark as its default
-  and overrides the accent. One accent per screen still holds.
+- **D7. The console's skin is the base dark register, not a second token set.**
+  Same token names, same components; `apps/admin.saroh.in` sets dark as its
+  default and does not follow the system. No accent is overridden: the design's
+  accent is Saffron 400, which is already what `.dark` spends on `--brand`
+  (resolved in U1). One accent per screen still holds.
 - **D8. Health checks degrade honestly.** A check that cannot be measured on
   this instance renders as "not measured here" rather than a green tick or an
   invented figure. Storage and version are the likely cases on a self-hosted
@@ -211,16 +213,15 @@ permission, its tests and its screen together.
 
 **Goal:** the frame every later screen mounts into (R18, R19).
 **Files:** `apps/admin.saroh.in/components/admin-shell.tsx`,
-`app/layout.tsx`, `app/globals.css`, `tailwind.config.ts`; new
-`components/console-nav.tsx`; `packages/ui/src/components/ui/data-view/**`
-(moved from `apps/app.saroh.in/components/shared/data-view/**`, D6) with a
-re-export left behind.
+`app/layout.tsx`; new `components/console-nav.tsx`, `console-rail.tsx`,
+`console-drawer.tsx`; `packages/ui/src/components/ui/page-container.tsx`
+(moved from the workspace, with a re-export left behind). The `DataView` move
+(D6) lands with U3, its first console screen, rather than ahead of any use.
 **Approach:** rail with the three widths the workspace uses, fed by one nav
-source; `next-themes` with dark as the default; accent override per D7;
+source; `next-themes` with dark as the default (D7);
 `PageContainer` widths; every screen on `PageHeader`.
 **Test scenarios:** nav filtered by permission; the rail collapses to icons at
-1100px and to a drawer below 760px; `check:routes` passes; the workspace's own
-DataView tests still pass after the move.
+1100px and to a drawer below 760px; `check:routes` passes.
 **Verification:** the three existing screens render unchanged in shape, in dark,
 at 320/390/1440.
 

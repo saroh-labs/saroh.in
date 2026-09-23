@@ -1,3 +1,6 @@
+import { PageContainer } from "@saroh/ui/page-container";
+import { PageHeader } from "@saroh/ui/page-header";
+
 import { AdminShell } from "@/components/admin-shell";
 import { FlagCard } from "@/components/flag-card";
 import { NotAuthorized } from "@/components/not-authorized";
@@ -38,20 +41,14 @@ export default async function FlagsPage() {
 
     return (
         <AdminShell staff={staff}>
-            <main className="mx-auto max-w-4xl p-6 sm:p-8">
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                    Delivery
-                </p>
-                <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-                    Release controls
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Precedence: an organization override wins over the global
-                    default, which wins over off. Every change records who made
-                    it and why.
-                </p>
+            <PageContainer>
+                <PageHeader
+                    breadcrumb={["Instance", "Releases"]}
+                    title="Releases"
+                    description="A business's own setting wins over the default for everyone, which wins over off. Every change records who made it and why."
+                />
 
-                <div className="mt-6 grid gap-4">
+                <div className="grid gap-4">
                     {flags.map((flag) => (
                         <FlagCard
                             key={flag.key}
@@ -63,7 +60,7 @@ export default async function FlagsPage() {
                         />
                     ))}
                 </div>
-            </main>
+            </PageContainer>
         </AdminShell>
     );
 }

@@ -94,7 +94,7 @@ export function FlagCard({
                             : "Organization overrides win over this global default."}
                     </p>
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex min-w-0 flex-wrap gap-2">
                     <Button
                         type="button"
                         variant="outline"
@@ -221,7 +221,7 @@ export function FlagCard({
                                 disabled={pending || !canPublish}
                             >
                                 <SelectTrigger
-                                    className="w-[220px]"
+                                    className="w-full sm:w-[220px]"
                                     aria-label={`Add an override for ${flag.key}`}
                                 >
                                     <SelectValue placeholder="Add override for…" />

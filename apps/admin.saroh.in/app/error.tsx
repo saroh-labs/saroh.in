@@ -25,8 +25,8 @@ export default function Error({
         <main className="mx-auto flex max-w-4xl flex-col items-center gap-4 p-16 text-center">
             <h1 className="text-2xl font-semibold">Something went wrong</h1>
             <p className="max-w-md text-sm text-muted-foreground">
-                We couldn&apos;t load the control plane. This is usually
-                temporary — please try again.
+                We couldn&apos;t load the console. This is usually temporary —
+                please try again.
             </p>
             {error.digest && (
                 <p className="font-mono text-xs text-muted-foreground">
