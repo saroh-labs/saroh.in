@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { toMoneyString } from "../../common/money";
+import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { InvoiceStanding } from "../invoices/invoice-state";
@@ -254,20 +254,6 @@ const NOT_AN_ORDER_INVOICE = {} as const;
  */
 function invoicesOf(organizationId: string, contactId: string) {
     return { organizationId, contactId };
-}
-
-/** "1234.50" → 123450, by digits: no float touches the cent. */
-function toMinor(value: { toString(): string }): number {
-    const [whole, frac = ""] = toMoneyString(value).split(".");
-    const negative = whole.startsWith("-");
-    const minor = Math.abs(Number(whole)) * 100 + Number(frac.slice(0, 2));
-    return negative ? -minor : minor;
-}
-
-function fromMinor(minor: number): string {
-    const sign = minor < 0 ? "-" : "";
-    const abs = Math.abs(minor);
-    return `${sign}${Math.trunc(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
 }
 
 /** Add per currency, in minor units. */
