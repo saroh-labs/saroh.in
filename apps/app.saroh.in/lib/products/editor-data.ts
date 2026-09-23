@@ -1,7 +1,7 @@
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { canWriteProducts } from "@/lib/products/access";
 import { listCategories, listOptions } from "@/lib/products/service";
-import { getSkuSettings } from "@/lib/products/settings";
+import { getSkuSettings, listAllergens } from "@/lib/products/settings";
 import { DEFAULT_SKU_PATTERN } from "@/lib/products/sku-pattern";
 import { productCategoriesHref } from "@/lib/stores/links";
 import type { Store } from "@/lib/stores/service";
@@ -15,13 +15,14 @@ import { getStorefront } from "@/lib/stores/storefronts";
  * that cannot be read leave Variants with none to offer, which it says.
  */
 export async function loadEditorContext(store: Store, productId?: string) {
-    const [settings, categories, options, organization, sku] =
+    const [settings, categories, options, organization, sku, allergens] =
         await Promise.all([
             getStorefront(store.id).catch(() => null),
             listCategories(store.id),
             listOptions(store.id).catch(() => []),
             resolveActiveOrganization(),
             getSkuSettings(store.id, productId).catch(() => null),
+            listAllergens(store.id).catch(() => null),
         ]);
     return {
         storeId: store.id,
@@ -32,5 +33,6 @@ export async function loadEditorContext(store: Store, productId?: string) {
         options,
         canWrite: canWriteProducts(organization),
         sku: sku ?? { pattern: DEFAULT_SKU_PATTERN, suggest: true, n: 1 },
+        allergens: (allergens ?? []).map((a) => ({ id: a.id, name: a.name })),
     };
 }

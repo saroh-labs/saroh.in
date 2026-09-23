@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { StoresModule } from "../stores/stores.module";
+import { AllergensService } from "./allergens.service";
 import { CatalogueController } from "./catalogue.controller";
 import { CatalogueService } from "./catalogue.service";
 import { FieldsService } from "./fields.service";
@@ -11,7 +12,13 @@ import { SkuService } from "./sku.service";
 @Module({
     imports: [StoresModule, CapabilitiesModule],
     controllers: [CatalogueController],
-    providers: [CatalogueService, OptionsService, SkuService, FieldsService],
+    providers: [
+        CatalogueService,
+        OptionsService,
+        SkuService,
+        FieldsService,
+        AllergensService,
+    ],
     exports: [CatalogueService],
 })
 export class CatalogueModule {}

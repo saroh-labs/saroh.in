@@ -220,3 +220,18 @@ export function customFieldText(f: {
     }
     return f.value;
 }
+
+/** "Contains gluten. May contain nuts, sesame." — or "" when none are ticked. */
+export function allergenLine(a: {
+    contains: { name: string }[];
+    mayContain: { name: string }[];
+}): string {
+    const list = (x: { name: string }[]) =>
+        x.map((y) => y.name.toLowerCase()).join(", ");
+    return [
+        a.contains.length ? `Contains ${list(a.contains)}.` : "",
+        a.mayContain.length ? `May contain ${list(a.mayContain)}.` : "",
+    ]
+        .filter(Boolean)
+        .join(" ");
+}

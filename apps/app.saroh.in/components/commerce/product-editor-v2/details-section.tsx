@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { ShopSwitch } from "@/components/commerce/product-sections/shop-switch";
@@ -36,12 +37,30 @@ const EMPTY: DetailsValues = {
 export function DetailsSection({
     product,
     storeId,
+    allergens,
 }: {
     product: ProductDetail | null;
     storeId: string;
+    /** The storefront's list (#483); empty hides "Contains". */
+    allergens: { id: string; name: string }[];
 }) {
     const { canWrite } = useEditor();
     const baseline = product ? detailsFrom(product) : EMPTY;
+    const baseContains = (product?.allergens.contains ?? []).map((a) => a.id);
+    const baseMay = (product?.allergens.mayContain ?? []).map((a) => a.id);
+    const allergenKey = JSON.stringify([baseContains, baseMay]);
+    const [contains, setContains] = useState(baseContains);
+    const [may, setMay] = useState(baseMay);
+    const [seenAllergens, setSeenAllergens] = useState(allergenKey);
+    if (seenAllergens !== allergenKey) {
+        setSeenAllergens(allergenKey);
+        setContains(baseContains);
+        setMay(baseMay);
+    }
+    const sameSet = (a: string[], b: string[]) =>
+        a.length === b.length && a.every((x) => b.includes(x));
+    const allergensDirty =
+        !sameSet(contains, baseContains) || !sameSet(may, baseMay);
     const form = useForm<DetailsValues>({
         resolver: zodResolver(detailsSchema),
         values: baseline,
@@ -55,7 +74,7 @@ export function DetailsSection({
     useSection(
         "details",
         {
-            dirty: isDirty,
+            dirty: isDirty || allergensDirty,
             problem: howLong
                 ? `Keep the line under ${LIMITS.howToUse} characters.`
                 : firstProblem(detailsSchema, v),
@@ -64,11 +83,10 @@ export function DetailsSection({
             save: async () => {
                 if (!product) return false;
                 const values = form.getValues();
-                const res = await patchProduct(
-                    storeId,
-                    product.id,
-                    detailsPatch(values),
-                );
+                const res = await patchProduct(storeId, product.id, {
+                    ...detailsPatch(values),
+                    ...(allergensDirty ? { contains, mayContain: may } : {}),
+                });
                 if (!res.ok) {
                     if (res.field === "howToUse" || res.field === "materials")
                         form.setError(res.field, { message: res.error });
@@ -78,7 +96,11 @@ export function DetailsSection({
                 form.reset(values);
                 return true;
             },
-            discard: () => form.reset(baseline),
+            discard: () => {
+                form.reset(baseline);
+                setContains(baseContains);
+                setMay(baseMay);
+            },
             collect: () => detailsPatch(form.getValues()),
         },
     );
@@ -154,6 +176,97 @@ export function DetailsSection({
                     {errors.materials.message}
                 </FieldHelp>
             ) : null}
+            {allergens.length > 0 ? (
+                <Allergens
+                    list={allergens}
+                    contains={contains}
+                    may={may}
+                    disabled={ro || !product}
+                    onContains={(ids) => {
+                        setContains(ids);
+                        // One allergen is either in it or may be: not both.
+                        setMay(may.filter((id) => !ids.includes(id)));
+                    }}
+                    onMay={(ids) => {
+                        setMay(ids);
+                        setContains(contains.filter((id) => !ids.includes(id)));
+                    }}
+                />
+            ) : null}
         </SectionCard>
+    );
+}
+
+function Allergens({
+    list,
+    contains,
+    may,
+    disabled,
+    onContains,
+    onMay,
+}: {
+    list: { id: string; name: string }[];
+    contains: string[];
+    may: string[];
+    disabled: boolean;
+    onContains: (ids: string[]) => void;
+    onMay: (ids: string[]) => void;
+}) {
+    const names = (ids: string[]) =>
+        list
+            .filter((a) => ids.includes(a.id))
+            .map((a) => a.name.toLowerCase())
+            .join(", ");
+    const toggle = (ids: string[], id: string) =>
+        ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
+    const group = (
+        label: string,
+        ids: string[],
+        onChange: (ids: string[]) => void,
+    ) => (
+        <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
+            {list.map((a) => {
+                const on = ids.includes(a.id);
+                return (
+                    <button
+                        key={a.id}
+                        type="button"
+                        aria-pressed={on}
+                        disabled={disabled}
+                        onClick={() => onChange(toggle(ids, a.id))}
+                        className={cn(
+                            "inline-flex h-8 items-center rounded-full border px-[13px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
+                            on
+                                ? "border-foreground bg-foreground font-semibold text-background"
+                                : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
+                        )}
+                    >
+                        {a.name}
+                    </button>
+                );
+            })}
+        </div>
+    );
+    return (
+        <>
+            <div className="mb-[7px] mt-3.5 flex items-center gap-2.5">
+                <span className="flex-1 text-[12.5px] font-medium">
+                    Contains
+                </span>
+                <span className="text-[11.5px] text-muted-foreground">
+                    Always on the shop
+                </span>
+            </div>
+            {group("Contains", contains, onContains)}
+            <p className="mb-[7px] mt-3.5 text-[12.5px] font-medium">
+                May contain — same kitchen
+            </p>
+            {group("May contain", may, onMay)}
+            <FieldHelp className="mt-[9px]">
+                {contains.length || may.length
+                    ? `Customers see: ${contains.length ? `Contains ${names(contains)}.` : ""}${may.length ? ` May contain ${names(may)}.` : ""}`
+                    : "Tick nothing and the shop says nothing — it will not claim a product is allergen-free."}
+            </FieldHelp>
+        </>
     );
 }

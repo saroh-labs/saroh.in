@@ -105,6 +105,11 @@ export interface ProductDetail extends Product {
     variants: Variant[];
     /** The fields its category asks for, with its values. */
     customFields: ProductCustomField[];
+    /** From the storefront's allergen list (#483). */
+    allergens: {
+        contains: { id: string; name: string }[];
+        mayContain: { id: string; name: string }[];
+    };
     inventory: Inventory | null;
     mrp: string | null;
     howToUse: string | null;
@@ -379,6 +384,9 @@ export interface ProductPatch {
     seoImageId?: string | null;
     /** Custom fields: field id → value; "" or null clears it. */
     customFields?: Record<string, string | null>;
+    /** Allergen ids; each list given replaces its kind. */
+    contains?: string[];
+    mayContain?: string[];
 }
 
 export function patchProduct(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    allergenLine,
     customersSee,
     customFieldText,
     discountAmount,
@@ -101,5 +102,15 @@ describe("product page display rules", () => {
         );
         expect(customFieldText({ type: "NUMBER", value: "12" })).toBe("12");
         expect(customFieldText({ type: "TEXT", value: null })).toBe("");
+    });
+
+    it("says allergens the way the shop does, and nothing when none", () => {
+        expect(
+            allergenLine({
+                contains: [{ name: "Gluten" }],
+                mayContain: [{ name: "Nuts" }, { name: "Sesame" }],
+            }),
+        ).toBe("Contains gluten. May contain nuts, sesame.");
+        expect(allergenLine({ contains: [], mayContain: [] })).toBe("");
     });
 });

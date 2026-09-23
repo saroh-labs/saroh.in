@@ -1,6 +1,7 @@
 "use server";
 
 import type {
+    AllergenView,
     CategoryRemoval,
     DefaultsEntry,
     DefaultsSaveResult,
@@ -206,5 +207,22 @@ export async function restoreField(storeId: string, fieldId: string) {
     return send<FieldView>(
         `${base(storeId)}/fields/${encodeURIComponent(fieldId)}/restore`,
         "POST",
+    );
+}
+
+// ---- Allergens ----
+
+/** One typed by hand, or the common food list at once. */
+export async function addAllergens(storeId: string, names: string[]) {
+    return send<AllergenView[]>(`${base(storeId)}/allergens`, "POST", {
+        names,
+    });
+}
+
+/** Refused while any product lists it. */
+export async function removeAllergen(storeId: string, allergenId: string) {
+    return send<{ id: string; name: string }>(
+        `${base(storeId)}/allergens/${encodeURIComponent(allergenId)}`,
+        "DELETE",
     );
 }

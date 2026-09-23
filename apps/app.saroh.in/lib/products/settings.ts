@@ -167,3 +167,16 @@ export interface FieldView {
 export function listFields(storeId: string): Promise<FieldView[] | null> {
     return getJson<FieldView[]>(`/stores/${storeId}/fields`);
 }
+
+// ---- Allergens (#483) ----
+
+export interface AllergenView {
+    id: string;
+    name: string;
+    contains: number;
+    mayContain: number;
+}
+
+export function listAllergens(storeId: string): Promise<AllergenView[] | null> {
+    return getJson<AllergenView[]>(`/stores/${storeId}/allergens`);
+}

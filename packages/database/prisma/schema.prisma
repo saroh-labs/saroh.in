@@ -834,7 +834,10 @@ model ProductAllergen {
   productId      String
   product        Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
   allergenId     String
-  allergen       StoreAllergen @relation(fields: [allergenId], references: [id], onDelete: Restrict)
+  // NoAction, checked at the end of the statement: a storefront's delete
+  // cascades to both sides. Removing an allergen a product lists is refused
+  // in the API with the count, before this is ever reached.
+  allergen       StoreAllergen @relation(fields: [allergenId], references: [id], onDelete: NoAction)
   organizationId String
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 

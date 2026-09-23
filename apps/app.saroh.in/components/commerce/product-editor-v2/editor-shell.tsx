@@ -54,6 +54,8 @@ export interface ProductEditorProps {
     canWrite: boolean;
     /** Settings → SKUs, and this product's number for {N}. */
     sku: { pattern: string; suggest: boolean; n: number };
+    /** Settings → Allergens; empty for a shop that sells no food. */
+    allergens: { id: string; name: string }[];
 }
 
 const PRODUCTS_HREF = "/commerce/products";
@@ -90,6 +92,7 @@ function EditorBody({
     options,
     canWrite,
     sku,
+    allergens,
 }: ProductEditorProps) {
     const router = useRouter();
     const { mode, states, saving, saveSections, collectAll, afterCreateAll } =
@@ -319,7 +322,11 @@ function EditorBody({
                         manageCategoriesHref={categoriesHref}
                     />
                     <DescriptionSection product={product} storeId={storeId} />
-                    <DetailsSection product={product} storeId={storeId} />
+                    <DetailsSection
+                        product={product}
+                        storeId={storeId}
+                        allergens={allergens}
+                    />
                     <MadeBySection
                         product={product}
                         storeId={storeId}

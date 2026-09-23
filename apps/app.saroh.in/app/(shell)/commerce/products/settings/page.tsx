@@ -3,6 +3,7 @@ import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
+import { AllergensTab } from "@/components/commerce/product-settings/allergens-tab";
 import { CategoriesTab } from "@/components/commerce/product-settings/categories-tab";
 import { DefaultsTab } from "@/components/commerce/product-settings/defaults-tab";
 import { FieldsTab } from "@/components/commerce/product-settings/fields-tab";
@@ -18,6 +19,7 @@ import {
     getCatalogue,
     getSkuPreview,
     getSkuSettings,
+    listAllergens,
     listFields,
 } from "@/lib/products/settings";
 import { requireSession } from "@/lib/session";
@@ -25,11 +27,12 @@ import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Product settings" };
 
-/** The tabs that are built; allergens arrive with #483. */
+/** The six tabs, in the design's order. */
 const BUILT: SettingsTab[] = [
     "categories",
     "options",
     "fields",
+    "allergens",
     "sku",
     "defaults",
 ];
@@ -70,9 +73,10 @@ export default async function ProductSettingsPage({
 
     const tab: SettingsTab =
         isSettingsTab(rawTab) && BUILT.includes(rawTab) ? rawTab : "categories";
-    const [catalogue, fields] = await Promise.all([
+    const [catalogue, fields, allergens] = await Promise.all([
         getCatalogue(store.id).catch(() => null),
         listFields(store.id).catch(() => null),
+        listAllergens(store.id).catch(() => null),
     ]);
     const sku =
         tab === "sku" ? await getSkuSettings(store.id).catch(() => null) : null;
@@ -110,6 +114,7 @@ export default async function ProductSettingsPage({
                         },
                         { key: "options", count: catalogue.options.length },
                         { key: "fields", count: fields?.length ?? 0 },
+                        { key: "allergens", count: allergens?.length ?? 0 },
                         { key: "sku" },
                         { key: "defaults" },
                     ]}
@@ -126,6 +131,12 @@ export default async function ProductSettingsPage({
                             storeId={store.id}
                             catalogue={catalogue}
                             fields={fields ?? []}
+                        />
+                    ) : tab === "allergens" ? (
+                        <AllergensTab
+                            storeId={store.id}
+                            allergens={allergens ?? []}
+                            canWrite={catalogue.canWrite}
                         />
                     ) : tab === "sku" ? (
                         <SkuTab

@@ -78,6 +78,19 @@ const nullableTrim = ({ value }: { value: unknown }) => {
  * text fields take "" or null to clear.
  */
 class ProductSectionFields {
+    /** Allergens (#483): ids from the storefront's list; each list replaces its kind. */
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(100)
+    @IsString({ each: true })
+    contains?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(100)
+    @IsString({ each: true })
+    mayContain?: string[];
+
     /** Custom fields (#482): field id → value; "" or null clears it. */
     @IsOptional()
     @IsObject()

@@ -204,3 +204,12 @@ export class UpdateFieldDto {
     @IsString({ each: true })
     categoryIds?: string[];
 }
+
+export class AddAllergensDto {
+    /** One typed by hand, or the common food list at once. */
+    @IsArray()
+    @ArrayMaxSize(50)
+    @IsString({ each: true })
+    @MaxLength(30, { each: true, message: "Keep it under 30 characters." })
+    names!: string[];
+}

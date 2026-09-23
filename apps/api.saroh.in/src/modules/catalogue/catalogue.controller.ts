@@ -17,8 +17,10 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { AllergensService } from "./allergens.service";
 import { CatalogueService } from "./catalogue.service";
 import {
+    AddAllergensDto,
     AddOptionValueDto,
     CreateFieldDto,
     CreateOptionDto,
@@ -46,7 +48,38 @@ export class CatalogueController {
         private readonly options: OptionsService,
         private readonly sku: SkuService,
         private readonly fields: FieldsService,
+        private readonly allergens: AllergensService,
     ) {}
+
+    // ---- Allergens (#483) ----
+
+    @Get("allergens")
+    listAllergens(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+    ) {
+        return this.allergens.list(storeId, user.id);
+    }
+
+    @Post("allergens")
+    @HttpCode(201)
+    addAllergens(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Body() dto: AddAllergensDto,
+    ) {
+        return this.allergens.add(storeId, user.id, dto.names);
+    }
+
+    /** Refused while any product lists it. */
+    @Delete("allergens/:allergenId")
+    removeAllergen(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("allergenId") allergenId: string,
+    ) {
+        return this.allergens.remove(storeId, allergenId, user.id);
+    }
 
     // ---- Custom fields (#482) ----
 

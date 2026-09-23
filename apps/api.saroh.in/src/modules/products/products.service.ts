@@ -10,6 +10,10 @@ import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
 import {
+    productAllergensFor,
+    saveProductAllergens,
+} from "../catalogue/allergens.service";
+import {
     productFieldsFor,
     saveProductFieldValues,
 } from "../catalogue/fields.service";
@@ -117,12 +121,11 @@ export class ProductsService {
         if (!product) {
             throw new NotFoundException("Product not found");
         }
-        const customFields = await productFieldsFor(
-            storeId,
-            product.id,
-            product.categoryId,
-        );
-        return { ...serializeProductDetail(product), customFields };
+        const [customFields, allergens] = await Promise.all([
+            productFieldsFor(storeId, product.id, product.categoryId),
+            productAllergensFor(product.id),
+        ]);
+        return { ...serializeProductDetail(product), customFields, allergens };
     }
 
     async create(storeId: string, userId: string, dto: CreateProductDto) {
@@ -192,6 +195,12 @@ export class ProductsService {
                     organizationId,
                     dto.customFields,
                 );
+            }
+            if (dto.contains || dto.mayContain) {
+                await saveProductAllergens(storeId, createdId, organizationId, {
+                    contains: dto.contains,
+                    mayContain: dto.mayContain,
+                });
             }
             await this.activation?.firstProductCreated(
                 organizationId,
@@ -351,6 +360,12 @@ export class ProductsService {
                 organizationId,
                 dto.customFields,
             );
+        }
+        if ((dto.contains || dto.mayContain) && organizationId) {
+            await saveProductAllergens(storeId, productId, organizationId, {
+                contains: dto.contains,
+                mayContain: dto.mayContain,
+            });
         }
         if (Object.keys(data).length > 0) {
             try {
