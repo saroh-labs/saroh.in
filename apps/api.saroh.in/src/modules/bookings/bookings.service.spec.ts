@@ -40,6 +40,17 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             findFirst: jest.fn().mockResolvedValue(null),
         },
+        // Staff (U3): nobody takes a service and there are no booking rules
+        // unless a test says so — every business before staff existed.
+        staffService: { findMany: jest.fn().mockResolvedValue([]) },
+        bookingRules: { findUnique: jest.fn().mockResolvedValue(null) },
+        staffHours: { findMany: jest.fn().mockResolvedValue([]) },
+        staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
+        staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
+        businessProfile: {
+            findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
+        },
+        $queryRaw: jest.fn(),
     };
     return {
         ...actual,
@@ -1636,5 +1647,265 @@ describe("courses on a service's time (ADR-007)", () => {
             "2026-07-21T00:00:00.000Z",
         );
         expect(slots.map((s) => s.startAt.toISOString())).not.toContain(START);
+    });
+});
+
+// ── Staff (U3) ─────────────────────────────────────────────────────────────
+
+describe("staff on bookings (U3)", () => {
+    const db = prisma as unknown as Record<string, Record<string, jest.Mock>>;
+    const ASHA = { id: "staff_asha", name: "Asha" };
+    const BEN = { id: "staff_ben", name: "Ben" };
+
+    /** A one-to-one both take, Mon 9–10 each; nobody booked. */
+    function wireStaffed(people = [ASHA, BEN]) {
+        wireBookHappyPath();
+        db.staffService!.findMany!.mockResolvedValue(
+            people.map((staff) => ({ staff })),
+        );
+        db.staffHours!.findMany!.mockResolvedValue(
+            people.map((p) => ({
+                staffId: p.id,
+                dayOfWeek: 1,
+                startMinute: 540,
+                endMinute: 600,
+            })),
+        );
+        bookingFindMany.mockResolvedValue([]);
+    }
+
+    beforeEach(() => jest.clearAllMocks());
+    afterEach(() => {
+        db.staffService!.findMany!.mockResolvedValue([]);
+        db.staffHours!.findMany!.mockResolvedValue([]);
+        db.staffTimeOff!.findMany!.mockResolvedValue([]);
+        db.bookingRules!.findUnique!.mockResolvedValue(null);
+        bookingFindMany.mockResolvedValue([]);
+        bookingCount.mockResolvedValue(0);
+    });
+
+    it("books the first person free, and counts that person — not the service — in the transaction", async () => {
+        wireStaffed();
+        await new BookingsService().book("svc_1", baseInput(), "iphash");
+
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            staffId: "staff_asha",
+        });
+        // Per person: one clash count on Asha, no service-wide count.
+        expect(bookingCount).toHaveBeenCalledTimes(1);
+        expect(bookingCount.mock.calls[0][0].where).toMatchObject({
+            staffId: "staff_asha",
+            status: "CONFIRMED",
+        });
+        // Her row is locked before counting.
+        expect(prisma.$queryRaw).toHaveBeenCalled();
+    });
+
+    it("gives the slot to the next person when the first is booked", async () => {
+        wireStaffed();
+        bookingFindMany.mockResolvedValue([
+            {
+                staffId: "staff_asha",
+                startAt: new Date(START),
+                endAt: new Date("2026-07-20T10:00:00.000Z"),
+            },
+        ]);
+        await new BookingsService().book("svc_1", baseInput(), "iphash");
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            staffId: "staff_ben",
+        });
+    });
+
+    it("refuses a person who is off, without saying so to the public", async () => {
+        wireStaffed([ASHA]);
+        db.staffTimeOff!.findMany!.mockResolvedValue([
+            {
+                staffId: "staff_asha",
+                startAt: new Date("2026-07-20T00:00:00Z"),
+                endAt: new Date("2026-07-21T00:00:00Z"),
+            },
+        ]);
+        const refused = await new BookingsService()
+            .book("svc_1", baseInput({ staffId: "staff_asha" }), "iphash")
+            .catch((e: unknown) => e);
+        expect(refused).toBeInstanceOf(BadRequestException);
+        const body = (refused as BadRequestException).getResponse() as {
+            message: string;
+        };
+        expect(body.message).not.toMatch(/off|leave|holiday|working/i);
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("tells the merchant why a named person can't: not working, or booked", async () => {
+        wireStaffed([ASHA]);
+        contactFindUnique.mockResolvedValue({
+            id: "c1",
+            organizationId: "org_SVC",
+            email: "a@example.com",
+            firstName: "A",
+            lastName: null,
+            phone: null,
+        });
+        db.staffTimeOff!.findMany!.mockResolvedValue([
+            {
+                staffId: "staff_asha",
+                startAt: new Date("2026-07-20T00:00:00Z"),
+                endAt: new Date("2026-07-21T00:00:00Z"),
+            },
+        ]);
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                contactId: "c1",
+                staffId: "staff_asha",
+            }),
+        ).rejects.toMatchObject({
+            response: { message: "Asha isn't working then.", field: "staffId" },
+        });
+
+        db.staffTimeOff!.findMany!.mockResolvedValue([]);
+        bookingFindMany.mockResolvedValue([
+            {
+                staffId: "staff_asha",
+                startAt: new Date(START),
+                endAt: new Date("2026-07-20T10:00:00.000Z"),
+            },
+        ]);
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                contactId: "c1",
+                staffId: "staff_asha",
+            }),
+        ).rejects.toMatchObject({
+            response: {
+                message: "Asha is already booked then.",
+                field: "staffId",
+            },
+        });
+    });
+
+    it("refuses when the person was booked elsewhere meanwhile (the in-transaction clash)", async () => {
+        wireStaffed([ASHA]);
+        bookingCount.mockResolvedValue(1);
+        await expect(
+            new BookingsService().book("svc_1", baseInput(), "iphash"),
+        ).rejects.toMatchObject({ response: { field: "staffId" } });
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a public booking later than the latest-booking rule", async () => {
+        wireBookHappyPath();
+        db.bookingRules!.findUnique!.mockResolvedValue({
+            bookAheadDays: null,
+            latestBookingMinutes: 60,
+            freeCancelHours: null,
+        });
+        jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+        jest.setSystemTime(new Date("2026-07-20T08:30:00Z"));
+        try {
+            await expect(
+                new BookingsService().book("svc_1", baseInput(), "iphash"),
+            ).rejects.toMatchObject({ response: { field: "startAt" } });
+        } finally {
+            jest.useRealTimers();
+        }
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("lists free starts per person, with ids only", async () => {
+        wireStaffed();
+        const slots = await new BookingsService().publicAvailability(
+            "svc_1",
+            "2026-07-20T00:00:00Z",
+            "2026-07-21T00:00:00Z",
+            undefined,
+            new Date("2026-07-01T00:00:00Z"),
+        );
+        expect(slots).toEqual([
+            {
+                startAt: new Date(START),
+                endAt: new Date("2026-07-20T10:00:00.000Z"),
+                staffIds: ["staff_asha", "staff_ben"],
+            },
+        ]);
+    });
+
+    it("names who takes a service publicly by display name and id — nothing else", async () => {
+        wireStaffed();
+        const people = await new BookingsService().publicServiceStaff("svc_1");
+        expect(people).toEqual([
+            { id: "staff_asha", name: "Asha" },
+            { id: "staff_ben", name: "Ben" },
+        ]);
+    });
+
+    it("keeps a class's own grid and capacity, naming its instructor", async () => {
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            capacity: 10,
+            availabilityRules: RULES,
+        });
+        db.staffService!.findMany!.mockResolvedValue([{ staff: ASHA }]);
+        await new BookingsService().book("svc_1", baseInput(), "iphash");
+        // Service-wide seats counted, then the instructor's clash — which
+        // leaves out the other places in the same session.
+        expect(bookingCount).toHaveBeenCalledTimes(2);
+        expect(bookingCount.mock.calls[1][0].where).toMatchObject({
+            staffId: "staff_asha",
+            NOT: { serviceId: "svc_1", startAt: new Date(START) },
+        });
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            staffId: "staff_asha",
+        });
+    });
+});
+
+describe("cancelling inside the free-cancellation window (U3)", () => {
+    const db = prisma as unknown as Record<string, Record<string, jest.Mock>>;
+    const START_AT = new Date("2026-07-20T09:00:00Z");
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        bookingFindUnique.mockResolvedValue({
+            id: "bk_1",
+            organizationId: "org_SVC",
+            status: "CONFIRMED",
+            startAt: START_AT,
+        });
+        bookingUpdate.mockResolvedValue({ id: "bk_1", status: "CANCELLED" });
+        db.bookingRules!.findUnique!.mockResolvedValue({
+            bookAheadDays: null,
+            latestBookingMinutes: null,
+            freeCancelHours: 12,
+        });
+    });
+    afterEach(() => db.bookingRules!.findUnique!.mockResolvedValue(null));
+
+    it("before the window: the class goes back to its pack", async () => {
+        await new BookingsService().cancelBooking(
+            ctx(),
+            "bk_1",
+            new Date("2026-07-19T20:00:00Z"),
+        );
+        expect(bookingUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "CANCELLED",
+            cancelledLate: false,
+        });
+        expect(db.packRedemption!.updateMany).toHaveBeenCalled();
+    });
+
+    it("inside it: the class stays used and the cancel is recorded as late", async () => {
+        await new BookingsService().cancelBooking(
+            ctx(),
+            "bk_1",
+            new Date("2026-07-20T01:00:00Z"),
+        );
+        expect(bookingUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "CANCELLED",
+            cancelledLate: true,
+        });
+        expect(db.packRedemption!.updateMany).not.toHaveBeenCalled();
     });
 });

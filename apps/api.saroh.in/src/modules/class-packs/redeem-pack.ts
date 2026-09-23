@@ -167,6 +167,11 @@ export async function redeemPackInTx(
             },
         });
     }
+    // The booking says how it was paid (U3) — a pack, and no membership.
+    await tx.booking.updateMany({
+        where: { id: input.bookingId },
+        data: { paidWith: "PACK", subscriptionId: null },
+    });
     return { purchaseId: chosen.id, packName: chosen.packName };
 }
 

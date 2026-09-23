@@ -76,6 +76,9 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
+        // U3 staff: mocked-DB and pure specs; staff.db.spec.ts runs here.
+        "<rootDir>/src/modules/staff/staff.service.spec.ts",
+        "<rootDir>/src/modules/staff/hours.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
     globalSetup: "<rootDir>/test/global-setup.ts",

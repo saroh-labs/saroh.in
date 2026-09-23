@@ -10,8 +10,12 @@ import {
 } from "@nestjs/common";
 import { createHash } from "node:crypto";
 
-import type { Slot } from "./availability";
-import type { PublicBooking, PublicService } from "./bookings.service";
+import type {
+    AvailableSlot,
+    PublicBooking,
+    PublicService,
+    PublicStaff,
+} from "./bookings.service";
 import { BookingsService, toPublicBooking } from "./bookings.service";
 import { BookServiceDto } from "./dto";
 
@@ -60,14 +64,28 @@ export class PublicBookingsController {
         return this.bookings.publicServices(list);
     }
 
-    /** Open slots for a bookable service over `?from=&to=` (ISO instants). */
+    /**
+     * Open slots for a bookable service over `?from=&to=` (ISO instants),
+     * optionally for one person (`?staffId=`). Inside the business's booking
+     * rules; a person appears only as an opaque id (U3).
+     */
     @Get(":serviceId/availability")
     availability(
         @Param("serviceId") serviceId: string,
         @Query("from") from: string,
         @Query("to") to: string,
-    ): Promise<Slot[]> {
-        return this.bookings.publicAvailability(serviceId, from, to);
+        @Query("staffId") staffId?: string,
+    ): Promise<AvailableSlot[]> {
+        return this.bookings.publicAvailability(serviceId, from, to, staffId);
+    }
+
+    /**
+     * Who takes a service: a display name and an opaque id each (U3). Never
+     * their hours, and never whether or why they are off.
+     */
+    @Get(":serviceId/staff")
+    staff(@Param("serviceId") serviceId: string): Promise<PublicStaff[]> {
+        return this.bookings.publicServiceStaff(serviceId);
     }
 
     /**
@@ -96,6 +114,7 @@ export class PublicBookingsController {
                 bookerEmail: dto.bookerEmail,
                 bookerPhone: dto.bookerPhone,
                 idempotencyKey: dto.idempotencyKey,
+                staffId: dto.staffId,
             },
             ipHash,
         );

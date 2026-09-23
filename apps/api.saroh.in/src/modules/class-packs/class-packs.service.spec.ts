@@ -20,6 +20,7 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn(),
         },
         organizationModule: { findFirst: jest.fn() },
+        booking: { updateMany: jest.fn() },
     };
     return {
         ...actual,

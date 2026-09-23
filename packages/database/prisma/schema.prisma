@@ -240,6 +240,15 @@ model Organization {
   classPackServices     ClassPackService[]
   packPurchases         PackPurchase[]
   packRedemptions       PackRedemption[]
+
+  // Staff who take bookings, their hours and the business's booking rules
+  // (ADR-008, U3).
+  staffMembers    StaffMember[]
+  staffServices   StaffService[]
+  staffHours      StaffHours[]
+  staffTimeOff    StaffTimeOff[]
+  staffExtraHours StaffExtraHours[]
+  bookingRules    BookingRules?
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -284,6 +293,9 @@ model Membership {
   // rather than to an error nobody can sign in past. Still OWNER, ADMIN,
   // MEMBER or REVIEWER for every business that has invented nothing.
   role String @default("MEMBER")
+
+  // The staff member this team member is on the diary as, if any (U3).
+  staffMember StaffMember?
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -2864,6 +2876,8 @@ model Service {
   bookings          Booking[]
   courses           Course[]
   classPackServices ClassPackService[]
+  // Who takes it (U3). None: the service's own weekly rules, as before.
+  staffServices     StaffService[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -2947,6 +2961,23 @@ model Booking {
   courseEnrollment   CourseEnrollment? @relation(fields: [courseEnrollmentId], references: [id], onDelete: SetNull)
   packRedemption     PackRedemption?
 
+  // Who takes it (U3). Null on every booking made before staff existed —
+  // there is no backfill; the calendar shows them as Unassigned. SetNull so
+  // removing a person keeps their bookings.
+  staffId String?
+  staff   StaffMember? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
+  // How it was paid: MEMBERSHIP | PACK | PAID | DESK, or null when nobody
+  // said (every booking made before this column). A membership booking names
+  // the subscription whose monthly classes it uses.
+  paidWith       String?
+  subscriptionId String?
+  subscription   CustomerSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  // Cancelled inside the business's free-cancellation window: a class paid
+  // with a pack or a membership keeps the class used (U3).
+  cancelledLate Boolean @default(false)
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])
@@ -2959,6 +2990,130 @@ model Booking {
   // `migrate dev` as drift, and the migration it generates DROPS it.
   @@index([organizationId, outcome, endAt])
   @@index([courseEnrollmentId])
+  // One person's diary across services — the clash check and the calendar.
+  @@index([staffId, startAt])
+  @@index([subscriptionId])
+}
+
+/// Someone who takes bookings (U3, ADR-008). Usually a team member, but a
+/// front-desk trainer may never sign in, so the membership is optional.
+model StaffMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The team member this person is, when they have an account. One staff
+  // member per membership; removing the member keeps the person on the diary.
+  membershipId String?     @unique
+  membership   Membership? @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+
+  name  String // shown on the calendar and, as a display name, on the booking page
+  title String? // e.g. "Trainer", "Physio"
+
+  status     String    @default("ACTIVE") // ACTIVE | ARCHIVED — archived take no new bookings
+  archivedAt DateTime?
+
+  services   StaffService[]
+  hours      StaffHours[]
+  timeOff    StaffTimeOff[]
+  extraHours StaffExtraHours[]
+  bookings   Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+/// Which services a person takes. For a class, the person is its instructor:
+/// shown beside it and checked for clashes, but the class keeps its own times.
+model StaffService {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          StaffMember  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  serviceId      String
+  service        Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([staffId, serviceId])
+  @@index([organizationId])
+  @@index([serviceId])
+}
+
+/// A person's weekly working hours, in the business's own timezone.
+model StaffHours {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          StaffMember  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  dayOfWeek   Int // 0 = Sunday … 6 = Saturday
+  startMinute Int // minutes from local midnight, inclusive
+  endMinute   Int // exclusive; > startMinute
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([staffId, dayOfWeek])
+}
+
+/// Time a person is away. The reason is for the team only — no public read
+/// ever carries it, or that the person is off at all.
+model StaffTimeOff {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          StaffMember  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  startAt DateTime // absolute; a whole day starts at local midnight
+  endAt   DateTime // exclusive
+  allDay  Boolean  @default(false)
+  reason  String?
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([staffId, startAt])
+}
+
+/// One-off hours on one date, on top of the weekly ones (a closed day opened).
+model StaffExtraHours {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          StaffMember  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  date        DateTime @db.Date // the business's local calendar date
+  startMinute Int
+  endMinute   Int
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([staffId, date])
+}
+
+/// Business-wide booking rules (U3). No row, or a null column, is no rule —
+/// what every business had before, so nothing changes until one is set.
+model BookingRules {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  bookAheadDays        Int? // how far ahead a customer may book
+  latestBookingMinutes Int? // the latest a customer may book before a start
+  freeCancelHours      Int? // cancel at least this long before to get a class back
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// What has happened to a Booking, in order (#121).
@@ -3767,6 +3922,9 @@ model SubscriptionPlan {
   interval    String // WEEK | MONTH | QUARTER | YEAR
   status      String  @default("ACTIVE") // ACTIVE | ARCHIVED — archived plans take no new subscribers
 
+  // A membership's classes a month (U3). Null: as many as they like.
+  classesPerMonth Int?
+
   subscriptions   CustomerSubscription[]
   // Subscriptions switching to this plan at their next renewal.
   pendingSwitches CustomerSubscription[] @relation("PendingPlan")
@@ -3819,6 +3977,8 @@ model CustomerSubscription {
 
   invoices Invoice[]
   skips    SubscriptionSkip[]
+  // Classes booked on this membership (U3).
+  bookings Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
