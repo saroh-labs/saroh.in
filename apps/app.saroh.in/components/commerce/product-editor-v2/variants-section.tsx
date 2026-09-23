@@ -256,6 +256,13 @@ export function VariantsSection({
                 if (res.ok) saved = saved.filter((b) => b.id !== goneId);
                 else why ??= res.error;
             }
+            // A refused removal says why; changing option would only be
+            // refused next for the variant still there.
+            if (why) {
+                setBase(saved);
+                setFailed(why);
+                return false;
+            }
             if (optionId !== (product.optionId ?? "")) {
                 const res = await patchProduct(storeId, product.id, {
                     optionId: optionId || null,
@@ -317,9 +324,10 @@ export function VariantsSection({
             why ??= DROPPED;
         }
         setRows(next);
-        // On success the refreshed product replaces both; on a failure the
-        // baseline is what did save, so the retry skips it.
-        if (why) setBase(saved);
+        // On success the rows as saved are the baseline, so the section is
+        // clean at once; on a failure it is what did save, so the retry
+        // skips it.
+        setBase(why ? saved : next);
         setFailed(why);
         return !why;
     }

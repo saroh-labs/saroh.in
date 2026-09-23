@@ -227,20 +227,22 @@ export function StockSheet({
             );
             return;
         }
-        onOpenChange(false);
+        changeOpen(false);
         showSuccess("Prices and stock saved.");
+    }
+
+    function changeOpen(o: boolean) {
+        if (!o) {
+            form.reset(valuesOf(product));
+            setAdding(false);
+        }
+        onOpenChange(o);
     }
 
     return (
         <QuickSheet
             open={open}
-            onOpenChange={(o) => {
-                if (!o) {
-                    form.reset(valuesOf(product));
-                    setAdding(false);
-                }
-                onOpenChange(o);
-            }}
+            onOpenChange={changeOpen}
             productName={product.name}
             title="Edit prices and stock"
             fullEditorHref={productEditHref(
