@@ -653,6 +653,8 @@ flowchart TB
 **Verification:**
 - Side by side with the design at 1440/390, both states.
 
+> **Done — #499** (merged). Order Detail (1d) on the org-scoped read: keyboard stepper, "waiting N min" (Saffron past 20), allergy banner + line tags from the customer's structured notes vs each line's contains / may-contain, Change this order under Items (refund by line, edit before preparing, hand to courier with a typed tracking link), timeline, customer card, money card only with the money reads; payment failed / not paid / not found / couldn't load. Ready and refunds held 10 s (`showUndo` duration; `dismissToasts()` so two Undos never stack); nothing sent. Members reach Sell → Orders via `order:stage` with no money, refund, edit, emails, totals, export or New order — and the old store-scoped order list/read now refuse them (closes the money leak). A payment recorded by hand reads as paid. No merchant pay link on failed payment ("Paid in cash" instead); no fee / payout rows (not recorded). `e2e/tests/order-detail.spec.ts` 6 on desk + phone (refund test needs `E2E_REFUND_ORDER_ID`).
+
 ---
 
 ### U15. Bookings calendar
@@ -681,6 +683,8 @@ flowchart TB
 **Verification:**
 - Each layout side by side with the design.
 
+> **Done — #500** (merged). `/bookings`: day by person (default), week, agenda + month; free gaps book only services that person takes and that fit; closed time opens hours for the day or every weekday; quick look (check in, no-show, move, cancel) held 8 s with Undo in toast and sheet; classes list everyone and how each paid, cancel as a whole; phones one person at a time + agenda. Old list at `/bookings/all`. API: check-in from an hour before start, no-show once started; a class the business cancels returns every credit. Diary colour tokens. Nothing promises a message; no pay link on hand bookings. Open: an unbooked class doesn't appear (the read returns only class times with someone on them).
+
 ---
 
 ### U16. Availability and Services editors
@@ -707,6 +711,8 @@ flowchart TB
 
 **Verification:**
 - Side by side with the design's `?view=avail` and `?view=services`.
+
+> **Done — #501** (merged). `/bookings/availability`: weekly hours per person, time off, extra hours, booking rules; draft until Save hours, Undo reverses every write, bookings left outside listed and kept; add someone without an account. `/services` cards, New/Edit dialog refusing what the design refuses, Pause with Undo. A service needs a person only if the business has anyone on the diary. `e2e/tests/bookings.spec.ts` 9 passed / 1 skipped on desk + phone. Open: no buttons yet to take someone off the diary or link them to a team member (API supports both).
 
 ---
 
