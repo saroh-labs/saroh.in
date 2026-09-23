@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { StockDraft } from "./editor-sections";
 import {
     basicsFrom,
     basicsPatch,
@@ -12,6 +13,7 @@ import {
     madeByFrom,
     madeByPatch,
     madeBySchema,
+    mergeDraft,
     partitionSections,
     photosFrom,
     photosInput,
@@ -354,5 +356,61 @@ describe("each section's values and patch", () => {
         expect(
             samePhotos(drafts, [{ ...drafts[0], alt: "Another word" }]),
         ).toBe(false);
+    });
+});
+
+describe("stock under a fresh load", () => {
+    const line = (variantId: string, quantity: string, warn = "5") => ({
+        variantId,
+        title: variantId,
+        quantity,
+        lowStockAlert: warn,
+        promised: 0,
+    });
+    const base: StockDraft = {
+        quantity: "0",
+        lowStockAlert: "10",
+        lines: [line("s", "4"), line("m", "6")],
+    };
+    // Another section saved: the product came back with new counts (an
+    // order took one of M) and a new variant L.
+    const fresh: StockDraft = {
+        quantity: "0",
+        lowStockAlert: "10",
+        lines: [line("s", "4"), line("m", "5"), line("l", "0")],
+    };
+
+    it("takes the fresh load where nothing was typed", () => {
+        expect(mergeDraft(fresh, base, base)).toEqual(fresh);
+    });
+
+    it("keeps a count typed for a variant, and the rest fresh", () => {
+        const draft: StockDraft = {
+            ...base,
+            lines: [line("s", "9", "2"), line("m", "6")],
+        };
+        expect(mergeDraft(fresh, base, draft)).toEqual({
+            ...fresh,
+            lines: [line("s", "9", "2"), line("m", "5"), line("l", "0")],
+        });
+    });
+
+    it("keeps the product's own count and warning when they were typed", () => {
+        const whole: StockDraft = {
+            quantity: "12",
+            lowStockAlert: "10",
+            lines: [],
+        };
+        const reloaded: StockDraft = {
+            quantity: "11",
+            lowStockAlert: "10",
+            lines: [],
+        };
+        expect(
+            mergeDraft(reloaded, whole, { ...whole, quantity: "20" }),
+        ).toEqual({ quantity: "20", lowStockAlert: "10", lines: [] });
+        expect(
+            mergeDraft(reloaded, whole, { ...whole, lowStockAlert: "3" }),
+        ).toEqual({ quantity: "11", lowStockAlert: "3", lines: [] });
     });
 });

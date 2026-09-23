@@ -393,6 +393,58 @@ export function isCount(value: string): boolean {
     return /^\d+$/.test(value.trim());
 }
 
+/** One variant's count as the Stock section edits it. */
+export interface StockLine {
+    variantId: string;
+    title: string;
+    quantity: string;
+    lowStockAlert: string;
+    promised: number;
+}
+
+/** The Stock section's values: the product's own count and each variant's. */
+export interface StockDraft {
+    quantity: string;
+    lowStockAlert: string;
+    lines: StockLine[];
+}
+
+/**
+ * A fresh load (another section saved) under unsaved edits: take the fresh
+ * lines, keeping what was typed for each variant still there.
+ */
+export function mergeDraft(
+    fresh: StockDraft,
+    base: StockDraft,
+    draft: StockDraft,
+): StockDraft {
+    const edited = (a: StockLine, b: StockLine | undefined) =>
+        a.quantity !== b?.quantity || a.lowStockAlert !== b.lowStockAlert;
+    const typed: Partial<Record<string, StockLine>> = {};
+    for (const l of draft.lines) {
+        const was = base.lines.find((b) => b.variantId === l.variantId);
+        if (edited(l, was)) typed[l.variantId] = l;
+    }
+    return {
+        quantity:
+            draft.quantity !== base.quantity ? draft.quantity : fresh.quantity,
+        lowStockAlert:
+            draft.lowStockAlert !== base.lowStockAlert
+                ? draft.lowStockAlert
+                : fresh.lowStockAlert,
+        lines: fresh.lines.map((l) => {
+            const mine = typed[l.variantId];
+            return mine
+                ? {
+                      ...l,
+                      quantity: mine.quantity,
+                      lowStockAlert: mine.lowStockAlert,
+                  }
+                : l;
+        }),
+    };
+}
+
 // ---- Helpers ----
 
 /** A money string without trailing ".00", as a merchant would type it. */

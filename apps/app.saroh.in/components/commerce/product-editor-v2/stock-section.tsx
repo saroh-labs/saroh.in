@@ -6,26 +6,13 @@ import { Plus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import { setInventory, setVariantStock } from "@/lib/products/actions";
-import { isCount } from "@/lib/products/editor-sections";
+import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
+import { isCount, mergeDraft } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
 
 import { useEditor, useSection } from "./editor-state";
 import { boxClass, FieldHelp } from "./fields";
 import { SectionCard } from "./section-card";
-
-interface Line {
-    variantId: string;
-    title: string;
-    quantity: string;
-    lowStockAlert: string;
-    promised: number;
-}
-
-interface StockDraft {
-    quantity: string;
-    lowStockAlert: string;
-    lines: Line[];
-}
 
 const DEFAULT_WARN = "10";
 
@@ -62,42 +49,6 @@ function draftFrom(p: ProductDetail, defaultWarn: string): StockDraft {
                     promised,
                 };
             }),
-    };
-}
-
-/**
- * A fresh load (another section saved) under unsaved edits: take the fresh
- * lines, keeping what was typed for each variant still there.
- */
-function mergeDraft(
-    fresh: StockDraft,
-    base: StockDraft,
-    draft: StockDraft,
-): StockDraft {
-    const edited = (a: Line, b: Line | undefined) =>
-        a.quantity !== b?.quantity || a.lowStockAlert !== b.lowStockAlert;
-    const typed: Partial<Record<string, Line>> = {};
-    for (const l of draft.lines) {
-        const was = base.lines.find((b) => b.variantId === l.variantId);
-        if (edited(l, was)) typed[l.variantId] = l;
-    }
-    return {
-        quantity:
-            draft.quantity !== base.quantity ? draft.quantity : fresh.quantity,
-        lowStockAlert:
-            draft.lowStockAlert !== base.lowStockAlert
-                ? draft.lowStockAlert
-                : fresh.lowStockAlert,
-        lines: fresh.lines.map((l) => {
-            const mine = typed[l.variantId];
-            return mine
-                ? {
-                      ...l,
-                      quantity: mine.quantity,
-                      lowStockAlert: mine.lowStockAlert,
-                  }
-                : l;
-        }),
     };
 }
 
@@ -208,7 +159,7 @@ export function StockSection({
         },
     );
 
-    const setLine = (id: string, patch: Partial<Line>) =>
+    const setLine = (id: string, patch: Partial<StockLine>) =>
         setDraft({
             ...draft,
             lines: draft.lines.map((l) =>
