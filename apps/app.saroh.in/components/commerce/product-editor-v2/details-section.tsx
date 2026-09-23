@@ -17,6 +17,7 @@ import {
     LIMITS,
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
+import type { EffectiveDefaults } from "@/lib/products/settings";
 
 import { useEditor, useSection } from "./editor-state";
 import { boxClass, FieldHelp, FieldLabel } from "./fields";
@@ -38,14 +39,21 @@ export function DetailsSection({
     product,
     storeId,
     allergens,
+    defaults,
 }: {
     product: ProductDetail | null;
     storeId: string;
     /** The storefront's list (#483); empty hides "Contains". */
     allergens: { id: string; name: string }[];
+    /** Creating: Settings → Defaults for the chosen category. */
+    defaults: EffectiveDefaults | null;
 }) {
     const { canWrite } = useEditor();
-    const baseline = product ? detailsFrom(product) : EMPTY;
+    // A new product starts with its category's line; picking another
+    // category changes it only while the merchant hasn't typed their own.
+    const baseline = product
+        ? detailsFrom(product)
+        : { ...EMPTY, howToUse: defaults?.howToUse ?? "" };
     const baseContains = (product?.allergens.contains ?? []).map((a) => a.id);
     const baseMay = (product?.allergens.mayContain ?? []).map((a) => a.id);
     const allergenKey = JSON.stringify([baseContains, baseMay]);
@@ -64,6 +72,7 @@ export function DetailsSection({
     const form = useForm<DetailsValues>({
         resolver: zodResolver(detailsSchema),
         values: baseline,
+        resetOptions: product ? undefined : { keepDirtyValues: true },
         mode: "onChange",
     });
     const { isDirty, errors } = form.formState;

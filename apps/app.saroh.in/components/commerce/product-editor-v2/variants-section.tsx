@@ -104,8 +104,12 @@ export function VariantsSection({
     /** Settings → SKUs, and this product's number for {N}. */
     sku: { pattern: string; suggest: boolean; n: number };
 }) {
-    const { canWrite } = useEditor();
+    const { canWrite, saving } = useEditor();
+    // While its save runs, the list is what is being sent: typing into it
+    // then would be overwritten by what comes back.
+    const busy = saving.includes("variants");
     const ro = !canWrite;
+    const locked = ro || busy;
     const savedOptionId = product.optionId ?? options.at(0)?.id ?? "";
     const savedOption = options.find((o) => o.id === savedOptionId) ?? null;
     const fromProduct = rowsFrom(product.variants, savedOption);
@@ -191,6 +195,10 @@ export function VariantsSection({
     };
     const bad = rows.some((r) => errOf(r));
     const dirty = optionId !== savedOptionId || !sameRows(rows, base);
+    // Added or removed rows change what Stock counts; an edit in place doesn't.
+    const changesList =
+        rows.some((r) => !r.id) ||
+        base.some((b) => !rows.some((r) => r.id === b.id));
 
     // The row being added: its own gate, so Save is never blamed for it.
     const newTitle = values.find((x) => x.id === newValue)?.value ?? "";
@@ -216,7 +224,7 @@ export function VariantsSection({
     const allTaken =
         values.length > 0 && values.every((x) => takenIds.includes(x.id));
     const addOff =
-        ro ||
+        locked ||
         !newValue ||
         takenIds.includes(newValue) ||
         dupSku ||
@@ -326,6 +334,7 @@ export function VariantsSection({
             note: failed ? `${failed} Your changes are still here.` : undefined,
             noteIsError: !!failed,
             saveLabel: failed === DROPPED ? "Try again" : undefined,
+            changesList,
         },
         {
             save,
@@ -389,7 +398,7 @@ export function VariantsSection({
                     </p>
                     <button
                         type="button"
-                        disabled={ro}
+                        disabled={locked}
                         onClick={() => setAdding(true)}
                         className="inline-flex h-[34px] items-center gap-[7px] rounded-[9px] border border-border bg-card px-[13px] text-[12.5px] font-semibold hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11"
                     >
@@ -427,7 +436,7 @@ export function VariantsSection({
                                         type="button"
                                         role="radio"
                                         aria-checked={on}
-                                        disabled={ro}
+                                        disabled={locked}
                                         onClick={() => {
                                             if (on) return;
                                             // Values belong to one option;
@@ -516,7 +525,7 @@ export function VariantsSection({
                                                     placeholder={
                                                         title || `Pick a ${opt}`
                                                     }
-                                                    disabled={ro}
+                                                    disabled={locked}
                                                     aria-label={`Variant ${i + 1} ${opt}`}
                                                     className={cn(
                                                         "h-8 rounded-[8px] text-[13px]",
@@ -531,7 +540,7 @@ export function VariantsSection({
                                                             sku: e.target.value,
                                                         })
                                                     }
-                                                    disabled={ro}
+                                                    disabled={locked}
                                                     aria-label={`Variant ${i + 1} SKU`}
                                                     className={boxClass({
                                                         small: true,
@@ -551,7 +560,7 @@ export function VariantsSection({
                                                             })
                                                         }
                                                         inputMode="decimal"
-                                                        disabled={ro}
+                                                        disabled={locked}
                                                         placeholder={
                                                             productPrice
                                                         }
@@ -572,7 +581,7 @@ export function VariantsSection({
                                                 </MoneyBox>
                                                 <button
                                                     type="button"
-                                                    disabled={ro}
+                                                    disabled={locked}
                                                     onClick={() => remove(r)}
                                                     aria-label={`Remove ${title || "this variant"}`}
                                                     title={`Remove ${title || "this variant"}`}
@@ -651,7 +660,7 @@ export function VariantsSection({
                                                                         on
                                                                     }
                                                                     disabled={
-                                                                        ro
+                                                                        locked
                                                                     }
                                                                     onClick={() =>
                                                                         set(
@@ -733,14 +742,14 @@ export function VariantsSection({
                                     disabled: takenIds.includes(x.id),
                                 }))}
                                 placeholder={`Pick a ${opt}`}
-                                disabled={ro || values.length === 0}
+                                disabled={locked || values.length === 0}
                                 aria-label={`New variant ${opt}`}
                                 className="h-8 rounded-[8px] text-[13px]"
                             />
                             <input
                                 value={newSku}
                                 onChange={(e) => setNewSku(e.target.value)}
-                                disabled={ro}
+                                disabled={locked}
                                 aria-label="New variant SKU"
                                 placeholder={suggested || "SKU"}
                                 className={boxClass({
@@ -758,7 +767,7 @@ export function VariantsSection({
                                         setNewPrice(e.target.value)
                                     }
                                     inputMode="decimal"
-                                    disabled={ro}
+                                    disabled={locked}
                                     placeholder={productPrice}
                                     aria-label="New variant price, blank uses the product's"
                                     className={cn(

@@ -36,10 +36,13 @@ export function PhotosSheet({
     const baseline = photosFrom(product.images);
     const [draft, setDraft] = useState<PhotoDraft[]>(baseline);
     const [saving, setSaving] = useState(false);
-    const [loadedFor, setLoadedFor] = useState(product.updatedAt);
-    // A fresh baseline after a save or refresh.
-    if (loadedFor !== product.updatedAt) {
-        setLoadedFor(product.updatedAt);
+    // A fresh baseline when the photos themselves change — a save here or
+    // elsewhere — not on every save of the product, which would drop a
+    // draft in progress.
+    const loadedKey = JSON.stringify(baseline.map((p) => [p.id, p.url, p.alt]));
+    const [loadedFor, setLoadedFor] = useState(loadedKey);
+    if (loadedFor !== loadedKey) {
+        setLoadedFor(loadedKey);
         setDraft(baseline);
     }
     const dirty = !samePhotos(draft, baseline);

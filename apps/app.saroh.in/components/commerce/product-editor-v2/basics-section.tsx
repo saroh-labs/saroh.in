@@ -13,6 +13,7 @@ import {
     basicsProblem,
     basicsSchema,
     isMoney,
+    joinAnd,
     LIMITS,
     paise,
     slugify,
@@ -54,6 +55,7 @@ export function BasicsSection({
     symbol,
     categories: initialCategories,
     manageCategoriesHref,
+    onCategoryChange,
 }: {
     product: ProductDetail | null;
     storeId: string;
@@ -61,6 +63,8 @@ export function BasicsSection({
     symbol: string;
     categories: CategoryChoice[];
     manageCategoriesHref: string;
+    /** Creating: the category picked, so its defaults can apply. */
+    onCategoryChange?: (categoryId: string) => void;
 }) {
     const { mode, canWrite } = useEditor();
     const creating = mode === "create";
@@ -87,6 +91,15 @@ export function BasicsSection({
         {
             dirty: isDirty,
             problem,
+            // The problem names only the first; creating says them all.
+            missing: creating
+                ? joinAnd(
+                      [
+                          v.name.trim() ? null : "a name",
+                          v.price.trim() ? null : "a price",
+                      ].filter((x): x is string => x !== null),
+                  )
+                : undefined,
             note: slugMoved
                 ? `Saving moves the address. Links people saved to /products/${baseline.slug} will stop working.`
                 : undefined,
@@ -289,12 +302,13 @@ export function BasicsSection({
                     id="pe-category"
                     storeId={storeId}
                     value={v.categoryId}
-                    onChange={(id) =>
+                    onChange={(id) => {
                         form.setValue("categoryId", id, {
                             shouldDirty: true,
                             shouldValidate: true,
-                        })
-                    }
+                        });
+                        onCategoryChange?.(id);
+                    }}
                     categories={categories}
                     onCreated={(c) => setCategories((list) => [...list, c])}
                     manageHref={manageCategoriesHref}

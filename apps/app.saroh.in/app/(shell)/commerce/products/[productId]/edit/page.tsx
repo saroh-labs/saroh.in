@@ -32,7 +32,7 @@ export default async function EditProductPage({
     const product = store ? await getProduct(store.id, productId) : null;
     if (!store || !product) notFound();
 
-    const context = await loadEditorContext(store, product.id);
+    const context = await loadEditorContext(store, product);
     return (
         <ProductEditorV2
             // A different product starts from its own saved values rather

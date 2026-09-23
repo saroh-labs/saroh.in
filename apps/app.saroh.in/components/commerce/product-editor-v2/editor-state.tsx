@@ -1,6 +1,6 @@
 "use client";
 
-import { showSuccess } from "@saroh/ui/toast";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import {
@@ -17,6 +17,7 @@ import type { SectionKey } from "@/lib/products/editor-sections";
 import {
     partitionSections,
     savedMessage,
+    SECTION_NAMES,
     SECTION_ORDER,
 } from "@/lib/products/editor-sections";
 import type { ProductPatch } from "@/lib/products/service";
@@ -34,6 +35,10 @@ export interface SectionState {
     discardLabel?: string;
     /** Said after it saves, instead of "{Name} saved." */
     savedMessage?: string;
+    /** Rows were added or removed: sections that list them wait for it. */
+    changesList?: boolean;
+    /** Creating: every required value still empty ("a name and a price"). */
+    missing?: string;
 }
 
 /**
@@ -110,7 +115,9 @@ export function ProductEditorProvider({
                 cur.noteIsError === next.noteIsError &&
                 cur.saveLabel === next.saveLabel &&
                 cur.discardLabel === next.discardLabel &&
-                cur.savedMessage === next.savedMessage
+                cur.savedMessage === next.savedMessage &&
+                cur.changesList === next.changesList &&
+                cur.missing === next.missing
             )
                 return prev;
             return { ...prev, [key]: next };
@@ -136,13 +143,24 @@ export function ProductEditorProvider({
             if (savable.length === 0) return;
             setSaving(savable);
             const saved: SectionKey[] = [];
-            // One at a time, in page order: each is its own call, and a
-            // failure in one leaves the others' results standing.
-            for (const k of savable) {
-                const handle = handles.current.get(k);
-                if (handle && (await handle.save())) saved.push(k);
+            try {
+                // One at a time, in page order: each is its own call, and a
+                // failure in one leaves the others' results standing.
+                for (const k of savable) {
+                    const handle = handles.current.get(k);
+                    if (!handle) continue;
+                    try {
+                        if (await handle.save()) saved.push(k);
+                    } catch {
+                        // A save that threw never reached the API's answer.
+                        showError(
+                            `Couldn't save ${SECTION_NAMES[k].toLowerCase()} — the connection dropped. Your changes are still here.`,
+                        );
+                    }
+                }
+            } finally {
+                setSaving([]);
             }
-            setSaving([]);
             if (saved.length === 0) return;
             router.refresh();
             const only = saved.length === 1 ? saved[0] : undefined;
@@ -250,6 +268,8 @@ export function useSection(
         saveLabel,
         discardLabel,
         savedMessage: said,
+        changesList,
+        missing,
     } = state;
     useEffect(() => {
         report(key, {
@@ -260,6 +280,8 @@ export function useSection(
             saveLabel,
             discardLabel,
             savedMessage: said,
+            changesList,
+            missing,
         });
     }, [
         key,
@@ -271,5 +293,7 @@ export function useSection(
         saveLabel,
         discardLabel,
         said,
+        changesList,
+        missing,
     ]);
 }

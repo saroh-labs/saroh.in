@@ -43,8 +43,9 @@ export function PhotosSection({
     product: ProductDetail | null;
     storeId: string;
 }) {
-    const { canWrite } = useEditor();
-    const ro = !canWrite;
+    const { canWrite, saving } = useEditor();
+    // Read-only, or saving: the set on screen is the one being sent.
+    const ro = !canWrite || saving.includes("photos");
     const fromProduct = product ? photosFrom(product.images) : [];
     const loadedKey = JSON.stringify(
         fromProduct.map((p) => [p.id, p.url, p.alt]),
@@ -143,7 +144,7 @@ export function PhotosSection({
     }
 
     function toggleLibrary(item: LibraryItem) {
-        if (!item.url) return;
+        if (ro || !item.url) return;
         const i = draft.findIndex(
             (p) => p.mediaId === item.id || p.url === item.url,
         );
@@ -204,6 +205,7 @@ export function PhotosSection({
                 onDrop={(e) => {
                     e.preventDefault();
                     setOver(false);
+                    if (ro || full) return;
                     const file = e.dataTransfer.files.item(0);
                     if (file) void addFile(file);
                 }}
@@ -285,10 +287,11 @@ export function PhotosSection({
                                     >
                                         ›
                                     </button>
-                                    {i > 0 && !ro ? (
+                                    {i > 0 && canWrite ? (
                                         <button
                                             type="button"
                                             className={tileBtn}
+                                            disabled={ro}
                                             aria-label={`Make photo ${i + 1} the cover`}
                                             onClick={() => move(i, 0)}
                                         >
@@ -378,17 +381,18 @@ export function PhotosSection({
                     {error}
                 </div>
             ) : null}
-            {!ro && !full ? (
+            {canWrite && !full ? (
                 <button
                     type="button"
+                    disabled={ro}
                     aria-expanded={byAddress}
                     onClick={() => setByAddress((o) => !o)}
-                    className="mt-1 text-[11.5px] text-brand hover:text-foreground coarse:min-h-11"
+                    className="mt-1 text-[11.5px] text-brand hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 coarse:min-h-11"
                 >
                     {byAddress ? "Close" : "Or add one by its address"}
                 </button>
             ) : null}
-            {byAddress && !full ? (
+            {byAddress && !full && !ro ? (
                 <div className="mt-2">
                     <AddressPanel
                         onAdd={(url, alt) => {

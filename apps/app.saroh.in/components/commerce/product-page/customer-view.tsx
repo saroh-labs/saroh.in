@@ -277,7 +277,11 @@ export function toShopData(overview: ProductOverview): ProductPageData {
         })),
         optionName: product.option?.name ?? null,
         variants: product.variants.map((v) => {
-            const line = stock.variants.find((l) => l.variantId === v.id);
+            // A variant with no count of its own sells from the product's,
+            // while the product still counts as a whole.
+            const line =
+                stock.variants.find((l) => l.variantId === v.id) ??
+                stock.product;
             return {
                 id: v.id,
                 title: v.title,

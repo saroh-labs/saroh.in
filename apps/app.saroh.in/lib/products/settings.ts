@@ -68,6 +68,8 @@ export interface CategoryRemoval {
         returnsMode: string | null;
         returnsText: string | null;
     } | null;
+    /** The custom fields shown for it; Undo shows them for it again. */
+    fieldIds: string[];
 }
 
 export interface DefaultsSaveResult {
@@ -102,6 +104,25 @@ export async function send<T>(
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
     const failure = toFailure(data, "That didn't save. Try again.");
     return { ...failure, field: failure.field as ResultField | undefined };
+}
+
+// ---- Defaults a new product starts with ----
+
+/** What a product in a category starts with (Settings → Defaults). */
+export interface EffectiveDefaults {
+    howToUse: string | null;
+    lowStockAlert: number;
+    returns: { mode: "STOREFRONT" | "OWN"; text: string | null };
+}
+
+export function getEffectiveDefaults(
+    storeId: string,
+    categoryId: string | null,
+): Promise<EffectiveDefaults | null> {
+    const q = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : "";
+    return getJson<EffectiveDefaults>(
+        `/stores/${storeId}/catalogue/defaults/effective${q}`,
+    );
 }
 
 // ---- SKU pattern (#484) ----

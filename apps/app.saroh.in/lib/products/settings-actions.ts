@@ -9,7 +9,7 @@ import type {
     FieldView,
     SkuSettings,
 } from "./settings";
-import { getSkuPreview, send } from "./settings";
+import { getEffectiveDefaults, getSkuPreview, send } from "./settings";
 
 /**
  * Server Actions for Product settings. Each change that takes effect at
@@ -74,6 +74,7 @@ export async function restoreCategory(
             movedTo: removal.movedTo,
             productIds: removal.productIds,
             defaults: removal.defaults,
+            fieldIds: removal.fieldIds,
         },
     );
 }
@@ -162,6 +163,14 @@ export async function undoDefaults(storeId: string, saved: DefaultsSaveResult) {
 // ---- SKU pattern ----
 
 /** The preview as the pattern is typed; null when it could not be read. */
+/** The editor's prefill when a new product's category changes. */
+export async function effectiveDefaults(
+    storeId: string,
+    categoryId: string | null,
+) {
+    return getEffectiveDefaults(storeId, categoryId);
+}
+
 export async function previewSkuPattern(storeId: string, pattern: string) {
     return getSkuPreview(storeId, pattern);
 }

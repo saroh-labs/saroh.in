@@ -12,7 +12,9 @@ import {
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -83,31 +85,37 @@ type Values = z.infer<typeof schema>;
 function valuesOf(p: ProductDetail): Values {
     const perVariant = p.stockMode === "variant";
     const own = p.inventory;
+    // As the editor's Stock section seeds it: open orders' promises move
+    // onto the variant they name, so each starts at what it promises and
+    // the first also at what was free to sell — every unit counted once.
+    const free = Math.max(0, (own?.quantity ?? 0) - (own?.reserved ?? 0));
     return {
         price: trimMoney(p.price),
         mrp: p.mrp ? trimMoney(p.mrp) : "",
         quantity: String(own?.quantity ?? 0),
         lowStockAlert: String(own?.lowStockAlert ?? 10),
-        rows: p.variants.map((v, i) => ({
-            variantId: v.id,
-            title: v.title,
-            sku: v.sku,
-            // A price equal to the product's reads as "the product's".
-            price: v.price && v.price !== p.price ? trimMoney(v.price) : "",
-            // Switching to a count per variant starts the first variant on
-            // the product's whole count, so nothing on the shelf vanishes.
-            quantity: String(
-                perVariant
-                    ? (v.inventory?.quantity ?? 0)
-                    : i === 0
-                      ? (own?.quantity ?? 0)
-                      : 0,
-            ),
-            lowStockAlert: String(
-                v.inventory?.lowStockAlert ?? own?.lowStockAlert ?? 10,
-            ),
-            promised: v.inventory?.reserved ?? 0,
-        })),
+        rows: p.variants.map((v, i) => {
+            const promised = perVariant
+                ? (v.inventory?.reserved ?? 0)
+                : (p.variantPromises[v.id] ?? 0);
+            return {
+                variantId: v.id,
+                title: v.title,
+                sku: v.sku,
+                // Blank only when it has no price of its own; one set equal
+                // to the product's is still its own.
+                price: v.price ? trimMoney(v.price) : "",
+                quantity: String(
+                    perVariant
+                        ? (v.inventory?.quantity ?? 0)
+                        : promised + (i === 0 ? free : 0),
+                ),
+                lowStockAlert: String(
+                    v.inventory?.lowStockAlert ?? own?.lowStockAlert ?? 10,
+                ),
+                promised,
+            };
+        }),
     };
 }
 
@@ -141,6 +149,18 @@ export function StockSheet({
         hasVariants &&
         product.stockMode === "product" &&
         product.inventory !== null;
+    // No count yet: a price edit must not start one at 0 (the shop would
+    // say sold out). Counting starts only when asked, as in the editor.
+    const counted =
+        product.stockMode === "variant" || product.inventory !== null;
+    const [adding, setAdding] = useState(false);
+    const showStock = counted || adding;
+    const rowGrid = cn(
+        "grid gap-2",
+        showStock
+            ? "grid-cols-[minmax(0,1.4fr)_5.5rem_4.5rem_4.5rem]"
+            : "grid-cols-[minmax(0,1.4fr)_5.5rem]",
+    );
     const firstError =
         errors.price?.message ??
         errors.mrp?.message ??
@@ -168,10 +188,7 @@ export function StockSheet({
                 (x) => x.id === row.variantId,
             );
             if (!variant) continue;
-            const was =
-                variant.price && variant.price !== product.price
-                    ? trimMoney(variant.price)
-                    : "";
+            const was = variant.price ? trimMoney(variant.price) : "";
             if (row.price.trim() === was) continue;
             const res = await updateVariant(storeId, product.id, variant.id, {
                 sku: variant.sku,
@@ -185,20 +202,22 @@ export function StockSheet({
             });
             if (!res.ok) failures.push(`${variant.title}'s price`);
         }
-        const stock = hasVariants
-            ? await setVariantStock(
-                  storeId,
-                  product.id,
-                  v.rows.map((r) => ({
-                      variantId: r.variantId,
-                      quantity: Number(r.quantity),
-                      lowStockAlert: Number(r.lowStockAlert),
-                  })),
-              )
-            : await setInventory(storeId, product.id, {
-                  quantity: Number(v.quantity),
-                  lowStockAlert: Number(v.lowStockAlert),
-              });
+        const stock = !showStock
+            ? { ok: true as const }
+            : hasVariants
+              ? await setVariantStock(
+                    storeId,
+                    product.id,
+                    v.rows.map((r) => ({
+                        variantId: r.variantId,
+                        quantity: Number(r.quantity),
+                        lowStockAlert: Number(r.lowStockAlert),
+                    })),
+                )
+              : await setInventory(storeId, product.id, {
+                    quantity: Number(v.quantity),
+                    lowStockAlert: Number(v.lowStockAlert),
+                });
         if (!stock.ok) failures.push("the stock counts");
 
         router.refresh();
@@ -216,7 +235,10 @@ export function StockSheet({
         <QuickSheet
             open={open}
             onOpenChange={(o) => {
-                if (!o) form.reset(valuesOf(product));
+                if (!o) {
+                    form.reset(valuesOf(product));
+                    setAdding(false);
+                }
                 onOpenChange(o);
             }}
             productName={product.name}
@@ -226,11 +248,11 @@ export function StockSheet({
                 product.id,
                 hasVariants ? "variants" : "stock",
             )}
-            dirty={isDirty || switching}
+            dirty={isDirty || switching || adding}
             saving={isSubmitting}
             note={
                 firstError ??
-                (isDirty || switching ? undefined : "No changes yet")
+                (isDirty || switching || adding ? undefined : "No changes yet")
             }
             onSave={() => void form.handleSubmit(save)()}
         >
@@ -278,19 +300,28 @@ export function StockSheet({
                             <p className="text-sm font-medium">Each variant</p>
                             <div
                                 aria-hidden
-                                className="grid grid-cols-[minmax(0,1.4fr)_5.5rem_4.5rem_4.5rem] gap-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground"
+                                className={cn(
+                                    rowGrid,
+                                    "text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground",
+                                )}
                             >
                                 <span>{product.option?.name ?? "Variant"}</span>
                                 <span>Price</span>
-                                <span>On hand</span>
-                                <span>Warn at</span>
+                                {showStock ? (
+                                    <>
+                                        <span>On hand</span>
+                                        <span>Warn at</span>
+                                    </>
+                                ) : null}
                             </div>
                             {rows.fields.map((row, i) => (
                                 <div
                                     key={row.id}
                                     className="flex flex-col gap-1"
                                 >
-                                    <div className="grid grid-cols-[minmax(0,1.4fr)_5.5rem_4.5rem_4.5rem] items-center gap-2">
+                                    <div
+                                        className={cn(rowGrid, "items-center")}
+                                    >
                                         <span className="truncate text-[13.5px] font-medium">
                                             {row.title}
                                         </span>
@@ -305,37 +336,49 @@ export function StockSheet({
                                             aria-label={`${row.title} price, blank for the product's`}
                                             className="h-9"
                                         />
-                                        <Input
-                                            {...form.register(
-                                                `rows.${i}.quantity`,
-                                            )}
-                                            inputMode="numeric"
-                                            aria-label={`${row.title} on hand`}
-                                            aria-invalid={Boolean(
-                                                errors.rows?.[i]?.quantity,
-                                            )}
-                                            className={cn(
-                                                "h-9",
-                                                errors.rows?.[i]?.quantity &&
-                                                    "border-destructive",
-                                            )}
-                                        />
-                                        <Input
-                                            {...form.register(
-                                                `rows.${i}.lowStockAlert`,
-                                            )}
-                                            inputMode="numeric"
-                                            aria-label={`${row.title} warn at`}
-                                            className="h-9"
-                                        />
+                                        {showStock ? (
+                                            <>
+                                                <Input
+                                                    {...form.register(
+                                                        `rows.${i}.quantity`,
+                                                    )}
+                                                    inputMode="numeric"
+                                                    aria-label={`${row.title} on hand`}
+                                                    aria-invalid={Boolean(
+                                                        errors.rows?.[i]
+                                                            ?.quantity,
+                                                    )}
+                                                    className={cn(
+                                                        "h-9",
+                                                        errors.rows?.[i]
+                                                            ?.quantity &&
+                                                            "border-destructive",
+                                                    )}
+                                                />
+                                                <Input
+                                                    {...form.register(
+                                                        `rows.${i}.lowStockAlert`,
+                                                    )}
+                                                    inputMode="numeric"
+                                                    aria-label={`${row.title} warn at`}
+                                                    className="h-9"
+                                                />
+                                            </>
+                                        ) : null}
                                     </div>
                                     <p className="font-mono text-[11px] text-muted-foreground">
-                                        {row.sku} · {row.promised} promised ·{" "}
-                                        {isCount(
-                                            form.watch(`rows.${i}.quantity`),
-                                        )
-                                            ? `${Math.max(0, Number(form.watch(`rows.${i}.quantity`)) - row.promised)} can sell`
-                                            : "—"}
+                                        {row.sku}
+                                        {showStock
+                                            ? ` · ${row.promised} promised · ${
+                                                  isCount(
+                                                      form.watch(
+                                                          `rows.${i}.quantity`,
+                                                      ),
+                                                  )
+                                                      ? `${Math.max(0, Number(form.watch(`rows.${i}.quantity`)) - row.promised)} can sell`
+                                                      : "—"
+                                              }`
+                                            : ""}
                                     </p>
                                     {(() => {
                                         const message =
@@ -352,12 +395,12 @@ export function StockSheet({
                                 </div>
                             ))}
                             <p className="text-[12px] text-muted-foreground">
-                                {switching
-                                    ? `Saving counts each variant on its own. The product's ${product.inventory?.quantity ?? 0} on hand start on the first variant — split them across the rest.`
+                                {switching && showStock
+                                    ? "Saving counts each variant on its own. Each starts at what its open orders hold, and the first also at what was free to sell — split them across the rest."
                                     : `A blank price is the product's ${money(product.price)}. Promised stock comes from open orders, so it can't be changed here.`}
                             </p>
                         </div>
-                    ) : (
+                    ) : showStock ? (
                         <div className="grid grid-cols-2 gap-3">
                             <FormField
                                 control={form.control}
@@ -397,7 +440,28 @@ export function StockSheet({
                                 changed here.
                             </p>
                         </div>
-                    )}
+                    ) : null}
+                    {!showStock ? (
+                        <div className="flex flex-col items-start gap-2.5">
+                            <p className="text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
+                                {hasVariants
+                                    ? `No stock count yet. Each of the ${product.variants.length} variants gets its own, so a small one can run out before a large one.`
+                                    : "No stock count yet. Add one to see how many you have and get a warning when it runs low."}
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setAdding(true)}
+                                className="inline-flex h-[34px] items-center gap-[7px] rounded-[9px] border border-border bg-card px-[13px] text-[12.5px] font-semibold hover:bg-muted/50 coarse:h-11"
+                            >
+                                <Plus
+                                    aria-hidden
+                                    className="size-3.5"
+                                    strokeWidth={2.2}
+                                />
+                                Add stock
+                            </button>
+                        </div>
+                    ) : null}
                 </div>
             </Form>
         </QuickSheet>

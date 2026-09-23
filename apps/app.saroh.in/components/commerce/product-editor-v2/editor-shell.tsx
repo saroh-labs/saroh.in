@@ -11,7 +11,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { ChevronLeft, Lock } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { currencySymbol } from "@/lib/format/money";
@@ -31,6 +31,8 @@ import type {
     ProductOptionView,
     ProductStatus,
 } from "@/lib/products/service";
+import type { EffectiveDefaults } from "@/lib/products/settings";
+import { effectiveDefaults } from "@/lib/products/settings-actions";
 
 import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
@@ -56,6 +58,11 @@ export interface ProductEditorProps {
     sku: { pattern: string; suggest: boolean; n: number };
     /** Settings → Allergens; empty for a shop that sells no food. */
     allergens: { id: string; name: string }[];
+    /**
+     * Settings → Defaults for the product's category (All products while
+     * creating one); null when they could not be read.
+     */
+    defaults: EffectiveDefaults | null;
 }
 
 const PRODUCTS_HREF = "/commerce/products";
@@ -93,6 +100,7 @@ function EditorBody({
     canWrite,
     sku,
     allergens,
+    defaults: initialDefaults,
 }: ProductEditorProps) {
     const router = useRouter();
     const { mode, states, saving, saveSections, collectAll, afterCreateAll } =
@@ -102,6 +110,20 @@ function EditorBody({
     const [createStatus, setCreateStatus] = useState<ProductStatus>("DRAFT");
     const [creatingNow, setCreatingNow] = useState(false);
     const [leaving, setLeaving] = useState(false);
+    // Creating: what the chosen category starts a product with. Sections
+    // take it for the fields the merchant hasn't touched.
+    const [defaults, setDefaults] = useState(initialDefaults);
+    const categoryAsked = useRef("");
+
+    async function categoryChanged(categoryId: string) {
+        if (!creating) return;
+        categoryAsked.current = categoryId;
+        const next = await effectiveDefaults(storeId, categoryId || null).catch(
+            () => null,
+        );
+        // Only the latest pick counts; a slower earlier answer is dropped.
+        if (next && categoryAsked.current === categoryId) setDefaults(next);
+    }
 
     const dirty = SECTION_ORDER.filter((k) => states[k]?.dirty);
     const problems = Object.fromEntries(
@@ -110,14 +132,8 @@ function EditorBody({
     const { savable, stuck } = partitionSections(dirty, problems);
 
     // Creating: a name and a price, and nothing anywhere that needs a fix.
-    const nameMissing = creating && problems.basics === "Add a name first.";
-    const priceMissing =
-        creating && (problems.basics === "Add a price first." || nameMissing);
+    const missing = creating ? (states.basics?.missing ?? "") : "";
     const createBad = SECTION_ORDER.some((k) => problems[k]);
-    const missing = [
-        nameMissing ? "a name" : null,
-        priceMissing ? "a price" : null,
-    ].filter((x): x is string => x !== null);
     const firstBad = SECTION_ORDER.map((k) => problems[k]).find(Boolean) ?? "";
 
     useLeaveGuard(canWrite && dirty.length > 0 && !creatingNow);
@@ -126,13 +142,22 @@ function EditorBody({
         if (!canWrite || createBad || creatingNow) return;
         setCreatingNow(true);
         const input = collectAll();
-        const res = await createProduct(storeId, {
-            ...input,
-            name: input.name ?? "",
-            price: input.price ?? "",
-            currency,
-            status: createStatus,
-        });
+        let res: Awaited<ReturnType<typeof createProduct>>;
+        try {
+            res = await createProduct(storeId, {
+                ...input,
+                name: input.name ?? "",
+                price: input.price ?? "",
+                currency,
+                status: createStatus,
+            });
+        } catch {
+            setCreatingNow(false);
+            showError(
+                "Couldn't create it — the connection dropped. Everything you entered is still here.",
+            );
+            return;
+        }
         if (!res.ok) {
             setCreatingNow(false);
             showError(res.error);
@@ -153,8 +178,8 @@ function EditorBody({
 
     const hint = creating
         ? createBad
-            ? missing.length
-                ? `Add ${joinAnd(missing)} to create it.`
+            ? missing
+                ? `Add ${missing} to create it.`
                 : firstBad
             : createStatus === "PUBLISHED"
               ? "Goes live as soon as it is created."
@@ -233,7 +258,7 @@ function EditorBody({
                             role="status"
                             className={cn(
                                 "max-w-[340px] text-pretty text-[12px]",
-                                creating && createBad && !missing.length
+                                creating && createBad && !missing
                                     ? "text-destructive"
                                     : "text-muted-foreground",
                             )}
@@ -320,17 +345,20 @@ function EditorBody({
                         symbol={symbol}
                         categories={categories}
                         manageCategoriesHref={categoriesHref}
+                        onCategoryChange={(id) => void categoryChanged(id)}
                     />
                     <DescriptionSection product={product} storeId={storeId} />
                     <DetailsSection
                         product={product}
                         storeId={storeId}
                         allergens={allergens}
+                        defaults={defaults}
                     />
                     <MadeBySection
                         product={product}
                         storeId={storeId}
                         storeName={storeName}
+                        defaults={defaults}
                     />
                     <PhotosSection product={product} storeId={storeId} />
                 </div>
@@ -350,7 +378,11 @@ function EditorBody({
                                 options={options}
                                 sku={sku}
                             />
-                            <StockSection product={product} storeId={storeId} />
+                            <StockSection
+                                product={product}
+                                storeId={storeId}
+                                defaultWarn={defaults?.lowStockAlert ?? null}
+                            />
                         </>
                     ) : (
                         <NextSteps />

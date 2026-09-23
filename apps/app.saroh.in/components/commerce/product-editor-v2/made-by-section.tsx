@@ -22,6 +22,7 @@ import {
 } from "@/lib/products/editor-sections";
 import { productSettingsHref } from "@/lib/products/links";
 import type { ProductCustomField, ProductDetail } from "@/lib/products/service";
+import type { EffectiveDefaults } from "@/lib/products/settings";
 
 import { useEditor, useSection } from "./editor-state";
 import { boxClass, FieldHelp, FieldLabel } from "./fields";
@@ -52,13 +53,24 @@ export function MadeBySection({
     product,
     storeId,
     storeName,
+    defaults,
 }: {
     product: ProductDetail | null;
     storeId: string;
     storeName: string;
+    /** Creating: Settings → Defaults for the chosen category. */
+    defaults: EffectiveDefaults | null;
 }) {
     const { canWrite } = useEditor();
-    const baseline = product ? madeByFrom(product) : EMPTY;
+    // A new product starts with its category's returns rule; picking
+    // another category changes it only while the merchant hasn't.
+    const baseline = product
+        ? madeByFrom(product)
+        : {
+              ...EMPTY,
+              returnsMode: defaults?.returns.mode ?? EMPTY.returnsMode,
+              returnsText: defaults?.returns.text ?? "",
+          };
     const fields = product?.customFields ?? [];
     const baseCustom = customFrom(fields);
     const customKey = JSON.stringify(baseCustom);
@@ -75,6 +87,7 @@ export function MadeBySection({
     const form = useForm<MadeByValues>({
         resolver: zodResolver(madeBySchema),
         values: baseline,
+        resetOptions: product ? undefined : { keepDirtyValues: true },
         mode: "onChange",
     });
     const { isDirty, errors } = form.formState;

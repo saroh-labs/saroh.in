@@ -132,6 +132,11 @@ export interface ProductDetail extends Product {
     optionId: string | null;
     images: ProductImage[];
     stockMode: "product" | "variant";
+    /**
+     * Still counting as a whole: what open orders promise per variant id,
+     * which moves onto each variant's own count when it switches.
+     */
+    variantPromises: Partial<Record<string, number>>;
     option: {
         id: string;
         name: string;

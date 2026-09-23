@@ -29,33 +29,75 @@ interface StockDraft {
 
 const DEFAULT_WARN = "10";
 
-function draftFrom(p: ProductDetail): StockDraft {
+function draftFrom(p: ProductDetail, defaultWarn: string): StockDraft {
     const own = p.inventory;
     const perVariant = p.stockMode === "variant";
+    // Moving to a count per variant counts every unit once: the API moves
+    // each open order's promise onto the variant it names, so each variant
+    // starts at what it promises, and the first also takes what was free to
+    // sell. Lines naming no variant stay promised on the product.
+    const free = Math.max(0, (own?.quantity ?? 0) - (own?.reserved ?? 0));
     return {
         quantity: String(own?.quantity ?? 0),
-        lowStockAlert: String(own?.lowStockAlert ?? DEFAULT_WARN),
+        lowStockAlert: String(own?.lowStockAlert ?? defaultWarn),
         lines: [...p.variants]
             .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-            .map((v, i) => ({
-                variantId: v.id,
-                title: v.title || v.sku,
-                // Moving to a count per variant starts the first on the
-                // product's whole count, so nothing on the shelf vanishes.
-                quantity: String(
-                    perVariant
-                        ? (v.inventory?.quantity ?? 0)
-                        : i === 0
-                          ? (own?.quantity ?? 0)
-                          : 0,
-                ),
-                lowStockAlert: String(
-                    v.inventory?.lowStockAlert ??
-                        own?.lowStockAlert ??
-                        DEFAULT_WARN,
-                ),
-                promised: v.inventory?.reserved ?? 0,
-            })),
+            .map((v, i) => {
+                const promised = perVariant
+                    ? (v.inventory?.reserved ?? 0)
+                    : (p.variantPromises[v.id] ?? 0);
+                return {
+                    variantId: v.id,
+                    title: v.title || v.sku,
+                    quantity: String(
+                        perVariant
+                            ? (v.inventory?.quantity ?? 0)
+                            : promised + (i === 0 ? free : 0),
+                    ),
+                    lowStockAlert: String(
+                        v.inventory?.lowStockAlert ??
+                            own?.lowStockAlert ??
+                            defaultWarn,
+                    ),
+                    promised,
+                };
+            }),
+    };
+}
+
+/**
+ * A fresh load (another section saved) under unsaved edits: take the fresh
+ * lines, keeping what was typed for each variant still there.
+ */
+function mergeDraft(
+    fresh: StockDraft,
+    base: StockDraft,
+    draft: StockDraft,
+): StockDraft {
+    const edited = (a: Line, b: Line | undefined) =>
+        a.quantity !== b?.quantity || a.lowStockAlert !== b.lowStockAlert;
+    const typed: Partial<Record<string, Line>> = {};
+    for (const l of draft.lines) {
+        const was = base.lines.find((b) => b.variantId === l.variantId);
+        if (edited(l, was)) typed[l.variantId] = l;
+    }
+    return {
+        quantity:
+            draft.quantity !== base.quantity ? draft.quantity : fresh.quantity,
+        lowStockAlert:
+            draft.lowStockAlert !== base.lowStockAlert
+                ? draft.lowStockAlert
+                : fresh.lowStockAlert,
+        lines: fresh.lines.map((l) => {
+            const mine = typed[l.variantId];
+            return mine
+                ? {
+                      ...l,
+                      quantity: mine.quantity,
+                      lowStockAlert: mine.lowStockAlert,
+                  }
+                : l;
+        }),
     };
 }
 
@@ -71,13 +113,19 @@ const same = (a: StockDraft, b: StockDraft) =>
 export function StockSection({
     product,
     storeId,
+    defaultWarn,
 }: {
     product: ProductDetail;
     storeId: string;
+    /** Settings → Defaults: where a first count starts warning. */
+    defaultWarn: number | null;
 }) {
-    const { canWrite } = useEditor();
+    const { canWrite, states } = useEditor();
     const ro = !canWrite;
-    const fromProduct = draftFrom(product);
+    const fromProduct = draftFrom(
+        product,
+        defaultWarn === null ? DEFAULT_WARN : String(defaultWarn),
+    );
     const loadedKey = JSON.stringify(fromProduct);
     const [base, setBase] = useState(fromProduct);
     const [draft, setDraft] = useState(fromProduct);
@@ -86,7 +134,11 @@ export function StockSection({
     if (seen !== loadedKey) {
         setSeen(loadedKey);
         setBase(fromProduct);
-        setDraft(fromProduct);
+        setDraft(
+            same(draft, base)
+                ? fromProduct
+                : mergeDraft(fromProduct, base, draft),
+        );
     }
 
     const perVariant = product.variants.length > 0;
@@ -108,13 +160,19 @@ export function StockSection({
     const lineBad = draft.lines.some(
         (l) => !isCount(l.quantity) || !isCount(l.lowStockAlert),
     );
-    const problem = (perVariant ? lineBad : qtyBad)
-        ? "Whole numbers, zero or more."
-        : belowPromised
-          ? `${belowPromised.promised} promised to open orders${
-                belowPromised.title ? ` for ${belowPromised.title}` : ""
-            } — on hand can't go below that.`
-          : "";
+    // Variants added or removed and not saved: the counts would be for a
+    // list that isn't there yet.
+    const variantsPending =
+        !!states.variants?.dirty && !!states.variants.changesList;
+    const problem = variantsPending
+        ? "Save variants first."
+        : (perVariant ? lineBad : qtyBad)
+          ? "Whole numbers, zero or more."
+          : belowPromised
+            ? `${belowPromised.promised} promised to open orders${
+                  belowPromised.title ? ` for ${belowPromised.title}` : ""
+              } — on hand can't go below that.`
+            : "";
 
     useSection(
         "stock",
@@ -377,7 +435,7 @@ export function StockSection({
                 {problem ||
                     (product.stockMode === "variant" || !product.inventory
                         ? "Each variant counts on its own; the product's total is the sum. Promised to orders is set by Orders."
-                        : "Saving counts each variant on its own. The first starts on the product's whole count, so nothing on the shelf vanishes.")}
+                        : "Saving counts each variant on its own. Each starts at what its open orders hold, and the first also at what was free to sell — nothing on the shelf is lost or counted twice.")}
             </FieldHelp>
             {lowLines.length > 0 && !problem ? (
                 <LowNote>
