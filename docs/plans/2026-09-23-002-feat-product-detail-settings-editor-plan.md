@@ -610,6 +610,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 - **Test scenarios:**
     - Covered by U13: rename, merge and delete with Undo; a blocked value removal; save defaults with update-existing.
 
+> **Done — #470.** `/commerce/products/settings?storefront=…&tab=…` with a Settings button on Products. Categories (add; rename in place; merge into another or Uncategorized; delete — each with Undo through the API's restore), Options (rename; delete refused while used, and said; values added with Enter, a duplicate said inline; a value in use can't be removed), Defaults (All products and each category: how to use, warn at, returns; the API's suggestions with Use it / Not now; a sticky save bar with "Also update the N saved products…", Undo through `catalogue/defaults/undo`; one leave guard). Loading, a failed read and a read-only role. The Defaults rules are pure (`lib/products/settings-rules.ts`, 5 tests). The old categories page and manager are gone; old links redirect. Verified in the browser at 1440 and 390: rename + Undo, merge + Undo (the 4 products came back), a value added and removed, a duplicate value, defaults saved with 3 products updated and undone, the leave dialog. The design's "Returns" chips map to the API's STOREFRONT / OWN + text. Custom fields, allergens and SKUs are #482, #483 and #484.
+
 ### U14. Custom fields — per category, team only or on the shop
 
 - **Goal:** R6a end to end.
