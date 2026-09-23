@@ -150,9 +150,7 @@ describe("the sheet", () => {
     it("puts under Workspace only the plain rows without a seat, each with its own icon", () => {
         const groups = ownerNav();
         const nav = buildMobileNav({ groups, pathname: "/" });
-        const workspace = nav.groups.find(
-            (g) => g.label === WORKSPACE_HEADING,
-        );
+        const workspace = nav.groups.find((g) => g.label === WORKSPACE_HEADING);
         const rowLabels = workspace?.rows.map((r) => r.label) ?? [];
         expect(rowLabels).toContain("Website");
         expect(rowLabels).toContain("Team");
@@ -211,9 +209,7 @@ describe("where you are", () => {
             groups: ownerNav(),
             pathname: "/analytics",
         });
-        expect(labels(nav.tabs.filter((t) => t.current))).toEqual([
-            "Insights",
-        ]);
+        expect(labels(nav.tabs.filter((t) => t.current))).toEqual(["Insights"]);
     });
 });
 

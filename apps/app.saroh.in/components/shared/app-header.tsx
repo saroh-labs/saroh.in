@@ -4,8 +4,6 @@ import Link from "next/link";
 import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
 import { CommandTrigger } from "@/components/shared/command-trigger";
 import { HelpLink } from "@/components/shared/help-link";
-import { MobileNav } from "@/components/shared/mobile-nav";
-import type { NavCounts } from "@/components/shared/nav-items";
 import { SkinSwitcher } from "@/components/shared/skin-switcher";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { UserMenu } from "@/components/shared/user-menu";
@@ -34,11 +32,6 @@ type AppHeaderProps =
           user: HeaderUser;
           organizations: Organization[];
           activeOrg: Organization | null;
-          unread: number;
-          /** `null` = availability unknown; see `filterNavGroups`. */
-          moduleKeys: string[] | null;
-          /** Work waiting behind a route; see `NavCounts`. */
-          counts?: NavCounts;
       };
 
 export function AppHeader(props: AppHeaderProps) {
@@ -59,20 +52,14 @@ export function AppHeader(props: AppHeaderProps) {
         );
     }
 
-    const { organizations, activeOrg, unread, moduleKeys, counts, user } =
-        props;
+    const { organizations, activeOrg, user } = props;
 
     return (
         // Gaps, not controls, give way on a phone: the switcher's name
         // truncates, and search, help and the account button keep their size.
+        // No menu button: below 760px the tab bar at the foot of the screen
+        // is the navigation, so the header only says where you are.
         <header className="sticky top-0 z-30 flex h-[61px] items-center gap-1 border-b bg-background px-2 py-[9px] sm:px-3.5 print:hidden">
-            <MobileNav
-                unread={unread}
-                moduleKeys={moduleKeys}
-                role={activeOrg?.role ?? null}
-                counts={counts}
-                organizationName={activeOrg?.name}
-            />
             <Link
                 href="/"
                 aria-label="Saroh — go to Home"

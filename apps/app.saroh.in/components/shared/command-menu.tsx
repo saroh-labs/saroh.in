@@ -441,8 +441,7 @@ export function CommandMenu({
                                           href: child.href,
                                           label: child.label,
                                           icon: item.icon,
-                                          hit:
-                                              own.hit || matches(child.label),
+                                          hit: own.hit || matches(child.label),
                                       },
                                   ]
                                 : [],
