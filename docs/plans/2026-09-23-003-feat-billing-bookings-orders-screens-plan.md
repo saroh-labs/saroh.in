@@ -431,6 +431,8 @@ flowchart TB
 **Verification:**
 - Subscription Detail's actions all map to one API call each with Undo.
 
+> **Done — #492** (merged). Collection weekday + note per subscription, dated by `collections.ts` (pure; U4 reuses it) with the next 6 on the read; skip by date with Undo (future, on the collection day, within a year; a period fully skipped before invoicing advances uncharged — plans price per period, so partial skips are pickup-only); change plan from next renewal (`pendingPlanId`, applied by renewal or a resume starting a new period; Undo); payment failed derived from the latest unpaid past-due invoice, with retry re-issuing its pay link. Routes need `subscription:write`. Migration `20260927300000_subscription_skip_change` (`SubscriptionSkip`, RLS). DB specs await test:int.
+
 ---
 
 ### U8. One read of a customer
