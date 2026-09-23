@@ -18,7 +18,7 @@ describe("order-state (pure lifecycle state machine)", () => {
         it("pins the status transition table", () => {
             expect(STATUS_TRANSITIONS).toEqual({
                 PENDING: ["PROCESSING", "CANCELLED"],
-                PROCESSING: ["SHIPPED", "CANCELLED"],
+                PROCESSING: ["SHIPPED", "DELIVERED", "CANCELLED"],
                 SHIPPED: ["DELIVERED"],
                 DELIVERED: [],
                 CANCELLED: [],
@@ -90,6 +90,13 @@ describe("order-state (pure lifecycle state machine)", () => {
                 expect(res.message).toContain("PROCESSING");
                 expect(res.field).toBe("status");
             }
+        });
+
+        it("a collection order goes from PROCESSING straight to DELIVERED (ADR-008)", () => {
+            expect(canTransitionStatus("PROCESSING", "DELIVERED")).toBe(true);
+            // Still no way back, and no skipping the work.
+            expect(canTransitionStatus("DELIVERED", "PROCESSING")).toBe(false);
+            expect(canTransitionStatus("PENDING", "DELIVERED")).toBe(false);
         });
 
         it("a SHIPPED order can be delivered but never cancelled", () => {
