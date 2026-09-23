@@ -1,7 +1,7 @@
 ---
 title: "feat: Billing, bookings, orders and customers to the design — and a phone tab bar"
 type: feat
-status: active
+status: completed
 date: 2026-09-23
 ---
 
@@ -804,6 +804,8 @@ flowchart TB
 **Verification:**
 - Side by side with the design on phone and desk in the gym template's theme.
 
+> **Done — #504** (merged). `/<domain>/book` in `--site-*` tokens: service → day (14; N free / Full / Closed) → start or class session → Name, Email, Phone (optional) → pay now or at the desk; dark summary card, phone bottom bar, confirmation with add-to-calendar and the cancel rule; no credits, no recognition, no message promised. Services list and booking block link to it on live sites. Pay now: pending booking holding the place 15 minutes + a draft invoice priced on the server, paid through the invoice path, the webhook confirms and numbers it; an expired hold frees its place at once and a 5-minute sweep cancels it (its draft is voided, not deleted). Pay at the desk books at once. Public `/public/*` routes accept any origin without cookies (webhooks keep the strict rule). Migration `20260929100000_booking_hold`. `629eb37a`: a double submit makes one booking (P2034/P2002 replayed, same booker checked), a taken time is a 409. Open: the provider checkout widget isn't wired (same as the invoice pay page); the calendar should label held bookings "Awaiting payment".
+
 ---
 
 ### U20. Verification, films and docs
@@ -825,6 +827,30 @@ flowchart TB
 
 **Verification:**
 - All green; screenshots attached to the epic.
+
+> **Done — #505.** Each screen was checked by its session against the design (Playwright side by side at 1440/390, light/dark, plus 320) and merged here. Final pass on the merged branch: typecheck 27/27, lint 25/25, app vitest 472, API unit 2510, `check:routes/blocks/cycles` clean, migration history replays from empty, full `test:int` 138 suites / 1704 tests green. Full e2e: 102 of 114 pass; 12 failures left as known issues by the owner's call (see What shipped).
+
+---
+
+## What shipped
+
+All 20 units, on `feat/billing-bookings-screens` (stacked on `feat/products-v2`), local until the PR.
+
+- **Decisions:** ADR-008 (invoice per order, immutable paper, GST, staff, kitchen stage, contact-rooted customer read, no credits online), DEC-023, DEC-024 (`order:stage` for Members).
+- **Data and API:** staff with hours, time off, extra hours and booking rules; the org bookings read by person and the month feed; GST (inclusive maths, place of supply, FY series, GSTIN check), one invoice per order, credit notes, supplementary invoices, CREDITED, the business's registered address frozen on paper; the kitchen flow with an event log, 10-minute Undo, partial refunds by line and edits before preparing; subscription collections, skips, plan change at renewal and derived payment failed; the contact-rooted customer read with notes and structured allergens; the public booking page's reads, 15-minute pay-now holds and a sweep.
+- **Screens:** phone tab bar and the Payments / Bookings / Calendar rail; Invoices and Invoice Detail (tax invoice / receipt / credit note, hand-written with GST); Subscriptions and Subscription Detail (2a); Order Detail (1d); the bookings calendar (day by person, week, agenda + month), Availability and Services; the Business Calendar; Customer Detail; the customer's booking page on a merchant site.
+- **Demo businesses:** Rye & Co. (GST bakery, every kitchen stage, IGST, credit note, subscriptions, trade invoices) and Pulse Fitness (staff, classes paid four ways, memberships, packs).
+- **Security closed on the way:** Members no longer read money through the old store-scoped order routes.
+
+### Known issues (left as they are)
+
+- **12 e2e failures in the final run** (owner's call to leave them for now): `auth.spec` session carried from accounts and sign-out everywhere (desk + phone); `bookings.spec` cancel then Undo (desk); `site-review.spec` shared preview bar (desk + phone); `site-versions.spec` version history and restore (3, desk); `four-scenes.spec` phone tab bar — nothing under the bar at the foot of `/`, and the More sheet holding focus (phone). The tab-bar and bookings ones are this epic's; auth and site ones touch code this epic didn't change and may predate it or come from the reseed / the parked `/businesses` landing — not yet triaged.
+- Subscription, course and pack invoices of a registered business print at 0% (plans carry no GST rate).
+- An unbooked class doesn't appear on the bookings calendar; no buttons yet to take someone off the diary or link them to a team member.
+- Rye's counter Member sees no orders layer on the Business Calendar (orders need `order:read`).
+- The provider checkout widget isn't wired on the booking page or the invoice pay page; held bookings aren't labelled "Awaiting payment" on the calendar.
+- The subscription `retry` route returns a token without a URL; subscription resumes aren't dated in the month feed.
+- `test:int` has twice segfaulted (exit 139) before running tests, likely watchman; a rerun passes.
 
 ---
 
