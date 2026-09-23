@@ -1023,6 +1023,29 @@ model Order {
   // Org-owned payment intents against this order (Stage 5 — S5-002).
   paymentIntents PaymentIntent[]
 
+  // The kitchen flow (ADR-008, U6). The stage sits UNDER `status`: each
+  // stage move maps to a status move (order-stage.ts), and every move is an
+  // OrderEvent. Existing orders were backfilled from their status.
+  stage      OrderStage      @default(NEW)
+  fulfilment OrderFulfilment @default(COLLECT)
+
+  // Where a DELIVERY order goes. `deliveryState` is also the place of
+  // supply for GST when no bill-to state is set (U5).
+  deliveryName       String?
+  deliveryPhone      String?
+  deliveryLine1      String?
+  deliveryLine2      String?
+  deliveryCity       String?
+  deliveryState      String?
+  deliveryPostalCode String?
+
+  // What the counter needs to know ("no sesame", "ring the bell").
+  notes       String?
+  // A typed courier tracking link — no courier integration (ADR-008).
+  trackingUrl String?
+
+  events OrderEvent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1060,6 +1083,9 @@ model OrderItem {
 
   review ProductReview?
 
+  // What has been refunded of this line (U6): caps the next line refund.
+  refundLines PaymentRefundLine[]
+
   @@index([orderId])
   @@index([variantId])
 }
@@ -1068,6 +1094,71 @@ enum StockRow {
   PRODUCT
   VARIANT
   NONE
+}
+
+// The kitchen stage (ADR-008). NEW → PREPARING → READY → COLLECTED, or
+// READY → HANDED_TO_COURIER → DELIVERED for a delivery.
+enum OrderStage {
+  NEW
+  PREPARING
+  READY
+  COLLECTED
+  HANDED_TO_COURIER
+  DELIVERED
+}
+
+enum OrderFulfilment {
+  COLLECT
+  DELIVERY
+}
+
+enum OrderEventKind {
+  // A kitchen stage move (and the status move it maps to).
+  STAGE
+  // The Undo of the last STAGE step; `undoesEventId` names it.
+  UNDO
+  // A status change made outside the kitchen flow (cancel, the legacy PATCH).
+  STATUS
+  // Items, address, fulfilment or notes changed before preparing.
+  EDIT
+  // A refund asked for, by line or in full.
+  REFUND
+}
+
+// One step on an order's timeline (ADR-008, U6): who, when, from → to. Undo
+// reverts only the latest step, within a server-side limit, and marks it
+// `undoneAt`. Org-owned, RLS org_isolation.
+model OrderEvent {
+  id             String @id @default(cuid())
+  organizationId String
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  kind OrderEventKind
+
+  // Who took the step. Not a foreign key: someone who leaves the team keeps
+  // their steps on the timeline. Null for the system (a webhook).
+  actorUserId String?
+
+  fromStage  OrderStage?
+  toStage    OrderStage?
+  fromStatus String?
+  toStatus   String?
+  note       String?
+
+  // Money this step moved (a refund, an edit's difference), minor units.
+  // Left out of every read by a role without a money permission.
+  amountCents Int?
+
+  // Set on a STAGE step when it is undone; on the UNDO step, which one.
+  undoneAt      DateTime?
+  undoesEventId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -3064,11 +3155,44 @@ model PaymentRefund {
   providerRefundId String?
   reason           String?
 
+  // The client's key for one refund request (U6): a retry with the same key
+  // returns this refund instead of making another.
+  idempotencyKey String?
+  // Money handed back because the order was edited down before preparing —
+  // it lowers the order total, rather than refunding what was bought.
+  forEdit        Boolean @default(false)
+
+  // The order lines this refund covers, when it was asked for by line.
+  lines PaymentRefundLine[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([paymentIntentId, idempotencyKey])
   @@index([organizationId])
   @@index([paymentIntentId])
+}
+
+// How much of one order line a refund covers (U6). The next line refund is
+// capped at the line's paid amount less every non-failed row here.
+model PaymentRefundLine {
+  id             String @id @default(cuid())
+  organizationId String
+
+  paymentRefundId String
+  paymentRefund   PaymentRefund @relation(fields: [paymentRefundId], references: [id], onDelete: Cascade)
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  quantity    Int
+  amountCents Int
+
+  createdAt DateTime @default(now())
+
+  @@index([paymentRefundId])
+  @@index([orderItemId])
+  @@index([organizationId])
 }
 
 // WebhookEvent — the SIGNED webhook inbox (S5-003). Every provider callback is
