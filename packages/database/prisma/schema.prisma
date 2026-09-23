@@ -227,6 +227,7 @@ model Organization {
   // Subscriptions, invoices, courses and class packs (ADR-007).
   subscriptionPlans     SubscriptionPlan[]
   customerSubscriptions CustomerSubscription[]
+  subscriptionSkips     SubscriptionSkip[]
   invoices              Invoice[]
   invoiceLines          InvoiceLine[]
   invoiceSequence       InvoiceSequence?
@@ -3718,7 +3719,9 @@ model SubscriptionPlan {
   interval    String // WEEK | MONTH | QUARTER | YEAR
   status      String  @default("ACTIVE") // ACTIVE | ARCHIVED — archived plans take no new subscribers
 
-  subscriptions CustomerSubscription[]
+  subscriptions   CustomerSubscription[]
+  // Subscriptions switching to this plan at their next renewal.
+  pendingSwitches CustomerSubscription[] @relation("PendingPlan")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3754,7 +3757,20 @@ model CustomerSubscription {
   cancelledAt        DateTime?
   createdByUserId    String?
 
+  // The collection schedule: the ISO weekday (1 Monday … 7 Sunday) the
+  // customer collects on, in the subscription's timezone, and what they
+  // collect. Null weekday: nothing is collected (a membership). Collections
+  // are dated from it within each period, so a monthly plan can collect weekly.
+  collectionWeekday Int?
+  collectionNote    String?
+
+  // A plan change booked for the next renewal: the renewal (or a resume
+  // past the paid period) switches plan, price and interval, then clears it.
+  pendingPlanId String?
+  pendingPlan   SubscriptionPlan? @relation("PendingPlan", fields: [pendingPlanId], references: [id], onDelete: SetNull)
+
   invoices Invoice[]
+  skips    SubscriptionSkip[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3765,6 +3781,25 @@ model CustomerSubscription {
   @@index([organizationId])
   @@index([contactId])
   @@index([status, currentPeriodEnd])
+  @@index([pendingPlanId])
+}
+
+// One collection a subscriber will not make, by its date in the
+// subscription's timezone. A period whose every collection is skipped before
+// it is invoiced is not charged; otherwise a skip changes the pickup only.
+model SubscriptionSkip {
+  id             String               @id @default(cuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  subscription   CustomerSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  date            DateTime @db.Date // the collection's local date
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@unique([subscriptionId, date])
+  @@index([organizationId])
 }
 
 // A bill. DRAFT → ISSUED → PAID, or VOID. An issued invoice never changes: a
