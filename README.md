@@ -26,6 +26,11 @@ product against the showcase seed, so every screen is real. The film is in the
 repository too, at
 [`docs/demos/tour/saroh-tour.mp4`](docs/demos/tour/saroh-tour.mp4).
 
+**A two-minute look at one product**, a boutique's dress: its page as the team
+sees it and as a customer sees it, a quick edit in a sheet and its Undo, the
+stock for each size, a new cover photo, and a reply to a review. At
+[`docs/demos/tour/saroh-products.mp4`](docs/demos/tour/saroh-products.mp4).
+
 ## What it does
 
 A business turns on the parts it needs; each is a module it can switch on or
