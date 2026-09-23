@@ -114,5 +114,11 @@ export default async function SitePostPage({
         notFound();
     }
 
-    return <PageSections sections={page.sections} apiUrl={publicApiUrl()} />;
+    return (
+        <PageSections
+            sections={page.sections}
+            apiUrl={publicApiUrl()}
+            bookHref="/book"
+        />
+    );
 }

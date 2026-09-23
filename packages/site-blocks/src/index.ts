@@ -46,6 +46,16 @@ export type {
     StockWord,
 } from "./product/product-page";
 
+// Not a page block either: the booking page on a merchant's site (U19),
+// `/<domain>/book` — every service, two weeks of times, pay now or at the desk.
+export {
+    default as BookingFlow,
+    BookingUnavailable,
+} from "./booking-flow/booking-flow";
+export type { BookingFlowProps } from "./booking-flow/booking-flow";
+export { isBookingPage } from "./booking-flow/model";
+export type { BookingPageData, BookingService } from "./booking-flow/model";
+
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";

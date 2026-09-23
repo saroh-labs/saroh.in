@@ -361,8 +361,10 @@ describe("CustomerDetailService", () => {
         const calls = (db.invoice.findMany as jest.Mock).mock.calls.map(
             (c: [{ where: Record<string, unknown> }]) => c[0].where,
         );
-        // The list: billed to the contact, or an order of a linked customer.
+        // The list: billed to the contact, or an order of a linked customer —
+        // never a pay-now hold's unnumbered draft (U19).
         expect(calls).toContainEqual({
+            NOT: { source: "BOOKING", number: null },
             organizationId: "org_1",
             OR: [
                 { contactId: "c1" },

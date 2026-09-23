@@ -100,12 +100,18 @@ export default function ServicesListSection({
     content,
     apiUrl = DEFAULT_API_URL,
     services: given,
+    bookHref,
 }: {
     content: RenderedServicesList;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
     /** Sample services to draw instead of fetching (catalog, tests). */
     services?: PublicService[];
+    /**
+     * The site's booking page (U19), on a live site only: each service links
+     * to it, opened on that service. A preview has no `/book`.
+     */
+    bookHref?: string;
 }) {
     const [state, setState] = useState<LoadState>(
         given ? { kind: "ready", services: given } : { kind: "loading" },
@@ -224,6 +230,15 @@ export default function ServicesListSection({
                                             <span className="ml-3 font-semibold">
                                                 {price}
                                             </span>
+                                        ) : null}
+                                        {bookHref ? (
+                                            <a
+                                                href={`${bookHref}?service=${encodeURIComponent(service.id)}`}
+                                                aria-label={`Book ${service.name}`}
+                                                className="text-site-fg ml-3 font-semibold underline underline-offset-4"
+                                            >
+                                                Book
+                                            </a>
                                         ) : null}
                                     </p>
                                 </li>

@@ -2904,6 +2904,8 @@ model Job {
   // the next run is enqueued with insert-on-conflict-do-nothing, so a retried
   // or reclaimed run can never fork a second chain.
   @@unique([type], map: "Job_one_pending_subscription_renew", where: raw("type = 'subscription.renew' AND status = 'PENDING'"))
+  // One waiting run of the booking-hold sweep (U19), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_booking_release_holds", where: raw("type = 'booking.release-holds' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -3059,6 +3061,12 @@ model Booking {
 
   status String @default("CONFIRMED") // PENDING → CONFIRMED → CANCELLED
 
+  // A PENDING booking made to pay now on the booking page (U19, ADR-008)
+  // holds its place until this instant; after it the place is free again —
+  // at read time, and for good when the sweep job cancels the hold. Null on
+  // every other booking.
+  holdExpiresAt DateTime?
+
   // How the appointment actually went: ATTENDED, NO_SHOW, or null for one
   // nobody has said yet (#241). SEPARATE from `status` on purpose — status
   // says whether the booking stands, this says how it went, and collapsing
@@ -3125,6 +3133,8 @@ model Booking {
   // One person's diary across services — the clash check and the calendar.
   @@index([staffId, startAt])
   @@index([subscriptionId])
+  // The sweep job's read: holds whose time ran out.
+  @@index([status, holdExpiresAt])
 }
 
 /// Someone who takes bookings (U3, ADR-008). Usually a team member, but a

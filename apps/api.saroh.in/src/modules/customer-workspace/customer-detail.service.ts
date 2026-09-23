@@ -20,6 +20,7 @@ import type { InvoiceStanding } from "../invoices/invoice-state";
 import {
     invoiceStanding,
     isPastDue,
+    NOT_A_BOOKING_HOLD,
     OWED_WHERE,
 } from "../invoices/invoice-state";
 import { allows, authorize } from "../organizations/organization-policy";
@@ -971,7 +972,7 @@ export class CustomerDetailService {
         const where = invoicesOf(organizationId, contactId, linkedCustomerIds);
         const [rows, unpaid, paid] = await Promise.all([
             this.db.invoice.findMany({
-                where,
+                where: { ...where, ...NOT_A_BOOKING_HOLD },
                 orderBy: { createdAt: "desc" },
                 take: ROWS,
                 select: {

@@ -18,11 +18,13 @@ import "reflect-metadata";
 import "./env";
 
 import { ValidationPipe } from "@nestjs/common";
+import type { CorsOptions } from "@nestjs/common/interfaces/external/cors-options.interface";
 import { NestFactory } from "@nestjs/core";
 import { getTrustedOrigins } from "@saroh/auth";
 import helmet from "helmet";
 
 import { AppModule } from "./app.module";
+import { corsOptionsFor } from "./common/cors";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { OriginGuard } from "./common/guards/origin.guard";
 import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
@@ -110,13 +112,20 @@ async function bootstrap() {
         ...DEV_HOSTNAMES.map((host) => `https://${host}.localhost`),
         ...Array.from({ length: 13 }, (_, i) => `http://localhost:${3000 + i}`),
     ];
-    app.enableCors({
-        origin: env.CORS_ORIGIN?.split(",").map((o) => o.trim()) ?? [
-            ...getTrustedOrigins(),
-            ...devOrigins,
-        ],
-        credentials: true,
-    });
+    const trustedOrigins = env.CORS_ORIGIN?.split(",").map((o) => o.trim()) ?? [
+        ...getTrustedOrigins(),
+        ...devOrigins,
+    ];
+    // Guardless `/public/*` routes answer any origin, without credentials:
+    // merchants' own sites call them (U19). See common/cors.ts.
+    app.enableCors(
+        (
+            req: { url?: string },
+            callback: (error: Error | null, options: CorsOptions) => void,
+        ) => {
+            callback(null, corsOptionsFor(req.url ?? "", trustedOrigins));
+        },
+    );
 
     app.useGlobalPipes(
         // Shared with DTO specs, so what a test accepts is what the API accepts

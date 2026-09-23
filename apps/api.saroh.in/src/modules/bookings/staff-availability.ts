@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 import { IANAZone } from "luxon";
 
 import type { Interval, StaffAvailabilityInput } from "./availability";
+import { holdsPlace } from "./booking-hold";
 
 /**
  * Reading people's hours for the slot engine (U3). The geometry is pure and
@@ -131,7 +132,7 @@ export async function loadPeople(
         db.booking.findMany({
             where: {
                 staffId: { in: staffIds },
-                status: "CONFIRMED",
+                ...holdsPlace(new Date()),
                 startAt: { lt: padTo },
                 endAt: { gt: padFrom },
                 ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),

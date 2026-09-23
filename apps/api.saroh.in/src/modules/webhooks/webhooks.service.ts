@@ -8,6 +8,7 @@ import {
 import type { Prisma, PrismaClient } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { confirmHoldInTx } from "../bookings/booking-hold";
 import {
     CAPTURED_NEEDS_REFUND,
     ONLINE_PAYMENT_METHOD,
@@ -583,6 +584,9 @@ export class WebhooksService {
      * An intent already SUCCEEDED means this payment was settled by an
      * earlier event (Razorpay sends `payment.captured` and `order.paid` for
      * one payment), so it is a no-op — never a second "needs a refund".
+     *
+     * A pay-now hold's invoice (U19) arrives here as a DRAFT: the payment
+     * confirms its booking and numbers the invoice (`booking-hold.ts`).
      */
     private async applyInvoiceSuccess(
         tx: Tx,
@@ -595,7 +599,7 @@ export class WebhooksService {
         await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoiceId} AND "organizationId" = ${intent.organizationId} FOR UPDATE`;
         const invoice = await tx.invoice.findFirst({
             where: { id: invoiceId, organizationId: intent.organizationId },
-            select: { status: true },
+            select: { status: true, source: true },
         });
 
         await tx.paymentIntent.update({
@@ -604,20 +608,32 @@ export class WebhooksService {
         });
 
         const providerRef = event.providerPaymentRef ?? null;
-        if (invoice?.status === "ISSUED") {
-            await tx.invoice.update({
-                where: { id: invoiceId },
-                data: {
-                    status: "PAID",
-                    paidAt: new Date(),
-                    paymentMethod: ONLINE_PAYMENT_METHOD,
-                    paymentReference:
-                        providerRef ?? intent.providerIntentId ?? null,
-                    paymentNote: `Paid online through ${
-                        PROVIDER_LABEL[intent.provider] ?? intent.provider
-                    }`,
-                },
-            });
+        const payment = {
+            paymentMethod: ONLINE_PAYMENT_METHOD,
+            paymentReference: providerRef ?? intent.providerIntentId ?? null,
+            paymentNote: `Paid online through ${
+                PROVIDER_LABEL[intent.provider] ?? intent.provider
+            }`,
+        };
+        // A pay-now hold's draft (U19): the booking is confirmed and the
+        // invoice numbered and paid — unless its place went to someone else
+        // after the hold ran out, and then the money is owed back, below.
+        const held =
+            invoice?.status === "DRAFT" && invoice.source === "BOOKING"
+                ? await confirmHoldInTx(tx, {
+                      invoiceId,
+                      organizationId: intent.organizationId,
+                      now: new Date(),
+                      payment,
+                  })
+                : null;
+        if (invoice?.status === "ISSUED" || held === "confirmed") {
+            if (invoice?.status === "ISSUED") {
+                await tx.invoice.update({
+                    where: { id: invoiceId },
+                    data: { status: "PAID", paidAt: new Date(), ...payment },
+                });
+            }
             if (providerRef) {
                 await tx.paymentAttempt.create({
                     data: {
@@ -632,7 +648,10 @@ export class WebhooksService {
             return { applied: true };
         }
 
-        const found = invoice?.status ?? "MISSING";
+        const found =
+            held === "released"
+                ? "RELEASED_HOLD"
+                : (invoice?.status ?? "MISSING");
         await tx.paymentAttempt.create({
             data: {
                 organizationId: intent.organizationId,
