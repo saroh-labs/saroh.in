@@ -122,6 +122,9 @@ export interface ProductDetail extends Product {
     maker: string | null;
     madeIn: string | null;
     supplierCode: string | null;
+    /** GST the price includes, in percent ("18"), ADR-008; null when unset. */
+    gstRate?: string | null;
+    hsnCode?: string | null;
     warranty: string | null;
     returnsMode: "STOREFRONT" | "OWN";
     returnsText: string | null;
@@ -384,6 +387,8 @@ export interface ProductPatch {
     maker?: string | null;
     madeIn?: string | null;
     supplierCode?: string | null;
+    gstRate?: string | null;
+    hsnCode?: string | null;
     warranty?: string | null;
     returnsMode?: "STOREFRONT" | "OWN";
     returnsText?: string | null;

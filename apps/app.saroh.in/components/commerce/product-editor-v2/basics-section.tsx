@@ -5,6 +5,9 @@ import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { OptionSelect } from "@/components/shared/option-select";
+import type { GstRateValue } from "@/lib/invoices/gst";
+import { GST_RATE_OPTIONS, isHsnSac } from "@/lib/invoices/gst";
 import { patchProduct } from "@/lib/products/actions";
 import type { BasicsValues } from "@/lib/products/editor-sections";
 import {
@@ -32,9 +35,19 @@ const EMPTY: BasicsValues = {
     price: "",
     mrp: "",
     categoryId: "",
+    gstRate: "",
+    hsnCode: "",
 };
 
-const FIELDS = ["name", "slug", "price", "mrp", "categoryId"] as const;
+const FIELDS = [
+    "name",
+    "slug",
+    "price",
+    "mrp",
+    "categoryId",
+    "gstRate",
+    "hsnCode",
+] as const;
 
 const CURRENCY_WORD: Record<string, string> = {
     INR: "rupees",
@@ -143,6 +156,7 @@ export function BasicsSection({
         (!isMoney(v.mrp) ||
             (isMoney(v.price) && paise(v.mrp) < paise(v.price)));
     const derived = slugify(v.name);
+    const hsnBad = v.hsnCode.trim() !== "" && !isHsnSac(v.hsnCode);
 
     return (
         <SectionCard k="basics" title="Basics">
@@ -319,6 +333,56 @@ export function BasicsSection({
                         ? "Uncategorized is a real choice — it clears the category rather than leaving it alone."
                         : "A product sits in one category. Choosing Uncategorized clears it."}
                 </FieldHelp>
+            </div>
+
+            {/* GST (ADR-008): printed on a registered business's tax invoice. */}
+            <div className="mt-4 flex flex-wrap gap-3.5">
+                <div className="min-w-0 flex-[1_1_150px]">
+                    <FieldLabel htmlFor="pe-gst">GST rate</FieldLabel>
+                    <OptionSelect
+                        id="pe-gst"
+                        value={v.gstRate as GstRateValue}
+                        onValueChange={(rate) =>
+                            form.setValue("gstRate", rate, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                            })
+                        }
+                        options={GST_RATE_OPTIONS}
+                        disabled={ro}
+                    />
+                    <FieldHelp
+                        className="mt-1.5"
+                        tone={errors.gstRate ? "bad" : "quiet"}
+                    >
+                        {errors.gstRate?.message ??
+                            "Included in the price. Bread and other nil-rated goods are 0%."}
+                    </FieldHelp>
+                </div>
+                <div className="min-w-0 flex-[1_1_150px]">
+                    <FieldLabel htmlFor="pe-hsn">HSN code</FieldLabel>
+                    <input
+                        id="pe-hsn"
+                        {...form.register("hsnCode")}
+                        inputMode="numeric"
+                        disabled={ro}
+                        placeholder="1905 90 10"
+                        aria-invalid={hsnBad || !!errors.hsnCode}
+                        className={boxClass({
+                            bad: hsnBad || !!errors.hsnCode,
+                            mono: true,
+                        })}
+                    />
+                    <FieldHelp
+                        className="mt-1.5"
+                        tone={hsnBad || errors.hsnCode ? "bad" : "quiet"}
+                    >
+                        {hsnBad
+                            ? "An HSN code is 4 to 8 digits."
+                            : (errors.hsnCode?.message ??
+                              "Team only. Printed on tax invoices.")}
+                    </FieldHelp>
+                </div>
             </div>
         </SectionCard>
     );

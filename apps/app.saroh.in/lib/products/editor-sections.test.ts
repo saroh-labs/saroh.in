@@ -44,6 +44,8 @@ describe("product editor sections", () => {
             price: "799",
             mrp: "999",
             categoryId: "",
+            gstRate: "",
+            hsnCode: "",
         };
         expect(basicsSchema.safeParse(ok).success).toBe(true);
         expect(basicsSchema.safeParse({ ...ok, price: "7.999" }).success).toBe(
@@ -149,6 +151,8 @@ describe("the editor's header and Save all", () => {
             price: "799",
             mrp: "",
             categoryId: "",
+            gstRate: "",
+            hsnCode: "",
         };
         expect(basicsProblem(ok, false)).toBe("");
         expect(basicsProblem({ ...ok, name: " " }, false)).toBe(
@@ -219,6 +223,8 @@ describe("each section's values and patch", () => {
             price: "799",
             mrp: "999.50",
             categoryId: "c1",
+            gstRate: "",
+            hsnCode: "",
         });
         expect(
             basicsPatch({
@@ -233,7 +239,19 @@ describe("each section's values and patch", () => {
             price: "799",
             mrp: null,
             categoryId: null,
+            gstRate: null,
+            hsnCode: null,
         });
+        // GST (ADR-008): the rate as saved, the HSN as printed.
+        expect(
+            basicsFrom(product({ gstRate: "18.00", hsnCode: "19059010" })),
+        ).toMatchObject({ gstRate: "18", hsnCode: "19059010" });
+        expect(
+            basicsPatch({ ...values, gstRate: "5", hsnCode: "2101 11 20" }),
+        ).toMatchObject({ gstRate: "5", hsnCode: "21011120" });
+        expect(
+            basicsSchema.safeParse({ ...values, hsnCode: "12" }).success,
+        ).toBe(false);
         expect(
             basicsFrom(product({ mrp: null, categoryId: null })),
         ).toMatchObject({ mrp: "", categoryId: "" });
