@@ -49,7 +49,9 @@ export function ConsoleRail({
         <nav
             aria-label="Console"
             className={cn(
-                "hidden shrink-0 flex-col gap-5 border-r border-border px-3 py-5 min-[760px]:flex",
+                // Stuck below the 56px header at the viewport's height, and
+                // scrolling on its own: the page scrolls, the rail stays.
+                "sticky top-14 hidden h-[calc(100dvh-3.5rem)] shrink-0 flex-col gap-5 self-start overflow-y-auto overscroll-contain border-r border-border px-3 py-5 min-[760px]:flex",
                 icons ? "w-16 items-center px-2" : "w-[238px]",
             )}
         >

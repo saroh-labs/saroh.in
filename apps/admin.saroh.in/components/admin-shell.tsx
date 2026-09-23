@@ -28,7 +28,9 @@ export function AdminShell({
 }) {
     return (
         <div className="flex min-h-screen flex-col">
-            <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border px-3 sm:px-4">
+            {/* Sticky, at a fixed 56px, so the rail can sit exactly below it
+                and only the work area moves with the page. */}
+            <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-3 sm:px-4">
                 <ConsoleDrawer permissions={staff.permissions} />
                 <Link href="/" className="shrink-0">
                     <Wordmark suffix="console" />
@@ -52,27 +54,31 @@ export function AdminShell({
                 </div>
             </header>
 
-            {staff.viaBootstrap && (
-                <div className="border-b border-warning/30 bg-warning-subtle px-4 py-2.5">
-                    <div className="flex items-center gap-2.5 text-sm text-warning-subtle-foreground">
-                        <Badge variant="outline" className="shrink-0">
-                            Break-glass
-                        </Badge>
-                        <p>
-                            You are here via the <code>ADMIN_ALLOWLIST</code>{" "}
-                            path, not a recorded grant. Add a PlatformAdmin
-                            grant so staff access is revocable and attributable.
-                        </p>
-                    </div>
-                </div>
-            )}
-
             <div className="flex min-h-0 flex-1">
                 <ConsoleRail permissions={staff.permissions} />
                 {/* The work area steps up from the ground in dark, which is
                     the design system's rule read in the console's direction.
                     Not a <main>: each screen's `PageContainer` is that. */}
-                <div className="min-w-0 flex-1 bg-card/40">{children}</div>
+                <div className="min-w-0 flex-1 bg-card/40">
+                    {/* In the work area rather than across the top, so the
+                        header and rail keep one fixed height to stick at. */}
+                    {staff.viaBootstrap && (
+                        <div className="border-b border-warning/30 bg-warning-subtle px-4 py-2.5">
+                            <div className="flex items-center gap-2.5 text-sm text-warning-subtle-foreground">
+                                <Badge variant="outline" className="shrink-0">
+                                    Break-glass
+                                </Badge>
+                                <p>
+                                    You are here via the{" "}
+                                    <code>ADMIN_ALLOWLIST</code> path, not a
+                                    recorded grant. Add a PlatformAdmin grant so
+                                    staff access is revocable and attributable.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    {children}
+                </div>
             </div>
         </div>
     );
