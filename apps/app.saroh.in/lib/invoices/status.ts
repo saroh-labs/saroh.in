@@ -43,6 +43,8 @@ export function invoiceStatus(
             return { label: "Paid", variant: "success", detail: null };
         case "VOID":
             return { label: "Void", variant: "neutral", detail: null };
+        case "CREDITED":
+            return { label: "Credited", variant: "neutral", detail: null };
         case "OVERDUE": {
             const late = invoice.dueAt ? daysLate(invoice.dueAt, now) : 0;
             return {
@@ -105,6 +107,8 @@ const SOURCE: Record<InvoiceSource, string> = {
     PACK: "Class pack",
     COURSE: "Course",
     MANUAL: "Entered by hand",
+    ORDER: "Order",
+    BOOKING: "Booking",
 };
 
 export function sourceLabel(source: InvoiceSource): string {

@@ -16,8 +16,12 @@ import { withLive } from "@/lib/lists/capped";
 
 export type InvoiceStatus = "DRAFT" | "ISSUED" | "PAID" | "VOID";
 /** The status as the merchant reads it; Overdue is derived by the API. */
-export type InvoiceStanding = "DRAFT" | "ISSUED" | "OVERDUE" | "PAID" | "VOID";
-export type InvoiceSource = "MANUAL" | "SUBSCRIPTION" | "COURSE" | "PACK";
+/** CREDITED: cancelled in full by a credit note (ADR-008). */
+export type InvoiceStanding =
+    "DRAFT" | "ISSUED" | "OVERDUE" | "PAID" | "VOID" | "CREDITED";
+/** ORDER: an order's own invoice or a correction to it (ADR-008). */
+export type InvoiceSource =
+    "MANUAL" | "SUBSCRIPTION" | "COURSE" | "PACK" | "ORDER" | "BOOKING";
 export type PaymentMethod = "CASH" | "UPI" | "BANK_TRANSFER" | "CARD" | "OTHER";
 /**
  * How a payment is stored: one of the ways it is recorded by hand, or ONLINE
