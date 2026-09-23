@@ -277,4 +277,18 @@ describe("amountDueCents", () => {
             mayContain: [],
         });
     });
+
+    it("reads a payment recorded by hand as paid in full, nothing due", () => {
+        const read = serializeOrderRead(
+            { ...base, paymentIntents: [] },
+            opts(true),
+        );
+        expect(read.money).toEqual(
+            expect.objectContaining({
+                paid: "400.00",
+                due: "0.00",
+                recordedByHand: true,
+            }),
+        );
+    });
 });

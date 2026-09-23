@@ -84,6 +84,12 @@ export interface OrderMoneyDto {
     refunded: string;
     /** Still to collect: an order edited up, or never paid. */
     due: string;
+    /**
+     * Paid, with no payment taken through a provider: the money moved
+     * outside Saroh (cash at the counter, a transfer) and was recorded by
+     * hand, so `paid` is the order's total rather than the provider sum.
+     */
+    recordedByHand: boolean;
     discountCode: { code: string; rule: string } | null;
 }
 
@@ -290,6 +296,11 @@ export function serializeOrderRead(
         (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
         0,
     );
+    // Recorded by hand: marked paid with no provider payment behind it.
+    const byHand =
+        (order.paymentStatus === "PAID" ||
+            order.paymentStatus === "REFUNDED") &&
+        order.paymentIntents.length === 0;
     const stage = order.stage as OrderStage;
     const address: DeliveryAddressDto = {
         name: order.deliveryName,
@@ -390,9 +401,14 @@ export function serializeOrderRead(
                   shipping: toMoneyString(order.shipping),
                   discount: toMoneyString(order.discount),
                   total: toMoneyString(order.total),
-                  paid: money(capturedCents),
+                  paid: byHand
+                      ? toMoneyString(order.total)
+                      : money(capturedCents),
                   refunded: money(refundedCents),
-                  due: money(amountDueCents(order, capturedCents)),
+                  due: byHand
+                      ? "0.00"
+                      : money(amountDueCents(order, capturedCents)),
+                  recordedByHand: byHand,
                   discountCode: order.discountRedemption
                       ? {
                             code: order.discountRedemption.code,
