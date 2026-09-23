@@ -31,6 +31,7 @@ import {
     MoreHorizontal,
     Package,
     Plus,
+    Settings2,
     Store,
     Trash2,
     Upload,
@@ -54,7 +55,11 @@ import type { ProductRating } from "@/lib/product-reviews/service";
 import { deleteProduct, updateProduct } from "@/lib/products/actions";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { inStorefront, mergeCatalogue } from "@/lib/products/catalogue";
-import { newProductHref, productHref } from "@/lib/products/links";
+import {
+    newProductHref,
+    productHref,
+    productSettingsHref,
+} from "@/lib/products/links";
 import type { ProductListItem, ProductStatus } from "@/lib/products/service";
 import { importProductsHref, newStorefrontHref } from "@/lib/stores/links";
 
@@ -388,6 +393,17 @@ export function CatalogueScreen({
                 actions={
                     first ? (
                         <>
+                            <Button variant="outline" asChild>
+                                <Link
+                                    href={productSettingsHref(
+                                        store?.id ??
+                                            (many ? undefined : first.id),
+                                    )}
+                                >
+                                    <Settings2 className="mr-1.5 size-4" />
+                                    Settings
+                                </Link>
+                            </Button>
                             <Button variant="outline" asChild>
                                 <Link
                                     href={importProductsHref(

@@ -31,12 +31,31 @@ export function newProductHref(storeId?: string): string {
         : "/commerce/products/new";
 }
 
-/** Catalogue settings: categories, options, defaults. */
+export const SETTINGS_TABS = [
+    "categories",
+    "options",
+    "fields",
+    "allergens",
+    "sku",
+    "defaults",
+] as const;
+export type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+export function isSettingsTab(value: string | undefined): value is SettingsTab {
+    return (SETTINGS_TABS as readonly string[]).includes(value ?? "");
+}
+
+/** Product settings for one storefront's catalogue, at a tab. */
 export function productSettingsHref(
-    tab?: "categories" | "options" | "defaults",
+    storeId?: string,
+    tab?: SettingsTab,
 ): string {
-    return tab && tab !== "categories"
-        ? `/commerce/products/settings?tab=${tab}`
+    const params = new URLSearchParams();
+    if (storeId) params.set("storefront", storeId);
+    if (tab && tab !== "categories") params.set("tab", tab);
+    const q = params.toString();
+    return q
+        ? `/commerce/products/settings?${q}`
         : "/commerce/products/settings";
 }
 
