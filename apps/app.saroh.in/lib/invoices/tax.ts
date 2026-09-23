@@ -46,3 +46,17 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
             : null,
     };
 }
+
+/**
+ * Whether a payment provider is connected, so issuing can make a pay link.
+ * False when it could not be found out: the form then offers "Issue it",
+ * and the invoice's own page says whether a link can be made.
+ */
+export async function hasPaymentProvider(): Promise<boolean> {
+    const base = await orgBase();
+    if (!base) return false;
+    const res = await apiFetch(`${base}/payment-providers`);
+    if (!res.ok) return false;
+    const rows = (await res.json()) as { status: string }[];
+    return rows.some((r) => r.status === "CONNECTED");
+}
