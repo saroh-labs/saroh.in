@@ -32,6 +32,7 @@ export function QuickLook({
     description,
     footer,
     titleClassName,
+    leading,
     children,
 }: {
     open: boolean;
@@ -47,6 +48,8 @@ export function QuickLook({
     footer?: ReactNode;
     /** The title's face: the invoice number is set in mono. */
     titleClassName?: string;
+    /** Before the title: a subscriber's initials. Decorative. */
+    leading?: ReactNode;
     children: ReactNode;
 }) {
     return (
@@ -62,6 +65,7 @@ export function QuickLook({
                 }}
             >
                 <div className="flex items-center gap-2.5 border-b border-border bg-card px-[18px] py-3.5">
+                    {leading}
                     <div className="min-w-0 flex-1">
                         <SheetTitle
                             className={cn(

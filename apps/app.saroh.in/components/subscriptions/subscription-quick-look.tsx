@@ -1,15 +1,10 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import {
-    Sheet,
-    SheetClose,
-    SheetContent,
-    SheetDescription,
-    SheetTitle,
-} from "@saroh/ui/sheet";
-import { X } from "lucide-react";
 import Link from "next/link";
+
+import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 
 import type {
     Optional,
@@ -34,7 +29,6 @@ import {
 
 import { Pill } from "./pill";
 
-const CARD = "rounded-xl border border-border bg-card";
 const EYEBROW =
     "text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground";
 
@@ -55,10 +49,11 @@ const EDITS = {
 } as const;
 
 /**
- * A row's quick look, after the design: where it stands, the next charge,
- * the next three collections and the last three charges — and ways into the
- * full page. "Change it" opens that page with the step ready
- * (`?do=pause|switch|cancel`); nothing changes from here.
+ * A row's quick look, after the design, in the shared quick-look sheet:
+ * where it stands, the next charge, the next three collections and the last
+ * three charges — and ways into the full page. "Change it" opens that page
+ * with the step ready (`?do=pause|switch|cancel|restart`); nothing changes
+ * from here.
  */
 export function SubscriptionQuickLook({
     sub,
@@ -75,29 +70,55 @@ export function SubscriptionQuickLook({
     canWrite: boolean;
     now: Date;
 }) {
-    return (
-        <Sheet
-            open={sub !== null}
-            onOpenChange={(o) => (!o ? onClose() : null)}
-        >
-            <SheetContent
-                className="flex w-full flex-col gap-0 bg-background p-0 focus:outline-none sm:max-w-[440px] [&>button:last-child]:hidden"
-                onOpenAutoFocus={(e) => {
-                    e.preventDefault();
-                    (e.currentTarget as HTMLElement | null)?.focus();
-                }}
+    const onOpenChange = (open: boolean) => (!open ? onClose() : null);
+    if (!sub) {
+        return (
+            <QuickLook
+                open={false}
+                onOpenChange={onOpenChange}
+                title=""
+                description=""
             >
-                {sub ? (
-                    <Body
-                        sub={sub}
-                        plans={plans}
-                        charges={charges}
-                        canWrite={canWrite}
-                        now={now}
-                    />
-                ) : null}
-            </SheetContent>
-        </Sheet>
+                {null}
+            </QuickLook>
+        );
+    }
+    const price = longPrice(sub.price, sub.currency, sub.interval);
+    return (
+        <QuickLook
+            open
+            onOpenChange={onOpenChange}
+            leading={
+                <span
+                    aria-hidden
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-[12px] font-bold"
+                >
+                    {initials(sub.contact.name)}
+                </span>
+            }
+            title={sub.contact.name}
+            titleClassName="font-display text-[17px] font-semibold tracking-[-0.02em]"
+            subtitle={`${sub.plan.name} · ${price}`}
+            description={`${sub.contact.name}'s subscription: ${sub.plan.name}, ${price}.`}
+            footer={
+                <Button
+                    asChild
+                    className="h-[38px] min-w-[160px] flex-1 rounded-[10px] text-[13.5px]"
+                >
+                    <Link href={`/billing/subscriptions/${sub.id}`}>
+                        Open full details
+                    </Link>
+                </Button>
+            }
+        >
+            <Body
+                sub={sub}
+                plans={plans}
+                charges={charges}
+                canWrite={canWrite}
+                now={now}
+            />
+        </QuickLook>
     );
 }
 
@@ -149,165 +170,126 @@ function Body({
 
     return (
         <>
-            <div className="flex items-center gap-2.5 border-b border-border bg-card px-[18px] py-3.5">
-                <span
-                    aria-hidden
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-[12px] font-bold"
-                >
-                    {initials(sub.contact.name)}
-                </span>
-                <div className="min-w-0 flex-1">
-                    <SheetTitle className="truncate font-display text-[17px] font-semibold tracking-[-0.02em]">
-                        {sub.contact.name}
-                    </SheetTitle>
-                    <SheetDescription className="truncate text-[12px] text-muted-foreground">
-                        {sub.plan.name} ·{" "}
-                        {longPrice(sub.price, sub.currency, sub.interval)}
-                    </SheetDescription>
+            <QuickLookCard className="py-3.5">
+                <div className="flex items-center gap-2">
+                    <Pill tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</Pill>
+                    <span className="flex-1" />
+                    <span className="text-[12px] text-muted-foreground">
+                        Since {dayText(sub.startedAt, tz, now)}
+                    </span>
                 </div>
-                <SheetClose
-                    aria-label="Close"
-                    className="flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-muted text-foreground/75 hover:bg-secondary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:size-11"
-                >
-                    <X className="size-4" strokeWidth={2} aria-hidden />
-                </SheetClose>
-            </div>
-            <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-[18px] py-4">
-                <div className={cn(CARD, "px-4 py-3.5")}>
-                    <div className="flex items-center gap-2">
-                        <Pill tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</Pill>
-                        <span className="flex-1" />
-                        <span className="text-[12px] text-muted-foreground">
-                            Since {dayText(sub.startedAt, tz, now)}
-                        </span>
-                    </div>
-                    <div className={cn(EYEBROW, "mt-3")}>Next charge</div>
-                    <div className="mt-0.5 font-display text-[24px] font-semibold tabular-nums tracking-[-0.02em]">
-                        {nextBig}
-                    </div>
-                    <p className="mt-0.5 text-pretty text-[12.5px] leading-[1.5] text-foreground/75">
-                        {nextLine}
+                <div className={cn(EYEBROW, "mt-3")}>Next charge</div>
+                <div className="mt-0.5 font-display text-[24px] font-semibold tabular-nums tracking-[-0.02em]">
+                    {nextBig}
+                </div>
+                <p className="mt-0.5 text-pretty text-[12.5px] leading-[1.5] text-foreground/75">
+                    {nextLine}
+                </p>
+                {older ? (
+                    <p className="mt-1.5 text-[12px] text-brand">
+                        Keeps {money(sub.price, sub.currency)} — the plan is{" "}
+                        {money(older.listPrice, sub.currency)} for new sign-ups
                     </p>
-                    {older ? (
-                        <p className="mt-1.5 text-[12px] text-brand">
-                            Keeps {money(sub.price, sub.currency)} — the plan is{" "}
-                            {money(older.listPrice, sub.currency)} for new
-                            sign-ups
-                        </p>
-                    ) : null}
-                    {sub.pendingPlan && tab !== "cancelled" ? (
-                        <p className="mt-1.5 text-[12px] font-semibold text-brand">
-                            Changes to {sub.pendingPlan.name} on{" "}
-                            {dayText(sub.pendingPlan.from, tz, now)}
-                        </p>
-                    ) : null}
+                ) : null}
+                {sub.pendingPlan && tab !== "cancelled" ? (
+                    <p className="mt-1.5 text-[12px] font-semibold text-brand">
+                        Changes to {sub.pendingPlan.name} on{" "}
+                        {dayText(sub.pendingPlan.from, tz, now)}
+                    </p>
+                ) : null}
+            </QuickLookCard>
+            {tab === "failed" ? (
+                <div
+                    role="alert"
+                    className="rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px]"
+                >
+                    <div className="text-[13px] font-bold text-destructive-subtle-foreground">
+                        {failWhy(sub, now)}
+                    </div>
+                    <div className="mt-[3px] text-[12px] text-foreground/75">
+                        Saroh doesn&apos;t charge cards — open it to send a new
+                        pay link, record a payment, pause or cancel.
+                    </div>
                 </div>
-                {tab === "failed" ? (
-                    <div
-                        role="alert"
-                        className="rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px]"
-                    >
-                        <div className="text-[13px] font-bold text-destructive-subtle-foreground">
-                            {failWhy(sub, now)}
-                        </div>
-                        <div className="mt-[3px] text-[12px] text-foreground/75">
-                            Saroh doesn&apos;t charge cards — open it to send a
-                            new pay link, record a payment, pause or cancel.
-                        </div>
-                    </div>
-                ) : null}
-                {upcoming.length ? (
-                    <div className={cn(CARD, "px-4 pb-1.5 pt-3")}>
-                        <div className={cn(EYEBROW, "mb-1")}>
-                            Next collections
-                        </div>
-                        {upcoming.map((u) => (
-                            <div
-                                key={u.date}
-                                className="flex items-center gap-2.5 border-t border-border/70 py-[7px]"
-                            >
-                                <span className="flex-1 text-[13px] font-semibold">
-                                    {u.label}
-                                </span>
-                                <Pill tone={u.tone}>{u.state}</Pill>
-                            </div>
-                        ))}
-                    </div>
-                ) : null}
-                <div className={cn(CARD, "px-4 pb-1.5 pt-3")}>
-                    <div className={cn(EYEBROW, "mb-1")}>Last charges</div>
-                    {charges.state === "ok" ? (
-                        last.length ? (
-                            last.map((c) => (
-                                <div
-                                    key={c.id}
-                                    className="flex items-baseline gap-2.5 border-t border-border/70 py-[7px]"
-                                >
-                                    <span className="w-[60px] shrink-0 text-[12.5px] text-muted-foreground">
-                                        {c.date}
-                                    </span>
-                                    <Pill tone={c.tone}>{c.result}</Pill>
-                                    <span className="flex-1" />
-                                    <span className="font-semibold tabular-nums">
-                                        {c.amount}
-                                    </span>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="border-t border-border/70 py-2 text-[12.5px] text-muted-foreground">
-                                Nothing charged yet.
-                            </p>
-                        )
-                    ) : (
-                        <p
-                            role={charges.state === "failed" ? "alert" : "note"}
-                            className="border-t border-border/70 py-2 text-[12.5px] text-muted-foreground"
+            ) : null}
+            {upcoming.length ? (
+                <QuickLookCard label="Next collections" className="pb-1.5 pt-3">
+                    {upcoming.map((u) => (
+                        <div
+                            key={u.date}
+                            className="flex items-center gap-2.5 border-t border-border/70 py-[7px]"
                         >
-                            {charges.state === "denied"
-                                ? "Your role can't see invoices, so charges aren't shown."
-                                : "Charges couldn't be loaded. The rest is up to date."}
-                        </p>
-                    )}
-                </div>
-                {canWrite ? (
-                    <div className={cn(CARD, "px-4 py-3")}>
-                        <div className={cn(EYEBROW, "mb-2")}>Change it</div>
-                        <div className="flex flex-wrap gap-2">
-                            {EDITS[tab].map(([label, step]) => (
-                                <Link
-                                    key={label}
-                                    href={step ? `${href}?do=${step}` : href}
-                                    className={cn(
-                                        "inline-flex h-[38px] items-center rounded-[9px] border border-border bg-card px-4 text-[14px] font-semibold hover:bg-muted coarse:h-11",
-                                        step === "cancel"
-                                            ? "text-destructive-subtle-foreground"
-                                            : "text-foreground",
-                                    )}
-                                >
-                                    {label}
-                                </Link>
-                            ))}
+                            <span className="flex-1 text-[13px] font-semibold">
+                                {u.label}
+                            </span>
+                            <Pill tone={u.tone}>{u.state}</Pill>
                         </div>
-                        <p className="mt-2 text-[11.5px] text-muted-foreground">
-                            {tab === "cancelled"
-                                ? "Starts a new subscription at today's price — the old one keeps its history."
-                                : "Opens the subscription with that step ready — nothing changes until you confirm there."}
+                    ))}
+                </QuickLookCard>
+            ) : null}
+            <QuickLookCard label="Last charges" className="pb-1.5 pt-3">
+                {charges.state === "ok" ? (
+                    last.length ? (
+                        last.map((c) => (
+                            <div
+                                key={c.id}
+                                className="flex items-baseline gap-2.5 border-t border-border/70 py-[7px]"
+                            >
+                                <span className="w-[60px] shrink-0 text-[12.5px] text-muted-foreground">
+                                    {c.date}
+                                </span>
+                                <Pill tone={c.tone}>{c.result}</Pill>
+                                <span className="flex-1" />
+                                <span className="font-semibold tabular-nums">
+                                    {c.amount}
+                                </span>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="border-t border-border/70 py-2 text-[12.5px] text-muted-foreground">
+                            Nothing charged yet.
                         </p>
-                    </div>
+                    )
                 ) : (
-                    <p className="text-[12px] text-muted-foreground">
-                        Your role can see this subscription but not change it.
+                    <p
+                        role={charges.state === "failed" ? "alert" : "note"}
+                        className="border-t border-border/70 py-2 text-[12.5px] text-muted-foreground"
+                    >
+                        {charges.state === "denied"
+                            ? "Your role can't see invoices, so charges aren't shown."
+                            : "Charges couldn't be loaded. The rest is up to date."}
                     </p>
                 )}
-            </div>
-            <div className="flex gap-2 border-t border-border bg-card px-[18px] py-3">
-                <Link
-                    href={href}
-                    className="flex h-[42px] flex-1 items-center justify-center rounded-[10px] bg-primary text-[14px] font-semibold text-primary-foreground hover:bg-primary-hover"
-                >
-                    Open full details
-                </Link>
-            </div>
+            </QuickLookCard>
+            {canWrite ? (
+                <QuickLookCard label="Change it" className="py-3">
+                    <div className="flex flex-wrap gap-2">
+                        {EDITS[tab].map(([label, step]) => (
+                            <Link
+                                key={label}
+                                href={step ? `${href}?do=${step}` : href}
+                                className={cn(
+                                    "inline-flex h-[38px] items-center rounded-[9px] border border-border bg-card px-4 text-[14px] font-semibold hover:bg-muted coarse:h-11",
+                                    step === "cancel"
+                                        ? "text-destructive-subtle-foreground"
+                                        : "text-foreground",
+                                )}
+                            >
+                                {label}
+                            </Link>
+                        ))}
+                    </div>
+                    <p className="mt-2 text-[11.5px] text-muted-foreground">
+                        {tab === "cancelled"
+                            ? "Starts a new subscription at today's price — the old one keeps its history."
+                            : "Opens the subscription with that step ready — nothing changes until you confirm there."}
+                    </p>
+                </QuickLookCard>
+            ) : (
+                <p className="text-[12px] text-muted-foreground">
+                    Your role can see this subscription but not change it.
+                </p>
+            )}
         </>
     );
 }
