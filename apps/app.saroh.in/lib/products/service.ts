@@ -17,9 +17,36 @@ export interface Product {
     image: string | null;
     categoryId: string | null;
     price: string;
+    /** The printed / compare-at price, shown struck through. */
+    mrp?: string | null;
     currency: string;
     status: ProductStatus;
     category?: { id: string; name: string } | null;
+}
+
+/** Which details the shop shows; a key missing means shown. */
+export type ShopFields = Partial<
+    Record<
+        | "howToUse"
+        | "materials"
+        | "keyPoints"
+        | "maker"
+        | "warranty"
+        | "returns",
+        boolean
+    >
+>;
+
+export interface ProductImage {
+    id: string;
+    url: string;
+    mediaId: string | null;
+    alt: string;
+    width: number | null;
+    height: number | null;
+    position: number;
+    creditName: string | null;
+    creditUrl: string | null;
 }
 
 /**
@@ -49,6 +76,13 @@ export interface Variant {
     title: string;
     price: string | null;
     image: string | null;
+    mrp?: string | null;
+    optionValueId?: string | null;
+    /** The product photo shown when picked; null = the cover. */
+    imageId?: string | null;
+    position?: number;
+    /** Its own stock, once the product counts per variant. */
+    inventory?: Inventory | null;
 }
 
 export interface Inventory {
@@ -60,6 +94,31 @@ export interface Inventory {
 export interface ProductDetail extends Product {
     variants: Variant[];
     inventory: Inventory | null;
+    mrp: string | null;
+    howToUse: string | null;
+    materials: string | null;
+    keyPoints: string[];
+    madeHere: boolean;
+    maker: string | null;
+    madeIn: string | null;
+    supplierCode: string | null;
+    warranty: string | null;
+    returnsMode: "STOREFRONT" | "OWN";
+    returnsText: string | null;
+    shopFields: ShopFields;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    seoImageId: string | null;
+    optionId: string | null;
+    images: ProductImage[];
+    stockMode: "product" | "variant";
+    option: {
+        id: string;
+        name: string;
+        values: { id: string; value: string }[];
+    } | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface Category {

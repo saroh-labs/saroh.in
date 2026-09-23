@@ -47,9 +47,9 @@ const STANDING: Record<
  * Sell → Orders → one order, after the "Saroh Orders Screen" design.
  *
  * Items and totals on the left, who and how it was paid on the right, and the
- * next thing to do with it in the header. The design also draws a delivery
- * address and a per-line variant; an order does not carry either yet, so
- * those are left out rather than drawn empty.
+ * next thing to do with it in the header. Each line names the variant bought
+ * (#462). The design also draws a delivery address; an order does not carry
+ * one yet, so it is left out rather than drawn empty.
  *
  * The storefront travels in the address (`?storefront=`); a link without it
  * is still honoured by asking each storefront until one has the order.
