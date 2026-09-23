@@ -67,10 +67,25 @@ describe("seats", () => {
             pathname: "/commerce/orders",
         });
         const tabs = labels(nav.tabs);
-        expect(tabs.slice(0, 2)).toEqual(["Home", "Sell"]);
+        expect(tabs).toEqual(["Home", "Sell", "Calendar", "Notifications"]);
         expect(new Set(tabs).size).toBe(tabs.length);
-        // No Home › Calendar yet, so its seat falls through to rail order.
         expect(tabs).toHaveLength(TAB_SEATS);
+    });
+
+    it("seats Calendar second while you are on it, then Sell", () => {
+        const nav = buildMobileNav({
+            groups: ownerNav(),
+            pathname: "/calendar",
+        });
+        expect(labels(nav.tabs)).toEqual([
+            "Home",
+            "Calendar",
+            "Sell",
+            "Notifications",
+        ]);
+        expect(nav.tabs.find((t) => t.label === "Calendar")?.current).toBe(
+            true,
+        );
     });
 
     it("fills a seat the preference cannot, in rail order, skipping sections", () => {
@@ -85,8 +100,8 @@ describe("seats", () => {
         expect(labels(nav.tabs)).toEqual([
             "Home",
             "Sell",
+            "Calendar",
             "Website",
-            "Contacts",
         ]);
     });
 

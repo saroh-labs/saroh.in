@@ -85,6 +85,7 @@ const OVERDUE = {
     paidAt: null,
     billToName: "Café Mocha",
     subscriptionId: null,
+    orderId: null,
     contact: null,
 };
 
@@ -278,6 +279,7 @@ describe("CalendarService.month", () => {
                     startAt: new Date("2026-09-08T04:30:00Z"),
                     status: "CONFIRMED",
                     outcome: null,
+                    paidWith: "PACK",
                     bookerName: null,
                     bookerEmail: null,
                     service: { name: "Physio" },
@@ -291,8 +293,8 @@ describe("CalendarService.month", () => {
         expect(res.layers).toEqual(["bookings", "classes"]);
         expect(res).not.toHaveProperty("takings");
         expect(res.days[7].layers.bookings?.items[0]).toMatchObject({
-            title: "Asha Rao",
-            subtitle: "Physio · Ravi",
+            title: "Physio · Asha Rao",
+            subtitle: "With Ravi · Class pack",
             link: { type: "booking", id: "bk_1" },
         });
         for (const d of res.days) {
@@ -382,6 +384,74 @@ describe("CalendarService.month", () => {
             res.days.find((d) => d.date === "2026-09-13")?.layers.subscriptions
                 ?.kinds,
         ).toEqual({ failed: 1 });
+    });
+
+    it("an order's own invoice is its order: not on the Invoices layer, not counted twice", async () => {
+        const paidAt = new Date("2026-09-05T05:00:00Z");
+        const ordersOwn = {
+            ...OVERDUE,
+            id: "inv_order",
+            number: "RC/26-27/0101",
+            status: "PAID",
+            source: "ORDER",
+            total: "250",
+            paidAt,
+            orderId: "o1",
+        };
+        const renewalPaid = {
+            ...OVERDUE,
+            id: "inv_renewal",
+            status: "PAID",
+            source: "SUBSCRIPTION",
+            total: "1200",
+            paidAt,
+            subscriptionId: "sub_1",
+        };
+        const handWritten = {
+            ...OVERDUE,
+            id: "inv_hand",
+            status: "PAID",
+            paidAt,
+        };
+        const { service } = build(undefined, {
+            orders: [order("o1", "2026-09-05T04:00:00Z")],
+            invoices: [ordersOwn, renewalPaid, handWritten],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+
+        const fifth = res.days.find((d) => d.date === "2026-09-05")!;
+        // The renewal's charge is the Subscriptions layer's to show.
+        expect(fifth.layers.invoices?.items.map((i) => i.id)).toEqual([
+            "inv_hand",
+        ]);
+        // The order (250) once, the renewal (1200) and the hand-written
+        // invoice (4000): the order's own invoice adds nothing.
+        expect(fifth.takings).toEqual([{ currency: "INR", amount: "5450.00" }]);
+    });
+
+    it("a renewal's charge stays on the Invoices layer for someone who cannot see subscriptions", async () => {
+        const renewalDue = {
+            ...OVERDUE,
+            id: "inv_renewal",
+            source: "SUBSCRIPTION",
+            dueAt: new Date("2026-09-25T06:00:00Z"),
+            subscriptionId: "sub_1",
+        };
+        const { service } = build(["PAYMENTS"], { invoices: [renewalDue] });
+        const res = await service.month(
+            {
+                ...OWNER,
+                role: "ADMIN",
+                actions: new Set(["org:read", "invoice:read"] as const),
+            },
+            "2026-09",
+            NOW,
+        );
+        expect(res.layers).toEqual(["invoices"]);
+        expect(
+            res.days.find((d) => d.date === "2026-09-25")?.layers.invoices
+                ?.kinds,
+        ).toEqual({ due: 1 });
     });
 
     it("a class start is one item with its places", async () => {
