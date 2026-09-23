@@ -430,6 +430,12 @@ export const NAV_GROUPS: NavGroup[] = [
                         label: "Services",
                         moduleKey: "APPOINTMENTS",
                     },
+                    // Who can be booked when, and the business's rules (U16).
+                    {
+                        href: "/bookings/availability",
+                        label: "Availability",
+                        moduleKey: "APPOINTMENTS",
+                    },
                     {
                         href: "/courses",
                         label: "Courses",

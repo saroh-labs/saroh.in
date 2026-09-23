@@ -902,11 +902,17 @@ export class BookingsService {
      * inside the window it stays used and the booking says it was cancelled
      * late (a membership's class then counts against its month too). With no
      * rule, every cancel is in time — as before the rules existed.
+     *
+     * `returnCredit` is the business cancelling rather than the customer —
+     * a whole class called off (U15). The rule protects the business from a
+     * customer dropping out late; it never takes a class from someone whose
+     * class was cancelled on them.
      */
     async cancelBooking(
         ctx: OrganizationContext,
         bookingId: string,
         now: Date = new Date(),
+        options: { returnCredit?: boolean } = {},
     ): Promise<Booking> {
         authorize(ctx, "booking:write");
 
@@ -915,7 +921,8 @@ export class BookingsService {
             return booking;
         }
         const rules = await loadBookingRules(prisma, ctx.organizationId);
-        const late = isLateCancel(booking.startAt, now, rules);
+        const late =
+            !options.returnCredit && isLateCancel(booking.startAt, now, rules);
         return prisma.$transaction(async (tx) => {
             const cancelled = await tx.booking.update({
                 where: { id: booking.id },
@@ -955,8 +962,11 @@ export class BookingsService {
      * the ledger with attendance nobody witnessed — which is worse than an
      * empty ledger, because it reads as fact.
      *
-     * **Only after it has ended.** Marking a future appointment attended is
-     * not a mistake worth supporting.
+     * **Not before it could have happened.** The desk checks someone in when
+     * they walk in, so attendance may be said from an hour before the start
+     * (U15, the bookings calendar); a no-show only once the start has passed,
+     * since nobody has failed to turn up before then. Marking next week's
+     * appointment attended is not a mistake worth supporting.
      *
      * **Never on a cancelled booking.** Cancelled-in-advance and did-not-turn-up
      * are the two most different things a merchant can be told about a
@@ -981,11 +991,8 @@ export class BookingsService {
                 "This booking was cancelled, which is already how it went.",
             );
         }
-        if (booking.endAt.getTime() > now.getTime()) {
-            throw new ConflictException(
-                "This appointment has not happened yet.",
-            );
-        }
+        const refusal = outcomeTooEarly(outcome, booking.startAt, now);
+        if (refusal) throw new ConflictException(refusal);
         if (booking.outcome === outcome) {
             // Already said. Not an error, and not a second history line.
             return booking;
@@ -2123,4 +2130,26 @@ export function toPublicBooking(booking: {
                 ? service.meetingUrl
                 : null,
     };
+}
+
+/** How early before the start the desk may check someone in. */
+export const CHECK_IN_EARLY_MS = 60 * 60_000;
+
+/**
+ * Why an outcome cannot be said yet, or null when it can: attendance from an
+ * hour before the start (someone walking in), a no-show once it has started.
+ */
+export function outcomeTooEarly(
+    outcome: BookingOutcome,
+    startAt: Date,
+    now: Date,
+): string | null {
+    const opensAt =
+        outcome === "ATTENDED"
+            ? startAt.getTime() - CHECK_IN_EARLY_MS
+            : startAt.getTime();
+    if (now.getTime() >= opensAt) return null;
+    return outcome === "ATTENDED"
+        ? "Check-in opens an hour before the appointment."
+        : "This appointment has not started yet.";
 }

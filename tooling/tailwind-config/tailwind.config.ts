@@ -229,6 +229,12 @@ const config = {
                     member: "hsl(var(--role-member))",
                     reviewer: "hsl(var(--role-reviewer))",
                 },
+                // The bookings diary: one-to-one and class blocks (globals.css).
+                diary: {
+                    one: "hsl(var(--diary-one))",
+                    class: "hsl(var(--diary-class))",
+                    foreground: "hsl(var(--diary-foreground))",
+                },
                 chart: {
                     1: "hsl(var(--chart-1))",
                     2: "hsl(var(--chart-2))",

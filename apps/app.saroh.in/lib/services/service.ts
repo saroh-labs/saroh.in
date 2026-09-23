@@ -312,10 +312,13 @@ export async function listAvailability(
     serviceId: string,
     fromISO: string,
     toISO: string,
+    staffId?: string,
 ): Promise<Slot[]> {
     const base = await orgBase();
     if (!base) return [];
     const query = new URLSearchParams({ from: fromISO, to: toISO });
+    // One person's free starts (U3); absent, anyone's.
+    if (staffId) query.set("staffId", staffId);
     const res = await apiFetch(
         `${base}/services/${serviceId}/availability?${query.toString()}`,
     );
@@ -347,6 +350,15 @@ export async function readBookingsCalendar(
     } catch {
         return null;
     }
+}
+
+/**
+ * The instant a page reads the diary at. A read, not render: pages take it
+ * from here so "now" stays out of their render (the React Compiler's rule),
+ * and pass it down so every block agrees on it.
+ */
+export function readNow(): number {
+    return Date.now();
 }
 
 /** How far back and ahead the bookings register reads: a year each way. */
@@ -468,6 +480,10 @@ export type BookByHandInput = {
     idempotencyKey?: string;
     /** Pay with this class pack (ADR-007); needs `pack:write`. */
     packPurchaseId?: string;
+    /** Who takes it (U3); absent, whoever is free. */
+    staffId?: string;
+    /** How it is paid (U3). */
+    paidWith?: "PAID" | "DESK";
 } & ({ contactId: string } | { bookerEmail: string; bookerName?: string });
 
 /**
@@ -498,9 +514,15 @@ export function rescheduleBooking(
     );
 }
 
-export function cancelBooking(bookingId: string): Promise<CrmResult<Booking>> {
+export function cancelBooking(
+    bookingId: string,
+    options: { returnCredit?: boolean } = {},
+): Promise<CrmResult<Booking>> {
+    // The business calling a class off gives a pack's class back even inside
+    // the free-cancellation window (U15).
+    const query = options.returnCredit ? "?returnCredit=true" : "";
     return send<Booking>(
-        `/bookings/${bookingId}`,
+        `/bookings/${bookingId}${query}`,
         "DELETE",
         undefined,
         "Could not cancel the booking",

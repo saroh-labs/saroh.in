@@ -214,6 +214,16 @@
         --role-member: 36 82% 47%; /* Saffron #D98A15 */
         --role-reviewer: 209 44% 27%; /* Slate #264562 */
 
+        /* ---- the bookings diary ----
+           A one-to-one booking and a class wear their own fill on the
+           calendar, in the legend and on the service cards, so the kind reads
+           at a glance; the kind is always named beside it too. Paper text on
+           both clears 7:1. The same fills on dark: they are blocks of colour
+           on the ground, not tints. */
+        --diary-one: 33 100% 22%; /* Umber #6E3800 */
+        --diary-class: 203 26% 33%; /* Slate #3F5A6B */
+        --diary-foreground: 45 100% 98%; /* #FFFDF6 */
+
         /* ---- chart series: W6, Saffron and slate ----
            Up to six unrelated series; slate is the only hue from outside the
            brand and stays at low chroma. Use the steps in order. Every fill
@@ -361,6 +371,10 @@
         --role-admin: 33 58% 50%; /* #CA8837 */
         --role-member: 36 82% 47%;
         --role-reviewer: 209 42% 60%; /* #6E9BC4 */
+
+        --diary-one: 33 100% 22%;
+        --diary-class: 203 26% 33%;
+        --diary-foreground: 45 100% 98%;
 
         --chart-1: 35 76% 36%;
         --chart-2: 33 58% 50%;
