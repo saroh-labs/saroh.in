@@ -60,10 +60,14 @@ import { collectionsInMonth, upcomingRenewals } from "./schedules";
  *
  * Takings go only to a role that reads the merchant's money (`payment:read`
  * and `invoice:read`, ADR-008), and count each rupee once: paid orders plus
- * paid invoices that are not an order's own. Until U5 gives invoices an
- * order, no invoice is an order's (SEAM: {@link isAnOrdersOwn}).
+ * paid invoices that are not an order's own (ADR-008: every order has one).
  * Order amounts need `payment:read`; subscription and invoice amounts ride
  * with their own reads.
+ *
+ * The Invoices layer is the paper that has no other layer: an order's own
+ * invoice is its order, and a renewal's charge is its renewal on the
+ * Subscriptions layer (when that layer is shown). Listing them again would
+ * say the day held twice as much.
  *
  * ## Days
  *
@@ -102,12 +106,12 @@ export interface CalendarMonth {
 }
 
 /**
- * SEAM (U5): an invoice that is an order's own is left out of the takings —
- * the order already counts that money. Until invoices carry `orderId`, none
- * is; U5 selects it and returns `inv.orderId !== null`.
+ * An invoice that is an order's own (ADR-008) is left out of the takings and
+ * the Invoices layer — the order already counts that money, and the order is
+ * the ledger for its payment.
  */
-function isAnOrdersOwn(_invoice: { id: string }): boolean {
-    return false;
+function isAnOrdersOwn(invoice: { orderId: string | null }): boolean {
+    return invoice.orderId !== null;
 }
 
 /** What {@link collectionsInMonth} and {@link upcomingRenewals} read. */
@@ -250,7 +254,13 @@ export class CalendarService {
                 this.readSubscriptions(organizationId, window, zone.zone, now),
             ),
             attempt("invoices", readInvoices, () =>
-                this.readInvoices(organizationId, window, zone.zone, now),
+                this.readInvoices(
+                    organizationId,
+                    window,
+                    zone.zone,
+                    now,
+                    sees.subscriptions,
+                ),
             ),
             attempt("bookings", sees.bookings, () =>
                 this.readBookings(organizationId, window, zone.zone),
@@ -664,12 +674,18 @@ export class CalendarService {
      * Invoices due (issued, not yet past due), overdue (issued, past due —
      * derived, never stored) on their due date, and paid on the day paid.
      * Paid invoices that are not an order's own are the invoices' takings.
+     *
+     * An order's own invoice is none of these: its order is on the Orders
+     * layer and holds its payment. A renewal's charge is left off the layer
+     * when the Subscriptions layer shows it, but still counts as overdue —
+     * `mergeToActOn` keeps it once, as the failed renewal it is.
      */
     private async readInvoices(
         organizationId: string,
         window: { start: Date; end: Date },
         zone: string,
         now: Date,
+        renewalsShown: boolean,
     ): Promise<{
         items: DatedItem[];
         overdue: (ToActOn & { invoiceId: string })[];
@@ -695,6 +711,7 @@ export class CalendarService {
                 paidAt: true,
                 billToName: true,
                 subscriptionId: true,
+                orderId: true,
                 contact: {
                     select: { firstName: true, lastName: true, email: true },
                 },
@@ -704,6 +721,8 @@ export class CalendarService {
         const overdue: (ToActOn & { invoiceId: string })[] = [];
         const takings: TakingEntry[] = [];
         for (const inv of rows) {
+            if (isAnOrdersOwn(inv)) continue;
+            const listed = !(renewalsShown && inv.subscriptionId !== null);
             const title = inv.number ?? "Invoice";
             const subtitle = inv.billToName ?? personName(inv.contact);
             const amount = {
@@ -713,44 +732,46 @@ export class CalendarService {
             const link = { type: "invoice" as const, id: inv.id };
             if (inv.status === "PAID" && inv.paidAt) {
                 const date = dayOf(inv.paidAt, zone);
-                items.push({
-                    layer: "invoices",
-                    date,
-                    item: {
-                        id: inv.id,
-                        kind: "paid",
-                        title,
-                        subtitle,
-                        at: inv.paidAt.toISOString(),
-                        ...amount,
-                        link,
-                    },
-                });
-                if (!isAnOrdersOwn(inv)) {
-                    takings.push({
+                if (listed) {
+                    items.push({
+                        layer: "invoices",
                         date,
-                        currency: inv.currency,
-                        amount: inv.total,
+                        item: {
+                            id: inv.id,
+                            kind: "paid",
+                            title,
+                            subtitle,
+                            at: inv.paidAt.toISOString(),
+                            ...amount,
+                            link,
+                        },
                     });
                 }
+                takings.push({
+                    date,
+                    currency: inv.currency,
+                    amount: inv.total,
+                });
                 continue;
             }
             if (inv.status !== "ISSUED" || !inv.dueAt) continue;
             const late = isPastDue(inv, now);
             const date = dayOf(inv.dueAt, zone);
-            items.push({
-                layer: "invoices",
-                date,
-                item: {
-                    id: inv.id,
-                    kind: late ? "overdue" : "due",
-                    title,
-                    subtitle,
-                    at: inv.dueAt.toISOString(),
-                    ...amount,
-                    link,
-                },
-            });
+            if (listed) {
+                items.push({
+                    layer: "invoices",
+                    date,
+                    item: {
+                        id: inv.id,
+                        kind: late ? "overdue" : "due",
+                        title,
+                        subtitle,
+                        at: inv.dueAt.toISOString(),
+                        ...amount,
+                        link,
+                    },
+                });
+            }
             if (late) {
                 overdue.push({
                     invoiceId: inv.id,
