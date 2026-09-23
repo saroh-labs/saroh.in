@@ -440,6 +440,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 
 ### U6. The shop-page preview component
 
+> **Done — #465** (visual check in two skins happens with the Customer view, #467). `ProductPage` in `packages/site-blocks/src/product/` (exported from the package root, not a page block): a gallery with thumbnails, the price with MRP struck through and the saving rounded down, a "how to use / care" line, a variant picker that changes price, MRP, stock word and photo (starting on the first variant that can be sold; a sold-out one can be looked at, not bought), an inert "Add to basket" in preview that says so, description and key points, a Details list (ingredients or fabric, made by, warranty, returns — each absent when team only), and reviews with replies. Optional numbered markers 1–7 for the team notes. `--site-*` only; 44px targets on the picker and basket. Verified: 7 component tests; all 55 site-blocks tests and `check:blocks` pass.
+
 - **Goal:** R4's preview, reusable by the future storefront page (KD10).
 - **Files:**
     - `packages/site-blocks/src/blocks/product-page/{product-page.tsx,types.ts,index.ts}`
