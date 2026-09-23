@@ -29,6 +29,11 @@
   forwards `error.message`.
 - **Adopted** — **Never put the only way to do something in a toast,** and keep
   error toasts on screen long enough to read (15 §5).
+- **Current** — **`showUndo` takes a `duration`** for a screen whose Undo
+  window is a rule of its own (Order Detail's ten-second steps, ADR-008), and
+  **`dismissToasts()` clears the stack** when a screen starts an Undo of its
+  own — two Undos on screen at once, for two different things, is how the
+  wrong one gets pressed.
 
 ### An unreachable API is not a signed-out user — **Current**
 
