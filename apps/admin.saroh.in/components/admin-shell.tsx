@@ -2,11 +2,12 @@ import { Badge } from "@saroh/ui/badge";
 import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
+import { AppsMenu } from "@/components/apps-menu";
 import { ConsoleDrawer } from "@/components/console-drawer";
 import { ConsoleRail } from "@/components/console-rail";
 import { SignOutButton } from "@/components/sign-out-button";
 import type { StaffIdentity } from "@/lib/control-plane";
-import { INSTANCE_HOST } from "@/lib/control-plane";
+import { instanceApps } from "@/lib/sibling-apps";
 
 /**
  * Chrome for the console.
@@ -14,18 +15,20 @@ import { INSTANCE_HOST } from "@/lib/control-plane";
  * It reuses the workspace's own parts — the rail at its three widths, the
  * shared tokens, `PageHeader` on every screen — and is still unmistakably not
  * a merchant surface, because it is dark by default and says what it is in the
- * bar: the instance, and who you are on it
+ * bar: who you are on it, and — in the apps menu — which instance this is
  * (`docs/product-transformation/information-architecture.md`, and the plan's
  * D7). Before this it was a top bar with no rail and no dark mode at all,
  * which read as unfinished rather than as deliberately different.
  */
-export function AdminShell({
+export async function AdminShell({
     staff,
     children,
 }: {
     staff: StaffIdentity;
     children: React.ReactNode;
 }) {
+    const instance = await instanceApps();
+
     return (
         <div className="flex min-h-screen flex-col">
             {/* Sticky, at a fixed 56px, so the rail can sit exactly below it
@@ -35,14 +38,6 @@ export function AdminShell({
                 <Link href="/" className="shrink-0">
                     <Wordmark suffix="console" />
                 </Link>
-                {/*
-                 * Which instance this is. On a self-hosted copy it is the
-                 * operator's own host, which is the whole point: the console
-                 * belongs to the instance it runs on, not to Saroh.
-                 */}
-                <span className="hidden min-w-0 truncate font-mono text-[12px] text-muted-foreground sm:block">
-                    {INSTANCE_HOST}
-                </span>
                 <div className="ml-auto flex min-w-0 items-center gap-3">
                     <p className="hidden min-w-0 truncate text-[12px] text-muted-foreground md:block">
                         {staff.email}
@@ -50,6 +45,7 @@ export function AdminShell({
                         <span className="sr-only">, </span>
                         {staff.roles.map(formatRole).join(" · ")}
                     </p>
+                    {instance && <AppsMenu instance={instance} />}
                     <SignOutButton />
                 </div>
             </header>

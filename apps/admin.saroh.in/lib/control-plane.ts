@@ -15,14 +15,6 @@ const API_URL =
     env.NEXT_PUBLIC_BETTER_AUTH_URL ??
     "https://api.saroh.in";
 
-/**
- * The instance this console governs, named by its API's host — the one thing
- * every instance has and no two share. The shell prints it so an operator with
- * two instances open knows which one they are about to change. The version
- * joins it once the health board reads one (plan U9).
- */
-export const INSTANCE_HOST = new URL(API_URL).host;
-
 export interface PlatformMetrics {
     organizations: { total: number; createdLast30Days: number };
     users: { total: number; verified: number; createdLast30Days: number };
