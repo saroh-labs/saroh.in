@@ -1,11 +1,18 @@
 /**
- * The showcase: five small businesses a product film is shot in.
+ * The showcase: seven small businesses a product film is shot in.
  *
  * Layered on top of the base seed (Northwind Supply stays exactly as `../data`
  * describes it and grows here). Each business is chosen so the demo account's
  * ROLE in it is the point — switching business changes what they can do:
  *
  *   Northwind Supply   OWNER     commerce, CRM, website, payments (base seed)
+ *   Leela & Loom       OWNER     commerce: the products screens' boutique
+ *                                (`./boutique.ts`)
+ *   Rye & Co.          OWNER     commerce, payments, CRM: a GST-registered
+ *                                bakery in Karnataka — orders in every kitchen
+ *                                stage, RC/26-27 tax invoices and credit
+ *                                notes, a Sourdough plan, trade cafés billed
+ *                                by hand (`./bakery.ts`)
  *   Pulse Fitness      OWNER     appointments, CRM, website, payments, courses:
  *                                memberships billed monthly or quarterly,
  *                                class packs, one course
@@ -14,6 +21,9 @@
  *   CarePoint Clinic   MEMBER    appointments, CRM, website — no billing; the
  *                                point is what a Member may and may not see
  *   Lumen Studio       REVIEWER  CRM, website (reviewer of its site only)
+ *
+ * Leela & Loom and Rye & Co. carry their own fixtures in their own files;
+ * everything below is for the others.
  *
  * Data only. `./run.ts` turns it into rows; the volume (customers, orders,
  * bookings, subscriptions, invoices) is generated there from a seeded PRNG so
@@ -2603,6 +2613,7 @@ export const SHOWCASE_BUSINESSES: readonly ShowcaseBusiness[] = [
  * Businesses an earlier showcase seeded and this one no longer does. Their
  * `seed_sc_<key>_` rows are removed on every run, so a database seeded before
  * the line-up changed does not keep a salon and a bakery nobody can explain.
+ * ("rye" is the earlier bakery; today's Rye & Co. is `seed_sc_rc_`.)
  */
 export const RETIRED_BUSINESS_KEYS: readonly string[] = ["mirror", "rye"];
 

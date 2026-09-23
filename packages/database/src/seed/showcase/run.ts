@@ -21,6 +21,7 @@ import {
 } from "../helpers";
 import { deleteSeeded } from "../run";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
+import { RYE, seedBakery } from "./bakery";
 import type { BillingContext, InvoiceRows, InvoiceSpec, Seen } from "./billing";
 import {
     invoiceRows,
@@ -30,7 +31,8 @@ import {
     planSubscriptions,
 } from "./billing";
 import { checkBoutique, seedBoutique } from "./boutique";
-import { checkShowcase } from "./check";
+import type { RyeCounts } from "./check";
+import { checkRye, checkShowcase } from "./check";
 import type { OrderStatus, PaymentStatus, SellableProduct } from "./commerce";
 import { planOrders, toPaise, upsertCatalog } from "./commerce";
 import type { LeadSpec } from "./crm";
@@ -162,6 +164,20 @@ export async function seedShowcase(): Promise<void> {
     businesses.push(
         await seedBoutique({ prisma, now, demoUserId: ctx.demoUserId }),
     );
+    // The GST bakery the invoices, orders and subscriptions screens are
+    // filmed in (U9). Nisha works its counter as a Member.
+    businesses.push(
+        await seedBakery({
+            prisma,
+            now,
+            demoUserId: ctx.demoUserId,
+            counterUserId: await ensureTeamMember(ctx, {
+                first: "Nisha",
+                last: "Kulkarni",
+                role: "MEMBER",
+            }),
+        }),
+    );
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -176,6 +192,7 @@ export async function seedShowcase(): Promise<void> {
     const pulseCounts: PulseCounts | null = pulse
         ? await checkPulse(prisma, pulse.id, now)
         : null;
+    const ryeCounts: RyeCounts = await checkRye(prisma, RYE.orgId, now);
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -187,6 +204,8 @@ export async function seedShowcase(): Promise<void> {
         console.log("[showcase] Pulse Fitness, as its films need it:");
         console.table(pulseCounts);
     }
+    console.log("[showcase] Rye & Co., as its films need it:");
+    console.table(ryeCounts);
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +

@@ -60,13 +60,14 @@ contacts, 16 leads, 3 services, 10 bookings, 12 products, 10 orders and 3 sites
 ### Showcase (the product film's world)
 
 ```bash
-pnpm --filter @saroh/database db:seed:showcase   # base seed, then six businesses on top
+pnpm --filter @saroh/database db:seed:showcase   # base seed, then seven businesses on top
 pnpm --filter @saroh/database db:seed:reset      # removes both
 ```
 
 This runs the base seed first, then adds more to Northwind (about 50 products,
-500 customers, 500 orders, 120 contacts and 40 leads) and adds four more
-businesses, each with one published site at `<slug>.saroh.app.localhost`:
+500 customers, 500 orders, 120 contacts and 40 leads) and adds six more
+businesses — the first four each with one published site at
+`<slug>.saroh.app.localhost`, the two shops without one:
 
 - **Pulse Fitness** (a gym): personal training, assessments, classes and a
   free trial, about 490 bookings. Four people on the diary (`pulse.ts`): the
@@ -102,6 +103,29 @@ businesses, each with one published site at `<slug>.saroh.app.localhost`:
   hidden. Its catalogue is fixed; its orders and reviews are rewritten each
   run and checked (`checkBoutique`). Before filming, run
   `node scripts/check-demo-images.mjs` to confirm every photo still loads.
+- **Rye & Co.** (an artisan bakery on Hill Road, Bengaluru, owned by
+  `demo@saroh.dev`; Nisha Kulkarni works the counter as a Member; `bakery.ts`):
+  the business the invoices, orders, subscriptions and customer screens are
+  filmed in. GST-registered in Karnataka (GSTIN `29AAGCR4375J1ZU`, prefix RC):
+  breads nil-rated (HSN 1905 90 10), pastry 18% (1905 90 20), coffee 5% (SAC
+  996331), delivery ₹60 at 18% (SAC 996813), prices GST-inclusive; eight
+  allergens on the storefront and each product's "contains" / "may contain".
+  About 65 orders over five weeks, each paid one with its tax invoice
+  (RC/26-27/0001…; CGST + SGST, IGST for deliveries to Goa, Telangana, West
+  Bengal and Maharashtra), and today's board in every kitchen stage — new,
+  preparing (one edited before preparing, with a supplementary invoice),
+  ready, collected, one with the courier and a tracking link, one whose
+  payment failed — plus one partly refunded by line with its credit note
+  (RCCN/26-27/0001). A Sourdough plan (₹480 a week) and a monthly one
+  (₹1,800), eight subscribers collecting on Saturdays: one renewal failed, one
+  paused, one changing plan at renewal, skips to come; renewals are tax
+  invoices with the loaf at 0% (plans carry no GST rate). Four trade cafés
+  billed by hand — paid, due, overdue, a draft, and one in Goa in IGST.
+  Subscribers' contacts are linked to their store customers; Rohan Das is a
+  contact and a customer with the same email, left unlinked (a possible
+  match). Priya Raman's note names sesame and today's order holds a loaf that
+  may contain it (the allergy banner). `checkRye` stops the run if any of these
+  states is missing.
 
 Every business keeps time in Asia/Kolkata (`BusinessProfile.timezone`). The
 showcase code is in `packages/database/src/seed/showcase/`. It uses a seeded
@@ -110,25 +134,27 @@ running it again inside that half hour changes no row (except the base seed's
 demo and reviewer password hashes, which it re-salts on every run). On a later
 day it moves the diary, the renewals and the invoices forward with the
 calendar. It queues no jobs: the API starts its own subscription renewal run
-when it boots. At the end it checks, in SQL, that every invoice adds up, each
-business's invoice numbers run from INV-0001 with no gaps, subscription periods
+when it boots. At the end it checks, in SQL, that every invoice adds up (and
+every tax invoice line's GST is its rate's), each invoice series runs from
+0001 with no gaps (INV-0001…, RC/26-27/0001…, RCCN/26-27/0001…), subscription periods
 follow the renewal rules, no service is booked past its capacity (counting the
 seats an open course still holds), and every class spent from a pack was one
 the pack could pay for; it stops with the failing rows if not. Rows it wrote
-for Mirror & Co. and Rye & Co., the earlier line-up, are removed.
+for Mirror & Co. and the earlier Rye & Co. (`seed_sc_rye_`; today's is
+`seed_sc_rc_`), the earlier line-up, are removed.
 
 #### Demo accounts
 
 Every account's password is `demo-password-123`, and every email is verified.
 
-| Email                | Business and role                                                                                                                                                                                                                                                                                                    |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `demo@saroh.dev`     | Northwind OWNER · Pulse Fitness OWNER · Prana Yoga ADMIN · CarePoint Clinic MEMBER · Lumen Studio REVIEWER (its site only) — plus the base seed's Monsoon and Whitefield sites, OWNER                                                                                                                                |
-| `admin@saroh.dev`    | Northwind ADMIN · Pulse Fitness ADMIN                                                                                                                                                                                                                                                                                |
-| `member@saroh.dev`   | Northwind MEMBER · Prana Yoga MEMBER                                                                                                                                                                                                                                                                                 |
-| `reviewer@saroh.dev` | Northwind REVIEWER (base seed)                                                                                                                                                                                                                                                                                       |
-| Business owners      | `radhika.bhat@` (Prana) · `meera.nair@` (CarePoint) · `aditi.rao@` (Lumen), all `@saroh.dev`                                                                                                                                                                                                                         |
-| Staff                | Northwind: `suresh.gowda@`, `anita.fernandes@` · Pulse: `kabir.sethi@`, `ritika.nair@`, `imran.shaikh@`, `deepa.hegde@` · Prana: `anand.murthy@`, `leela.krishnan@`, `farah.siddiqui@` · CarePoint: `pooja.shetty@` (ADMIN), `arjun.rao@`, `sara.thomas@` · Lumen: `vikram.iyer@`, `sana.merchant@`, `rohan.pillai@` |
+| Email                | Business and role                                                                                                                                                                                                                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `demo@saroh.dev`     | Northwind OWNER · Leela & Loom OWNER · Rye & Co. OWNER · Pulse Fitness OWNER · Prana Yoga ADMIN · CarePoint Clinic MEMBER · Lumen Studio REVIEWER (its site only) — plus the base seed's Monsoon and Whitefield sites, OWNER                                                                                                                                 |
+| `admin@saroh.dev`    | Northwind ADMIN · Pulse Fitness ADMIN                                                                                                                                                                                                                                                                                                                        |
+| `member@saroh.dev`   | Northwind MEMBER · Prana Yoga MEMBER                                                                                                                                                                                                                                                                                                                         |
+| `reviewer@saroh.dev` | Northwind REVIEWER (base seed)                                                                                                                                                                                                                                                                                                                               |
+| Business owners      | `radhika.bhat@` (Prana) · `meera.nair@` (CarePoint) · `aditi.rao@` (Lumen), all `@saroh.dev`                                                                                                                                                                                                                                                                 |
+| Staff                | Northwind: `suresh.gowda@`, `anita.fernandes@` · Pulse: `kabir.sethi@`, `ritika.nair@`, `imran.shaikh@`, `deepa.hegde@` · Prana: `anand.murthy@`, `leela.krishnan@`, `farah.siddiqui@` · CarePoint: `pooja.shetty@` (ADMIN), `arjun.rao@`, `sara.thomas@` · Lumen: `vikram.iyer@`, `sana.merchant@`, `rohan.pillai@` · Rye & Co.: `nisha.kulkarni@` (MEMBER) |
 
 CarePoint is a Member's view on purpose. A Member's role today reads the
 business, its team and its sites but not contacts or bookings, so the clinic
