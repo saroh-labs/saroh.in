@@ -346,6 +346,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 
 ### U2. API: sections, photos, SEO, details; product-overview read
 
+> **Done — #461.** Routes under `stores/:storeId/products/:productId`: `PATCH` (one section: any subset of name, address, description, category, option, price, MRP, status, details, shop switches and SEO), `GET`/`PUT …/images` (the ordered set of at most 5, from a kept photo, a READY library object or an https address), and `GET …/overview` (product, stock by variant, price range with the saving, and orders / reviews / discounts panels that are each `ok`, `failed` or `forbidden`). The rules are pure (`product-rules.ts`, `product-overview.ts`). Descriptions are sanitised on the site allowlist. The cover mirrors to `Product.image`. A library object a product still shows can't be deleted. Verified: 9 unit tests for the rules and arithmetic, 16 DB tests for sections, photos and the overview, plus the media refusal; the full API suites pass (unit 2,118, integration 1,431).
+
 - **Goal:** the editor and the product page have calls matching their sections (KD8, KD9).
 - **Files:**
     - `apps/api.saroh.in/src/modules/products/{dto.ts,products.service.ts,products.controller.ts,serialize.ts}`

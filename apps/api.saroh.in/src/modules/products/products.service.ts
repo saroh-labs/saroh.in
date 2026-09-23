@@ -5,13 +5,58 @@ import {
     NotFoundException,
     Optional,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { sanitizeRichHtml } from "../sites/sanitize";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
-import type { CreateProductDto, ProductStatus, UpdateProductDto } from "./dto";
+import type {
+    CreateProductDto,
+    PatchProductDto,
+    ProductStatus,
+    UpdateProductDto,
+} from "./dto";
+import {
+    assertDetailsCoherent,
+    assertMrpAtOrAbovePrice,
+    cleanShopFields,
+} from "./product-rules";
 import { serializeProductDetail, serializeProductListItem } from "./serialize";
+
+/** Everything a product page or the editor needs about one product. */
+export const PRODUCT_DETAIL_INCLUDE = {
+    category: { select: { id: true, name: true } },
+    variants: {
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        include: { inventory: true },
+    },
+    images: { orderBy: { position: "asc" } },
+    inventory: true,
+    option: {
+        select: {
+            id: true,
+            name: true,
+            values: {
+                select: { id: true, value: true },
+                orderBy: { position: "asc" },
+            },
+        },
+    },
+} satisfies Prisma.ProductInclude;
+
+/** Key points are one line each: trimmed, and blank lines dropped. */
+function cleanKeyPoints(points: string[] | undefined): string[] {
+    return (points ?? []).map((p) => p.trim()).filter((p) => p !== "");
+}
+
+/** The description is merchant HTML: kept to what the shop can render. */
+function cleanDescription(value: string | null | undefined): string | null {
+    if (value == null) return null;
+    const clean = sanitizeRichHtml(value).trim();
+    return clean === "" ? null : clean;
+}
 
 /**
  * Product catalog data layer. Authorization is delegated to StoresService so
@@ -59,11 +104,7 @@ export class ProductsService {
         await this.stores.getForUser(storeId, userId);
         const product = await prisma.product.findFirst({
             where: { id: productId, storeId },
-            include: {
-                category: { select: { id: true, name: true } },
-                variants: { orderBy: { createdAt: "asc" } },
-                inventory: true,
-            },
+            include: PRODUCT_DETAIL_INCLUDE,
         });
         if (!product) {
             throw new NotFoundException("Product not found");
@@ -82,6 +123,15 @@ export class ProductsService {
         }
         await this.assertSlugFree(storeId, slug);
         await this.assertCategoryInStore(storeId, dto.categoryId);
+        await this.assertOptionInStore(storeId, dto.optionId);
+        assertMrpAtOrAbovePrice(dto.price, dto.mrp ?? null);
+        assertDetailsCoherent({
+            madeHere: dto.madeHere ?? true,
+            maker: dto.maker ?? null,
+            returnsMode: dto.returnsMode ?? "STOREFRONT",
+            returnsText: dto.returnsText ?? null,
+        });
+        const shopFields = cleanShopFields(dto.shopFields ?? {});
 
         try {
             const product = await prisma.product.create({
@@ -90,12 +140,27 @@ export class ProductsService {
                     organizationId,
                     name: dto.name,
                     slug,
-                    description: dto.description ?? null,
+                    description: cleanDescription(dto.description),
                     image: dto.image ?? null,
                     categoryId: dto.categoryId ?? null,
                     price: dto.price,
+                    mrp: dto.mrp ?? null,
                     currency: dto.currency ?? "USD",
                     status: dto.status ?? "DRAFT",
+                    howToUse: dto.howToUse ?? null,
+                    materials: dto.materials ?? null,
+                    keyPoints: cleanKeyPoints(dto.keyPoints),
+                    madeHere: dto.madeHere ?? true,
+                    maker: dto.maker ?? null,
+                    madeIn: dto.madeIn ?? null,
+                    supplierCode: dto.supplierCode ?? null,
+                    warranty: dto.warranty ?? null,
+                    returnsMode: dto.returnsMode ?? "STOREFRONT",
+                    returnsText: dto.returnsText ?? null,
+                    shopFields,
+                    seoTitle: dto.seoTitle ?? null,
+                    seoDescription: dto.seoDescription ?? null,
+                    optionId: dto.optionId ?? null,
                 },
             });
             if (organizationId) {
@@ -154,6 +219,110 @@ export class ProductsService {
                 field: "slug",
             });
         }
+    }
+
+    /**
+     * Save one section of the editor: only the fields present change.
+     *
+     * Cross-field rules are judged on the product AFTER the patch — an MRP
+     * sent alone is compared with the stored price, a returns mode sent alone
+     * with the stored text — so saving one section can never leave another
+     * incoherent. Returns the whole product so the section can re-baseline.
+     */
+    async patch(
+        storeId: string,
+        productId: string,
+        userId: string,
+        dto: PatchProductDto,
+    ) {
+        await this.requireWrite(storeId, userId);
+        const current = await prisma.product.findFirst({
+            where: { id: productId, storeId },
+            select: {
+                slug: true,
+                price: true,
+                mrp: true,
+                madeHere: true,
+                maker: true,
+                returnsMode: true,
+                returnsText: true,
+            },
+        });
+        if (!current) {
+            throw new NotFoundException("Product not found");
+        }
+
+        const has = (key: keyof PatchProductDto) => dto[key] !== undefined;
+        const data: Record<string, unknown> = {};
+
+        if (has("name")) data.name = dto.name;
+        if (has("slug")) {
+            const slug = slugify(dto.slug ?? "");
+            if (slug !== current.slug) await this.assertSlugFree(storeId, slug);
+            data.slug = slug;
+        }
+        if (has("description"))
+            data.description = cleanDescription(dto.description);
+        if (has("categoryId")) {
+            await this.assertCategoryInStore(storeId, dto.categoryId);
+            data.categoryId = dto.categoryId ?? null;
+        }
+        if (has("optionId")) {
+            await this.assertOptionInStore(storeId, dto.optionId);
+            data.optionId = dto.optionId ?? null;
+        }
+        if (has("price")) data.price = dto.price;
+        if (has("mrp")) data.mrp = dto.mrp ?? null;
+        if (has("status")) data.status = dto.status;
+        for (const key of [
+            "howToUse",
+            "materials",
+            "maker",
+            "madeIn",
+            "supplierCode",
+            "warranty",
+            "returnsText",
+            "seoTitle",
+            "seoDescription",
+        ] as const) {
+            if (has(key)) data[key] = dto[key] ?? null;
+        }
+        if (has("keyPoints")) data.keyPoints = cleanKeyPoints(dto.keyPoints);
+        if (has("madeHere")) data.madeHere = dto.madeHere;
+        if (has("returnsMode")) data.returnsMode = dto.returnsMode;
+        if (has("shopFields"))
+            data.shopFields = cleanShopFields(dto.shopFields ?? {});
+        if (has("seoImageId")) {
+            if (dto.seoImageId)
+                await this.assertImageOfProduct(productId, dto.seoImageId);
+            data.seoImageId = dto.seoImageId ?? null;
+        }
+
+        const price = dto.price ?? current.price.toString();
+        const mrp = has("mrp")
+            ? (dto.mrp ?? null)
+            : (current.mrp?.toString() ?? null);
+        assertMrpAtOrAbovePrice(price, mrp, has("mrp") ? "mrp" : "price");
+        assertDetailsCoherent({
+            madeHere: dto.madeHere ?? current.madeHere,
+            maker: has("maker") ? (dto.maker ?? null) : current.maker,
+            returnsMode: dto.returnsMode ?? current.returnsMode,
+            returnsText: has("returnsText")
+                ? (dto.returnsText ?? null)
+                : current.returnsText,
+        });
+
+        if (Object.keys(data).length > 0) {
+            try {
+                await prisma.product.update({ where: { id: productId }, data });
+            } catch {
+                throw new ConflictException({
+                    message: "That address is already used by another product",
+                    field: "slug",
+                });
+            }
+        }
+        return this.get(storeId, productId, userId);
     }
 
     /** Delete a product; variants + inventory cascade (schema onDelete: Cascade). */
@@ -242,6 +411,41 @@ export class ProductsService {
             throw new ConflictException({
                 message: "That slug is already taken",
                 field: "slug",
+            });
+        }
+    }
+
+    /** A product picks its option from its own store's options. */
+    private async assertOptionInStore(
+        storeId: string,
+        optionId?: string | null,
+    ): Promise<void> {
+        if (!optionId) return;
+        const option = await prisma.productOption.findFirst({
+            where: { id: optionId, storeId },
+            select: { id: true },
+        });
+        if (!option) {
+            throw new BadRequestException({
+                message: "Unknown option",
+                field: "optionId",
+            });
+        }
+    }
+
+    /** The sharing image is one of the product's own photos. */
+    private async assertImageOfProduct(
+        productId: string,
+        imageId: string,
+    ): Promise<void> {
+        const image = await prisma.productImage.findFirst({
+            where: { id: imageId, productId },
+            select: { id: true },
+        });
+        if (!image) {
+            throw new BadRequestException({
+                message: "Pick one of this product's photos",
+                field: "seoImageId",
             });
         }
     }

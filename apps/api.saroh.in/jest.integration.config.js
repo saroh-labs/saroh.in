@@ -54,6 +54,8 @@ module.exports = {
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
+        "<rootDir>/src/modules/products/product-rules.spec.ts",
+        "<rootDir>/src/modules/products/product-overview.spec.ts",
         "<rootDir>/src/modules/product-reviews/",
         // ADR-007 invoices: DB-free specs run in the unit project; only
         // invoices.db.spec.ts runs here.

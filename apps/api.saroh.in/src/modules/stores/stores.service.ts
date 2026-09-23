@@ -149,6 +149,25 @@ export class StoresService {
         return (await this.canWriteLegacy(storeId, userId)) ? writable : null;
     }
 
+    /**
+     * Whether the caller's membership in the store's business permits an
+     * action beyond the store's own read/write — `order:read` or
+     * `product-review:read` on a product page that shows orders and reviews.
+     * Membership only: a legacy store grant says nothing about those areas.
+     */
+    async memberAllows(
+        storeId: string,
+        userId: string,
+        action: OrgAction,
+    ): Promise<boolean> {
+        const store = await prisma.store.findFirst({
+            where: { id: storeId, deletedAt: null },
+            select: { organizationId: true },
+        });
+        if (!store?.organizationId) return false;
+        return this.orgAllows(store.organizationId, userId, action);
+    }
+
     // ------------------------------------------------------------------
     // Authorization internals
     // ------------------------------------------------------------------

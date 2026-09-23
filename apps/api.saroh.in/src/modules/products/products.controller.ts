@@ -5,6 +5,7 @@ import {
     Get,
     HttpCode,
     Param,
+    Patch,
     Post,
     Put,
     Query,
@@ -17,7 +18,14 @@ import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import type { ProductStatus } from "./dto";
-import { CreateProductDto, UpdateProductDto } from "./dto";
+import {
+    CreateProductDto,
+    PatchProductDto,
+    ReplaceProductImagesDto,
+    UpdateProductDto,
+} from "./dto";
+import { ProductImagesService } from "./product-images.service";
+import { ProductOverviewService } from "./product-overview.service";
 import { ProductsService } from "./products.service";
 
 /**
@@ -29,7 +37,11 @@ import { ProductsService } from "./products.service";
 @UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
 @RequireModule("COMMERCE")
 export class ProductsController {
-    constructor(private readonly products: ProductsService) {}
+    constructor(
+        private readonly products: ProductsService,
+        private readonly overview: ProductOverviewService,
+        private readonly images: ProductImagesService,
+    ) {}
 
     @Get()
     list(
@@ -57,6 +69,47 @@ export class ProductsController {
         @Param("productId") productId: string,
     ) {
         return this.products.get(storeId, productId, user.id);
+    }
+
+    /** The product page: product, stock by variant, and its panels. */
+    @Get(":productId/overview")
+    getOverview(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+    ) {
+        return this.overview.get(storeId, productId, user.id);
+    }
+
+    /** One editor section's save; returns the whole product. */
+    @Patch(":productId")
+    patch(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body() dto: PatchProductDto,
+    ) {
+        return this.products.patch(storeId, productId, user.id, dto);
+    }
+
+    @Get(":productId/images")
+    listImages(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+    ) {
+        return this.images.list(storeId, productId, user.id);
+    }
+
+    /** Replace the ordered photo set; the first is the cover. */
+    @Put(":productId/images")
+    replaceImages(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body() dto: ReplaceProductImagesDto,
+    ) {
+        return this.images.replace(storeId, productId, user.id, dto);
     }
 
     @Put(":productId")
