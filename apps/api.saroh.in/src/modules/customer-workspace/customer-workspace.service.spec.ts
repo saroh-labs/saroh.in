@@ -13,13 +13,11 @@ const CTX: OrganizationContext = {
 function make(overrides: Record<string, unknown> = {}) {
     const db = {
         contact: {
-            findFirst: jest
-                .fn()
-                .mockResolvedValue({
-                    id: "c1",
-                    email: "a@x.com",
-                    phone: "+1 (555) 000",
-                }),
+            findFirst: jest.fn().mockResolvedValue({
+                id: "c1",
+                email: "a@x.com",
+                phone: "+1 (555) 000",
+            }),
         },
         customer: {
             findFirst: jest.fn().mockResolvedValue({ id: "cust1" }),
@@ -54,6 +52,21 @@ function make(overrides: Record<string, unknown> = {}) {
 }
 
 describe("CustomerWorkspaceService", () => {
+    it("keeps lead rows out of a Member's timeline", async () => {
+        // The module is reachable with `contact:read` (DEC-020), so the lead
+        // rows have to ask for `lead:read` themselves or a Member reads the
+        // pipeline through the timeline.
+        const { svc, db } = make();
+        db.lead.findMany.mockResolvedValue([
+            { title: "Annual membership", createdAt: new Date() },
+        ]);
+
+        const timeline = await svc.timeline({ ...CTX, role: "MEMBER" }, "c1");
+
+        expect(timeline.events.some((e) => e.type === "LEAD")).toBe(false);
+        expect(db.lead.findMany).not.toHaveBeenCalled();
+    });
+
     it("suggests by exact email/phone and NEVER by name", async () => {
         const { svc, db } = make();
         db.customer.findMany.mockResolvedValue([

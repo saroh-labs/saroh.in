@@ -345,6 +345,11 @@ export class ContactsService {
     /**
      * A contact plus its leads (newest first, each with its current stage), or a
      * 404 for a missing / cross-tenant id. Authorizes `contact:read`.
+     *
+     * The leads are gated on `lead:read` the way `list()`'s rollup is: a Member
+     * reads the people on the diary (DEC-020) and nothing about the pipeline,
+     * so they get the person with an empty `leads` — the same shape, so every
+     * caller keeps working.
      */
     async get(ctx: OrganizationContext, contactId: string) {
         authorize(ctx, "contact:read");
@@ -352,10 +357,15 @@ export class ContactsService {
         const contact = await prisma.contact.findUnique({
             where: { id: contactId },
             include: {
-                leads: {
-                    orderBy: { createdAt: "desc" },
-                    include: { stage: true, pipeline: true },
-                },
+                leads: allows(ctx, "lead:read")
+                    ? {
+                          orderBy: { createdAt: "desc" },
+                          include: { stage: true, pipeline: true },
+                      }
+                    : {
+                          where: { id: { in: [] } },
+                          include: { stage: true, pipeline: true },
+                      },
             },
         });
         if (contact?.organizationId !== ctx.organizationId) {

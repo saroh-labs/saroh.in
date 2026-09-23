@@ -4,9 +4,11 @@ import {
     Get,
     Header,
     HttpCode,
+    Ip,
     Param,
     Post,
 } from "@nestjs/common";
+import { createHash } from "node:crypto";
 
 import type { CreateIntentResult } from "./payments.service";
 import type { PublicInvoiceView } from "./public-invoices.service";
@@ -21,6 +23,15 @@ import { PublicInvoicesService } from "./public-invoices.service";
  * The link is a credential, so neither answer may be cached, indexed or leak
  * the URL onward in a Referer header.
  */
+/**
+ * Who is asking, as a hash — the same shape the public booking controller
+ * uses. `undefined` when the platform gives no address, and the service then
+ * falls back to the link itself.
+ */
+function callerHash(ip: string | undefined): string | undefined {
+    return ip ? createHash("sha256").update(ip).digest("hex") : undefined;
+}
+
 @Controller("public/invoices")
 export class PublicInvoicesController {
     constructor(private readonly invoices: PublicInvoicesService) {}
@@ -29,8 +40,11 @@ export class PublicInvoicesController {
     @Header("Referrer-Policy", "no-referrer")
     @Header("X-Robots-Tag", "noindex, nofollow")
     @Header("Cache-Control", "no-store")
-    read(@Param("token") token: string): Promise<PublicInvoiceView> {
-        return this.invoices.read(token);
+    read(
+        @Param("token") token: string,
+        @Ip() ip: string,
+    ): Promise<PublicInvoiceView> {
+        return this.invoices.read(token, callerHash(ip));
     }
 
     /**
@@ -47,7 +61,8 @@ export class PublicInvoicesController {
     createIntent(
         @Param("token") token: string,
         @Body() body: unknown,
+        @Ip() ip: string,
     ): Promise<CreateIntentResult> {
-        return this.invoices.createIntent(token, body);
+        return this.invoices.createIntent(token, body, callerHash(ip));
     }
 }
