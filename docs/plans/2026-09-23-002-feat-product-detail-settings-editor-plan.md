@@ -713,6 +713,19 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 - **Data:** migrations `20260924100000_catalogue_extras`, `20260924110000_allergen_fk`, `20260924120000_product_archived_at` (plus the earlier units'); the Leela & Loom showcase store.
 - **Deferred:** the 30-day purge of deleted custom fields; other app services (customers, members, stores, content, imports, organizations) still read `message` at the top level and show "Something went wrong" for a refusal — the same one-line move to `toFailure`.
 
+### Code review (2026-09-23)
+
+A multi-agent review of the branch (correctness on the API and the app, security, adversarial, migrations, testing, standards, frontend races) raised 27 findings after six safe fixes; all 27 were applied (`cface84c`, `da8dccd9`, `fb247272`, `ab0bd2a7`, `3c6d2eb4`, `5635818d`). The ones that mattered:
+
+- **Stock:** switching to a count per variant now moves each open order's promise onto its variant and counts every unit once; before, shipping an older order drove a variant's promised count negative and the switch double-counted promised units. The quick stock sheet no longer starts counting an untracked product at 0.
+- **Security:** PUT and the CSV import now sanitise description HTML, which the product page and the shop render; `ProductFieldCategory` got its RLS policy (`20260925100000_product_field_category_rls`).
+- **Data loss in the UI:** Variants and Photos lock while saving; the photos sheet only resets when the photos change; Save all holds Stock until Variants is saved; a throwing save no longer leaves the editor stuck.
+- **Older products** without an option can take their first one, so their variants save.
+- **R12:** a new product now starts from the Defaults tab (`GET catalogue/defaults/effective`).
+- Tests added for the overview, the stock switch and its refusal, category guards and Undo, cross-store allergens, the editor's section mappers, and an e2e refusal case. `test:int` 121 suites / 1482 tests.
+
+Left as is: a product untracked with open orders, then tracked, with variant-less lines mixed in, can attribute a few promised units to the wrong row (totals stay right). Photo FKs indexed (`20260925110000_product_photo_indexes`).
+
 ## Risks
 
 - **Changing order stock moves (U3) touches money-adjacent code.** Mitigation: specs first for each transition, including legacy null-variant lines, and the existing order-state suites kept green.
