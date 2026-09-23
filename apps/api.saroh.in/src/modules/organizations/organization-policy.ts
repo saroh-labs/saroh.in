@@ -101,6 +101,17 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
 ];
 
 /**
+ * What a MEMBER holds beyond the read-only floor (DEC-024, amends DEC-020):
+ * the kitchen. Someone at the counter reads an order's kitchen view — items,
+ * stage, notes, who it is for, never money — and moves its stage. Refunds and
+ * edits stay `payment:manage` / `order:write`, which a Member does not hold.
+ *
+ * Kept apart from the floor because it is a write: the floor is what every
+ * reading role shares, and this is one narrow thing a Member may DO.
+ */
+const MEMBER_ACTIONS: readonly OrgAction[] = ["order:stage"];
+
+/**
  * Role → allowed actions.
  *
  * Rationale (ADR-001 role vocabulary):
@@ -115,8 +126,9 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
  *             in `organization-members.service.ts` (#276), inside a
  *             serializable transaction.)
  *  - MEMBER — read-only: can see the org, its roster, its stores, and the
- *             diary (bookings, services, contacts), but mutates nothing and
- *             sees no money.
+ *             diary (bookings, services, contacts), and sees no money. The
+ *             one thing it may change is an order's kitchen stage
+ *             (`order:stage`, DEC-024).
  *  - REVIEWER — website only, and narrower than MEMBER rather than beneath it.
  *             Its three actions are enumerated in CAPABILITIES below, and
  *             `SiteReviewer` narrows them to named sites (#276).
@@ -129,7 +141,7 @@ const CAPABILITIES: Record<OrgRole, ReadonlySet<OrgAction>> = {
     ADMIN: new Set<OrgAction>(
         ORG_ACTIONS.filter((action) => action !== "org:delete"),
     ),
-    MEMBER: new Set<OrgAction>(READ_ONLY_ACTIONS),
+    MEMBER: new Set<OrgAction>([...READ_ONLY_ACTIONS, ...MEMBER_ACTIONS]),
     /*
      * REVIEWER — website only (#193), and the narrowest role in the system.
      *
