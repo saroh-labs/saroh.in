@@ -42,6 +42,15 @@ export class EntitlementService {
      * `Plan`) — never a merchant payment record.
      */
     async getEntitlements(organizationId: string): Promise<EntitlementMap> {
+        const [planValues, overrides] = await Promise.all([
+            this.getPlanEntitlements(organizationId),
+            this.liveOverrides(organizationId),
+        ]);
+        return applyOverrides(planValues, overrides);
+    }
+
+    /** What the plan alone grants (or the free floor), before any override. */
+    async getPlanEntitlements(organizationId: string): Promise<EntitlementMap> {
         const subscription = await prisma.subscription.findUnique({
             where: { organizationId },
             include: { plan: true },
@@ -52,6 +61,25 @@ export class EntitlementService {
         }
 
         return asEntitlementMap(subscription.plan.entitlements);
+    }
+
+    /**
+     * Limits an operator has raised for this Organization and that still
+     * apply: not revoked, not yet expired. Expiry is read, not swept — an
+     * override stops applying the instant it lapses, with no job to miss.
+     */
+    async liveOverrides(
+        organizationId: string,
+    ): Promise<EntitlementOverrideRow[]> {
+        return prisma.entitlementOverride.findMany({
+            where: {
+                organizationId,
+                revokedAt: null,
+                expiresAt: { gt: new Date() },
+            },
+            select: { id: true, key: true, value: true, expiresAt: true },
+            orderBy: { value: "desc" },
+        });
     }
 
     /**
@@ -89,6 +117,33 @@ export class EntitlementService {
         const entitlements = await this.getEntitlements(organizationId);
         return entitlements[key] === true;
     }
+}
+
+export interface EntitlementOverrideRow {
+    id: string;
+    key: string;
+    value: number;
+    expiresAt: Date;
+}
+
+/**
+ * Apply live overrides to a plan's limits. An override only ever RAISES a
+ * numeric cap the plan already sets: a key the plan leaves uncapped stays
+ * uncapped (an override must not impose a limit where there was none), a
+ * boolean feature is untouched, and a value below the plan's own is ignored.
+ */
+export function applyOverrides(
+    planValues: EntitlementMap,
+    overrides: readonly EntitlementOverrideRow[],
+): EntitlementMap {
+    const out: EntitlementMap = { ...planValues };
+    for (const override of overrides) {
+        const current = out[override.key];
+        if (typeof current === "number" && override.value > current) {
+            out[override.key] = override.value;
+        }
+    }
+    return out;
 }
 
 /**

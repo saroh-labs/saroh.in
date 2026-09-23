@@ -120,6 +120,9 @@ model Organization {
   // Per-organization feature-flag overrides (S1-012)
   featureFlagOverrides FeatureFlagOverride[]
 
+  // Time-bounded raises of one plan limit, granted from the admin console.
+  entitlementOverrides EntitlementOverride[]
+
   // Uploaded media objects, org-owned (S2-008). Bytes live in object storage
   // (R2); this is the tenant-scoped metadata index.
   media Media[]
@@ -1365,6 +1368,68 @@ model AdminAuditEvent {
   @@index([actorUserId, createdAt])
   @@index([organizationId, createdAt])
   @@index([targetType, targetId, createdAt])
+}
+
+// An operator's note on one Organization, written in the admin console and
+// read only there. Relation-free like AdminAuditEvent: a note is the platform's
+// record about a business, not the business's own data, so it never cascades
+// from a tenant delete and no tenant path reads it.
+model AdminOrganizationNote {
+  id String @id @default(cuid())
+
+  organizationId String
+  authorUserId   String
+  body           String
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+// A durable bulk operation run from the admin console: retry a set of failed
+// jobs, replay a set of webhook deliveries. The operation and one row per
+// target are written before anything executes, so a restart resumes from the
+// items still PENDING and the record says what happened to each one.
+model AdminOperation {
+  id String @id @default(cuid())
+
+  kind        String // "jobs.retry" | "webhooks.replay"
+  status      String @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  actorUserId String
+  reason      String
+
+  idempotencyKey String @unique
+
+  total     Int @default(0)
+  succeeded Int @default(0)
+  skipped   Int @default(0)
+  failed    Int @default(0)
+
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  items AdminOperationItem[]
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+model AdminOperationItem {
+  id String @id @default(cuid())
+
+  operationId String
+  operation   AdminOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  targetType String // "job" | "webhook_event"
+  targetId   String
+
+  status      String    @default("PENDING") // PENDING | DONE | SKIPPED | FAILED
+  detail      String?
+  processedAt DateTime?
+
+  @@unique([operationId, targetId])
+  @@index([operationId, status])
 }
 
 // ============================================================================
@@ -3021,6 +3086,30 @@ model Subscription {
 
   @@unique([provider, providerSubscriptionId])
   @@index([planId])
+}
+
+// EntitlementOverride — one plan limit raised for one Organization, for a
+// while, by an operator (admin console). `EntitlementService` applies the
+// highest live override over the plan's own value; an expired or revoked row
+// is history and changes nothing. Numeric caps only: a feature a plan does not
+// include is a plan change, not a limit.
+model EntitlementOverride {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  key   String
+  value Int
+
+  reason          String
+  grantedByUserId String
+
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, expiresAt])
 }
 
 // BillingWebhookEvent — the idempotent inbox for Saroh's billing-provider

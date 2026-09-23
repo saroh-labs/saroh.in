@@ -1,14 +1,11 @@
 import {
     BadRequestException,
     Body,
-    Controller,
     Delete,
     Get,
     Param,
-    Post,
     Put,
     Query,
-    UseGuards,
 } from "@nestjs/common";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -16,60 +13,33 @@ import { IdentityOnly } from "../../common/decorators/identity-only.decorator";
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
-import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
-import { PlatformAdminGuard } from "../../common/guards/platform-admin.guard";
-import { PlatformPermissionGuard } from "../../common/guards/platform-permission.guard";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import type { AuthUser } from "../../common/types/store-context";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { FlagKey } from "../feature-flags/flags";
 import { isKnownFlagKey } from "../feature-flags/flags";
-import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminMetricsService } from "./admin-metrics.service";
-import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminPermission } from "./admin-permissions";
-import {
-    ClearFlagOverrideDto,
-    ListAdminAuditDto,
-    OpenAdminAccessSessionDto,
-    RevokeAdminAccessSessionDto,
-    SetFlagDto,
-} from "./dto";
-import {
-    OrganizationAccessSessionGuard,
-    RequireOrganizationAccessSession,
-} from "./organization-access-session.guard";
+import { AdminRoutes } from "./admin-routes.decorator";
+import { ClearFlagOverrideDto, ListAdminAuditDto, SetFlagDto } from "./dto";
 
 /**
  * The Saroh control plane (S1-012) — the API behind admin.saroh.in.
  *
- * Every route is double-guarded: authenticated, then STAFF. `PlatformAdminGuard`
- * is the only authorization in the codebase that is not tenant-scoped, so this
- * controller is the one place where a request is not answering to some
- * Organization. That is exactly why the surface is kept narrow: rollout control
- * and aggregate metrics, no tenant records.
+ * Every route is guarded by `@AdminRoutes()`: authenticated, then STAFF, then
+ * the route's declared permission. This controller holds identity, aggregate
+ * metrics, releases and the ledger; businesses, people, staff and the
+ * machinery each have their own controller beside it.
  */
-@Controller("admin")
-@UseGuards(
-    BetterAuthGuard,
-    PlatformAdminGuard,
-    PlatformPermissionGuard,
-    // Last: it only acts on routes marked with
-    // `@RequireOrganizationAccessSession`, and those must already have
-    // passed staff authentication and the permission check before a
-    // support-access session is consulted.
-    OrganizationAccessSessionGuard,
-)
+@AdminRoutes()
 export class AdminController {
     constructor(
         private readonly flags: FeatureFlagService,
         private readonly adminFlags: AdminFlagsService,
         private readonly metrics: AdminMetricsService,
         private readonly adminAudit: AdminAuditService,
-        private readonly adminAccess: AdminAccessService,
-        private readonly organizationView: AdminOrganizationViewService,
         private readonly idempotency: IdempotencyService,
     ) {}
 
@@ -107,13 +77,6 @@ export class AdminController {
         return this.adminFlags.list();
     }
 
-    /** Organizations available as override targets (id/name/slug only). */
-    @Get("organizations")
-    @RequireAdminPermission(AdminPermission.OrganizationRead)
-    listOrganizations() {
-        return this.adminFlags.targetableOrganizations();
-    }
-
     @Get("flags/:flagKey/history")
     @RequireAdminPermission(AdminPermission.FlagsRead)
     async history(@Param("flagKey") flagKey: string) {
@@ -144,86 +107,6 @@ export class AdminController {
             },
         });
         return page;
-    }
-
-    @Post("organizations/:organizationId/access-sessions")
-    @RequireAdminPermission(AdminPermission.OrganizationViewAs)
-    async openOrganizationAccess(
-        @PlatformAdminContext() staff: PlatformAdminInfo,
-        @Param("organizationId") organizationId: string,
-        @Body() dto: OpenAdminAccessSessionDto,
-    ) {
-        const session = await this.adminAccess.open({
-            organizationId,
-            staff,
-            reason: dto.reason,
-            idempotencyKey: dto.idempotencyKey,
-        });
-        return {
-            id: session.id,
-            organizationId: session.organizationId,
-            scope: session.scope,
-            expiresAt: session.expiresAt,
-        };
-    }
-
-    /**
-     * Read one Organization under an open support-access session (#139).
-     *
-     * This is the route that makes the access ledger true. Every other admin
-     * route is platform-level; this one reads a single tenant's workspace, and
-     * reaching it requires a session that `authorize()` has just checked —
-     * right Organization, right staff member, not revoked, not expired, not a
-     * write. Before this existed, a session could be opened and revoked and
-     * nothing in between ever consulted one, so the recorded authorization
-     * described a control with no code behind it.
-     *
-     * Counts and lifecycle only. See `AdminOrganizationViewService`.
-     */
-    @Get("organizations/:organizationId")
-    @RequireAdminPermission(AdminPermission.OrganizationViewAs)
-    @RequireOrganizationAccessSession("READ")
-    async viewOrganization(
-        @PlatformAdminContext() staff: PlatformAdminInfo,
-        @Param("organizationId") organizationId: string,
-    ) {
-        const view = await this.organizationView.view(organizationId);
-
-        // A successful read goes through `recordRead`, which reports an audit
-        // outage without failing the response. Denials take the opposite path
-        // inside `authorize()` and fail the request (SEC-008): losing the
-        // record of a refusal leaves an incident with no evidence, while
-        // losing the record of a read that already succeeded does not change
-        // what the caller saw.
-        await this.adminAudit.recordRead({
-            actorUserId: staff.userId,
-            permission: AdminPermission.OrganizationViewAs,
-            action: "organization.access.read",
-            targetType: "organization",
-            targetId: organizationId,
-            organizationId,
-            outcome: AdminAuditOutcome.Success,
-        });
-
-        return view;
-    }
-
-    @Delete("organizations/:organizationId/access-sessions/:accessSessionId")
-    @RequireAdminPermission(AdminPermission.OrganizationViewAs)
-    async revokeOrganizationAccess(
-        @PlatformAdminContext() staff: PlatformAdminInfo,
-        @Param("organizationId") organizationId: string,
-        @Param("accessSessionId") accessSessionId: string,
-        @Body() dto: RevokeAdminAccessSessionDto,
-    ) {
-        await this.adminAccess.revoke({
-            sessionId: accessSessionId,
-            organizationId,
-            staff,
-            reason: dto.reason,
-            idempotencyKey: dto.idempotencyKey,
-        });
-        return { ok: true };
     }
 
     /** Set a flag's GLOBAL default — the value every Organization inherits. */

@@ -9,6 +9,7 @@ import {
 import { Prisma, prisma } from "@saroh/database";
 
 import type { FieldType, FormField } from "../forms/dto";
+import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { fieldsFromSnapshot } from "./live-form-fields";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 
@@ -107,6 +108,7 @@ export class EnquiryService {
         if (form?.deletedAt !== null) {
             throw new NotFoundException("Form not found");
         }
+        await assertOrganizationOpen(form.organizationId);
         if (form.status !== "ACTIVE") {
             throw new GoneException(
                 "This form is no longer accepting submissions",

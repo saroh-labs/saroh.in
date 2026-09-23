@@ -8,10 +8,15 @@ import {
 import type { IncomingHttpHeaders } from "node:http";
 
 import { OrganizationContextService } from "../../modules/organizations/organization-context.service";
+import {
+    assertOrganizationOpen,
+    isReadOnlyMethod,
+} from "../../modules/organizations/organization-lifecycle.gate";
 import type { OrganizationContext } from "../types/organization-context";
 import type { AuthUser } from "../types/store-context";
 
 interface OrganizationRequest {
+    method?: string;
     params?: Record<string, string | undefined>;
     headers: IncomingHttpHeaders;
     user?: AuthUser;
@@ -31,6 +36,9 @@ interface OrganizationRequest {
  *   - `UnauthorizedException` if no authenticated user (guard misordering).
  *   - `BadRequestException`   if no organization id can be determined.
  *   - `NotFoundException` / `ForbiddenException` from the resolver otherwise.
+ *   - `ForbiddenException` for a write to a business an operator suspended or
+ *     scheduled for deletion. Reads still pass, so its people can see what
+ *     happened and take their data (`organization-lifecycle.gate.ts`).
  */
 @Injectable()
 export class OrganizationGuard implements CanActivate {
@@ -55,6 +63,11 @@ export class OrganizationGuard implements CanActivate {
             user.id,
             organizationId,
         );
+        // After membership: a stranger learns nothing about the business's
+        // state, and a member learns why their write was refused.
+        if (!isReadOnlyMethod(request.method)) {
+            await assertOrganizationOpen(organizationId);
+        }
         return true;
     }
 }

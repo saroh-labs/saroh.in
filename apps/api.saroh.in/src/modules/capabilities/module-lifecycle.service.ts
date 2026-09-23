@@ -31,6 +31,18 @@ import type { ModuleKey } from "./module-registry";
 import { MODULE_BY_KEY, MODULES } from "./module-registry";
 import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
 
+/** A transaction client, for work that must commit with a lifecycle change. */
+export type ModuleTransaction = Parameters<
+    Parameters<typeof prisma.$transaction>[0]
+>[0];
+
+/**
+ * Extra work to run inside the lifecycle change's own transaction. The admin
+ * console writes its ledger entry here, so an operator's module change and the
+ * record of it commit together or not at all.
+ */
+export type AlsoInTransaction = (tx: ModuleTransaction) => Promise<void>;
+
 @Injectable()
 export class ModuleLifecycleService {
     constructor(
@@ -46,6 +58,7 @@ export class ModuleLifecycleService {
     async enable(
         ctx: OrganizationContext,
         moduleKey: ModuleKey,
+        alsoInTransaction?: AlsoInTransaction,
     ): Promise<void> {
         authorize(ctx, "module:manage");
         const descriptor = this.descriptor(moduleKey);
@@ -99,6 +112,7 @@ export class ModuleLifecycleService {
                 },
             });
             await this.audit(tx, ctx, "organization.module.enabled", moduleKey);
+            await alsoInTransaction?.(tx);
         });
 
         // After the commit, so only a module that really is enabled is counted.
@@ -111,6 +125,7 @@ export class ModuleLifecycleService {
     async disable(
         ctx: OrganizationContext,
         moduleKey: ModuleKey,
+        alsoInTransaction?: AlsoInTransaction,
     ): Promise<void> {
         authorize(ctx, "module:manage");
         this.descriptor(moduleKey);
@@ -182,6 +197,7 @@ export class ModuleLifecycleService {
                 "organization.module.disabled",
                 moduleKey,
             );
+            await alsoInTransaction?.(tx);
         });
     }
 

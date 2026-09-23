@@ -13,6 +13,7 @@ import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { hashPayToken } from "../invoices/pay-token";
+import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import type { CreateIntentResult } from "./payments.service";
 import { PaymentsService } from "./payments.service";
@@ -182,6 +183,7 @@ export class PublicInvoicesService {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
+        await assertOrganizationOpen(found.organizationId);
         return runInOrgContext(found.organizationId, async () => {
             const invoice = await prisma.invoice.findFirst({
                 where: {
