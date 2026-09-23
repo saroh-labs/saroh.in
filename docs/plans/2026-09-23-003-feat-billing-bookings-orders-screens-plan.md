@@ -403,6 +403,8 @@ flowchart TB
 **Verification:**
 - Order Detail's stepper, timeline and panels render entirely from the order read.
 
+> **Done — #491** (merged). `Order.stage`, fulfilment, delivery address (incl. state), notes, tracking; `OrderEvent` timeline; `PaymentRefundLine` + refund idempotency key. `order:stage` granted to Members. Status table gains PROCESSING→DELIVERED. `order-stage.ts`: mapping, unpaid can't start, Undo of the latest event only, once, within 10 minutes (`UNDO_WINDOW_MS`, in ADR-008), stock reversed on recorded rows. New org-scoped order read (`GET organizations/:org/orders/:id`, `order:read` or `order:stage`; money only with `payment:read`), stage + undo routes, edit (`order:write`; lines/fulfilment/address only while New; difference charged by a new payment on the order or refunded). Refund by lines: server-side amounts capped per line and order, two-phase under the row lock, idempotent; partial refunds keep the order PAID with a derived PARTLY_REFUNDED. Supplementary invoice/credit note are `TODO(U5)` hooks. Migration `20260927200000_order_kitchen_flow` (backfills stage from status; RLS). Open: the old store-scoped order read still shows money to `store:read` (Members) — U14 moves Order Detail to the new read; Commerce nav still needs `order:read`; edits keep a fixed discount amount. DB spec awaits test:int.
+
 ---
 
 ### U7. Subscriptions: skip, change plan, payment failed
