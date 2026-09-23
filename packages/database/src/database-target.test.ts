@@ -4,9 +4,9 @@ import { assertDatabaseTarget, resolveDatabaseTarget } from "./database-target";
 
 /** The two URLs this repository actually configures, with fake credentials. */
 const SAROH_DEV =
-    "postgresql://user:pw@ep-autumn-mouse-a1dr0mtz-pooler.ap-southeast-1.aws.neon.tech/saroh-dev?sslmode=require";
+    "postgresql://user:pw@ep-example-host-12345678.ap-southeast-1.aws.neon.tech/saroh-dev?sslmode=require";
 const NEONDB =
-    "postgresql://user:pw@ep-billowing-cloud-a1lajgqk-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
+    "postgresql://user:pw@ep-example-host-12345678.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
 
 afterEach(() => {
     vi.unstubAllEnvs();
@@ -16,7 +16,7 @@ describe("resolveDatabaseTarget", () => {
     it("extracts the database and host", () => {
         expect(resolveDatabaseTarget(SAROH_DEV)).toEqual({
             database: "saroh-dev",
-            host: "ep-autumn-mouse-a1dr0mtz-pooler",
+            host: "ep-example-host-12345678",
         });
     });
 
@@ -71,7 +71,7 @@ describe("assertDatabaseTarget", () => {
         } catch (error) {
             const message = (error as Error).message;
             expect(message).toContain("neondb");
-            expect(message).toContain("ep-billowing-cloud-a1lajgqk-pooler");
+            expect(message).toContain("ep-example-host-12345678");
             expect(message).toContain("saroh-dev");
         }
     });

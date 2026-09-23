@@ -46,7 +46,7 @@ const CONFIRM_VAR = "DATABASE_TARGET_CONFIRM";
 export interface DatabaseTarget {
     /** Database name, e.g. `saroh-dev`. */
     database: string;
-    /** Host without its domain suffix, e.g. `ep-autumn-mouse-a1dr0mtz-pooler`. */
+    /** Host without its domain suffix, e.g. `ep-example-host-12345678-pooler`. */
     host: string;
 }
 
