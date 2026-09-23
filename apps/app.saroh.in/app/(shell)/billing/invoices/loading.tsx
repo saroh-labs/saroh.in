@@ -1,5 +1,5 @@
-import { ListSkeleton } from "@/components/shared/list-skeleton";
+import { InvoiceSkeleton } from "@/components/invoices/invoice-skeleton";
 
 export default function Loading() {
-    return <ListSkeleton />;
+    return <InvoiceSkeleton />;
 }
