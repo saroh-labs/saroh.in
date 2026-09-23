@@ -322,6 +322,8 @@ flowchart TB
 **Verification:**
 - The calendar screen (U17) and bookings calendar (U15) render from these reads alone.
 
+> **Done — #489** (merged). `GET organizations/:org/services/bookings?from&to[&staffId]` (`booking:read`): diaries per active person plus an Unassigned diary last, each booking with service, contact, staff, `paidWith` (stored, else pack, else subscription), and class sessions with capacity, places taken and who is booked with how they paid; prices only with `payment:read`. The app's `listAllBookings` now makes this one call (`lib/services/booking-calendar.ts`; register covers a year either side). `GET organizations/:org/calendar?month=YYYY-MM` (`org:read`): every day with every visible layer (orders, collections via `collections.ts`, subscription renewals/failed/ended, invoices due/overdue/paid, bookings, classes), items capped at 50 per day with true counts, to-act-on (failed renewals + overdue invoices, each once), takings counting each rupee once (orders plus non-order invoices; needs `payment:read` + `invoice:read`), per-layer failures in `unavailable`, days in the business zone (`businessZone()` fallback chain, named in the response). Not dated: subscription resumes (no resume record). To-act-on covers the month shown only.
+
 ---
 
 ### U5. GST, and an invoice for every order
