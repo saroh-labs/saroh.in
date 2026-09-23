@@ -5,6 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { paperTitle } from "@/components/invoices/invoice-paper";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -24,17 +25,6 @@ type Read =
     | { state: "loading" }
     | { state: "failed"; error: string }
     | { state: "ready"; invoice: Invoice };
-
-/** What the paper is called: a tax invoice, a receipt, a credit note. */
-export function paperTitle(
-    i: Pick<Invoice, "gst" | "kind" | "standing">,
-): string {
-    if (i.kind === "CREDIT_NOTE") return "Credit note";
-    if (i.gst) return "Tax invoice";
-    return i.standing === "PAID" || i.standing === "CREDITED"
-        ? "Receipt"
-        : "Invoice";
-}
 
 /**
  * An invoice's quick look, from the Invoices list (the design's peek): who
