@@ -2,12 +2,13 @@
 
 > **Read when:** touching invoices, subscriptions or plans, the renewal job,
 > courses, class packs, or anything that books into a course session or spends
-> a pack. Architecture: ADR-007 / DEC-019. Product rules:
+> a pack. Architecture: ADR-007 / DEC-019, amended by ADR-008 / DEC-023. Product rules:
 > `saroh-product.md` ("Money a person owes").
 
 ## Invoices — **Current**
 
-- **States:** DRAFT → ISSUED → PAID or VOID, and a void one can be reissued.
+- **States:** DRAFT → ISSUED → PAID or VOID, and a void one can be reissued
+  (a GST-registered business credits instead of voiding — below).
   Overdue is derived — `isPastDue` in `modules/invoices/invoice-state.ts` is the
   one rule, used by the invoice's standing, the owed sums and subscriptions.
   Never store it.
@@ -23,6 +24,32 @@
 - **Who sees what:** invoice ids and numbers go only to a role with
   `invoice:read`; a subscription or pack view without it still says what is
   owed, not which invoices.
+
+## Invoices for orders, corrections and GST — **Adopted** (ADR-008, DEC-023)
+
+- **One invoice per order**, and per paid online booking — idempotent on the
+  order (or booking) id, created inside the payment reconciliation or by the
+  order service for pay-later and hand-recorded payments. **The order is the
+  ledger:** its invoice has no pay link and mirrors the order's payment; a
+  refund reconciliation makes the credit note.
+- **Count each rupee once.** Takings and spent = orders + non-order invoices.
+  Owed = unpaid invoices minus order invoices. A new sum that forgets the
+  exclusion counts twice.
+- **An issued invoice and its lines never change and are never deleted.**
+  Down is a credit note, up a supplementary invoice, each with
+  `relatedInvoiceId`. A GST-registered business cannot void an issued invoice
+  — discard drafts, credit issued ones; void stays for unregistered receipts.
+- **GST:** prices include it; tax is derived per line from the inclusive
+  amount, rounded per line and frozen. Spread an order discount across lines
+  before tax; delivery is a taxed line. Place of supply: bill-to state, else
+  delivery state, else the business's state — same state CGST + SGST, else
+  IGST. Registered → tax invoice; unregistered → receipt. A registered
+  business's orders ignore the storefront's old add-on tax.
+- **Numbering:** `InvoiceSequence` per business **and series** — prefix +
+  financial year (April–March) when registered, plain prefix otherwise; credit
+  notes on their own series; the full number ≤ 16 characters; never renumber
+  an existing invoice.
+- **Tax settings are Owner/Admin only.**
 
 ## Paying an invoice from a link — **Current**
 
@@ -73,7 +100,9 @@
   enrolees, and not while its business has Courses switched off. A service's
   capacity cannot drop below a course's seats.
 - **Packs:** a pack must be unexpired at the session's start; with several,
-  the soonest to expire is spent. Cancelling a booking returns its class.
+  the soonest to expire is spent. Cancelling a booking returns its class —
+  before the business's free-cancellation window; after it (**Adopted**,
+  ADR-008) the cancel is late and the credit stays used.
   Balance is derived (credits − live redemptions).
 - **Contact deletion** cancels the person's future course and pack-paid
   bookings and deletes their enrolments **before** the contact (a booking

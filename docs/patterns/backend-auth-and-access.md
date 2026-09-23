@@ -30,12 +30,12 @@ what the API allows.
 `OrgRole` has four values (`common/types/organization-context.ts`), and
 `organization-policy.ts` maps each to a closed set of actions.
 
-| Role       | What it may do                                                                                                                                                                                                     |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `OWNER`    | Everything, including `org:delete`.                                                                                                                                                                                |
-| `ADMIN`    | Everything except `org:delete`.                                                                                                                                                                                    |
-| `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`, and the diary — `booking:read`, `service:read`, `contact:read` (DEC-020). No leads, no pipeline, no money. |
-| `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                                                                                                                                |
+| Role       | What it may do                                                                                                                                                                                                                                                                                                          |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OWNER`    | Everything, including `org:delete`.                                                                                                                                                                                                                                                                                     |
+| `ADMIN`    | Everything except `org:delete`.                                                                                                                                                                                                                                                                                         |
+| `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`, and the diary — `booking:read`, `service:read`, `contact:read` (DEC-020) — plus `order:stage` (DEC-024, adopted): an order's kitchen view without money, and moving its stage. No leads, no pipeline, no money. |
+| `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                                                                                                                                                                                                                                     |
 
 - **Current** — **REVIEWER is enumerated, never derived** (#276). The read-only
   floor includes the roster, the stores and the media library; a reviewer is an
@@ -55,6 +55,19 @@ what the API allows.
   writes nothing), so `getPageDraft` requiring `section:write` is correct and
   stays. A read-only editor would make every editor change answer "and with no
   write access?".
+- **Adopted** — **Members move kitchen stages, nothing else on an order**
+  (DEC-024, amends DEC-020). `order:stage` reads the order's kitchen view —
+  items, stage, notes, allergens, customer name — with money figures left out
+  by the API, and moves its stage or undoes the last step. Refunds and edits
+  to items or address stay `order:write` / `payment:manage` (Owner/Admin).
+- **Adopted** — **No money figures without a money read** (ADR-008). Stats,
+  takings, fees and payouts go only to a role that may read that money
+  (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,
+  it does not send them for the screen to hide. `billing:read` is Saroh's own
+  billing (DEC-014), not the merchant's.
+- **Adopted** — **Who writes the new settings** (ADR-008): staff, their hours,
+  time off and booking rules need `service:write`; GST registration, state and
+  rates need Owner/Admin. A Member is refused both.
 - **Current** — **Membership is assignable, and invitations are hashed.**
   `OrganizationInvitation` holds the role, a reviewer's sites, and a sha256 of
   the token; the plaintext exists only in the invitee's email. Seven-day expiry,
