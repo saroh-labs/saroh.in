@@ -18,6 +18,18 @@ export interface OrganizationProfile {
     website: string | null;
 }
 
+/** GST (ADR-008). The GSTIN is the profile's `taxId`. */
+export interface TaxSettings {
+    registered: boolean;
+    /** A GST state code, e.g. "29", and its name. */
+    state: string | null;
+    stateName: string | null;
+    invoicePrefix: string | null;
+    /** Percent, e.g. "18". */
+    deliveryRate: string;
+    deliverySac: string | null;
+}
+
 export interface OrganizationSettings {
     id: string;
     name: string;
@@ -25,15 +37,27 @@ export interface OrganizationSettings {
     profile: OrganizationProfile | null;
     /** The earliest order in the business, ISO; `null` before the first. */
     tradingSince: string | null;
+    /** Absent only from an API older than GST (U5). */
+    tax?: TaxSettings;
+}
+
+export interface TaxSettingsInput {
+    registered?: boolean;
+    state?: string;
+    invoicePrefix?: string;
+    deliveryRate?: string;
+    deliverySac?: string;
 }
 
 export interface OrganizationSettingsInput {
     name?: string;
     profile?: Partial<Record<keyof OrganizationProfile, string>>;
+    tax?: TaxSettingsInput;
 }
 
+/** A refusal names the field it is about when the API says which. */
 export type SettingsResult<T> =
-    { ok: true; data: T } | { ok: false; error: string };
+    { ok: true; data: T } | { ok: false; error: string; field?: string };
 
 /** The active org's editable identity. Null when no org is active. */
 export async function getOrganizationSettings(): Promise<OrganizationSettings | null> {
@@ -62,10 +86,7 @@ export async function updateOrganizationSettings(
         .catch(() => null)) as OrganizationSettings | null;
 
     if (!res.ok || !data) {
-        return {
-            ok: false,
-            error: toFailure(data, "Could not save your organization.").error,
-        };
+        return toFailure(data, "Could not save your organization.");
     }
     return { ok: true, data };
 }

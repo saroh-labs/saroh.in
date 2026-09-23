@@ -31,6 +31,9 @@ export interface Service {
     capacity: number;
     priceCents: number | null;
     currency: string | null;
+    /** GST the price includes, in percent, and its SAC code (ADR-008). */
+    gstRate?: string | null;
+    sacCode?: string | null;
     timezone: string;
     status: ServiceStatus;
     locationType: LocationType;
@@ -161,6 +164,8 @@ export interface CreateServiceInput {
     capacity?: number;
     priceCents?: number;
     currency?: string;
+    gstRate?: string | null;
+    sacCode?: string | null;
     timezone: string;
     locationType?: LocationType;
     meetingUrl?: string | null;
@@ -176,6 +181,8 @@ export interface UpdateServiceInput {
     capacity?: number;
     priceCents?: number;
     currency?: string;
+    gstRate?: string | null;
+    sacCode?: string | null;
     timezone?: string;
     status?: ServiceStatus;
     locationType?: LocationType;

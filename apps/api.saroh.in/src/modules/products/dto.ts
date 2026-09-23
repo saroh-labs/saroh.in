@@ -153,6 +153,28 @@ class ProductSectionFields {
     @MaxLength(DETAIL_LIMITS.shortText)
     supplierCode?: string | null;
 
+    /**
+     * GST the price includes, in percent (ADR-008): printed on a registered
+     * business's tax invoice. Checked against GST's rates in the service.
+     * "" or null clears it.
+     */
+    @IsOptional()
+    @Transform(nullableTrim)
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
+    gstRate?: string | null;
+
+    /** HSN code: four to eight digits, spaces allowed as typed on paper. */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) => {
+        if (typeof value !== "string") return value;
+        const t = value.replace(/\s+/g, "");
+        return t === "" ? null : t;
+    })
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{4,8}$/, { message: "An HSN code is 4 to 8 digits" })
+    hsnCode?: string | null;
+
     @IsOptional()
     @Transform(nullableTrim)
     @ValidateIf((_o, v) => v !== null)

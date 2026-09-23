@@ -19,6 +19,7 @@ import {
     productFieldsFor,
     saveProductFieldValues,
 } from "../catalogue/fields.service";
+import { isGstRate } from "../invoices/gst";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
 import type {
@@ -62,6 +63,21 @@ export const PRODUCT_DETAIL_INCLUDE = {
 } satisfies Prisma.ProductInclude;
 
 /** Key points are one line each: trimmed, and blank lines dropped. */
+/**
+ * A product's GST rate (ADR-008): one GST has, or null to clear it. Refused
+ * on the rate's own field, so the editor can put the message there.
+ */
+function checkGstRate(rate: string | null | undefined): string | null {
+    if (rate === undefined || rate === null) return null;
+    if (!isGstRate(rate)) {
+        throw new BadRequestException({
+            message: `${rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            field: "gstRate",
+        });
+    }
+    return rate;
+}
+
 function cleanKeyPoints(points: string[] | undefined): string[] {
     return (points ?? []).map((p) => p.trim()).filter((p) => p !== "");
 }
@@ -217,6 +233,8 @@ export class ProductsService {
                     maker: dto.maker ?? null,
                     madeIn: dto.madeIn ?? null,
                     supplierCode: dto.supplierCode ?? null,
+                    gstRate: checkGstRate(dto.gstRate),
+                    hsnCode: dto.hsnCode ?? null,
                     warranty: dto.warranty ?? null,
                     returnsMode: dto.returnsMode ?? "STOREFRONT",
                     returnsText: dto.returnsText ?? null,
@@ -401,6 +419,8 @@ export class ProductsService {
             data.optionId = dto.optionId ?? null;
         }
         if (has("price")) data.price = dto.price;
+        if (has("gstRate")) data.gstRate = checkGstRate(dto.gstRate);
+        if (has("hsnCode")) data.hsnCode = dto.hsnCode ?? null;
         if (has("mrp")) data.mrp = dto.mrp ?? null;
         if (has("status")) {
             data.status = dto.status;

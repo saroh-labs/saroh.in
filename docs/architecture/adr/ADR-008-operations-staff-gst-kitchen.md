@@ -49,6 +49,11 @@ as the one place a business finds its paper. ADR-007 kept orders out.
 - **Each rupee is counted once.** Takings and a customer's "spent" sum orders
   plus invoices that are not order invoices. "Owed" sums unpaid invoices,
   leaving order invoices out — an unpaid order is owed on the order.
+- **A pay-later order is invoiced when its payment is recorded**, not when it
+  is placed (settled in U5): the invoice is written PAID, so its number and
+  date are those of the payment, and an order never paid never takes a
+  number. An order edited after it was invoiced gets a supplementary invoice
+  or a credit note for what changed.
 
 **Consequences.** The invoice list holds every sale. Owed, takings and spent
 each need the order-invoice exclusion; a sum that forgets it counts twice.
@@ -113,6 +118,13 @@ Rules, rule 46.
   their numbers.
 - A registered business's orders **ignore the storefront's old add-on tax**
   setting; GST is already in the price.
+- **Settled in U5.** Series: `RC/26-27/0001` registered, `RC-0001` not; credit
+  notes `RCCN/26-27/0001` / `RCCN-0001`; no prefix keeps the legacy `INV`
+  series. A prefix is one to three characters, so the longest number
+  (`ABCCN/26-27/9999`) is 16. The financial year is read in the business's
+  timezone (else Asia/Kolkata). An issued invoice credited in full reads
+  **CREDITED**. The GST maths is `invoices/gst.ts`; an order's paper is
+  written by `invoices/order-invoicing.ts`.
 
 **Consequences.** Tax settings are Owner/Admin only. The tax maths lives in one
 pure module, built test-first from worked examples.

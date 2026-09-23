@@ -10,6 +10,12 @@ import { Prisma, prisma } from "@saroh/database";
 import { ActivationEvents } from "../analytics/activation-events";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
+import { gstInsideOrder } from "../invoices/order-invoice";
+import {
+    creditRestOfOrder,
+    ensureOrderInvoice,
+    loadTaxProfile,
+} from "../invoices/order-invoicing";
 import { StoresService } from "../stores/stores.service";
 import type {
     CreateOrderDto,
@@ -18,7 +24,12 @@ import type {
     UpdateOrderDto,
 } from "./dto";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
-import { fromCents, priceOrderLines, toCents } from "./order-pricing";
+import {
+    fromCents,
+    priceOrderLines,
+    toCents,
+    withGstRates,
+} from "./order-pricing";
 import { stageForStatus } from "./order-stage";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
 import {
@@ -165,7 +176,14 @@ export class OrdersService {
             (sum, l) => sum + l.priceCents * l.quantity,
             0,
         );
-        const taxCents = toCents(dto.tax ?? "0");
+        // A GST-registered business's prices include GST: the storefront's
+        // add-on tax is ignored, and `tax` records the GST inside the total
+        // instead of adding to it (ADR-008).
+        const profile = organizationId
+            ? await loadTaxProfile(prisma, organizationId)
+            : null;
+        const registered = profile?.registered ?? false;
+        let taxCents = registered ? 0 : toCents(dto.tax ?? "0");
         const shippingCents = toCents(dto.shipping ?? "0");
         // A code and a typed amount are mutually exclusive: two answers to
         // "why did this come off" would leave no way to tell which was meant.
@@ -207,6 +225,17 @@ export class OrdersService {
             0,
             subtotalCents + taxCents + shippingCents - discountCents,
         );
+        if (registered && profile) {
+            taxCents = gstInsideOrder(await withGstRates(lines), {
+                shippingCents,
+                discountCents,
+                deliveryState:
+                    dto.fulfilment === "DELIVERY"
+                        ? (dto.address?.state ?? null)
+                        : null,
+                profile,
+            });
+        }
 
         const data = {
             storeId,
@@ -405,6 +434,20 @@ export class OrdersService {
                     ...(kitchen ?? {}),
                 },
             });
+            // Paid by hand (pay later, cash at the counter): the order's
+            // invoice is made now, once — the same one a payment webhook
+            // would have made (ADR-008). Refunded by hand: what is left of
+            // it is credited.
+            const paymentChanging =
+                nextPayment != null && nextPayment !== order.paymentStatus;
+            if (paymentChanging && nextPayment === "PAID") {
+                await ensureOrderInvoice(tx, orderId, {
+                    method: "RECORDED",
+                });
+            }
+            if (paymentChanging && nextPayment === "REFUNDED") {
+                await creditRestOfOrder(tx, orderId, "Refunded", userId);
+            }
             if (statusChanging && order.organizationId) {
                 // On the order's timeline too, as a step outside the kitchen.
                 await tx.orderEvent.create({

@@ -122,6 +122,11 @@ describe("sourceLabel", () => {
     it("names what an invoice is for", () => {
         expect(sourceLabel("SUBSCRIPTION")).toBe("Membership");
         expect(sourceLabel("PACK")).toBe("Class pack");
+        // ADR-008: an order's paper, and one cancelled by a credit note.
+        expect(sourceLabel("ORDER")).toBe("Order");
+        expect(invoiceStatus({ standing: "CREDITED", dueAt: null }).label).toBe(
+            "Credited",
+        );
         expect(sourceLabel("COURSE")).toBe("Course");
         expect(sourceLabel("MANUAL")).toBe("Entered by hand");
     });

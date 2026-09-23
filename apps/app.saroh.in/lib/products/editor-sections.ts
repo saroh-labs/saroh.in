@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { isHsnSac, rateOption } from "@/lib/invoices/gst";
 import type {
     ProductDetail,
     ProductImage,
@@ -101,6 +102,15 @@ export const basicsSchema = z
         price: money,
         mrp: optionalMoney,
         categoryId: z.string(),
+        // GST (ADR-008): the rate the price includes, and the HSN code a
+        // registered business prints on its tax invoice.
+        gstRate: z.string(),
+        hsnCode: z
+            .string()
+            .refine(
+                (v) => v.trim() === "" || isHsnSac(v),
+                "An HSN code is 4 to 8 digits.",
+            ),
     })
     .refine(
         (v) =>
@@ -119,6 +129,8 @@ export function basicsFrom(p: ProductDetail): BasicsValues {
         price: trimMoney(p.price),
         mrp: p.mrp ? trimMoney(p.mrp) : "",
         categoryId: p.categoryId ?? "",
+        gstRate: rateOption(p.gstRate),
+        hsnCode: p.hsnCode ?? "",
     };
 }
 
@@ -129,6 +141,8 @@ export function basicsPatch(v: BasicsValues): ProductPatch {
         price: v.price.trim(),
         mrp: nullIfEmpty(v.mrp),
         categoryId: v.categoryId || null,
+        gstRate: v.gstRate || null,
+        hsnCode: nullIfEmpty(v.hsnCode.replace(/\s+/g, "")),
     };
 }
 

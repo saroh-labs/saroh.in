@@ -31,6 +31,7 @@ describe("viewWhere", () => {
     it("splits Issued from Overdue at now, with no overlap", () => {
         expect(viewWhere("issued", now)).toEqual({
             status: "ISSUED",
+            kind: { not: "CREDIT_NOTE" },
             OR: [{ dueAt: null }, { dueAt: { gte: now } }],
         });
         expect(viewWhere("overdue", now)).toEqual({

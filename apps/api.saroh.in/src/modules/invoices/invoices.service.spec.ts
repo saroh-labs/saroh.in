@@ -8,10 +8,13 @@ jest.mock("@saroh/database", () => {
             create: jest.fn(),
             updateMany: jest.fn(),
             findFirst: jest.fn(),
+            findUnique: jest.fn(),
+            aggregate: jest.fn(),
         },
         invoiceLine: { createMany: jest.fn(), deleteMany: jest.fn() },
         invoiceSequence: { upsert: jest.fn() },
         contact: { findFirst: jest.fn() },
+        businessProfile: { findUnique: jest.fn() },
     };
     return {
         ...actual,
@@ -23,6 +26,7 @@ jest.mock("@saroh/database", () => {
                 deleteMany: jest.fn(),
             },
             contact: { findFirst: jest.fn() },
+            businessProfile: { findUnique: jest.fn() },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
         },
@@ -44,12 +48,14 @@ import { validate } from "class-validator";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoiceInputDto, RecordPaymentDto } from "./dto";
 import { InvoicesService } from "./invoices.service";
+import { financialYear } from "./numbering";
 import { serializeInvoice } from "./serialize";
 
 type Mocked = Record<string, jest.Mock>;
 const db = prisma as unknown as {
     invoice: Mocked;
     contact: Mocked;
+    businessProfile: Mocked;
     $transaction: jest.Mock;
     __tx: Record<string, Mocked>;
 };
@@ -148,6 +154,9 @@ beforeEach(() => {
     });
     db.invoice.updateMany!.mockResolvedValue({ count: 1 });
     db.invoice.deleteMany!.mockResolvedValue({ count: 1 });
+    // Unregistered unless a test says otherwise: a receipt.
+    db.businessProfile.findUnique!.mockResolvedValue(null);
+    tx.businessProfile!.findUnique!.mockResolvedValue(null);
 });
 
 describe("drafts", () => {
@@ -255,6 +264,19 @@ describe("issuing", () => {
         status: "DRAFT",
         contactId: "c_1",
         dueAt: null,
+        tax: decimal("396"),
+        billToGstin: null,
+        billToState: null,
+        billToAddress: null,
+        lines: [
+            {
+                description: "Monthly membership",
+                quantity: 1,
+                unitPrice: decimal("1200"),
+                gstRate: null,
+                hsnSac: null,
+            },
+        ],
         ...over,
     });
     beforeEach(() => {
@@ -366,6 +388,9 @@ describe("the bill-to", () => {
         expect(view.billTo).toEqual({
             name: "Asha Rao",
             email: "asha@example.com",
+            gstin: null,
+            state: null,
+            address: null,
         });
     });
 });
@@ -423,6 +448,15 @@ describe("payments recorded by hand", () => {
     );
 });
 
+/** What the void reads under its transaction: an unregistered receipt. */
+const ISSUED_RECEIPT = {
+    status: "ISSUED",
+    kind: "INVOICE",
+    orderId: null,
+    bookingId: null,
+    sellerGstin: null,
+};
+
 describe("void and reissue", () => {
     const period = {
         source: "SUBSCRIPTION",
@@ -432,7 +466,7 @@ describe("void and reissue", () => {
     };
 
     beforeEach(() => {
-        tx.invoice!.findFirst!.mockResolvedValueOnce({ status: "ISSUED" });
+        tx.invoice!.findFirst!.mockResolvedValueOnce(ISSUED_RECEIPT);
         tx.invoice!.findFirst!.mockResolvedValueOnce({
             contactId: "c_1",
             currency: "INR",
@@ -497,7 +531,10 @@ describe("void and reissue", () => {
 
     it("refuses to void a draft", async () => {
         tx.invoice!.findFirst!.mockReset();
-        tx.invoice!.findFirst!.mockResolvedValue({ status: "DRAFT" });
+        tx.invoice!.findFirst!.mockResolvedValue({
+            ...ISSUED_RECEIPT,
+            status: "DRAFT",
+        });
         await expect(
             service.voidInvoice(owner, "inv_1", { reason: "x" }),
         ).rejects.toBeInstanceOf(ConflictException);
@@ -703,6 +740,328 @@ describe("what the API accepts", () => {
         const dto = plainToInstance(RecordPaymentDto, { method: "CHEQUE" });
         expect((await validate(dto)).map((e) => e.property)).toContain(
             "method",
+        );
+    });
+});
+
+describe("GST (ADR-008)", () => {
+    /** Rye & Co.: GST-registered in Karnataka. */
+    const RYE_PROFILE = {
+        gstRegistered: true,
+        gstState: "29",
+        taxId: "29AAGCR4375J1ZU",
+        invoicePrefix: "RC",
+        timezone: "Asia/Kolkata",
+        deliveryGstRate: decimal("18"),
+        deliverySacCode: "996813",
+    };
+    const registered = () => {
+        db.businessProfile.findUnique!.mockResolvedValue(RYE_PROFILE);
+        tx.businessProfile!.findUnique!.mockResolvedValue(RYE_PROFILE);
+    };
+
+    it("a Karnataka business billing a Goa café writes IGST, not CGST + SGST", async () => {
+        registered();
+        await service.createDraft(owner, {
+            contactId: "c_1",
+            currency: "INR",
+            billToGstin: "30AAACR5055K1ZK",
+            lines: [
+                {
+                    description: "Croissants (trade)",
+                    quantity: 40,
+                    unitPrice: "59",
+                    gstRate: "18",
+                    hsnSac: "19059020",
+                },
+            ],
+        } as InvoiceInputDto);
+        const data = tx.invoice!.create!.mock.calls[0]![0].data;
+        expect(data).toEqual(
+            expect.objectContaining({
+                billToGstin: "30AAACR5055K1ZK",
+                // The state comes with the GSTIN.
+                billToState: "30",
+                placeOfSupply: "30",
+                taxType: "INTER",
+                sellerGstin: "29AAGCR4375J1ZU",
+                subtotal: "2000.00",
+                tax: "360.00",
+                igst: "360.00",
+                cgst: "0.00",
+                total: "2360.00",
+            }),
+        );
+        expect(tx.invoiceLine!.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    hsnSac: "19059020",
+                    gstRate: "18",
+                    taxableValue: "2000.00",
+                    igst: "360.00",
+                }),
+            ],
+        });
+    });
+
+    it("ignores a typed tax on a tax invoice: GST is in the price", async () => {
+        registered();
+        await service.createDraft(owner, {
+            ...DRAFT_INPUT,
+            lines: [
+                {
+                    description: "Almond croissant",
+                    quantity: 1,
+                    unitPrice: "118",
+                    gstRate: "18",
+                },
+            ],
+        } as InvoiceInputDto);
+        const data = tx.invoice!.create!.mock.calls[0]![0].data;
+        expect(data).toEqual(
+            expect.objectContaining({
+                subtotal: "100.00",
+                tax: "18.00",
+                cgst: "9.00",
+                sgst: "9.00",
+                total: "118.00",
+                taxType: "INTRA",
+            }),
+        );
+    });
+
+    it("refuses an invalid GSTIN for the buyer, on its field", async () => {
+        const attempt = service.createDraft(owner, {
+            ...DRAFT_INPUT,
+            billToGstin: "29AAGCR4375J1ZX",
+        } as InvoiceInputDto);
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toMatchObject({
+            response: { details: { field: "billToGstin" } },
+        });
+        expect(tx.invoice!.create).not.toHaveBeenCalled();
+    });
+
+    it("refuses a rate GST does not have", async () => {
+        registered();
+        await expect(
+            service.createDraft(owner, {
+                ...DRAFT_INPUT,
+                lines: [
+                    {
+                        description: "x",
+                        quantity: 1,
+                        unitPrice: "10",
+                        gstRate: "7",
+                    },
+                ],
+            } as InvoiceInputDto),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("numbers a registered business's invoice in its financial-year series", async () => {
+        registered();
+        tx.invoice!.findFirst!.mockResolvedValue({
+            status: "DRAFT",
+            contactId: "c_1",
+            dueAt: null,
+            tax: decimal("0"),
+            billToGstin: null,
+            billToState: null,
+            billToAddress: null,
+            lines: [
+                {
+                    description: "Almond croissant",
+                    quantity: 1,
+                    unitPrice: decimal("118"),
+                    gstRate: decimal("18"),
+                    hsnSac: "19059020",
+                },
+            ],
+        });
+        await service.issue(owner, "inv_1");
+        const fy = financialYear(new Date());
+        expect(tx.invoiceSequence!.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId_series: {
+                        organizationId: "org_1",
+                        series: `RC/${fy}`,
+                    },
+                },
+            }),
+        );
+        const data = tx.invoice!.updateMany!.mock.calls[0]![0].data;
+        expect(data.number).toBe(`RC/${fy}/0001`);
+        expect(data.sellerGstin).toBe("29AAGCR4375J1ZU");
+        expect(data.cgst).toBe("9.00");
+    });
+
+    it("an unregistered business issues a receipt with no GST columns", async () => {
+        tx.invoice!.findFirst!.mockResolvedValue({
+            status: "DRAFT",
+            contactId: "c_1",
+            dueAt: null,
+            tax: decimal("0"),
+            billToGstin: null,
+            billToState: null,
+            billToAddress: null,
+            lines: [
+                {
+                    description: "Personal training",
+                    quantity: 4,
+                    unitPrice: decimal("1500"),
+                    gstRate: null,
+                    hsnSac: null,
+                },
+            ],
+        });
+        await service.issue(owner, "inv_1");
+        const data = tx.invoice!.updateMany!.mock.calls[0]![0].data;
+        expect(data.number).toBe("INV-0001");
+        expect(data.sellerGstin).toBeNull();
+        expect(data.taxType).toBeNull();
+        const lines = tx.invoiceLine!.createMany!.mock.calls[0]![0].data;
+        expect(lines[0]).toEqual(
+            expect.objectContaining({
+                gstRate: null,
+                hsnSac: null,
+                taxableValue: null,
+            }),
+        );
+    });
+
+    it("refuses to void a registered business's issued invoice", async () => {
+        tx.invoice!.findFirst!.mockResolvedValue({
+            ...ISSUED_RECEIPT,
+            sellerGstin: "29AAGCR4375J1ZU",
+        });
+        const attempt = service.voidInvoice(owner, "inv_1", { reason: "x" });
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toThrow(/credit note/);
+        expect(tx.invoice!.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses to void once registered, even a receipt from before", async () => {
+        registered();
+        tx.invoice!.findFirst!.mockResolvedValue(ISSUED_RECEIPT);
+        await expect(
+            service.voidInvoice(owner, "inv_1", { reason: "x" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(tx.invoice!.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses to void or reissue an order's invoice", async () => {
+        tx.invoice!.findFirst!.mockResolvedValue({
+            ...ISSUED_RECEIPT,
+            orderId: "o_1",
+        });
+        await expect(
+            service.reissue(owner, "inv_1", { reason: "x" }),
+        ).rejects.toThrow(/order/);
+        expect(tx.invoice!.updateMany).not.toHaveBeenCalled();
+    });
+
+    const orderInvoice = () =>
+        row({
+            status: "PAID",
+            number: "RC/26-27/0001",
+            orderId: "o_1",
+            order: { id: "o_1", orderId: "ORD-001" },
+            source: "ORDER",
+        });
+
+    it("an order's invoice has no pay link and is not paid here", async () => {
+        db.invoice.findFirst!.mockResolvedValue({
+            ...orderInvoice(),
+            status: "ISSUED",
+        });
+        await expect(service.createPayLink(owner, "inv_1")).rejects.toThrow(
+            /order ORD-001/,
+        );
+        await expect(
+            service.recordPayment(owner, "inv_1", {
+                method: "CASH",
+            } as RecordPaymentDto),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("an order's invoice is credited through the order, not here", async () => {
+        db.invoice.findFirst!.mockResolvedValue(orderInvoice());
+        await expect(
+            service.credit(owner, "inv_1", { reason: "x" }),
+        ).rejects.toThrow(/Use the order/);
+    });
+
+    it("cancels an issued invoice with a credit note for all of it, leaving it CREDITED", async () => {
+        db.invoice.findFirst!.mockResolvedValue(
+            row({ status: "ISSUED", number: "RC/26-27/0004" }),
+        );
+        registered();
+        tx.invoice!.findUnique!.mockResolvedValue({
+            id: "inv_1",
+            organizationId: "org_1",
+            orderId: null,
+            currency: "INR",
+            status: "ISSUED",
+            sellerGstin: "29AAGCR4375J1ZU",
+            sellerState: "29",
+            placeOfSupply: "30",
+            taxType: "INTER",
+            tax: decimal("360"),
+            total: decimal("2360"),
+            billToName: "Café Goa",
+            billToEmail: "cafe@goa.in",
+            billToAddress: null,
+            billToState: "30",
+            billToGstin: "30AAACR5055K1ZK",
+            contactId: "c_1",
+            lines: [
+                {
+                    description: "Croissants (trade)",
+                    quantity: 40,
+                    unitPrice: decimal("59"),
+                    amount: decimal("2360"),
+                    gstRate: decimal("18"),
+                    hsnSac: "19059020",
+                    orderItemId: null,
+                },
+            ],
+        });
+        tx.invoice!.aggregate!.mockResolvedValue({ _sum: { total: null } });
+        tx.invoice!.create!.mockResolvedValue({ id: "cn_1" });
+
+        await service.credit(owner, "inv_1", { reason: "Order cancelled" });
+
+        const data = tx.invoice!.create!.mock.calls[0]![0].data;
+        expect(data).toEqual(
+            expect.objectContaining({
+                kind: "CREDIT_NOTE",
+                relatedInvoiceId: "inv_1",
+                total: "2360.00",
+                igst: "360.00",
+                placeOfSupply: "30",
+                dueAt: null,
+            }),
+        );
+        expect(data.number).toMatch(/^RCCN\//);
+        expect(tx.invoice!.updateMany).toHaveBeenCalledWith({
+            where: { id: "inv_1", status: { in: ["ISSUED", "PAID"] } },
+            data: { status: "CREDITED", payTokenHash: null },
+        });
+    });
+
+    it("what is owed leaves out an order's invoices and credit notes", async () => {
+        db.invoice.findMany!.mockResolvedValue([]);
+        await service.owed(owner, { contactId: "c_1" });
+        expect(db.invoice.findMany!.mock.calls[0]![0].where).toEqual(
+            expect.objectContaining({
+                status: "ISSUED",
+                orderId: null,
+                kind: { not: "CREDIT_NOTE" },
+                contactId: "c_1",
+            }),
         );
     });
 });

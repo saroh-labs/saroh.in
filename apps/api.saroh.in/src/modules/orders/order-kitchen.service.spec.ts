@@ -31,6 +31,25 @@ const mockDb = {
     locks: 0,
 };
 
+// The order's invoice (ADR-008, U5) has its own specs; here the business
+// is unregistered and the invoice writes are recorded, not run.
+jest.mock("../invoices/order-invoicing", () => ({
+    loadTaxProfile: jest.fn().mockResolvedValue({
+        registered: false,
+        gstin: null,
+        state: null,
+        prefix: null,
+        timezone: null,
+        deliveryRateBps: 1800,
+        deliverySac: null,
+    }),
+    ensureOrderInvoice: jest.fn().mockResolvedValue(null),
+    creditRestOfOrder: jest.fn().mockResolvedValue(undefined),
+    correctOrderInvoiceForEdit: jest
+        .fn()
+        .mockResolvedValue({ supplementary: null, creditNote: null }),
+}));
+
 jest.mock("@saroh/database", () => {
     const pick = <T extends Record<string, unknown>>(row: T) => ({ ...row });
     const orderWith = () => {
@@ -191,6 +210,7 @@ jest.mock("@saroh/database", () => {
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { correctOrderInvoiceForEdit } from "../invoices/order-invoicing";
 import type { PaymentsService } from "../payments/payments.service";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { UNDO_WINDOW_MS } from "./order-stage";
@@ -435,6 +455,22 @@ describe("editing before preparing", () => {
             kind: "EDIT",
             amountCents: 12000,
         });
+        // The issued invoice is never edited: the added units go on a
+        // supplementary invoice, settled once the difference is paid.
+        expect(correctOrderInvoiceForEdit).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                orderId: "order_1",
+                changes: [
+                    expect.objectContaining({
+                        orderItemId: "li_1",
+                        deltaQuantity: 1,
+                        unitCents: 12000,
+                    }),
+                ],
+                settled: false,
+            }),
+        );
     });
 
     it("a quantity down refunds the difference and releases the stock", async () => {
@@ -451,6 +487,18 @@ describe("editing before preparing", () => {
             `order-edit:${result.eventId}`,
         );
         expect(result.refund?.refundId).toBe("rf_edit");
+        // Down: a credit note for the removed units.
+        expect(correctOrderInvoiceForEdit).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                changes: [
+                    expect.objectContaining({
+                        orderItemId: "li_1",
+                        deltaQuantity: -1,
+                    }),
+                ],
+            }),
+        );
     });
 
     it("an unpaid order just costs the new total — no money moves", async () => {

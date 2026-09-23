@@ -182,6 +182,11 @@ module.exports = {
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
         // U13: the invoice pay link (make, replace, revoke, read).
         "<rootDir>/src/modules/invoices/pay-link.spec.ts",
+        // U5 GST: the tax maths, the states and GSTINs, and the order
+        // invoice builder — pure.
+        "<rootDir>/src/modules/invoices/gst.spec.ts",
+        "<rootDir>/src/modules/invoices/gst-states.spec.ts",
+        "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.

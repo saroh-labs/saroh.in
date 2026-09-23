@@ -1,10 +1,12 @@
 import { Transform, Type } from "class-transformer";
 import {
+    IsBoolean,
     IsEmail,
     IsIn,
     IsOptional,
     IsString,
     IsUrl,
+    Matches,
     MaxLength,
     MinLength,
     ValidateNested,
@@ -105,6 +107,46 @@ export class OnboardOrganizationDto {
 }
 
 /**
+ * The business's GST settings (ADR-008). Owner/Admin, like the rest of the
+ * profile (`org:update`). The GSTIN is the profile's `taxId`; switching
+ * registration on checks it (shape, state, check character) against the
+ * state. "" clears a text field.
+ */
+export class TaxSettingsDto {
+    @IsOptional()
+    @IsBoolean()
+    registered?: boolean;
+
+    /** A GST state code ("29") or its name ("Karnataka"). */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(60)
+    state?: string;
+
+    /** One to three capitals or digits: RC → RC/26-27/0001. */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim() : value,
+    )
+    @IsString()
+    @MaxLength(10)
+    invoicePrefix?: string;
+
+    /** The GST rate on delivery, in percent. */
+    @IsOptional()
+    @Transform(trim)
+    @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
+    deliveryRate?: string;
+
+    /** The SAC code delivery is billed under; "" clears it. */
+    @IsOptional()
+    @Transform(trim)
+    @Matches(/^(\d{4,8})?$/, { message: "A SAC code is 4 to 8 digits" })
+    deliverySac?: string;
+}
+
+/**
  * Payload for `PATCH /organizations/:organizationId`. Both fields are optional
  * so a caller can rename the org, edit the business profile, or both.
  *
@@ -127,4 +169,10 @@ export class UpdateOrganizationDto {
     @ValidateNested()
     @Type(() => BusinessProfileDto)
     profile?: BusinessProfileDto;
+
+    /** GST (ADR-008): registration, state, invoice prefix, delivery rate. */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => TaxSettingsDto)
+    tax?: TaxSettingsDto;
 }

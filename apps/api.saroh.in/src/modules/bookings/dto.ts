@@ -8,10 +8,12 @@ import {
     IsISO8601,
     IsOptional,
     IsString,
+    Matches,
     Max,
     MaxLength,
     Min,
     MinLength,
+    ValidateIf,
     ValidateNested,
 } from "class-validator";
 
@@ -92,6 +94,22 @@ export class CreateServiceDto {
     @MaxLength(3)
     currency?: string;
 
+    /**
+     * GST the price includes, in percent (ADR-008): on a registered
+     * business's tax invoice. Checked against GST's rates in the service.
+     * null clears it.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
+    gstRate?: string | null;
+
+    /** SAC code: four to eight digits. null clears it. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{4,8}$/, { message: "A SAC code is 4 to 8 digits" })
+    sacCode?: string | null;
+
     /** IANA timezone, e.g. "Asia/Kolkata". Validated against the tz database in the service. */
     @IsString()
     @MinLength(1)
@@ -165,6 +183,22 @@ export class UpdateServiceDto {
     @IsString()
     @MaxLength(3)
     currency?: string;
+
+    /**
+     * GST the price includes, in percent (ADR-008): on a registered
+     * business's tax invoice. Checked against GST's rates in the service.
+     * null clears it.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
+    gstRate?: string | null;
+
+    /** SAC code: four to eight digits. null clears it. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{4,8}$/, { message: "A SAC code is 4 to 8 digits" })
+    sacCode?: string | null;
 
     @IsOptional()
     @IsString()

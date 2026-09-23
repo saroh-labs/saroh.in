@@ -2,12 +2,31 @@
 // comes off, records it in the order's own transaction, and refuses rather
 // than charging full price. The real DiscountsService runs against a mocked
 // database, so the order and discount halves are tested together.
+// The order's invoice (ADR-008, U5) has its own specs; here the business
+// is unregistered and the invoice writes are recorded, not run.
+jest.mock("../invoices/order-invoicing", () => ({
+    loadTaxProfile: jest.fn().mockResolvedValue({
+        registered: false,
+        gstin: null,
+        state: null,
+        prefix: null,
+        timezone: null,
+        deliveryRateBps: 1800,
+        deliverySac: null,
+    }),
+    ensureOrderInvoice: jest.fn().mockResolvedValue(null),
+    creditRestOfOrder: jest.fn().mockResolvedValue(undefined),
+    correctOrderInvoiceForEdit: jest
+        .fn()
+        .mockResolvedValue({ supplementary: null, creditNote: null }),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
         order: { create: jest.fn(), count: jest.fn() },
         customer: { findFirst: jest.fn() },
-        product: { findFirst: jest.fn() },
+        product: { findFirst: jest.fn(), findMany: jest.fn() },
         inventory: { findUnique: jest.fn(), update: jest.fn() },
         storeSettings: { findUnique: jest.fn() },
         discount: { findUnique: jest.fn() },
@@ -30,6 +49,7 @@ import { Prisma, prisma } from "@saroh/database";
 
 import type { ActivationEvents } from "../analytics/activation-events";
 import { DiscountsService } from "../discounts/discounts.service";
+import { loadTaxProfile } from "../invoices/order-invoicing";
 import type { StoresService } from "../stores/stores.service";
 import { OrdersService } from "./orders.service";
 
@@ -90,6 +110,39 @@ beforeEach(() => {
 });
 
 const createData = () => db.order!.create!.mock.calls[0][0].data;
+
+describe("OrdersService.create — a GST-registered business (ADR-008)", () => {
+    it("ignores the storefront's add-on tax: GST is in the price, and tax records it", async () => {
+        (loadTaxProfile as jest.Mock).mockResolvedValueOnce({
+            registered: true,
+            gstin: "29AAGCR4375J1ZU",
+            state: "29",
+            prefix: "RC",
+            timezone: "Asia/Kolkata",
+            deliveryRateBps: 1800,
+            deliverySac: null,
+        });
+        db.product!.findMany!.mockResolvedValue([
+            { id: "p_1", gstRate: "18.00" },
+        ]);
+        await makeService().create("st_1", "u_1", { ...DTO, tax: "7.20" });
+        // 2 × ₹20 at 18% inclusive: ₹33.90 + ₹6.10. Nothing added on top.
+        expect(createData()).toMatchObject({
+            subtotal: "40.00",
+            tax: "6.10",
+            total: "40.00",
+        });
+    });
+
+    it("an unregistered business still adds the tax typed at checkout", async () => {
+        await makeService().create("st_1", "u_1", { ...DTO, tax: "7.20" });
+        expect(createData()).toMatchObject({
+            subtotal: "40.00",
+            tax: "7.20",
+            total: "47.20",
+        });
+    });
+});
 
 describe("OrdersService.create — discount codes", () => {
     it("takes off what the API works out and records the redemption with its rule", async () => {

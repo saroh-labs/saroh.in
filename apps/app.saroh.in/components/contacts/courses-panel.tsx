@@ -17,6 +17,7 @@ const STANDING_WORD = {
     OVERDUE: "overdue",
     PAID: "paid",
     VOID: "void",
+    CREDITED: "credited",
 } as const;
 
 /**

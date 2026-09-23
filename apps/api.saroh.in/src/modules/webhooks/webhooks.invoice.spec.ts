@@ -294,6 +294,7 @@ describe("webhook refund on an invoice intent", () => {
     it("records the refund and leaves the invoice's status alone", async () => {
         intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
         refundFindFirst.mockResolvedValue(null);
+        refundCreate.mockResolvedValue({ id: "rf_1" });
 
         const result = await deliver(
             bodyOf({

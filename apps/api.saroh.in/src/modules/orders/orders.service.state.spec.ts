@@ -3,6 +3,25 @@
 // callback against a tx stub whose delegates are the same jest mocks, so we can
 // assert whether the order write happened — or, for an illegal transition, that
 // it never did.
+// The order's invoice (ADR-008, U5) has its own specs; here the business
+// is unregistered and the invoice writes are recorded, not run.
+jest.mock("../invoices/order-invoicing", () => ({
+    loadTaxProfile: jest.fn().mockResolvedValue({
+        registered: false,
+        gstin: null,
+        state: null,
+        prefix: null,
+        timezone: null,
+        deliveryRateBps: 1800,
+        deliverySac: null,
+    }),
+    ensureOrderInvoice: jest.fn().mockResolvedValue(null),
+    creditRestOfOrder: jest.fn().mockResolvedValue(undefined),
+    correctOrderInvoiceForEdit: jest
+        .fn()
+        .mockResolvedValue({ supplementary: null, creditNote: null }),
+}));
+
 jest.mock("@saroh/database", () => {
     const order = {
         findFirst: jest.fn(),
@@ -35,6 +54,10 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { ActivationEvents } from "../analytics/activation-events";
+import {
+    creditRestOfOrder,
+    ensureOrderInvoice,
+} from "../invoices/order-invoicing";
 import type { StoresService } from "../stores/stores.service";
 import { OrdersService } from "./orders.service";
 
@@ -146,6 +169,33 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
                 data: expect.objectContaining({ paymentStatus: "PAID" }),
             }),
         );
+        // Paid by hand: the order's invoice is made in the same
+        // transaction, the way a payment webhook would (ADR-008).
+        expect(ensureOrderInvoice).toHaveBeenCalledWith(
+            expect.anything(),
+            ORDER,
+            { method: "RECORDED" },
+        );
+    });
+
+    it("a refund recorded by hand credits what is left of the invoice", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "DELIVERED",
+            paymentStatus: "PAID",
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+        await service.updateStatus(STORE, ORDER, USER, {
+            paymentStatus: "REFUNDED",
+        });
+        expect(creditRestOfOrder).toHaveBeenCalledWith(
+            expect.anything(),
+            ORDER,
+            "Refunded",
+            USER,
+        );
+        expect(ensureOrderInvoice).not.toHaveBeenCalled();
     });
 
     it("is idempotent: re-setting the SAME status is a no-op change, not rejected", async () => {
