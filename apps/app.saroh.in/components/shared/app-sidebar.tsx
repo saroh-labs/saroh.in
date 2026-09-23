@@ -16,6 +16,7 @@ import {
     isNavSectionActive,
     navCountFor,
     navFor,
+    navPathname,
     showsGroupLabel,
 } from "@/components/shared/nav-items";
 
@@ -77,8 +78,8 @@ export function AppSidebar({
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
 }) {
-    const pathname = usePathname();
     const groups = navFor({ role, actions, moduleKeys });
+    const pathname = navPathname(usePathname(), groups);
     const iconRail = useIconRail();
     const [flyoutFor, setFlyoutFor] = useState<string | null>(null);
 

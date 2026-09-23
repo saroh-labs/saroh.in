@@ -10,6 +10,7 @@ import {
     isNavSectionActive,
     navCountFor,
     navFor,
+    navPathname,
     navRoleCan,
     navRowsForModule,
 } from "@/components/shared/nav-items";
@@ -799,5 +800,30 @@ describe("navCountFor", () => {
         expect(navCountFor("/leads", { "/leads": 4 }, 2)).toBe(4);
         expect(navCountFor("/leads", undefined, 2)).toBe(0);
         expect(navCountFor(undefined, { "/leads": 4 }, 2)).toBe(0);
+    });
+});
+
+describe("Customer Detail sits in the section that holds customers (U18)", () => {
+    const groupsWith = (moduleKeys: string[]) =>
+        navFor({ role: "OWNER", moduleKeys });
+
+    it("is Sell › Customers where the business sells", () => {
+        const groups = groupsWith(["CRM", "COMMERCE"]);
+        expect(navPathname("/customers/c_1", groups)).toBe(
+            "/commerce/customers",
+        );
+    });
+
+    it("is Contacts where it takes bookings and sells nothing", () => {
+        const groups = groupsWith(["CRM", "APPOINTMENTS"]);
+        expect(navPathname("/customers/c_1", groups)).toBe("/contacts");
+    });
+
+    it("leaves every other address as it is", () => {
+        const groups = groupsWith(["CRM", "COMMERCE"]);
+        expect(navPathname("/commerce/orders/o_1", groups)).toBe(
+            "/commerce/orders/o_1",
+        );
+        expect(navPathname("/customers", groups)).toBe("/customers");
     });
 });
