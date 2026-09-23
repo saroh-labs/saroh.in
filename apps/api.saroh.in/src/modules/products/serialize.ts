@@ -92,6 +92,13 @@ export interface ProductListItemDto extends ProductDto {
     variantCount: number;
     /** The first variant's SKU; `null` for a product with no variants. */
     sku: string | null;
+    /** What an order line can be for: each variant, with its own price. */
+    variants: {
+        id: string;
+        sku: string;
+        title: string;
+        price: string | null;
+    }[];
     inventory: { quantity: number; lowStockAlert: number } | null;
 }
 
@@ -274,7 +281,12 @@ export function serializeProduct(product: RawProduct): ProductDto {
 
 interface RawProductListItem extends RawProduct {
     _count: { variants: number };
-    variants: { sku: string }[];
+    variants: {
+        id: string;
+        sku: string;
+        title: string;
+        price: DecimalLike | null;
+    }[];
     inventory: { quantity: number; lowStockAlert: number } | null;
 }
 
@@ -285,6 +297,12 @@ export function serializeProductListItem(
         ...serializeProduct(product),
         variantCount: product._count.variants,
         sku: product.variants[0]?.sku ?? null,
+        variants: product.variants.map((v) => ({
+            id: v.id,
+            sku: v.sku,
+            title: v.title,
+            price: v.price ? toMoneyString(v.price) : null,
+        })),
         inventory: product.inventory
             ? {
                   quantity: product.inventory.quantity,

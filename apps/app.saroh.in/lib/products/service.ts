@@ -32,6 +32,13 @@ export interface ProductListItem extends Product {
     updatedAt: string;
     variantCount: number;
     sku: string | null;
+    /** Each variant an order line can be for, with its own price if any. */
+    variants: {
+        id: string;
+        sku: string;
+        title: string;
+        price: string | null;
+    }[];
     inventory: { quantity: number; lowStockAlert: number } | null;
 }
 

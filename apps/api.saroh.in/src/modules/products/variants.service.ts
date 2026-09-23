@@ -1,18 +1,34 @@
 import {
+    BadRequestException,
     ConflictException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { assertMrpAtOrAbovePrice } from "./product-rules";
 import { ProductsService } from "./products.service";
 import { serializeVariant } from "./serialize";
-import type { CreateVariantDto, UpdateVariantDto } from "./variants.dto";
+import type {
+    CreateVariantDto,
+    ReorderVariantsDto,
+    UpdateVariantDto,
+} from "./variants.dto";
+
+const SKU_TAKEN = {
+    message: "Another variant already has this SKU.",
+    field: "sku",
+};
 
 /**
  * Product variants (SKUs). Scoped to a product within a store; authorization
  * and product-existence are delegated to ProductsService. SKU is unique per
  * product (@@unique([productId, sku])).
+ *
+ * Products v2 (#462): a variant can carry its value of the product's option,
+ * one of the product's photos, its own MRP and a position. Once the product
+ * counts stock per variant, a new variant starts with its own count of 0, and
+ * a variant with stock promised to open orders cannot be removed.
  */
 @Injectable()
 export class VariantsService {
@@ -22,7 +38,8 @@ export class VariantsService {
         await this.products.assertProductReadable(storeId, productId, userId);
         const variants = await prisma.productVariant.findMany({
             where: { productId },
-            orderBy: { createdAt: "asc" },
+            orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+            include: { inventory: true },
         });
         return variants.map(serializeVariant);
     }
@@ -33,23 +50,54 @@ export class VariantsService {
         userId: string,
         dto: CreateVariantDto,
     ) {
-        await this.products.assertProductWritable(storeId, productId, userId);
+        const organizationId = await this.products.assertProductWritable(
+            storeId,
+            productId,
+            userId,
+        );
+        await this.assertCoherent(productId, dto);
+
+        const [last, perVariant] = await Promise.all([
+            prisma.productVariant.findFirst({
+                where: { productId },
+                orderBy: { position: "desc" },
+                select: { position: true },
+            }),
+            this.countsPerVariant(productId),
+        ]);
         try {
-            const variant = await prisma.productVariant.create({
-                data: {
-                    productId,
-                    sku: dto.sku,
-                    title: dto.title,
-                    price: dto.price ?? null,
-                    image: dto.image ?? null,
-                },
+            const variant = await prisma.$transaction(async (tx) => {
+                const created = await tx.productVariant.create({
+                    data: {
+                        productId,
+                        sku: dto.sku,
+                        title: dto.title,
+                        price: dto.price ?? null,
+                        mrp: dto.mrp ?? null,
+                        image: dto.image ?? null,
+                        optionValueId: dto.optionValueId ?? null,
+                        imageId: dto.imageId ?? null,
+                        position: (last?.position ?? -1) + 1,
+                    },
+                });
+                // A product counting per variant counts every variant: a new
+                // one starts at nothing on hand rather than untracked.
+                if (perVariant && organizationId) {
+                    await tx.variantInventory.create({
+                        data: {
+                            variantId: created.id,
+                            productId,
+                            organizationId,
+                        },
+                    });
+                }
+                return created;
             });
             return { id: variant.id };
-        } catch {
-            throw new ConflictException({
-                message: "That SKU already exists for this product",
-                field: "sku",
-            });
+        } catch (error) {
+            if (isUniqueViolation(error))
+                throw new ConflictException(SKU_TAKEN);
+            throw error;
         }
     }
 
@@ -68,6 +116,7 @@ export class VariantsService {
         if (!variant) {
             throw new NotFoundException("Variant not found");
         }
+        await this.assertCoherent(productId, dto);
         try {
             await prisma.productVariant.update({
                 where: { id: variantId },
@@ -75,16 +124,53 @@ export class VariantsService {
                     sku: dto.sku,
                     title: dto.title,
                     price: dto.price ?? null,
+                    mrp: dto.mrp ?? null,
                     image: dto.image ?? null,
+                    optionValueId: dto.optionValueId ?? null,
+                    imageId: dto.imageId ?? null,
                 },
             });
             return { id: variantId };
-        } catch {
-            throw new ConflictException({
-                message: "That SKU already exists for this product",
-                field: "sku",
+        } catch (error) {
+            if (isUniqueViolation(error))
+                throw new ConflictException(SKU_TAKEN);
+            throw error;
+        }
+    }
+
+    /** Put the variants in the order given; every variant, each once. */
+    async reorder(
+        storeId: string,
+        productId: string,
+        userId: string,
+        dto: ReorderVariantsDto,
+    ) {
+        await this.products.assertProductWritable(storeId, productId, userId);
+        const current = await prisma.productVariant.findMany({
+            where: { productId },
+            select: { id: true },
+        });
+        const known = new Set(current.map((v) => v.id));
+        const given = new Set(dto.ids);
+        if (
+            given.size !== dto.ids.length ||
+            given.size !== known.size ||
+            dto.ids.some((id) => !known.has(id))
+        ) {
+            throw new BadRequestException({
+                message: "List every variant of this product once.",
+                field: "ids",
             });
         }
+        await prisma.$transaction(
+            dto.ids.map((id, position) =>
+                prisma.productVariant.update({
+                    where: { id },
+                    data: { position },
+                }),
+            ),
+        );
+        return this.list(storeId, productId, userId);
     }
 
     async remove(
@@ -93,15 +179,134 @@ export class VariantsService {
         variantId: string,
         userId: string,
     ) {
-        await this.products.assertProductWritable(storeId, productId, userId);
+        const organizationId = await this.products.assertProductWritable(
+            storeId,
+            productId,
+            userId,
+        );
         const variant = await prisma.productVariant.findFirst({
             where: { id: variantId, productId },
-            select: { id: true },
+            select: {
+                id: true,
+                title: true,
+                inventory: {
+                    select: {
+                        quantity: true,
+                        reserved: true,
+                        lowStockAlert: true,
+                    },
+                },
+            },
         });
         if (!variant) {
             throw new NotFoundException("Variant not found");
         }
-        await prisma.productVariant.delete({ where: { id: variantId } });
+        // Stock promised to an open order is a promise to a customer: the
+        // variant stays until those orders are fulfilled or cancelled.
+        if (variant.inventory && variant.inventory.reserved > 0) {
+            throw new ConflictException({
+                message: `${variant.title} has ${variant.inventory.reserved} promised to open orders, so it can't be removed yet.`,
+                field: "variantId",
+            });
+        }
+
+        await prisma.$transaction(async (tx) => {
+            await tx.productVariant.delete({ where: { id: variantId } });
+            // The last variant counting its own stock takes its count back to
+            // the product, so the product does not silently lose its stock.
+            if (variant.inventory) {
+                const others = await tx.variantInventory.count({
+                    where: { productId },
+                });
+                if (others === 0) {
+                    const row = await tx.inventory.findUnique({
+                        where: { productId },
+                        select: { id: true },
+                    });
+                    const back = {
+                        quantity: { increment: variant.inventory.quantity },
+                        lowStockAlert: variant.inventory.lowStockAlert,
+                    };
+                    if (row) {
+                        await tx.inventory.update({
+                            where: { productId },
+                            data: back,
+                        });
+                    } else {
+                        await tx.inventory.create({
+                            data: {
+                                storeId,
+                                organizationId,
+                                productId,
+                                quantity: variant.inventory.quantity,
+                                lowStockAlert: variant.inventory.lowStockAlert,
+                            },
+                        });
+                    }
+                }
+            }
+        });
         return { id: variantId };
     }
+
+    /** Whether the product already counts stock per variant. */
+    private async countsPerVariant(productId: string): Promise<boolean> {
+        return (
+            (await prisma.variantInventory.count({ where: { productId } })) > 0
+        );
+    }
+
+    /**
+     * A variant's option value belongs to the product's option, its photo is
+     * one of the product's own, and its MRP is not below what it sells for.
+     */
+    private async assertCoherent(
+        productId: string,
+        dto: CreateVariantDto,
+    ): Promise<void> {
+        const product = await prisma.product.findUniqueOrThrow({
+            where: { id: productId },
+            select: { price: true, mrp: true, optionId: true },
+        });
+        if (dto.optionValueId) {
+            const value = await prisma.productOptionValue.findFirst({
+                where: {
+                    id: dto.optionValueId,
+                    optionId: product.optionId ?? "__none__",
+                },
+                select: { id: true },
+            });
+            if (!value) {
+                throw new BadRequestException({
+                    message: product.optionId
+                        ? "Pick one of this product's option values."
+                        : "Choose what customers pick by first (Size, Shade…).",
+                    field: "optionValueId",
+                });
+            }
+        }
+        if (dto.imageId) {
+            const image = await prisma.productImage.findFirst({
+                where: { id: dto.imageId, productId },
+                select: { id: true },
+            });
+            if (!image) {
+                throw new BadRequestException({
+                    message: "Pick one of this product's photos.",
+                    field: "imageId",
+                });
+            }
+        }
+        const price = dto.price ?? product.price.toString();
+        const mrp = dto.mrp ?? product.mrp?.toString() ?? null;
+        assertMrpAtOrAbovePrice(price, mrp, dto.mrp ? "mrp" : "price");
+    }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+    return (
+        typeof error === "object" &&
+        error !== null &&
+        (error as { code?: unknown }).code === "P2002"
+    );
 }

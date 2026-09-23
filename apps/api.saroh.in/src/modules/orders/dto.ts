@@ -40,6 +40,12 @@ export class OrderItemInput {
     @IsString()
     productId!: string;
 
+    /** Required when the product has variants: the one being bought. */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    variantId?: string;
+
     @Type(() => Number)
     @IsInt({ message: "Quantity must be a whole number" })
     @Min(1, { message: "Quantity must be at least 1" })

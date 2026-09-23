@@ -21,6 +21,34 @@ interface ProductLite {
     id: string;
     name: string;
     price: string;
+    variants?: { id: string; title: string; price: string | null }[];
+}
+
+/**
+ * What a line can be for. A product with variants is bought as one of them
+ * — "Linen Wrap Dress · M" — at that variant's price, so each is its own
+ * choice; the key carries both ids ("product:variant") to the submit.
+ */
+interface Sellable {
+    key: string;
+    productId: string;
+    variantId?: string;
+    label: string;
+    price: string;
+}
+
+function sellablesOf(products: ProductLite[]): Sellable[] {
+    return products.flatMap((p) =>
+        p.variants && p.variants.length > 0
+            ? p.variants.map((v) => ({
+                  key: `${p.id}:${v.id}`,
+                  productId: p.id,
+                  variantId: v.id,
+                  label: `${p.name} · ${v.title}`,
+                  price: v.price ?? p.price,
+              }))
+            : [{ key: p.id, productId: p.id, label: p.name, price: p.price }],
+    );
 }
 /**
  * What the storefront says about checkout (Sell → Storefronts). Defaults, not
@@ -104,7 +132,9 @@ export function OrderForm({
         resolver: zodResolver(formSchema),
         defaultValues: {
             customerId: "",
-            lines: [{ productId: products[0]?.id ?? "", quantity: 1 }],
+            lines: [
+                { productId: sellablesOf(products)[0]?.key ?? "", quantity: 1 },
+            ],
             tax: "0",
             shipping: "0",
             discount: "0",
@@ -127,8 +157,9 @@ export function OrderForm({
     // two answers to "why did this come off" would leave no way to tell.
     const typedOff = toCents(discount) > 0;
 
-    const priceOf = (id: string) =>
-        toCents(products.find((p) => p.id === id)?.price ?? "0");
+    const sellables = sellablesOf(products);
+    const priceOf = (key: string) =>
+        toCents(sellables.find((s) => s.key === key)?.price ?? "0");
     // No `?? []`: `lines` has a default value and RHF types the watched result
     // as the schema's array, so the fallback was unreachable.
     const subtotalCents = watchedLines.reduce(
@@ -168,7 +199,16 @@ export function OrderForm({
     async function onSubmit(values: FormValues) {
         const items = values.lines
             .filter((l) => l.productId && l.quantity > 0)
-            .map((l) => ({ productId: l.productId, quantity: l.quantity }));
+            .map((l) => {
+                const sellable = sellables.find((s) => s.key === l.productId);
+                return {
+                    productId: sellable?.productId ?? l.productId,
+                    ...(sellable?.variantId
+                        ? { variantId: sellable.variantId }
+                        : {}),
+                    quantity: l.quantity,
+                };
+            });
         const res = await createOrder(storeId, {
             customerId: values.customerId,
             items,
@@ -279,9 +319,9 @@ export function OrderForm({
                                         onValueChange={field.onChange}
                                         disabled={isSubmitting}
                                         className="flex-1"
-                                        options={products.map((p) => ({
-                                            value: p.id,
-                                            label: `${p.name} — ${show(toCents(p.price))}`,
+                                        options={sellables.map((s) => ({
+                                            value: s.key,
+                                            label: `${s.label} — ${show(toCents(s.price))}`,
                                         }))}
                                     />
                                 )}
@@ -320,7 +360,7 @@ export function OrderForm({
                     size="sm"
                     onClick={() =>
                         append({
-                            productId: products[0]?.id ?? "",
+                            productId: sellablesOf(products)[0]?.key ?? "",
                             quantity: 1,
                         })
                     }

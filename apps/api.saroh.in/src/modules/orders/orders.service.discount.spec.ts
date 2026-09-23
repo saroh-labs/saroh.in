@@ -76,8 +76,10 @@ beforeEach(() => {
     jest.clearAllMocks();
     db.customer!.findFirst!.mockResolvedValue({ id: "c_1" });
     db.product!.findFirst!.mockResolvedValue({
+        name: "Widget",
         price: "20.00",
         categoryId: "cat_1",
+        variants: [],
     });
     db.inventory!.findUnique!.mockResolvedValue(null);
     db.order!.count!.mockResolvedValue(0);

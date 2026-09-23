@@ -78,6 +78,7 @@ export default async function NewOrderPage({
                     id: p.id,
                     name: p.name,
                     price: p.price,
+                    variants: p.variants,
                 }))}
                 checkout={checkout}
             />

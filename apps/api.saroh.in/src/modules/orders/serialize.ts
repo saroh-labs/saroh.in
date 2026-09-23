@@ -15,6 +15,9 @@ interface DecimalLike {
 export interface OrderItemDto {
     id: string;
     productId: string;
+    /** The variant bought, when the line names one. */
+    variantId: string | null;
+    variant: { title: string } | null;
     quantity: number;
     price: string;
     product?: { name: string } | null;
@@ -77,6 +80,8 @@ interface RawSummary {
 interface RawItem {
     id: string;
     productId: string;
+    variantId?: string | null;
+    variant?: { title: string } | null;
     quantity: number;
     price: DecimalLike;
     product?: { name: string } | null;
@@ -132,6 +137,8 @@ export function serializeOrderDetail(order: RawDetail): OrderDetailDto {
         items: order.items.map((i) => ({
             id: i.id,
             productId: i.productId,
+            variantId: i.variantId ?? null,
+            variant: i.variant ?? null,
             quantity: i.quantity,
             price: toMoneyString(i.price),
             product: i.product ?? null,

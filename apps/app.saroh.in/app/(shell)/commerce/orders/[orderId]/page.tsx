@@ -171,6 +171,9 @@ export default async function OrderPage({
                                                     "A product that no longer exists"}
                                             </div>
                                             <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+                                                {item.variant
+                                                    ? `${item.variant.title} · `
+                                                    : ""}
                                                 {money(item.price)} each
                                             </div>
                                         </div>

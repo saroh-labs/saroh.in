@@ -88,10 +88,10 @@ export class ProductsService {
                 // Enough to draw a catalogue row: the variant count, the SKU
                 // the product is known by, and its stock.
                 _count: { select: { variants: true } },
+                // Every variant, briefly: an order is taken for one of them.
                 variants: {
-                    select: { sku: true },
-                    orderBy: { createdAt: "asc" },
-                    take: 1,
+                    select: { id: true, sku: true, title: true, price: true },
+                    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                 },
                 inventory: { select: { quantity: true, lowStockAlert: true } },
             },

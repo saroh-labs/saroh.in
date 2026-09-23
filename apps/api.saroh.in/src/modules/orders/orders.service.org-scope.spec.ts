@@ -69,7 +69,12 @@ function makeService(writable: { organizationId: string | null } | null) {
 beforeEach(() => {
     jest.clearAllMocks();
     customerFindFirst.mockResolvedValue({ id: CUSTOMER });
-    productFindFirst.mockResolvedValue({ price: "20.00" });
+    productFindFirst.mockResolvedValue({
+        name: "Widget",
+        price: "20.00",
+        categoryId: null,
+        variants: [],
+    });
     inventoryFindUnique.mockResolvedValue(null); // untracked — no stock plumbing
     orderCount.mockResolvedValue(0);
     orderCreate.mockResolvedValue({ id: "order_1" });

@@ -30,6 +30,9 @@ export interface OrderSummary {
 export interface OrderItem {
     id: string;
     productId: string;
+    /** The variant bought, when the line names one. */
+    variantId?: string | null;
+    variant?: { title: string } | null;
     quantity: number;
     price: string;
     product?: { name: string } | null;
@@ -49,7 +52,7 @@ export interface OrderDetail extends OrderSummary {
 
 export interface CreateOrderInput {
     customerId: string;
-    items: { productId: string; quantity: number }[];
+    items: { productId: string; variantId?: string; quantity: number }[];
     tax?: string;
     shipping?: string;
     discount?: string;

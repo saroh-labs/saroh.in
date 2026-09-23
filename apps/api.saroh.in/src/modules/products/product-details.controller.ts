@@ -15,9 +15,13 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { UpdateInventoryDto } from "./inventory.dto";
+import { UpdateInventoryDto, UpdateVariantStockDto } from "./inventory.dto";
 import { InventoryService } from "./inventory.service";
-import { CreateVariantDto, UpdateVariantDto } from "./variants.dto";
+import {
+    CreateVariantDto,
+    ReorderVariantsDto,
+    UpdateVariantDto,
+} from "./variants.dto";
 import { VariantsService } from "./variants.service";
 
 /**
@@ -51,6 +55,17 @@ export class ProductDetailsController {
         @Body() dto: CreateVariantDto,
     ) {
         return this.variants.create(storeId, productId, user.id, dto);
+    }
+
+    /** The variants in the order customers see them. */
+    @Put("variants/order")
+    reorderVariants(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body() dto: ReorderVariantsDto,
+    ) {
+        return this.variants.reorder(storeId, productId, user.id, dto);
     }
 
     @Put("variants/:variantId")
@@ -87,6 +102,17 @@ export class ProductDetailsController {
         @Param("productId") productId: string,
     ) {
         return this.inventory.get(storeId, productId, user.id);
+    }
+
+    /** Every variant's count at once; switches the product to per-variant. */
+    @Put("inventory/variants")
+    setVariantStock(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body() dto: UpdateVariantStockDto,
+    ) {
+        return this.inventory.setVariants(storeId, productId, user.id, dto);
     }
 
     @Put("inventory")

@@ -19,6 +19,7 @@ function product(
         updatedAt: "2026-09-18T07:10:00.000Z",
         variantCount: 2,
         sku: "SD-800",
+        variants: [],
         inventory: { quantity: 42, lowStockAlert: 5 },
         ...over,
     };

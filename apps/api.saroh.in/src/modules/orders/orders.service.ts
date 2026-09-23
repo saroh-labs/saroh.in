@@ -106,7 +106,10 @@ export class OrdersService {
             include: {
                 customer: CUSTOMER_SELECT,
                 items: {
-                    include: { product: { select: { name: true } } },
+                    include: {
+                        product: { select: { name: true } },
+                        variant: { select: { title: true } },
+                    },
                 },
                 discountRedemption: {
                     select: {
@@ -139,7 +142,9 @@ export class OrdersService {
             });
         }
 
-        // Snapshot each line's price from its product (must be in this store).
+        // Snapshot each line's price from what was bought: the variant's own
+        // price when it has one, else the product's. A product with variants
+        // is bought as one of them, so its line must say which.
         const lines: (OrderLine & {
             priceCents: number;
             categoryId: string | null;
@@ -148,7 +153,12 @@ export class OrdersService {
             const product = await prisma.product.findFirst({
                 where: { id: item.productId, storeId },
                 // The category too: a collection code matches on it.
-                select: { price: true, categoryId: true },
+                select: {
+                    name: true,
+                    price: true,
+                    categoryId: true,
+                    variants: { select: { id: true, price: true } },
+                },
             });
             if (!product) {
                 throw new BadRequestException({
@@ -156,10 +166,33 @@ export class OrdersService {
                     field: "items",
                 });
             }
+            let unitPrice = product.price.toString();
+            let variantId: string | null = null;
+            if (product.variants.length > 0) {
+                const variant = product.variants.find(
+                    (v) => v.id === item.variantId,
+                );
+                if (!variant) {
+                    throw new BadRequestException({
+                        message: item.variantId
+                            ? `That option of ${product.name} no longer exists.`
+                            : `Choose which one of ${product.name} is being bought.`,
+                        field: "items",
+                    });
+                }
+                variantId = variant.id;
+                if (variant.price) unitPrice = variant.price.toString();
+            } else if (item.variantId) {
+                throw new BadRequestException({
+                    message: `${product.name} has no options to choose from.`,
+                    field: "items",
+                });
+            }
             lines.push({
                 productId: item.productId,
+                variantId,
                 quantity: item.quantity,
-                priceCents: toCents(product.price.toString()),
+                priceCents: toCents(unitPrice),
                 categoryId: product.categoryId,
             });
         }
@@ -244,6 +277,7 @@ export class OrdersService {
             items: {
                 create: lines.map((l) => ({
                     productId: l.productId,
+                    variantId: l.variantId ?? null,
                     quantity: l.quantity,
                     price: fromCents(l.priceCents),
                 })),
@@ -338,7 +372,13 @@ export class OrdersService {
                 id: true,
                 status: true,
                 paymentStatus: true,
-                items: { select: { productId: true, quantity: true } },
+                items: {
+                    select: {
+                        productId: true,
+                        variantId: true,
+                        quantity: true,
+                    },
+                },
             },
         });
         if (!order) {

@@ -1,0 +1,314 @@
+import { BadRequestException, ConflictException } from "@nestjs/common";
+import { prisma } from "@saroh/database";
+
+import { CustomersService } from "../customers/customers.service";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { OrdersService } from "../orders/orders.service";
+import { StoresService } from "../stores/stores.service";
+import { InventoryService } from "./inventory.service";
+import { ProductsService } from "./products.service";
+import { VariantsService } from "./variants.service";
+
+/**
+ * Products v2 (#462) against a real Postgres: variants with option values,
+ * photos and MRP; stock counted per variant; orders that reserve, commit and
+ * release against the variant their line names. Integration project.
+ */
+const tag = `${process.pid}-${Date.now()}`;
+
+describe("Variants and stock per variant (DB)", () => {
+    const stores = new StoresService(new FeatureFlagService());
+    const products = new ProductsService(stores);
+    const variants = new VariantsService(products);
+    const inventory = new InventoryService(products);
+    const customers = new CustomersService(stores);
+    const orders = new OrdersService(stores);
+
+    let ownerId = "";
+    let orgId = "";
+    let storeId = "";
+    let customerId = "";
+    let dressId = "";
+    let sizeOptionId = "";
+    const values: Record<string, string> = {};
+    const v: Record<string, string> = {};
+
+    beforeAll(async () => {
+        ownerId = (
+            await prisma.user.create({
+                data: { email: `var-owner-${tag}@example.com` },
+            })
+        ).id;
+        orgId = (
+            await prisma.organization.create({
+                data: { name: "Variants Org", slug: `var-org-${tag}` },
+            })
+        ).id;
+        storeId = (
+            await stores.createForUser(ownerId, orgId, {
+                name: "Variants Store",
+                slug: `var-${tag}`,
+            })
+        ).id;
+        const option = await prisma.productOption.create({
+            data: {
+                storeId,
+                organizationId: orgId,
+                name: "Size",
+                values: {
+                    create: ["S", "M", "L"].map((value, position) => ({
+                        value,
+                        position,
+                        organizationId: orgId,
+                    })),
+                },
+            },
+            include: { values: true },
+        });
+        sizeOptionId = option.id;
+        for (const val of option.values) values[val.value] = val.id;
+
+        dressId = (
+            await products.create(storeId, ownerId, {
+                name: "Linen Wrap Dress",
+                price: "2499",
+                mrp: "3299",
+                currency: "INR",
+                optionId: sizeOptionId,
+            })
+        ).id;
+        await inventory.upsert(storeId, dressId, ownerId, { quantity: 12 });
+        customerId = (
+            await customers.create(storeId, ownerId, {
+                email: `var-buyer-${tag}@example.com`,
+                firstName: "Asha",
+            })
+        ).id;
+    });
+
+    afterAll(async () => {
+        await prisma.orderItem.deleteMany({ where: { order: { storeId } } });
+        await prisma.order.deleteMany({ where: { storeId } });
+        await prisma.customer.deleteMany({ where: { storeId } });
+        await prisma.product.deleteMany({ where: { storeId } });
+        await prisma.store.deleteMany({ where: { id: storeId } });
+        await prisma.organization.deleteMany({ where: { id: orgId } });
+        await prisma.user.deleteMany({ where: { id: ownerId } });
+    });
+
+    const stockOf = async (variantId: string) =>
+        prisma.variantInventory.findUniqueOrThrow({
+            where: { variantId },
+            select: { quantity: true, reserved: true },
+        });
+
+    it("adds variants with a value of the product's option, in order", async () => {
+        for (const size of ["S", "M", "L"]) {
+            v[size] = (
+                await variants.create(storeId, dressId, ownerId, {
+                    sku: `LWD-${size}`,
+                    title: size,
+                    optionValueId: values[size],
+                    price: size === "L" ? "2699" : null,
+                })
+            ).id;
+        }
+        const list = await variants.list(storeId, dressId, ownerId);
+        expect(list.map((x) => [x.title, x.position])).toEqual([
+            ["S", 0],
+            ["M", 1],
+            ["L", 2],
+        ]);
+        // Still counting as a whole: no variant has its own row yet.
+        expect(list.every((x) => x.inventory === null)).toBe(true);
+    });
+
+    it("refuses a value from another option, a duplicate SKU and an MRP below price", async () => {
+        const other = await prisma.productOption.create({
+            data: {
+                storeId,
+                organizationId: orgId,
+                name: "Colour",
+                values: { create: [{ value: "Sage", organizationId: orgId }] },
+            },
+            include: { values: true },
+        });
+        await expect(
+            variants.create(storeId, dressId, ownerId, {
+                sku: "LWD-X",
+                title: "Sage",
+                optionValueId: other.values[0].id,
+            }),
+        ).rejects.toMatchObject({ response: { field: "optionValueId" } });
+        await expect(
+            variants.create(storeId, dressId, ownerId, {
+                sku: "LWD-S",
+                title: "S2",
+            }),
+        ).rejects.toThrow(ConflictException);
+        await expect(
+            variants.update(storeId, dressId, v.L, ownerId, {
+                sku: "LWD-L",
+                title: "L",
+                price: "2699",
+                mrp: "2500",
+            }),
+        ).rejects.toThrow(/MRP/);
+    });
+
+    it("counts per variant once every variant is given a count", async () => {
+        await expect(
+            inventory.setVariants(storeId, dressId, ownerId, {
+                variants: [{ variantId: v.S, quantity: 5, lowStockAlert: 2 }],
+            }),
+        ).rejects.toThrow(BadRequestException);
+
+        const view = await inventory.setVariants(storeId, dressId, ownerId, {
+            variants: [
+                { variantId: v.S, quantity: 5, lowStockAlert: 2 },
+                { variantId: v.M, quantity: 4, lowStockAlert: 2 },
+                { variantId: v.L, quantity: 3, lowStockAlert: 2 },
+            ],
+        });
+        expect(view.mode).toBe("variant");
+        // The product's own row keeps only old promises — none here.
+        expect(view.quantity).toBe(0);
+        await expect(
+            inventory.upsert(storeId, dressId, ownerId, { quantity: 99 }),
+        ).rejects.toThrow(/each variant/);
+    });
+
+    it("an order for M reserves M only, at the variant's price, and cancelling releases it", async () => {
+        const created = await orders.create(storeId, ownerId, {
+            customerId,
+            items: [
+                { productId: dressId, variantId: v.M, quantity: 2 },
+                { productId: dressId, variantId: v.L, quantity: 1 },
+            ],
+        });
+        expect(await stockOf(v.M)).toEqual({ quantity: 4, reserved: 2 });
+        expect(await stockOf(v.S)).toEqual({ quantity: 5, reserved: 0 });
+        const order = await prisma.order.findUniqueOrThrow({
+            where: { id: created.id },
+            select: { subtotal: true, items: { select: { variantId: true } } },
+        });
+        // 2 × 2499 + 1 × 2699
+        expect(order.subtotal.toString()).toBe("7697");
+        expect(order.items.map((i) => i.variantId).sort()).toEqual(
+            [v.M, v.L].sort(),
+        );
+
+        await orders.updateStatus(storeId, created.id, ownerId, {
+            status: "CANCELLED",
+        });
+        expect(await stockOf(v.M)).toEqual({ quantity: 4, reserved: 0 });
+    });
+
+    it("shipping takes the units off that variant's shelf", async () => {
+        const created = await orders.create(storeId, ownerId, {
+            customerId,
+            items: [{ productId: dressId, variantId: v.S, quantity: 2 }],
+        });
+        await orders.updateStatus(storeId, created.id, ownerId, {
+            status: "PROCESSING",
+        });
+        await orders.updateStatus(storeId, created.id, ownerId, {
+            status: "SHIPPED",
+        });
+        expect(await stockOf(v.S)).toEqual({ quantity: 3, reserved: 0 });
+    });
+
+    it("refuses an order that doesn't say which variant, and one beyond the shelf", async () => {
+        await expect(
+            orders.create(storeId, ownerId, {
+                customerId,
+                items: [{ productId: dressId, quantity: 1 }],
+            }),
+        ).rejects.toThrow(/Choose which one/);
+        await expect(
+            orders.create(storeId, ownerId, {
+                customerId,
+                items: [{ productId: dressId, variantId: v.L, quantity: 4 }],
+            }),
+        ).rejects.toThrow(/Not enough stock/);
+    });
+
+    it("won't remove a variant with stock promised to an open order", async () => {
+        const open = await orders.create(storeId, ownerId, {
+            customerId,
+            items: [{ productId: dressId, variantId: v.L, quantity: 1 }],
+        });
+        await expect(
+            variants.remove(storeId, dressId, v.L, ownerId),
+        ).rejects.toThrow(/promised to open orders/);
+        await orders.updateStatus(storeId, open.id, ownerId, {
+            status: "CANCELLED",
+        });
+    });
+
+    it("a new variant starts at 0 once the product counts per variant", async () => {
+        v.XL = (
+            await variants.create(storeId, dressId, ownerId, {
+                sku: "LWD-XL",
+                title: "XL",
+            })
+        ).id;
+        expect(await stockOf(v.XL)).toEqual({ quantity: 0, reserved: 0 });
+    });
+
+    it("reorders, listing every variant once", async () => {
+        await expect(
+            variants.reorder(storeId, dressId, ownerId, { ids: [v.L, v.M] }),
+        ).rejects.toThrow(BadRequestException);
+        const list = await variants.reorder(storeId, dressId, ownerId, {
+            ids: [v.XL, v.L, v.M, v.S],
+        });
+        expect(list.map((x) => x.title)).toEqual(["XL", "L", "M", "S"]);
+    });
+
+    it("the last counted variant hands its stock back to the product", async () => {
+        const shirt = (
+            await products.create(storeId, ownerId, {
+                name: "Cotton Kurta",
+                price: "999",
+                currency: "INR",
+            })
+        ).id;
+        const only = (
+            await variants.create(storeId, shirt, ownerId, {
+                sku: "CK-ONE",
+                title: "Free size",
+            })
+        ).id;
+        await inventory.setVariants(storeId, shirt, ownerId, {
+            variants: [{ variantId: only, quantity: 7, lowStockAlert: 3 }],
+        });
+        await variants.remove(storeId, shirt, only, ownerId);
+        const view = await inventory.get(storeId, shirt, ownerId);
+        expect(view).toMatchObject({
+            mode: "product",
+            quantity: 7,
+            lowStockAlert: 3,
+        });
+    });
+
+    it("a product still counting as a whole moves its own stock, as before", async () => {
+        const serum = (
+            await products.create(storeId, ownerId, {
+                name: "Vitamin C Serum",
+                price: "599",
+                currency: "INR",
+            })
+        ).id;
+        await inventory.upsert(storeId, serum, ownerId, { quantity: 10 });
+        await orders.create(storeId, ownerId, {
+            customerId,
+            items: [{ productId: serum, quantity: 3 }],
+        });
+        const own = await prisma.inventory.findUniqueOrThrow({
+            where: { productId: serum },
+            select: { quantity: true, reserved: true },
+        });
+        expect(own).toEqual({ quantity: 10, reserved: 3 });
+    });
+});
