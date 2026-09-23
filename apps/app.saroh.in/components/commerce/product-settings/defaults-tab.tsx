@@ -19,7 +19,7 @@ import {
     toEntry,
 } from "@/lib/products/settings-rules";
 
-import { ReadOnlyNote } from "./categories-tab";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import {
     chipBtn,
     primaryBtn,

@@ -17,7 +17,7 @@ import {
     updateField,
 } from "@/lib/products/settings-actions";
 
-import { ReadOnlyNote } from "./categories-tab";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { bigBtn, chipBtn, rowBtn, TabIntro, textBox } from "./product-settings";
 
 const TYPES: { type: FieldType; label: string }[] = [

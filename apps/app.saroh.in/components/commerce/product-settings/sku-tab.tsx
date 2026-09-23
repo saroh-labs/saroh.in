@@ -12,7 +12,7 @@ import {
 } from "@/lib/products/settings-actions";
 import { patternProblem } from "@/lib/products/sku-pattern";
 
-import { ReadOnlyNote } from "./categories-tab";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { primaryBtn, smallBtn, TabIntro, useUnsaved } from "./product-settings";
 
 const TOKENS = [
