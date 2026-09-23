@@ -76,11 +76,15 @@ function mayIn(
         organizationRole: OrgRole;
         organizationActions?: ReadonlySet<OrgAction>;
     },
-    action: OrgAction,
+    action: OrgAction | readonly OrgAction[],
 ): boolean {
-    return input.organizationActions
-        ? input.organizationActions.has(action)
-        : can(input.organizationRole, action);
+    // Any one of several will do (Commerce: `order:read` or `order:stage`).
+    const actions = typeof action === "string" ? [action] : action;
+    return actions.some((a) =>
+        input.organizationActions
+            ? input.organizationActions.has(a)
+            : can(input.organizationRole, a),
+    );
 }
 
 /**
