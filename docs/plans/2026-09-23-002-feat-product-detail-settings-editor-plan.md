@@ -545,6 +545,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 - **Test scenarios:**
     - Covered by U13's walkthrough: save a sheet, then Undo; close a changed sheet and choose Keep editing; switch team notes off.
 
+> **Done — #467.** Four sheets (details, description, stock, photos) over the product page, each saving its own section with Undo; Cancel discards, and the X, Escape or the backdrop ask first when something changed. Focus lands on the sheet itself, so nothing opens already ringed on film. The Customer view shows `ProductPage` in the storefront's own theme with numbered team notes, each linking to its editor section (Reviews to its tab). Along with it, a fidelity pass brought the whole product page to the Detail design, compared side by side at 1440px: header, tabs, stat tiles, linked cards, the variants table and drawer, reviews (gold stars and bars, Reply and Hide as text links, reply once, no year on dates), orders in fixed columns with the storefront and what open orders hold, discounts quieter unless they apply now, and the design's smaller state card with its own icon for every empty, failed and withheld tab. Customer names in Orders and Reviews link to the customer (the overview now carries the customer id). Verified in the browser on Leela & Loom's Vitamin C serum: every tab, the Customer view, and the details sheet; product API specs, the app's 302 tests, lint and typecheck green. Dark mode and phone widths are checked again in U13.
+
 ### U9. Editor v2: the shell, and Basics through SEO
 
 > **Design update (2026-09-23):** the Made by card gains "More about it" — the custom fields of the product's category (U14), each tagged On the shop / Team only, saved with that section, with a "Manage fields" link.
@@ -655,6 +657,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 - **Verification:**
     - `pnpm --filter @saroh/database db:seed:showcase` runs clean.
     - The boutique appears in the workspace switcher for `demo@saroh.dev`.
+
+> **Done — #471.** "Leela & Loom" (`seed_sc_ll_*`, store `leela-and-loom`): 30 products across serums, moisturisers, cleansers, men's care and dresses, 107 Unsplash photos (all load), variants in Volume, Shade, Size and Colour with stock per variant (one sold out, one low), 81 reviews behind delivered lines of the same variant (some replied, one hidden), and three discount codes (one on the serums, one for everything, one ended). `checkBoutique` passes on a re-run; it is also run on its own because the full showcase run currently stops on Pulse Fitness's invoice numbering when the dev API's renewal job has added non-seed invoices (not caused by this work). Checked in the browser on the product page's every tab.
 
 ### U13. Verification, the film script and the docs
 
