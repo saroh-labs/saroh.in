@@ -223,28 +223,33 @@ export function AvailabilityEditor({
 
     if (!me) {
         return (
-            <div className="rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
-                <p className="text-[14px] font-semibold">
-                    Nobody takes bookings yet
-                </p>
-                <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                    Add the people who can be booked. Each gets weekly hours,
-                    time off and a column on the calendar.
-                </p>
-                {canEdit ? (
-                    <Button
-                        className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
-                        onClick={() => setAdding(true)}
-                    >
-                        Add someone
-                    </Button>
-                ) : null}
-                <AddPersonDialog
-                    open={adding}
-                    onOpenChange={setAdding}
-                    onAdded={(id) => setWho(id)}
-                />
-            </div>
+            <>
+                <h1 className="mb-3.5 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
+                    Availability
+                </h1>
+                <div className="rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
+                    <p className="text-[14px] font-semibold">
+                        Nobody takes bookings yet
+                    </p>
+                    <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
+                        Add the people who can be booked. Each gets weekly
+                        hours, time off and a column on the calendar.
+                    </p>
+                    {canEdit ? (
+                        <Button
+                            className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
+                            onClick={() => setAdding(true)}
+                        >
+                            Add someone
+                        </Button>
+                    ) : null}
+                    <AddPersonDialog
+                        open={adding}
+                        onOpenChange={setAdding}
+                        onAdded={(id) => setWho(id)}
+                    />
+                </div>
+            </>
         );
     }
 

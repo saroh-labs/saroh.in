@@ -113,7 +113,7 @@ export function AgendaMonth({
     const { days, lead } = monthDays(date);
     return (
         <div className="flex flex-wrap items-start gap-4">
-            <div className="min-w-0 flex-[0_1_260px] rounded-[12px] border border-border bg-card p-3">
+            <div className="min-w-0 flex-[0_1_260px] rounded-[12px] border border-border bg-card p-3 max-[759px]:flex-[1_1_100%]">
                 <div
                     role="group"
                     aria-label="Pick a day"

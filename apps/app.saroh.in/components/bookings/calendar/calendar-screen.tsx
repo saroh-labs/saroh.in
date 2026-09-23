@@ -535,6 +535,22 @@ export function CalendarScreen({
                     </PartialNotice>
                 ) : null}
 
+                {staff !== null &&
+                !staff.some((p) => p.status === "ACTIVE") &&
+                columns.length ? (
+                    <p className="mb-3 text-[12.5px] text-muted-foreground">
+                        Nobody is on the diary yet, so there are no free times
+                        to book here.{" "}
+                        {can.hours ? (
+                            <Link
+                                href="/bookings/availability"
+                                className="font-semibold text-brand hover:text-foreground"
+                            >
+                                Add who takes bookings
+                            </Link>
+                        ) : null}
+                    </p>
+                ) : null}
                 {layout === "day" ? (
                     <>
                         {columns.length > 1 ? (
