@@ -128,7 +128,9 @@ describe("an order's invoice", () => {
             RYE,
         );
         expect(doc.totalCents).toBe(50920);
-        expect(doc.lines.at(-1)?.description).toBe("Tax added at checkout");
+        expect(doc.lines[doc.lines.length - 1].description).toBe(
+            "Tax added at checkout",
+        );
     });
 
     it("bills the customer, and the delivery address when it is delivered", () => {

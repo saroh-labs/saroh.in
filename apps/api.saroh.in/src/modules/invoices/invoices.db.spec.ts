@@ -52,7 +52,12 @@ describe("invoice numbers (real database)", () => {
     it("starts a business at INV-0001 with no counter row beforehand", async () => {
         expect(
             await prisma.invoiceSequence.findUnique({
-                where: { organizationId: org.organizationId },
+                where: {
+                    organizationId_series: {
+                        organizationId: org.organizationId,
+                        series: "INV",
+                    },
+                },
             }),
         ).toBeNull();
         const issued = await service.issue(org, await draft());
@@ -60,7 +65,12 @@ describe("invoice numbers (real database)", () => {
         expect(issued.billTo).toEqual({
             name: "Asha Rao",
             email: "asha@example.com",
+            gstin: null,
+            state: null,
+            address: null,
         });
+        // An unregistered business: a receipt, no GST.
+        expect(issued.gst).toBeNull();
     });
 
     it("gives concurrent issues distinct, consecutive numbers", async () => {
