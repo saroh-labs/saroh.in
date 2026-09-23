@@ -44,7 +44,9 @@ export function ProductHeader({
         product.category?.name ?? "no category",
         product.status === "PUBLISHED"
             ? storefront.name
-            : "not on the shop yet",
+            : product.status === "ARCHIVED"
+              ? "not on the shop"
+              : "not on the shop yet",
     ];
 
     const crumbs = sellCrumbs(
@@ -82,7 +84,9 @@ export function ProductHeader({
                 >
                     {live
                         ? "The shop's product page arrives with the website."
-                        : "Publish it first — a draft has no public page."}
+                        : product.status === "ARCHIVED"
+                          ? "Archived — its page does not open for customers."
+                          : "Publish it first — a draft has no public page."}
                 </span>
                 <Button
                     type="button"
@@ -91,7 +95,11 @@ export function ProductHeader({
                     aria-describedby="shop-link-why"
                     className="h-8 gap-[7px] rounded-[9px] px-3 text-[12.5px] coarse:h-11"
                 >
-                    {live ? "View on the shop" : "Not on the shop yet"}
+                    {live
+                        ? "View on the shop"
+                        : product.status === "ARCHIVED"
+                          ? "Not on the shop"
+                          : "Not on the shop yet"}
                     <ArrowUpRight
                         className="size-[13px]"
                         strokeWidth={2}

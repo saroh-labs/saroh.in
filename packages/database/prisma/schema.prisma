@@ -584,7 +584,9 @@ model Product {
   mrp      Decimal? @db.Decimal(10, 2)
   currency String   @default("USD")
 
-  status String @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  status     String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  // When it was last archived (#485); null unless status is ARCHIVED.
+  archivedAt DateTime?
 
   // Details (products v2). Each customer-facing one has a switch in
   // shopFields: { howToUse, materials, keyPoints, maker, warranty, returns }.

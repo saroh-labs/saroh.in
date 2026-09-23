@@ -214,6 +214,11 @@ export function ProductOverviewTab({
                         )}
                     </LinkedCard>
                 </div>
+                {tracked ? (
+                    <p className="text-pretty text-[11.5px] text-muted-foreground">
+                        {promisedLine(stock.totals.promised, orders)}
+                    </p>
+                ) : null}
             </section>
 
             <div className="grid gap-4 lg:grid-cols-2">
@@ -359,4 +364,30 @@ export function ProductOverviewTab({
             </section>
         </div>
     );
+}
+
+/** What the promised stock is, and which open orders hold it. */
+function promisedLine(
+    promised: number,
+    orders: ProductOverview["orders"],
+): string {
+    if (orders.status !== "ok") {
+        return `Promised stock (${promised}) comes from the product itself, so it is still right while orders are down.`;
+    }
+    if (promised === 0) return "Nothing is promised to an open order.";
+    const open = orders.data.recent.filter((o) => o.open);
+    // Older open orders than the recent ones read here can hold stock too.
+    if (open.length === 0)
+        return `${promised} ${promised === 1 ? "is" : "are"} promised to open orders.`;
+    const held = open
+        .map(
+            (o) =>
+                `${o.orderNumber} (${o.lines.reduce((n, l) => n + l.quantity, 0)})`,
+        )
+        .join(", ");
+    return `The ${promised} promised in stock ${promised === 1 ? "is" : "are"} ${
+        open.length === 1
+            ? "this open order"
+            : `these ${open.length} open orders`
+    }: ${held}.`;
 }

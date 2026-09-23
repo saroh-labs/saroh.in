@@ -47,7 +47,8 @@ export function ViewerDate({
      * `heading` says "Today" / "Tomorrow" where it applies; `short` is a date;
      * `datetime` adds the time, for a timeline where the hour matters.
      */
-    variant?: "short" | "heading" | "datetime" | "dayMonth" | "time";
+    variant?:
+        "short" | "heading" | "datetime" | "dayMonth" | "dayMonthLong" | "time";
     className?: string;
 }) {
     const timeZone = useSyncExternalStore(
@@ -65,13 +66,20 @@ export function ViewerDate({
                 ? // "18 Sep" — a stat tile's figure, where the year is noise. Three
                   // letters every month (ICU writes "Sept"), as the design does.
                   dayMonth(iso, timeZone)
-                : variant === "time"
-                  ? new Intl.DateTimeFormat("en-GB", {
-                        hour: "2-digit",
-                        minute: "2-digit",
+                : variant === "dayMonthLong"
+                  ? // "2 September" — said in a sentence.
+                    new Intl.DateTimeFormat("en-GB", {
+                        day: "numeric",
+                        month: "long",
                         timeZone,
                     }).format(new Date(iso))
-                  : formatShortDate(iso, timeZone);
+                  : variant === "time"
+                    ? new Intl.DateTimeFormat("en-GB", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          timeZone,
+                      }).format(new Date(iso))
+                    : formatShortDate(iso, timeZone);
 
     return (
         // `<time dateTime>` carries the exact instant regardless of how the

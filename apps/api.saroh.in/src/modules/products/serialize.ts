@@ -62,6 +62,7 @@ export interface ProductDto {
     mrp: string | null;
     currency: string;
     status: string;
+    archivedAt: Date | null;
     howToUse: string | null;
     materials: string | null;
     keyPoints: string[];
@@ -162,6 +163,7 @@ interface RawProduct {
     mrp: DecimalLike | null;
     currency: string;
     status: string;
+    archivedAt: Date | null;
     howToUse: string | null;
     materials: string | null;
     keyPoints: string[];
@@ -258,6 +260,7 @@ export function serializeProduct(product: RawProduct): ProductDto {
         mrp: product.mrp ? toMoneyString(product.mrp) : null,
         currency: product.currency,
         status: product.status,
+        archivedAt: product.archivedAt,
         howToUse: product.howToUse,
         materials: product.materials,
         keyPoints: product.keyPoints,

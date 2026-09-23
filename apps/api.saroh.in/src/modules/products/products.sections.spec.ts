@@ -234,6 +234,71 @@ describe("Products v2: sections, photos, overview (DB)", () => {
         });
     });
 
+    describe("archiving and the option (#485)", () => {
+        it("stamps when it was archived, and clears it when it leaves", async () => {
+            const archived = await products.patch(storeId, productId, ownerId, {
+                status: "ARCHIVED",
+            });
+            expect(archived.archivedAt).toBeInstanceOf(Date);
+            const back = await products.patch(storeId, productId, ownerId, {
+                status: "DRAFT",
+            });
+            expect(back.archivedAt).toBeNull();
+        });
+
+        it("refuses a new option while variants exist, and allows it without", async () => {
+            const volume = await prisma.productOption.create({
+                data: {
+                    storeId,
+                    organizationId: orgId,
+                    name: "Volume",
+                    position: 0,
+                },
+            });
+            const shade = await prisma.productOption.create({
+                data: {
+                    storeId,
+                    organizationId: orgId,
+                    name: "Shade",
+                    position: 1,
+                },
+            });
+            const lone = await products.create(storeId, ownerId, {
+                name: "Option test",
+                price: "100",
+                currency: "INR",
+            });
+            // No variants: any option may be chosen.
+            await products.patch(storeId, lone.id, ownerId, {
+                optionId: volume.id,
+            });
+            await prisma.productVariant.create({
+                data: {
+                    productId: lone.id,
+                    sku: `OPT-${Date.now()}`,
+                    title: "15 ml",
+                },
+            });
+            await expect(
+                products.patch(storeId, lone.id, ownerId, {
+                    optionId: shade.id,
+                }),
+            ).rejects.toThrow(
+                "Remove the variants first to sell it by shade instead.",
+            );
+            // The same option again is not a change.
+            await expect(
+                products.patch(storeId, lone.id, ownerId, {
+                    optionId: volume.id,
+                }),
+            ).resolves.toMatchObject({ optionId: volume.id });
+            await prisma.product.delete({ where: { id: lone.id } });
+            await prisma.productOption.deleteMany({
+                where: { id: { in: [volume.id, shade.id] } },
+            });
+        });
+    });
+
     describe("the photo set", () => {
         const url = (n: number) => `https://images.example.test/rose-${n}.jpg`;
 

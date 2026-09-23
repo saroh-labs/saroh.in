@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { ArchivedBanner } from "@/components/commerce/product-page/archived-banner";
 import { CustomerView } from "@/components/commerce/product-page/customer-view";
 import { ProductDiscountsTab } from "@/components/commerce/product-page/discounts-tab";
 import { ProductHeader } from "@/components/commerce/product-page/header";
@@ -91,6 +92,14 @@ export default async function ProductPage({
                     storeId={store.id}
                     view={view}
                 />
+                {overview.product.status === "ARCHIVED" ? (
+                    <ArchivedBanner
+                        storeId={store.id}
+                        productId={overview.product.id}
+                        archivedAt={overview.product.archivedAt ?? null}
+                        canWrite={overview.canWrite}
+                    />
+                ) : null}
                 {view === "customer" ? (
                     <CustomerView
                         overview={overview}

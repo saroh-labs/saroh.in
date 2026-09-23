@@ -164,6 +164,7 @@ export class ProductsService {
                     mrp: dto.mrp ?? null,
                     currency: dto.currency ?? "USD",
                     status: dto.status ?? "DRAFT",
+                    archivedAt: dto.status === "ARCHIVED" ? new Date() : null,
                     howToUse: dto.howToUse ?? null,
                     materials: dto.materials ?? null,
                     keyPoints: cleanKeyPoints(dto.keyPoints),
@@ -241,7 +242,14 @@ export class ProductsService {
                     categoryId: dto.categoryId ?? null,
                     price: dto.price,
                     currency: dto.currency ?? "USD",
-                    ...(dto.status ? { status: dto.status } : {}),
+                    ...(dto.status
+                        ? {
+                              status: dto.status,
+                              ...(dto.status === "ARCHIVED"
+                                  ? {}
+                                  : { archivedAt: null }),
+                          }
+                        : {}),
                 },
             });
             return { id: productId };
@@ -279,6 +287,9 @@ export class ProductsService {
                 returnsMode: true,
                 returnsText: true,
                 shopFields: true,
+                status: true,
+                optionId: true,
+                _count: { select: { variants: true } },
             },
         });
         if (!current) {
@@ -301,12 +312,37 @@ export class ProductsService {
             data.categoryId = dto.categoryId ?? null;
         }
         if (has("optionId")) {
+            // Each variant's value belongs to the option it was made under;
+            // switching would orphan them all.
+            if (
+                (dto.optionId ?? null) !== current.optionId &&
+                current._count.variants > 0
+            ) {
+                const next = dto.optionId
+                    ? await prisma.productOption.findFirst({
+                          where: { id: dto.optionId, storeId },
+                          select: { name: true },
+                      })
+                    : null;
+                throw new ConflictException({
+                    message: next
+                        ? `Remove the variants first to sell it by ${next.name.toLowerCase()} instead.`
+                        : "Remove the variants first to sell it without an option.",
+                    field: "optionId",
+                });
+            }
             await this.assertOptionInStore(storeId, dto.optionId);
             data.optionId = dto.optionId ?? null;
         }
         if (has("price")) data.price = dto.price;
         if (has("mrp")) data.mrp = dto.mrp ?? null;
-        if (has("status")) data.status = dto.status;
+        if (has("status")) {
+            data.status = dto.status;
+            // When it went, for the archived banner; cleared when it leaves.
+            if (dto.status === "ARCHIVED" && current.status !== "ARCHIVED")
+                data.archivedAt = new Date();
+            if (dto.status !== "ARCHIVED") data.archivedAt = null;
+        }
         for (const key of [
             "howToUse",
             "materials",

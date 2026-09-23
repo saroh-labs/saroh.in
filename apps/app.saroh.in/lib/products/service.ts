@@ -21,6 +21,8 @@ export interface Product {
     mrp?: string | null;
     currency: string;
     status: ProductStatus;
+    /** When it was archived; null unless it is. */
+    archivedAt?: string | null;
     category?: { id: string; name: string } | null;
 }
 
