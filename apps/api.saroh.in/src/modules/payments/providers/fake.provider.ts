@@ -36,8 +36,16 @@ export class FakeMerchantProvider implements MerchantProvider {
 
     refund(input: RefundInput): Promise<RefundResult> {
         this.refundCalls.push(input);
+        // A payment can be refunded more than once now (by line, U6); each
+        // refund gets its own id, the first keeping the old shape.
+        const nth = this.refundCalls.filter(
+            (c) => c.providerIntentId === input.providerIntentId,
+        ).length;
         return Promise.resolve({
-            providerRefundId: `fake_refund_${input.providerIntentId}`,
+            providerRefundId:
+                nth === 1
+                    ? `fake_refund_${input.providerIntentId}`
+                    : `fake_refund_${input.providerIntentId}_${nth}`,
             status: "PENDING",
         });
     }

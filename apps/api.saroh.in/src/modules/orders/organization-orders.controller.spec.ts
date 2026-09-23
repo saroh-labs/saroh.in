@@ -15,6 +15,7 @@ import { ForbiddenException } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import type { OrderKitchenService } from "./order-kitchen.service";
 import type { OrdersService } from "./orders.service";
 import { OrganizationOrdersController } from "./organization-orders.controller";
 
@@ -27,9 +28,10 @@ import { OrganizationOrdersController } from "./organization-orders.controller";
  */
 describe("OrganizationOrdersController", () => {
     const listForOrganization = jest.fn().mockResolvedValue([]);
-    const controller = new OrganizationOrdersController({
-        listForOrganization,
-    } as unknown as OrdersService);
+    const controller = new OrganizationOrdersController(
+        { listForOrganization } as unknown as OrdersService,
+        {} as unknown as OrderKitchenService,
+    );
 
     const as = (
         role: OrganizationContext["role"],

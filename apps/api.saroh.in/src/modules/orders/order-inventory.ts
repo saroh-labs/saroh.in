@@ -139,6 +139,48 @@ async function heldRow(
 }
 
 /**
+ * Change how much a RESERVED line holds by `delta` units (U6 — an order
+ * edited before preparing). Settles on the row the line recorded, like every
+ * other move, so an edit never lands a release on a row the line did not
+ * reserve from. Growing a hold is refused when the stock is not there (no
+ * oversell); shrinking one is always allowed. MUST run inside the order
+ * write's transaction.
+ */
+export async function adjustReservation(
+    tx: Prisma.TransactionClient,
+    line: OrderLine,
+    delta: number,
+): Promise<void> {
+    if (delta === 0) return;
+    const { row, variantId } = await heldRow(tx, line);
+    const [from, to]: [StockPhase, StockPhase] =
+        delta > 0 ? ["RELEASED", "RESERVED"] : ["RESERVED", "RELEASED"];
+    const q = Math.abs(delta);
+    if (row === "VARIANT") {
+        if (!variantId) return;
+        const own = await tx.variantInventory.findUnique({
+            where: { variantId },
+            select: { quantity: true, reserved: true },
+        });
+        if (!own) return;
+        await tx.variantInventory.update({
+            where: { variantId },
+            data: nextStock(own, from, to, q),
+        });
+    } else if (row === "PRODUCT") {
+        const inv = await tx.inventory.findUnique({
+            where: { productId: line.productId },
+            select: { quantity: true, reserved: true },
+        });
+        if (!inv) return;
+        await tx.inventory.update({
+            where: { productId: line.productId },
+            data: nextStock(inv, from, to, q),
+        });
+    }
+}
+
+/**
  * Apply the inventory deltas for moving an order's lines from `from` to `to`.
  * MUST run inside the same transaction as the order write so stock and order
  * stay consistent. Throws ConflictException if a reserve would oversell.

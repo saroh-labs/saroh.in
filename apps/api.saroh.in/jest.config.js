@@ -130,6 +130,13 @@ module.exports = {
         "<rootDir>/src/modules/customers/serialize.spec.ts",
         "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
         "<rootDir>/src/modules/orders/order-state.spec.ts",
+        // ADR-008 kitchen flow (U6): the pure stage machine, refund-by-line
+        // arithmetic, the order read's money hiding, and the kitchen service
+        // with a jest-mocked Prisma.
+        "<rootDir>/src/modules/orders/order-stage.spec.ts",
+        "<rootDir>/src/modules/orders/order-refunds.spec.ts",
+        "<rootDir>/src/modules/orders/order-read.spec.ts",
+        "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
         // Products v2: MRP, saving, shop switches and detail coherence — pure.
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
