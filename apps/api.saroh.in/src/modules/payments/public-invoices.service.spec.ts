@@ -223,6 +223,33 @@ describe("PublicInvoicesService.read", () => {
         expect(invoiceFindFirst).not.toHaveBeenCalled();
     });
 
+    it("rate-limits one caller across different links", async () => {
+        // The limiter used to be keyed on the token the caller sent, so every
+        // new token opened a fresh window and nothing was throttled at all.
+        invoiceFindFirst.mockResolvedValue(STORED);
+        const { service } = makeService({
+            read: new FixedWindowRateLimiter(2, 60_000),
+        });
+        const caller = "ip-hash-1";
+
+        await service.read(TOKEN, caller);
+        await service.read("a-different-token", caller).catch(() => undefined);
+        const third = service.read("a-third-token", caller);
+
+        await expect(third).rejects.toMatchObject({ status: 429 });
+    });
+
+    it("counts two callers on one link separately", async () => {
+        invoiceFindFirst.mockResolvedValue(STORED);
+        const { service } = makeService({
+            read: new FixedWindowRateLimiter(1, 60_000),
+        });
+
+        await service.read(TOKEN, "ip-hash-1");
+
+        await expect(service.read(TOKEN, "ip-hash-2")).resolves.toBeDefined();
+    });
+
     it("rate-limits reads per link", async () => {
         invoiceFindFirst.mockResolvedValue(STORED);
         const { service } = makeService({

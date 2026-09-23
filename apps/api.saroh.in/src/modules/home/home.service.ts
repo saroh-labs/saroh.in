@@ -280,6 +280,12 @@ export class HomeService {
             views.filter((v) => v.readiness !== "DISABLED").map((v) => v.key),
         );
         const now = new Date();
+        // Reaching CRM is not reading leads: since DEC-020 a Member reaches the
+        // module for contacts and holds no `lead:read`, so the two lead bands
+        // below ask for the action rather than the module.
+        const canReadLeads = input.organizationActions
+            ? input.organizationActions.has("lead:read")
+            : can(input.organizationRole, "lead:read");
         const numbers: HomeNumber[] = [];
         let upcoming: HomeBooking[] = [];
 
@@ -287,14 +293,14 @@ export class HomeService {
             numbers.push(
                 ...(await this.attempt(
                     { moduleKey: "CRM", label: "Customer numbers" },
-                    () => this.crmNumbers(input.organizationId),
+                    () => this.crmNumbers(input.organizationId, canReadLeads),
                     [],
                     unavailable,
                 )),
             );
         }
 
-        if (active.has("CRM")) {
+        if (active.has("CRM") && canReadLeads) {
             const overdue = await this.attempt(
                 { moduleKey: "CRM", label: "Overdue follow-ups" },
                 () => this.overdueFollowUps(input.organizationId, now),
@@ -627,9 +633,16 @@ export class HomeService {
     }
 
     /** Counts that are destinations: open leads, and everyone on file. */
-    private async crmNumbers(organizationId: string): Promise<HomeNumber[]> {
+    private async crmNumbers(
+        organizationId: string,
+        canReadLeads: boolean,
+    ): Promise<HomeNumber[]> {
         const [openLeads, contacts] = await Promise.all([
-            this.db.lead.count({ where: { organizationId, status: "OPEN" } }),
+            canReadLeads
+                ? this.db.lead.count({
+                      where: { organizationId, status: "OPEN" },
+                  })
+                : Promise.resolve(0),
             this.db.contact.count({ where: { organizationId } }),
         ]);
 

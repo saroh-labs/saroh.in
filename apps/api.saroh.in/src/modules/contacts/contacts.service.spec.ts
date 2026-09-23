@@ -339,8 +339,8 @@ describe("ContactsService.list", () => {
         const service = new ContactsService();
         findMany.mockResolvedValue([CONTACT]);
 
-        // MEMBER cannot read contacts at all, so exercise the gate directly:
-        // the rollup must not be the hole that leaks commerce to a CRM role.
+        // The rollup must not be the hole that leaks commerce to a role
+        // without `order:read`.
         const { can } = jest.requireActual<
             typeof import("../organizations/organization-policy")
         >("../organizations/organization-policy");
@@ -349,6 +349,25 @@ describe("ContactsService.list", () => {
 
         await service.list(ctx());
         expect(linkFindMany).toHaveBeenCalled();
+    });
+
+    it("gives a Member the diary but no pipeline and no orders", async () => {
+        // DEC-020: a Member reads the people on the diary. Nothing here may
+        // carry a lead's value or what someone has bought.
+        const service = new ContactsService();
+        findMany.mockResolvedValue([CONTACT]);
+        bookingGroupBy.mockResolvedValue([
+            { contactId: "c_1", _min: { startAt: new Date("2026-10-01") } },
+        ]);
+
+        const [row] = await service.list(ctx({ role: "MEMBER" }));
+
+        expect(row?.nextBookingAt).not.toBeNull();
+        expect(row?.openLeadCount).toBe(0);
+        expect(row?.openLeadValue).toBeNull();
+        expect(row?.lastOrderAt).toBeNull();
+        expect(leadGroupBy).not.toHaveBeenCalled();
+        expect(orderGroupBy).not.toHaveBeenCalled();
     });
 
     it("drops bookings that belong to no contact", async () => {
@@ -387,6 +406,23 @@ describe("ContactsService.get", () => {
                 }),
             }),
         );
+    });
+
+    it("asks for no leads when the role cannot read them", async () => {
+        // The leak this test exists for: `get` used to include every lead
+        // unconditionally, so a Member opening a contact saw the pipeline.
+        const service = new ContactsService();
+        findUnique.mockResolvedValue({
+            id: "c_1",
+            organizationId: "org_1",
+            leads: [],
+        });
+
+        const res = await service.get(ctx({ role: "MEMBER" }), "c_1");
+
+        expect(res.id).toBe("c_1");
+        const include = findUnique.mock.calls[0]?.[0]?.include;
+        expect(include.leads).toMatchObject({ where: { id: { in: [] } } });
     });
 
     it("404s a cross-tenant contact", async () => {
