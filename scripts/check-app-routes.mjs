@@ -115,12 +115,13 @@ function emittedConsoleHrefs() {
     const found = [];
     for (const file of walk(API_SRC)) {
         if (!/\.tsx?$/.test(file) || /\.spec\.tsx?$/.test(file)) continue;
-        const lines = readFileSync(file, "utf8").split("\n");
-        lines.forEach((line, i) => {
-            for (const m of line.matchAll(/\bconsoleHref:\s*"(\/[^"]*)"/g)) {
-                found.push({ href: m[1], file: relative(ROOT, file), line: i + 1 });
-            }
-        });
+        // The whole file, not line by line: a formatter is free to put the key
+        // and its string on separate lines, and a missed link is a silent one.
+        const text = readFileSync(file, "utf8");
+        for (const m of text.matchAll(/\bconsoleHref:\s*"(\/[^"]*)"/g)) {
+            const line = text.slice(0, m.index).split("\n").length;
+            found.push({ href: m[1], file: relative(ROOT, file), line });
+        }
     }
     return found;
 }
