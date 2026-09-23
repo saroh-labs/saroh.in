@@ -178,6 +178,8 @@ export function StockSheet({
                 title: variant.title,
                 price: row.price.trim() || null,
                 mrp: variant.mrp ?? null,
+                // The API's PUT replaces the variant: an omitted image is cleared.
+                image: variant.image ?? null,
                 optionValueId: variant.optionValueId ?? null,
                 imageId: variant.imageId ?? null,
             });

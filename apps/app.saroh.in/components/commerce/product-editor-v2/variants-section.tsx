@@ -228,21 +228,15 @@ export function VariantsSection({
         // The first refusal names what stopped the save; the rest still run.
         let why: string | null = null;
         let next = rows;
+        // What the server holds after each call that worked, so a retry
+        // after a partial failure resends only what is still different.
+        let saved = base;
         const replace = (key: string, patch: Partial<Row>) => {
             next = next.map((r) => (r.key === key ? { ...r, ...patch } : r));
         };
         try {
-            if (optionId !== (product.optionId ?? "")) {
-                const res = await patchProduct(storeId, product.id, {
-                    optionId: optionId || null,
-                });
-                if (!res.ok) {
-                    showError(res.error);
-                    return false;
-                }
-            }
-            // Removed first, so a value or SKU freed by a removal can be
-            // taken by a new row.
+            // Removed first: a value or SKU freed by a removal can be taken
+            // by a new row, and a product left with none can change option.
             const goneIds = base
                 .map((b) => b.id)
                 .filter(
@@ -251,7 +245,18 @@ export function VariantsSection({
                 );
             for (const goneId of goneIds) {
                 const res = await deleteVariant(storeId, product.id, goneId);
-                if (!res.ok) why ??= res.error;
+                if (res.ok) saved = saved.filter((b) => b.id !== goneId);
+                else why ??= res.error;
+            }
+            if (optionId !== (product.optionId ?? "")) {
+                const res = await patchProduct(storeId, product.id, {
+                    optionId: optionId || null,
+                });
+                if (!res.ok) {
+                    setBase(saved);
+                    showError(res.error);
+                    return false;
+                }
             }
             for (const r of rows) {
                 const input = {
@@ -272,6 +277,7 @@ export function VariantsSection({
                     }
                     // Saved: a retry must update it, not make it twice.
                     replace(r.key, { id: res.data.id });
+                    saved = [...saved, { ...r, id: res.data.id }];
                 } else if (was && !sameRows([r], [was])) {
                     const res = await updateVariant(
                         storeId,
@@ -279,7 +285,9 @@ export function VariantsSection({
                         r.id,
                         input,
                     );
-                    if (!res.ok) why ??= res.error;
+                    if (res.ok)
+                        saved = saved.map((b) => (b.id === r.id ? r : b));
+                    else why ??= res.error;
                 }
             }
             const ids = next
@@ -301,6 +309,9 @@ export function VariantsSection({
             why ??= DROPPED;
         }
         setRows(next);
+        // On success the refreshed product replaces both; on a failure the
+        // baseline is what did save, so the retry skips it.
+        if (why) setBase(saved);
         setFailed(why);
         return !why;
     }

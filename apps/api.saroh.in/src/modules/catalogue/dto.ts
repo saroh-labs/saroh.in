@@ -14,6 +14,8 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import { DETAIL_LIMITS, RETURNS_MODES } from "../products/dto";
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -119,14 +121,16 @@ export class ProductDefaultsSnapshot {
     @IsOptional()
     @ValidateIf((_o, v) => v !== null)
     @IsString()
+    @MaxLength(DETAIL_LIMITS.howToUse)
     howToUse?: string | null;
 
-    @IsString()
+    @IsIn(RETURNS_MODES)
     returnsMode!: string;
 
     @IsOptional()
     @ValidateIf((_o, v) => v !== null)
     @IsString()
+    @MaxLength(DETAIL_LIMITS.returnsText)
     returnsText?: string | null;
 }
 

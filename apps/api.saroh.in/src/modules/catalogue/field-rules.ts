@@ -23,9 +23,15 @@ export type FieldValueCheck =
 export function checkFieldValue(
     type: FieldType,
     name: string,
-    raw: string | null | undefined,
+    raw: unknown,
 ): FieldValueCheck {
-    const v = (raw ?? "").trim();
+    // The body is JSON: a number or a boolean may arrive where text is meant.
+    const v =
+        typeof raw === "string" ||
+        typeof raw === "number" ||
+        typeof raw === "boolean"
+            ? String(raw).trim()
+            : "";
     if (v === "") return { ok: true, value: null };
     switch (type) {
         case "NUMBER":

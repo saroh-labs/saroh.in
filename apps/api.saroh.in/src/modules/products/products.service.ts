@@ -220,7 +220,7 @@ export class ProductsService {
         await this.requireWrite(storeId, userId);
         const current = await prisma.product.findFirst({
             where: { id: productId, storeId },
-            select: { slug: true },
+            select: { slug: true, status: true },
         });
         if (!current) {
             throw new NotFoundException("Product not found");
@@ -245,9 +245,13 @@ export class ProductsService {
                     ...(dto.status
                         ? {
                               status: dto.status,
-                              ...(dto.status === "ARCHIVED"
-                                  ? {}
-                                  : { archivedAt: null }),
+                              // As patch() does: stamped on the way in,
+                              // cleared on the way out.
+                              ...(dto.status !== "ARCHIVED"
+                                  ? { archivedAt: null }
+                                  : current.status !== "ARCHIVED"
+                                    ? { archivedAt: new Date() }
+                                    : {}),
                           }
                         : {}),
                 },

@@ -85,7 +85,7 @@ export function formatCount(value: number): string {
 /** The sign a currency is written with ("₹" for INR), for a field's prefix. */
 export function currencySymbol(currency: string): string {
     try {
-        const part = new Intl.NumberFormat("en-IN", {
+        const part = new Intl.NumberFormat(DISPLAY_LOCALE, {
             style: "currency",
             currency,
             currencyDisplay: "narrowSymbol",
