@@ -4,7 +4,26 @@ type: feat
 status: active
 date: 2026-09-23
 origin: claude.ai design project 1fef6fb9-c3b1-4c04-bfc2-86d09cb32a65 — Saroh Product Detail.dc.html, Saroh Product Settings.dc.html, Saroh Product Editor v2.dc.html (+ support.js)
-issues: [481, 460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472]
+issues:
+    [
+        481,
+        460,
+        461,
+        462,
+        463,
+        464,
+        465,
+        466,
+        467,
+        468,
+        469,
+        470,
+        471,
+        472,
+        482,
+        483,
+        484,
+    ]
 follow_ups: [473, 474, 475, 476, 477, 478, 479, 480]
 ---
 
@@ -77,7 +96,7 @@ The work runs against a demo **beauty & dresses store** of about 30 products, wi
 
 ### Catalogue settings
 
-- **R6.** The settings page lives at `/commerce/products/settings`, with three tabs kept in the URL: Categories, Options, Defaults.
+- **R6.** The settings page lives at `/commerce/products/settings`, with six tabs kept in the URL (updated design, 2026-09-23): Categories, Options, Custom fields, Allergens, SKUs, Defaults. It is designed in light and dark, and below 760px the workspace's own phone navigation carries it (the design's shared tab bar is the same model).
 - **R7.** Categories:
     - add, with a duplicate-name check and a 40-character limit
     - rename in place
@@ -95,6 +114,23 @@ The work runs against a demo **beauty & dresses store** of about 30 products, wi
     - They save explicitly, from a sticky save bar showing the count of changed values.
     - Optionally, saving also updates the saved products that still hold the old default. The count is exact.
     - Leaving with unsaved defaults asks first.
+    - Returns is one choice of four (updated design): the same as All products (on a category), the storefront's rule, "Non-returnable", "Returnable within 7 days, unused" — stored as the storefront mode or as an own rule with that text.
+- **R6a. Custom fields** (new tab). Extra things a product records, per category:
+    - a name (≤40, unique ignoring case) and a type — Text, Number, Date or Yes / no
+    - who sees it: Team only, or On the shop (under the description); changing it applies at once, with Undo
+    - the categories that ask for it (chips; none means no product asks for it, and it says so)
+    - delete with Undo; values already typed on products are kept for 30 days
+    - the editor's "More about it" section asks for the fields of the product's category; the product page lists every value, tagged; the shop preview shows the filled-in On the shop ones.
+- **R6b. Allergens** (new tab, "Allergen list"). What the editor offers under Contains and May contain:
+    - add (≤30, unique ignoring case), remove with Undo
+    - each row counts the products that contain it or may contain it; one a product lists can't be removed, and says so
+    - the editor's Details section offers them as Contains / May contain chips; the product page and the shop preview show "Contains: …". Tick nothing and the shop says nothing — it never claims a product is allergen-free.
+- **R6c. SKU pattern** (new tab). How the editor suggests a SKU:
+    - a pattern from the parts `{NAME3}`, `{CAT}`, `{VALUE}`, `{N}` (default `{NAME3}{N}-{VALUE}`) and a switch, "Suggest SKUs in the product editor"
+    - validation, first match wins: empty; no part; characters other than letters, numbers, - and _ outside the parts; an unknown part; a preview clash ("{k} variants would share {SKU}")
+    - a preview of what every existing variant would be called, beside today's SKU; today's SKUs are never rewritten
+    - an explicit save from a sticky bar; leaving with an unsaved pattern asks first
+    - the editor's SKU placeholder follows the saved pattern.
 
 ### Editor v2
 
@@ -215,7 +251,7 @@ These are noted here, and each gets a line in the epic, so none is lost:
 - **Option matrices.** Variants over two options at once, such as Shade × Size.
 - **Local uploads.** Setting up R2 for local development.
 - **Multi-storefront choices.** "Sell it at" storefront chips on a variant. One storefront per business (ADR-006) makes the choice moot today.
-- **Food fields.** Allergens and a ready time as food-business fields. They return when a food business needs them.
+- **Food fields.** A food business's ready time ("Baked each morning") as its own field. (Allergens moved into this work with the updated Settings design — R6b, U15.)
 
 ### Outside this work
 
@@ -537,19 +573,44 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 
 ### U11. The catalogue settings page
 
-- **Goal:** R6–R9 in the workspace.
+- **Goal:** R6–R9 in the workspace, to the updated design (six tabs; U14–U16 fill the three new ones).
 - **Files:**
     - `apps/app.saroh.in/app/(shell)/commerce/products/settings/{page.tsx,loading.tsx}`
-    - `components/commerce/product-settings/{categories-tab,options-tab,defaults-tab,defaults-save-bar}.tsx`
+    - `components/commerce/product-settings/{categories-tab,options-tab,defaults-tab,defaults-save-bar,settings-tabs}.tsx`
     - `lib/products/settings.ts`
     - a redirect at `commerce/products/categories/page.tsx`
     - retire `components/stores/categories-manager.tsx`
     - a "Settings" entry on the Products page header
 - **Approach:**
     - Changes that take effect immediately call U4 and show a toast whose Undo sends the reverse call.
-    - Defaults is a single form with a sticky save bar and a leave guard.
+    - Defaults (and the SKU pattern, U16) are forms with a sticky save bar and one leave guard: "Leave with unsaved changes? Your changes to the defaults or the SKU pattern will be lost."
+    - The design's gaps are filled from the repo's patterns: loading, failed read, a read-only role (every control disabled, and why), a refused category delete when a discount code reaches it, and inline messages where the design fails silently (duplicate option names and values).
 - **Test scenarios:**
     - Covered by U13: rename, merge and delete with Undo; a blocked value removal; save defaults with update-existing.
+
+### U14. Custom fields — per category, team only or on the shop
+
+- **Goal:** R6a end to end.
+- **Files:**
+    - schema: `ProductField(storeId, organizationId, name, type, onShop, position, deletedAt)`, `ProductFieldCategory(fieldId, categoryId)`, `ProductFieldValue(productId, fieldId, value, organizationId)`; a migration with RLS
+    - API: `apps/api.saroh.in/src/modules/catalogue/fields.{service,dto}.ts` and routes under `stores/:storeId/fields`; values saved through the product section PATCH (`customFields: { [fieldId]: string | null }`), validated by type
+    - app: `components/commerce/product-settings/fields-tab.tsx`; editor "More about it" section; the product page's "Everything about it" rows; the shop preview's extras
+- **Approach:** a soft delete keeps values 30 days (a daily job purges later); a field's category list decides which products ask for it; the overview returns filled values with their visibility.
+- **Test scenarios:** a Date field refuses "tomorrow-ish"; a Yes / no stores true/false; a field removed from a category stops being asked for but keeps its values; a team-only field never reaches the preview; undo of a delete restores the field and its values; duplicate names refused ignoring case.
+
+### U15. Allergens — a store's list, contains and may contain
+
+- **Goal:** R6b end to end.
+- **Files:** schema `StoreAllergen(storeId, organizationId, name, position)` and `ProductAllergen(productId, allergenId, kind CONTAINS|MAY_CONTAIN)`; API `catalogue/allergens.*` and the product PATCH (`contains`, `mayContain` as allergen ids); app `allergens-tab.tsx`, the editor's chips, the product page row and the preview's "Contains:" line.
+- **Approach:** a new store starts with no list (a food business adds the usual eight in one step: "Add the common food allergens"); removal refused while any product lists it, with the count.
+- **Test scenarios:** duplicate refused ignoring case; in use can't be removed and names how many; a product with none says nothing on the shop; counts split contains / may contain.
+
+### U16. SKU pattern — suggestion, preview and clash check
+
+- **Goal:** R6c end to end.
+- **Files:** `StoreSettings.skuPattern`, `skuSuggest`; API `catalogue/sku.{service,dto}.ts` (`GET …/sku-pattern/preview?pattern=` → every variant's current and suggested SKU with clashes; `PUT …/sku-pattern`); a pure `skuFrom(pattern, parts)` shared by API and app; app `sku-tab.tsx`; the editor's SKU placeholder (replaces `suggestSku`).
+- **Approach:** the same fill rules as the design (`{NAME3}` first three letters of the name's first word, `{CAT}` three letters of the category or GEN, `{VALUE}` four characters of the option value, `{N}` the product's number, two digits); the preview is computed on the server over the store's variants.
+- **Test scenarios:** each validation message in order; a clash found and named; `{N}` resolving it; saving never rewrites an existing SKU; suggest off leaves the editor's SKU empty.
 
 ### U12. The demo store: beauty & dresses
 
