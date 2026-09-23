@@ -92,9 +92,14 @@ export class PublicInvoicesService {
         ),
     ) {}
 
-    async read(token: string): Promise<PublicInvoiceView> {
+    async read(token: string, callerHash?: string): Promise<PublicInvoiceView> {
         const tokenHash = hashPayToken(token);
-        if (!this.readLimiter.take(tokenHash)) throw tooManyRequests();
+        // Keyed on the caller, like the booking and enquiry limiters: a limiter
+        // keyed on the token the caller sent throttles nothing, because every
+        // new token is a fresh window.
+        if (!this.readLimiter.take(callerHash ?? tokenHash)) {
+            throw tooManyRequests();
+        }
         const found = await this.find(tokenHash);
         return runInOrgContext(found.organizationId, async () => {
             const invoice = await prisma.invoice.findFirst({
@@ -168,10 +173,14 @@ export class PublicInvoicesService {
     async createIntent(
         token: string,
         body: unknown,
+        callerHash?: string,
     ): Promise<CreateIntentResult> {
         const options = parseIntentBody(body);
         const tokenHash = hashPayToken(token);
-        if (!this.payLimiter.take(tokenHash)) throw tooManyRequests();
+        // The caller, not the token they sent — see `read`.
+        if (!this.payLimiter.take(callerHash ?? tokenHash)) {
+            throw tooManyRequests();
+        }
         const found = await this.find(tokenHash);
         return runInOrgContext(found.organizationId, async () => {
             const invoice = await prisma.invoice.findFirst({

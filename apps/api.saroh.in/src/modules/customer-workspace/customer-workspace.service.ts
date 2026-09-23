@@ -3,7 +3,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 
 /**
  * Unified customer workspace (#120, Task 5).
@@ -175,7 +175,9 @@ export class CustomerWorkspaceService {
 
         const events: TimelineEvent[] = [];
 
-        if (available.has("CRM")) {
+        // The module is reachable with `contact:read` since DEC-020, so the
+        // lead rows ask for `lead:read` themselves.
+        if (available.has("CRM") && allows(ctx, "lead:read")) {
             const leads = await this.db.lead.findMany({
                 where: { contactId, organizationId: ctx.organizationId },
                 select: { title: true, createdAt: true },

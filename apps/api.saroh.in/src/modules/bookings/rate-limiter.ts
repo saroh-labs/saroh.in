@@ -12,6 +12,9 @@
  * in-process limiter keeps the public booking endpoint self-contained with no
  * new infra dependency. Mirrors the enquiry command's limiter (S3-002).
  */
+/** How many keys may pile up before `take` sweeps the expired ones. */
+const SWEEP_AT = 1_000;
+
 export class FixedWindowRateLimiter {
     private readonly windows = new Map<
         string,
@@ -33,6 +36,15 @@ export class FixedWindowRateLimiter {
      */
     take(key: string, now: number = Date.now()): boolean {
         const window = this.windows.get(key);
+
+        // Sweep expired windows before adding a key. Without this the map only
+        // ever grows, and a caller who controls the key — a public route keyed
+        // on anything from the request — can grow it without limit.
+        if (this.windows.size >= SWEEP_AT) {
+            for (const [k, w] of this.windows) {
+                if (now >= w.resetAt) this.windows.delete(k);
+            }
+        }
 
         if (!window || now >= window.resetAt) {
             this.windows.set(key, { count: 1, resetAt: now + this.windowMs });
