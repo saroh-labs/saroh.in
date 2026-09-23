@@ -37,6 +37,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "contacts/contacts.controller.ts": "CRM",
     "pipelines/pipelines.controller.ts": "CRM",
     "bookings/bookings.controller.ts": "APPOINTMENTS",
+    // Staff, their hours and the booking rules (U3) — both controllers.
+    "staff/staff.controller.ts": "APPOINTMENTS",
     "sites/sites.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",

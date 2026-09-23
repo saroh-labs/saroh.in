@@ -45,6 +45,7 @@ import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
 import { SearchModule } from "./modules/search/search.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
 import { SitesModule } from "./modules/sites/sites.module";
+import { StaffModule } from "./modules/staff/staff.module";
 import { StoresModule } from "./modules/stores/stores.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
 import { WaitlistModule } from "./modules/waitlist/waitlist.module";
@@ -112,6 +113,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         LeadsModule,
         NotificationsModule,
         BookingsModule,
+        StaffModule,
         PaymentsModule,
         WebhooksModule,
         CommunicationsModule,
