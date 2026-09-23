@@ -368,6 +368,10 @@ flowchart TB
 **Verification:**
 - The worked examples in `gst.spec.ts` pass; the paper check against the design happens in U9/U11.
 
+> **Done — #490** (merged). `invoices/gst.ts` (test-first): inclusive line → taxable + CGST/SGST or IGST per line, discount spread, delivery a taxed line, place of supply bill-to → delivery → business state; `gst-states.ts` (state codes, GSTIN check). Numbering (test-first): `InvoiceSequence` keyed business + series — registered `RC/26-27/0001`, unregistered `PF-0001`, no prefix keeps legacy `INV-0001`; credit notes own series; ≤16 chars; FY in the business zone. `order-invoicing.ts`: one invoice per order (row lock + partial unique index) made in the webhook reconciliation or on a recorded / pay-later payment, PAID, no pay link, bill-to from the order; refunds → credit notes (by line when named), full refund → CREDITED; U6's edits → supplementary invoice / credit note. Registered businesses can't void — `POST invoices/:id/credit`. Registered orders ignore the storefront add-on tax (`Order.tax` = GST inside the total). Owed/spent count order paper once; customer read includes linked orders' invoices. Tax settings on `PATCH organizations/:id` (Owner/Admin); GST rate + HSN on products (editor v2 Basics), rate + SAC on services; GST card on Business. Migration `20260928100000_gst_and_order_invoices`. Not yet: plan/course/pack invoices of a registered business print at 0% (no rate on plans).
+
+> **Phase A integration — green.** Full `test:int` after U1–U8 and U9 (Pulse): 133 suites / 1642 tests (`0961ce8d` fixed two fixtures — a subscription spec that moved dates but not its sign-up invoice, and an order spec whose fixture had over-reserved stock — and registered `collections.spec.ts` in the unit config after correcting two expectations).
+
 ---
 
 ### U6. The kitchen flow for orders
