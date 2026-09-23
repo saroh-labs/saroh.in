@@ -162,3 +162,13 @@ export class UndoDefaultsDto {
     @Type(() => StockAlertSnapshot)
     stock!: StockAlertSnapshot[];
 }
+
+export class SaveSkuPatternDto {
+    @Transform(trim)
+    @IsString()
+    @MaxLength(40, { message: "Keep it under 40 characters." })
+    pattern!: string;
+
+    @IsBoolean()
+    suggest!: boolean;
+}

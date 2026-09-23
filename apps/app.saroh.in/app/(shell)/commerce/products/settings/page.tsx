@@ -7,19 +7,24 @@ import { CategoriesTab } from "@/components/commerce/product-settings/categories
 import { DefaultsTab } from "@/components/commerce/product-settings/defaults-tab";
 import { OptionsTab } from "@/components/commerce/product-settings/options-tab";
 import { ProductSettings } from "@/components/commerce/product-settings/product-settings";
+import { SkuTab } from "@/components/commerce/product-settings/sku-tab";
 import { sellCrumbs } from "@/components/commerce/sell-crumbs";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
 import type { SettingsTab } from "@/lib/products/links";
 import { isSettingsTab, productSettingsHref } from "@/lib/products/links";
-import { getCatalogue } from "@/lib/products/settings";
+import {
+    getCatalogue,
+    getSkuPreview,
+    getSkuSettings,
+} from "@/lib/products/settings";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Product settings" };
 
-/** The tabs that are built; the rest arrive with #482, #483 and #484. */
-const BUILT: SettingsTab[] = ["categories", "options", "defaults"];
+/** The tabs that are built; custom fields and allergens arrive with #482 and #483. */
+const BUILT: SettingsTab[] = ["categories", "options", "sku", "defaults"];
 
 /**
  * Sell → Products → Settings (#470): one storefront's categories, the
@@ -58,6 +63,11 @@ export default async function ProductSettingsPage({
     const tab: SettingsTab =
         isSettingsTab(rawTab) && BUILT.includes(rawTab) ? rawTab : "categories";
     const catalogue = await getCatalogue(store.id).catch(() => null);
+    const sku =
+        tab === "sku" ? await getSkuSettings(store.id).catch(() => null) : null;
+    const skuPreview = sku
+        ? await getSkuPreview(store.id, sku.pattern).catch(() => null)
+        : null;
 
     return (
         <PageContainer width="wide" className="space-y-3">
@@ -88,6 +98,7 @@ export default async function ProductSettingsPage({
                             count: catalogue.categories.length + 1,
                         },
                         { key: "options", count: catalogue.options.length },
+                        { key: "sku" },
                         { key: "defaults" },
                     ]}
                 >
@@ -98,6 +109,19 @@ export default async function ProductSettingsPage({
                         />
                     ) : tab === "options" ? (
                         <OptionsTab storeId={store.id} catalogue={catalogue} />
+                    ) : tab === "sku" ? (
+                        <SkuTab
+                            storeId={store.id}
+                            settings={
+                                sku ?? {
+                                    pattern: "{NAME3}{N}-{VALUE}",
+                                    suggest: true,
+                                    n: 1,
+                                }
+                            }
+                            preview={skuPreview}
+                            canWrite={catalogue.canWrite}
+                        />
                     ) : (
                         <DefaultsTab storeId={store.id} catalogue={catalogue} />
                     )}

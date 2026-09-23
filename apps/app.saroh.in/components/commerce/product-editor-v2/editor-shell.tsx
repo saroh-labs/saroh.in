@@ -52,6 +52,8 @@ export interface ProductEditorProps {
     categoriesHref: string;
     options: ProductOptionView[];
     canWrite: boolean;
+    /** Settings → SKUs, and this product's number for {N}. */
+    sku: { pattern: string; suggest: boolean; n: number };
 }
 
 const PRODUCTS_HREF = "/commerce/products";
@@ -87,6 +89,7 @@ function EditorBody({
     categoriesHref,
     options,
     canWrite,
+    sku,
 }: ProductEditorProps) {
     const router = useRouter();
     const { mode, states, saving, saveSections, collectAll, afterCreateAll } =
@@ -338,6 +341,7 @@ function EditorBody({
                                 storeId={storeId}
                                 symbol={symbol}
                                 options={options}
+                                sku={sku}
                             />
                             <StockSection product={product} storeId={storeId} />
                         </>

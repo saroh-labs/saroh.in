@@ -14,18 +14,14 @@ import {
     reorderVariants,
     updateVariant,
 } from "@/lib/products/actions";
-import {
-    isMoney,
-    LIMITS,
-    suggestSku,
-    trimMoney,
-} from "@/lib/products/editor-sections";
+import { isMoney, LIMITS, trimMoney } from "@/lib/products/editor-sections";
 import { productSettingsHref } from "@/lib/products/links";
 import type {
     ProductDetail,
     ProductOptionView,
     Variant,
 } from "@/lib/products/service";
+import { skuFrom } from "@/lib/products/sku-pattern";
 
 import { useEditor, useSection } from "./editor-state";
 import { boxClass, FieldHelp, MoneyBox } from "./fields";
@@ -95,11 +91,14 @@ export function VariantsSection({
     storeId,
     symbol,
     options,
+    sku,
 }: {
     product: ProductDetail;
     storeId: string;
     symbol: string;
     options: ProductOptionView[];
+    /** Settings → SKUs, and this product's number for {N}. */
+    sku: { pattern: string; suggest: boolean; n: number };
 }) {
     const { canWrite } = useEditor();
     const ro = !canWrite;
@@ -174,11 +173,22 @@ export function VariantsSection({
 
     // The row being added: its own gate, so Save is never blamed for it.
     const newTitle = values.find((x) => x.id === newValue)?.value ?? "";
-    const suggested = suggestSku(product.name, newTitle || "");
-    const sku = newSku.trim() || (newTitle ? suggested : "");
+    // The store's pattern (Settings → SKUs); off, the field starts empty.
+    const suggested =
+        sku.suggest && newTitle
+            ? skuFrom(sku.pattern, {
+                  name: product.name,
+                  category: product.category?.name ?? "",
+                  value: newTitle,
+                  n: sku.n,
+              })
+            : "";
+    const newSkuValue = newSku.trim() || suggested;
     const dupSku =
-        sku !== "" &&
-        rows.some((r) => r.sku.trim().toLowerCase() === sku.toLowerCase());
+        newSkuValue !== "" &&
+        rows.some(
+            (r) => r.sku.trim().toLowerCase() === newSkuValue.toLowerCase(),
+        );
     const newPriceBad = newPrice.trim() !== "" && !isMoney(newPrice);
     const allTaken =
         values.length > 0 && values.every((x) => takenIds.includes(x.id));
@@ -188,7 +198,8 @@ export function VariantsSection({
         takenIds.includes(newValue) ||
         dupSku ||
         newPriceBad ||
-        sku.length > LIMITS.sku;
+        newSkuValue === "" ||
+        newSkuValue.length > LIMITS.sku;
 
     async function save(): Promise<boolean> {
         let ok = true;
@@ -312,7 +323,7 @@ export function VariantsSection({
                 key: `new-${(nextKey.current += 1)}`,
                 valueId: newValue,
                 legacyTitle: "",
-                sku,
+                sku: newSkuValue,
                 price: newPrice.trim(),
                 mrp: null,
                 image: null,
@@ -705,11 +716,13 @@ export function VariantsSection({
                                 onChange={(e) => setNewSku(e.target.value)}
                                 disabled={ro}
                                 aria-label="New variant SKU"
-                                placeholder={newTitle ? suggested : "SKU"}
+                                placeholder={suggested || "SKU"}
                                 className={boxClass({
                                     small: true,
                                     mono: true,
-                                    bad: dupSku || sku.length > LIMITS.sku,
+                                    bad:
+                                        dupSku ||
+                                        newSkuValue.length > LIMITS.sku,
                                 })}
                             />
                             <MoneyBox symbol={symbol} small>

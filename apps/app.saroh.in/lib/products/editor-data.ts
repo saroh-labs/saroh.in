@@ -1,6 +1,8 @@
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { canWriteProducts } from "@/lib/products/access";
 import { listCategories, listOptions } from "@/lib/products/service";
+import { getSkuSettings } from "@/lib/products/settings";
+import { DEFAULT_SKU_PATTERN } from "@/lib/products/sku-pattern";
 import { productCategoriesHref } from "@/lib/stores/links";
 import type { Store } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";
@@ -12,13 +14,15 @@ import { getStorefront } from "@/lib/stores/storefronts";
  * storefront's settings cannot be read — the editor still works. Options
  * that cannot be read leave Variants with none to offer, which it says.
  */
-export async function loadEditorContext(store: Store) {
-    const [settings, categories, options, organization] = await Promise.all([
-        getStorefront(store.id).catch(() => null),
-        listCategories(store.id),
-        listOptions(store.id).catch(() => []),
-        resolveActiveOrganization(),
-    ]);
+export async function loadEditorContext(store: Store, productId?: string) {
+    const [settings, categories, options, organization, sku] =
+        await Promise.all([
+            getStorefront(store.id).catch(() => null),
+            listCategories(store.id),
+            listOptions(store.id).catch(() => []),
+            resolveActiveOrganization(),
+            getSkuSettings(store.id, productId).catch(() => null),
+        ]);
     return {
         storeId: store.id,
         storeName: store.name,
@@ -27,5 +31,6 @@ export async function loadEditorContext(store: Store) {
         categoriesHref: productCategoriesHref(store.id),
         options,
         canWrite: canWriteProducts(organization),
+        sku: sku ?? { pattern: DEFAULT_SKU_PATTERN, suggest: true, n: 1 },
     };
 }

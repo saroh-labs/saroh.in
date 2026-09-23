@@ -12,7 +12,6 @@ import {
     seoFallback,
     slugify,
     splitLines,
-    suggestSku,
     trimMoney,
 } from "./editor-sections";
 
@@ -22,13 +21,6 @@ describe("product editor sections", () => {
         expect(slugify("Kurta & Palazzo Set")).toBe("kurta-and-palazzo-set");
         expect(slugify("  --  ")).toBe("");
         expect(slugify("a".repeat(200))).toHaveLength(150);
-    });
-
-    it("suggests a SKU from the product and the variant", () => {
-        expect(suggestSku("Hydra Glow Serum", "50 ml")).toBe("HGS-50ML");
-        expect(suggestSku("Linen Wrap Dress", "M")).toBe("LWD-M");
-        expect(suggestSku("", "S")).toBe("SKU-S");
-        expect(suggestSku("Beard Oil", "")).toBe("BO-");
     });
 
     it("checks money and keeps MRP at or above the price", () => {

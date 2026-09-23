@@ -110,3 +110,42 @@ export async function send<T>(
         field: data?.field,
     };
 }
+
+// ---- SKU pattern (#484) ----
+
+export interface SkuSettings {
+    pattern: string;
+    suggest: boolean;
+    /** The product's number for {N}; the next one for a new product. */
+    n: number;
+}
+
+export interface SkuPreview {
+    rows: {
+        productId: string;
+        product: string;
+        variant: string;
+        now: string;
+        next: string;
+    }[];
+    total: number;
+    /** The first thing wrong with the pattern, clash included; "" if none. */
+    problem: string;
+}
+
+export function getSkuSettings(
+    storeId: string,
+    productId?: string,
+): Promise<SkuSettings | null> {
+    const q = productId ? `?productId=${encodeURIComponent(productId)}` : "";
+    return getJson<SkuSettings>(`/stores/${storeId}/sku-pattern${q}`);
+}
+
+export function getSkuPreview(
+    storeId: string,
+    pattern: string,
+): Promise<SkuPreview | null> {
+    return getJson<SkuPreview>(
+        `/stores/${storeId}/sku-pattern/preview?pattern=${encodeURIComponent(pattern)}`,
+    );
+}

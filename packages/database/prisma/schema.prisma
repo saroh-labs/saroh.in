@@ -128,11 +128,15 @@ model Organization {
   media Media[]
 
   // Products v2 (#460): photos, per-variant stock, store options, defaults.
-  productImages     ProductImage[]
-  variantInventory  VariantInventory[]
-  productOptions    ProductOption[]
-  productOptionVals ProductOptionValue[]
-  catalogueDefaults CatalogueDefaults[]
+  productImages      ProductImage[]
+  variantInventory   VariantInventory[]
+  productOptions     ProductOption[]
+  productOptionVals  ProductOptionValue[]
+  catalogueDefaults  CatalogueDefaults[]
+  productFields      ProductField[]
+  productFieldValues ProductFieldValue[]
+  storeAllergens     StoreAllergen[]
+  productAllergens   ProductAllergen[]
 
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
@@ -489,6 +493,8 @@ model Store {
 
   productOptions    ProductOption[]
   catalogueDefaults CatalogueDefaults[]
+  productFields     ProductField[]
+  allergens         StoreAllergen[]
 
   @@index([slug])
   @@index([createdAt])
@@ -619,6 +625,9 @@ model Product {
 
   reviews ProductReview[]
 
+  fieldValues ProductFieldValue[]
+  allergens   ProductAllergen[]
+
   @@unique([storeId, slug])
   @@index([storeId])
   @@index([categoryId])
@@ -746,6 +755,96 @@ model CatalogueDefaults {
   @@index([organizationId])
 }
 
+/// A thing a product records beyond the standard details (#482) — "Keeps
+/// for", "Skin type" — asked of the products in the categories it names.
+/// Team only unless `onShop`. Deleting one keeps its values for 30 days.
+model ProductField {
+  id             String       @id @default(cuid())
+  storeId        String
+  store          Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name      String
+  type      String    @default("TEXT") // TEXT | NUMBER | DATE | YES_NO
+  onShop    Boolean   @default(false)
+  position  Int       @default(0)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  categories ProductFieldCategory[]
+  values     ProductFieldValue[]
+
+  @@index([storeId])
+  @@index([organizationId])
+}
+
+model ProductFieldCategory {
+  id         String       @id @default(cuid())
+  fieldId    String
+  field      ProductField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId, categoryId])
+  @@index([categoryId])
+}
+
+model ProductFieldValue {
+  id             String       @id @default(cuid())
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fieldId        String
+  field          ProductField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  value String
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, fieldId])
+  @@index([fieldId])
+  @@index([organizationId])
+}
+
+/// A storefront's allergen list (#483) — what the editor offers under
+/// "Contains" and "May contain". A new store starts with none.
+model StoreAllergen {
+  id             String       @id @default(cuid())
+  storeId        String
+  store          Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name     String
+  position Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  products ProductAllergen[]
+
+  @@index([storeId])
+  @@index([organizationId])
+}
+
+model ProductAllergen {
+  id             String        @id @default(cuid())
+  productId      String
+  product        Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  allergenId     String
+  allergen       StoreAllergen @relation(fields: [allergenId], references: [id], onDelete: Restrict)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  kind String // CONTAINS | MAY_CONTAIN
+
+  @@unique([productId, allergenId])
+  @@index([allergenId])
+  @@index([organizationId])
+}
+
 model Category {
   id             String        @id @default(cuid())
   storeId        String
@@ -765,6 +864,7 @@ model Category {
 
   discountReach DiscountCategory[]
   defaults      CatalogueDefaults[]
+  fields        ProductFieldCategory[]
 
   @@unique([storeId, slug])
   @@index([storeId])
@@ -1184,6 +1284,11 @@ model StoreSettings {
   // Theme
   theme        String  @default("light") // light, dark, custom
   primaryColor String?
+
+  // Products (#484): how the editor suggests a SKU. Null = the built-in
+  // pattern; suggestions off leave the editor's SKU empty.
+  skuPattern String?
+  skuSuggest Boolean @default(true)
 
   updatedAt DateTime @updatedAt
 }

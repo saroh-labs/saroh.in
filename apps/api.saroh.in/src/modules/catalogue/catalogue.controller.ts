@@ -8,6 +8,7 @@ import {
     Patch,
     Post,
     Put,
+    Query,
     UseGuards,
 } from "@nestjs/common";
 
@@ -22,9 +23,11 @@ import {
     CreateOptionDto,
     RenameOptionDto,
     SaveDefaultsDto,
+    SaveSkuPatternDto,
     UndoDefaultsDto,
 } from "./dto";
 import { OptionsService } from "./options.service";
+import { SkuService } from "./sku.service";
 
 /**
  * Store-wide catalogue settings: the settings page's one read, the options
@@ -38,7 +41,37 @@ export class CatalogueController {
     constructor(
         private readonly catalogue: CatalogueService,
         private readonly options: OptionsService,
+        private readonly sku: SkuService,
     ) {}
+
+    /** The pattern, whether to suggest, and a product's number for {N}. */
+    @Get("sku-pattern")
+    skuPattern(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Query("productId") productId?: string,
+    ) {
+        return this.sku.get(storeId, user.id, productId);
+    }
+
+    /** Every variant's SKU today and under this pattern, with any clash. */
+    @Get("sku-pattern/preview")
+    skuPreview(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Query("pattern") pattern = "",
+    ) {
+        return this.sku.preview(storeId, user.id, pattern);
+    }
+
+    @Put("sku-pattern")
+    saveSkuPattern(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Body() dto: SaveSkuPatternDto,
+    ) {
+        return this.sku.save(storeId, user.id, dto);
+    }
 
     @Get("catalogue")
     get(@CurrentUser() user: AuthUser, @Param("storeId") storeId: string) {

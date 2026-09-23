@@ -4,8 +4,9 @@ import type {
     CategoryRemoval,
     DefaultsEntry,
     DefaultsSaveResult,
+    SkuSettings,
 } from "./settings";
-import { send } from "./settings";
+import { getSkuPreview, send } from "./settings";
 
 /**
  * Server Actions for Product settings. Each change that takes effect at
@@ -153,4 +154,22 @@ export async function undoDefaults(storeId: string, saved: DefaultsSaveResult) {
             stock: saved.updated.stock,
         },
     );
+}
+
+// ---- SKU pattern ----
+
+/** The preview as the pattern is typed; null when it could not be read. */
+export async function previewSkuPattern(storeId: string, pattern: string) {
+    return getSkuPreview(storeId, pattern);
+}
+
+export async function saveSkuPattern(
+    storeId: string,
+    pattern: string,
+    suggest: boolean,
+) {
+    return send<SkuSettings>(`${base(storeId)}/sku-pattern`, "PUT", {
+        pattern,
+        suggest,
+    });
 }

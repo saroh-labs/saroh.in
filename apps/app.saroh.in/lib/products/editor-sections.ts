@@ -445,27 +445,6 @@ export function slugify(name: string): string {
         .replace(/-+$/g, "");
 }
 
-/**
- * A SKU to start from: the product's initials (up to three words) and the
- * variant's first word — "Hydra Glow Serum" + "50 ml" → "HGS-50ML".
- */
-export function suggestSku(productName: string, variantTitle: string): string {
-    const initials = productName
-        .split(/\s+/)
-        .filter((w) => /[a-z0-9]/i.test(w))
-        .slice(0, 3)
-        .map((w) => w.replace(/[^a-z0-9]/gi, "").charAt(0))
-        .join("")
-        .toUpperCase();
-    const tail = variantTitle
-        .replace(/[^a-z0-9 ]/gi, "")
-        .replace(/\s+/g, "")
-        .slice(0, 6)
-        .toUpperCase();
-    const head = initials || "SKU";
-    return tail ? `${head}-${tail}` : `${head}-`;
-}
-
 // ---- The editor's sections, as the shell sees them ----
 
 /** Each part of the editor that saves on its own, top to bottom. */
