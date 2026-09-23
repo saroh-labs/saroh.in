@@ -85,6 +85,15 @@ export class CustomerWorkspaceController {
         return { ok: true };
     }
 
+    /** Which contact a store customer is linked to (U18), or null. */
+    @Get("links/by-customer/:customerId")
+    contactFor(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("customerId") customerId: string,
+    ) {
+        return this.workspace.contactFor(ctx, customerId);
+    }
+
     @Get(":contactId/timeline")
     timeline(
         @OrgContext() ctx: OrganizationContext,

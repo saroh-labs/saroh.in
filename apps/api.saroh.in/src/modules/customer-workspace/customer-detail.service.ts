@@ -5,9 +5,16 @@ import {
     Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { DateTime } from "luxon";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { howPaid } from "../bookings/booking-calendar";
+import type { PaidWith } from "../bookings/dto";
+import {
+    businessTimezone,
+    FALLBACK_TIMEZONE,
+} from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import {
@@ -17,7 +24,11 @@ import {
 } from "../invoices/invoice-state";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { ContactNoteView } from "./contact-notes.service";
-import { loadContactNotes, notedAllergens } from "./contact-notes.service";
+import {
+    allergenChoices,
+    loadContactNotes,
+    notedAllergens,
+} from "./contact-notes.service";
 
 /**
  * One read of a customer (U8, R17), rooted on the CRM contact — the record
@@ -59,7 +70,9 @@ export type DetailSource =
     | "bookings"
     | "subscriptions"
     | "invoices"
-    | "packs";
+    | "packs"
+    | "membership"
+    | "consent";
 
 export interface DetailUnavailable {
     source: DetailSource;
@@ -75,6 +88,8 @@ const LABELS: Record<DetailSource, string> = {
     subscriptions: "Subscriptions",
     invoices: "Invoices",
     packs: "Class packs",
+    membership: "Membership",
+    consent: "Offers and news",
 };
 
 /** Kept per currency; amounts in different currencies are never added. */
@@ -111,6 +126,18 @@ export interface DetailOrder {
     status: string;
     paymentStatus: string;
     itemCount: number;
+    /** What was bought, line by line (up to ORDER_LINES), for "usually buys". */
+    items: {
+        productId: string;
+        name: string;
+        variant: string | null;
+        quantity: number;
+    }[];
+    /** COLLECT or DELIVERY (U6), and where the kitchen has it. */
+    fulfilment: string;
+    stage: string;
+    /** Where a delivery went; null for a collection. */
+    delivery: string | null;
     /** Money only — absent for a viewer who reads no money. */
     total?: string;
     currency?: string;
@@ -124,10 +151,20 @@ export interface DetailBooking {
     endAt: string;
     timezone: string;
     service: { id: string; name: string };
+    /** A class is a service more than one person books at once. */
+    isClass: boolean;
+    /** Who takes it (U3); null on bookings from before staff. */
+    staff: { id: string; name: string } | null;
     status: string;
     outcome: string | null;
     /** Paid with a class pack (a redemption not given back). */
     paidWithPack: boolean;
+    /** MEMBERSHIP | PACK | PAID | DESK, from the record (U3); null if unknown. */
+    paidWith: PaidWith | null;
+    /** The pack whose class it used, while the redemption stands. */
+    packName: string | null;
+    /** Cancelled after the free-cancellation window: the class stays used. */
+    cancelledLate: boolean;
 }
 
 export interface DetailSubscription {
@@ -156,6 +193,10 @@ export interface DetailInvoice {
     kind: string;
     /** Set on an order's paper: it is counted on the order, not here. */
     orderId: string | null;
+    /** The order's number, for "Order #1063". */
+    orderNumber: string | null;
+    /** The plan a subscription charge is for, for "Sourdough subscription". */
+    planName: string | null;
     total: string;
     currency: string;
     issuedAt: string | null;
@@ -171,6 +212,8 @@ export interface DetailPack {
     left: number;
     /** Use-by: the classes left lapse after this. */
     expiresAt: string;
+    /** When it was bought. */
+    boughtAt: string;
     standing: "ACTIVE" | "USED_UP" | "EXPIRED";
     /** Money only. */
     price?: string;
@@ -199,6 +242,8 @@ export interface DetailStats {
         membership: number | null;
         /** The soonest use-by among packs with classes left. */
         nextExpiry: string | null;
+        /** The membership whose monthly classes count, when there is one. */
+        allowance: MembershipAllowance | null;
     } | null;
     spent?: MoneyTotal[] | null;
     owed?: {
@@ -206,6 +251,31 @@ export interface DetailStats {
         unpaidCount: number;
         overdueCount: number;
     } | null;
+}
+
+/**
+ * A membership's classes this month (U3: `SubscriptionPlan.classesPerMonth`),
+ * counted as a booking with it does: confirmed or cancelled late, in the
+ * calendar month of the membership's own timezone.
+ */
+export interface MembershipAllowance {
+    subscriptionId: string;
+    plan: string;
+    perMonth: number;
+    used: number;
+    /** Zero while paused: no classes until it resumes. */
+    left: number;
+    /** The start of next month, when the allowance comes back. */
+    resetsAt: string;
+    paused: boolean;
+}
+
+/** Offers by email (the `Consent` record), as the customer last said. */
+export interface OffersConsent {
+    /** GRANTED | REVOKED; null when never asked. */
+    status: string | null;
+    source: string | null;
+    at: string | null;
 }
 
 export interface CustomerDetail {
@@ -222,8 +292,15 @@ export interface CustomerDetail {
     };
     /** Whether money figures were included for this viewer. */
     money: boolean;
+    /** The business's zone, for the dates the screen writes out. */
+    timezone: string;
     stats: DetailStats;
-    notes: { from: "contact"; rows: ContactNoteView[] } | null;
+    notes: {
+        from: "contact";
+        rows: ContactNoteView[];
+        /** The allergens a new note may name (the storefronts' lists). */
+        allergenChoices: { id: string; name: string }[];
+    } | null;
     /** Every allergen the notes name, once — what Order Detail matches on. */
     allergens: { id: string; name: string }[] | null;
     linkedCustomers?: LinkedCustomer[] | null;
@@ -237,6 +314,7 @@ export interface CustomerDetail {
     subscriptions?: { from: "contact"; rows: DetailSubscription[] } | null;
     invoices?: { from: "contact"; rows: DetailInvoice[] } | null;
     packs?: { from: "contact"; rows: DetailPack[] } | null;
+    consent: OffersConsent | null;
     unavailable: DetailUnavailable[];
 }
 
@@ -244,6 +322,8 @@ export interface CustomerDetail {
 const ROWS = 50;
 const UPCOMING = 20;
 const PAST = 30;
+/** Lines kept per order: enough to see what they buy. */
+const ORDER_LINES = 12;
 
 /**
  * The invoices that are an order's own (ADR-008) — and credit notes — are
@@ -341,11 +421,17 @@ export class CustomerDetailService {
 
         // NOT guarded either, as on Home: availability decides which blocks
         // may exist at all, and guessing could show a module that is off.
-        const views = await this.availability.listViews({
-            organizationId,
-            organizationRole: ctx.role,
-            organizationActions: ctx.actions,
-        });
+        const [views, timezone] = await Promise.all([
+            this.availability.listViews({
+                organizationId,
+                organizationRole: ctx.role,
+                organizationActions: ctx.actions,
+            }),
+            // A failed zone read costs the zone, not the page.
+            businessTimezone(this.db, organizationId).catch(
+                () => FALLBACK_TIMEZONE,
+            ),
+        ]);
         const on = new Set(
             views.filter((v) => v.readiness !== "DISABLED").map((v) => v.key),
         );
@@ -382,9 +468,14 @@ export class CustomerDetailService {
             subscriptions,
             invoices,
             packs,
+            membership,
+            consent,
         ] = await Promise.all([
             attempt("notes", () =>
-                loadContactNotes(this.db, organizationId, contactId),
+                Promise.all([
+                    loadContactNotes(this.db, organizationId, contactId),
+                    allergenChoices(this.db, organizationId),
+                ]),
             ),
             links === undefined
                 ? skip
@@ -428,6 +519,18 @@ export class CustomerDetailService {
                       this.readPacks(organizationId, contactId, money),
                   )
                 : skip,
+            // Classes a month are a count, not money: whoever reads the
+            // diary may see what a member has left.
+            wants.bookings
+                ? attempt("membership", () =>
+                      this.readMembership(organizationId, contactId).then(
+                          (allowance) => ({ allowance }),
+                      ),
+                  )
+                : skip,
+            attempt("consent", () =>
+                this.readConsent(organizationId, contactId),
+            ),
         ]);
 
         const stats: DetailStats = {};
@@ -436,17 +539,23 @@ export class CustomerDetailService {
             stats.bookings = bookings ? bookings.counts.bookings : null;
             stats.attended = bookings ? bookings.counts.attended : null;
             stats.noShows = bookings ? bookings.counts.noShows : null;
-            stats.lateCancels = null;
+            stats.lateCancels = bookings ? bookings.counts.lateCancels : null;
         }
         if (wants.packs) {
-            stats.classesLeft = packs
-                ? {
-                      total: packs.classesLeft,
-                      packs: packs.classesLeft,
-                      membership: null,
-                      nextExpiry: packs.nextExpiry,
-                  }
-                : null;
+            // A classes-left figure missing one of its parts is not the
+            // figure: null, and the failed source is already named.
+            stats.classesLeft =
+                packs && membership !== null
+                    ? {
+                          total:
+                              packs.classesLeft +
+                              (membership?.allowance?.left ?? 0),
+                          packs: packs.classesLeft,
+                          membership: membership?.allowance?.left ?? null,
+                          nextExpiry: packs.nextExpiry,
+                          allowance: membership?.allowance ?? null,
+                      }
+                    : null;
         }
         if (money) {
             // A total with a missing part is not the total: null, and the
@@ -467,7 +576,7 @@ export class CustomerDetailService {
             if (wants.invoices) stats.owed = invoices ? invoices.owed : null;
         }
 
-        const noteRows = notes ?? null;
+        const noteRows = notes?.[0] ?? null;
         return {
             contact: {
                 id: contact.id,
@@ -481,8 +590,16 @@ export class CustomerDetailService {
                 createdAt: contact.createdAt.toISOString(),
             },
             money,
+            timezone,
             stats,
-            notes: noteRows ? { from: "contact", rows: noteRows } : null,
+            notes:
+                notes && noteRows
+                    ? {
+                          from: "contact",
+                          rows: noteRows,
+                          allergenChoices: notes[1],
+                      }
+                    : null,
             allergens: noteRows ? notedAllergens(noteRows) : null,
             ...(links === undefined ? {} : { linkedCustomers: links }),
             ...(possibleMatches === undefined ? {} : { possibleMatches }),
@@ -528,6 +645,7 @@ export class CustomerDetailService {
                           ? { from: "contact" as const, rows: packs.rows }
                           : null,
                   }),
+            consent,
             unavailable,
         };
     }
@@ -655,6 +773,23 @@ export class CustomerDetailService {
                     currency: true,
                     store: { select: { id: true, name: true } },
                     _count: { select: { items: true } },
+                    fulfilment: true,
+                    stage: true,
+                    deliveryLine1: true,
+                    deliveryLine2: true,
+                    deliveryCity: true,
+                    deliveryState: true,
+                    deliveryPostalCode: true,
+                    items: {
+                        take: ORDER_LINES,
+                        orderBy: { id: "asc" },
+                        select: {
+                            productId: true,
+                            quantity: true,
+                            product: { select: { name: true } },
+                            variant: { select: { title: true } },
+                        },
+                    },
                 },
             }),
             this.db.order.count({ where }),
@@ -680,6 +815,28 @@ export class CustomerDetailService {
                 status: o.status,
                 paymentStatus: o.paymentStatus,
                 itemCount: o._count.items,
+                items: o.items.map((i) => ({
+                    productId: i.productId,
+                    name: i.product.name,
+                    variant: i.variant?.title ?? null,
+                    quantity: i.quantity,
+                })),
+                fulfilment: o.fulfilment,
+                stage: o.stage,
+                delivery:
+                    o.fulfilment === "DELIVERY"
+                        ? [
+                              o.deliveryLine1,
+                              o.deliveryLine2,
+                              o.deliveryCity,
+                              [o.deliveryState, o.deliveryPostalCode]
+                                  .filter(Boolean)
+                                  .join(" "),
+                          ]
+                              .map((part) => part?.trim())
+                              .filter(Boolean)
+                              .join(", ") || null
+                        : null,
                 ...(money
                     ? { total: toMoneyString(o.total), currency: o.currency }
                     : {}),
@@ -698,11 +855,20 @@ export class CustomerDetailService {
             timezone: true,
             status: true,
             outcome: true,
-            service: { select: { id: true, name: true } },
-            packRedemption: { select: { reversedAt: true } },
+            paidWith: true,
+            subscriptionId: true,
+            cancelledLate: true,
+            service: { select: { id: true, name: true, capacity: true } },
+            staff: { select: { id: true, name: true } },
+            packRedemption: {
+                select: {
+                    reversedAt: true,
+                    purchase: { select: { pack: { select: { name: true } } } },
+                },
+            },
         } as const;
-        const [upcoming, past, bookings, attended, noShows] = await Promise.all(
-            [
+        const [upcoming, past, bookings, attended, noShows, lateCancels] =
+            await Promise.all([
                 this.db.booking.findMany({
                     where: { ...where, startAt: { gte: now } },
                     orderBy: { startAt: "asc" },
@@ -724,24 +890,34 @@ export class CustomerDetailService {
                 this.db.booking.count({
                     where: { ...where, outcome: "NO_SHOW" },
                 }),
-            ],
-        );
+                this.db.booking.count({
+                    where: { ...where, cancelledLate: true },
+                }),
+            ]);
         const view = (b: (typeof upcoming)[number]): DetailBooking => ({
             id: b.id,
             startAt: b.startAt.toISOString(),
             endAt: b.endAt.toISOString(),
             timezone: b.timezone,
-            service: b.service,
+            service: { id: b.service.id, name: b.service.name },
+            isClass: b.service.capacity > 1,
+            staff: b.staff,
             status: b.status,
             outcome: b.outcome,
             paidWithPack:
                 b.packRedemption !== null &&
                 b.packRedemption.reversedAt === null,
+            paidWith: howPaid(b),
+            packName:
+                b.packRedemption?.reversedAt === null
+                    ? b.packRedemption.purchase.pack.name
+                    : null,
+            cancelledLate: b.cancelledLate,
         });
         return {
             upcoming: upcoming.map(view),
             past: past.map(view),
-            counts: { bookings, attended, noShows },
+            counts: { bookings, attended, noShows, lateCancels },
         };
     }
 
@@ -810,6 +986,10 @@ export class CustomerDetailService {
                     issuedAt: true,
                     dueAt: true,
                     paidAt: true,
+                    order: { select: { orderId: true } },
+                    subscription: {
+                        select: { plan: { select: { name: true } } },
+                    },
                 },
             }),
             this.db.invoice.findMany({
@@ -842,6 +1022,8 @@ export class CustomerDetailService {
                 source: i.source,
                 kind: i.kind,
                 orderId: i.orderId,
+                orderNumber: i.order?.orderId ?? null,
+                planName: i.subscription?.plan.name ?? null,
                 total: toMoneyString(i.total),
                 currency: i.currency,
                 issuedAt: i.issuedAt?.toISOString() ?? null,
@@ -876,6 +1058,7 @@ export class CustomerDetailService {
                 price: true,
                 currency: true,
                 expiresAt: true,
+                createdAt: true,
                 pack: { select: { id: true, name: true } },
                 _count: {
                     select: { redemptions: { where: { reversedAt: null } } },
@@ -900,6 +1083,7 @@ export class CustomerDetailService {
                 used,
                 left,
                 expiresAt: p.expiresAt.toISOString(),
+                boughtAt: p.createdAt.toISOString(),
                 standing: expired
                     ? "EXPIRED"
                     : left === 0
@@ -914,6 +1098,72 @@ export class CustomerDetailService {
             rows: views,
             classesLeft,
             nextExpiry: (nextExpiry as Date | null)?.toISOString() ?? null,
+        };
+    }
+
+    /**
+     * The membership whose plan includes classes a month, and what is left
+     * of this month's (U3). Null when the person has none.
+     */
+    private async readMembership(
+        organizationId: string,
+        contactId: string,
+    ): Promise<MembershipAllowance | null> {
+        const sub = await this.db.customerSubscription.findFirst({
+            where: {
+                organizationId,
+                contactId,
+                status: { not: "CANCELLED" },
+                plan: { classesPerMonth: { not: null } },
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+                id: true,
+                status: true,
+                timezone: true,
+                plan: { select: { name: true, classesPerMonth: true } },
+            },
+        });
+        const perMonth = sub?.plan.classesPerMonth;
+        if (!sub || perMonth === null || perMonth === undefined) return null;
+        const month = DateTime.now().setZone(sub.timezone).startOf("month");
+        const next = month.plus({ months: 1 });
+        const used = await this.db.booking.count({
+            where: {
+                organizationId,
+                subscriptionId: sub.id,
+                startAt: {
+                    gte: month.toUTC().toJSDate(),
+                    lt: next.toUTC().toJSDate(),
+                },
+                OR: [{ status: "CONFIRMED" }, { cancelledLate: true }],
+            },
+        });
+        const paused = sub.status === "PAUSED";
+        return {
+            subscriptionId: sub.id,
+            plan: sub.plan.name,
+            perMonth,
+            used: Math.min(used, perMonth),
+            left: paused ? 0 : Math.max(0, perMonth - used),
+            resetsAt: next.toUTC().toISO() ?? next.toJSDate().toISOString(),
+            paused,
+        };
+    }
+
+    /** What the person last said about offers by email. */
+    private async readConsent(
+        organizationId: string,
+        contactId: string,
+    ): Promise<OffersConsent> {
+        const row = await this.db.consent.findFirst({
+            where: { organizationId, contactId, channel: "EMAIL" },
+            select: { status: true, source: true, updatedAt: true },
+        });
+        return {
+            status: row?.status ?? null,
+            source: row?.source ?? null,
+            at: row?.updatedAt.toISOString() ?? null,
         };
     }
 }

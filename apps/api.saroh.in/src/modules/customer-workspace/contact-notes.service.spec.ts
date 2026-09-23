@@ -47,6 +47,11 @@ function make() {
             deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
         storeAllergen: { count: jest.fn().mockResolvedValue(1) },
+        user: {
+            findMany: jest
+                .fn()
+                .mockResolvedValue([{ id: "user_1", name: "Nisha" }]),
+        },
         auditEvent: { create: jest.fn().mockResolvedValue({}) },
         $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db)),
     };

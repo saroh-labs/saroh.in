@@ -122,7 +122,11 @@ export interface PersonDiary {
 }
 
 /** How a booking was paid, from what it records (U3) and what it holds. */
-export function howPaid(row: DiaryRow): PaidWith | null {
+export function howPaid(row: {
+    paidWith: string | null;
+    packRedemption: { reversedAt: Date | null } | null;
+    subscriptionId: string | null;
+}): PaidWith | null {
     if (row.paidWith && (PAID_WITH as readonly string[]).includes(row.paidWith))
         return row.paidWith as PaidWith;
     if (row.packRedemption?.reversedAt === null) return "PACK";

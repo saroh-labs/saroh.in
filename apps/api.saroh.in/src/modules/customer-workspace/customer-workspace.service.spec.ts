@@ -25,6 +25,7 @@ function make(overrides: Record<string, unknown> = {}) {
         },
         customerIdentityLink: {
             findMany: jest.fn().mockResolvedValue([]),
+            findFirst: jest.fn().mockResolvedValue(null),
             upsert: jest.fn().mockResolvedValue({}),
             deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
@@ -140,5 +141,27 @@ describe("CustomerWorkspaceService", () => {
         expect(db.order.findMany).not.toHaveBeenCalled();
         expect(db.booking.findMany).not.toHaveBeenCalled();
         expect(events.every((e) => e.moduleKey === "CRM")).toBe(true);
+    });
+
+    it("finds the contact a store customer is linked to, in this organization", async () => {
+        const { svc, db } = make();
+        db.customerIdentityLink.findFirst.mockResolvedValue({
+            contactId: "c1",
+        });
+
+        await expect(svc.contactFor(CTX, "cust1")).resolves.toEqual({
+            contactId: "c1",
+        });
+        expect(
+            db.customerIdentityLink.findFirst.mock.calls[0][0].where,
+        ).toEqual({ organizationId: "org_1", customerId: "cust1" });
+    });
+
+    it("says no contact for a store customer nobody linked", async () => {
+        const { svc } = make();
+
+        await expect(svc.contactFor(CTX, "cust9")).resolves.toEqual({
+            contactId: null,
+        });
     });
 });
