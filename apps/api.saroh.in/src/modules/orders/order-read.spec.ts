@@ -291,4 +291,29 @@ describe("amountDueCents", () => {
             }),
         );
     });
+
+    it("shows the variant's photo and SKU, falling back to the cover", () => {
+        const line = (variant: RawOrderRead["items"][number]["variant"]) =>
+            serializeOrderRead(
+                {
+                    ...base,
+                    items: [
+                        {
+                            ...base.items[0],
+                            product: { name: "Loaf", image: "cover.jpg" },
+                            variant,
+                        },
+                    ],
+                },
+                opts(false),
+            ).items[0];
+        expect(
+            line({ title: "800g", sku: "SD-800", photo: { url: "v.jpg" } }),
+        ).toEqual(
+            expect.objectContaining({ sku: "SD-800", imageUrl: "v.jpg" }),
+        );
+        expect(line(null)).toEqual(
+            expect.objectContaining({ sku: null, imageUrl: "cover.jpg" }),
+        );
+    });
 });

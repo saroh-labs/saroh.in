@@ -47,6 +47,10 @@ export interface OrderLineDto {
     productId: string;
     name: string | null;
     variantTitle: string | null;
+    /** The variant's SKU, where the line names a variant. */
+    sku: string | null;
+    /** The variant's photo, else the product's cover. */
+    imageUrl: string | null;
     /**
      * What the product says it contains and may contain, as it says it NOW —
      * the allergy banner checks these ids against the customer's notes
@@ -199,12 +203,18 @@ export interface RawOrderRead {
         price: DecimalLike;
         product: {
             name: string;
+            image?: string | null;
             allergens?: {
                 kind: string;
                 allergen: { id: string; name: string };
             }[];
         } | null;
-        variant: { title: string } | null;
+        variant: {
+            title: string;
+            sku?: string;
+            image?: string | null;
+            photo?: { url: string } | null;
+        } | null;
         refundLines: { quantity: number; amountCents: number }[];
     }[];
     events: {
@@ -354,6 +364,12 @@ export function serializeOrderRead(
             productId: i.productId,
             name: i.product?.name ?? null,
             variantTitle: i.variant?.title ?? null,
+            sku: i.variant?.sku ?? null,
+            imageUrl:
+                i.variant?.photo?.url ??
+                i.variant?.image ??
+                i.product?.image ??
+                null,
             allergens: allergensOf(i.product?.allergens ?? []),
             quantity: i.quantity,
             refundedQuantity: i.refundLines.reduce((s, r) => s + r.quantity, 0),

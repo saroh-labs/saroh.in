@@ -696,6 +696,7 @@ const READ_INCLUDE = {
             product: {
                 select: {
                     name: true,
+                    image: true,
                     allergens: {
                         orderBy: { allergen: { position: "asc" } },
                         select: {
@@ -705,7 +706,14 @@ const READ_INCLUDE = {
                     },
                 },
             },
-            variant: { select: { title: true } },
+            variant: {
+                select: {
+                    title: true,
+                    sku: true,
+                    image: true,
+                    photo: { select: { url: true } },
+                },
+            },
             refundLines: {
                 where: { paymentRefund: { status: { not: "FAILED" } } },
                 select: { quantity: true, amountCents: true },
