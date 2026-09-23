@@ -1017,6 +1017,7 @@ export class BookingsService {
             };
         }
 
+        const zone = staffing.zone;
         const availService = this.toAvailabilityService(service);
         const candidates = named ? [named] : staffing.people;
         const endAt = new Date(
@@ -1077,6 +1078,29 @@ export class BookingsService {
                     field: "staffId",
                 });
             }
+        }
+        // A public booker whose start was a real one — inside somebody's
+        // hours, but booked meanwhile, or off — hears it went, as a conflict:
+        // the page then shows what is left, as it does for a full class.
+        // Booked and off read alike, so time off never leaves the business.
+        if (
+            audience === "public" &&
+            people.some((person) =>
+                isPersonSlotStart(
+                    availService,
+                    rules,
+                    { ...person, busy: [], timeOff: [] },
+                    zone,
+                    startAt,
+                ),
+            )
+        ) {
+            throw new ConflictException({
+                message: named
+                    ? `That time with ${named.name} is no longer available. Pick another time.`
+                    : "That time is no longer available. Pick another time.",
+                field: "startAt",
+            });
         }
         throw new BadRequestException({
             message: named
@@ -1710,63 +1734,65 @@ export class BookingsService {
         // 4. Idempotency pre-check — replay an existing booking unchanged, but
         //    only to the same booker: a key alone does not hand over someone
         //    else's booking (or its meeting link).
-        if (input.idempotencyKey) {
-            const existing = await prisma.booking.findUnique({
-                where: {
-                    serviceId_idempotencyKey: {
-                        serviceId,
-                        idempotencyKey: input.idempotencyKey,
-                    },
-                },
-            });
-            if (existing) return this.replay(existing, input, now);
-        }
+        const existing = await this.bookingByKey(serviceId, input);
+        if (existing) return this.replay(existing, input, now);
 
         // 5. Who it is with (U3) — after the replay, so a retried request is
         //    not refused by the person its own first attempt booked.
-        const person = await this.resolvePerson(
-            service,
-            rules,
-            staffing,
-            startAt,
-            input.staffId,
-            "public",
-        );
+        //    A double submit can lose here too, once its twin has committed:
+        //    the person is busy with the very booking this key made.
+        let person: ReserveWith;
+        try {
+            person = await this.resolvePerson(
+                service,
+                rules,
+                staffing,
+                startAt,
+                input.staffId,
+                "public",
+            );
+        } catch (err) {
+            const twin = await this.bookingByKey(serviceId, input);
+            if (twin) return this.replay(twin, input, now);
+            throw err;
+        }
         if (input.pay === "DESK") person.paidWith = "DESK";
 
         // 6. Atomic, serializable reservation (see the method doc for WHY) —
         //    with the hold's invoice in the same transaction for pay now.
         // Written inside the transaction; a holder, since a closure's write
         // is invisible to the narrowing that follows.
-        const made: { payToken: string | null } = { payToken: null };
-        const also = price
-            ? {
-                  onRace: "This slot is fully booked",
-                  inTx: async (
-                      tx: Prisma.TransactionClient,
-                      booking: Booking,
-                  ) => {
-                      if (!booking.contactId) return;
-                      const hold = await createHoldInvoiceInTx(tx, {
-                          organizationId: service.organizationId,
-                          bookingId: booking.id,
-                          contactId: booking.contactId,
-                          billToName: booking.bookerName,
-                          billToEmail: booking.bookerEmail ?? "",
-                          service: {
-                              name: service.name,
-                              priceCents: price.cents,
-                              currency: price.currency,
-                              timezone: service.timezone,
-                              gstRate: service.gstRate,
-                              sacCode: service.sacCode,
-                          },
-                          startAt,
-                      });
-                      made.payToken = hold.payToken;
-                  },
-              }
-            : undefined;
+        // Which booking this call wrote, so an idempotency race that hands
+        // back the winner's is told apart — and a token made in a
+        // transaction that was then rolled back is never handed out.
+        const made: { bookingId: string | null; payToken: string | null } = {
+            bookingId: null,
+            payToken: null,
+        };
+        const also = {
+            onRace: "This slot is fully booked",
+            inTx: async (tx: Prisma.TransactionClient, booking: Booking) => {
+                made.bookingId = booking.id;
+                if (!price || !booking.contactId) return;
+                const hold = await createHoldInvoiceInTx(tx, {
+                    organizationId: service.organizationId,
+                    bookingId: booking.id,
+                    contactId: booking.contactId,
+                    billToName: booking.bookerName,
+                    billToEmail: booking.bookerEmail ?? "",
+                    service: {
+                        name: service.name,
+                        priceCents: price.cents,
+                        currency: price.currency,
+                        timezone: service.timezone,
+                        gstRate: service.gstRate,
+                        sacCode: service.sacCode,
+                    },
+                    startAt,
+                });
+                made.payToken = hold.payToken;
+            },
+        };
         if (price) person.holdUntil = holdExpiry(now);
         const booking = await this.reserve(
             service,
@@ -1778,10 +1804,26 @@ export class BookingsService {
             person,
         );
         // An idempotency race replays the winner, which made its own token.
-        if (price && !made.payToken && booking.status === "PENDING") {
+        if (made.bookingId !== booking.id) {
             return this.replay(booking, input, now);
         }
         return { booking, payToken: made.payToken };
+    }
+
+    /** The booking an idempotency key already made for this service, if any. */
+    private async bookingByKey(
+        serviceId: string,
+        input: BookInput,
+    ): Promise<Booking | null> {
+        if (!input.idempotencyKey) return null;
+        return prisma.booking.findUnique({
+            where: {
+                serviceId_idempotencyKey: {
+                    serviceId,
+                    idempotencyKey: input.idempotencyKey,
+                },
+            },
+        });
     }
 
     /**
@@ -2101,17 +2143,18 @@ export class BookingsService {
         } catch (err) {
             const code = (err as { code?: string }).code;
             // Idempotency race: two concurrent books with the same
-            // (serviceId, idempotencyKey) — the unique index rejects the second
-            // (P2002). Re-read and replay the winner instead of erroring.
-            if (input.idempotencyKey && code === "P2002") {
-                const existing = await prisma.booking.findUnique({
-                    where: {
-                        serviceId_idempotencyKey: {
-                            serviceId,
-                            idempotencyKey: input.idempotencyKey,
-                        },
-                    },
-                });
+            // (serviceId, idempotencyKey). The loser is refused one of three
+            // ways — the unique index (P2002), a serialization failure
+            // (P2034, both read the slot and its person), or the capacity or
+            // person gate once the winner is visible. Whichever, when the
+            // key's booking now exists, replay the winner instead of erroring.
+            if (
+                input.idempotencyKey &&
+                (code === "P2002" ||
+                    code === "P2034" ||
+                    err instanceof ConflictException)
+            ) {
+                const existing = await this.bookingByKey(serviceId, input);
                 if (existing) return existing;
             }
             // Serialization failure — Postgres aborted the loser of a race.

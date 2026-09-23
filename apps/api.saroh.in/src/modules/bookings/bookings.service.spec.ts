@@ -322,10 +322,12 @@ describe("BookingsService.book — capacity-one reservation", () => {
             ...SERVICE,
             availabilityRules: RULES,
         });
-        // Pre-check finds nothing; the tx loses the unique race; re-read wins.
-        bookingFindUnique
-            .mockResolvedValueOnce(null)
-            .mockResolvedValueOnce({ id: "bk_win" });
+        // Pre-check finds nothing; the tx loses the unique race; re-read wins
+        // — replayed only to the same booker, like any replay.
+        bookingFindUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+            id: "bk_win",
+            bookerEmail: "jane@example.com",
+        });
         bookingCount.mockResolvedValue(0);
         contactUpsert.mockResolvedValue({ id: "contact_1" });
         bookingCreate.mockRejectedValue({ code: "P2002" });
@@ -336,7 +338,10 @@ describe("BookingsService.book — capacity-one reservation", () => {
             "iphash",
         );
 
-        expect(res).toEqual({ id: "bk_win" });
+        expect(res).toEqual({
+            id: "bk_win",
+            bookerEmail: "jane@example.com",
+        });
     });
 
     it("400s an off-grid startAt (not an aligned slot) — no tx", async () => {
@@ -1749,6 +1754,22 @@ describe("staff on bookings (U3)", () => {
         });
     });
 
+    it("tells a public booker a time booked meanwhile went, as a conflict", async () => {
+        wireStaffed([ASHA]);
+        bookingFindMany.mockResolvedValue([
+            {
+                staffId: "staff_asha",
+                startAt: new Date(START),
+                endAt: new Date("2026-07-20T10:00:00.000Z"),
+            },
+        ]);
+        const refused = await new BookingsService()
+            .book("svc_1", baseInput(), "iphash")
+            .catch((e: unknown) => e);
+        expect(refused).toBeInstanceOf(ConflictException);
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
     it("refuses a person who is off, without saying so to the public", async () => {
         wireStaffed([ASHA]);
         db.staffTimeOff!.findMany!.mockResolvedValue([
@@ -1761,8 +1782,10 @@ describe("staff on bookings (U3)", () => {
         const refused = await new BookingsService()
             .book("svc_1", baseInput({ staffId: "staff_asha" }), "iphash")
             .catch((e: unknown) => e);
-        expect(refused).toBeInstanceOf(BadRequestException);
-        const body = (refused as BadRequestException).getResponse() as {
+        // Refused as a time that went — the same answer as booked, so the
+        // page shows what is left and time off never shows through.
+        expect(refused).toBeInstanceOf(ConflictException);
+        const body = (refused as ConflictException).getResponse() as {
             message: string;
         };
         expect(body.message).not.toMatch(/off|leave|holiday|working/i);

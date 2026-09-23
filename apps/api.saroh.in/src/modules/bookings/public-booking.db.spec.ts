@@ -234,7 +234,7 @@ describe("the booking page (real database)", () => {
             from: new Date(at.getTime() - 3_600_000).toISOString(),
             to: new Date(at.getTime() + 3_600_000).toISOString(),
         });
-        const diary = cal.diaries.find((d) => d.staff?.id === karan);
+        const diary = cal.diaries.find((d) => d.person?.id === karan);
         expect(JSON.stringify(diary)).toContain("DESK");
     });
 
