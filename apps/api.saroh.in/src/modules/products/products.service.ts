@@ -163,11 +163,7 @@ export class ProductsService {
             // Still counting as a whole: what each variant will take with it
             // when it switches, so the editor can seed the counts.
             detail.stockMode === "product" && product.variants.length > 0
-                ? promisesToMove(
-                      prisma,
-                      product.id,
-                      product.inventory?.reserved ?? 0,
-                  )
+                ? promisesToMove(prisma, product.id, product.inventory != null)
                 : Promise.resolve({}),
         ]);
         return { ...detail, customFields, allergens, variantPromises };

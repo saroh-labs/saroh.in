@@ -9,7 +9,7 @@ import type {
     UpdateInventoryDto,
     UpdateVariantStockDto,
 } from "./inventory.dto";
-import { promisesToMove } from "./open-promises";
+import { linesToMove, promisesToMove } from "./open-promises";
 import { ProductsService } from "./products.service";
 
 export interface StockView {
@@ -124,11 +124,7 @@ export class InventoryService {
         }
         const variants = await prisma.productVariant.findMany({
             where: { productId },
-            select: {
-                id: true,
-                title: true,
-                inventory: { select: { reserved: true } },
-            },
+            select: { id: true, title: true },
         });
         if (variants.length === 0) {
             throw new BadRequestException({
@@ -148,26 +144,35 @@ export class InventoryService {
                 field: "variants",
             });
         }
-        const firstSwitch = variants.every((v) => !v.inventory);
 
         await prisma.$transaction(async (tx) => {
+            // Lock the product's row first: two first switches at once, or
+            // an order settling on this row, wait for each other.
+            await tx.$queryRaw`SELECT id FROM "Inventory" WHERE "productId" = ${productId} FOR UPDATE`;
             const own = await tx.inventory.findUnique({
                 where: { productId },
                 select: { reserved: true },
             });
-            // On the switch, what open orders promise per variant moves
-            // off the product's row and onto the variant's.
+            const counted = await tx.variantInventory.findMany({
+                where: { productId },
+                select: { variantId: true, reserved: true },
+            });
+            const firstSwitch = counted.length === 0;
+            const promisedNow = Object.fromEntries(
+                counted.map((row) => [row.variantId, row.reserved]),
+            );
+            // On the switch, the open lines holding stock on the product's
+            // row for a variant move to that variant's row.
             const moving = firstSwitch
-                ? await promisesToMove(tx, productId, own?.reserved ?? 0)
+                ? await promisesToMove(tx, productId, own != null)
                 : {};
             for (const input of dto.variants) {
-                const current = byId.get(input.variantId);
                 const promised = firstSwitch
                     ? (moving[input.variantId] ?? 0)
-                    : (current?.inventory?.reserved ?? 0);
+                    : (promisedNow[input.variantId] ?? 0);
                 if (input.quantity < promised) {
                     throw new BadRequestException({
-                        message: `${current?.title ?? "A variant"} has ${promised} promised to open orders — on hand can't go below that.`,
+                        message: `${byId.get(input.variantId)?.title ?? "A variant"} has ${promised} promised to open orders — on hand can't go below that.`,
                         field: "variants",
                     });
                 }
@@ -187,11 +192,18 @@ export class InventoryService {
                     },
                 });
             }
-            // The product's own row now holds only what lines without a
-            // variant promise.
+            if (!firstSwitch) return;
+            await tx.orderItem.updateMany({
+                where: linesToMove(productId, own != null),
+                data: { stockRow: "VARIANT" },
+            });
+            // The product's own row now holds only what the lines left on it
+            // promise.
             if (own) {
                 const moved = Object.values(moving).reduce((n, q) => n + q, 0);
-                const left = own.reserved - moved;
+                // Never below zero, even if a line from before rows were
+                // recorded was guessed wrong.
+                const left = Math.max(0, own.reserved - moved);
                 await tx.inventory.update({
                     where: { productId },
                     data: { quantity: left, reserved: left },

@@ -83,7 +83,7 @@ beforeEach(() => {
     });
     db.inventory!.findUnique!.mockResolvedValue(null);
     db.order!.count!.mockResolvedValue(0);
-    db.order!.create!.mockResolvedValue({ id: "o_1" });
+    db.order!.create!.mockResolvedValue({ id: "o_1", items: [] });
     db.storeSettings!.findUnique!.mockResolvedValue({ currency: "INR" });
     db.discount!.findUnique!.mockResolvedValue(MARKETDAY);
     db.discountRedemption!.count!.mockResolvedValue(3);
@@ -145,7 +145,7 @@ describe("OrdersService.create — discount codes", () => {
         });
 
         jest.clearAllMocks();
-        db.order!.create!.mockResolvedValue({ id: "o_2" });
+        db.order!.create!.mockResolvedValue({ id: "o_2", items: [] });
         await makeService().create("st_1", "u_1", { ...DTO, discount: "5" });
         expect(db.$transaction.mock.calls[0][1]).toBeUndefined();
         expect(createData()).toMatchObject({ discount: "5.00" });

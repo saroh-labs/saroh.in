@@ -77,7 +77,7 @@ beforeEach(() => {
     });
     inventoryFindUnique.mockResolvedValue(null); // untracked — no stock plumbing
     orderCount.mockResolvedValue(0);
-    orderCreate.mockResolvedValue({ id: "order_1" });
+    orderCreate.mockResolvedValue({ id: "order_1", items: [] });
     settingsFindUnique.mockResolvedValue(null);
 });
 

@@ -145,7 +145,7 @@ export class OrdersService {
         // Snapshot each line's price from what was bought: the variant's own
         // price when it has one, else the product's. A product with variants
         // is bought as one of them, so its line must say which.
-        const lines: (OrderLine & {
+        const lines: (Omit<OrderLine, "id"> & {
             priceCents: number;
             categoryId: string | null;
         })[] = [];
@@ -292,13 +292,23 @@ export class OrdersService {
             try {
                 const created = await prisma.$transaction(
                     async (tx) => {
-                        const order = await tx.order.create({
+                        const { items, ...order } = await tx.order.create({
                             data: { ...data, orderId: orderNumber },
-                            select: { id: true },
+                            select: {
+                                id: true,
+                                items: {
+                                    select: {
+                                        id: true,
+                                        productId: true,
+                                        variantId: true,
+                                        quantity: true,
+                                    },
+                                },
+                            },
                         });
                         await applyInventoryTransition(
                             tx,
-                            lines,
+                            items,
                             "RELEASED",
                             "RESERVED",
                         );
@@ -374,9 +384,11 @@ export class OrdersService {
                 paymentStatus: true,
                 items: {
                     select: {
+                        id: true,
                         productId: true,
                         variantId: true,
                         quantity: true,
+                        stockRow: true,
                     },
                 },
             },

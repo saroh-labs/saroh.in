@@ -11,12 +11,19 @@ jest.mock("@saroh/database", () => {
     const inventory = {
         findUnique: jest.fn(),
         update: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
     };
+    // Settling a held line locks the product's row and reads the row the
+    // line recorded; none recorded here, and the product counts no stock.
+    const orderItem = { findUnique: jest.fn().mockResolvedValue(null) };
+    const $queryRaw = jest.fn().mockResolvedValue([]);
     return {
         prisma: {
             order,
             inventory,
-            $transaction: jest.fn((cb) => cb({ order, inventory })),
+            $transaction: jest.fn((cb) =>
+                cb({ order, inventory, orderItem, $queryRaw }),
+            ),
         },
     };
 });

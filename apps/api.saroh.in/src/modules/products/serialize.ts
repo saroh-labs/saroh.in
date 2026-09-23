@@ -108,8 +108,8 @@ export interface ProductDetailDto extends ProductDto {
     images: ProductImageDto[];
     /**
      * "variant" once any variant has its own stock row; "product" otherwise.
-     * In variant mode the product row, if any, holds only promises made to
-     * orders from before the product counted per variant.
+     * In variant mode the product row, if any, holds only what open order
+     * lines without a variant promise.
      */
     stockMode: "product" | "variant";
     inventory: {

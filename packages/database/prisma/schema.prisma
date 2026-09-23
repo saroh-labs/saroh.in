@@ -1052,10 +1052,22 @@ model OrderItem {
   quantity Int
   price    Decimal @db.Decimal(10, 2)
 
+  // Where this line's reservation sits, set when the order first holds
+  // stock; every later release or fulfil settles on the same row. NONE: the
+  // product counted no stock, so nothing was held. Null only on lines from
+  // before this was recorded (open ones were backfilled).
+  stockRow StockRow?
+
   review ProductReview?
 
   @@index([orderId])
   @@index([variantId])
+}
+
+enum StockRow {
+  PRODUCT
+  VARIANT
+  NONE
 }
 
 // ============================================================================

@@ -3,6 +3,7 @@ import { prisma } from "@saroh/database";
 
 import { CustomersService } from "../customers/customers.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import type { OrderStatus } from "../orders/dto";
 import { OrdersService } from "../orders/orders.service";
 import { StoresService } from "../stores/stores.service";
 import { InventoryService } from "./inventory.service";
@@ -399,6 +400,140 @@ describe("Variants and stock per variant (DB)", () => {
             await expect(refused).rejects.toThrow(
                 "S has 3 promised to open orders — on hand can't go below that.",
             );
+        });
+    });
+
+    describe("each line settles on the row it reserved from", () => {
+        const own = (productId: string) =>
+            prisma.inventory.findUniqueOrThrow({
+                where: { productId },
+                select: { quantity: true, reserved: true },
+            });
+        const stockRowOf = async (orderId: string) =>
+            (
+                await prisma.orderItem.findFirstOrThrow({
+                    where: { orderId },
+                    select: { stockRow: true },
+                })
+            ).stockRow;
+        const withVariants = async (name: string, sku: string) => {
+            const id = (
+                await products.create(storeId, ownerId, {
+                    name,
+                    price: "300",
+                    currency: "INR",
+                    optionId: sizeOptionId,
+                })
+            ).id;
+            const out: Record<string, string> = {};
+            for (const size of ["S", "M"]) {
+                out[size] = (
+                    await variants.create(storeId, id, ownerId, {
+                        sku: `${sku}-${size}`,
+                        title: size,
+                        optionValueId: values[size],
+                    })
+                ).id;
+            }
+            return { id, v: out };
+        };
+        const move = async (orderId: string, statuses: OrderStatus[]) => {
+            for (const status of statuses) {
+                await orders.updateStatus(storeId, orderId, ownerId, {
+                    status,
+                });
+            }
+        };
+
+        it("an order from before the product counted holds nothing, and releases nothing", async () => {
+            const { id, v: sv } = await withVariants("Kajal", "KJ");
+            // Untracked: the order for S reserves nothing.
+            const early = await orders.create(storeId, ownerId, {
+                customerId,
+                items: [{ productId: id, variantId: sv.S, quantity: 2 }],
+            });
+            expect(await stockRowOf(early.id)).toBe("NONE");
+
+            await inventory.upsert(storeId, id, ownerId, { quantity: 10 });
+            const later = await orders.create(storeId, ownerId, {
+                customerId,
+                items: [{ productId: id, variantId: sv.M, quantity: 2 }],
+            });
+            expect(await stockRowOf(later.id)).toBe("PRODUCT");
+            expect(await own(id)).toEqual({ quantity: 10, reserved: 2 });
+            // Only M's promise moves — S never reserved.
+            const detail = await products.get(storeId, id, ownerId);
+            expect(detail.variantPromises).toEqual({ [sv.M]: 2 });
+
+            await inventory.setVariants(storeId, id, ownerId, {
+                variants: [
+                    { variantId: sv.S, quantity: 5, lowStockAlert: 1 },
+                    { variantId: sv.M, quantity: 5, lowStockAlert: 1 },
+                ],
+            });
+            expect(await stockOf(sv.S)).toEqual({ quantity: 5, reserved: 0 });
+            expect(await stockOf(sv.M)).toEqual({ quantity: 5, reserved: 2 });
+            expect(await own(id)).toEqual({ quantity: 0, reserved: 0 });
+            expect(await stockRowOf(later.id)).toBe("VARIANT");
+
+            await move(later.id, ["PROCESSING", "SHIPPED"]);
+            await move(early.id, ["CANCELLED"]);
+            expect(await stockOf(sv.S)).toEqual({ quantity: 5, reserved: 0 });
+            expect(await stockOf(sv.M)).toEqual({ quantity: 3, reserved: 0 });
+            expect(await own(id)).toEqual({ quantity: 0, reserved: 0 });
+        });
+
+        it("the product's row keeps exactly what lines without a variant promise, however often it's saved", async () => {
+            const lip = (
+                await products.create(storeId, ownerId, {
+                    name: "Lip Tint",
+                    price: "300",
+                    currency: "INR",
+                    optionId: sizeOptionId,
+                })
+            ).id;
+            await inventory.upsert(storeId, lip, ownerId, { quantity: 10 });
+            // Placed before the product had variants: names none.
+            const whole = await orders.create(storeId, ownerId, {
+                customerId,
+                items: [{ productId: lip, quantity: 3 }],
+            });
+            const sv: Record<string, string> = {};
+            for (const size of ["S", "M"]) {
+                sv[size] = (
+                    await variants.create(storeId, lip, ownerId, {
+                        sku: `LT-${size}`,
+                        title: size,
+                        optionValueId: values[size],
+                    })
+                ).id;
+            }
+            const forS = await orders.create(storeId, ownerId, {
+                customerId,
+                items: [{ productId: lip, variantId: sv.S, quantity: 2 }],
+            });
+            expect(await own(lip)).toEqual({ quantity: 10, reserved: 5 });
+
+            const counts = {
+                variants: [
+                    { variantId: sv.S, quantity: 4, lowStockAlert: 1 },
+                    { variantId: sv.M, quantity: 1, lowStockAlert: 1 },
+                ],
+            };
+            await inventory.setVariants(storeId, lip, ownerId, counts);
+            expect(await own(lip)).toEqual({ quantity: 3, reserved: 3 });
+            expect(await stockOf(sv.S)).toEqual({ quantity: 4, reserved: 2 });
+
+            // A second save is no longer a switch: nothing moves again.
+            await inventory.setVariants(storeId, lip, ownerId, counts);
+            expect(await own(lip)).toEqual({ quantity: 3, reserved: 3 });
+            expect(await stockOf(sv.S)).toEqual({ quantity: 4, reserved: 2 });
+
+            await move(whole.id, ["CANCELLED"]);
+            await move(forS.id, ["PROCESSING", "SHIPPED"]);
+            expect(await own(lip)).toEqual({ quantity: 3, reserved: 0 });
+            expect(await stockOf(sv.S)).toEqual({ quantity: 2, reserved: 0 });
+            expect(await stockOf(sv.M)).toEqual({ quantity: 1, reserved: 0 });
         });
     });
 
