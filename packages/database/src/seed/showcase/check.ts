@@ -18,6 +18,7 @@ import { boundary } from "./periods";
 export interface ShowcaseCounts {
     business: string;
     contacts: number;
+    staff: number;
     bookings: number;
     plans: number;
     subscriptions: string;
@@ -222,8 +223,87 @@ export async function checkShowcase(
                 OR r."createdAt" < p."createdAt" OR b."courseEnrollmentId" IS NOT NULL
                 OR NOT EXISTS (SELECT 1 FROM "ClassPackService" x
                     WHERE x."packId" = p."packId" AND x."serviceId" = b."serviceId")
-                OR (r."reversedAt" IS NULL AND b.status <> 'CONFIRMED')
-                OR (r."reversedAt" IS NOT NULL AND b.status <> 'CANCELLED'))`,
+                OR (r."reversedAt" IS NULL AND b.status <> 'CONFIRMED'
+                    AND NOT b."cancelledLate")
+                OR (r."reversedAt" IS NOT NULL
+                    AND (b.status <> 'CANCELLED' OR b."cancelledLate")))`,
+    );
+
+    // How a booking was paid (U3): a pack's class has its redemption; a
+    // membership's names the member's own subscription and stays within the
+    // plan's classes a month (a late cancel counts); only a cancelled booking
+    // can have been cancelled late.
+    fail(
+        "bookings whose way of paying disagrees with what paid",
+        await prisma.$queryRaw<Row[]>`
+            SELECT b.id, b."paidWith" FROM "Booking" b
+            LEFT JOIN "PackRedemption" r ON r."bookingId" = b.id
+            LEFT JOIN "CustomerSubscription" cs ON cs.id = b."subscriptionId"
+            WHERE b."organizationId" = ANY(${orgs}) AND (
+                (b."paidWith" IS NOT NULL AND (b."paidWith" = 'PACK') <> (r.id IS NOT NULL))
+                OR (b."paidWith" = 'MEMBERSHIP') <> (b."subscriptionId" IS NOT NULL)
+                OR (cs.id IS NOT NULL AND cs."contactId" IS DISTINCT FROM b."contactId")
+                OR (b."paidWith" IS NOT NULL
+                    AND b."paidWith" NOT IN ('MEMBERSHIP', 'PACK', 'PAID', 'DESK'))
+                OR (b."cancelledLate" AND b.status <> 'CANCELLED'))`,
+    );
+    fail(
+        "memberships used past their classes a month",
+        await prisma.$queryRaw<Row[]>`
+            SELECT b."subscriptionId", p."classesPerMonth", COUNT(*)::int AS used
+            FROM "Booking" b
+            JOIN "CustomerSubscription" cs ON cs.id = b."subscriptionId"
+            JOIN "SubscriptionPlan" p ON p.id = cs."planId"
+            WHERE b."organizationId" = ANY(${orgs})
+              AND (b.status = 'CONFIRMED' OR b."cancelledLate")
+              AND p."classesPerMonth" IS NOT NULL
+            GROUP BY b."subscriptionId", p."classesPerMonth",
+                date_trunc('month', (b."startAt" AT TIME ZONE 'UTC') AT TIME ZONE cs.timezone)
+            HAVING COUNT(*) > p."classesPerMonth"`,
+    );
+
+    // Who takes a booking (U3): someone who takes that service, never in two
+    // places at once, and one instructor for every place in a class session.
+    fail(
+        "bookings taken by someone who does not take that service",
+        await prisma.$queryRaw<Row[]>`
+            SELECT b.id FROM "Booking" b
+            WHERE b."organizationId" = ANY(${orgs}) AND b."staffId" IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM "StaffService" x
+                  WHERE x."staffId" = b."staffId" AND x."serviceId" = b."serviceId"
+                    AND x."organizationId" = b."organizationId")`,
+    );
+    fail(
+        "people booked in two places at once",
+        await prisma.$queryRaw<Row[]>`
+            SELECT a.id AS one, b.id AS other FROM "Booking" a
+            JOIN "Booking" b ON b."staffId" = a."staffId" AND a.id < b.id
+            JOIN "Service" s ON s.id = a."serviceId"
+            WHERE a."organizationId" = ANY(${orgs})
+              AND a.status <> 'CANCELLED' AND b.status <> 'CANCELLED'
+              AND a."startAt" < b."endAt" AND b."startAt" < a."endAt"
+              AND NOT (s.capacity > 1 AND a."serviceId" = b."serviceId"
+                       AND a."startAt" = b."startAt")`,
+    );
+    fail(
+        "class sessions with more than one instructor",
+        await prisma.$queryRaw<Row[]>`
+            SELECT "serviceId", "startAt" FROM "Booking"
+            WHERE "organizationId" = ANY(${orgs})
+            GROUP BY "serviceId", "startAt"
+            HAVING COUNT(DISTINCT COALESCE("staffId", '')) > 1`,
+    );
+    fail(
+        "weekly hours that end before they start or overlap",
+        await prisma.$queryRaw<Row[]>`
+            SELECT a.id FROM "StaffHours" a
+            WHERE a."organizationId" = ANY(${orgs}) AND (
+                a."endMinute" <= a."startMinute" OR a."startMinute" < 0
+                OR a."endMinute" > 1440 OR a."dayOfWeek" NOT BETWEEN 0 AND 6
+                OR EXISTS (SELECT 1 FROM "StaffHours" b
+                    WHERE b."staffId" = a."staffId" AND b."dayOfWeek" = a."dayOfWeek"
+                      AND b.id <> a.id AND b."startMinute" < a."endMinute"
+                      AND a."startMinute" < b."endMinute"))`,
     );
 
     // Subscriptions the showcase wrote: each invoiced period is the next on
@@ -293,6 +373,7 @@ export async function checkShowcase(
         const where = { organizationId: b.id };
         const [
             contacts,
+            staff,
             bookings,
             plans,
             subs,
@@ -304,6 +385,7 @@ export async function checkShowcase(
             invoices,
         ] = await Promise.all([
             prisma.contact.count({ where }),
+            prisma.staffMember.count({ where }),
             prisma.booking.count({ where }),
             prisma.subscriptionPlan.count({ where }),
             prisma.customerSubscription.groupBy({
@@ -336,6 +418,7 @@ export async function checkShowcase(
         counts.push({
             business: b.name,
             contacts,
+            staff,
             bookings,
             plans,
             subscriptions: list(subs.map((s) => [s.status, s._count])),

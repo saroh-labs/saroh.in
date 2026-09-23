@@ -68,13 +68,23 @@ This runs the base seed first, then adds more to Northwind (about 50 products,
 500 customers, 500 orders, 120 contacts and 40 leads) and adds four more
 businesses, each with one published site at `<slug>.saroh.app.localhost`:
 
-- **Pulse Fitness** (a gym): personal training, classes and a free trial, about
-  470 bookings. Monthly (₹2,500; ₹2,200 for members who joined before the
-  last price rise) and quarterly (₹6,500) plans with 120 subscriptions started
-  over the past year and invoiced every period — most paid, some overdue, a
-  few paused, cancelled or ending at the period's end. Two class packs (26
-  sold), one open course, and a few invoices written by hand (one with tax,
-  one void, one draft). About 690 invoices.
+- **Pulse Fitness** (a gym): personal training, assessments, classes and a
+  free trial, about 490 bookings. Four people on the diary (`pulse.ts`): the
+  demo owner as Karan Mehta (linked to their membership) and
+  three trainers without accounts, each with their own weekly hours; one off
+  for two days this week, one with extra hours this Saturday; booking rules
+  (21 days ahead, 2 hours before, free cancel up to 12 hours). Every booking
+  is taken by someone who works then, or left Unassigned (a few each week),
+  and says how it was paid — membership, pack, online or at the desk — with
+  late cancels and no-shows. Standard (₹2,500, 8 classes a month; ₹2,200 for
+  members who joined before the last price rise), Off-peak (₹1,600, 4) and
+  Yearly (₹25,000, 8) memberships with 120 subscriptions over the past year,
+  invoiced every period — most paid, some overdue with a failed renewal, a few
+  paused, cancelled or ending, one changing plan at renewal. Packs of 5
+  (₹2,200 / 60 days) and 10 (₹4,000 / 90 days) classes and a retired "First 3
+  classes" (₹999): about 30 sold, one about to run out, one run out unused. One
+  open course, a few invoices written by hand, notes on three people. About
+  770 invoices. `checkPulse` stops the run if any of these states is missing.
 - **Prana Yoga** (a studio): studio classes, and live online classes whose
   bookings carry a meeting link. Four courses — one running, one online
   starting soon, one finished, one draft — with 30 enrolments; three class

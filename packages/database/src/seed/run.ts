@@ -1239,6 +1239,16 @@ export async function deleteSeeded(
         // seeded ids, so they are removed explicitly and counted.
         () => prisma.bookingEvent.deleteMany({ where }),
         () => prisma.booking.deleteMany({ where }),
+        // Who takes bookings, their hours and the business's rules (U3), and
+        // the team's notes on a person (U8): cascade from their parents, but
+        // written with seeded ids, so removed and counted explicitly.
+        () => prisma.contactNote.deleteMany({ where }),
+        () => prisma.staffService.deleteMany({ where }),
+        () => prisma.staffHours.deleteMany({ where }),
+        () => prisma.staffTimeOff.deleteMany({ where }),
+        () => prisma.staffExtraHours.deleteMany({ where }),
+        () => prisma.staffMember.deleteMany({ where }),
+        () => prisma.bookingRules.deleteMany({ where }),
         () => prisma.courseEnrollment.deleteMany({ where }),
         () => prisma.courseSession.deleteMany({ where }),
         () => prisma.course.deleteMany({ where }),
