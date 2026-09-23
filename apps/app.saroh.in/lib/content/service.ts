@@ -1,3 +1,4 @@
+import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
 
 /**
@@ -98,18 +99,10 @@ async function mutate<T = { id: string }>(
         method,
         ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    const data = (await res.json().catch(() => null)) as
-        | (Record<string, unknown> & {
-              message?: string;
-              field?: ResultField;
-          })
-        | null;
+    const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
-    return {
-        ok: false,
-        error: data?.message ?? "Something went wrong",
-        field: data?.field,
-    };
+    const failure = toFailure(data, "Something went wrong");
+    return { ...failure, field: failure.field as ResultField | undefined };
 }
 
 // ---- Posts ----

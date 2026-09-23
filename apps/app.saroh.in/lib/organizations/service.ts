@@ -1,3 +1,4 @@
+import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
 
 /**
@@ -130,23 +131,20 @@ export async function createOrganization(
     const data = (await res.json().catch(() => null)) as {
         id?: string;
         slug?: string;
-        message?: string;
-        details?: { field?: string };
     } | null;
 
     if (res.ok && data?.id && data.slug) {
         return { ok: true, data: { id: data.id, slug: data.slug } };
     }
-    /*
-     * The field arrives as `details.field` — the API's error filter forwards
-     * `message` and `details`, nothing else. This read `data.field`, which
-     * the API never sends, so a refused name was never shown on its field.
-     */
-    const field = data?.details?.field;
+    // The API's envelope is `{ error: { message, details } }`.
+    const failure = toFailure(data, "Something went wrong");
     return {
         ok: false,
-        error: data?.message ?? "Something went wrong",
-        field: field === "name" || field === "address" ? field : undefined,
+        error: failure.error,
+        field:
+            failure.field === "name" || failure.field === "address"
+                ? failure.field
+                : undefined,
     };
 }
 

@@ -106,7 +106,8 @@ export class ImportsService {
                     plan.fileIssues.length > 0
                         ? "This file cannot be imported as mapped"
                         : "There is nothing to import",
-                fileIssues: plan.fileIssues,
+                // `details` is the one slot the error filter forwards.
+                details: { fileIssues: plan.fileIssues },
             });
         }
 
