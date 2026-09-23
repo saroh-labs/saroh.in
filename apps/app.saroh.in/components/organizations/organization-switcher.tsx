@@ -4,11 +4,12 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { showError } from "@saroh/ui/toast";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, LayoutList, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { accountsUrl } from "@/lib/accounts";
 import { setActiveOrganization } from "@/lib/organizations/actions";
 import type {
     Organization,
@@ -210,6 +211,16 @@ export function OrganizationSwitcher({
                         <Plus aria-hidden className="size-4" />
                         New business
                     </Link>
+                    {/* The full list, with each role spelled out and the
+                        person's own account beside it, lives in accounts;
+                        this switcher is a shortcut to the same choice. */}
+                    <a
+                        href={`${accountsUrl}/businesses`}
+                        className="flex items-center gap-[9px] rounded-lg px-[9px] py-2 text-[12.5px] text-neutral-600 transition-colors duration-fast hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:text-muted-foreground"
+                    >
+                        <LayoutList aria-hidden className="size-4" />
+                        All your businesses and your account
+                    </a>
                 </div>
             </PopoverContent>
         </Popover>

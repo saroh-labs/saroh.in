@@ -60,7 +60,7 @@ export default function AccountPage() {
         <main className="mx-auto grid max-w-2xl gap-6 p-6 sm:p-8">
             <header className="flex items-center justify-between gap-4">
                 <div className="grid gap-1">
-                    <Link href="/apps" aria-label="Saroh">
+                    <Link href="/businesses" aria-label="Your businesses">
                         <Wordmark />
                     </Link>
                     <h1 className="text-2xl font-semibold">Account</h1>

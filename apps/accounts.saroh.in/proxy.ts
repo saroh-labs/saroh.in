@@ -3,7 +3,7 @@ import { getSessionCookie } from "better-auth/cookies";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const protectedRoutes = new Set(["/apps", "/account", "/"]);
+const protectedRoutes = new Set(["/businesses", "/apps", "/account", "/"]);
 const authRoutePrefixes = [
     "/login",
     "/signup",
@@ -23,11 +23,11 @@ export default async function proxy(req: NextRequest) {
     );
 
     // Already authenticated visitors shouldn't see the auth screens — bounce
-    // them to the app picker. Validate against api (auth lives there now).
+    // them to their businesses. Validate against api (auth lives there now).
     if (isOnAuthRoute && sessionCookie) {
         const session = await getServerSession(req.headers);
         if (session?.user) {
-            return NextResponse.redirect(new URL("/apps", req.url));
+            return NextResponse.redirect(new URL("/businesses", req.url));
         }
     }
 

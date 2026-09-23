@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { HomeDashboard } from "@/components/home/home-dashboard";
 import { PageContainer } from "@/components/shared/page-container";
+import { accountsUrl } from "@/lib/accounts";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
@@ -36,7 +37,9 @@ export default async function Home() {
     // is the cookie being written. Writing it is also what stops the question
     // repeating on the way back in.
     const chosen = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value;
-    if (organizations.length > 1 && !chosen) redirect("/choose");
+    if (organizations.length > 1 && !chosen) {
+        redirect(`${accountsUrl}/businesses`);
+    }
 
     const home = await getHome();
     // A business with nothing on is asked what it wants to do first, and the
