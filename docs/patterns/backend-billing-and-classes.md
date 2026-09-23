@@ -84,6 +84,27 @@
   `CAPTURED_NEEDS_REFUND`, raised on Home until the provider's refund webhook
   clears it. A refund never changes an invoice's status.
 
+## Paying for a booking online — **Current** (U19, ADR-008)
+
+- **Pay now is a hold, not a booking.** The booking page's pay-now makes a
+  PENDING booking with `holdExpiresAt` (15 minutes) and a DRAFT invoice
+  (`source` BOOKING) with a pay token; the customer pays it through the
+  invoice payment path (`bookings/booking-hold.ts`). The webhook confirms the
+  booking (`paidWith` PAID) and numbers the invoice PAID in one transaction; an
+  unpaid hold never takes a number.
+- **Every capacity count reads `holdsPlace(now)`** — confirmed, or a hold
+  inside its time. Never write `status: "CONFIRMED"` for a place count: a
+  live hold would be double-booked, and an expired one would never free.
+- **An expired hold is free at once**; `booking.release-holds` (every 5 min)
+  cancels it and voids its draft, keeping the intent so a late payment is
+  still found. A late payment confirms when the place is still free, else it
+  is `CAPTURED_NEEDS_REFUND`.
+- **Hold drafts are not the business's paper**: `NOT_A_BOOKING_HOLD` keeps
+  an unnumbered booking invoice out of the invoice list and customer paper.
+- **The price is the service's, on the server.** The book request has no
+  amount field (the validation pipe refuses one); pay at the desk books
+  CONFIRMED with `paidWith` DESK. No credits online (ADR-008).
+
 ## Subscriptions — **Current**
 
 - **Forward only.** A backdated start keeps its renewal day but only the period

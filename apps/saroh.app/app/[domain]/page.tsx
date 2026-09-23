@@ -30,5 +30,11 @@ export default async function SiteHomePage({
         notFound();
     }
 
-    return <PageSections sections={home.sections} apiUrl={publicApiUrl()} />;
+    return (
+        <PageSections
+            sections={home.sections}
+            apiUrl={publicApiUrl()}
+            bookHref="/book"
+        />
+    );
 }
