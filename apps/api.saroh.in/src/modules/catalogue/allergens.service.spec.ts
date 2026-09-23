@@ -21,6 +21,7 @@ describe("Allergens (DB)", () => {
     let orgId = "";
     let storeId = "";
     let loafId = "";
+    let otherOrgId = "";
     let otherStoreId = "";
 
     beforeAll(async () => {
@@ -57,7 +58,9 @@ describe("Allergens (DB)", () => {
         await prisma.store.deleteMany({
             where: { id: { in: [storeId, otherStoreId] } },
         });
-        await prisma.organization.deleteMany({ where: { id: orgId } });
+        await prisma.organization.deleteMany({
+            where: { id: { in: [orgId, otherOrgId] } },
+        });
         await prisma.user.deleteMany({ where: { id: ownerId } });
     });
 
@@ -111,8 +114,17 @@ describe("Allergens (DB)", () => {
     });
 
     it("refuses another storefront's allergen, and creates nothing when it does", async () => {
+        // A business has one storefront, so the other list is another's.
+        otherOrgId = (
+            await prisma.organization.create({
+                data: {
+                    name: "Allergen Org Two",
+                    slug: `allergen-org-two-${tag}`,
+                },
+            })
+        ).id;
         otherStoreId = (
-            await stores.createForUser(ownerId, orgId, {
+            await stores.createForUser(ownerId, otherOrgId, {
                 name: "Allergen Store Two",
                 slug: `allergen-two-${tag}`,
             })
