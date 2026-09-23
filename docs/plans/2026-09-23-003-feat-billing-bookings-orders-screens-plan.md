@@ -206,6 +206,8 @@ flowchart TB
 **Verification:**
 - ADR-008 accepted in the doc; every later unit's data decision traces to it.
 
+> **Done — #486** (`001dd538`). ADR-008 accepted; DEC-023 (invoice per order, immutability, GST) and DEC-024 (Members move kitchen stages via `order:stage`, which also grants a money-free kitchen read of the order; `order:read` stays Owner/Admin). ADR-007 marked amended; billing and access patterns updated. Money figures are gated on the money reads (`payment:read`, `invoice:read`, `subscription:read`) and omitted by the API.
+
 ---
 
 ### U2. Phone tab bar and the rail's new sections
