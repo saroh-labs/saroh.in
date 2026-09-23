@@ -636,6 +636,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 - **Approach:** the same fill rules as the design (`{NAME3}` first three letters of the name's first word, `{CAT}` three letters of the category or GEN, `{VALUE}` four characters of the option value, `{N}` the product's number, two digits); the preview is computed on the server over the store's variants.
 - **Test scenarios:** each validation message in order; a clash found and named; `{N}` resolving it; saving never rewrites an existing SKU; suggest off leaves the editor's SKU empty.
 
+> **Done — #484.** `StoreSettings.skuPattern` / `skuSuggest` (migration `20260924100000_catalogue_extras`, which also carries the tables for U14 and U15; the chain replays from empty). API `GET/PUT /stores/:id/sku-pattern` (the GET returns the product's number for `{N}`) and `GET …/sku-pattern/preview?pattern=`; save refuses a bad pattern or a clash and never touches a variant's SKU. The rules are pure (`catalogue/sku-pattern.ts`), copied into the app (`lib/products/sku-pattern.ts`) and tested on the same cases in both (4 + 4), plus 4 DB tests. The SKUs tab (token chips, live checks with the server's clash check debounced, the preview's first 8 rows, a save bar with Undo, the shared leave guard) and the editor's SKU placeholder, empty when suggestions are off; `suggestSku` is gone. Verified in the browser: a clash ("50 variants would share VIT…"), a bad character, save and Undo, and the editor suggesting `VIT01-50ML`.
+
 ### U12. The demo store: beauty & dresses
 
 - **Goal:** R25 (KD15, KD16).
