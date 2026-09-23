@@ -7,6 +7,7 @@
  */
 
 import { toMoneyString } from "../../common/money";
+import { bpsToRate, rateToBps } from "../invoices/gst";
 import { sanitizeRichHtml } from "../sites/sanitize";
 
 interface DecimalLike {
@@ -71,6 +72,9 @@ export interface ProductDto {
     maker: string | null;
     madeIn: string | null;
     supplierCode: string | null;
+    /** GST the price includes, in percent ("18"); null when not set. */
+    gstRate: string | null;
+    hsnCode: string | null;
     warranty: string | null;
     returnsMode: string;
     returnsText: string | null;
@@ -172,6 +176,8 @@ interface RawProduct {
     maker: string | null;
     madeIn: string | null;
     supplierCode: string | null;
+    gstRate?: DecimalLike | null;
+    hsnCode?: string | null;
     warranty: string | null;
     returnsMode: string;
     returnsText: string | null;
@@ -282,6 +288,11 @@ export function serializeProduct(product: RawProduct): ProductDto {
         maker: product.maker,
         madeIn: product.madeIn,
         supplierCode: product.supplierCode,
+        gstRate:
+            product.gstRate != null
+                ? bpsToRate(rateToBps(product.gstRate) ?? 0)
+                : null,
+        hsnCode: product.hsnCode ?? null,
         warranty: product.warranty,
         returnsMode: product.returnsMode,
         returnsText: product.returnsText,

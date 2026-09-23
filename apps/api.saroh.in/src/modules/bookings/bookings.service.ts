@@ -14,6 +14,7 @@ import { IANAZone } from "luxon";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { redeemPackInTx, reversePackInTx } from "../class-packs/redeem-pack";
+import { isGstRate } from "../invoices/gst";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
@@ -191,6 +192,18 @@ export interface PublicService {
     currency: string | null;
 }
 
+/** A service's GST rate (ADR-008): one GST has, or null to clear it. */
+function serviceGstRate(rate: string | null | undefined): string | null {
+    if (rate === undefined || rate === null) return null;
+    if (!isGstRate(rate)) {
+        throw new BadRequestException({
+            message: `${rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            details: { field: "gstRate" },
+        });
+    }
+    return rate;
+}
+
 @Injectable()
 export class BookingsService {
     /**
@@ -239,6 +252,8 @@ export class BookingsService {
                 capacity: dto.capacity ?? 1,
                 priceCents: dto.priceCents ?? null,
                 currency: dto.currency ?? null,
+                gstRate: serviceGstRate(dto.gstRate),
+                sacCode: dto.sacCode ?? null,
                 timezone: dto.timezone,
                 ...location,
                 status: "ACTIVE",
@@ -315,6 +330,9 @@ export class BookingsService {
         }
         if (dto.priceCents !== undefined) data.priceCents = dto.priceCents;
         if (dto.currency !== undefined) data.currency = dto.currency;
+        if (dto.gstRate !== undefined)
+            data.gstRate = serviceGstRate(dto.gstRate);
+        if (dto.sacCode !== undefined) data.sacCode = dto.sacCode;
         if (dto.timezone !== undefined) data.timezone = dto.timezone;
         if (dto.status !== undefined) data.status = dto.status;
         if (dto.locationType !== undefined || dto.meetingUrl !== undefined) {

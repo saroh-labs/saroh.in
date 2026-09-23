@@ -11,6 +11,7 @@ jest.mock("@saroh/database", () => {
         },
         businessProfile: {
             upsert: jest.fn(),
+            findUnique: jest.fn(),
         },
         membership: {
             findMany: jest.fn(),
@@ -39,6 +40,7 @@ import { OrganizationSettingsService } from "./organization-settings.service";
 const orgFindUnique = prisma.organization.findUnique as jest.Mock;
 const orgUpdate = prisma.organization.update as jest.Mock;
 const profileUpsert = prisma.businessProfile.upsert as jest.Mock;
+const profileFindUnique = prisma.businessProfile.findUnique as jest.Mock;
 const membershipFindMany = prisma.membership.findMany as jest.Mock;
 const membershipCount = prisma.membership.count as jest.Mock;
 const orderFindFirst = prisma.order.findFirst as jest.Mock;
@@ -57,6 +59,8 @@ describe("OrganizationSettingsService", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         orderFindFirst.mockResolvedValue(null);
+        // Unregistered until a test registers it.
+        profileFindUnique.mockResolvedValue(null);
         orgFindUnique.mockResolvedValue({
             id: "org_1",
             name: "Acme",
@@ -220,6 +224,122 @@ describe("OrganizationSettingsService", () => {
             const audited = JSON.stringify(record.mock.calls[0][0]);
             expect(audited).not.toContain("SECRET-TAX");
             expect(audited).not.toContain("cfo@acme.test");
+        });
+
+        describe("GST (ADR-008)", () => {
+            it("registers with a valid GSTIN, taking the state from it", async () => {
+                await service.update(ctx("ADMIN"), {
+                    profile: { taxId: "29AAGCR4375J1ZU" },
+                    tax: { registered: true, invoicePrefix: "rc" },
+                });
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        update: {
+                            taxId: "29AAGCR4375J1ZU",
+                            gstRegistered: true,
+                            gstState: "29",
+                            invoicePrefix: "RC",
+                        },
+                    }),
+                );
+            });
+
+            it("refuses an invalid GSTIN on save, and writes nothing", async () => {
+                const attempt = service.update(ctx(), {
+                    profile: { taxId: "29AAGCR4375J1ZX" },
+                    tax: { registered: true },
+                });
+                await expect(attempt).rejects.toBeInstanceOf(
+                    BadRequestException,
+                );
+                await expect(attempt).rejects.toMatchObject({
+                    response: { details: { field: "taxId" } },
+                });
+                expect(prisma.$transaction).not.toHaveBeenCalled();
+            });
+
+            it("refuses a GSTIN from another state than the one chosen", async () => {
+                await expect(
+                    service.update(ctx(), {
+                        profile: { taxId: "30AAACR5055K1ZK" },
+                        tax: { registered: true, state: "Karnataka" },
+                    }),
+                ).rejects.toThrow(/registered in Goa/);
+            });
+
+            it("refuses a state that is not one", async () => {
+                await expect(
+                    service.update(ctx(), { tax: { state: "Atlantis" } }),
+                ).rejects.toBeInstanceOf(BadRequestException);
+            });
+
+            it("refuses registering with no GSTIN, and clearing it once registered", async () => {
+                await expect(
+                    service.update(ctx(), { tax: { registered: true } }),
+                ).rejects.toThrow(/GSTIN/);
+                profileFindUnique.mockResolvedValue({
+                    gstRegistered: true,
+                    gstState: "29",
+                    taxId: "29AAGCR4375J1ZU",
+                });
+                await expect(
+                    service.update(ctx(), { profile: { taxId: "" } }),
+                ).rejects.toThrow(/GSTIN/);
+            });
+
+            it("refuses a prefix that would make numbers too long, and a rate GST has not", async () => {
+                await expect(
+                    service.update(ctx(), { tax: { invoicePrefix: "RYEC" } }),
+                ).rejects.toMatchObject({
+                    response: { details: { field: "invoicePrefix" } },
+                });
+                await expect(
+                    service.update(ctx(), { tax: { deliveryRate: "7" } }),
+                ).rejects.toMatchObject({
+                    response: { details: { field: "deliveryRate" } },
+                });
+            });
+
+            it("tax settings are Owner/Admin: a Member is refused", async () => {
+                await expect(
+                    service.update(ctx("MEMBER"), {
+                        tax: { registered: false },
+                    }),
+                ).rejects.toBeInstanceOf(ForbiddenException);
+                expect(profileUpsert).not.toHaveBeenCalled();
+            });
+
+            it("reads the tax settings back apart from the profile", async () => {
+                orgFindUnique.mockResolvedValue({
+                    id: "org_1",
+                    name: "Rye & Co.",
+                    slug: "rye",
+                    businessProfile: {
+                        legalName: null,
+                        type: null,
+                        country: "IN",
+                        taxId: "29AAGCR4375J1ZU",
+                        contactEmail: null,
+                        website: null,
+                        timezone: "Asia/Kolkata",
+                        gstRegistered: true,
+                        gstState: "29",
+                        invoicePrefix: "RC",
+                        deliveryGstRate: { toString: () => "18.00" },
+                        deliverySacCode: "996813",
+                    },
+                });
+                const settings = await service.get(ctx());
+                expect(settings.tax).toEqual({
+                    registered: true,
+                    state: "29",
+                    stateName: "Karnataka",
+                    invoicePrefix: "RC",
+                    deliveryRate: "18",
+                    deliverySac: "996813",
+                });
+                expect(settings.profile).not.toHaveProperty("gstRegistered");
+            });
         });
 
         it("never re-slugs on rename — the slug is the stable public identifier", async () => {
