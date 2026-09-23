@@ -200,9 +200,7 @@ export function linkHref(link: CalendarLink): string {
         case "service":
             return `/services/${link.id}`;
         case "subscription":
-            // No page of its own yet (U13 builds Subscription Detail): the
-            // list, where it is one row.
-            return "/billing/subscriptions";
+            return `/billing/subscriptions/${link.id}`;
     }
 }
 

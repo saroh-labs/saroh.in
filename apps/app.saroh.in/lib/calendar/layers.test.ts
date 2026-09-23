@@ -322,7 +322,7 @@ describe("how things read", () => {
     it("links every kind of record somewhere that exists", () => {
         expect(linkHref({ type: "booking", id: "b1" })).toBe("/bookings/b1");
         expect(linkHref({ type: "subscription", id: "s1" })).toBe(
-            "/billing/subscriptions",
+            "/billing/subscriptions/s1",
         );
     });
 });
