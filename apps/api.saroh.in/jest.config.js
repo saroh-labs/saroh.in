@@ -191,6 +191,8 @@ module.exports = {
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
         "<rootDir>/src/modules/subscriptions/periods.spec.ts",
+        // U7: collection dates and when a skip saves the charge.
+        "<rootDir>/src/modules/subscriptions/collections.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",

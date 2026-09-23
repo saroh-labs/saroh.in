@@ -97,8 +97,12 @@ beforeAll(async () => {
         });
         return p.id;
     };
-    bread = await product("Sourdough", "250.00", 20);
-    pastry = await product("Croissant", "120.00", 20);
+    // Every paidOrder() holds its units straight on the rows, without the
+    // no-oversell guard, and most orders stay open for the whole file, so
+    // the stock must cover all of them (nine orders hold 27 croissants
+    // before the edit test asks for one more).
+    bread = await product("Sourdough", "250.00", 100);
+    pastry = await product("Croissant", "120.00", 100);
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",
         publicKey: "rzp_public",

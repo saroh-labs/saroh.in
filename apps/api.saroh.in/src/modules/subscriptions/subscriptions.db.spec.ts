@@ -362,6 +362,12 @@ describe("collections, skips and plan changes (real database)", () => {
                 currentPeriodEnd: utcDay(-14),
             },
         });
+        // Its sign-up invoice becomes that paid week's, or it would still
+        // claim a period starting today — the one the resume starts.
+        await prisma.invoice.updateMany({
+            where: { subscriptionId: s.id },
+            data: { periodStart: utcDay(-21), periodEnd: utcDay(-14) },
+        });
         const resumed = await service.resume(org, s.id);
         expect(resumed).toMatchObject({
             plan: { id: otherPlanId },

@@ -46,7 +46,13 @@ describe("collectionDates", () => {
         expect(collectionDates(period, SATURDAY, "Asia/Kolkata")).toEqual([
             "2026-09-05",
         ]);
-        expect(collectionDates(period, SATURDAY, "UTC")).toEqual([]);
+        // A Friday collection: in Kolkata the period runs Sat 5 – Fri 11, so
+        // the Friday is the 11th; read in UTC it starts on Fri the 4th.
+        const FRIDAY = 5;
+        expect(collectionDates(period, FRIDAY, "Asia/Kolkata")).toEqual([
+            "2026-09-11",
+        ]);
+        expect(collectionDates(period, FRIDAY, "UTC")).toEqual(["2026-09-04"]);
     });
 
     it("has none in an empty period (a start still ahead)", () => {
@@ -90,8 +96,10 @@ describe("everyCollectionSkipped", () => {
     });
 
     it("is false for a period with no collections at all", () => {
+        // A week holds every weekday, so only an empty period has none.
+        const empty = { start: week.start, end: week.start };
         expect(
-            everyCollectionSkipped(week, 3, "UTC", new Set(["2026-09-09"])),
+            everyCollectionSkipped(empty, 3, "UTC", new Set(["2026-09-09"])),
         ).toBe(false);
     });
 });
