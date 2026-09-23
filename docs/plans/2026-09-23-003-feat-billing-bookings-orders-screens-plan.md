@@ -460,6 +460,8 @@ flowchart TB
 **Verification:**
 - Customer Detail renders from this read alone.
 
+> **Done — #493** (merged `d08ca9ea`). `GET …/customers/:contactId/detail` rooted on the contact: stats, notes with structured allergens, linked store customers and their orders, bookings, subscriptions, invoices, packs; unlinked same-email customers come back only as possible matches. Each source reads on its own (`unavailable` names a failed one). Money needs `invoice:read` + `payment:read`. `ContactNote` + `ContactNoteAllergen` (RLS) with note CRUD; an allergen a note names can't be removed. Migration `20260928200000_contact_notes`. Seams for U5 (order invoices) and U3 (late cancels, membership classes). DB spec awaits test:int.
+
 ---
 
 ### U9. Two demo businesses to film in
