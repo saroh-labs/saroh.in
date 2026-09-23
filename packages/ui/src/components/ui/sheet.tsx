@@ -50,29 +50,42 @@ const sheetVariants = cva(
 interface SheetContentProps
     extends
         React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-        VariantProps<typeof sheetVariants> {}
+        VariantProps<typeof sheetVariants> {
+    /**
+     * False when the sheet draws its own close button in its header — a
+     * quick look puts it beside the status, where the design has it.
+     */
+    closeButton?: boolean;
+}
 
 const SheetContent = React.forwardRef<
     React.ElementRef<typeof SheetPrimitive.Content>,
     SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
-    <SheetPortal>
-        <SheetOverlay />
-        <SheetPrimitive.Content
-            ref={ref}
-            className={cn(sheetVariants({ side }), className)}
-            {...props}
-        >
-            {children}
-            {/* A 30px target (44 on touch), not a bare 16px glyph: closing a
-                sheet is the most common thing done in one. */}
-            <SheetPrimitive.Close className="absolute right-3 top-3 z-10 grid size-[30px] place-items-center rounded-[7px] text-muted-foreground ring-offset-background transition-colors duration-fast hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none coarse:size-11">
-                <X className="size-4" strokeWidth={2.1} />
-                <span className="sr-only">Close</span>
-            </SheetPrimitive.Close>
-        </SheetPrimitive.Content>
-    </SheetPortal>
-));
+>(
+    (
+        { side = "right", className, children, closeButton = true, ...props },
+        ref,
+    ) => (
+        <SheetPortal>
+            <SheetOverlay />
+            <SheetPrimitive.Content
+                ref={ref}
+                className={cn(sheetVariants({ side }), className)}
+                {...props}
+            >
+                {children}
+                {closeButton ? (
+                    /* A 30px target (44 on touch), not a bare 16px glyph:
+                       closing a sheet is the most common thing done in one. */
+                    <SheetPrimitive.Close className="absolute right-3 top-3 z-10 grid size-[30px] place-items-center rounded-[7px] text-muted-foreground ring-offset-background transition-colors duration-fast hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none coarse:size-11">
+                        <X className="size-4" strokeWidth={2.1} />
+                        <span className="sr-only">Close</span>
+                    </SheetPrimitive.Close>
+                ) : null}
+            </SheetPrimitive.Content>
+        </SheetPortal>
+    ),
+);
 SheetContent.displayName = SheetPrimitive.Content.displayName;
 
 function SheetHeader({
