@@ -130,14 +130,38 @@ export interface Category {
 }
 
 export type ResultField =
-    "name" | "slug" | "price" | "categoryId" | "sku" | "parentId";
+    | "name"
+    | "slug"
+    | "price"
+    | "mrp"
+    | "categoryId"
+    | "optionId"
+    | "sku"
+    | "title"
+    | "parentId"
+    | "description"
+    | "howToUse"
+    | "materials"
+    | "keyPoints"
+    | "maker"
+    | "returnsText"
+    | "shopFields"
+    | "seoTitle"
+    | "seoDescription"
+    | "seoImageId"
+    | "images"
+    | "optionValueId"
+    | "imageId"
+    | "variants"
+    | "variantId"
+    | "quantity";
 
 export type Result<T = { ok: true }> =
     { ok: true; data: T } | { ok: false; error: string; field?: ResultField };
 
 async function mutate<T = { id: string }>(
     path: string,
-    method: "POST" | "PUT" | "DELETE",
+    method: "POST" | "PUT" | "PATCH" | "DELETE",
     body?: unknown,
 ): Promise<Result<T>> {
     const res = await apiFetch(path, {
@@ -236,7 +260,10 @@ export interface VariantInput {
     sku: string;
     title: string;
     price?: string | null;
+    mrp?: string | null;
     image?: string | null;
+    optionValueId?: string | null;
+    imageId?: string | null;
 }
 
 export function createVariant(
@@ -291,5 +318,108 @@ export function setInventory(
         `/stores/${storeId}/products/${productId}/inventory`,
         "PUT",
         input,
+    );
+}
+
+// ---- Products v2: one section at a time (#461, #462) ----
+
+/** Any subset of a product's own fields — one editor section's save. */
+export interface ProductPatch {
+    name?: string;
+    slug?: string;
+    description?: string | null;
+    categoryId?: string | null;
+    optionId?: string | null;
+    price?: string;
+    mrp?: string | null;
+    status?: ProductStatus;
+    howToUse?: string | null;
+    materials?: string | null;
+    keyPoints?: string[];
+    madeHere?: boolean;
+    maker?: string | null;
+    madeIn?: string | null;
+    supplierCode?: string | null;
+    warranty?: string | null;
+    returnsMode?: "STOREFRONT" | "OWN";
+    returnsText?: string | null;
+    shopFields?: ShopFields;
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    seoImageId?: string | null;
+}
+
+export function patchProduct(
+    storeId: string,
+    productId: string,
+    patch: ProductPatch,
+) {
+    return mutate<ProductDetail>(
+        `/stores/${storeId}/products/${productId}`,
+        "PATCH",
+        patch,
+    );
+}
+
+/** One photo of the ordered set: kept (id), from the library, or an address. */
+export interface ProductImageInput {
+    id?: string;
+    mediaId?: string;
+    url?: string;
+    alt?: string;
+    width?: number;
+    height?: number;
+    creditName?: string | null;
+    creditUrl?: string | null;
+}
+
+export function replaceProductImages(
+    storeId: string,
+    productId: string,
+    images: ProductImageInput[],
+) {
+    return mutate<ProductImage[]>(
+        `/stores/${storeId}/products/${productId}/images`,
+        "PUT",
+        { images },
+    );
+}
+
+export interface StockView {
+    productId: string;
+    mode: "product" | "variant";
+    quantity: number;
+    reserved: number;
+    lowStockAlert: number;
+    variants: {
+        variantId: string;
+        quantity: number;
+        reserved: number;
+        lowStockAlert: number;
+    }[];
+}
+
+/** Every variant's count at once; switches the product to per-variant. */
+export function setVariantStock(
+    storeId: string,
+    productId: string,
+    variants: { variantId: string; quantity: number; lowStockAlert: number }[],
+) {
+    return mutate<StockView>(
+        `/stores/${storeId}/products/${productId}/inventory/variants`,
+        "PUT",
+        { variants },
+    );
+}
+
+export function reorderVariants(
+    storeId: string,
+    productId: string,
+    ids: string[],
+) {
+    return mutate<Variant[]>(
+        `/stores/${storeId}/products/${productId}/variants/order`,
+        "PUT",
+        { ids },
     );
 }

@@ -314,6 +314,9 @@ export async function seedBoutique(
     // --- customers, orders, invitations and reviews
     await writeOrdersAndReviews(prisma, { storeId, orgId, now, placed });
 
+    // --- discount codes: one on a category, one on everything, one ended
+    await writeDiscounts(prisma, { storeId, orgId, now, categoryId });
+
     return { id: orgId, name: BOUTIQUE_NAME, prefix: sid("") };
 }
 
@@ -674,6 +677,78 @@ async function writeOrdersAndReviews(
             });
         }
     }
+}
+
+/**
+ * Three codes, so a product page's Discounts tab has something to say: one
+ * that reaches the serums through their category, one for the whole shop,
+ * and one that ended — listed quieter, because "why did that order get 15%
+ * off" is asked after the fact.
+ */
+async function writeDiscounts(
+    prisma: Db,
+    ctx: {
+        storeId: string;
+        orgId: string;
+        now: Date;
+        categoryId: Record<string, string>;
+    },
+) {
+    const { storeId, orgId, now, categoryId } = ctx;
+    // Join rows go with their discount (cascade).
+    await prisma.discount.deleteMany({
+        where: { id: { startsWith: sid("discount") } },
+    });
+    await prisma.discount.create({
+        data: {
+            id: sid("discount", "glow15"),
+            organizationId: orgId,
+            code: "GLOW15",
+            description: "the serums, for the festive season",
+            kind: "PERCENTAGE",
+            percentBps: 1500,
+            appliesTo: "COLLECTION",
+            startsAt: at(now, -6, 9),
+            endsAt: at(now, 21, 23),
+            createdAt: at(now, -8, 11),
+            categories: {
+                create: {
+                    id: sid("discount", "glow15", "serums"),
+                    categoryId: categoryId.serums,
+                },
+            },
+        },
+    });
+    await prisma.discount.create({
+        data: {
+            id: sid("discount", "welcome100"),
+            organizationId: orgId,
+            code: "WELCOME100",
+            description: "a first order, anything in the shop",
+            kind: "FIXED_AMOUNT",
+            amount: "100",
+            currency: "INR",
+            appliesTo: "BUSINESS",
+            createdAt: at(now, -60, 11),
+        },
+    });
+    await prisma.discount.create({
+        data: {
+            id: sid("discount", "monsoon20"),
+            organizationId: orgId,
+            code: "MONSOON20",
+            description: "the monsoon sale",
+            kind: "PERCENTAGE",
+            percentBps: 2000,
+            appliesTo: "STOREFRONT",
+            startsAt: at(now, -45, 9),
+            endsAt: at(now, -24, 23),
+            createdAt: at(now, -46, 11),
+            stores: {
+                create: { id: sid("discount", "monsoon20", "store"), storeId },
+            },
+        },
+    });
 }
 
 /** This business's volume, children first. Its catalogue stays. */

@@ -98,3 +98,31 @@ export async function completeUpload(
         error: messageOf(data, "Could not confirm the upload."),
     };
 }
+
+export interface LibraryItem {
+    id: string;
+    filename: string;
+    contentType: string;
+    status: string;
+    url: string | null;
+    createdAt: string;
+}
+
+/**
+ * The business's photo library, newest first — ready images that storage can
+ * serve. A failed read throws (a failed read is not an empty library).
+ */
+export async function listLibrary(): Promise<LibraryItem[]> {
+    const base = await mediaBase();
+    if (!base) return [];
+    const res = await apiFetch(base, { method: "GET" });
+    if (!res.ok)
+        throw new Error(`The photo library could not be read (${res.status}).`);
+    const rows = (await res.json()) as LibraryItem[];
+    return rows.filter(
+        (r) =>
+            r.status === "READY" &&
+            r.url !== null &&
+            r.contentType.startsWith("image/"),
+    );
+}

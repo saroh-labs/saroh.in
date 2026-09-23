@@ -1,15 +1,16 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { customerHref } from "@/lib/customers/links";
 import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
 import type { OverviewReview } from "@/lib/products/overview-rules";
 
@@ -17,16 +18,18 @@ const REPLY_MAX = 1000;
 
 /**
  * The latest reviews, each with what the merchant can do: reply once (shown
- * under the review on the shop, and editable), and hide or show. Hiding takes
+ * under the review on the shop), and hide or show. Hiding takes
  * an Undo rather than a confirm — it is reversible, and the review stays
  * listed here, marked.
  */
 export function ReviewList({
     reviews,
     canReply,
+    storeId,
 }: {
     reviews: OverviewReview[];
     canReply: boolean;
+    storeId: string;
 }) {
     const router = useRouter();
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -35,7 +38,7 @@ export function ReviewList({
 
     function startReply(review: OverviewReview) {
         setReplyingTo(review.id);
-        setDraft(review.reply ?? "");
+        setDraft("");
     }
 
     function postReply(review: OverviewReview) {
@@ -47,7 +50,7 @@ export function ReviewList({
                 showError("Your reply wasn't posted. Try again.");
                 return;
             }
-            showSuccess(review.reply ? "Reply updated." : "Reply posted.");
+            showSuccess("Reply posted.");
             setReplyingTo(null);
             router.refresh();
         });
@@ -82,82 +85,85 @@ export function ReviewList({
     }
 
     return (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col gap-2.5">
             {reviews.map((r) => {
                 const hidden = r.status === "HIDDEN";
                 return (
                     <li key={r.id}>
                         <Card
                             className={cn(
-                                "px-4 py-3.5",
-                                hidden && "bg-muted/50",
+                                "rounded-[12px] px-4 py-[13px]",
+                                hidden && "opacity-[.72]",
                             )}
                         >
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <span
                                     role="img"
                                     aria-label={`${r.rating} out of 5`}
                                     className="tracking-[1px] text-highlight"
                                 >
                                     {"★".repeat(r.rating)}
-                                    <span className="text-muted-foreground/40">
-                                        {"★".repeat(5 - r.rating)}
+                                    {"☆".repeat(5 - r.rating)}
+                                </span>
+                                {r.customerId ? (
+                                    <Link
+                                        href={customerHref(
+                                            storeId,
+                                            r.customerId,
+                                        )}
+                                        className="text-[13px] font-semibold text-brand hover:text-foreground"
+                                    >
+                                        {r.displayName}
+                                    </Link>
+                                ) : (
+                                    <span className="text-[13px] font-semibold">
+                                        {r.displayName}
                                     </span>
-                                </span>
-                                <span className="font-medium">
-                                    {r.displayName}
-                                </span>
-                                <span className="text-muted-foreground">
+                                )}
+                                <span className="text-[12px] text-muted-foreground">
                                     {r.variantTitle
                                         ? `bought ${r.variantTitle} · `
                                         : ""}
-                                    <ViewerDate iso={r.createdAt} />
+                                    <ViewerDate
+                                        iso={r.createdAt}
+                                        variant="dayMonth"
+                                    />
                                 </span>
                                 {hidden ? (
-                                    <Badge variant="neutral">
+                                    <span className="rounded-full bg-muted px-[7px] py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-foreground/75">
                                         Hidden from the shop
-                                    </Badge>
-                                ) : !r.reply ? (
-                                    <Badge variant="draft">
-                                        Waiting for a reply
-                                    </Badge>
+                                    </span>
                                 ) : null}
                             </div>
                             {r.body ? (
-                                <p className="mt-2 whitespace-pre-line text-[13.5px] leading-[1.55]">
+                                <p className="mt-1.5 whitespace-pre-line text-pretty text-[13.5px] leading-[1.55] text-foreground/75">
                                     {r.body}
                                 </p>
                             ) : (
-                                <p className="mt-2 text-[13px] text-muted-foreground">
+                                <p className="mt-1.5 text-[13px] text-muted-foreground">
                                     No comment left — just a rating.
                                 </p>
                             )}
                             {r.reply && replyingTo !== r.id ? (
-                                <p className="mt-3 rounded-md bg-muted px-3 py-2 text-[13px]">
-                                    <span className="font-medium">
-                                        Your reply:{" "}
-                                    </span>
+                                <p className="mt-2 rounded-[8px] bg-muted/60 px-[11px] py-2 text-[13px] leading-[1.5] text-foreground/75">
+                                    <strong className="font-semibold text-foreground">
+                                        Your reply:
+                                    </strong>{" "}
                                     {r.reply}
                                 </p>
                             ) : null}
 
                             {replyingTo === r.id ? (
                                 <form
-                                    className="mt-3 flex flex-col gap-2"
+                                    className="mt-[9px]"
                                     onSubmit={(e) => {
                                         e.preventDefault();
                                         postReply(r);
                                     }}
                                 >
-                                    <label
-                                        htmlFor={`reply-${r.id}`}
-                                        className="text-[12.5px] font-medium"
-                                    >
-                                        Reply to {r.displayName}
-                                    </label>
                                     <Textarea
-                                        id={`reply-${r.id}`}
-                                        rows={3}
+                                        aria-label={`Reply to ${r.displayName}`}
+                                        rows={2}
                                         value={draft}
                                         maxLength={REPLY_MAX}
                                         onChange={(e) =>
@@ -165,53 +171,55 @@ export function ReviewList({
                                         }
                                         placeholder="Shown under the review, on the shop"
                                         disabled={pending}
+                                        className="min-h-0 rounded-[8px] px-2.5 py-2 text-[13px] leading-[1.5]"
                                     />
-                                    <div className="flex flex-wrap items-center gap-2">
+                                    <div className="mt-1.5 flex items-center gap-[7px]">
                                         <Button
                                             type="submit"
-                                            size="sm"
                                             disabled={pending || !draft.trim()}
+                                            className="h-[30px] rounded-[8px] px-3 text-[12px] font-semibold"
                                         >
-                                            {r.reply
-                                                ? "Update reply"
-                                                : "Post reply"}
+                                            Post reply
                                         </Button>
                                         <Button
                                             type="button"
-                                            size="sm"
-                                            variant="ghost"
+                                            variant="outline"
                                             onClick={() => setReplyingTo(null)}
                                             disabled={pending}
+                                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
                                         >
                                             Cancel
                                         </Button>
-                                        <span className="ml-auto text-[11.5px] tabular-nums text-muted-foreground">
-                                            {draft.length} / {REPLY_MAX}
-                                        </span>
+                                        {draft.length > REPLY_MAX - 100 ? (
+                                            <span className="ml-auto text-[11.5px] tabular-nums text-muted-foreground">
+                                                {draft.length} / {REPLY_MAX}
+                                            </span>
+                                        ) : null}
                                     </div>
                                 </form>
-                            ) : canReply ? (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    <Button
+                            ) : null}
+                            {canReply && replyingTo !== r.id ? (
+                                <div className="mt-[9px] flex gap-3.5">
+                                    {r.reply ? null : (
+                                        <button
+                                            type="button"
+                                            onClick={() => startReply(r)}
+                                            disabled={pending}
+                                            className="text-[12.5px] font-semibold text-brand hover:text-foreground disabled:opacity-50 coarse:min-h-11"
+                                        >
+                                            Reply
+                                        </button>
+                                    )}
+                                    <button
                                         type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => startReply(r)}
-                                        disabled={pending}
-                                    >
-                                        {r.reply ? "Edit reply" : "Reply"}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="ghost"
                                         onClick={() => toggleHidden(r)}
                                         disabled={pending}
+                                        className="text-[12.5px] text-muted-foreground hover:text-foreground disabled:opacity-50 coarse:min-h-11"
                                     >
                                         {hidden
                                             ? "Show on the shop"
                                             : "Hide from the shop"}
-                                    </Button>
+                                    </button>
                                 </div>
                             ) : null}
                         </Card>

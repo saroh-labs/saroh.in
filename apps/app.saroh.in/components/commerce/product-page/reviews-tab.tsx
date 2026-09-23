@@ -1,10 +1,10 @@
 import { Card } from "@saroh/ui/card";
-import { EmptyState } from "@saroh/ui/data-state";
+import { Star } from "lucide-react";
 
 import type { ProductOverview } from "@/lib/products/overview";
 import { ratingBars } from "@/lib/products/overview-rules";
 
-import { PanelFailed, PanelForbidden } from "./panel-state";
+import { PanelFailed, PanelForbidden, TabState } from "./panel-state";
 import { ReviewList } from "./review-list";
 
 /**
@@ -27,11 +27,12 @@ export function ProductReviewsTab({
     }
     if (reviews.status === "forbidden")
         return <PanelForbidden what="reviews" />;
-    const { summary, latest, toAnswer, hiddenCount } = reviews.data;
+    const { summary, latest, hiddenCount } = reviews.data;
 
     if (latest.length === 0) {
         return (
-            <EmptyState
+            <TabState
+                icon={Star}
                 title="No reviews yet"
                 description={
                     product.status === "PUBLISHED"
@@ -43,32 +44,43 @@ export function ProductReviewsTab({
     }
 
     return (
-        <div className="flex flex-wrap items-start gap-5">
-            <Card className="flex-[1_1_240px] px-5 py-4">
-                <p className="font-display text-[30px] font-semibold tabular-nums leading-none">
-                    {summary.average?.toFixed(1) ?? "—"}
+        <div className="flex flex-wrap items-start gap-4">
+            <Card className="flex-[1_1_250px] rounded-[12px] px-[18px] py-4">
+                <p className="flex items-baseline gap-2">
+                    <span className="font-display text-[30px] font-semibold tabular-nums tracking-[-0.02em]">
+                        {summary.average?.toFixed(1) ?? "—"}
+                    </span>
+                    {summary.average ? (
+                        <span
+                            aria-hidden
+                            className="tracking-[1px] text-highlight"
+                        >
+                            {"★".repeat(Math.round(summary.average))}
+                            {"☆".repeat(5 - Math.round(summary.average))}
+                        </span>
+                    ) : null}
                 </p>
-                <p className="mt-1 text-[13px] text-muted-foreground">
+                <p className="mt-0.5 text-[12.5px] text-muted-foreground">
                     From {summary.count}{" "}
-                    {summary.count === 1 ? "customer" : "customers"} who bought
+                    {summary.count === 1 ? "customer" : "customers"} who ordered
                     it
                     {hiddenCount > 0
                         ? ` · ${hiddenCount} hidden from the shop`
                         : ""}
                 </p>
                 <ul
-                    className="mt-4 flex flex-col gap-1.5"
+                    className="mt-3.5 flex flex-col gap-1.5"
                     aria-label="How the ratings spread"
                 >
                     {ratingBars(summary.distribution).map((bar) => (
                         <li
                             key={bar.stars}
-                            className="grid grid-cols-[2.5rem_minmax(0,1fr)_2rem] items-center gap-2 text-[12.5px]"
+                            className="grid grid-cols-[20px_minmax(0,1fr)_18px] items-center gap-2 text-[12px] text-muted-foreground"
                         >
-                            <span>{bar.stars} ★</span>
+                            <span>{bar.stars}★</span>
                             <span className="h-1.5 overflow-hidden rounded-full bg-muted">
                                 <span
-                                    className="block h-full rounded-full bg-foreground"
+                                    className="block h-full rounded-full bg-highlight"
                                     style={{ width: `${bar.percent}%` }}
                                 />
                             </span>
@@ -78,19 +90,21 @@ export function ProductReviewsTab({
                         </li>
                     ))}
                 </ul>
-                <p className="mt-4 border-t border-border pt-3 text-[12px] text-muted-foreground">
+                <p className="mt-3.5 border-t border-border pt-3 text-[11.5px] leading-[1.5] text-muted-foreground">
                     Customers are asked after their order is delivered. Only
                     people with an order can review, so each shows what they
                     bought.
                 </p>
             </Card>
-            <div className="min-w-0 flex-[2_1_420px]">
-                <p className="mb-3 text-[13px] font-medium">
-                    {toAnswer > 0
-                        ? `${toAnswer} waiting for a reply · the latest ${latest.length}`
-                        : `The latest ${latest.length}`}
+            <div className="flex min-w-0 flex-[2_1_400px] flex-col gap-2.5">
+                <p className="text-[12.5px] text-muted-foreground">
+                    The latest {latest.length} of {summary.count + hiddenCount}
                 </p>
-                <ReviewList reviews={latest} canReply={canReply} />
+                <ReviewList
+                    reviews={latest}
+                    canReply={canReply}
+                    storeId={overview.storefront.id}
+                />
             </div>
         </div>
     );

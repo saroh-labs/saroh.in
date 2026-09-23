@@ -9,10 +9,10 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@saroh/ui/sheet";
-import { Pencil } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { orderHref } from "@/lib/orders/links";
 import { productEditHref } from "@/lib/products/links";
@@ -57,58 +57,86 @@ export function VariantDrawer({
     const reviews =
         overview.reviews.status === "ok" ? overview.reviews.data : null;
 
+    const photo = open
+        ? (product.images.find((i) => i.id === open.imageId) ??
+          product.images.at(0))
+        : undefined;
+    const mineOrders =
+        open && orders
+            ? orders.recent.filter(
+                  (o) => o.open && o.lines.some((l) => l.variantId === open.id),
+              )
+            : [];
+    const mineReviews =
+        open && reviews
+            ? reviews.latest.filter((r) => r.variantId === open.id)
+            : [];
+
     return (
         <Sheet open={open !== null} onOpenChange={(o) => !o && onClose()}>
-            <SheetContent className="w-full overflow-y-auto sm:max-w-[420px]">
+            <SheetContent className="w-full gap-0 overflow-y-auto p-0 sm:max-w-[420px]">
                 {open ? (
                     <>
-                        <SheetHeader>
-                            <p className="text-[11.5px] text-muted-foreground">
-                                {product.name}
-                            </p>
-                            <SheetTitle>{open.title}</SheetTitle>
-                            <SheetDescription className="font-mono text-[12px]">
-                                SKU {open.sku}
-                            </SheetDescription>
+                        <SheetHeader className="sticky top-0 z-[1] flex-row items-center gap-2.5 space-y-0 border-b border-border bg-card py-3.5 pl-[18px] pr-14 text-left">
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[11.5px] text-muted-foreground">
+                                    {product.name}
+                                </p>
+                                <SheetTitle className="font-display text-[18px] tracking-[-0.02em]">
+                                    {open.title}
+                                </SheetTitle>
+                                <SheetDescription className="sr-only">
+                                    Stock, open orders and reviews for this
+                                    variant.
+                                </SheetDescription>
+                            </div>
+                            {overview.canWrite ? (
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="h-[30px] rounded-[8px] px-[11px] text-[12px] coarse:h-11"
+                                >
+                                    <Link href={edit("variants")}>Edit</Link>
+                                </Button>
+                            ) : null}
                         </SheetHeader>
-                        <div className="mt-4 flex flex-col gap-5 text-[13px]">
-                            <div className="flex items-start gap-3">
-                                {(() => {
-                                    const photo =
-                                        product.images.find(
-                                            (i) => i.id === open.imageId,
-                                        ) ?? product.images.at(0);
-                                    return photo ? (
+                        <div className="flex flex-col gap-5 px-[18px] pb-[22px] pt-4 text-[13px]">
+                            <div>
+                                <div className="flex items-start gap-3">
+                                    {photo ? (
                                         // eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos
                                         <img
                                             src={photo.url}
                                             alt={photo.alt}
-                                            className="h-[72px] w-24 shrink-0 rounded-md border border-border object-cover"
+                                            className="h-[72px] w-24 shrink-0 rounded-[9px] object-cover"
                                         />
-                                    ) : null;
-                                })()}
-                                <div>
-                                    <p className="font-display text-[20px] font-semibold tabular-nums">
-                                        {money(open.price ?? product.price)}
-                                    </p>
-                                    <p className="text-muted-foreground">
-                                        {open.price === null ||
-                                        open.price === product.price
-                                            ? "The product's price"
-                                            : `Its own price — the product's is ${money(product.price)}`}
-                                    </p>
-                                    <p className="mt-1 text-muted-foreground">
-                                        {open.imageId
-                                            ? "Shows its own photo when someone picks it."
-                                            : "Shows the cover when someone picks it."}
-                                    </p>
+                                    ) : null}
+                                    <div className="min-w-0">
+                                        <p className="font-display text-[20px] font-semibold tabular-nums">
+                                            {money(open.price ?? product.price)}
+                                        </p>
+                                        <p className="text-[12px] text-muted-foreground">
+                                            {open.price === null ||
+                                            open.price === product.price
+                                                ? "The product's price"
+                                                : `Its own price — the product's is ${money(product.price)}`}
+                                        </p>
+                                        <p className="mt-1 font-mono text-[11.5px] text-muted-foreground">
+                                            SKU {open.sku}
+                                        </p>
+                                    </div>
                                 </div>
+                                <p className="mt-2 text-[11.5px] text-muted-foreground">
+                                    {open.imageId
+                                        ? "Shows its own photo when someone picks it."
+                                        : "Shows the cover when someone picks it."}
+                                </p>
                             </div>
 
                             <DrawerSection title="Stock">
                                 {openLine ? (
                                     <>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-4 gap-2">
                                             <Tile
                                                 label="On hand"
                                                 value={openLine.onHand}
@@ -126,16 +154,13 @@ export function VariantDrawer({
                                                 value={openLine.warnAt}
                                             />
                                         </div>
-                                        <p className="mt-2">
+                                        <Badge
+                                            variant={WORD_BADGE[openLine.word]}
+                                            className="mt-2.5 rounded-full px-2 text-[11.5px] font-semibold"
+                                        >
                                             Customers see:{" "}
-                                            <Badge
-                                                variant={
-                                                    WORD_BADGE[openLine.word]
-                                                }
-                                            >
-                                                {customersSee(openLine)}
-                                            </Badge>
-                                        </p>
+                                            {customersSee(openLine)}
+                                        </Badge>
                                     </>
                                 ) : (
                                     <p className="text-muted-foreground">
@@ -146,82 +171,68 @@ export function VariantDrawer({
 
                             <DrawerSection title="Open orders">
                                 {orders ? (
-                                    (() => {
-                                        const mine = orders.recent.filter(
-                                            (o) =>
-                                                o.open &&
-                                                o.lines.some(
-                                                    (l) =>
-                                                        l.variantId === open.id,
-                                                ),
-                                        );
-                                        const sold =
-                                            orders.soldThisMonth[open.id] ?? 0;
-                                        return (
-                                            <>
-                                                {mine.length === 0 ? (
-                                                    <p className="text-muted-foreground">
-                                                        None open.
-                                                    </p>
-                                                ) : (
-                                                    <ul className="flex flex-col gap-1.5">
-                                                        {mine.map((o) => (
-                                                            <li
-                                                                key={o.id}
-                                                                className="flex flex-wrap items-center gap-2"
-                                                            >
-                                                                <Link
-                                                                    href={orderHref(
-                                                                        storeId,
-                                                                        o.id,
-                                                                    )}
-                                                                    className="font-mono text-[12px] underline-offset-4 hover:underline"
-                                                                >
-                                                                    {
-                                                                        o.orderNumber
-                                                                    }
-                                                                </Link>
-                                                                <span>
-                                                                    {o.customer}{" "}
-                                                                    · ×{" "}
-                                                                    {o.lines
-                                                                        .filter(
-                                                                            (
-                                                                                l,
-                                                                            ) =>
-                                                                                l.variantId ===
-                                                                                open.id,
-                                                                        )
-                                                                        .reduce(
-                                                                            (
-                                                                                n,
-                                                                                l,
-                                                                            ) =>
-                                                                                n +
-                                                                                l.quantity,
-                                                                            0,
-                                                                        )}
-                                                                </span>
-                                                                <Badge variant="draft">
-                                                                    {ORDER_STATUS_LABEL[
-                                                                        o.status
-                                                                    ] ??
-                                                                        o.status}
-                                                                </Badge>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                )}
-                                                <p className="mt-2 text-muted-foreground">
-                                                    {sold} sold this month.
-                                                </p>
-                                            </>
-                                        );
-                                    })()
+                                    <>
+                                        {mineOrders.length === 0 ? (
+                                            <p className="text-[12.5px] text-muted-foreground">
+                                                No open orders for this size.
+                                            </p>
+                                        ) : (
+                                            <ul>
+                                                {mineOrders.map((o) => (
+                                                    <li
+                                                        key={o.id}
+                                                        className="flex items-center gap-2.5 border-b border-foreground/10 py-2 last:border-0"
+                                                    >
+                                                        <Link
+                                                            href={orderHref(
+                                                                storeId,
+                                                                o.id,
+                                                            )}
+                                                            className="font-mono text-[12px] text-brand hover:text-foreground"
+                                                        >
+                                                            {o.orderNumber}
+                                                        </Link>
+                                                        <span className="min-w-0 flex-1 truncate">
+                                                            {o.customer} · ×{" "}
+                                                            {o.lines
+                                                                .filter(
+                                                                    (l) =>
+                                                                        l.variantId ===
+                                                                        open.id,
+                                                                )
+                                                                .reduce(
+                                                                    (n, l) =>
+                                                                        n +
+                                                                        l.quantity,
+                                                                    0,
+                                                                )}
+                                                        </span>
+                                                        <Badge
+                                                            variant={
+                                                                o.status ===
+                                                                "PROCESSING"
+                                                                    ? "success"
+                                                                    : "draft"
+                                                            }
+                                                            className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                                        >
+                                                            {ORDER_STATUS_LABEL[
+                                                                o.status
+                                                            ] ?? o.status}
+                                                        </Badge>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                        <p className="mt-2 text-[12.5px] text-muted-foreground">
+                                            {orders.soldThisMonth[open.id] ?? 0}{" "}
+                                            sold this month.
+                                        </p>
+                                    </>
                                 ) : (
-                                    <p className="text-muted-foreground">
+                                    <p className="text-[12.5px] text-muted-foreground">
                                         {overview.orders.status === "failed"
-                                            ? "Couldn't load orders."
+                                            ? "Couldn't load orders. Stock figures above are still right."
                                             : "Your role can't see orders."}
                                     </p>
                                 )}
@@ -229,60 +240,57 @@ export function VariantDrawer({
 
                             <DrawerSection title="Reviews from people who bought it">
                                 {reviews ? (
-                                    (() => {
-                                        const mine = reviews.latest.filter(
-                                            (r) => r.variantId === open.id,
-                                        );
-                                        return mine.length === 0 ? (
-                                            <p className="text-muted-foreground">
-                                                None yet.
-                                            </p>
-                                        ) : (
-                                            <ul className="flex flex-col gap-2">
-                                                {mine.map((r) => (
-                                                    <li
-                                                        key={r.id}
-                                                        className="rounded-md border border-border px-3 py-2"
-                                                    >
-                                                        <p>
-                                                            <span
-                                                                aria-label={`${r.rating} out of 5`}
-                                                            >
-                                                                {"★".repeat(
-                                                                    r.rating,
-                                                                )}
-                                                            </span>{" "}
-                                                            <span className="font-medium">
-                                                                {r.displayName}
-                                                            </span>
+                                    mineReviews.length === 0 ? (
+                                        <p className="text-[12.5px] text-muted-foreground">
+                                            No reviews from people who bought
+                                            this size yet.
+                                        </p>
+                                    ) : (
+                                        <ul className="flex flex-col gap-2">
+                                            {mineReviews.map((r) => (
+                                                <li
+                                                    key={r.id}
+                                                    className="rounded-[9px] bg-muted px-[11px] py-[9px]"
+                                                >
+                                                    <p className="flex flex-wrap items-center gap-1.5 text-[12px]">
+                                                        <span
+                                                            role="img"
+                                                            aria-label={`${r.rating} out of 5`}
+                                                            className="tracking-[1px] text-highlight"
+                                                        >
+                                                            {"★".repeat(
+                                                                r.rating,
+                                                            )}
+                                                        </span>
+                                                        <span className="font-semibold">
+                                                            {r.displayName}
+                                                        </span>
+                                                        <span className="text-muted-foreground">
+                                                            ·{" "}
+                                                            <ViewerDate
+                                                                iso={
+                                                                    r.createdAt
+                                                                }
+                                                            />
+                                                        </span>
+                                                    </p>
+                                                    {r.body ? (
+                                                        <p className="mt-[3px] text-[12.5px] leading-[1.5]">
+                                                            {r.body}
                                                         </p>
-                                                        {r.body ? (
-                                                            <p className="mt-1">
-                                                                {r.body}
-                                                            </p>
-                                                        ) : null}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        );
-                                    })()
+                                                    ) : null}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )
                                 ) : (
-                                    <p className="text-muted-foreground">
+                                    <p className="text-[12.5px] text-muted-foreground">
                                         {overview.reviews.status === "failed"
                                             ? "Couldn't load reviews."
                                             : "Your role can't see reviews."}
                                     </p>
                                 )}
                             </DrawerSection>
-
-                            {overview.canWrite ? (
-                                <Button asChild variant="outline">
-                                    <Link href={edit("variants")}>
-                                        <Pencil aria-hidden />
-                                        Edit in the full editor
-                                    </Link>
-                                </Button>
-                            ) : null}
                         </div>
                     </>
                 ) : null}
@@ -299,9 +307,9 @@ export function Tile({
     value: number | string;
 }) {
     return (
-        <div className="rounded-md bg-muted px-3 py-2">
+        <div className="rounded-[9px] bg-muted px-2.5 py-[9px]">
             <p className="text-[11px] text-muted-foreground">{label}</p>
-            <p className="font-display text-[17px] font-semibold tabular-nums">
+            <p className="mt-0.5 font-display text-[17px] font-semibold tabular-nums">
                 {value}
             </p>
         </div>

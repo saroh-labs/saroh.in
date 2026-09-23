@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { CustomerView } from "@/components/commerce/product-page/customer-view";
 import { ProductDiscountsTab } from "@/components/commerce/product-page/discounts-tab";
 import { ProductHeader } from "@/components/commerce/product-page/header";
 import { ProductOrdersTab } from "@/components/commerce/product-page/orders-tab";
@@ -13,6 +14,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { isProductTab, productHref } from "@/lib/products/links";
 import { findProductStore, getProductOverview } from "@/lib/products/overview";
+import { listCategories } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
 
@@ -39,6 +41,7 @@ export default async function ProductPage({
         storefront?: string;
         tab?: string;
         orders?: string;
+        view?: string;
     }>;
 }) {
     await requireSession();
@@ -67,6 +70,11 @@ export default async function ProductPage({
     if (!store || !overview) notFound();
 
     const tab = isProductTab(query.tab) ? query.tab : "overview";
+    const view = query.view === "customer" ? "customer" : "team";
+    // The details sheet picks a category; only a writer opens it.
+    const categories = overview.canWrite
+        ? await listCategories(store.id).catch(() => [])
+        : [];
     // A hint for which controls to draw; the API decides regardless.
     const may = (action: string) =>
         organization?.actions
@@ -78,51 +86,72 @@ export default async function ProductPage({
     return (
         <PageContainer width="wide">
             <div className="flex flex-col gap-5">
-                <ProductHeader overview={overview} storeId={store.id} />
-                <ProductTabs overview={overview} active={tab} href={href} />
-                <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
-                    {tab === "overview" ? (
-                        <ProductOverviewTab
+                <ProductHeader
+                    overview={overview}
+                    storeId={store.id}
+                    view={view}
+                />
+                {view === "customer" ? (
+                    <CustomerView
+                        overview={overview}
+                        storeId={store.id}
+                        canWrite={overview.canWrite}
+                    />
+                ) : (
+                    <>
+                        <ProductTabs
                             overview={overview}
-                            storeId={store.id}
+                            active={tab}
                             href={href}
                         />
-                    ) : null}
-                    {tab === "variants" ? (
-                        <ProductVariantsTab
-                            overview={overview}
-                            storeId={store.id}
-                        />
-                    ) : null}
-                    {tab === "photos" ? (
-                        <ProductPhotosTab
-                            overview={overview}
-                            storeId={store.id}
-                        />
-                    ) : null}
-                    {tab === "reviews" ? (
-                        <ProductReviewsTab
-                            overview={overview}
-                            retryHref={href("reviews")}
-                            canReply={may("product-review:write")}
-                        />
-                    ) : null}
-                    {tab === "orders" ? (
-                        <ProductOrdersTab
-                            overview={overview}
-                            storeId={store.id}
-                            filter={
-                                query.orders === "recent" ? "recent" : "open"
-                            }
-                        />
-                    ) : null}
-                    {tab === "discounts" ? (
-                        <ProductDiscountsTab
-                            overview={overview}
-                            retryHref={href("discounts")}
-                        />
-                    ) : null}
-                </div>
+                        <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
+                            {tab === "overview" ? (
+                                <ProductOverviewTab
+                                    overview={overview}
+                                    storeId={store.id}
+                                    href={href}
+                                    categories={categories}
+                                />
+                            ) : null}
+                            {tab === "variants" ? (
+                                <ProductVariantsTab
+                                    overview={overview}
+                                    storeId={store.id}
+                                />
+                            ) : null}
+                            {tab === "photos" ? (
+                                <ProductPhotosTab
+                                    overview={overview}
+                                    storeId={store.id}
+                                />
+                            ) : null}
+                            {tab === "reviews" ? (
+                                <ProductReviewsTab
+                                    overview={overview}
+                                    retryHref={href("reviews")}
+                                    canReply={may("product-review:write")}
+                                />
+                            ) : null}
+                            {tab === "orders" ? (
+                                <ProductOrdersTab
+                                    overview={overview}
+                                    storeId={store.id}
+                                    filter={
+                                        query.orders === "recent"
+                                            ? "recent"
+                                            : "open"
+                                    }
+                                />
+                            ) : null}
+                            {tab === "discounts" ? (
+                                <ProductDiscountsTab
+                                    overview={overview}
+                                    retryHref={href("discounts")}
+                                />
+                            ) : null}
+                        </div>
+                    </>
+                )}
             </div>
         </PageContainer>
     );

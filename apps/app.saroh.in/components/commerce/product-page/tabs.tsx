@@ -102,7 +102,7 @@ export function ProductTabs({
     return (
         <nav
             aria-label="Product views"
-            className="-mx-1 flex gap-1 overflow-x-auto border-b border-border px-1"
+            className="-mx-1 flex gap-0.5 overflow-x-auto border-b border-border px-1"
         >
             {tabs.map((t) => {
                 const on = t.id === active;
@@ -114,9 +114,9 @@ export function ProductTabs({
                         scroll={false}
                         aria-current={on ? "page" : undefined}
                         className={cn(
-                            "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-md px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
+                            "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-md px-3.5 py-2.5 text-[13px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
                             on
-                                ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
+                                ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
                                 : "font-medium text-muted-foreground hover:text-foreground",
                         )}
                     >
@@ -124,15 +124,13 @@ export function ProductTabs({
                         {t.badge ? (
                             <span
                                 className={cn(
-                                    "rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums",
+                                    "rounded-full px-1.5 py-px text-[11px] font-semibold tabular-nums",
                                     t.badge.tone === "attention" &&
                                         "bg-brand-subtle text-brand-subtle-foreground",
                                     t.badge.tone === "danger" &&
                                         "bg-destructive-subtle text-destructive-subtle-foreground",
                                     t.badge.tone === "plain" &&
-                                        (on
-                                            ? "bg-muted text-foreground"
-                                            : "bg-foreground/[0.04] text-muted-foreground"),
+                                        "bg-muted text-muted-foreground",
                                 )}
                             >
                                 {t.badge.text}

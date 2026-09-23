@@ -24,6 +24,7 @@ export type Panel<T> =
 export interface OverviewOrder {
     id: string;
     orderNumber: string;
+    customerId: string;
     customer: string;
     status: string;
     open: boolean;
@@ -36,6 +37,7 @@ export interface OverviewReview {
     rating: number;
     body: string | null;
     displayName: string;
+    customerId: string | null;
     status: "PUBLISHED" | "HIDDEN";
     reply: string | null;
     variantId: string | null;

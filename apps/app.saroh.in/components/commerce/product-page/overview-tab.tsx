@@ -1,6 +1,5 @@
 import { Badge } from "@saroh/ui/badge";
 import { Card } from "@saroh/ui/card";
-import { StatCard } from "@saroh/ui/stat-card";
 import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -8,16 +7,17 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import type { EditorSection, ProductTab } from "@/lib/products/links";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
-import { plural, ratingLabel } from "@/lib/products/overview-rules";
+import { onTheShop, ratingLabel } from "@/lib/products/overview-rules";
 
 import { DraftChecklist } from "./draft-checklist";
 import { ProductDetailsCard } from "./overview-details";
 import {
-    EditLink,
     LinkedCard,
     PanelLine,
+    ProductStat,
     SectionTitle,
 } from "./overview-parts";
+import { SheetButton } from "./sheet-button";
 
 /**
  * The product at a glance. Four numbers a merchant checks first, what is
@@ -28,10 +28,12 @@ export function ProductOverviewTab({
     overview,
     storeId,
     href,
+    categories,
 }: {
     overview: ProductOverview;
     storeId: string;
     href: (tab: ProductTab) => string;
+    categories: { id: string; name: string }[];
 }) {
     const { product, stock, orders, reviews, discounts } = overview;
     const money = (amount: string) =>
@@ -51,7 +53,7 @@ export function ProductOverviewTab({
             ) : null}
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-2.5">
-                <StatCard
+                <ProductStat
                     label="Can be sold now"
                     value={tracked ? stock.totals.canSell : "—"}
                     hint={
@@ -60,7 +62,7 @@ export function ProductOverviewTab({
                             : "No stock count yet"
                     }
                 />
-                <StatCard
+                <ProductStat
                     label="Variants"
                     value={product.variants.length || "—"}
                     hint={
@@ -75,16 +77,23 @@ export function ProductOverviewTab({
                             : "Sold as itself"
                     }
                 />
-                <StatCard
+                <ProductStat
                     label="Last changed"
-                    value={<ViewerDate iso={overview.lastChanged} />}
-                    hint="Its name, price or details"
+                    value={
+                        <ViewerDate
+                            iso={overview.lastChanged}
+                            variant="dayMonth"
+                        />
+                    }
+                    hint={
+                        <ViewerDate iso={overview.lastChanged} variant="time" />
+                    }
                 />
                 <Link
                     href={href("reviews")}
-                    className="rounded-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="rounded-[12px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                    <StatCard
+                    <ProductStat
                         className="h-full transition-colors hover:border-border-strong"
                         label="Reviews"
                         value={
@@ -93,15 +102,22 @@ export function ProductOverviewTab({
                                 : "—"
                         }
                         hint={
-                            reviews.status === "ok"
-                                ? reviews.data.summary.count === 0
-                                    ? "None yet"
-                                    : reviews.data.toAnswer > 0
-                                      ? `${reviews.data.toAnswer} waiting for a reply`
-                                      : "All answered"
-                                : reviews.status === "failed"
-                                  ? "Couldn't load reviews"
-                                  : "Your role can't see reviews"
+                            reviews.status === "ok" ? (
+                                reviews.data.summary.count === 0 ? (
+                                    "None yet"
+                                ) : reviews.data.toAnswer > 0 ? (
+                                    <span className="text-brand">
+                                        {reviews.data.toAnswer} waiting for a
+                                        reply
+                                    </span>
+                                ) : (
+                                    "All answered"
+                                )
+                            ) : reviews.status === "failed" ? (
+                                "Couldn't load reviews"
+                            ) : (
+                                "Your role can't see reviews"
+                            )
                         }
                     />
                 </Link>
@@ -112,7 +128,7 @@ export function ProductOverviewTab({
                     title="Linked to this product"
                     aside="Read-only here. Each has its own tab, and links on to where it is managed."
                 />
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-2.5">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-2.5">
                     <LinkedCard title="Orders" href={href("orders")}>
                         {orders.status === "ok" ? (
                             <>
@@ -149,9 +165,15 @@ export function ProductOverviewTab({
                                     {ratingLabel(reviews.data.summary) ??
                                         "No reviews yet"}
                                 </p>
-                                <p className="text-[12px] text-muted-foreground">
+                                <p
+                                    className={
+                                        reviews.data.toAnswer > 0
+                                            ? "text-[12px] text-brand"
+                                            : "text-[12px] text-muted-foreground"
+                                    }
+                                >
                                     {reviews.data.toAnswer > 0
-                                        ? `${plural(reviews.data.toAnswer, "review")} to answer`
+                                        ? `${reviews.data.toAnswer} waiting for a reply`
                                         : reviews.data.summary.count > 0
                                           ? "Every review has a reply or is answered"
                                           : "Only people who bought it can review it"}
@@ -195,70 +217,89 @@ export function ProductOverviewTab({
             </section>
 
             <div className="grid gap-4 lg:grid-cols-2">
-                <ProductDetailsCard overview={overview} edit={edit} />
+                <ProductDetailsCard
+                    overview={overview}
+                    storeId={storeId}
+                    categories={categories}
+                />
 
-                <section className="flex min-w-0 flex-col gap-3">
-                    <SectionTitle
-                        title="Photos"
-                        aside={`${product.images.length} of 5`}
-                        action={
-                            <Link
-                                href={href("photos")}
-                                className="text-[13px] font-medium underline-offset-4 hover:underline"
-                            >
-                                See all
-                            </Link>
-                        }
-                    />
+                <Card className="flex min-w-0 flex-col self-start rounded-[12px] px-4 pb-1 pt-3.5">
+                    <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
+                        <h2 className="flex-1 text-[12.5px] text-muted-foreground">
+                            Photos
+                        </h2>
+                        {overview.canWrite ? (
+                            <SheetButton
+                                kind="photos"
+                                label="Edit"
+                                ariaLabel="Edit photos"
+                                product={product}
+                                storeId={storeId}
+                            />
+                        ) : null}
+                        <Link
+                            href={href("photos")}
+                            className="text-[12px] text-brand hover:text-foreground"
+                        >
+                            See all
+                        </Link>
+                    </div>
                     {product.images.length > 0 ? (
-                        <div className="grid grid-cols-3 gap-1.5">
+                        <div className="grid grid-cols-[2fr_1fr_1fr] gap-1.5">
                             {product.images.slice(0, 5).map((img, i) => (
                                 <div
                                     key={img.id}
                                     className={
                                         i === 0
-                                            ? "relative col-span-2 row-span-2 overflow-hidden rounded-[10px] border border-border"
-                                            : "overflow-hidden rounded-[10px] border border-border"
+                                            ? "relative row-span-2 overflow-hidden rounded-[8px]"
+                                            : "overflow-hidden rounded-[6px]"
                                     }
                                 >
                                     {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */}
                                     <img
                                         src={img.url}
                                         alt={img.alt}
-                                        className="aspect-square size-full object-cover"
+                                        className={
+                                            i === 0
+                                                ? "aspect-[4/3] size-full object-cover"
+                                                : "aspect-[4/3] w-full object-cover"
+                                        }
                                     />
                                     {i === 0 ? (
-                                        <Badge
-                                            variant="neutral"
-                                            className="absolute left-2 top-2"
-                                        >
+                                        <span className="absolute left-1.5 top-1.5 rounded-full bg-foreground px-[7px] py-px text-[11px] font-semibold text-background">
                                             Cover
-                                        </Badge>
+                                        </span>
                                     ) : null}
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <Card className="grid place-items-center border-dashed px-4 py-10 text-center text-[13px] text-muted-foreground">
+                        <div className="grid place-items-center rounded-[8px] border border-dashed border-border px-4 py-10 text-center text-[12.5px] text-muted-foreground">
                             No photos yet — up to 5, the first is the cover.
-                        </Card>
+                        </div>
                     )}
-                </section>
+                    <p className="pb-3 pt-2 text-[11.5px] text-muted-foreground">
+                        {product.images.length} of 5 photos
+                    </p>
+                </Card>
             </div>
 
             <section className="flex flex-col gap-3">
                 <SectionTitle
-                    title="Description"
+                    title="Description and ingredients"
                     action={
                         overview.canWrite ? (
-                            <EditLink
-                                href={edit("description")}
-                                label="Edit description"
+                            <SheetButton
+                                kind="description"
+                                label="Edit"
+                                ariaLabel="Edit description"
+                                product={product}
+                                storeId={storeId}
                             />
                         ) : null
                     }
                 />
-                <Card className="max-w-[70ch] px-5 py-4">
+                <Card className="max-w-[70ch] rounded-[12px] px-5 py-4">
                     {product.description ? (
                         <div
                             className="prose prose-sm max-w-none text-foreground dark:prose-invert"
@@ -279,6 +320,41 @@ export function ProductOverviewTab({
                             ))}
                         </ul>
                     ) : null}
+                </Card>
+                <Card className="max-w-[calc(70ch+40px)] rounded-[12px] px-[18px] py-1">
+                    <dl className="text-[13.5px]">
+                        <div className="grid grid-cols-[104px_minmax(0,1fr)_auto] items-baseline gap-3 py-[11px]">
+                            <dt className="text-[12.5px] text-muted-foreground">
+                                Ingredients or material
+                            </dt>
+                            <dd className="min-w-0 break-words">
+                                {product.materials ?? (
+                                    <span className="text-muted-foreground">
+                                        Not given.
+                                    </span>
+                                )}
+                            </dd>
+                            {product.materials ? (
+                                onTheShop(product.shopFields, "materials") ? (
+                                    <Badge
+                                        variant="success"
+                                        className="rounded-full px-[7px] py-px text-[11px] font-semibold"
+                                    >
+                                        On the shop
+                                    </Badge>
+                                ) : (
+                                    <Badge
+                                        variant="neutral"
+                                        className="rounded-full px-[7px] py-px text-[11px] font-semibold"
+                                    >
+                                        Team only
+                                    </Badge>
+                                )
+                            ) : (
+                                <span />
+                            )}
+                        </div>
+                    </dl>
                 </Card>
             </section>
         </div>

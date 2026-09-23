@@ -22,6 +22,7 @@ export type Panel<T> =
 export interface OverviewOrder {
     id: string;
     orderNumber: string;
+    customerId: string;
     customer: string;
     status: string;
     open: boolean;
@@ -42,6 +43,8 @@ export interface OverviewReview {
     rating: number;
     body: string | null;
     displayName: string;
+    /** Null when the customer record has gone. */
+    customerId: string | null;
     status: "PUBLISHED" | "HIDDEN";
     reply: string | null;
     variantId: string | null;
@@ -222,6 +225,7 @@ export class ProductOverviewService {
                         orderId: true,
                         status: true,
                         createdAt: true,
+                        customerId: true,
                         customer: {
                             select: {
                                 firstName: true,
@@ -253,6 +257,7 @@ export class ProductOverviewService {
             recent: recent.map((o) => ({
                 id: o.id,
                 orderNumber: o.orderId,
+                customerId: o.customerId,
                 customer:
                     [o.customer.firstName, o.customer.lastName]
                         .filter(Boolean)
@@ -293,6 +298,7 @@ export class ProductOverviewService {
                     rating: true,
                     body: true,
                     displayName: true,
+                    customerId: true,
                     status: true,
                     reply: true,
                     createdAt: true,
@@ -312,6 +318,7 @@ export class ProductOverviewService {
                     rating: r.rating,
                     body: r.body,
                     displayName: r.displayName,
+                    customerId: r.customerId,
                     status: r.status === "HIDDEN" ? "HIDDEN" : "PUBLISHED",
                     reply: r.reply,
                     variantId,

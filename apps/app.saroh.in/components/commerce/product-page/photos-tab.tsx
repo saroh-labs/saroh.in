@@ -1,11 +1,11 @@
 import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
-import { Pencil } from "lucide-react";
-import Link from "next/link";
+import { Image as ImageIcon } from "lucide-react";
 
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
+
+import { StateLink, TabState } from "./panel-state";
+import { SheetButton } from "./sheet-button";
 
 /**
  * The photos in the order customers see them. The first is the cover, and
@@ -23,17 +23,15 @@ export function ProductPhotosTab({
 
     if (product.images.length === 0) {
         return (
-            <EmptyState
+            <TabState
+                icon={ImageIcon}
                 title="No photos yet"
                 description="Add up to 5. The first becomes the cover on the shop and in lists."
-                action={
-                    overview.canWrite ? (
-                        <Button asChild variant="outline">
-                            <Link href={edit}>Add photos</Link>
-                        </Button>
-                    ) : undefined
-                }
-            />
+            >
+                {overview.canWrite ? (
+                    <StateLink href={edit}>Add photos</StateLink>
+                ) : null}
+            </TabState>
         );
     }
 
@@ -52,17 +50,15 @@ export function ProductPhotosTab({
                     In the order customers see them. The first is the cover.
                 </p>
                 {overview.canWrite ? (
-                    <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="ml-auto"
-                    >
-                        <Link href={edit}>
-                            <Pencil aria-hidden />
-                            Edit photos
-                        </Link>
-                    </Button>
+                    <div className="ml-auto">
+                        <SheetButton
+                            kind="photos"
+                            label="Edit"
+                            ariaLabel="Edit photos"
+                            product={product}
+                            storeId={storeId}
+                        />
+                    </div>
                 ) : null}
             </div>
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">

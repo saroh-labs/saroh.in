@@ -1,8 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
-import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
+import { Tag } from "lucide-react";
 import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -14,11 +13,16 @@ import {
     plural,
 } from "@/lib/products/overview-rules";
 
-import { PanelFailed, PanelForbidden } from "./panel-state";
+import {
+    PanelFailed,
+    PanelForbidden,
+    StateLink,
+    TabState,
+} from "./panel-state";
 
 const STATE = {
     ACTIVE: { label: "Applies now", variant: "success" },
-    SCHEDULED: { label: "Scheduled", variant: "info" },
+    SCHEDULED: { label: "Scheduled", variant: "neutral" },
     EXPIRED: { label: "Ended", variant: "neutral" },
     EXHAUSTED: { label: "Used up", variant: "neutral" },
 } as const;
@@ -47,22 +51,21 @@ export function ProductDiscountsTab({
 
     if (discounts.data.length === 0) {
         return (
-            <EmptyState
-                title="No discount codes reach it yet"
+            <TabState
+                icon={Tag}
+                title="No discounts reach it yet"
                 description="A code set on this product, its category, the storefront or everything in the shop shows here."
-                action={
-                    <Button asChild variant="outline">
-                        <Link href="/commerce/discounts">Open Discounts</Link>
-                    </Button>
-                }
-            />
+            >
+                <StateLink href="/commerce/discounts">Open Discounts</StateLink>
+            </TabState>
         );
     }
 
     return (
-        <div className="flex flex-col gap-3">
-            <p className="text-[12.5px] text-muted-foreground">
-                Codes that reach this product. Set up and changed in Discounts.
+        <div>
+            <p className="mb-3 text-pretty text-[12.5px] text-muted-foreground">
+                Discounts that reach this product — set on it, its category, the
+                storefront or everything. Set up in Discounts.
             </p>
             <ul className="flex flex-col gap-2.5">
                 {discounts.data.map((d) => {
@@ -72,38 +75,46 @@ export function ProductDiscountsTab({
                             : STATE.EXPIRED;
                     const ended =
                         d.state === "EXPIRED" || d.state === "EXHAUSTED";
+                    // Only what applies now is at full strength.
+                    const quiet = d.state !== "ACTIVE";
                     return (
                         <li key={d.id}>
                             <Card
                                 className={cn(
-                                    "px-4 py-3",
-                                    ended && "bg-muted/40",
+                                    "rounded-[12px] px-4 py-[13px]",
+                                    quiet && "opacity-70",
                                 )}
                             >
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="font-mono text-[13px] font-semibold">
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                    <span className="font-mono text-[13px] font-medium">
                                         {d.code}
                                     </span>
-                                    <Badge variant={state.variant}>
+                                    <Badge
+                                        variant={state.variant}
+                                        className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                    >
                                         {state.label}
                                     </Badge>
                                     <Link
                                         href="/commerce/discounts"
-                                        className="ml-auto text-[12.5px] font-medium underline-offset-4 hover:underline"
+                                        className="ml-auto text-[12px] text-brand hover:text-foreground"
                                     >
                                         Open in Discounts
                                     </Link>
                                 </div>
-                                <p className="mt-1 text-[13.5px]">
+                                <p className="mt-1.5 text-[13.5px]">
                                     {discountAmount(d, money)}{" "}
                                     {DISCOUNT_REACH_LABEL[d.appliesTo] ?? ""}
                                     {d.description ? ` — ${d.description}` : ""}
                                 </p>
-                                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                <p className="mt-1 text-[12px] text-muted-foreground">
                                     {d.endsAt ? (
                                         <>
                                             {ended ? "Ended " : "Until "}
-                                            <ViewerDate iso={d.endsAt} />
+                                            <ViewerDate
+                                                iso={d.endsAt}
+                                                variant="dayMonth"
+                                            />
                                         </>
                                     ) : (
                                         "No end date"

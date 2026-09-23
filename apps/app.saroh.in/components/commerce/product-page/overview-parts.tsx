@@ -1,10 +1,8 @@
-import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
-import { Pencil } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-/** Small pieces the product page's Overview is built from. */
+/** Small pieces the product page's Overview is built from, at the design's sizes. */
 
 export function SectionTitle({
     title,
@@ -15,27 +13,47 @@ export function SectionTitle({
     aside?: string;
     action?: ReactNode;
 }) {
+    // Title, then its Edit, then what it means — the design reads left to
+    // right, so the action sits with the thing it edits, not at the far edge.
     return (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
             <h2 className="font-display text-[15px] font-semibold tracking-[-0.015em]">
                 {title}
             </h2>
+            {action ? <div className="self-center">{action}</div> : null}
             {aside ? (
-                <p className="text-[12.5px] text-muted-foreground">{aside}</p>
+                <p className="text-[12px] text-muted-foreground">{aside}</p>
             ) : null}
-            {action ? <div className="ml-auto">{action}</div> : null}
         </div>
     );
 }
 
-export function EditLink({ href, label }: { href: string; label: string }) {
+/** A number the merchant checks first: label, figure, one line under it. */
+export function ProductStat({
+    label,
+    value,
+    hint,
+    className,
+}: {
+    label: string;
+    value: ReactNode;
+    hint?: ReactNode;
+    className?: string;
+}) {
     return (
-        <Button asChild variant="outline" size="sm">
-            <Link href={href}>
-                <Pencil aria-hidden />
-                {label}
-            </Link>
-        </Button>
+        <Card
+            className={`rounded-[12px] px-[15px] py-[13px] ${className ?? ""}`}
+        >
+            <p className="text-[11.5px] text-muted-foreground">{label}</p>
+            <p className="mt-1 font-display text-[22px] font-semibold tabular-nums leading-tight">
+                {value}
+            </p>
+            {hint ? (
+                <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                    {hint}
+                </p>
+            ) : null}
+        </Card>
     );
 }
 
@@ -49,19 +67,17 @@ export function LinkedCard({
     children: ReactNode;
 }) {
     return (
-        <Card className="flex min-w-0 flex-col gap-1 px-4 py-3.5">
-            <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {title}
-                </p>
+        <Card className="flex min-w-0 flex-col gap-[7px] rounded-[12px] px-[15px] py-[13px]">
+            <div className="flex items-baseline justify-between gap-2">
+                <p className="text-[11.5px] text-muted-foreground">{title}</p>
                 <Link
                     href={href}
-                    className="text-[12.5px] font-medium underline-offset-4 hover:underline"
+                    className="text-[12px] text-brand hover:text-foreground"
                 >
                     Open
                 </Link>
             </div>
-            {children}
+            <div className="flex flex-col gap-1 leading-[1.45]">{children}</div>
         </Card>
     );
 }
@@ -74,11 +90,11 @@ export function PanelLine({
     what: string;
 }) {
     return status === "failed" ? (
-        <p role="alert" className="text-[12.5px] text-destructive">
+        <p role="alert" className="text-[12px] text-destructive">
             Couldn&apos;t load {what}. Everything else on this page is current.
         </p>
     ) : (
-        <p className="text-[12.5px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
             Your role can&apos;t see {what}.
         </p>
     );

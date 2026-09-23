@@ -47,7 +47,7 @@ export function ViewerDate({
      * `heading` says "Today" / "Tomorrow" where it applies; `short` is a date;
      * `datetime` adds the time, for a timeline where the hour matters.
      */
-    variant?: "short" | "heading" | "datetime";
+    variant?: "short" | "heading" | "datetime" | "dayMonth" | "time";
     className?: string;
 }) {
     const timeZone = useSyncExternalStore(
@@ -61,7 +61,17 @@ export function ViewerDate({
             ? formatDayHeading(iso, timeZone)
             : variant === "datetime"
               ? formatShortDateTime(iso, timeZone)
-              : formatShortDate(iso, timeZone);
+              : variant === "dayMonth"
+                ? // "18 Sep" — a stat tile's figure, where the year is noise. Three
+                  // letters every month (ICU writes "Sept"), as the design does.
+                  dayMonth(iso, timeZone)
+                : variant === "time"
+                  ? new Intl.DateTimeFormat("en-GB", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        timeZone,
+                    }).format(new Date(iso))
+                  : formatShortDate(iso, timeZone);
 
     return (
         // `<time dateTime>` carries the exact instant regardless of how the
@@ -71,4 +81,30 @@ export function ViewerDate({
             {text}
         </time>
     );
+}
+
+const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+];
+
+function dayMonth(iso: string, timeZone: string): string {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        day: "numeric",
+        month: "numeric",
+        timeZone,
+    }).formatToParts(new Date(iso));
+    const day = parts.find((p) => p.type === "day")?.value ?? "";
+    const month = Number(parts.find((p) => p.type === "month")?.value ?? "1");
+    return `${day} ${MONTHS[month - 1] ?? ""}`;
 }
