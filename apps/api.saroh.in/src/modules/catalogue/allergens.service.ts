@@ -128,7 +128,7 @@ export class AllergensService {
             select: {
                 id: true,
                 name: true,
-                _count: { select: { products: true } },
+                _count: { select: { products: true, contactNotes: true } },
             },
         });
         if (!allergen) throw new NotFoundException("Allergen not found");
@@ -136,6 +136,15 @@ export class AllergensService {
         if (used > 0) {
             throw new ConflictException({
                 message: `${allergen.name} is on ${used} ${used === 1 ? "product" : "products"} — take it off them first.`,
+                field: "allergenId",
+            });
+        }
+        // A customer's allergy is never dropped in passing (U8): the notes
+        // that name it are edited first, by someone who reads them.
+        const noted = allergen._count.contactNotes;
+        if (noted > 0) {
+            throw new ConflictException({
+                message: `${allergen.name} is in ${noted} customer ${noted === 1 ? "note" : "notes"} — take it off them first.`,
                 field: "allergenId",
             });
         }
