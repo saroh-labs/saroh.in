@@ -424,6 +424,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 
 ### U5. API: permissions, module gate and the reviews filter
 
+> **Done — #464.** No new vocabulary: the products area reads with `store:read` and writes with `store:write` through `StoresService`; the product page's orders and reviews panels also need `order:read` / `product-review:read`, and the discounts panel `discount:read`. A spec reads every products-area controller's own metadata (products, product details, categories, catalogue) and fails if one loses the session guard, the module guard or `@RequireModule("COMMERCE")`. A DB spec on the organization path checks that a Member reads the product page and settings but every write is not found, a Reviewer can't open either, and an Admin can change both. The workspace's `listReviews` takes a product and status filter. Verified: 4 gate tests and 4 role tests; full API suites green (unit 2,125, integration 1,458).
+
 - **Goal:** the new routes follow the existing access model, and the workspace can read reviews for one product.
 - **Files:**
     - the new controllers (store read/write via `StoresService`, `@RequireModule("COMMERCE")`)

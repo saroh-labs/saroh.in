@@ -1,0 +1,132 @@
+import { NotFoundException } from "@nestjs/common";
+import { prisma } from "@saroh/database";
+
+import { CatalogueService } from "../catalogue/catalogue.service";
+import { OptionsService } from "../catalogue/options.service";
+import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { StoresService } from "../stores/stores.service";
+import { InventoryService } from "./inventory.service";
+import { ProductOverviewService } from "./product-overview.service";
+import { ProductsService } from "./products.service";
+
+/**
+ * Who may do what in the products area (#464), on the organization path:
+ * the business role decides. A Member reads products and settings and
+ * changes nothing; a Reviewer does not open products at all; an Admin
+ * changes them. A refusal is "not found", never a hint the store exists.
+ */
+const tag = `${process.pid}-${Date.now()}`;
+
+describe("products area access by role (DB)", () => {
+    // The organization path is on for this business.
+    const flags = {
+        isEnabled: () => Promise.resolve(true),
+    } as unknown as FeatureFlagService;
+    const stores = new StoresService(flags);
+    const products = new ProductsService(stores);
+    const overview = new ProductOverviewService(products, stores);
+    const inventory = new InventoryService(products);
+    const options = new OptionsService(stores);
+    const catalogue = new CatalogueService(stores, options);
+
+    const users: Record<string, string> = {};
+    let orgId = "";
+    let storeId = "";
+    let productId = "";
+
+    beforeAll(async () => {
+        for (const role of ["OWNER", "ADMIN", "MEMBER", "REVIEWER"]) {
+            users[role] = (
+                await prisma.user.create({
+                    data: {
+                        email: `acc-${role.toLowerCase()}-${tag}@example.com`,
+                    },
+                })
+            ).id;
+        }
+        orgId = (
+            await prisma.organization.create({
+                data: { name: "Access Org", slug: `acc-org-${tag}` },
+            })
+        ).id;
+        await prisma.membership.createMany({
+            data: Object.entries(users).map(([role, userId]) => ({
+                organizationId: orgId,
+                userId,
+                role,
+            })),
+        });
+        storeId = (
+            await stores.createForUser(users.OWNER, orgId, {
+                name: "Access Store",
+                slug: `acc-${tag}`,
+            })
+        ).id;
+        productId = (
+            await products.create(storeId, users.OWNER, {
+                name: "Ceramide Moisturiser",
+                price: "899",
+                currency: "INR",
+            })
+        ).id;
+    });
+
+    afterAll(async () => {
+        await prisma.product.deleteMany({ where: { storeId } });
+        await prisma.store.deleteMany({ where: { id: storeId } });
+        await prisma.membership.deleteMany({
+            where: { organizationId: orgId },
+        });
+        await prisma.organization.deleteMany({ where: { id: orgId } });
+        await prisma.user.deleteMany({
+            where: { id: { in: Object.values(users) } },
+        });
+    });
+
+    it("a Member reads the product page and the settings", async () => {
+        const view = await overview.get(storeId, productId, users.MEMBER);
+        expect(view.canWrite).toBe(false);
+        const settings = await catalogue.get(storeId, users.MEMBER);
+        expect(settings.canWrite).toBe(false);
+    });
+
+    it("a Member changes nothing", async () => {
+        await expect(
+            products.patch(storeId, productId, users.MEMBER, { name: "x" }),
+        ).rejects.toThrow(NotFoundException);
+        await expect(
+            inventory.upsert(storeId, productId, users.MEMBER, { quantity: 3 }),
+        ).rejects.toThrow(NotFoundException);
+        await expect(
+            options.create(storeId, users.MEMBER, { name: "Shade" }),
+        ).rejects.toThrow(NotFoundException);
+        await expect(
+            catalogue.saveDefaults(storeId, users.MEMBER, {
+                entries: [{ key: "all", lowStockAlert: 5 }],
+            }),
+        ).rejects.toThrow(NotFoundException);
+    });
+
+    it("a Reviewer does not open products", async () => {
+        await expect(
+            overview.get(storeId, productId, users.REVIEWER),
+        ).rejects.toThrow(NotFoundException);
+        await expect(catalogue.get(storeId, users.REVIEWER)).rejects.toThrow(
+            NotFoundException,
+        );
+    });
+
+    it("an Admin changes products and settings", async () => {
+        const after = await products.patch(storeId, productId, users.ADMIN, {
+            mrp: "999",
+        });
+        expect(after.mrp).toBe("999.00");
+        const created = await options.create(storeId, users.ADMIN, {
+            name: "Size",
+            values: ["50 ml"],
+        });
+        expect(created.id).toBeTruthy();
+        const view = await overview.get(storeId, productId, users.ADMIN);
+        expect(view.canWrite).toBe(true);
+    });
+});

@@ -52,10 +52,20 @@ export interface InvitationState {
     blocked: { reason: string; message: string } | null;
 }
 
-export async function listReviews(): Promise<Review[]> {
+/**
+ * Reviews, newest first — every product's, or one product's when the product
+ * page asks (the API filters; nothing is thinned out here).
+ */
+export async function listReviews(
+    filter: { productId?: string; status?: "PUBLISHED" | "HIDDEN" } = {},
+): Promise<Review[]> {
     const base = await orgBase();
     if (!base) return [];
-    return (await getJson<Review[]>(`${base}/product-reviews`)) ?? [];
+    const query = new URLSearchParams();
+    if (filter.productId) query.set("productId", filter.productId);
+    if (filter.status) query.set("status", filter.status);
+    const qs = query.size > 0 ? `?${query.toString()}` : "";
+    return (await getJson<Review[]>(`${base}/product-reviews${qs}`)) ?? [];
 }
 
 export async function reviewSummary(): Promise<ProductRating[]> {
