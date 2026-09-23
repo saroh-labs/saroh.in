@@ -8,9 +8,12 @@ import { prisma } from "@saroh/database";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { MediaService } from "../media/media.service";
 import { StoresService } from "../stores/stores.service";
+import type { PatchProductDto, UpdateProductDto } from "./dto";
+import { InventoryService } from "./inventory.service";
 import { ProductImagesService } from "./product-images.service";
 import { ProductOverviewService } from "./product-overview.service";
 import { ProductsService } from "./products.service";
+import { VariantsService } from "./variants.service";
 
 /**
  * Products v2 (#461) against a real Postgres: section saves, the photo set,
@@ -21,6 +24,8 @@ const tag = `${process.pid}-${Date.now()}`;
 describe("Products v2: sections, photos, overview (DB)", () => {
     const stores = new StoresService(new FeatureFlagService());
     const products = new ProductsService(stores);
+    const variants = new VariantsService(products);
+    const inventory = new InventoryService(products);
     // The library path is exercised through a stub: a READY object of this
     // org resolves, anything else is not found — MediaService's own spec
     // covers its tenant check.
@@ -231,6 +236,124 @@ describe("Products v2: sections, photos, overview (DB)", () => {
             await expect(
                 products.patch(storeId, productId, strangerId, { name: "x" }),
             ).rejects.toThrow(NotFoundException);
+        });
+    });
+
+    describe("the whole-product save, and what reads hand back", () => {
+        let aloeId = "";
+
+        beforeAll(async () => {
+            aloeId = (
+                await products.create(storeId, ownerId, {
+                    name: "Aloe Gel",
+                    price: "300",
+                    currency: "INR",
+                })
+            ).id;
+        });
+
+        const put = (patch: Partial<UpdateProductDto>) =>
+            products.update(storeId, aloeId, ownerId, {
+                name: "Aloe Gel",
+                slug: "aloe-gel",
+                price: "300",
+                currency: "INR",
+                ...patch,
+            });
+
+        it("cleans the description a whole-product save sends", async () => {
+            await put({
+                description:
+                    '<p>Cool <em>gel</em></p><img src="x" onerror="alert(1)"><script>alert(1)</script>',
+            });
+            const after = await products.get(storeId, aloeId, ownerId);
+            expect(after.description).toContain("<p>Cool <em>gel</em></p>");
+            expect(after.description).not.toMatch(/script|onerror|alert/);
+        });
+
+        it("names a slug another product has, and nothing else as one", async () => {
+            await expect(put({ slug: "night-cream" })).rejects.toThrow(
+                ConflictException,
+            );
+            await expect(put({ slug: "night-cream" })).rejects.toThrow(
+                "That slug is already taken",
+            );
+            // A write that fails for another reason is not called a clash.
+            const other = await put({ price: "not money" }).catch(
+                (e: unknown) => e,
+            );
+            expect(other).toBeInstanceOf(Error);
+            expect(other).not.toBeInstanceOf(ConflictException);
+            expect(String(other)).not.toMatch(/slug is already taken/);
+        });
+
+        it("hands back a description saved before saves were cleaned, clean", async () => {
+            // Written raw, as an older save or import left it.
+            await prisma.product.update({
+                where: { id: aloeId },
+                data: {
+                    description:
+                        '<p>Old copy</p><script>alert(1)</script><img src="x" onerror="alert(2)">',
+                },
+            });
+            const got = await products.get(storeId, aloeId, ownerId);
+            expect(got.description).toContain("<p>Old copy</p>");
+            expect(got.description).not.toMatch(/script|onerror|alert/);
+            const listed = (await products.list(storeId, ownerId)).find(
+                (p) => p.id === aloeId,
+            );
+            expect(listed?.description).not.toMatch(/script|onerror|alert/);
+        });
+
+        it("leaves the product alone when a section sends null for what it can't be without", async () => {
+            const before = await products.get(storeId, aloeId, ownerId);
+            // As the wire sends it: null, not omitted.
+            const after = await products.patch(
+                storeId,
+                aloeId,
+                ownerId,
+                JSON.parse(
+                    '{"name":null,"slug":null,"price":null,"status":null}',
+                ) as PatchProductDto,
+            );
+            expect(after).toMatchObject({
+                name: before.name,
+                slug: before.slug,
+                price: before.price,
+                status: before.status,
+            });
+        });
+
+        it("lists a product counted per variant at its variants' sum, warning at the lowest", async () => {
+            const tee = (
+                await products.create(storeId, ownerId, {
+                    name: "Plain Tee",
+                    price: "499",
+                    currency: "INR",
+                })
+            ).id;
+            const ids: string[] = [];
+            for (const size of ["S", "M", "L"]) {
+                ids.push(
+                    (
+                        await variants.create(storeId, tee, ownerId, {
+                            sku: `PT-${size}-${tag}`,
+                            title: size,
+                        })
+                    ).id,
+                );
+            }
+            await inventory.setVariants(storeId, tee, ownerId, {
+                variants: [
+                    { variantId: ids[0], quantity: 4, lowStockAlert: 3 },
+                    { variantId: ids[1], quantity: 6, lowStockAlert: 1 },
+                    { variantId: ids[2], quantity: 5, lowStockAlert: 2 },
+                ],
+            });
+            const row = (await products.list(storeId, ownerId)).find(
+                (p) => p.id === tee,
+            );
+            expect(row?.inventory).toEqual({ quantity: 15, lowStockAlert: 1 });
         });
     });
 

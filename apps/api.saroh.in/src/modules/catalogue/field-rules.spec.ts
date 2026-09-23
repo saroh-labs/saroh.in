@@ -42,6 +42,39 @@ describe("custom field rules", () => {
         expect(checkFieldValue("YES_NO", "Vegan", "yes").ok).toBe(false);
     });
 
+    it("takes a number or a boolean the JSON body sent in place of text", () => {
+        expect(checkFieldValue("NUMBER", "Shelf life", 12)).toEqual({
+            ok: true,
+            value: "12",
+        });
+        expect(checkFieldValue("NUMBER", "Shelf life", -1.5)).toEqual({
+            ok: true,
+            value: "-1.5",
+        });
+        expect(checkFieldValue("YES_NO", "Vegan", true)).toEqual({
+            ok: true,
+            value: "true",
+        });
+        expect(checkFieldValue("YES_NO", "Vegan", false)).toEqual({
+            ok: true,
+            value: "false",
+        });
+        expect(checkFieldValue("TEXT", "Batch", 42)).toEqual({
+            ok: true,
+            value: "42",
+        });
+        expect(checkFieldValue("NUMBER", "Shelf life", true)).toEqual({
+            ok: false,
+            error: "Shelf life is a number.",
+        });
+        expect(checkFieldValue("YES_NO", "Vegan", 1).ok).toBe(false);
+        // Anything else is no value at all.
+        expect(checkFieldValue("NUMBER", "Shelf life", { n: 1 })).toEqual({
+            ok: true,
+            value: null,
+        });
+    });
+
     it("refuses a duplicate name ignoring case", () => {
         expect(fieldNameProblem("skin type", ["Skin type"])).toBe(
             "There is already a field called skin type.",

@@ -1,4 +1,4 @@
-import { ConflictException } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { CategoriesService } from "../categories/categories.service";
@@ -425,6 +425,30 @@ describe("Catalogue settings (DB)", () => {
                     entries: [{ key: dresses, returnsMode: "OWN" }],
                 }),
             ).rejects.toThrow(/returns rule/);
+        });
+
+        it("gives the editor's prefill to someone who can read the store, and no one else", async () => {
+            for (const categoryId of [serums, dresses, null]) {
+                expect(
+                    await catalogue.effectiveForUser(
+                        storeId,
+                        ownerId,
+                        categoryId,
+                    ),
+                ).toEqual(await catalogue.effective(storeId, categoryId));
+            }
+            const strangerId = (
+                await prisma.user.create({
+                    data: { email: `cat-stranger-${tag}@example.com` },
+                })
+            ).id;
+            try {
+                await expect(
+                    catalogue.effectiveForUser(storeId, strangerId, serums),
+                ).rejects.toThrow(NotFoundException);
+            } finally {
+                await prisma.user.delete({ where: { id: strangerId } });
+            }
         });
     });
 });
