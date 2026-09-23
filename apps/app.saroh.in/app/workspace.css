@@ -127,6 +127,29 @@
     height: 15px;
 }
 
+/* ─── The phone tab bar ──────────────────────────────────────────────────────
+   Below 760px the tab bar (`components/shared/tab-bar.tsx`) is fixed to the
+   foot of the screen: 52px tabs, a 1px rule, and the phone's own safe area.
+   `--tab-bar-inset` is that height, and 0 wherever the bar is not drawn. The
+   shell pads its scroll container by it, and anything that sticks to the
+   bottom of the page — a bulk tray, an editor's save bar — sits at
+   `bottom-[var(--tab-bar-inset)]` so the bar never covers it. */
+:root {
+    --tab-bar-inset: 0px;
+}
+
+@media not all and (min-width: 760px) {
+    :root {
+        --tab-bar-inset: calc(53px + env(safe-area-inset-bottom));
+    }
+}
+
+@media print {
+    :root {
+        --tab-bar-inset: 0px;
+    }
+}
+
 /* ---------------------------------------------------------------------------
    The rich text editor (#208).
 

@@ -15,7 +15,7 @@ import {
     renameOption,
 } from "@/lib/products/settings-actions";
 
-import { ReadOnlyNote } from "./categories-tab";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import {
     bigBtn,
     primaryBtn,

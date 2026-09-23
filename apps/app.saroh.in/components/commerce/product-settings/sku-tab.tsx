@@ -12,7 +12,7 @@ import {
 } from "@/lib/products/settings-actions";
 import { patternProblem } from "@/lib/products/sku-pattern";
 
-import { ReadOnlyNote } from "./categories-tab";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { primaryBtn, smallBtn, TabIntro, useUnsaved } from "./product-settings";
 
 const TOKENS = [
@@ -242,7 +242,7 @@ export function SkuTab({
             </p>
 
             {dirty && canWrite ? (
-                <div className="sticky bottom-0 z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5">
+                <div className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5">
                     <span
                         role="status"
                         className={cn(

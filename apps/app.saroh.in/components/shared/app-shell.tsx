@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { CommandMenu } from "@/components/shared/command-menu";
 import type { NavCounts } from "@/components/shared/nav-items";
+import { TabBar } from "@/components/shared/tab-bar";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
 import { unreadNotificationCount } from "@/lib/notifications/service";
@@ -19,7 +20,7 @@ import { listStorefronts } from "@/lib/stores/storefronts";
  * The authenticated app shell, rendered once in the root layout. It is the
  * SINGLE server-side fetcher for the chrome — session, org list, active org,
  * and unread count are read here exactly once and passed as props to the
- * (client) `AppSidebar` / `MobileNav` and the presentational `AppHeader`.
+ * (client) `AppSidebar` / `TabBar` and the presentational `AppHeader`.
  * `getServerSession` is a `no-store` network call, so consolidating the fetch
  * here (instead of each chrome piece fetching) avoids duplicate round-trips.
  *
@@ -115,6 +116,16 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
      */
     const navSites = sites.map((site) => ({ id: site.id, name: site.name }));
 
+    /*
+     * Resolved once and handed to every navigation alike — the rail, the tab
+     * bar and the command menu — so a role the business invented is offered
+     * the same destinations in each. The phone drawer this replaced was given
+     * the role but not the permissions, and judged an invented role by the
+     * built-in it maps to.
+     */
+    const role = activeOrg?.role ?? null;
+    const actions = activeOrg?.actions ?? null;
+
     return (
         <div className="flex min-h-screen flex-col">
             {/*
@@ -138,8 +149,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
              */}
             <CommandMenu
                 moduleKeys={moduleKeys}
-                role={activeOrg?.role ?? null}
-                actions={activeOrg?.actions ?? null}
+                role={role}
+                actions={actions}
                 sites={navSites}
                 storefrontCount={storefrontCount}
             />
@@ -149,16 +160,13 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 user={session.user}
                 organizations={organizations}
                 activeOrg={activeOrg}
-                unread={unread}
-                moduleKeys={moduleKeys}
-                counts={counts}
             />
             <div className="flex min-h-0 flex-1">
                 <AppSidebar
                     unread={unread}
                     moduleKeys={moduleKeys}
-                    role={activeOrg?.role ?? null}
-                    actions={activeOrg?.actions ?? null}
+                    role={role}
+                    actions={actions}
                     counts={counts}
                 />
                 {/* The working area is white and the rail sits on Paper: the
@@ -172,15 +180,29 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                      * skip link must MOVE focus, not just scroll, or the next Tab
                      * would land back at the top of the nav.
                      */}
+                    {/*
+                     * Padded by the tab bar's height below 760px (0 above;
+                     * `--tab-bar-inset` in workspace.css), so the last row
+                     * of a page scrolls clear of the bar instead of ending
+                     * underneath it.
+                     */}
                     <div
                         id="main-content"
                         tabIndex={-1}
-                        className="flex flex-1 flex-col outline-none"
+                        className="flex flex-1 flex-col pb-[var(--tab-bar-inset)] outline-none"
                     >
                         {children}
                     </div>
                 </div>
             </div>
+            {/* Below 760px, the rail's place is taken by this. */}
+            <TabBar
+                unread={unread}
+                moduleKeys={moduleKeys}
+                role={role}
+                actions={actions}
+                counts={counts}
+            />
         </div>
     );
 }

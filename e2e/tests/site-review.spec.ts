@@ -75,47 +75,28 @@ test.describe("a reviewer", () => {
          * on, and "New site" leads to a form that fails on submit (#313).
          */
         /*
-         * Below `lg` the rail is a DRAWER, and the desktop one stays in the
-         * document behind it — so which navigation this test reads has to be
-         * chosen, not filtered for. Both draw the same groups from the same
-         * projection, which is the point of having one `navFor`; running at
-         * both widths is what proves the drawer did not keep its own copy.
+         * Below 760px the rail is not drawn and the phone TAB BAR carries the
+         * nav — so which navigation this test reads has to be chosen, not
+         * filtered for. Both draw the same groups from the same projection,
+         * which is the point of having one `navFor`; running at both widths
+         * is what proves the bar did not keep its own copy.
+         *
+         * Decided by the viewport, not by asking what is showing:
+         * `isVisible()` does not wait for anything, and answered before the
+         * chrome had rendered. 760 is where `AppSidebar` stops being hidden.
          */
-        /*
-         * Decided by the viewport, not by asking whether the hamburger is
-         * showing. `isVisible()` does not wait for anything, so run on its own
-         * — rather than after the tests above have warmed the page — it
-         * answered "no" before the header had rendered, and the assertions then
-         * read the hidden desktop rail. The breakpoint is `lg`, which is where
-         * `AppSidebar` stops being `hidden`.
-         */
-        const onPhone = (page.viewportSize()?.width ?? 1440) < 1024;
-        const opener = page.getByRole("button", {
-            name: "Open navigation menu",
-        });
-        if (onPhone) {
-            /*
-             * Pressed until it opens, rather than once.
-             *
-             * The drawer is a client component: a press that lands before React
-             * has attached its handler does nothing at all, and there is no
-             * state to wait for beforehand — the button is in the document and
-             * enabled either way. Retrying the press until the panel is there
-             * is the only honest way to say "open the drawer".
-             */
-            await expect(async () => {
-                await opener.click();
-                await expect(page.getByRole("dialog")).toBeVisible({
-                    timeout: 2_000,
-                });
-            }).toPass({ timeout: 20_000 });
-        }
+        const onPhone = (page.viewportSize()?.width ?? 1440) < 760;
 
         const rail = onPhone
-            ? page.getByRole("dialog").getByRole("navigation", {
-                  name: "Primary",
-              })
+            ? page.getByRole("navigation", { name: "Main" })
             : page.getByRole("navigation", { name: "Primary" });
+        if (onPhone) {
+            // Home and Website are all a reviewer reaches, and both fit on
+            // the bar — so there is no More sheet holding anything else.
+            await expect(
+                rail.getByRole("button", { name: /^More/ }),
+            ).toHaveCount(0);
+        }
         for (const gone of [
             "/notifications",
             "/settings/organization",

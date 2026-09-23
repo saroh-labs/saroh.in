@@ -8,7 +8,7 @@ import { useState, useTransition } from "react";
 import type { AllergenView } from "@/lib/products/settings";
 import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
-import { ReadOnlyNote } from "./categories-tab";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import {
     bigBtn,
     rowBtn,

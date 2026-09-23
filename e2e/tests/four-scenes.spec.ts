@@ -46,6 +46,9 @@ async function overlappingControls(page: Page) {
             return r.width > 0 && r.height > 0;
         });
 
+        // The phone tab bar is fixed, and the page scrolls beneath it by
+        // design; what must not end up under it is checked on its own below.
+        const bar = document.querySelector('nav[aria-label="Main"]');
         const hits: string[] = [];
         for (let i = 0; i < els.length; i++) {
             for (let j = i + 1; j < els.length; j++) {
@@ -53,6 +56,7 @@ async function overlappingControls(page: Page) {
                 const b = els[j];
                 // Containment is the stretched-link pattern, not a collision.
                 if (a.contains(b) || b.contains(a)) continue;
+                if (bar && bar.contains(a) !== bar.contains(b)) continue;
                 const ra = a.getBoundingClientRect();
                 const rb = b.getBoundingClientRect();
                 if (
@@ -104,6 +108,95 @@ test.describe("no two controls share the same pixels", () => {
             expect(await overlappingControls(page)).toEqual([]);
         });
     }
+});
+
+test.describe("the phone tab bar", () => {
+    for (const route of ROUTES) {
+        test(`${route} leaves nothing under the bar at the foot of the page`, async ({
+            page,
+        }, testInfo) => {
+            test.skip(
+                testInfo.project.name !== "phone",
+                "The tab bar is drawn below 760px only.",
+            );
+            await signIn(page);
+            await page.goto(route);
+            const bar = page.getByRole("navigation", { name: "Main" });
+            await expect(bar).toBeVisible();
+
+            // At the very bottom, the shell's padding has to have lifted the
+            // last control clear of the bar.
+            await page.evaluate(() =>
+                window.scrollTo(0, document.documentElement.scrollHeight),
+            );
+            const hidden = await page.evaluate(() => {
+                const nav = document.querySelector('nav[aria-label="Main"]');
+                if (!nav) return ["no tab bar"];
+                const top = nav.getBoundingClientRect().top;
+                return [
+                    ...document.querySelectorAll<HTMLElement>(
+                        "button, a[href], [role=button], input",
+                    ),
+                ]
+                    .filter((el) => !nav.contains(el))
+                    .filter((el) => {
+                        const r = el.getBoundingClientRect();
+                        return (
+                            r.width > 0 &&
+                            r.height > 0 &&
+                            r.bottom > top + 1 &&
+                            r.top < window.innerHeight
+                        );
+                    })
+                    .map((el) =>
+                        (
+                            el.getAttribute("aria-label") ??
+                            (el.textContent.trim() || el.tagName)
+                        ).slice(0, 30),
+                    );
+            });
+            expect(hidden).toEqual([]);
+        });
+    }
+
+    test("More opens a sheet that holds focus and gives it back", async ({
+        page,
+    }, testInfo) => {
+        test.skip(
+            testInfo.project.name !== "phone",
+            "The tab bar is drawn below 760px only.",
+        );
+        await signIn(page);
+        await page.goto("/");
+        const more = page
+            .getByRole("navigation", { name: "Main" })
+            .getByRole("button", { name: /^More/ });
+        await expect(more).toHaveAttribute("aria-expanded", "false");
+
+        // Pressed until it opens: a press before hydration does nothing.
+        await expect(async () => {
+            await more.click();
+            await expect(
+                page.getByRole("dialog", { name: "Everything else" }),
+            ).toBeVisible({ timeout: 2_000 });
+        }).toPass({ timeout: 20_000 });
+
+        const sheet = page.getByRole("dialog", { name: "Everything else" });
+        await expect(
+            sheet.getByRole("button", { name: "Close" }),
+        ).toBeFocused();
+        await expect(more).toHaveAttribute("aria-expanded", "true");
+
+        // Tab stays inside: after many presses focus is still in the sheet.
+        for (let i = 0; i < 30; i++) await page.keyboard.press("Tab");
+        expect(
+            await sheet.evaluate((el) => el.contains(document.activeElement)),
+        ).toBe(true);
+
+        await page.keyboard.press("Escape");
+        await expect(sheet).toHaveCount(0);
+        await expect(more).toBeFocused();
+    });
 });
 
 test.describe("touch targets", () => {

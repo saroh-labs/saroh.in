@@ -431,7 +431,7 @@ function RoleDetail({
                 className={cn(
                     "flex flex-wrap items-center gap-3 border-t border-muted px-4 py-[13px]",
                     canEdit && !role.system
-                        ? "sticky bottom-0 z-10 bg-card shadow-[0_-1px_0_hsl(var(--border)),0_-8px_16px_-12px_hsl(var(--foreground)/0.18)]"
+                        ? "sticky bottom-[var(--tab-bar-inset)] z-10 bg-card shadow-[0_-1px_0_hsl(var(--border)),0_-8px_16px_-12px_hsl(var(--foreground)/0.18)]"
                         : "bg-foreground/[0.03]",
                 )}
             >

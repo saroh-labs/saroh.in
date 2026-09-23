@@ -31,7 +31,7 @@ Under a store: products and categories, orders, customers, content (posts and
 post categories), members, and store settings.
 
 [`components/shared/nav-items.tsx`](components/shared/nav-items.tsx) is the
-single source of truth for the sidebar, mobile drawer and command menu, and
+single source of truth for the sidebar, the phone tab bar and command menu, and
 lists **only routes that exist** — `pnpm check:routes` fails the build on a nav
 entry that would 404.
 

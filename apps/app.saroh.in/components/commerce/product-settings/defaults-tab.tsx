@@ -19,7 +19,7 @@ import {
     toEntry,
 } from "@/lib/products/settings-rules";
 
-import { ReadOnlyNote } from "./categories-tab";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import {
     chipBtn,
     primaryBtn,
@@ -312,7 +312,7 @@ export function DefaultsTab({
             </div>
 
             {dirty && catalogue.canWrite ? (
-                <div className="sticky bottom-0 z-10 mt-3.5 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5">
+                <div className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5">
                     <div className="flex flex-wrap items-center gap-2">
                         <span
                             role="status"

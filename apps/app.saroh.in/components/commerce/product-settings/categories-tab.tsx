@@ -5,6 +5,7 @@ import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import type { CatalogueView } from "@/lib/products/settings";
 import {
     addCategory,
@@ -472,17 +473,5 @@ export function CategoriesTab({
                 </li>
             </ul>
         </section>
-    );
-}
-
-export function ReadOnlyNote() {
-    return (
-        <p
-            role="note"
-            className="mb-3.5 rounded-[9px] bg-muted/60 px-3 py-2.5 text-[12.5px] leading-[1.5] text-foreground/75"
-        >
-            Your role can read these settings but not change them. An owner or
-            admin can change what your role reaches in Team.
-        </p>
     );
 }
