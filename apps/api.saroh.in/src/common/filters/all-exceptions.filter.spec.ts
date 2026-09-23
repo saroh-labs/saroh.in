@@ -111,6 +111,23 @@ describe("AllExceptionsFilter", () => {
         ]);
     });
 
+    it("carries the field a refusal names under details", () => {
+        const res = makeResponse();
+        filter.catch(
+            new BadRequestException({
+                message: "MRP can't be lower than the price it sells for.",
+                field: "price",
+            }),
+            makeHost(res),
+        );
+
+        const err = envelope(res);
+        expect(err.message).toBe(
+            "MRP can't be lower than the price it sells for.",
+        );
+        expect(err.details).toEqual({ field: "price" });
+    });
+
     it("carries a reason an exception provides under details (#198)", () => {
         // A preview link's 410 says WHY — expired or revoked — in a shape the
         // renderer can branch on, through the same slot validation uses.

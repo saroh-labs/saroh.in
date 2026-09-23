@@ -1,3 +1,4 @@
+import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson } from "@/lib/api/http";
 import type { Result, ResultField } from "@/lib/products/service";
 
@@ -97,18 +98,10 @@ export async function send<T>(
         method,
         ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    const data = (await res.json().catch(() => null)) as
-        | (Record<string, unknown> & { message?: string; field?: ResultField })
-        | null;
+    const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
-    return {
-        ok: false,
-        error:
-            typeof data?.message === "string"
-                ? data.message
-                : "That didn't save. Try again.",
-        field: data?.field,
-    };
+    const failure = toFailure(data, "That didn't save. Try again.");
+    return { ...failure, field: failure.field as ResultField | undefined };
 }
 
 // ---- SKU pattern (#484) ----

@@ -65,6 +65,10 @@ function rowsFrom(
         });
 }
 
+/** A save that never reached the API, as opposed to one it refused. */
+const DROPPED =
+    "Couldn't save variants — the connection dropped. The product itself is saved.";
+
 const sameRows = (a: Row[], b: Row[]) =>
     a.length === b.length &&
     a.every((r, i) => {
@@ -121,7 +125,8 @@ export function VariantsSection({
     const [rows, setRows] = useState<Row[]>(fromProduct);
     const [optionId, setOptionId] = useState(savedOptionId);
     const [seen, setSeen] = useState(loadedKey);
-    const [failed, setFailed] = useState(false);
+    // Why the last save stopped: the API's refusal, or the connection.
+    const [failed, setFailed] = useState<string | null>(null);
     const [adding, setAdding] = useState(false);
     const [open, setOpen] = useState<string | null>(null);
     const [newValue, setNewValue] = useState("");
@@ -134,7 +139,7 @@ export function VariantsSection({
         setBase(fromProduct);
         setRows(fromProduct);
         setOptionId(savedOptionId);
-        setFailed(false);
+        setFailed(null);
     }
 
     const option = options.find((o) => o.id === optionId) ?? null;
@@ -145,6 +150,21 @@ export function VariantsSection({
         values.find((x) => x.id === r.valueId)?.value ?? r.legacyTitle;
     const takenIds = rows.map((r) => r.valueId).filter(Boolean);
     const productPrice = isMoney(product.price) ? trimMoney(product.price) : "";
+    const cents = (m: string) => Math.round(Number(m) * 100);
+    // The API refuses a price over the MRP customers see struck through;
+    // said here first, beside the price, rather than after a Save.
+    const overMrp = (price: string, mrp: string | null) => {
+        const cap = mrp ?? product.mrp;
+        return (
+            !!price.trim() &&
+            isMoney(price) &&
+            !!cap &&
+            isMoney(cap) &&
+            cents(price) > cents(cap)
+        );
+    };
+    const mrpNote = (mrp: string | null) =>
+        `Above the MRP of ${symbol}${trimMoney(mrp ?? product.mrp ?? "")}. Lower it, or raise the MRP in Basics.`;
     const photos = product.images;
 
     const skuCount: Record<string, number> = {};
@@ -166,6 +186,7 @@ export function VariantsSection({
             return "Another variant already has this SKU.";
         if (r.price.trim() && !isMoney(r.price))
             return "Price: a number with at most two decimals, or blank to use the product's.";
+        if (overMrp(r.price, r.mrp)) return `Price: ${mrpNote(r.mrp)}`;
         return "";
     };
     const bad = rows.some((r) => errOf(r));
@@ -189,7 +210,9 @@ export function VariantsSection({
         rows.some(
             (r) => r.sku.trim().toLowerCase() === newSkuValue.toLowerCase(),
         );
-    const newPriceBad = newPrice.trim() !== "" && !isMoney(newPrice);
+    const newOverMrp = overMrp(newPrice, null);
+    const newPriceBad =
+        (newPrice.trim() !== "" && !isMoney(newPrice)) || newOverMrp;
     const allTaken =
         values.length > 0 && values.every((x) => takenIds.includes(x.id));
     const addOff =
@@ -202,7 +225,8 @@ export function VariantsSection({
         newSkuValue.length > LIMITS.sku;
 
     async function save(): Promise<boolean> {
-        let ok = true;
+        // The first refusal names what stopped the save; the rest still run.
+        let why: string | null = null;
         let next = rows;
         const replace = (key: string, patch: Partial<Row>) => {
             next = next.map((r) => (r.key === key ? { ...r, ...patch } : r));
@@ -227,10 +251,7 @@ export function VariantsSection({
                 );
             for (const goneId of goneIds) {
                 const res = await deleteVariant(storeId, product.id, goneId);
-                if (!res.ok) {
-                    showError(res.error);
-                    ok = false;
-                }
+                if (!res.ok) why ??= res.error;
             }
             for (const r of rows) {
                 const input = {
@@ -246,8 +267,7 @@ export function VariantsSection({
                 if (!r.id) {
                     const res = await createVariant(storeId, product.id, input);
                     if (!res.ok) {
-                        showError(res.error);
-                        ok = false;
+                        why ??= res.error;
                         continue;
                     }
                     // Saved: a retry must update it, not make it twice.
@@ -259,10 +279,7 @@ export function VariantsSection({
                         r.id,
                         input,
                     );
-                    if (!res.ok) {
-                        showError(res.error);
-                        ok = false;
-                    }
+                    if (!res.ok) why ??= res.error;
                 }
             }
             const ids = next
@@ -272,20 +289,20 @@ export function VariantsSection({
                 .map((b) => b.id)
                 .filter((id): id is string => !!id);
             if (
-                ok &&
+                !why &&
                 ids.length > 1 &&
                 JSON.stringify(ids) !==
                     JSON.stringify(savedOrder.filter((id) => ids.includes(id)))
             ) {
                 const res = await reorderVariants(storeId, product.id, ids);
-                if (!res.ok) ok = false;
+                if (!res.ok) why ??= res.error;
             }
         } catch {
-            ok = false;
+            why ??= DROPPED;
         }
         setRows(next);
-        setFailed(!ok);
-        return ok;
+        setFailed(why);
+        return !why;
     }
 
     useSection(
@@ -295,18 +312,16 @@ export function VariantsSection({
             problem: bad
                 ? "A variant needs a fix — see the row marked in red."
                 : "",
-            note: failed
-                ? "Couldn't save variants — the connection dropped. The product itself is saved and your changes are still here."
-                : undefined,
-            noteIsError: failed,
-            saveLabel: failed ? "Try again" : undefined,
+            note: failed ? `${failed} Your changes are still here.` : undefined,
+            noteIsError: !!failed,
+            saveLabel: failed === DROPPED ? "Try again" : undefined,
         },
         {
             save,
             discard: () => {
                 setRows(base);
                 setOptionId(savedOptionId);
-                setFailed(false);
+                setFailed(null);
                 setNewValue("");
                 setNewSku("");
                 setNewPrice("");
@@ -768,9 +783,11 @@ export function VariantsSection({
                                       ? `Every ${opt} is already a variant. Add another value in Settings → Options.`
                                       : dupSku
                                         ? "That SKU is already on this product."
-                                        : newPriceBad
-                                          ? "A number with at most two decimal places."
-                                          : `Blank price uses the product's ${symbol}${productPrice}. Save variants to keep it.`}
+                                        : newOverMrp
+                                          ? mrpNote(null)
+                                          : newPriceBad
+                                            ? "A number with at most two decimal places."
+                                            : `Blank price uses the product's ${symbol}${productPrice}. Save variants to keep it.`}
                             </span>
                         </div>
                     </div>
