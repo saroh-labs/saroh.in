@@ -133,6 +133,7 @@ module.exports = {
         // Products v2: MRP, saving, shop switches and detail coherence — pure.
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
+        "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         // #173 — organization stamping on create; DB-free so CI catches a
         // regression without a provisioned Postgres.

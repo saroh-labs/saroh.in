@@ -399,6 +399,8 @@ Phases: **A** data and API (U1–U5) → **B** screens (U6–U11) → **C** demo
 
 ### U4. API: catalogue settings — categories, options, defaults
 
+> **Done — #463.** Categories: names are unique ignoring case and ≤40 characters (the name is checked before the address, so the message is the useful one); `PATCH` renames in place and keeps the slug; `POST …/merge` and `DELETE` move products (to another category or Uncategorized = null) and return what moved, including the category's own defaults; `POST …/categories/restore` is Undo, moving back only products still where the change left them. A category a discount code reaches can't be merged or deleted. New `CatalogueModule`: `GET stores/:id/catalogue` (categories with counts, uncategorized count, options with what uses them, defaults with per-field "still on default" counts, and suggestions); options and values CRUD, with in-use guards and the removed values handed back for Undo; `PUT catalogue/defaults` (optionally updating saved products still on the old value, per field, including the stock rows' warning levels) and `POST catalogue/defaults/undo`, which restores the rows and exactly the products it changed. Resolution rules are pure (`catalogue-defaults.ts`). Verified: 3 unit tests plus 12 DB tests; full API suites green (unit 2,121, integration 1,454).
+
 - **Goal:** R6–R9 on the server, with undo calls (KD5, KD6).
 - **Files:**
     - `apps/api.saroh.in/src/modules/categories/*`, with merge and a delete that moves products

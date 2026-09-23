@@ -10,6 +10,7 @@ import { AutomationsModule } from "./modules/automations/automations.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CapabilitiesModule } from "./modules/capabilities/capabilities.module";
+import { CatalogueModule } from "./modules/catalogue/catalogue.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { ClassPacksModule } from "./modules/class-packs/class-packs.module";
 import { CommunicationsModule } from "./modules/communications/communications.module";
@@ -87,6 +88,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         MembersModule,
         ProductsModule,
         CategoriesModule,
+        CatalogueModule,
         CustomersModule,
         CustomerWorkspaceModule,
         OrdersModule,
