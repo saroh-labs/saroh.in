@@ -50,6 +50,11 @@
 - **Current** — **Hover moves one ramp step, pressed two**, never a new hue and
   never an opacity. **De-emphasis is a colour, not an opacity:** Ink 500 on
   light.
+- **Current** — **`--layer-1`…`--layer-6` are the Business Calendar's layer
+  fills** (umber, green, slate, clay, bronze, navy, as the design draws them,
+  kept on dark), with `--layer-foreground` for the count written on them.
+  Which layer takes which is `lib/calendar/layers.ts`; the class strings sit
+  in `components/calendar/tones.ts` because Tailwind does not scan `lib/`.
 - **Current** — **`--accent` is a shadcn neutral** with about 32 component
   usages, not a brand accent. Don't rename it.
 - **Adopted** — **Never an arbitrary value, a hex literal or a raw palette class

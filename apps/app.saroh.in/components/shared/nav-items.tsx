@@ -4,6 +4,7 @@ import {
     Bell,
     Blocks,
     Building2,
+    Calendar,
     CalendarClock,
     Globe,
     Home,
@@ -49,6 +50,9 @@ import { mayAddWebsite } from "@/lib/business-limits";
 export type NavRole = "OWNER" | "ADMIN" | "MEMBER" | "REVIEWER";
 
 export type NavAction =
+    // The business itself: Home › Calendar reads the month across every
+    // module (the layers inside it gate themselves). Not a Reviewer's.
+    | "org:read"
     | "site:read"
     | "site:create"
     | "section:write"
@@ -102,6 +106,7 @@ export type NavAction =
  */
 const REACHABLE: Record<NavRole, readonly NavAction[]> = {
     OWNER: [
+        "org:read",
         "site:read",
         "site:create",
         "section:write",
@@ -125,6 +130,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "pipeline:read",
     ],
     ADMIN: [
+        "org:read",
         "site:read",
         "site:create",
         "section:write",
@@ -148,6 +154,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "pipeline:read",
     ],
     MEMBER: [
+        "org:read",
         "site:read",
         "member:read",
         "module:read",
@@ -320,7 +327,21 @@ export function showsGroupLabel(group: NavGroup): boolean {
  * from the marketing site.
  */
 export const NAV_GROUPS: NavGroup[] = [
-    { items: [{ href: "/", label: "Home", icon: Home }] },
+    {
+        items: [
+            { href: "/", label: "Home", icon: Home },
+            // Home › Calendar: one month of everything dated, after the
+            // "Saroh Business Calendar" design. Not module-gated — it spans
+            // modules, and each layer on it follows its own module and
+            // permission (the API leaves out what the viewer may not see).
+            {
+                href: "/calendar",
+                label: "Calendar",
+                icon: Calendar,
+                action: "org:read",
+            },
+        ],
+    },
     {
         // Grouped by PURPOSE rather than by module, following the canvas
         // design. A merchant does not think "Commerce" and "Appointments" —

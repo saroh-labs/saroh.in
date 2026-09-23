@@ -234,6 +234,29 @@ describe("what each role is offered", () => {
         ]);
     });
 
+    it("offers Home › Calendar to everyone who reads the business, not a reviewer", () => {
+        for (const role of ["OWNER", "ADMIN", "MEMBER"] as const) {
+            expect(
+                hrefs(navFor({ role, moduleKeys: AVAILABLE_TO[role] })),
+            ).toContain("/calendar");
+        }
+        expect(
+            hrefs(
+                navFor({ role: "REVIEWER", moduleKeys: AVAILABLE_TO.REVIEWER }),
+            ),
+        ).not.toContain("/calendar");
+        // A role the business invented follows its own permissions.
+        expect(
+            hrefs(
+                navFor({
+                    role: "MEMBER",
+                    actions: ["site:read"],
+                    moduleKeys: null,
+                }),
+            ),
+        ).not.toContain("/calendar");
+    });
+
     it("leaves no heading standing over nothing", () => {
         const groups = navFor({
             role: "REVIEWER",

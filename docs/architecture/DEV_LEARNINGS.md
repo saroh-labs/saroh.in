@@ -433,3 +433,17 @@ own first, which clears the bookings' link, then deletes the contact. When
 a row references two parents that cascade from each other, clear the inner
 one first.
 **Category**: database · `apps/api.saroh.in/src/modules/contacts/contacts.service.ts`
+
+## Frontend — a colour class written in `lib/` never reached the CSS (U17)
+
+**Problem**: The Business Calendar's layer chips rendered with no fill, though
+`bg-layer-1` was a real colour in the shared Tailwind config and its
+`--layer-1` variable was in the page's CSS.
+**Root cause**: Tailwind only generates the classes it finds in its `content`
+globs. `app.saroh.in` scans `app/`, `components/`, `pages/`, `src/` and
+`packages/ui/src` — not `lib/`. The tone → class map lived in
+`lib/calendar/layers.ts`, so every class in it was dropped from the build.
+**Fix**: The class strings moved to `components/calendar/tones.ts`; `lib/`
+keeps the tone numbers. Any whole class string a component picks from a map
+has to live in a scanned folder.
+**Category**: frontend · `apps/app.saroh.in/components/calendar/tones.ts`

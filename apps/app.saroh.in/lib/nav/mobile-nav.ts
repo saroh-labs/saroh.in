@@ -92,9 +92,10 @@ const pagesOf = (item: NavItem) =>
  * Which rows get the four seats.
  *
  * By a named preference first, then in rail order skipping sections. On a
- * page inside a section, that section takes the second seat — where you are
- * is always one tap away — and Sell gives up its seat to Calendar when it is
- * the section you are in, since it is already seated.
+ * page inside a section — or on Calendar, which the design seats the same
+ * way — that place takes the second seat, so where you are is always one tap
+ * away. Calendar comes after Sell; Sell gives up its seat to Calendar when it
+ * is the section you are in, since it is already seated.
  */
 export function seatPreference(currentSection: string | null): string[] {
     if (!currentSection) return [...DEFAULT_PREFERENCE];
@@ -105,6 +106,9 @@ export function seatPreference(currentSection: string | null): string[] {
         "Notifications",
     ];
 }
+
+/** The one plain row that holds the second seat while you are on it. */
+const SEATED_WHEN_CURRENT = "/calendar";
 
 export function buildMobileNav({
     groups,
@@ -122,7 +126,10 @@ export function buildMobileNav({
     const count = (href?: string) => navCountFor(href, counts, unread);
 
     const sectionNow = rows.find(
-        (item) => isSection(item) && isNavSectionActive(pathname, item),
+        (item) =>
+            (isSection(item) && isNavSectionActive(pathname, item)) ||
+            (item.href === SEATED_WHEN_CURRENT &&
+                isNavItemActive(pathname, item.href)),
     );
     const preference = seatPreference(sectionNow?.label ?? null);
 
