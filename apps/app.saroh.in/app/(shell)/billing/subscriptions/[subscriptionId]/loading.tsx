@@ -4,7 +4,13 @@ import { SubscriptionsSkeleton } from "@/components/subscriptions/subscriptions-
 export default function Loading() {
     return (
         <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
-            <SubscriptionsSkeleton here="Subscriptions" />
+            <SubscriptionsSkeleton
+                here="Subscription"
+                back={{
+                    href: "/billing/subscriptions",
+                    label: "Subscriptions",
+                }}
+            />
         </PageContainer>
     );
 }
