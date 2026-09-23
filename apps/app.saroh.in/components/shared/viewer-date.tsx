@@ -112,7 +112,10 @@ function dayMonth(iso: string, timeZone: string): string {
         month: "numeric",
         timeZone,
     }).formatToParts(new Date(iso));
-    const day = parts.find((p) => p.type === "day")?.value ?? "";
+    // en-GB pads a numeric day with numeric month ("02"); the design doesn't.
+    const day = String(
+        Number(parts.find((p) => p.type === "day")?.value ?? ""),
+    );
     const month = Number(parts.find((p) => p.type === "month")?.value ?? "1");
     return `${day} ${MONTHS[month - 1] ?? ""}`;
 }

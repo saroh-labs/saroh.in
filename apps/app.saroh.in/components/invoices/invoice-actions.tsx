@@ -24,14 +24,13 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { Pencil, Printer } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
+    creditInvoice,
     deleteInvoice,
     issueInvoice,
     recordPayment,
@@ -59,26 +58,20 @@ export interface InvoiceRef {
 }
 
 /**
- * What can be done to an invoice from its header, after the design: a draft
- * is issued, changed or deleted; an issued one gets a payment recorded; any
- * of them prints. Every move is forward-only on the server, so the ones that
- * cannot be taken back ask first.
+ * Issue a draft: it takes the next number in the series and its lines lock.
+ * Saroh doesn't send it, and the dialog says so.
  */
-export function InvoiceHeaderActions({
+export function IssueDialog({
+    open,
+    onOpenChange,
     invoice,
-    canWrite,
 }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
     invoice: InvoiceRef;
-    canWrite: boolean;
 }) {
     const router = useRouter();
-    const [issuing, setIssuing] = useState(false);
-    const [deleting, setDeleting] = useState(false);
-    const [paying, setPaying] = useState(false);
     const [busy, setBusy] = useState(false);
-    const draft = invoice.standing === "DRAFT";
-    const open =
-        invoice.standing === "ISSUED" || invoice.standing === "OVERDUE";
 
     async function issue() {
         setBusy(true);
@@ -86,88 +79,70 @@ export function InvoiceHeaderActions({
         setBusy(false);
         if (!res.ok) return showError(res.error);
         showSuccess(`${res.data.number ?? "Invoice"} issued`);
+        onOpenChange(false);
         router.refresh();
     }
 
+    return (
+        <AlertDialog open={open} onOpenChange={onOpenChange}>
+            <AlertDialogContent className="max-w-[420px]">
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="font-display text-[17px] tracking-[-0.02em]">
+                        Issue {invoice.total} to {invoice.who}?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                        It takes the next number and its lines lock — a mistake
+                        after this is corrected with a credit note. Saroh
+                        doesn&apos;t send it: copy its pay link or print it and
+                        hand it over.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Not yet</AlertDialogCancel>
+                    <AlertDialogAction
+                        disabled={busy}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            void issue();
+                        }}
+                    >
+                        {busy ? "Issuing…" : "Issue it"}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
+
+/** Delete a draft. It never had a number, so no number is skipped. */
+export function DeleteDraftDialog({
+    open,
+    onOpenChange,
+    invoice,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    invoice: InvoiceRef;
+}) {
+    const router = useRouter();
+
     async function remove() {
-        setBusy(true);
         const res = await deleteInvoice(invoice.id);
-        setBusy(false);
         if (!res.ok) return showError(res.error);
         showSuccess("Draft deleted");
         router.push("/billing/invoices");
     }
 
     return (
-        <div className="flex flex-wrap items-center gap-2 print:hidden">
-            {canWrite && draft ? (
-                <>
-                    <Button disabled={busy} onClick={() => setIssuing(true)}>
-                        Issue it
-                    </Button>
-                    <Button variant="outline" asChild>
-                        <Link href={`/billing/invoices/${invoice.id}/edit`}>
-                            <Pencil className="mr-1.5 size-4" />
-                            Edit
-                        </Link>
-                    </Button>
-                    <Button
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => setDeleting(true)}
-                    >
-                        Delete draft
-                    </Button>
-                </>
-            ) : null}
-            {canWrite && open ? (
-                <Button onClick={() => setPaying(true)}>
-                    Record a payment
-                </Button>
-            ) : null}
-            <Button variant="outline" onClick={() => window.print()}>
-                <Printer className="mr-1.5 size-4" />
-                Print
-            </Button>
-
-            <AlertDialog open={issuing} onOpenChange={setIssuing}>
-                <AlertDialogContent className="max-w-[420px]">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="font-display text-[17px] tracking-[-0.02em]">
-                            Issue {invoice.total} to {invoice.who}?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            It takes the next number, and its lines can&apos;t
-                            change after this — a mistake is voided and
-                            reissued. Saroh doesn&apos;t send it: print it and
-                            hand it over.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Not yet</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void issue()}>
-                            Issue it
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            <ConfirmDialog
-                open={deleting}
-                onOpenChange={setDeleting}
-                title="Delete this draft?"
-                description={`The draft for ${invoice.who} goes, lines and all. It never had a number, so nothing is skipped. This cannot be undone.`}
-                confirmLabel="Delete draft"
-                cancelLabel="Keep it"
-                onConfirm={() => void remove()}
-            />
-
-            <RecordPaymentDialog
-                open={paying}
-                onOpenChange={setPaying}
-                invoice={invoice}
-            />
-        </div>
+        <ConfirmDialog
+            open={open}
+            onOpenChange={onOpenChange}
+            title="Delete this draft?"
+            description={`The draft for ${invoice.who} goes, lines and all. It never had a number, so nothing is skipped. This cannot be undone.`}
+            confirmLabel="Delete draft"
+            cancelLabel="Keep it"
+            onConfirm={() => void remove()}
+        />
     );
 }
 
@@ -304,30 +279,57 @@ export function RecordPaymentDialog({
 }
 
 /**
- * "Void this invoice", beneath the invoice as the design draws it. Voiding
- * keeps the number and cannot be undone; the dialog asks why, and offers to
- * open a corrected draft in its place — the usual reason to void.
+ * Cancel an issued invoice, or refund a paid one that no order owns.
+ *
+ * A GST-registered business never voids an issued invoice (ADR-008): it
+ * issues a credit note for all of it, and the invoice keeps its number and
+ * reads Cancelled. A business that is not registered voids it instead, and
+ * may open a corrected draft in its place. Either way the dialog asks why
+ * and says it cannot be undone; neither moves any money.
  */
-export function VoidInvoice({ invoice }: { invoice: InvoiceRef }) {
+export function CancelInvoiceDialog({
+    open,
+    onOpenChange,
+    invoice,
+    registered,
+    refund = false,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    invoice: InvoiceRef;
+    /** Its paper is a tax invoice: cancel by credit note, never void. */
+    registered: boolean;
+    /** A paid invoice being refunded, rather than an unpaid one cancelled. */
+    refund?: boolean;
+}) {
     const router = useRouter();
     const reasonId = useId();
-    const [open, setOpen] = useState(false);
     const [reason, setReason] = useState("");
-    const [busy, setBusy] = useState<"void" | "reissue" | null>(null);
+    const [busy, setBusy] = useState<"credit" | "void" | "reissue" | null>(
+        null,
+    );
+    const byCredit = registered || refund;
 
-    async function run(kind: "void" | "reissue") {
+    async function run(kind: "credit" | "void" | "reissue") {
         if (!reason.trim()) {
-            showError("Say why it is being voided.");
+            showError(
+                byCredit
+                    ? "Say why it is being cancelled."
+                    : "Say why it is being voided.",
+            );
             return;
         }
         setBusy(kind);
         const res =
-            kind === "void"
-                ? await voidInvoice(invoice.id, reason.trim())
-                : await reissueInvoice(invoice.id, reason.trim());
+            kind === "credit"
+                ? await creditInvoice(invoice.id, reason.trim())
+                : kind === "void"
+                  ? await voidInvoice(invoice.id, reason.trim())
+                  : await reissueInvoice(invoice.id, reason.trim());
         setBusy(null);
         if (!res.ok) return showError(res.error);
-        setOpen(false);
+        onOpenChange(false);
+        setReason("");
         if (kind === "reissue") {
             showSuccess(
                 `${invoice.number ?? "Invoice"} voided — a corrected draft is open`,
@@ -335,74 +337,88 @@ export function VoidInvoice({ invoice }: { invoice: InvoiceRef }) {
             router.push(`/billing/invoices/${res.data.id}/edit`);
             return;
         }
-        showSuccess(`${invoice.number ?? "Invoice"} voided`);
+        showSuccess(
+            kind === "credit"
+                ? `${invoice.number ?? "Invoice"} cancelled with credit note ${res.data.number ?? ""}`.trim()
+                : `${invoice.number ?? "Invoice"} voided`,
+        );
         router.refresh();
     }
 
     return (
-        <div className="flex flex-wrap items-center gap-3 print:hidden">
-            <Button
-                variant="outline"
-                className="border-destructive/45 text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
-                onClick={() => setOpen(true)}
-            >
-                Void this invoice
-            </Button>
-            <p className="text-[12.5px] text-muted-foreground">
-                Voiding keeps the number and cannot be undone.
-            </p>
-
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="sm:max-w-[460px]">
-                    <DialogHeader>
-                        <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
-                            Void {invoice.number}?
-                        </DialogTitle>
-                        <DialogDescription>
-                            It keeps its number and stays in the list, marked
-                            void, so {invoice.number} always means the same
-                            thing. This cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={reasonId}>Why</Label>
-                        <Input
-                            id={reasonId}
-                            value={reason}
-                            maxLength={500}
-                            placeholder="Wrong amount, wrong person…"
-                            onChange={(e) => setReason(e.target.value)}
-                        />
-                        <p className="text-[12px] text-muted-foreground">
-                            Kept on the invoice, for whoever reads it later.
-                        </p>
-                    </div>
-                    <DialogFooter className="gap-2 sm:space-x-0">
-                        <Button
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Keep it
-                        </Button>
-                        <Button
-                            variant="outline"
-                            disabled={busy !== null}
-                            onClick={() => void run("void")}
-                        >
-                            {busy === "void" ? "Voiding…" : "Void it"}
-                        </Button>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-[460px]">
+                <DialogHeader>
+                    <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
+                        {refund
+                            ? `Refund ${invoice.number} with a credit note?`
+                            : `Cancel ${invoice.number}?`}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {byCredit
+                            ? `A credit note for ${invoice.total} cancels it. ${invoice.number} keeps its number and its lines, and nothing more is owed on it. This cannot be undone.`
+                            : `It keeps its number and stays in the list, marked void, so ${invoice.number} always means the same thing. This cannot be undone.`}
+                        {refund
+                            ? ` Saroh records the credit note only — pay ${invoice.who} back yourself.`
+                            : ""}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-1.5">
+                    <Label htmlFor={reasonId}>Why</Label>
+                    <Input
+                        id={reasonId}
+                        value={reason}
+                        maxLength={500}
+                        placeholder="Wrong amount, wrong person, returned…"
+                        onChange={(e) => setReason(e.target.value)}
+                    />
+                    <p className="text-[12px] text-muted-foreground">
+                        {byCredit
+                            ? "Printed on the credit note."
+                            : "Kept on the invoice, for whoever reads it later."}
+                    </p>
+                </div>
+                <DialogFooter className="gap-2 sm:space-x-0">
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                    >
+                        Keep it
+                    </Button>
+                    {byCredit ? (
                         <Button
                             variant="destructive"
                             disabled={busy !== null}
-                            onClick={() => void run("reissue")}
+                            onClick={() => void run("credit")}
                         >
-                            {busy === "reissue"
-                                ? "Voiding…"
-                                : "Void and reissue"}
+                            {busy === "credit"
+                                ? "Issuing the credit note…"
+                                : refund
+                                  ? "Issue the credit note"
+                                  : "Cancel with a credit note"}
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </div>
+                    ) : (
+                        <>
+                            <Button
+                                variant="outline"
+                                disabled={busy !== null}
+                                onClick={() => void run("void")}
+                            >
+                                {busy === "void" ? "Voiding…" : "Void it"}
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                disabled={busy !== null}
+                                onClick={() => void run("reissue")}
+                            >
+                                {busy === "reissue"
+                                    ? "Voiding…"
+                                    : "Void and write again"}
+                            </Button>
+                        </>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }

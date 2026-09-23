@@ -1,22 +1,28 @@
 import { InvoicesScreen } from "@/components/invoices/invoices-screen";
 import { PageContainer } from "@/components/shared/page-container";
 import { listInvoices } from "@/lib/invoices/service";
+import { tabFromView } from "@/lib/invoices/status";
+import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Invoices" };
 
-/** Billing → Invoices. The newest and every unpaid one; the tabs filter in the browser. */
+/**
+ * Payments → Invoices. The newest and every unpaid one; the tabs filter in
+ * the browser, and `?view=` keeps the tab in the address.
+ */
 export default async function InvoicesPage({
     searchParams,
 }: {
     searchParams: Promise<{ view?: string }>;
 }) {
     await requireSession();
-    const [{ rows: invoices, truncated }, organization, { view }] =
+    const [{ rows: invoices, truncated }, organization, business, { view }] =
         await Promise.all([
             listInvoices(),
             resolveActiveOrganization(),
+            getInvoiceBusiness(),
             searchParams,
         ]);
     const canWrite = organization?.actions
@@ -28,9 +34,17 @@ export default async function InvoicesPage({
             <InvoicesScreen
                 invoices={invoices}
                 truncated={truncated}
-                businessName={organization?.name ?? "This business"}
                 canWrite={canWrite}
-                initialFilterId={view}
+                businessName={organization?.name ?? "This business"}
+                tax={
+                    business
+                        ? {
+                              registered: business.registered,
+                              gstin: business.gstin,
+                          }
+                        : null
+                }
+                initialTab={tabFromView(view)}
             />
         </PageContainer>
     );

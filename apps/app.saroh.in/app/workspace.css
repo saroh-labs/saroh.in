@@ -198,6 +198,19 @@
     outline-offset: 2px;
 }
 
+/* The invoice as paper (Saroh Invoice Detail): cream stock and dark ink in
+   either theme, because it is the document the customer is handed, not a
+   panel of the workspace. It re-points the few tokens the paper reads, so
+   its Tailwind classes stay token classes; print pins the same ink below. */
+.invoice-paper {
+    --foreground: 60 4% 11%; /* Ink 900 */
+    --muted-foreground: 42 9% 39%; /* Ink 500 */
+    --border: 46 15% 83%; /* Ink 200 */
+    --border-strong: 45 11% 71%; /* Ink 300 */
+    background-color: hsl(48 100% 98%); /* Paper stock #FFFDF6 */
+    color: hsl(var(--foreground));
+}
+
 /* =============================================================================
    PRINTING AN INVOICE (ADR-007)
    =============================================================================
@@ -224,6 +237,10 @@
         background: transparent !important;
         border-color: #d9d6cc !important;
         box-shadow: none !important;
+    }
+    /* The paper's two heavy rules are ink, not a line colour. */
+    .invoice-print .border-foreground {
+        border-color: #1c1c1a !important;
     }
     .invoice-print .text-muted-foreground {
         color: #5c5850 !important;
