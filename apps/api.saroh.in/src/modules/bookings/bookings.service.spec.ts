@@ -1017,17 +1017,39 @@ describe("BookingsService.recordOutcome", () => {
         });
     });
 
-    it("refuses an appointment that has not happened yet", async () => {
+    it("checks someone in who walks in, from an hour before the start", async () => {
+        bookingFindUnique.mockResolvedValue(BOOKING);
+        // The desk checks people in on arrival (U15), not after the hour.
+        const walkingIn = new Date("2026-07-20T08:15:00.000Z");
+        await new BookingsService().recordOutcome(
+            ctx(),
+            "bk_1",
+            "ATTENDED",
+            walkingIn,
+        );
+        expect(bookingUpdate).toHaveBeenCalled();
+    });
+
+    it("refuses attendance earlier than that, and a no-show before the start", async () => {
         bookingFindUnique.mockResolvedValue(BOOKING);
         // Nothing derives an outcome from time passing, and nothing lets a
-        // merchant assert one before the time has passed either.
-        const beforeItEnds = new Date("2026-07-20T09:30:00.000Z");
+        // merchant assert one before it could have happened either.
+        const tooEarly = new Date("2026-07-20T07:30:00.000Z");
         await expect(
             new BookingsService().recordOutcome(
                 ctx(),
                 "bk_1",
                 "ATTENDED",
-                beforeItEnds,
+                tooEarly,
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        const beforeTheStart = new Date("2026-07-20T08:45:00.000Z");
+        await expect(
+            new BookingsService().recordOutcome(
+                ctx(),
+                "bk_1",
+                "NO_SHOW",
+                beforeTheStart,
             ),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(bookingUpdate).not.toHaveBeenCalled();
