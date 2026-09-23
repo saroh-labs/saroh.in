@@ -535,6 +535,8 @@ flowchart TB
 **Verification:**
 - Side by side with the design at 1440/390, light/dark.
 
+> **Done — #495** (merged `946a62e5`). `/billing/invoices` to the design: All / Due / Overdue / Paid / Drafts with counts, owed, overdue banner, rows as cards; quick look with lines, CGST/SGST or IGST, links to order / subscription / customer, copy pay link. Credit notes sit under the invoice they correct; credit notes and order invoices never count as owed. Built the shared `components/shared/quick-look.tsx` (Subscriptions moved onto it in `786db513`).
+
 ---
 
 ### U11. Invoice Detail and the hand-written invoice
@@ -561,6 +563,8 @@ flowchart TB
 
 **Verification:**
 - Paper matches the design at print size; e2e green.
+
+> **Done — #496** (merged). Invoice Detail: tax invoice (Rye) / receipt (Pulse) / credit-note paper, actions by status, Connected + Payment + What happened panels, print leaves only the paper (also from dark). New invoice and edit draft to the design plus per-line GST rate + HSN/SAC and buyer GSTIN/state/address. "Issue with pay link" (Saroh doesn't send); registered businesses cancel with a credit note, unregistered void / void and re-issue; refunds of an order's invoice route to the order, others by credit note paid back by hand; no Download PDF (print saves as PDF). `e2e/tests/invoices.spec.ts` on Northwind (keeps the film businesses' series intact). Follow-up `caa82102`: the business's registered address (BusinessProfile line 1/2, city, PIN; state = `gstState`) required when GST-registered, edited on the GST card, frozen on every invoice at issue (`Invoice.sellerAddress`; corrections copy the original's) — CGST rule 46. Migration `20260929200000_business_registered_address`.
 
 ---
 
