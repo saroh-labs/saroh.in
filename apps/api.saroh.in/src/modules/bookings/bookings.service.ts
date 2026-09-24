@@ -2643,11 +2643,14 @@ export function toPublicBooking(booking: {
         endAt: booking.endAt.toISOString(),
         serviceName: typeof service?.name === "string" ? service.name : "",
         online,
-        // A cancelled booking no longer holds a place in the class, so it no
-        // longer carries the way in.
+        // Only a CONFIRMED booking holds a place in the class — a PENDING
+        // pay-now hold has not paid yet, and a cancelled booking no longer
+        // holds one at all — so only CONFIRMED carries the way in. `outcome`
+        // (ATTENDED/NO_SHOW) never touches this: it is set after the class,
+        // once the link is no longer needed either way.
         meetingUrl:
             online &&
-            booking.status !== "CANCELLED" &&
+            booking.status === "CONFIRMED" &&
             typeof service.meetingUrl === "string"
                 ? service.meetingUrl
                 : null,

@@ -19,6 +19,7 @@ export function KitchenStepper({
     stage,
     refunded,
     next,
+    busy,
     onAdvance,
 }: {
     flow: KitchenStage[];
@@ -27,6 +28,8 @@ export function KitchenStepper({
     refunded: boolean;
     /** The step this person may take now, if any. */
     next: KitchenStage | null;
+    /** A move is already in flight — disable the next step, like the header's own button. */
+    busy: boolean;
     onAdvance: () => void;
 }) {
     const at = flow.indexOf(stage);
@@ -78,6 +81,7 @@ export function KitchenStepper({
                                 <button
                                     type="button"
                                     onClick={onAdvance}
+                                    disabled={busy}
                                     aria-label={`${STEP_LABEL[s]} — next step`}
                                     className={cn(
                                         FOCUS,

@@ -289,6 +289,19 @@ export class OrderKitchenService {
         if (!touchesItems && !touchesDelivery && !touchesNotes) {
             throw new BadRequestException("Nothing to change");
         }
+        // A repeated itemId would apply its delta twice against the same
+        // stale snapshot below (and `[{a,0},{a,1}]` deletes, then updates,
+        // a row that is already gone) — refused before any of that runs.
+        const changedItemIds = new Set<string>();
+        for (const change of dto.lines ?? []) {
+            if (changedItemIds.has(change.itemId)) {
+                throw new BadRequestException({
+                    message: "Each item can be changed once per edit.",
+                    field: "lines",
+                });
+            }
+            changedItemIds.add(change.itemId);
+        }
 
         // Priced before the lock: reading the catalogue needs no lock, and
         // an unknown product fails before anything is held.

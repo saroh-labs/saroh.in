@@ -1439,6 +1439,7 @@ describe("toPublicBooking — what a booker is answered with", () => {
         ipHash: "iphash",
         startAt: new Date(START),
         endAt: new Date("2026-07-20T10:00:00.000Z"),
+        status: "CONFIRMED",
         snapshot: {
             service: {
                 name: "Evening yoga",
@@ -1468,6 +1469,14 @@ describe("toPublicBooking — what a booker is answered with", () => {
     it("has no link once the booking is cancelled", () => {
         expect(
             toPublicBooking({ ...booking, status: "CANCELLED" }),
+        ).toMatchObject({ online: true, meetingUrl: null });
+    });
+
+    it("has no link for a PENDING pay-now hold — it has not paid yet", () => {
+        // U19: the hold hasn't been paid for, so /book and /holds/:token must
+        // not hand out the online meeting link before it is CONFIRMED.
+        expect(
+            toPublicBooking({ ...booking, status: "PENDING" }),
         ).toMatchObject({ online: true, meetingUrl: null });
     });
 

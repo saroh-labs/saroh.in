@@ -207,7 +207,11 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { ConflictException, ForbiddenException } from "@nestjs/common";
+import {
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+} from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { correctOrderInvoiceForEdit } from "../invoices/order-invoicing";
@@ -515,6 +519,26 @@ describe("editing before preparing", () => {
         await expect(
             kitchen.edit(OWNER, "order_1", { fulfilment: "DELIVERY" }),
         ).rejects.toThrow(/needs an address/);
+    });
+
+    it("a repeated itemId in lines is refused, not double-counted", async () => {
+        const refused = await kitchen
+            .edit(OWNER, "order_1", {
+                lines: [
+                    { itemId: "li_1", quantity: 4 },
+                    { itemId: "li_1", quantity: 0 },
+                ],
+            })
+            .catch((e: unknown) => e);
+
+        expect(refused).toBeInstanceOf(BadRequestException);
+        expect((refused as BadRequestException).getResponse()).toMatchObject({
+            message: "Each item can be changed once per edit.",
+            field: "lines",
+        });
+        // Refused before anything is read or written.
+        expect(mockDb.order.total).toBe("360.00");
+        expect(mockDb.inventory.reserved).toBe(3);
     });
 });
 

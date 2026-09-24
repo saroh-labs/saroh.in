@@ -252,6 +252,7 @@ export function OrderDetail({
                     stage={order.stage}
                     refunded={refundedFull}
                     next={hold ? null : next}
+                    busy={busy}
                     onAdvance={advance}
                 />
                 {hold?.kind === "refund" ? (
