@@ -599,6 +599,38 @@ describe("refunds and the shelf", () => {
         ).rejects.toThrow("None of that line can go back in stock");
     });
 
+    it("a put-back on a shelf sold below none settles, and the order is refunded", async () => {
+        const jug = await product("Jug", { hill: 3 });
+        const order = await place(hill, [{ productId: jug, quantity: 3 }]);
+        await pay(order);
+        // Counted to 0 below what was promised; fulfilling takes it to −3.
+        await prisma.$transaction((tx) =>
+            count(
+                tx,
+                { organizationId: orgId, userId: ownerId },
+                { target: { storeId: hill, productId: jug }, counted: 0 },
+            ),
+        );
+        await fulfil(order);
+        expect(await shelf(hill, jug)).toMatchObject({ onHand: -3 });
+        const item = await line(order, jug);
+        const refund = await payments.initiateRefund(owner, order, {
+            lines: [{ itemId: item, quantity: 3 }],
+            putBack: [{ itemId: item, quantity: 1 }],
+        });
+        await confirmRefund(order, refund.providerRefundId);
+        expect(await shelf(hill, jug)).toMatchObject({ onHand: -2 });
+        expect(
+            await prisma.paymentRefund.findUniqueOrThrow({
+                where: { id: refund.refundId },
+                select: { status: true },
+            }),
+        ).toEqual({ status: "SUCCEEDED" });
+        expect(
+            await prisma.order.findUniqueOrThrow({ where: { id: order } }),
+        ).toMatchObject({ paymentStatus: "REFUNDED" });
+    });
+
     it("a refund the provider fails, with 'Put back' ticked: no Returned entry", async () => {
         const bowl = await product("Bowl", { hill: 10 });
         const order = await place(hill, [{ productId: bowl, quantity: 2 }]);

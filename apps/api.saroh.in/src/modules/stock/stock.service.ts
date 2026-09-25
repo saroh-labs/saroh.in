@@ -44,7 +44,8 @@ import { recordProductTracking } from "./tracking-audit";
  *   reads "Count didn't match" when the locked shelf had moved since.
  * - A move takes only what is not promised, and writes a pair.
  * - Undo reverses the change (a count 10 → 8 undone after 3 sold leaves 7,
- *   never "back to 10"), is refused where it would leave less than none, is
+ *   never "back to 10"), is refused where taking units away would leave
+ *   less than none (adding to a shelf sold below 0 is fine), is
  *   only for hand-made entries (a moved pair undoes both sides), is never
  *   itself undone, and a batch is all or nothing.
  * - Nothing changes at a closed storefront.
@@ -290,9 +291,11 @@ export interface RecordEntryInput {
     /** A promise moving with this change (a sale takes its hold). */
     promisedDelta?: number;
     /**
-     * Let on hand go below 0. Only a sale may: a count below promised is
-     * allowed, so fulfilling what was promised can take a shelf below none,
-     * and the order was fulfilled all the same.
+     * Let a change that takes units away leave on hand below 0. Only a sale
+     * may: a count below promised is allowed, so fulfilling what was
+     * promised can take a shelf below none, and the order was fulfilled all
+     * the same. A change that adds units is never refused, even when the
+     * shelf is still below 0 after it.
      */
     allowNegative?: boolean;
 }
@@ -315,7 +318,9 @@ export async function recordEntry(
     });
     const before = row.onHand;
     const after = before + input.quantity;
-    if (after < 0 && !input.allowNegative) {
+    // Only a change that takes units away is refused below 0: a shelf sold
+    // below none (a sale may) still takes a return, a delivery or a move in.
+    if (after < 0 && input.quantity < 0 && !input.allowNegative) {
         throw new ConflictException(
             belowZeroRefusal(await storefrontName(tx, row.storeId)),
         );
@@ -674,7 +679,8 @@ export async function reverse(
     );
     for (const e of entries) {
         const next = (onHand.get(e.stockLevelId) ?? 0) - e.quantity;
-        if (next < 0) {
+        // Refused only where the undo takes units away (as recordEntry).
+        if (next < 0 && -e.quantity < 0) {
             throw new ConflictException(
                 belowZeroRefusal(await storefrontName(tx, e.storeId)),
             );

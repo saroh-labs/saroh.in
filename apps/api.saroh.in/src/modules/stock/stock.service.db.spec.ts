@@ -329,6 +329,100 @@ describe("Stock log and rules (DB)", () => {
         expect(await onHand(stockLevelId)).toBe(13);
     });
 
+    describe("a shelf sold below none", () => {
+        /** A shelf at `start` that a sale of `sold` took below 0. */
+        async function soldBelow(name: string, start: number, sold: number) {
+            const made = await product(name, start);
+            const orderId = await order();
+            await tx(async (t) => {
+                await t.$queryRaw`SELECT id FROM "StockLevel" WHERE id = ${made.stockLevelId} FOR UPDATE`;
+                await recordSold(t, {
+                    stockLevelId: made.stockLevelId,
+                    units: sold,
+                    orderId,
+                });
+            });
+            return { ...made, orderId };
+        }
+
+        it("takes Received +2 at −3: −1", async () => {
+            const { stockLevelId } = await soldBelow("Short loaf", 3, 6);
+            expect(await onHand(stockLevelId)).toBe(-3);
+            const { entry } = await tx((t) =>
+                adjust(t, actor, {
+                    target: { stockLevelId },
+                    kind: "RECEIVED",
+                    units: 2,
+                }),
+            );
+            expect(entry).toMatchObject({ before: -3, after: -1 });
+            // Taking units away is still refused there.
+            await expect(
+                tx((t) =>
+                    adjust(t, actor, {
+                        target: { stockLevelId },
+                        kind: "WASTED",
+                        units: 1,
+                    }),
+                ),
+            ).rejects.toThrow("less than none");
+            expect(await onHand(stockLevelId)).toBe(-1);
+        });
+
+        it("takes a return, and a move in", async () => {
+            const { productId, stockLevelId, orderId } = await soldBelow(
+                "Short roll",
+                2,
+                5,
+            );
+            await tx(async (t) => {
+                await t.$queryRaw`SELECT id FROM "StockLevel" WHERE id = ${stockLevelId} FOR UPDATE`;
+                await recordReturned(t, { stockLevelId, units: 1, orderId });
+            });
+            expect(await onHand(stockLevelId)).toBe(-2);
+            // Online has 4 of it; moving 1 to Hill Road leaves Hill Road −1.
+            const { shelf } = await tx((t) =>
+                count(t, actor, {
+                    target: { storeId: online, productId },
+                    counted: 4,
+                }),
+            );
+            await tx((t) =>
+                move(t, actor, {
+                    from: { stockLevelId: shelf.stockLevelId },
+                    toStoreId: hill,
+                    units: 1,
+                }),
+            );
+            expect(await onHand(stockLevelId)).toBe(-1);
+        });
+
+        it("undoes a Wasted entry: the units come back", async () => {
+            const made = await product("Short bun", 5);
+            const { entry: wasted } = await tx((t) =>
+                adjust(t, actor, {
+                    target: { stockLevelId: made.stockLevelId },
+                    kind: "WASTED",
+                    units: 2,
+                }),
+            );
+            const orderId = await order();
+            await tx(async (t) => {
+                await t.$queryRaw`SELECT id FROM "StockLevel" WHERE id = ${made.stockLevelId} FOR UPDATE`;
+                await recordSold(t, {
+                    stockLevelId: made.stockLevelId,
+                    units: 6,
+                    orderId,
+                });
+            });
+            expect(await onHand(made.stockLevelId)).toBe(-3);
+            const [undo] = await tx((t) =>
+                reverse(t, actor, { entryIds: [wasted.id] }),
+            );
+            expect(undo).toMatchObject({ quantity: 2, before: -3, after: -1 });
+        });
+    });
+
     it("moves 3 from Hill Road to Online as −3 and +3 sharing a pair id", async () => {
         const { productId, stockLevelId } = await product("Rye loaf", 10);
         const moved = await tx((t) =>
