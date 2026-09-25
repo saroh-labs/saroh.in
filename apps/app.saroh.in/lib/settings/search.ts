@@ -50,7 +50,10 @@ const team = (label: string, value: string): SettingsEntry => ({
     tab: { param: TEAM_TAB_PARAM, value },
 });
 
-/** In the design's order: Business by its tabs, then Team, Modules, Providers. */
+/**
+ * In the design's order: Business by its tabs, then Team, Modules, Plan and
+ * billing, Your profile, Providers.
+ */
 export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Business name", "identity"),
     business("Logo", "identity"),
@@ -81,6 +84,11 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     },
     { label: "Modules — Sell, Payments, Website…", page: "/settings/modules" },
     { label: "Contacts pipeline", page: "/settings/modules" },
+    { label: "Plan and billing", page: "/settings/billing" },
+    { label: "Change plan", page: "/settings/billing" },
+    { label: "Invoices from Saroh", page: "/settings/billing" },
+    { label: "Your profile and password", page: "/settings/profile" },
+    { label: "Alerts — email, WhatsApp", page: "/settings/profile" },
     {
         label: "Providers — hosting, email, payments",
         page: "/settings/providers",
