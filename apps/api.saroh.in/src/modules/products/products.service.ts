@@ -32,6 +32,7 @@ import { listAt } from "./listings.service";
 import { promisesToMove } from "./open-promises";
 import type { ProductScope } from "./product-access";
 import { ProductAccess } from "./product-access";
+import { duplicateProduct } from "./product-duplicate";
 import {
     assertDetailsCoherent,
     assertMrpAtOrAbovePrice,
@@ -659,6 +660,35 @@ export class ProductsService {
             }
         }
         return this.getIn(scope, productId);
+    }
+
+    /** Store-route alias of `duplicateIn`. */
+    async duplicate(storeId: string, productId: string, userId: string) {
+        return this.duplicateIn(
+            await this.access.writeViaStore(storeId, userId, productId),
+            productId,
+        );
+    }
+
+    /**
+     * A draft copy of the product (#518; `duplicateProduct` says what is
+     * copied), read back at the scope's storefront so the editor can open it.
+     */
+    async duplicateIn(scope: ProductScope, productId: string) {
+        const { organizationId, storeId } = scope;
+        let copyId: string;
+        try {
+            copyId = await prisma.$transaction((tx) =>
+                duplicateProduct(tx, { organizationId, productId, storeId }),
+            );
+        } catch (error) {
+            // Another copy took the same suffix in the meantime.
+            if (!isSlugClash(error)) throw error;
+            throw new ConflictException(
+                "Another copy was being made at the same time. Try again.",
+            );
+        }
+        return this.getIn(scope, copyId);
     }
 
     /**

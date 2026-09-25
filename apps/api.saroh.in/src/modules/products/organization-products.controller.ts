@@ -142,6 +142,23 @@ export class OrganizationProductsController {
         );
     }
 
+    /**
+     * A draft copy, sold where the original is, stock at 0 (#518). Returns
+     * the copy as `GET :productId` does.
+     */
+    @Post(":productId/duplicate")
+    @HttpCode(201)
+    async duplicate(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("productId") productId: string,
+        @Query("storefront") storefront?: string,
+    ) {
+        return this.products.duplicateIn(
+            await this.access.write(ctx, productId, storefront),
+            productId,
+        );
+    }
+
     /** Delete the product from the catalogue, and so every storefront. */
     @Delete(":productId")
     async remove(

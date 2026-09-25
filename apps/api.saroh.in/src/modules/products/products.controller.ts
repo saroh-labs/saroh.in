@@ -122,6 +122,17 @@ export class ProductsController {
         return this.products.update(storeId, productId, user.id, dto);
     }
 
+    /** A draft copy of the product (#518). */
+    @Post(":productId/duplicate")
+    @HttpCode(201)
+    duplicate(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+    ) {
+        return this.products.duplicate(storeId, productId, user.id);
+    }
+
     @Delete(":productId")
     remove(
         @CurrentUser() user: AuthUser,
