@@ -666,4 +666,143 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
         });
         expect(row.paymentStatus).toBe("PAID");
     });
+
+    it("paid anyway, then handed back: invoiced once when it came in, credited once when it went, and takings net to nothing", async () => {
+        const calendar = new CalendarService({
+            listViews: jest.fn().mockResolvedValue(
+                ["COMMERCE", "APPOINTMENTS", "PAYMENTS"].map((key) => ({
+                    key,
+                    readiness: "ACTIVE",
+                })),
+            ),
+        } as unknown as ModuleAvailabilityService);
+        /** Today's takings in India, in paise. */
+        const takenToday = async () => {
+            const now = new Date();
+            const today = DateTime.fromJSDate(now, {
+                zone: "Asia/Kolkata",
+            }).toISODate();
+            const month = await calendar.month(owner, today!.slice(0, 7), now);
+            const day = month.days.find((d) => d.date === today);
+            return Math.round(Number(day?.takings?.[0]?.amount ?? 0) * 100);
+        };
+        /** The order's paper, oldest first. */
+        const paper = (orderId: string) =>
+            prisma.invoice.findMany({
+                where: { orderId },
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                select: {
+                    kind: true,
+                    status: true,
+                    total: true,
+                    paymentMethod: true,
+                    paymentReference: true,
+                    paymentRefundId: true,
+                    relatedInvoiceId: true,
+                    lines: { select: { amount: true, cgst: true } },
+                },
+            });
+
+        // ₹610 paid and invoiced; +₹120 (unpaid), then back to ₹610: the
+        // ₹120 charge is superseded with no charge after it.
+        const order = await paidOrder();
+        const { id: invoiceId } = (await prisma.$transaction((tx) =>
+            ensureOrderInvoice(tx, order.id),
+        ))!;
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 4 }],
+        });
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 3 }],
+        });
+        await nameApart(order.id);
+        const [old] = await differenceIntents(order.id);
+        expect(old!.status).toBe("SUPERSEDED");
+        const settled = await takenToday();
+
+        // The customer pays the replaced charge anyway: Razorpay's two
+        // events for one payment, and the first delivered twice.
+        const captured = {
+            providerEventId: `evt_late_${order.id}`,
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: `prov_${old!.id}`,
+            providerPaymentRef: `pay_late_${order.id}`,
+        };
+        await webhook(captured);
+        await webhook(captured);
+        await webhook({
+            ...captured,
+            providerEventId: `evt_late_paid_${order.id}`,
+            eventType: "order.paid",
+        });
+
+        const inAfter = await paper(order.id);
+        const took = inAfter.filter(
+            (i) => i.kind === "SUPPLEMENTARY" && i.paymentMethod === "ONLINE",
+        );
+        expect(took).toHaveLength(1);
+        expect(took[0]).toMatchObject({
+            status: "PAID",
+            relatedInvoiceId: invoiceId,
+            paymentReference: `pay_late_${order.id}`,
+        });
+        expect(took[0]!.total.toString()).toBe("120");
+        // Money in: the day took ₹120 more.
+        expect((await takenToday()) - settled).toBe(12000);
+        // Still owed back, and still not the order's money.
+        const owed = (await kitchen.read(owner, order.id)).money;
+        expect(owed?.paid).toBe("610.00");
+        expect(owed?.owedBack).toEqual([{ id: old!.id, amount: "120.00" }]);
+
+        // Handed back from the provider's dashboard, the event delivered
+        // twice: one refund, one credit note, mirroring the invoice.
+        const refunded = {
+            providerEventId: `evt_late_rf_${order.id}`,
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: `prov_${old!.id}`,
+            providerRefundId: `rfnd_late2_${order.id}`,
+            refundAmountCents: 12000,
+        };
+        await webhook(refunded);
+        await webhook(refunded);
+
+        const refunds = await prisma.paymentRefund.findMany({
+            where: { paymentIntentId: old!.id },
+        });
+        expect(refunds).toHaveLength(1);
+        const all = await paper(order.id);
+        const notes = all.filter((i) => i.paymentRefundId !== null);
+        expect(notes).toHaveLength(1);
+        expect(notes[0]).toMatchObject({
+            kind: "CREDIT_NOTE",
+            status: "ISSUED",
+            relatedInvoiceId: invoiceId,
+            paymentRefundId: refunds[0]!.id,
+        });
+        expect(notes[0]!.total.toString()).toBe("120");
+        const lines = (i: (typeof all)[number]) =>
+            i.lines.map((l) => [l.amount.toString(), l.cgst.toString()]);
+        expect(lines(notes[0]!)).toEqual(lines(took[0]!));
+        // Every rupee in has its invoice and every rupee out its credit
+        // note: ₹610 + ₹120 + ₹120 in, ₹120 + ₹120 out.
+        const sum = (kind: string) =>
+            all
+                .filter((i) => i.kind === kind)
+                .reduce((s, i) => s + Math.round(Number(i.total) * 100), 0);
+        expect(sum("INVOICE") + sum("SUPPLEMENTARY") - sum("CREDIT_NOTE")).toBe(
+            61000,
+        );
+
+        // Money out: the day is back where the edits left it.
+        expect((await takenToday()) - settled).toBe(0);
+        const after = (await kitchen.read(owner, order.id)).money;
+        expect(after?.owedBack).toEqual([]);
+        expect(after?.paid).toBe("610.00");
+        const row = await prisma.order.findUniqueOrThrow({
+            where: { id: order.id },
+        });
+        expect(row.paymentStatus).toBe("PAID");
+    });
 });

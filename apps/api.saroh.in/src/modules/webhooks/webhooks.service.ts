@@ -17,6 +17,7 @@ import {
     creditNoteForRefund,
     creditRestOfOrder,
     ensureOrderInvoice,
+    invoiceSupersededPayment,
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
 import type { PaymentStatus } from "../orders/dto";
@@ -446,9 +447,11 @@ export class WebhooksService {
      * superseded (#508, U8). There is no provider cancel, so a customer
      * still on its checkout could pay it. It is not the order's money: the
      * intent stays SUPERSEDED — every paid sum counts SUCCEEDED intents
-     * only — the order and its invoices are left alone, and the capture is
+     * only — the order's payment status is left alone, and the capture is
      * recorded as needing a refund, as an invoice paid twice is. Order
      * Detail shows it as owed back until a refund for it is on record.
+     * It was received, though, so it is invoiced: a supplementary invoice,
+     * PAID by this payment, that the refund's credit note later offsets.
      *
      * A second event for the same payment (Razorpay sends `payment.captured`
      * and `order.paid`) finds that record and changes nothing.
@@ -476,6 +479,12 @@ export class WebhooksService {
                 status: CAPTURED_NEEDS_REFUND,
                 rawResponse: { intentStatus: SUPERSEDED_INTENT },
             },
+        });
+        // Money in has an invoice, money out a credit note: the payment is
+        // invoiced now, and its refund's credit note offsets it.
+        await invoiceSupersededPayment(tx, {
+            orderId,
+            paymentIntentId: intent.id,
         });
         this.logger.warn(
             `Payment captured on superseded charge ${intent.id} of order ${orderId}; recorded as needing a refund`,

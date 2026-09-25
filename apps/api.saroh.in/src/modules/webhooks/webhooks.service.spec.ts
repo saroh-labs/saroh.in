@@ -18,6 +18,7 @@ jest.mock("../invoices/order-invoicing", () => ({
     ensureOrderInvoice: jest.fn().mockResolvedValue(null),
     creditNoteForRefund: jest.fn().mockResolvedValue(null),
     creditRestOfOrder: jest.fn().mockResolvedValue(undefined),
+    invoiceSupersededPayment: jest.fn().mockResolvedValue(null),
     settleSupplementaryInvoices: jest.fn().mockResolvedValue(0),
 }));
 
@@ -66,6 +67,7 @@ import {
     creditNoteForRefund,
     creditRestOfOrder,
     ensureOrderInvoice,
+    invoiceSupersededPayment,
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
 import { encryptSecret } from "../payments/crypto";
@@ -794,12 +796,23 @@ describe("WebhooksService — a payment on a superseded edit charge (#508 U8)", 
                 status: "CAPTURED_NEEDS_REFUND",
             }),
         });
-        // Not SUCCEEDED, so no paid sum counts it; the order and its
-        // supplementary invoices are left as the later edit left them.
+        // Not SUCCEEDED, so no paid sum counts it; the order and the
+        // supplementary invoices the edits wrote are left as they were.
         expect(intentUpdate).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
         expect(settleSupplementary).not.toHaveBeenCalled();
         expect(ensureOrderInvoice).not.toHaveBeenCalled();
+        // But the money came in, so it is invoiced — after the capture is
+        // on record, which is what files it.
+        expect(invoiceSupersededPayment).toHaveBeenCalledTimes(1);
+        expect(invoiceSupersededPayment).toHaveBeenCalledWith(
+            expect.anything(),
+            { orderId: "order_1", paymentIntentId: "pi_old" },
+        );
+        expect(attemptCreate.mock.invocationCallOrder[0]).toBeLessThan(
+            (invoiceSupersededPayment as jest.Mock).mock
+                .invocationCallOrder[0]!,
+        );
     });
 
     it("reads the status under the intent's lock: superseded a moment ago is superseded", async () => {
@@ -829,6 +842,7 @@ describe("WebhooksService — a payment on a superseded edit charge (#508 U8)", 
             changed: false,
         });
         expect(attemptCreate).not.toHaveBeenCalled();
+        expect(invoiceSupersededPayment).not.toHaveBeenCalled();
     });
 });
 

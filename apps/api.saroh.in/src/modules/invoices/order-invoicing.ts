@@ -3,6 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { SUPERSEDED_INTENT } from "../payments/intent-state";
 import { bpsToRate, rateToBps } from "./gst";
 import { stateName } from "./gst-states";
+import { CAPTURED_NEEDS_REFUND, ONLINE_PAYMENT_METHOD } from "./invoice-state";
 import type { InvoiceKind } from "./numbering";
 import { nextInvoiceNumber, seriesFor } from "./numbering";
 import type {
@@ -15,6 +16,7 @@ import {
     buildCorrection,
     buildCreditNote,
     buildOrderInvoice,
+    buildPaymentSupplementary,
     formatSellerAddress,
     orderBillTo,
 } from "./order-invoice";
@@ -337,6 +339,9 @@ async function writeCorrection(
         createdByUserId?: string | null;
         status: "ISSUED" | "PAID";
         at: Date;
+        /** How a document written PAID was paid, when a payment paid it. */
+        method?: string | null;
+        reference?: string | null;
     },
 ): Promise<{ id: string; number: string }> {
     const profile = await loadTaxProfile(tx, original.organizationId);
@@ -369,6 +374,8 @@ async function writeCorrection(
             issuedAt: extra.at,
             dueAt: null,
             paidAt: extra.status === "PAID" ? extra.at : null,
+            paymentMethod: extra.method ?? null,
+            paymentReference: extra.reference ?? null,
             paymentNote: extra.note ?? null,
             createdByUserId: extra.createdByUserId ?? null,
         },
@@ -415,6 +422,12 @@ export async function issueCreditNote(
         note?: string | null;
         createdByUserId?: string | null;
         at?: Date;
+        /**
+         * The lines to spread over instead of every invoiced line — a
+         * supplementary invoice's own, when the credit note hands back the
+         * money that invoice took.
+         */
+        spreadOver?: OriginalRow["lines"];
     },
 ): Promise<{ id: string; number: string | null } | null> {
     await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${input.invoiceId} FOR UPDATE`;
@@ -435,7 +448,13 @@ export async function issueCreditNote(
     if (amountCents <= 0) return null;
 
     const doc = buildCreditNote(
-        { ...asOriginal(original), lines: await invoicedLines(tx, original) },
+        {
+            ...asOriginal(original),
+            lines:
+                input.spreadOver && input.spreadOver.length > 0
+                    ? input.spreadOver
+                    : await invoicedLines(tx, original),
+        },
         amountCents,
         amountCents === input.amountCents ? input.refundLines : [],
     );
@@ -464,6 +483,11 @@ export async function issueCreditNote(
  * when the order has no invoice (it was placed before U5), when the refund
  * already made one, or when it hands back an edit's difference — the edit
  * wrote its own credit note.
+ *
+ * Money handed back from a superseded edit charge is credited like any
+ * other: its payment was invoiced when it came in
+ * ({@link invoiceSupersededPayment}), and the credit note is spread over
+ * that invoice's own lines, so the two mirror each other (#508, U8).
  */
 export async function creditNoteForRefund(
     tx: Tx,
@@ -477,7 +501,9 @@ export async function creditNoteForRefund(
             forEdit: true,
             reason: true,
             status: true,
-            paymentIntent: { select: { orderId: true, status: true } },
+            paymentIntent: {
+                select: { id: true, orderId: true, status: true },
+            },
             lines: {
                 select: {
                     orderItemId: true,
@@ -488,9 +514,6 @@ export async function creditNoteForRefund(
         },
     });
     if (!refund || refund.forEdit || refund.status === "FAILED") return null;
-    // Money paid on a superseded edit charge was never the order's, nor on
-    // its invoice: handing it back credits nothing (#508, U8).
-    if (refund.paymentIntent.status === SUPERSEDED_INTENT) return null;
     const orderId = refund.paymentIntent.orderId;
     if (!orderId) return null;
     const invoice = await tx.invoice.findFirst({
@@ -498,13 +521,139 @@ export async function creditNoteForRefund(
         select: { id: true },
     });
     if (!invoice) return null;
+    // Not for any line of the order: it credits the invoice that took it.
+    const superseded = refund.paymentIntent.status === SUPERSEDED_INTENT;
+    const paidOn = superseded
+        ? await supersededPaymentInvoice(tx, orderId, refund.paymentIntent.id)
+        : null;
     return issueCreditNote(tx, {
         invoiceId: invoice.id,
         amountCents: refund.amountCents,
-        refundLines: refund.lines,
+        refundLines: superseded ? [] : refund.lines,
         paymentRefundId: refund.id,
-        note: refund.reason ?? "Refund",
+        note:
+            refund.reason ??
+            (superseded
+                ? "Refund of a payment on a replaced charge"
+                : "Refund"),
+        spreadOver: paidOn?.lines,
     });
+}
+
+/**
+ * The reference a superseded charge's payment is invoiced under: the
+ * provider's payment id the webhook recorded with the capture, else the
+ * provider's id for the charge, else Saroh's. The same answer when the
+ * payment is invoiced and when it is handed back, which is how the credit
+ * note finds the invoice it mirrors, and how a second call finds the
+ * invoice the first made.
+ */
+async function supersededPaymentReference(
+    tx: Tx,
+    paymentIntentId: string,
+): Promise<string> {
+    const intent = await tx.paymentIntent.findUnique({
+        where: { id: paymentIntentId },
+        select: {
+            providerIntentId: true,
+            attempts: {
+                where: { status: CAPTURED_NEEDS_REFUND },
+                orderBy: { createdAt: "asc" },
+                take: 1,
+                select: { providerRef: true },
+            },
+        },
+    });
+    return (
+        intent?.attempts[0]?.providerRef ??
+        intent?.providerIntentId ??
+        paymentIntentId
+    );
+}
+
+/** The supplementary invoice a superseded charge's payment was invoiced on. */
+async function supersededPaymentInvoice(
+    tx: Tx,
+    orderId: string,
+    paymentIntentId: string,
+): Promise<{
+    id: string;
+    number: string | null;
+    lines: OriginalRow["lines"];
+} | null> {
+    return tx.invoice.findFirst({
+        where: {
+            orderId,
+            kind: "SUPPLEMENTARY",
+            paymentMethod: ONLINE_PAYMENT_METHOD,
+            paymentReference: await supersededPaymentReference(
+                tx,
+                paymentIntentId,
+            ),
+        },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, number: true, lines: ORIGINAL_SELECT.lines },
+    });
+}
+
+/**
+ * Money a customer paid on an edit's difference charge that a later edit
+ * superseded (#508, U8). It is not the order's price — the order is owed
+ * what the later edit said, and this is owed back — but it was received,
+ * so it is invoiced: a supplementary invoice against the order's invoice
+ * for what came in, PAID by that payment, its amount spread over the
+ * invoiced lines. The refund that hands it back makes the credit note that
+ * offsets it ({@link creditNoteForRefund}); takings read the money in on
+ * the day it came and out on the day it went.
+ *
+ * Call it after the capture is recorded as needing a refund — the
+ * reference it is filed under comes from that record. The webhook does,
+ * under the intent's row lock, and a second event for the same payment
+ * finds that record and stops before here; a second call finds the invoice
+ * the first made and returns it. Locks intent, then invoice: the edit takes
+ * order, intent, invoice, so neither waits on the other the wrong way round.
+ *
+ * Nothing when the order has no invoice (placed before orders were
+ * invoiced).
+ */
+export async function invoiceSupersededPayment(
+    tx: Tx,
+    input: { orderId: string; paymentIntentId: string; at?: Date },
+): Promise<{ id: string; number: string | null; created: boolean } | null> {
+    const invoice = await tx.invoice.findFirst({
+        where: { orderId: input.orderId, kind: "INVOICE" },
+        select: { id: true },
+    });
+    if (!invoice) return null;
+    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoice.id} FOR UPDATE`;
+    const made = await supersededPaymentInvoice(
+        tx,
+        input.orderId,
+        input.paymentIntentId,
+    );
+    if (made) return { id: made.id, number: made.number, created: false };
+
+    const original = await tx.invoice.findUnique({
+        where: { id: invoice.id },
+        select: ORIGINAL_SELECT,
+    });
+    const intent = await tx.paymentIntent.findUnique({
+        where: { id: input.paymentIntentId },
+        select: { amountCents: true },
+    });
+    if (!original || !intent || intent.amountCents <= 0) return null;
+    const doc = buildPaymentSupplementary(
+        { ...asOriginal(original), lines: await invoicedLines(tx, original) },
+        intent.amountCents,
+    );
+    const written = await writeCorrection(tx, original, "SUPPLEMENTARY", doc, {
+        note: "Paid on a replaced charge; owed back",
+        status: "PAID",
+        at: input.at ?? new Date(),
+        method: ONLINE_PAYMENT_METHOD,
+        reference: await supersededPaymentReference(tx, input.paymentIntentId),
+    });
+    return { ...written, created: true };
 }
 
 /**
