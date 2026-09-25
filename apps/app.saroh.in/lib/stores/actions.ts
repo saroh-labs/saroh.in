@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import type { CreateStoreInput, StoreResult, UpdateStoreInput } from "./schema";
 import {
     createStore as createStoreApi,
@@ -16,7 +18,11 @@ import {
 export async function createStore(
     input: CreateStoreInput,
 ): Promise<StoreResult<{ id: string }>> {
-    return createStoreApi(input);
+    const res = await createStoreApi(input);
+    // A second storefront brings pickers and "Storefronts" into the whole
+    // workspace, so every page is read again, as a close does.
+    if (res.ok) revalidatePath("/", "layout");
+    return res;
 }
 
 export async function updateStore(

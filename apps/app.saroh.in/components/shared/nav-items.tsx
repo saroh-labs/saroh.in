@@ -357,6 +357,8 @@ export function showsGroupLabel(group: NavGroup): boolean {
  * promise a merge that has not happened — the same over-claim that was removed
  * from the marketing site.
  */
+const STOREFRONTS_HREF = "/commerce/storefronts";
+
 export const NAV_GROUPS: NavGroup[] = [
     {
         items: [
@@ -434,8 +436,9 @@ export const NAV_GROUPS: NavGroup[] = [
                         action: "discount:read",
                     },
                     {
-                        href: "/commerce/storefronts",
-                        // Singular: a business has one for now (ADR-006).
+                        href: STOREFRONTS_HREF,
+                        // Singular for the business with one; `navFor`
+                        // names it "Storefronts" once there are more.
                         label: "Storefront",
                         action: "store:read",
                     },
@@ -871,6 +874,7 @@ export function navFor({
     actions,
     moduleKeys,
     sites,
+    storefronts,
 }: {
     /** `null` when it could not be resolved; the nav then fails open. */
     role: NavRole | null;
@@ -886,8 +890,13 @@ export function navFor({
      * rail and the drawer leave it out: Website is one row there.
      */
     sites?: readonly { id: string; name: string }[];
+    /**
+     * How many storefronts the business has; with more than one the row
+     * reads "Storefronts" (ADR-010). `null` or absent keeps the singular.
+     */
+    storefronts?: number | null;
 }): NavGroup[] {
-    return filterNavGroupsByRole(
+    const groups = filterNavGroupsByRole(
         filterNavGroups(
             sites ? navGroupsWithSites(NAV_GROUPS, sites, role) : NAV_GROUPS,
             moduleKeys,
@@ -895,6 +904,20 @@ export function navFor({
         role,
         actions,
     );
+    return (storefronts ?? 0) > 1 ? pluralStorefronts(groups) : groups;
+}
+
+/** The Storefront row, named for a business that has several. */
+function pluralStorefronts(groups: NavGroup[]): NavGroup[] {
+    const rename = <T extends { href?: string; label: string }>(row: T): T =>
+        row.href === STOREFRONTS_HREF ? { ...row, label: "Storefronts" } : row;
+    return groups.map((group) => ({
+        ...group,
+        items: group.items.map((item) => ({
+            ...rename(item),
+            children: item.children?.map(rename),
+        })),
+    }));
 }
 
 /**

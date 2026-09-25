@@ -60,11 +60,17 @@ pattern files refer back here.
 
 - **Current** — Commerce-led, not commerce-only (decided 2026-08-02). A `Store`
   is a commerce channel beneath an Organization (ADR-001), not the tenant.
-- **Current** — **One storefront and one website per business, for now**
-  (ADR-006). The API refuses a second; the schema stays multi. Design screens
-  for one: no picker unless a business already has more than one, no "New
-  storefront" / "New site" once it has one, singular copy. Storefront and
-  website stay separate — mapping them is future work.
+- **Current** — **Several storefronts, one website per business.** A business
+  may add storefronts up to its plan's `storefronts` entitlement (5 on the free
+  floor), under a product ceiling of 25 (ADR-010); the API refuses one more
+  (409 at the ceiling, 403 at the plan) and the app reads the allowance from
+  `GET …/storefronts/allowance` rather than copying the number. Websites stay
+  at one (ADR-006). Design screens so a one-storefront business sees no
+  change: a picker or "across N storefronts" only with more than one
+  (`lib/stores/pick.ts`), singular copy otherwise. A storefront closes (soft)
+  only once no order waits and no stock is on hand or promised there — "Move
+  or count out its stock first" — and closing never removes a catalogue
+  product. Storefront and website stay separate — mapping them is future work.
 - **Current** — **One customer record behind an order and a booking is not true
   yet.** `Customer` is store-scoped (its `organizationId` is still nullable), and
   linking it to a `Contact` is manual

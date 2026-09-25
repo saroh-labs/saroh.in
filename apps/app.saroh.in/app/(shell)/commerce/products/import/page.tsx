@@ -8,6 +8,7 @@ import { CsvImport } from "@/components/stores/csv-import";
 import { describeImport } from "@/lib/imports/service";
 import { requireSession } from "@/lib/session";
 import { importProductsHref } from "@/lib/stores/links";
+import { pickStorefront } from "@/lib/stores/pick";
 import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Import products" };
@@ -26,9 +27,7 @@ export default async function ImportProductsPage({
         searchParams,
         listBusinessStores(),
     ]);
-    const store =
-        stores.find((s) => s.id === storefront) ??
-        (stores.length === 1 ? stores[0] : undefined);
+    const store = pickStorefront(stores, storefront);
 
     if (!store) {
         return (

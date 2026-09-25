@@ -8,6 +8,7 @@ import { CsvImport } from "@/components/stores/csv-import";
 import { importCustomersHref } from "@/lib/customers/links";
 import { describeImport } from "@/lib/imports/service";
 import { requireSession } from "@/lib/session";
+import { pickStorefront } from "@/lib/stores/pick";
 import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Import customers" };
@@ -27,9 +28,7 @@ export default async function ImportCustomersPage({
         searchParams,
         listBusinessStores(),
     ]);
-    const store =
-        stores.find((s) => s.id === storefront) ??
-        (stores.length === 1 ? stores[0] : undefined);
+    const store = pickStorefront(stores, storefront);
 
     if (!store) {
         return (
