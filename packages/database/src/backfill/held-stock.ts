@@ -151,11 +151,19 @@ export interface HeldStockReport {
 
 class DryRunRollback extends Error {}
 
+/** A line moved onto a mismatched row after its orders were locked: again. */
+class OrdersMoved extends Error {}
+
 /**
  * Apply the repair rule (above) to every business, or to those named. Each
- * business runs in its own transaction, locking the rows it changes in id
- * order before reading them again; a dry run does the same work and rolls it
- * back, so it reports exactly what a real run would do.
+ * business runs in its own transaction and takes the locks every stock flow
+ * takes, in the same order: the open Orders whose lines it may rewrite
+ * (sorted, FOR UPDATE), then the rows (by id) — so a cancel, a fulfilment or
+ * a refund settling on one of those orders either finishes first or waits,
+ * and never acts on a line this repair rewrote under it. It reads again under
+ * the locks; if a line of another order joined a row meanwhile, it starts
+ * that business again. A dry run does the same work and rolls it back, so it
+ * reports exactly what a real run would do.
  */
 export async function reconcileHeldStock(
     db: PrismaClient,
@@ -183,16 +191,24 @@ export async function reconcileHeldStock(
             strayLinesCleared: [],
             dryRun,
         };
-        try {
-            await db.$transaction(
-                async (tx) => {
-                    await reconcileOrganization(tx, organizationId, part);
-                    if (dryRun) throw new DryRunRollback();
-                },
-                { timeout: 120_000 },
-            );
-        } catch (e) {
-            if (!(e instanceof DryRunRollback)) throw e;
+        for (let attempt = 1; ; attempt += 1) {
+            part.capped = [];
+            part.promisedMore = [];
+            part.strayLinesCleared = [];
+            try {
+                await db.$transaction(
+                    async (tx) => {
+                        await reconcileOrganization(tx, organizationId, part);
+                        if (dryRun) throw new DryRunRollback();
+                    },
+                    { timeout: 120_000 },
+                );
+                break;
+            } catch (e) {
+                if (e instanceof DryRunRollback) break;
+                if (e instanceof OrdersMoved && attempt < 5) continue;
+                throw e;
+            }
         }
         report.capped.push(...part.capped);
         report.promisedMore.push(...part.promisedMore);
@@ -207,6 +223,14 @@ async function reconcileOrganization(
     report: HeldStockReport,
 ): Promise<void> {
     const first = await heldStockMismatches(tx, [organizationId]);
+    // Lock order (docs/patterns/backend-data-and-money.md): the Orders whose
+    // lines this may rewrite, then the rows.
+    const orderIds = await ordersTouched(tx, first);
+    if (orderIds.length > 0) {
+        await tx.$queryRaw`
+            SELECT id FROM "Order" WHERE id = ANY(${orderIds}::text[])
+            ORDER BY id FOR UPDATE`;
+    }
     const ids = first.rows.map((r) => r.stockLevelId).sort();
     if (ids.length > 0) {
         await tx.$queryRaw`
@@ -215,6 +239,14 @@ async function reconcileOrganization(
     }
     // Read again under the locks: a line may have moved meanwhile.
     const found = await heldStockMismatches(tx, [organizationId]);
+    const locked = new Set(orderIds);
+    const lockedRows = new Set(ids);
+    if (
+        found.rows.some((r) => !lockedRows.has(r.stockLevelId)) ||
+        (await ordersTouched(tx, found)).some((id) => !locked.has(id))
+    ) {
+        throw new OrdersMoved();
+    }
 
     for (const line of found.lines) {
         await tx.orderItem.update({
@@ -273,6 +305,32 @@ async function reconcileOrganization(
         }
         report.capped.push({ ...row, lines: capped });
     }
+}
+
+/**
+ * The orders whose lines a repair of `m` may rewrite: every stray line's,
+ * and every open line's on a mismatched row. Sorted, for locking.
+ */
+async function ordersTouched(
+    tx: TransactionClient,
+    m: HeldStockMismatches,
+): Promise<string[]> {
+    const rowIds = m.rows.map((r) => r.stockLevelId);
+    const onRows =
+        rowIds.length === 0
+            ? []
+            : await tx.$queryRaw<{ orderId: string }[]>`
+                SELECT DISTINCT i."orderId"
+                FROM "OrderItem" i
+                JOIN "Order" o ON o.id = i."orderId"
+                WHERE i."stockLevelId" = ANY(${rowIds}::text[])
+                  AND o.status::text = ANY(${[...OPEN_ORDER_STATUSES]}::text[])`;
+    return Array.from(
+        new Set([
+            ...m.lines.map((l) => l.orderId),
+            ...onRows.map((r) => r.orderId),
+        ]),
+    ).sort();
 }
 
 /** A repair report as lines a person can read, for the CLIs. */

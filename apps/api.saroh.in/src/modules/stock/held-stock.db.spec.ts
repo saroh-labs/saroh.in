@@ -459,6 +459,64 @@ describe("the repair (reconcileHeldStock)", () => {
     });
 });
 
+describe("the repair and an order being changed", () => {
+    it("waits for the order's lock, so a cancel never acts on a line it rewrote", async () => {
+        const p = `hs-lock-${tag}-`;
+        const cord = await product("Cord");
+        // Promised 2; the older order holds 2, the newer one 3.
+        const rowId = await row(cord, { onHand: 10, promised: 2 });
+        const held = (q: number) => ({
+            productId: cord,
+            quantity: q,
+            stockRow: "PRODUCT" as const,
+            stockLevelId: rowId,
+            heldQuantity: q,
+        });
+        const [older] = await order(`${p}a`, "PENDING", at(50), [held(2)]);
+        const [newer] = await order(`${p}b`, "PENDING", at(60), [held(3)]);
+
+        let locked!: () => void;
+        const gotLock = new Promise<void>((r) => (locked = r));
+        // A change to the newer order has its lock and has read its line.
+        const change = prisma.$transaction(
+            async (tx) => {
+                await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${`${p}b`} FOR UPDATE`;
+                locked();
+                await new Promise((r) => setTimeout(r, 400));
+                // Still what it read: the repair hasn't rewritten it.
+                return (
+                    await tx.orderItem.findUniqueOrThrow({
+                        where: { id: newer },
+                        select: { heldQuantity: true },
+                    })
+                ).heldQuantity;
+            },
+            { timeout: 10_000 },
+        );
+        await gotLock;
+        const repair = reconcileHeldStock(prisma, {
+            organizationIds: [orgId],
+        });
+        const [seen, report] = await Promise.all([change, repair]);
+        expect(seen).toBe(3);
+        expect(
+            report.capped.find((c) => c.stockLevelId === rowId),
+        ).toMatchObject({
+            lines: [{ orderItemId: newer, was: 3, now: 0, unheld: true }],
+        });
+        expect(await lineOf(older)).toMatchObject({ heldQuantity: 2 });
+        // A cancel now gives back only what the order still holds: none.
+        await orders.updateStatus(hill, `${p}b`, ownerId, {
+            status: "CANCELLED",
+        });
+        expect(await shelf(rowId)).toEqual({ onHand: 10, promised: 2 });
+        await orders.updateStatus(hill, `${p}a`, ownerId, {
+            status: "CANCELLED",
+        });
+        expect(await shelf(rowId)).toEqual({ onHand: 10, promised: 0 });
+    });
+});
+
 describe("the #510 backfill reports and repairs held stock", () => {
     it("caps an open line the old counter never promised", async () => {
         const twine = await product("Twine");

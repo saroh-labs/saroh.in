@@ -102,6 +102,27 @@ function heldRowIds(lines: readonly Line[]): string[] {
 }
 
 /**
+ * Load lines, lock the rows they sit on (id order), and read the lines again
+ * under those locks — what they hold is acted on as it stands now. Every
+ * writer of a line's row and held units holds its Order's lock, as the
+ * caller does; reading twice is the backstop for anything that doesn't (a
+ * repair script). A line that moved to another row meanwhile gets that row
+ * locked too.
+ */
+async function loadLocked(
+    tx: Tx,
+    where: Prisma.OrderItemWhereInput,
+): Promise<Line[]> {
+    const first = await loadLines(tx, where);
+    const locked = new Set(heldRowIds(first));
+    await lockStockLevels(tx, Array.from(locked));
+    const again = await loadLines(tx, where);
+    const more = heldRowIds(again).filter((id) => !locked.has(id));
+    if (more.length > 0) await lockStockLevels(tx, more);
+    return again;
+}
+
+/**
  * Lock every shelf an order's lines sit on, in id order. The caller holds
  * the order's lock; a flow that may touch any of the order's lines (a refund
  * settling, a cancel) takes them all here, before a PaymentRefund.
@@ -387,10 +408,9 @@ export async function releaseLines(
     lines: readonly { id: string; units?: number }[],
 ): Promise<void> {
     if (lines.length === 0) return;
-    const loaded = await loadLines(tx, {
+    const loaded = await loadLocked(tx, {
         id: { in: lines.map((l) => l.id) },
     });
-    await lockStockLevels(tx, heldRowIds(loaded));
     const asked = new Map(lines.map((l) => [l.id, l.units]));
     for (const line of loaded) {
         await releaseOne(tx, line, asked.get(line.id) ?? line.heldQuantity);
@@ -412,8 +432,7 @@ export async function commitLines(
     actorUserId: string | null,
 ): Promise<void> {
     if (lineIds.length === 0) return;
-    const lines = await loadLines(tx, { id: { in: [...lineIds] } });
-    await lockStockLevels(tx, heldRowIds(lines));
+    const lines = await loadLocked(tx, { id: { in: [...lineIds] } });
     for (const line of lines) {
         if (!line.stockLevelId || line.heldQuantity <= 0) continue;
         await recordSold(tx, {
@@ -605,18 +624,16 @@ export async function settleRefundStock(
 
     if (refund.lines.length === 0) {
         if (!opts.orderFullyRefunded) return;
-        const lines = await loadLines(tx, { orderId });
-        await lockStockLevels(tx, heldRowIds(lines));
+        const lines = await loadLocked(tx, { orderId });
         for (const line of lines) {
             await releaseOne(tx, line, line.heldQuantity);
         }
         return;
     }
 
-    const lines = await loadLines(tx, {
+    const lines = await loadLocked(tx, {
         id: { in: refund.lines.map((l) => l.orderItemId) },
     });
-    await lockStockLevels(tx, heldRowIds(lines));
     const byId = new Map(lines.map((l) => [l.id, l]));
     const untracked = await untrackedAmong(
         tx,
