@@ -16,6 +16,7 @@ import {
     Receipt,
     ReceiptText,
     Repeat,
+    SlidersHorizontal,
     Store,
     Target,
     Ticket,
@@ -28,6 +29,7 @@ import { mayAddStorefront, mayAddWebsite } from "@/lib/business-limits";
 import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
+import { searchSettings } from "@/lib/settings/search";
 
 import type { NavAction, NavRole } from "./nav-items";
 import {
@@ -477,16 +479,24 @@ export function CommandMenu({
                 {/*
                  * The settings screen's tabs. The rail offers one Settings row
                  * now, so its pages are listed here, matched on their own
-                 * names and on "settings".
+                 * names and on "settings" — and, once something is typed, the
+                 * settings on them, the same ones Search settings finds:
+                 * "GSTIN" goes to Business, on its tax tab.
                  */}
                 {(() => {
-                    const pages = settingsPagesFor({
-                        role,
-                        actions: permissions,
-                    }).filter(
+                    const actor = { role, actions: permissions };
+                    const pages = settingsPagesFor(actor).filter(
                         (page) => matches("Settings") || matches(page.label),
                     );
-                    if (pages.length === 0) return null;
+                    const settings = needle
+                        ? searchSettings(needle, actor, {
+                              limit: 5,
+                              byPage: false,
+                          })
+                        : [];
+                    if (pages.length === 0 && settings.length === 0) {
+                        return null;
+                    }
                     return (
                         <CommandGroup heading="Settings">
                             {pages.map((page) => (
@@ -497,6 +507,21 @@ export function CommandMenu({
                                 >
                                     <page.icon className="mr-2 size-4 shrink-0 text-muted-foreground" />
                                     {page.label}
+                                </CommandItem>
+                            ))}
+                            {settings.map((hit) => (
+                                <CommandItem
+                                    key={`${hit.href}#${hit.label}`}
+                                    value={`${hit.href}#${hit.label}`}
+                                    onSelect={() => go(hit.href)}
+                                >
+                                    <SlidersHorizontal className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                                    <span className="min-w-0 flex-1 truncate">
+                                        {hit.label}
+                                    </span>
+                                    <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                                        {hit.where}
+                                    </span>
                                 </CommandItem>
                             ))}
                         </CommandGroup>
