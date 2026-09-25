@@ -61,7 +61,15 @@ const base: RawOrderRead = {
     paymentIntents: [
         {
             amountCents: 40000,
-            refunds: [{ amountCents: 12000, forEdit: false }],
+            refunds: [
+                {
+                    id: "rf_1",
+                    amountCents: 12000,
+                    forEdit: false,
+                    status: "SUCCEEDED",
+                    providerRefundId: "rfnd_1",
+                },
+            ],
         },
     ],
     discountRedemption: null,
@@ -84,7 +92,44 @@ describe("serializeOrderRead", () => {
             paid: "400.00",
             refunded: "120.00",
             due: "0.00",
+            refundsBeingConfirmed: [],
         });
+    });
+
+    it("lists a refund whose provider answer was lost as being confirmed (#508)", () => {
+        const read = serializeOrderRead(
+            {
+                ...base,
+                paymentIntents: [
+                    {
+                        amountCents: 40000,
+                        refunds: [
+                            // Taken by the provider, waiting for its webhook.
+                            {
+                                id: "rf_taken",
+                                amountCents: 5000,
+                                forEdit: false,
+                                status: "PENDING",
+                                providerRefundId: "rfnd_1",
+                            },
+                            {
+                                id: "rf_lost",
+                                amountCents: 12000,
+                                forEdit: false,
+                                status: "PENDING",
+                                providerRefundId: null,
+                            },
+                        ],
+                    },
+                ],
+            },
+            opts(true),
+        );
+        expect(read.money?.refundsBeingConfirmed).toEqual([
+            { id: "rf_lost", amount: "120.00" },
+        ]);
+        // Held: counted as handed back until the provider says.
+        expect(read.money?.refunded).toBe("170.00");
     });
 
     it("lists the order's paper only for a role that reads invoices (ADR-008)", () => {

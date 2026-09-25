@@ -206,6 +206,47 @@ export function allocateAcrossPayments<
 }
 
 /**
+ * Which part of a split refund each line rides on. A refund that comes back
+ * from two payments is two provider refunds; each line goes on the part its
+ * money comes from, so a part the provider refuses frees only its own lines.
+ * Lines are laid end to end over the parts in order; a line that straddles
+ * two parts goes, whole, on the one carrying more of it (the first on a
+ * tie), and the other part carries only money. A line past the parts' total
+ * (the lines can sum to more than a full refund's money) goes on the last.
+ * Returns one list of lines per part, in the parts' order.
+ */
+export function apportionLines<L extends { amountCents: number }>(
+    partCents: readonly number[],
+    lines: readonly L[],
+): L[][] {
+    const out: L[][] = partCents.map(() => []);
+    if (partCents.length === 0) return out;
+    const ends: number[] = [];
+    partCents.reduce((end, c) => {
+        ends.push(end + c);
+        return end + c;
+    }, 0);
+    let at = 0;
+    for (const line of lines) {
+        const from = at;
+        const to = at + line.amountCents;
+        at = to;
+        let best = partCents.length - 1;
+        let bestShare = 0;
+        for (const [i, end] of ends.entries()) {
+            const start = end - partCents[i];
+            const share = Math.min(to, end) - Math.max(from, start);
+            if (share > bestShare) {
+                best = i;
+                bestShare = share;
+            }
+        }
+        out[best].push(line);
+    }
+    return out;
+}
+
+/**
  * How the money on an order stands, from its payments and refunds — derived,
  * never stored. `PARTLY_REFUNDED` is the reading ADR-008 adds: some money
  * went back, not all of it, and the order's stored paymentStatus stays PAID.

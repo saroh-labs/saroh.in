@@ -3,10 +3,13 @@ import { Logger } from "@nestjs/common";
 import type {
     CreateOrderIntentInput,
     CreateOrderIntentResult,
+    FindRefundInput,
     MerchantProvider,
+    ProviderCredentials,
     RefundInput,
     RefundResult,
 } from "./provider.port";
+import { RefundCallError } from "./provider.port";
 
 /**
  * Razorpay adapter (S5-002).
@@ -28,16 +31,12 @@ export class RazorpayProvider implements MerchantProvider {
     ): Promise<CreateOrderIntentResult> {
         const { amountCents, currency, orderId, credentials } = input;
 
-        const basic = Buffer.from(
-            `${credentials.keyId}:${credentials.keySecret}`,
-        ).toString("base64");
-
         let res: Response;
         try {
             res = await fetch(`${this.baseUrl}/orders`, {
                 method: "POST",
                 headers: {
-                    Authorization: `Basic ${basic}`,
+                    Authorization: `Basic ${basicAuth(credentials)}`,
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
@@ -81,20 +80,26 @@ export class RazorpayProvider implements MerchantProvider {
     /**
      * Refund a captured payment via `POST /payments/{payment_id}/refund`
      * (Razorpay amounts are in paise = `amountCents`). Requires the provider
-     * payment id (captured from the payment webhook). Errors are SANITIZED to
-     * the HTTP status only — never the auth header, key secret, or raw body.
+     * payment id (captured from the payment webhook).
+     *
+     * Idempotent: Saroh's reference goes as `X-Refund-Idempotency`, so a
+     * retry with the same reference and body answers with the first refund
+     * instead of making a second; it also rides in `receipt` and `notes` so
+     * the refund can be found again, and the webhook can name it. A 409
+     * ("still processing that key"), a 429, a 5xx or a network error may
+     * have made a refund — `UNKNOWN`; any other 4xx made none — `REFUSED`.
+     * Errors are SANITIZED to the HTTP status only — never the auth header,
+     * key secret, or raw body.
      */
     async refund(input: RefundInput): Promise<RefundResult> {
-        const { providerPaymentRef, amountCents, credentials } = input;
+        const { reference, providerPaymentRef, amountCents, credentials } =
+            input;
         if (!providerPaymentRef) {
-            throw new Error(
+            throw new RefundCallError(
                 "Razorpay refund failed: missing payment id (payment not captured yet)",
+                "REFUSED",
             );
         }
-
-        const basic = Buffer.from(
-            `${credentials.keyId}:${credentials.keySecret}`,
-        ).toString("base64");
 
         let res: Response;
         try {
@@ -103,27 +108,118 @@ export class RazorpayProvider implements MerchantProvider {
                 {
                     method: "POST",
                     headers: {
-                        Authorization: `Basic ${basic}`,
+                        Authorization: `Basic ${basicAuth(credentials)}`,
                         "Content-Type": "application/json",
+                        "X-Refund-Idempotency": reference,
                     },
-                    body: JSON.stringify({ amount: amountCents }),
+                    body: JSON.stringify({
+                        amount: amountCents,
+                        receipt: reference,
+                        notes: { saroh_refund_id: reference },
+                    }),
                 },
             );
         } catch {
-            throw new Error("Razorpay refund failed: network error");
+            throw new RefundCallError(
+                "Razorpay refund failed: network error",
+                "UNKNOWN",
+            );
         }
 
         if (!res.ok) {
             this.logger.warn(`Razorpay refund failed with HTTP ${res.status}`);
-            throw new Error(`Razorpay refund failed (HTTP ${res.status})`);
-        }
-
-        const body = (await res.json()) as { id?: string; status?: string };
-        if (!body.id) {
-            throw new Error(
-                "Razorpay refund failed: missing refund id in response",
+            throw new RefundCallError(
+                `Razorpay refund failed (HTTP ${res.status})`,
+                mayHaveRefunded(res.status) ? "UNKNOWN" : "REFUSED",
             );
         }
-        return { providerRefundId: body.id, status: body.status ?? "PENDING" };
+
+        const body = (await res.json()) as RazorpayRefund;
+        if (!body.id) {
+            // It answered yes without saying to what: it may have refunded.
+            throw new RefundCallError(
+                "Razorpay refund failed: missing refund id in response",
+                "UNKNOWN",
+            );
+        }
+        return toResult(body);
     }
+
+    /**
+     * Find the refund made under `reference` among the payment's refunds
+     * (`GET /payments/{payment_id}/refunds`), matched on `receipt` or the
+     * note Saroh sends — never on the amount. No payment id means no refund
+     * could have been made.
+     */
+    async findRefund(input: FindRefundInput): Promise<RefundResult | null> {
+        const { reference, providerPaymentRef, credentials } = input;
+        if (!providerPaymentRef) return null;
+
+        let res: Response;
+        try {
+            res = await fetch(
+                `${this.baseUrl}/payments/${providerPaymentRef}/refunds?count=100`,
+                {
+                    headers: {
+                        Authorization: `Basic ${basicAuth(credentials)}`,
+                    },
+                },
+            );
+        } catch {
+            throw new RefundCallError(
+                "Razorpay refund lookup failed: network error",
+                "UNKNOWN",
+            );
+        }
+        if (!res.ok) {
+            this.logger.warn(
+                `Razorpay refund lookup failed with HTTP ${res.status}`,
+            );
+            throw new RefundCallError(
+                `Razorpay refund lookup failed (HTTP ${res.status})`,
+                "UNKNOWN",
+            );
+        }
+
+        const body = (await res.json()) as { items?: RazorpayRefund[] };
+        const found = (body.items ?? []).find(
+            (r) =>
+                r.id && (r.receipt === reference || noteRef(r) === reference),
+        );
+        return found ? toResult(found) : null;
+    }
+}
+
+interface RazorpayRefund {
+    id?: string;
+    status?: string;
+    receipt?: string | null;
+    notes?: Record<string, string | undefined> | unknown[] | null;
+}
+
+/** Razorpay sends `notes` as `[]` when there are none. */
+function noteRef(refund: RazorpayRefund): string | undefined {
+    const notes = refund.notes;
+    if (!notes || Array.isArray(notes)) return undefined;
+    return notes.saroh_refund_id;
+}
+
+function basicAuth(credentials: ProviderCredentials): string {
+    return Buffer.from(
+        `${credentials.keyId}:${credentials.keySecret}`,
+    ).toString("base64");
+}
+
+/** 409: a request with this key is still being processed; 429 and 5xx: unsure. */
+function mayHaveRefunded(status: number): boolean {
+    return status === 409 || status === 429 || status >= 500;
+}
+
+function toResult(refund: RazorpayRefund): RefundResult {
+    const status = refund.status ?? "PENDING";
+    return {
+        providerRefundId: refund.id ?? "",
+        status,
+        failed: status.toLowerCase() === "failed",
+    };
 }

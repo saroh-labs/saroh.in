@@ -95,6 +95,12 @@ export interface OrderMoneyDto {
      */
     recordedByHand: boolean;
     discountCode: { code: string; rule: string } | null;
+    /**
+     * Refunds whose provider answer was lost (#508): the money is held, and
+     * counted in `refunded`, until the provider says. Each can be tried
+     * again — the API looks at the provider before it sends anything.
+     */
+    refundsBeingConfirmed: { id: string; amount: string }[];
 }
 
 export interface OrderReadDto {
@@ -234,7 +240,13 @@ export interface RawOrderRead {
     /** SUCCEEDED payments only, with their non-failed refunds. */
     paymentIntents: {
         amountCents: number;
-        refunds: { amountCents: number; forEdit: boolean }[];
+        refunds: {
+            id: string;
+            amountCents: number;
+            forEdit: boolean;
+            status: string;
+            providerRefundId: string | null;
+        }[];
     }[];
     discountRedemption?: {
         code: string;
@@ -425,6 +437,13 @@ export function serializeOrderRead(
                       ? "0.00"
                       : money(amountDueCents(order, capturedCents)),
                   recordedByHand: byHand,
+                  refundsBeingConfirmed: order.paymentIntents.flatMap((p) =>
+                      p.refunds.flatMap((r) =>
+                          r.status === "PENDING" && !r.providerRefundId
+                              ? [{ id: r.id, amount: money(r.amountCents) }]
+                              : [],
+                      ),
+                  ),
                   discountCode: order.discountRedemption
                       ? {
                             code: order.discountRedemption.code,

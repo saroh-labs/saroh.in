@@ -59,10 +59,18 @@ a note saying so.
   `NOT_CONFIGURED`, `PENDING`, `ACTIVE`, `DEGRADED` or `FAILED` from persisted
   state, never a live probe carrying secrets, and each state maps to where to fix
   it.
+- **Current** — **A refund is sent under Saroh's reference, and an unsure
+  answer holds the money** (DEC-026). The PaymentRefund row's id is the
+  provider's idempotency key or `refund_id`; adapters throw `RefundCallError`
+  with `REFUSED` (a 4xx it would give again — the row goes FAILED) or
+  `UNKNOWN` (network, timeout, 5xx, 429, 409, a duplicate id — the row stays
+  PENDING, money held). Try-again asks the provider first (`findRefund`) and
+  re-sends only when it has none. Never match a refund by amount alone.
 - **Adopted** — **Classify every negative outcome** — genuinely empty, provider
   error, rate limited, not configured — and never let a failed or partial call
-  become "nothing found" or "done". Gap: results carry provider ids, failures
-  are thrown, and a refund's `status` is the provider's raw string; there is no
+  become "nothing found" or "done". Gap: refund calls classify their failures
+  (`RefundCallError`, above); every other provider call throws a plain error,
+  and a refund's `status` is still the provider's raw string. There is no
   shared outcome classification.
 - **Adopted** — **No fallback that can produce a plausible wrong answer.** When a
   wrong result is costly, fail loudly. Not audited across adapters.

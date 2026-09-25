@@ -5,6 +5,7 @@ import {
     editOrderBeforePreparing,
     moveOrderStage,
     refundOrderLines,
+    retryOrderRefund,
     undoOrderStage,
 } from "./kitchen-service";
 import type { KitchenStage } from "./read";
@@ -63,4 +64,8 @@ export async function refundLines(
     },
 ) {
     return refundOrderLines(orderId, input);
+}
+
+export async function retryRefund(orderId: string, refundId: string) {
+    return retryOrderRefund(orderId, refundId);
 }

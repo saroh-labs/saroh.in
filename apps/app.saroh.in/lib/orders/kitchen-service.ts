@@ -112,6 +112,13 @@ export function editOrderBeforePreparing(
     );
 }
 
+export interface RefundOutcome {
+    amountCents: number;
+    status: string;
+    /** The provider hasn't said yet whether it went; the money is held. */
+    beingConfirmed: boolean;
+}
+
 /**
  * Refund chosen lines — or, with none, everything still refundable. The API
  * works out the amount; `idempotencyKey` makes a retry return the first
@@ -123,7 +130,7 @@ export function refundOrderLines(
         lines: { itemId: string; quantity: number }[] | null;
         idempotencyKey: string;
     },
-): Promise<CrmResult<{ amountCents: number; status: string }>> {
+): Promise<CrmResult<RefundOutcome>> {
     return mutate(
         path(orderId, "/refund"),
         "POST",
@@ -132,5 +139,21 @@ export function refundOrderLines(
             idempotencyKey: input.idempotencyKey,
         },
         "The refund didn't go through. Nothing was sent back.",
+    );
+}
+
+/**
+ * Try again a refund the provider hasn't answered for. The API asks the
+ * provider for it first and sends it again only if the provider has none.
+ */
+export function retryOrderRefund(
+    orderId: string,
+    refundId: string,
+): Promise<CrmResult<RefundOutcome>> {
+    return mutate(
+        path(orderId, `/refunds/${encodeURIComponent(refundId)}/retry`),
+        "POST",
+        {},
+        "We couldn't check on the refund. Nothing was sent twice — try again in a minute.",
     );
 }

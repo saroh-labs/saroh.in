@@ -17,7 +17,11 @@ jest.mock("../../env", () => ({
     },
 }));
 
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import {
+    BadGatewayException,
+    BadRequestException,
+    ForbiddenException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
@@ -27,6 +31,7 @@ import {
     FakeMerchantProvider,
     FakeProviderFactory,
 } from "../payments/providers/fake.provider";
+import { RefundCallError } from "../payments/providers/provider.port";
 import {
     FakeWebhookProvider,
     FakeWebhookProviderFactory,
@@ -117,7 +122,7 @@ beforeAll(async () => {
  * held on the products' rows, and a succeeded payment for the total.
  */
 async function paidOrder(
-    over: { paid?: boolean } = {},
+    over: { paid?: boolean; payments?: number[] } = {},
 ): Promise<{ id: string; lines: { bread: string; pastry: string } }> {
     const n = await prisma.order.count({ where: { storeId } });
     const order = await prisma.order.create({
@@ -158,26 +163,32 @@ async function paidOrder(
         data: { reserved: { increment: 3 } },
     });
     if (over.paid !== false) {
-        const intent = await prisma.paymentIntent.create({
-            data: {
-                organizationId: owner.organizationId,
-                orderId: order.id,
-                provider: "RAZORPAY",
-                providerIntentId: `prov_${order.id}`,
-                amountCents: 61000,
-                currency: "INR",
-                status: "SUCCEEDED",
-            },
-        });
-        await prisma.paymentAttempt.create({
-            data: {
-                organizationId: owner.organizationId,
-                paymentIntentId: intent.id,
-                provider: "RAZORPAY",
-                providerRef: `pay_${order.id}`,
-                status: "CAPTURED",
-            },
-        });
+        // One payment for the total, or the total paid in parts (an edit's
+        // difference taken later), oldest first.
+        for (const [i, amountCents] of (over.payments ?? [61000]).entries()) {
+            const intent = await prisma.paymentIntent.create({
+                data: {
+                    organizationId: owner.organizationId,
+                    orderId: order.id,
+                    provider: "RAZORPAY",
+                    providerIntentId:
+                        i === 0 ? `prov_${order.id}` : `prov_${order.id}_${i}`,
+                    amountCents,
+                    currency: "INR",
+                    status: "SUCCEEDED",
+                    createdAt: new Date(Date.now() - 60_000 + i * 1000),
+                },
+            });
+            await prisma.paymentAttempt.create({
+                data: {
+                    organizationId: owner.organizationId,
+                    paymentIntentId: intent.id,
+                    provider: "RAZORPAY",
+                    providerRef: `pay_${order.id}_${i}`,
+                    status: "CAPTURED",
+                },
+            });
+        }
     }
     const line = (productId: string) =>
         order.items.find((i) => i.productId === productId)?.id ?? "";
@@ -346,6 +357,108 @@ describe("refund by line (real database)", () => {
             where: { id: order.id },
         });
         expect(row.paymentStatus).toBe("REFUNDED");
+    });
+});
+
+describe("refunds the provider has not answered for (real database)", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it("a refund being confirmed holds its money: the next refund gets only the rest", async () => {
+        const order = await paidOrder();
+        fake.failNextRefund("UNKNOWN");
+        const lost = await payments.initiateRefund(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 2 }],
+        });
+        expect(lost.beingConfirmed).toBe(true);
+        expect(
+            await prisma.paymentRefund.findUniqueOrThrow({
+                where: { id: lost.refundId },
+            }),
+        ).toMatchObject({ status: "PENDING", providerRefundId: null });
+
+        const rest = await payments.initiateRefund(owner, order.id);
+        expect(rest.amountCents).toBe(61000 - 24000);
+    });
+
+    it("try-again finds the refund the lost call made — one refund at the provider, one step", async () => {
+        const order = await paidOrder();
+        fake.failNextRefund("UNKNOWN", { madeAnyway: true });
+        const lost = await payments.initiateRefund(owner, order.id, {
+            lines: [{ itemId: order.lines.bread, quantity: 1 }],
+        });
+        const calls = fake.refundCalls.length;
+
+        const settled = await payments.retryRefund(
+            owner,
+            order.id,
+            lost.refundId,
+        );
+
+        expect(settled.beingConfirmed).toBe(false);
+        expect(fake.refundCalls).toHaveLength(calls);
+        const steps = await prisma.orderEvent.findMany({
+            where: { orderId: order.id, kind: "REFUND" },
+        });
+        expect(steps.map((e) => e.amountCents)).toEqual([25000]);
+    });
+
+    it("split across two payments: a refused part frees only its own lines", async () => {
+        // ₹250 paid first, ₹360 later; a full refund comes back newest first.
+        const order = await paidOrder({ payments: [25000, 36000] });
+        const original = FakeMerchantProvider.prototype.refund;
+        jest.spyOn(fake, "refund")
+            .mockImplementationOnce((input) => original.call(fake, input))
+            .mockRejectedValueOnce(new RefundCallError("no", "REFUSED"));
+
+        const result = await payments.initiateRefund(owner, order.id);
+
+        expect(result.refunds.map((r) => [r.amountCents, r.status])).toEqual([
+            [36000, "PENDING"],
+            [25000, "FAILED"],
+        ]);
+        const rows = await prisma.paymentRefund.findMany({
+            where: { paymentIntent: { orderId: order.id } },
+            include: { lines: true },
+        });
+        const taken = rows.find((r) => r.status === "PENDING");
+        const failed = rows.find((r) => r.status === "FAILED");
+        // Each line rides whole on one part.
+        const onTaken = new Set(taken?.lines.map((l) => l.orderItemId));
+        const onFailed = new Set(failed?.lines.map((l) => l.orderItemId));
+        expect(onTaken.size + onFailed.size).toBe(2);
+
+        const read = await kitchen.read(owner, order.id);
+        for (const line of read.items) {
+            expect(line.refundedQuantity).toBe(
+                onTaken.has(line.id) ? line.quantity : 0,
+            );
+        }
+        const steps = await prisma.orderEvent.findMany({
+            where: { orderId: order.id, kind: "REFUND" },
+        });
+        expect(steps.map((e) => e.amountCents)).toEqual([36000]);
+
+        // What the refused part held is refundable again.
+        const again = await payments.initiateRefund(owner, order.id);
+        expect(again.amountCents).toBe(25000);
+    });
+
+    it("every part refused: nothing went back, and it says so", async () => {
+        const order = await paidOrder({ payments: [25000, 36000] });
+        fake.failNextRefund("REFUSED");
+        fake.failNextRefund("REFUSED");
+
+        await expect(
+            payments.initiateRefund(owner, order.id),
+        ).rejects.toBeInstanceOf(BadGatewayException);
+        expect(
+            await prisma.paymentRefund.count({
+                where: {
+                    paymentIntent: { orderId: order.id },
+                    status: { not: "FAILED" },
+                },
+            }),
+        ).toBe(0);
     });
 });
 

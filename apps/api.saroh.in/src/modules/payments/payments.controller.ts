@@ -98,4 +98,15 @@ export class PaymentsController {
             idempotencyKey: dto.idempotencyKey,
         });
     }
+
+    /** Try again a refund whose provider answer was lost — it looks first (#508). */
+    @Post("orders/:orderId/refunds/:refundId/retry")
+    @HttpCode(200)
+    retryRefund(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("orderId") orderId: string,
+        @Param("refundId") refundId: string,
+    ) {
+        return this.payments.retryRefund(ctx, orderId, refundId);
+    }
 }

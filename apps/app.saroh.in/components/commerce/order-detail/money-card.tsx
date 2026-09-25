@@ -1,3 +1,4 @@
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -7,7 +8,7 @@ import type { OrderRead, OrderReadMoney } from "@/lib/orders/read";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
-import { FOCUS, Panel, PanelTitle } from "./parts";
+import { actionClass, FOCUS, Panel, PanelTitle } from "./parts";
 
 const KIND_LABEL: Record<string, string> = {
     CREDIT_NOTE: "Credit note",
@@ -32,6 +33,8 @@ export function MoneyCard({
     invoices,
     payments,
     format,
+    onRetryRefund,
+    busy = false,
 }: {
     money: OrderReadMoney;
     fulfilment: OrderRead["fulfilment"];
@@ -40,6 +43,9 @@ export function MoneyCard({
     invoices: OrderRead["invoices"];
     payments: OrderPaymentsSummary | null;
     format: (amount: number) => string;
+    /** Try again a refund being confirmed — `payment:manage` only. */
+    onRetryRefund?: (refundId: string) => void;
+    busy?: boolean;
 }) {
     const n = (v: string) => Number(v);
     const rows: [string, string][] = [
@@ -115,6 +121,34 @@ export function MoneyCard({
                         : `Refunded ${format(n(money.refunded))}`}
                 </div>
             ) : null}
+            {money.refundsBeingConfirmed.map((r) => (
+                <div
+                    key={r.id}
+                    role="status"
+                    className="mt-2 rounded-lg border border-border px-2.5 py-2 text-[12.5px]"
+                >
+                    <p className="text-pretty">
+                        <span className="font-semibold">
+                            {format(n(r.amount))} refund not confirmed yet.
+                        </span>{" "}
+                        <span className="text-muted-foreground">
+                            {provider ? providerName(provider) : "The provider"}{" "}
+                            didn&apos;t answer. The money is held until it does.
+                        </span>
+                    </p>
+                    {onRetryRefund ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className={cn(actionClass("ghost"), "mt-2")}
+                            disabled={busy}
+                            onClick={() => onRetryRefund(r.id)}
+                        >
+                            Try again
+                        </Button>
+                    ) : null}
+                </div>
+            ))}
             {!invoice && taxed ? (
                 <div className="pt-[3px] text-[12.5px] text-muted-foreground">
                     Includes GST {format(n(money.tax))}

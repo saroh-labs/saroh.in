@@ -745,7 +745,14 @@ const READ_INCLUDE = {
             amountCents: true,
             refunds: {
                 where: { status: { not: "FAILED" } },
-                select: { amountCents: true, forEdit: true },
+                orderBy: { createdAt: "asc" },
+                select: {
+                    id: true,
+                    amountCents: true,
+                    forEdit: true,
+                    status: true,
+                    providerRefundId: true,
+                },
             },
         },
     },

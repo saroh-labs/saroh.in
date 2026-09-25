@@ -3,6 +3,7 @@ import { BadRequestException } from "@nestjs/common";
 import type { RefundableLine } from "./order-refunds";
 import {
     allocateAcrossPayments,
+    apportionLines,
     linePaidCents,
     planLineRefund,
     planRemainingLines,
@@ -138,6 +139,53 @@ describe("allocateAcrossPayments", () => {
         expect(() => allocateAcrossPayments(P, 4501)).toThrow(
             /more than is left/,
         );
+    });
+});
+
+describe("apportionLines — which part of a split refund each line rides on", () => {
+    const line = (id: string, amountCents: number) => ({ id, amountCents });
+
+    it("puts everything on the one part when nothing is split", () => {
+        expect(apportionLines([500], [line("a", 300), line("b", 200)])).toEqual(
+            [[line("a", 300), line("b", 200)]],
+        );
+    });
+
+    it("lays whole lines over the parts in order", () => {
+        expect(
+            apportionLines([300, 200], [line("a", 300), line("b", 200)]),
+        ).toEqual([[line("a", 300)], [line("b", 200)]]);
+    });
+
+    it("a single ₹500 line split ₹300/₹200 rides on the ₹300 part", () => {
+        expect(apportionLines([300, 200], [line("a", 500)])).toEqual([
+            [line("a", 500)],
+            [],
+        ]);
+        expect(apportionLines([200, 300], [line("a", 500)])).toEqual([
+            [],
+            [line("a", 500)],
+        ]);
+    });
+
+    it("an even straddle goes on the first part", () => {
+        expect(apportionLines([250, 250], [line("a", 500)])).toEqual([
+            [line("a", 500)],
+            [],
+        ]);
+    });
+
+    it("a line past the parts' total goes on the last part", () => {
+        expect(
+            apportionLines([300, 100], [line("a", 400), line("b", 50)]),
+        ).toEqual([[line("a", 400)], [line("b", 50)]]);
+    });
+
+    it("zero-money lines go on the last part", () => {
+        expect(apportionLines([300, 100], [line("free", 0)])).toEqual([
+            [],
+            [line("free", 0)],
+        ]);
     });
 });
 

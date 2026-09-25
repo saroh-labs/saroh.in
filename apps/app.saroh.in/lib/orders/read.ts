@@ -82,6 +82,12 @@ export interface OrderReadMoney {
     /** Paid outside a provider — cash, a transfer — and recorded by hand. */
     recordedByHand: boolean;
     discountCode: { code: string; rule: string } | null;
+    /**
+     * Refunds the provider hasn't answered for yet: the money is held (and
+     * counted in `refunded`) until it does. Each can be tried again — the
+     * API asks the provider first, so nothing is sent twice.
+     */
+    refundsBeingConfirmed: { id: string; amount: string }[];
 }
 
 export interface OrderReadInvoice {

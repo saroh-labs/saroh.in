@@ -1,10 +1,12 @@
 import {
+    BadGatewayException,
     BadRequestException,
     ConflictException,
     Inject,
     Injectable,
     Logger,
     NotFoundException,
+    ServiceUnavailableException,
 } from "@nestjs/common";
 import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
@@ -18,6 +20,7 @@ import type {
 } from "../orders/order-refunds";
 import {
     allocateAcrossPayments,
+    apportionLines,
     planLineRefund,
     planRemainingLines,
 } from "../orders/order-refunds";
@@ -27,10 +30,12 @@ import { decryptSecret, encryptSecret } from "./crypto";
 import type {
     ProviderCredentials,
     ProviderFactory,
+    RefundResult,
 } from "./providers/provider.port";
 import {
     isSupportedProvider,
     PROVIDER_FACTORY,
+    RefundCallError,
 } from "./providers/provider.port";
 
 /** Validated input for {@link PaymentsService.connectProvider}. */
@@ -67,12 +72,19 @@ export interface InitiateRefundResult {
     amountCents: number;
     currency: string;
     status: string;
+    /**
+     * The provider has not said yet whether a part of this refund was made
+     * (its call timed out, or answered unsure). The money stays reserved
+     * until the refund webhook — or a try-again — settles it.
+     */
+    beingConfirmed: boolean;
     refunds: {
         id: string;
         paymentIntentId: string;
         amountCents: number;
         status: string;
         providerRefundId: string | null;
+        beingConfirmed: boolean;
     }[];
     /** The lines this refund covers, with the amount worked out for each. */
     lines: { itemId: string; quantity: number; amountCents: number }[];
@@ -89,6 +101,21 @@ interface RefundRow {
     lines: { orderItemId: string; quantity: number; amountCents: number }[];
 }
 
+/** PENDING with no provider refund id: the provider's answer was lost. */
+function beingConfirmed(row: {
+    status: string;
+    providerRefundId: string | null;
+}): boolean {
+    return row.status === "PENDING" && !row.providerRefundId;
+}
+
+const REFUND_ROW_INCLUDE = {
+    paymentIntent: { select: { provider: true } },
+    lines: {
+        select: { orderItemId: true, quantity: true, amountCents: true },
+    },
+} as const;
+
 function refundResult(rows: RefundRow[]): InitiateRefundResult {
     const [first] = rows;
     return {
@@ -99,12 +126,14 @@ function refundResult(rows: RefundRow[]): InitiateRefundResult {
         amountCents: rows.reduce((s, r) => s + r.amountCents, 0),
         currency: first.currency,
         status: first.status,
+        beingConfirmed: rows.some(beingConfirmed),
         refunds: rows.map((r) => ({
             id: r.id,
             paymentIntentId: r.paymentIntentId,
             amountCents: r.amountCents,
             status: r.status,
             providerRefundId: r.providerRefundId,
+            beingConfirmed: beingConfirmed(r),
         })),
         lines: rows.flatMap((r) =>
             r.lines.map((l) => ({
@@ -114,6 +143,22 @@ function refundResult(rows: RefundRow[]): InitiateRefundResult {
             })),
         ),
     };
+}
+
+type RefundOutcome =
+    | { kind: "ACCEPTED" | "UNKNOWN"; row: RefundRow }
+    | { kind: "REFUSED"; row: RefundRow; error: Error };
+
+/**
+ * A refund the provider refused, as the merchant hears it. Anything that is
+ * not the provider's refusal (a missing provider, say) passes through.
+ */
+function refusal(error: Error): Error {
+    return error instanceof RefundCallError
+        ? new BadGatewayException(
+              "The payment provider refused the refund. Nothing was sent back.",
+          )
+        : error;
 }
 
 /**
@@ -429,8 +474,11 @@ export class PaymentsService {
      * - Two phases. Under the order's row lock the refund is RESERVED — the
      *   PaymentRefund rows (PENDING, with the lines they cover) and the
      *   timeline step are written — so two racing requests cannot both see
-     *   the same money left. The provider is called after that commits; a
-     *   refused call marks the rows FAILED, which frees the lines again.
+     *   the same money left. The provider is called after that commits,
+     *   with each row's id as Saroh's reference; a definite refusal marks
+     *   the row FAILED, which frees its lines again, and an answer that
+     *   never came keeps it PENDING with its money held (see
+     *   {@link retryRefund}).
      * - Idempotent by `idempotencyKey`: a retry with the same key returns
      *   the refund the first one made, even while it is in flight.
      * - Order.paymentStatus is NOT moved here. The refund webhook settles it,
@@ -536,6 +584,81 @@ export class PaymentsService {
         );
     }
 
+    /**
+     * Try again a refund whose provider answer was lost (#508, U1).
+     * `payment:manage`; the refund must be a PENDING row of an order of the
+     * caller's organization (else 404).
+     *
+     * It looks before it sends: the provider is asked for the refund made
+     * under this row's reference, and the row is settled from that answer.
+     * Only when the provider has none is it sent again — the same reference
+     * and amount, so Razorpay's idempotency key and Cashfree's `refund_id`
+     * still hold. It never reserves new money, and never goes through the
+     * key replay of {@link initiateRefund}, which answers a duplicate
+     * request, not a retry.
+     */
+    async retryRefund(
+        ctx: OrganizationContext,
+        orderId: string,
+        refundId: string,
+    ): Promise<InitiateRefundResult> {
+        authorize(ctx, "payment:manage");
+        const order = await this.requireOwnedOrder(ctx, orderId);
+        const row = await prisma.paymentRefund.findFirst({
+            where: {
+                id: refundId,
+                organizationId: ctx.organizationId,
+                paymentIntent: { orderId: order.id },
+            },
+            include: {
+                ...REFUND_ROW_INCLUDE,
+                paymentIntent: {
+                    select: {
+                        id: true,
+                        provider: true,
+                        providerIntentId: true,
+                        currency: true,
+                    },
+                },
+            },
+        });
+        if (!row) throw new NotFoundException("Refund not found");
+        if (row.status !== "PENDING") {
+            throw new ConflictException("This refund has already settled.");
+        }
+        // The provider took it; its webhook settles it. Nothing to retry.
+        if (row.providerRefundId) return refundResult([row]);
+
+        const call = await this.refundCall(
+            ctx.organizationId,
+            row.paymentIntent,
+        );
+        let found: RefundResult | null;
+        try {
+            found = await this.factory.get(call.provider).findRefund({
+                reference: row.id,
+                providerIntentId: row.paymentIntent.providerIntentId ?? "",
+                providerPaymentRef: call.providerPaymentRef,
+                credentials: call.credentials,
+            });
+        } catch {
+            throw new ServiceUnavailableException(
+                "We couldn't reach the payment provider. Try again in a minute.",
+            );
+        }
+
+        const outcome = found
+            ? await this.settleFromProvider(row.id, found)
+            : await this.sendRefund(ctx.organizationId, row, row.paymentIntent);
+        if (outcome.kind === "ACCEPTED") {
+            await this.recordRefundTaken(ctx, order.id, row.reason, [
+                outcome.row,
+            ]);
+        }
+        if (outcome.kind === "REFUSED") throw refusal(outcome.error);
+        return refundResult([outcome.row]);
+    }
+
     /** The shared two-phase refund core — see {@link initiateRefund}. */
     private async refundOrder(
         ctx: OrganizationContext,
@@ -559,16 +682,7 @@ export class PaymentsService {
                     idempotencyKey: k,
                     paymentIntent: { orderId: order.id },
                 },
-                include: {
-                    paymentIntent: { select: { provider: true } },
-                    lines: {
-                        select: {
-                            orderItemId: true,
-                            quantity: true,
-                            amountCents: true,
-                        },
-                    },
-                },
+                include: REFUND_ROW_INCLUDE,
                 orderBy: { createdAt: "asc" },
             });
 
@@ -633,6 +747,12 @@ export class PaymentsService {
             // The order-level cap: never more than was taken and not yet
             // handed back, whatever the lines add up to.
             const split = allocateAcrossPayments(refundable, amountCents);
+            // Each line rides on the part its money comes back from, so a
+            // part the provider refuses frees only its own lines.
+            const partLines = apportionLines(
+                split.map((p) => p.amountCents),
+                plan.lines,
+            );
 
             const rows = [];
             for (const [i, part] of split.entries()) {
@@ -647,13 +767,10 @@ export class PaymentsService {
                             reason: opts.reason,
                             idempotencyKey: key,
                             forEdit: opts.forEdit,
-                            // The lines ride on the first row; a refund
-                            // split across two payments is still one
-                            // request for these lines.
-                            ...(i === 0 && plan.lines.length > 0
+                            ...(partLines[i].length > 0
                                 ? {
                                       lines: {
-                                          create: plan.lines.map((l) => ({
+                                          create: partLines[i].map((l) => ({
                                               organizationId:
                                                   ctx.organizationId,
                                               orderItemId: l.itemId,
@@ -664,99 +781,140 @@ export class PaymentsService {
                                   }
                                 : {}),
                         },
-                        include: {
-                            paymentIntent: { select: { provider: true } },
-                            lines: {
-                                select: {
-                                    orderItemId: true,
-                                    quantity: true,
-                                    amountCents: true,
-                                },
-                            },
-                        },
+                        include: REFUND_ROW_INCLUDE,
                     }),
                 );
             }
-            return { rows, split, amountCents, done: false as const };
+            return { rows, split, done: false as const };
         });
 
         if (reserved.done) return refundResult(reserved.replay);
 
-        // Phase two: the provider, outside the lock.
-        const settled = [];
+        // Phase two: the provider, outside the lock — every part, even
+        // after one is refused, so no part is left reserved and never sent.
+        const outcomes = [];
         for (const [i, part] of reserved.split.entries()) {
-            const row = reserved.rows[i];
-            const intent = part.payment.intent;
-            try {
-                const providerRow = await this.requireOwnedProvider(
+            outcomes.push(
+                await this.sendRefund(
                     ctx.organizationId,
-                    intent.provider,
-                );
-                // The provider payment id captured from the success webhook
-                // (Razorpay books the refund against it). Null-safe: some
-                // providers refund against the order id alone.
-                const attempt = await prisma.paymentAttempt.findFirst({
-                    where: {
-                        paymentIntentId: intent.id,
-                        providerRef: { not: null },
-                    },
-                    orderBy: { createdAt: "desc" },
-                });
-                const result = await this.factory
-                    .get(providerRow.provider)
-                    .refund({
-                        providerIntentId: intent.providerIntentId ?? "",
-                        providerPaymentRef: attempt?.providerRef ?? null,
-                        amountCents: part.amountCents,
-                        currency: intent.currency,
-                        credentials: this.openCredentials(providerRow),
-                    });
-                settled.push(
-                    await prisma.paymentRefund.update({
-                        where: { id: row.id },
-                        data: { providerRefundId: result.providerRefundId },
-                        include: {
-                            paymentIntent: { select: { provider: true } },
-                            lines: {
-                                select: {
-                                    orderItemId: true,
-                                    quantity: true,
-                                    amountCents: true,
-                                },
-                            },
-                        },
-                    }),
-                );
-            } catch (err) {
-                // Nothing went back: free the money and the lines again, and
-                // say so. A retry needs a new key — this one's answer is this
-                // failure.
-                await prisma.paymentRefund.update({
-                    where: { id: row.id },
-                    data: { status: "FAILED" },
-                });
-                throw err;
-            }
+                    reserved.rows[i],
+                    part.payment.intent,
+                ),
+            );
         }
-        // On the timeline once the provider has taken it — a refused refund
-        // is not a step the order went through.
+        const taken = outcomes.flatMap((o) =>
+            o.kind === "ACCEPTED" ? [o.row] : [],
+        );
+        if (taken.length > 0) {
+            await this.recordRefundTaken(ctx, order.id, opts.reason, taken);
+        }
+        // Nothing went back and nothing may have: say so. Anything else is
+        // an answer — some of it taken, some of it still being confirmed.
+        const refused = outcomes.flatMap((o) =>
+            o.kind === "REFUSED" ? [o.error] : [],
+        );
+        if (refused.length === outcomes.length) throw refusal(refused[0]);
+        return refundResult(outcomes.map((o) => o.row));
+    }
+
+    /**
+     * Send one reserved refund row to the provider, under the row's id as
+     * Saroh's reference, and record what the provider said:
+     *
+     * - `ACCEPTED` — the provider took it; its refund id is stored and the
+     *   row stays PENDING until the refund webhook settles it.
+     * - `REFUSED` — the provider definitely made no refund (or the call
+     *   never left Saroh): the row is FAILED, freeing its money and lines.
+     * - `UNKNOWN` — the provider may have made one: the row stays PENDING
+     *   with its money held. A second real refund cannot be undone; an
+     *   over-held reservation can — by the webhook, or a try-again.
+     */
+    private async sendRefund(
+        organizationId: string,
+        row: { id: string; amountCents: number },
+        intent: {
+            id: string;
+            provider: string;
+            providerIntentId: string | null;
+            currency: string;
+        },
+    ): Promise<RefundOutcome> {
+        let result: RefundResult;
+        try {
+            const call = await this.refundCall(organizationId, intent);
+            result = await this.factory.get(call.provider).refund({
+                reference: row.id,
+                providerIntentId: intent.providerIntentId ?? "",
+                providerPaymentRef: call.providerPaymentRef,
+                amountCents: row.amountCents,
+                currency: intent.currency,
+                credentials: call.credentials,
+            });
+        } catch (err) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            if (err instanceof RefundCallError && err.outcome === "UNKNOWN") {
+                this.logger.warn(
+                    `Refund ${row.id}: the provider's answer is unknown (${error.message}); held until it says`,
+                );
+                return { kind: "UNKNOWN", row: await this.refundRow(row.id) };
+            }
+            return {
+                kind: "REFUSED",
+                row: await this.failRefund(row.id),
+                error,
+            };
+        }
+        return this.settleFromProvider(row.id, result);
+    }
+
+    /** Record a refund the provider has answered for (sent, or looked up). */
+    private async settleFromProvider(
+        refundId: string,
+        result: RefundResult,
+    ): Promise<RefundOutcome> {
+        if (result.failed) {
+            return {
+                kind: "REFUSED",
+                row: await this.failRefund(refundId),
+                error: new RefundCallError(
+                    `The provider refused refund ${refundId} (${result.status})`,
+                    "REFUSED",
+                ),
+            };
+        }
+        // Only a row still PENDING: the webhook may have settled it first.
+        await prisma.paymentRefund.updateMany({
+            where: { id: refundId, status: "PENDING" },
+            data: { providerRefundId: result.providerRefundId },
+        });
+        return { kind: "ACCEPTED", row: await this.refundRow(refundId) };
+    }
+
+    /**
+     * The provider took these refund rows: a REFUND step on the timeline
+     * for the money, and a credit note per row against the order's invoice
+     * (ADR-008) — one per row, keyed on it, so the refund webhook finding it
+     * already made makes no second. An edit's difference is skipped: the
+     * edit wrote its own. A failure here never undoes a refund the provider
+     * took — the webhook's reconciliation makes the note instead.
+     */
+    private async recordRefundTaken(
+        ctx: OrganizationContext,
+        orderId: string,
+        reason: string | null,
+        rows: RefundRow[],
+    ): Promise<void> {
         await prisma.orderEvent.create({
             data: {
                 organizationId: ctx.organizationId,
-                orderId: order.id,
+                orderId,
                 kind: "REFUND",
                 actorUserId: ctx.userId,
-                note: opts.reason,
-                amountCents: reserved.amountCents,
+                note: reason,
+                amountCents: rows.reduce((s, r) => s + r.amountCents, 0),
             },
         });
-        // A credit note for the refunded lines, against the order's invoice
-        // (ADR-008), once the provider has taken the refund. One per refund
-        // row, keyed on it, so the refund webhook finding it already made
-        // makes no second. An edit's difference is skipped: the edit wrote
-        // its own. A failure here never undoes a refund the provider took —
-        // the webhook's reconciliation makes the note instead.
-        for (const row of settled) {
+        for (const row of rows) {
             try {
                 await prisma.$transaction((tx) =>
                     creditNoteForRefund(tx, row.id),
@@ -769,7 +927,52 @@ export class PaymentsService {
                 );
             }
         }
-        return refundResult(settled);
+    }
+
+    /**
+     * What a refund call needs: the connected provider, its decrypted
+     * credentials, and the provider payment id captured from the success
+     * webhook (Razorpay books the refund against it). Null-safe: some
+     * providers refund against the order id alone.
+     */
+    private async refundCall(
+        organizationId: string,
+        intent: { id: string; provider: string },
+    ): Promise<{
+        provider: string;
+        credentials: ProviderCredentials;
+        providerPaymentRef: string | null;
+    }> {
+        const providerRow = await this.requireOwnedProvider(
+            organizationId,
+            intent.provider,
+        );
+        const attempt = await prisma.paymentAttempt.findFirst({
+            where: { paymentIntentId: intent.id, providerRef: { not: null } },
+            orderBy: { createdAt: "desc" },
+        });
+        return {
+            provider: providerRow.provider,
+            credentials: this.openCredentials(providerRow),
+            providerPaymentRef: attempt?.providerRef ?? null,
+        };
+    }
+
+    /** Nothing went back: free the money and the lines again. */
+    private async failRefund(refundId: string): Promise<RefundRow> {
+        // Only a row still PENDING — a settled refund is never un-made.
+        await prisma.paymentRefund.updateMany({
+            where: { id: refundId, status: "PENDING" },
+            data: { status: "FAILED" },
+        });
+        return this.refundRow(refundId);
+    }
+
+    private async refundRow(refundId: string): Promise<RefundRow> {
+        return prisma.paymentRefund.findUniqueOrThrow({
+            where: { id: refundId },
+            include: REFUND_ROW_INCLUDE,
+        });
     }
 
     /**

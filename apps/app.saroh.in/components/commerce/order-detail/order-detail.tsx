@@ -394,6 +394,10 @@ export function OrderDetail({
                                 invoices={order.invoices}
                                 payments={payments}
                                 format={format}
+                                onRetryRefund={
+                                    can.refund ? kitchen.retryRefund : undefined
+                                }
+                                busy={busy}
                             />
                         ) : null}
                         {aside}

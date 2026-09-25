@@ -15,6 +15,7 @@ import {
     editBeforePreparing,
     moveStage,
     refundLines,
+    retryRefund as retryRefundAction,
     undoStage,
 } from "@/lib/orders/actions";
 import type { EditOrderInput } from "@/lib/orders/kitchen-service";
@@ -183,6 +184,14 @@ export function useKitchen({
                         const sent =
                             formatMoney(res.data.amountCents, currency) ??
                             format(choice.amount);
+                        if (res.data.beingConfirmed) {
+                            showInfo(
+                                `${refundTo} hasn't confirmed the ${sent} refund yet.`,
+                                "The money is held until it answers. Nothing will be sent twice.",
+                            );
+                            refresh();
+                            return;
+                        }
                         showSuccess(
                             choice.lines === null
                                 ? "Refunded in full."
@@ -194,6 +203,27 @@ export function useKitchen({
                         refresh();
                     });
                 }),
+        });
+    };
+
+    /** Ask again about a refund the provider hasn't answered for. */
+    const retryRefund = (refundId: string) => {
+        startTransition(async () => {
+            const res = await retryRefundAction(order.id, refundId);
+            if (!res.ok) {
+                showError(res.error);
+                refresh();
+                return;
+            }
+            if (res.data.beingConfirmed) {
+                showInfo(
+                    `Still waiting on ${refundTo}.`,
+                    "The money stays held until it answers. Nothing was sent twice.",
+                );
+            } else {
+                showSuccess(`${refundTo} has the refund.`);
+            }
+            refresh();
         });
     };
 
@@ -233,6 +263,7 @@ export function useKitchen({
         commitHold,
         cancelHold,
         startRefund,
+        retryRefund,
         saveEdit,
     };
 }
