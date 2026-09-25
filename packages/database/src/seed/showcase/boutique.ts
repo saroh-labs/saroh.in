@@ -207,11 +207,12 @@ export async function seedBoutique(
     const categoryId: Record<string, string> = {};
     for (const c of BOUTIQUE_CATEGORIES) {
         const row = await prisma.category.upsert({
-            where: { storeId_slug: { storeId, slug: c.key } },
-            update: { name: c.name, organizationId: orgId },
+            where: {
+                organizationId_slug: { organizationId: orgId, slug: c.key },
+            },
+            update: { name: c.name },
             create: {
                 id: sid("category", c.key),
-                storeId,
                 organizationId: orgId,
                 name: c.name,
                 slug: c.key,
@@ -224,11 +225,12 @@ export async function seedBoutique(
     for (let i = 0; i < BOUTIQUE_OPTIONS.length; i++) {
         const o = BOUTIQUE_OPTIONS[i];
         const row = await prisma.productOption.upsert({
-            where: { storeId_name: { storeId, name: o.name } },
+            where: {
+                organizationId_name: { organizationId: orgId, name: o.name },
+            },
             update: { position: i },
             create: {
                 id: sid("option", o.key),
-                storeId,
                 organizationId: orgId,
                 name: o.name,
                 position: i,
@@ -279,11 +281,12 @@ export async function seedBoutique(
     ];
     for (const d of defaults) {
         await prisma.catalogueDefaults.upsert({
-            where: { storeId_key: { storeId, key: d.key } },
+            where: {
+                organizationId_key: { organizationId: orgId, key: d.key },
+            },
             update: d.data,
             create: {
                 id: sid("defaults", d.key === "all" ? "all" : "dresses"),
-                storeId,
                 organizationId: orgId,
                 key: d.key,
                 categoryId: d.categoryId,
@@ -318,7 +321,7 @@ export async function seedBoutique(
     await writeDiscounts(prisma, { storeId, orgId, now, categoryId });
 
     // --- custom fields (#482): two on the shop, one for the team
-    await writeFields(prisma, { storeId, orgId, categoryId, placed });
+    await writeFields(prisma, { orgId, categoryId, placed });
 
     return { id: orgId, name: BOUTIQUE_NAME, prefix: sid("") };
 }
@@ -763,13 +766,12 @@ async function writeDiscounts(
 async function writeFields(
     prisma: Db,
     ctx: {
-        storeId: string;
         orgId: string;
         categoryId: Record<string, string>;
         placed: Record<string, { productId: string }>;
     },
 ) {
-    const { storeId, orgId, categoryId, placed } = ctx;
+    const { orgId, categoryId, placed } = ctx;
     // Values and category links go with their field (cascade).
     await prisma.productField.deleteMany({
         where: { id: { startsWith: sid("field") } },
@@ -821,7 +823,6 @@ async function writeFields(
         await prisma.productField.create({
             data: {
                 id: sid("field", f.key),
-                storeId,
                 organizationId: orgId,
                 name: f.name,
                 type: "TEXT",

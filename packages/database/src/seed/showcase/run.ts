@@ -455,11 +455,12 @@ async function seedNorthwind(
     // Categories: the base three plus labels, tools and shipping.
     for (const c of NORTHWIND_NEW_CATEGORIES) {
         await prisma.category.upsert({
-            where: { storeId_slug: { storeId, slug: c.slug } },
-            update: { name: c.name, organizationId: orgId },
+            where: {
+                organizationId_slug: { organizationId: orgId, slug: c.slug },
+            },
+            update: { name: c.name },
             create: {
                 id: sid(key, "category", c.slug),
-                storeId,
                 organizationId: orgId,
                 name: c.name,
                 slug: c.slug,
@@ -467,7 +468,10 @@ async function seedNorthwind(
         });
     }
     const categories = await prisma.category.findMany({
-        where: { storeId, slug: { in: Object.keys(NORTHWIND_CATEGORY_INDEX) } },
+        where: {
+            organizationId: orgId,
+            slug: { in: Object.keys(NORTHWIND_CATEGORY_INDEX) },
+        },
         select: { id: true, slug: true },
     });
     const categoryId = (slug: string) => {

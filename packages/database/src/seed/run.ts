@@ -507,12 +507,15 @@ async function seedCommerce(
     const categories: string[] = [];
     for (let i = 0; i < CATEGORIES.length; i++) {
         const c = CATEGORIES[i];
+        // The business's categories (#529): keyed by the business, not the
+        // storefront.
         const category = await prisma.category.upsert({
-            where: { storeId_slug: { storeId: store.id, slug: c.slug } },
-            update: { name: c.name, organizationId: orgId },
+            where: {
+                organizationId_slug: { organizationId: orgId, slug: c.slug },
+            },
+            update: { name: c.name },
             create: {
                 id: id("category", i),
-                storeId: store.id,
                 organizationId: orgId,
                 name: c.name,
                 slug: c.slug,
