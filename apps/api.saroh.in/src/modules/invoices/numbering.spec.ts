@@ -459,6 +459,16 @@ describe("a chosen format", () => {
         expect(invoiceSeriesKeys(null, at).NEVER).toBe(LEGACY_SERIES.key);
     });
 
+    it("a cleared zone (an old empty string) reads India's time, not no zone", () => {
+        // 31 March 23:30 in India is still the old financial year.
+        const at = new Date("2026-03-31T18:00:00Z");
+        expect(invoiceSeriesKeys("RC", at, "").FY).toBe("RC/25-26");
+        expect(invoiceSeriesKeys("RC", at, "Europe/London").FY).toBe(
+            "RC/25-26",
+        );
+        expect(invoiceSeriesKeys("RC", at, "Asia/Tokyo").FY).toBe("RC/26-27");
+    });
+
     it("the month is the business's own: 1 October 00:10 in India is October", () => {
         const s = seriesFor({
             registered: true,
