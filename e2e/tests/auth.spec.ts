@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * The auth cases from #50 / S1-008, which the backlog records as
@@ -31,7 +31,16 @@ test.describe("cross-origin session", () => {
 
         await page.goto(`${urls.APP_URL}/`);
 
-        // Landing anywhere under /login means the cookie did not travel.
+        // Landing anywhere under /login means the cookie did not travel. The
+        // demo owner is in several businesses, so a first visit is asked which
+        // one (`/choose`, since 9f2e8ee7) — which is itself only reachable
+        // signed in — and choosing opens its Home.
+        await expect(page).toHaveURL(new RegExp(`^${urls.APP_URL}/choose$`));
+        await expect(
+            page.getByRole("heading", { name: "Which business?", level: 1 }),
+        ).toBeVisible();
+        await page.getByRole("button", { name: /^Northwind Supply/ }).click();
+
         await expect(page).toHaveURL(new RegExp(`^${urls.APP_URL}/?$`));
         await expect(
             page.getByRole("heading", { name: "Home", level: 1 }),
@@ -83,7 +92,11 @@ test.describe("cross-origin session", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`${urls.APP_URL}/`);
+        // Opened by id: with no business chosen, `/` is the chooser.
+        await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
+        await expect(
+            page.getByRole("heading", { name: "Home", level: 1 }),
+        ).toBeVisible();
 
         await page.getByRole("button", { name: "Your account" }).click();
         await page.getByRole("menuitem", { name: /sign out|log out/i }).click();

@@ -23,7 +23,7 @@ import {
 
 const RYE = "seed_sc_rc_org";
 /** #1063: Priya Raman, whose note names sesame; the loaf may contain it. */
-const PRIYA_ORDER = "seed_sc_rc_order_62";
+const PRIYA = "seed_sc_rc_customer_priya";
 const NORTHWIND = "seed_org";
 const NW_STORE = "seed_store";
 
@@ -40,6 +40,33 @@ async function signIn(page: Page, who = demoUser) {
     await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
         timeout: 30_000,
     });
+}
+
+/**
+ * Priya's order today — the loaf that may contain sesame.
+ *
+ * Looked up, not named: the showcase numbers Rye's orders in the order they
+ * were placed over five weeks relative to NOW, so how many come before
+ * today's changes with the day the seed runs and a fixed id pointed at
+ * somebody else's order (seed_sc_rc_order_62 was Sana's on 25 Sep). Her
+ * latest order is today's, which is the one the seed writes the case into.
+ */
+async function priyaOrderToday(page: Page): Promise<string> {
+    const res = await page.request.get(
+        `${urls.API_URL}/organizations/${RYE}/orders`,
+        { headers: { "x-organization-id": RYE } },
+    );
+    expect(res.ok()).toBe(true);
+    const orders = (await res.json()) as {
+        id: string;
+        placedAt: string;
+        customer: { id: string } | null;
+    }[];
+    const latest = orders
+        .filter((o) => o.customer?.id === PRIYA)
+        .sort((a, b) => Date.parse(b.placedAt) - Date.parse(a.placedAt))[0];
+    expect(latest, "Priya has an order in the Rye & Co. seed").toBeDefined();
+    return latest.id;
 }
 
 /** Two Toasters are mounted (one per theme); only one is ever shown. */
@@ -148,7 +175,7 @@ test.describe("order detail", () => {
     test("names the allergy a line may contain", async ({ page }) => {
         await signIn(page);
         await page.goto(`/open/${RYE}`);
-        await page.goto(`/commerce/orders/${PRIYA_ORDER}`);
+        await page.goto(`/commerce/orders/${await priyaOrderToday(page)}`);
         const banner = page.getByRole("alert").filter({
             hasText: "Priya is allergic to sesame",
         });
@@ -171,7 +198,7 @@ test.describe("order detail", () => {
     }) => {
         const page = await memberPage(browser);
         await page.goto(`/open/${RYE}`);
-        await page.goto(`/commerce/orders/${PRIYA_ORDER}`);
+        await page.goto(`/commerce/orders/${await priyaOrderToday(page)}`);
 
         await expect(
             page.getByRole("button", { name: "Start preparing", exact: true }),

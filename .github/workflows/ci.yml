@@ -331,8 +331,15 @@ jobs:
       # block contract, which lives in a built package (#252) — and this job
       # builds the apps two steps LATER, so a direct `pnpm --filter` call
       # resolved @saroh/block-contract to a dist nobody had made yet.
-      - name: Seed the demo Organization
-        run: pnpm turbo run db:seed --filter=@saroh/database
+      #
+      # The SHOWCASE, not the base seed alone. The bookings, subscriptions,
+      # order, customer and product-editor specs are set in Pulse Fitness,
+      # Rye & Co. and Leela & Loom (`seed_sc_*`) and sign in as their staff
+      # (Nisha, Rye's Member); none of that exists after `db:seed`, so those
+      # specs failed on a 404 or a sign-in that never landed. The showcase runs
+      # the base seed first, so Northwind is still there for everything else.
+      - name: Seed the demo Organizations (showcase)
+        run: pnpm turbo run db:seed:showcase --filter=@saroh/database
 
       - name: Build the apps under test
         run: pnpm turbo run build --filter=@saroh/api --filter=auth --filter=application --filter=sites

@@ -70,11 +70,18 @@ export async function generateMetadata({
     };
 }
 
-export function generateStaticParams() {
-    // No DB here — domains are rendered on demand. Pre-rendering returns once
-    // api exposes a list-domains endpoint for the renderer to enumerate.
-    return [] as { params: { domain: string } }[];
-}
+/*
+ * No `generateStaticParams` here, not even an empty one.
+ *
+ * An empty list looked like a harmless placeholder and was not: it turned
+ * every tenant route into an on-demand STATIC page, and the renderer reads the
+ * publication `no-store` so a publish shows at once. In a production build
+ * that combination is a hard error — "Page changed from static to dynamic at
+ * runtime" — so a merchant's home and booking page answered 500 while
+ * `next dev`, which renders everything dynamically, looked fine. Tenant pages
+ * are rendered per request; pre-rendering, if it ever comes, needs a list of
+ * hosts AND a cached read to go with it.
+ */
 
 export default async function SiteLayout({
     params,
