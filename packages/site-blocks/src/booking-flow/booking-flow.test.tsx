@@ -344,6 +344,118 @@ describe("the booking page (U19)", () => {
         );
     });
 
+    it.each([
+        ["a released hold", { state: "RELEASED" }],
+        ["a cancelled hold", { state: "CANCELLED" }],
+        ["a hold with no token to pay it", { state: "HELD", payToken: null }],
+    ])(
+        "never calls a replay of %s booked, and shows the times again (#508)",
+        async (_label, answer) => {
+            serve((url) =>
+                url.endsWith("/days")
+                    ? json(ONE_DAYS)
+                    : json(
+                          booked({
+                              holdExpiresAt: "2026-09-18T04:15:00.000Z",
+                              ...answer,
+                          }),
+                          201,
+                      ),
+            );
+            render(<BookingFlow page={PAGE} apiUrl={API} />);
+            await chooseOneToOne();
+            fireEvent.click(
+                screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
+            );
+
+            expect(
+                await screen.findByText(
+                    "That time has gone. Pick another one.",
+                ),
+            ).toBeInTheDocument();
+            expect(
+                screen.queryByRole("heading", { name: /You're booked/ }),
+            ).toBeNull();
+            await waitFor(() =>
+                expect(
+                    calls.filter((c) => c.url.endsWith("/days")),
+                ).toHaveLength(2),
+            );
+        },
+    );
+
+    it("books at the desk after a failed payment once, on a key it keeps for a retry (#508)", async () => {
+        let deskAnswers = 0;
+        serve((url, init) => {
+            if (url.endsWith("/days")) return json(ONE_DAYS);
+            if (url.endsWith("/payment-intent")) return json({}, 500);
+            if (url.endsWith("/release")) {
+                return json({ state: "RELEASED", holdExpiresAt: null });
+            }
+            if (url.endsWith("/book")) {
+                const body = JSON.parse(init?.body as string) as {
+                    pay: string;
+                };
+                if (body.pay === "NOW") {
+                    return json(
+                        booked({
+                            state: "HELD",
+                            holdExpiresAt: "2026-09-18T04:15:00.000Z",
+                            payToken: "tok_1",
+                        }),
+                        201,
+                    );
+                }
+                // The first desk booking fails on the way back.
+                deskAnswers += 1;
+                return deskAnswers === 1 ? json({}, 502) : json(booked(), 201);
+            }
+            return json({ state: "HELD", holdExpiresAt: null });
+        });
+        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        await chooseOneToOne();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
+        );
+        const desk = await screen.findByRole("button", {
+            name: "Book it to pay at the desk",
+        });
+        fireEvent.click(desk);
+        fireEvent.click(desk);
+
+        expect(
+            await screen.findByText(
+                "Something went wrong on our side. Please try again.",
+            ),
+        ).toBeInTheDocument();
+        const deskCalls = () =>
+            calls
+                .filter((c) => c.url.endsWith("/book"))
+                .map(
+                    (c) =>
+                        JSON.parse(c.init?.body as string) as {
+                            pay: string;
+                            idempotencyKey: string;
+                        },
+                )
+                .filter((b) => b.pay === "DESK");
+        expect(calls.filter((c) => c.url.endsWith("/release"))).toHaveLength(1);
+        expect(deskCalls()).toHaveLength(1);
+
+        // Trying again sends the same key.
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+        expect(
+            await screen.findByRole("heading", {
+                name: "You're booked, Asha.",
+            }),
+        ).toBeInTheDocument();
+        const [first, retry] = deskCalls();
+        expect(deskCalls()).toHaveLength(2);
+        expect(retry.idempotencyKey).toBe(first.idempotencyKey);
+    });
+
     it("lists a class's sessions with places left, and a full one cannot be picked", async () => {
         serve(() => json(CLASS_DAYS));
         render(<BookingFlow page={PAGE} apiUrl={API} />);

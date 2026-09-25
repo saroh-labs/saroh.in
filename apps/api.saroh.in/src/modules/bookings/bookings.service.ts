@@ -48,6 +48,7 @@ import {
     holdsPlace,
     holdState,
     isExpiredHold,
+    lockBookingInTx,
     releaseHoldInTx,
     renewHoldTokenInTx,
 } from "./booking-hold";
@@ -359,10 +360,20 @@ export class BookingsService {
     ) {}
 
     /**
-     * Reads and releases of a pay-now hold, per hashed IP: the page polls
-     * every few seconds while its booker pays, a scraper does more.
+     * Reads and releases of a pay-now hold (#508). The page polls every four
+     * seconds while its booker pays — 15 a minute — so one hold gets 40.
+     * Counted per hashed IP AND token, so one payer cannot use up a limit
+     * the other customers on the same network share.
      */
     private readonly holdLimiter = new FixedWindowRateLimiter(40, 60_000);
+
+    /**
+     * And a ceiling per hashed IP, whatever the token: room for ten people
+     * paying at once from one network (a gym's wifi), not for a scraper. It
+     * is checked first — the token is the caller's to make up, so only this
+     * bounds a run of invented tokens, and the keys it leaves behind.
+     */
+    private readonly holdIpCeiling = new FixedWindowRateLimiter(150, 60_000);
 
     // ── Service CRUD ───────────────────────────────────────────────────────
 
@@ -869,12 +880,7 @@ export class BookingsService {
         ipHash: string | undefined,
         now: Date = new Date(),
     ): Promise<PublicHold> {
-        if (ipHash && !this.holdLimiter.take(ipHash)) {
-            throw new HttpException(
-                "Too many requests. Try again shortly.",
-                429,
-            );
-        }
+        this.takeHoldHit(token, ipHash, now);
         const booking = await this.holdBooking(token);
         return {
             state: holdState(booking, now),
@@ -893,12 +899,7 @@ export class BookingsService {
         ipHash: string | undefined,
         now: Date = new Date(),
     ): Promise<PublicHold> {
-        if (ipHash && !this.holdLimiter.take(ipHash)) {
-            throw new HttpException(
-                "Too many requests. Try again shortly.",
-                429,
-            );
-        }
+        this.takeHoldHit(token, ipHash, now);
         const found = await this.holdBooking(token);
         await prisma.$transaction((tx) => releaseHoldInTx(tx, found.id, now));
         const booking = await prisma.booking.findUniqueOrThrow({
@@ -909,6 +910,27 @@ export class BookingsService {
             holdExpiresAt: booking.holdExpiresAt?.toISOString() ?? null,
             booking: toPublicBooking(booking),
         };
+    }
+
+    /** One read or release of a hold against its limits; 429 past them. */
+    private takeHoldHit(
+        token: string,
+        ipHash: string | undefined,
+        now: Date,
+    ): void {
+        if (!ipHash) return;
+        const at = now.getTime();
+        // The ceiling first and on its own: a refusal there never adds a
+        // per-token key.
+        const allowed =
+            this.holdIpCeiling.take(ipHash, at) &&
+            this.holdLimiter.take(`${ipHash}:${hashPayToken(token)}`, at);
+        if (!allowed) {
+            throw new HttpException(
+                "Too many requests. Try again shortly.",
+                429,
+            );
+        }
     }
 
     private async holdBooking(token: string): Promise<Booking> {
@@ -1287,6 +1309,9 @@ export class BookingsService {
      * a whole class called off (U15). The rule protects the business from a
      * customer dropping out late; it never takes a class from someone whose
      * class was cancelled on them.
+     *
+     * A pay-now hold (PENDING) is released rather than cancelled (#508): its
+     * draft invoice is voided with it, as when its time runs out.
      */
     async cancelBooking(
         ctx: OrganizationContext,
@@ -1296,14 +1321,34 @@ export class BookingsService {
     ): Promise<Booking> {
         authorize(ctx, "booking:write");
 
-        const booking = await this.requireOwnedBooking(ctx, bookingId);
-        if (booking.status === "CANCELLED") {
-            return booking;
+        const found = await this.requireOwnedBooking(ctx, bookingId);
+        if (found.status === "CANCELLED") {
+            return found;
         }
         const rules = await loadBookingRules(prisma, ctx.organizationId);
-        const late =
-            !options.returnCredit && isLateCancel(booking.startAt, now, rules);
         return prisma.$transaction(async (tx) => {
+            // Where it stands now, under its locks — invoice before booking,
+            // the webhook's order (#508) — so a second cancel, or a payment
+            // landing on a hold, is seen rather than overwritten.
+            await lockBookingInTx(tx, found.id);
+            const booking =
+                (await tx.booking.findUnique({ where: { id: found.id } })) ??
+                found;
+            if (booking.status === "CANCELLED") return booking;
+            // A pay-now hold nobody has paid: let it go as the booker would,
+            // so its draft invoice is voided and its pay link stops working.
+            // A payment that lands after is recorded as owed back.
+            if (booking.status === "PENDING") {
+                await releaseHoldInTx(tx, booking.id, now, ctx.userId);
+                return (
+                    (await tx.booking.findUnique({
+                        where: { id: booking.id },
+                    })) ?? booking
+                );
+            }
+            const late =
+                !options.returnCredit &&
+                isLateCancel(booking.startAt, now, rules);
             const cancelled = await tx.booking.update({
                 where: { id: booking.id },
                 data: {
@@ -1579,6 +1624,22 @@ export class BookingsService {
                         throw new ConflictException(
                             "The class pack that paid for this booking expires before that time. Pick an earlier time, or take the pack off the booking first.",
                         );
+                    }
+                    // A membership's class is one of the month it lands in
+                    // (#508): moved into another month, it needs a class
+                    // left there, on a membership still active. The booking
+                    // itself is not counted, so a move within its month fits.
+                    if (
+                        booking.paidWith === "MEMBERSHIP" &&
+                        booking.subscriptionId
+                    ) {
+                        await useMembershipInTx(tx, {
+                            organizationId: ctx.organizationId,
+                            bookingId: booking.id,
+                            contactId: booking.contactId ?? "",
+                            subscriptionId: booking.subscriptionId,
+                            startAt,
+                        });
                     }
 
                     const moved = await tx.booking.update({

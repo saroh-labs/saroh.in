@@ -194,18 +194,39 @@ export async function renewHoldTokenInTx(
 }
 
 /**
+ * Lock a booking for a change that may touch its hold: the hold's invoice
+ * rows first, then the booking's. The payment webhook takes the invoice's
+ * lock and then the booking's (`applyInvoiceSuccess` → `confirmHoldInTx`),
+ * so everything else that locks a booking which may be a hold takes them in
+ * that order too. The other way round, a release and a payment arriving
+ * together each wait on the other, and Postgres kills one (#508).
+ */
+export async function lockBookingInTx(
+    tx: Tx,
+    bookingId: string,
+): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE "bookingId" = ${bookingId} AND source = 'BOOKING' ORDER BY id FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM "Booking" WHERE id = ${bookingId} FOR UPDATE`;
+}
+
+/**
  * Let a hold go: the booking is cancelled (keeping its expiry, which is how
  * it reads as released rather than cancelled) and its draft invoice voided,
- * its pay token cleared. Takes the booking's row lock and re-reads it, so a
- * payment confirming it at the same moment wins or loses cleanly. Returns
- * whether anything was released.
+ * its pay token cleared. Takes the invoice's and then the booking's row lock
+ * ({@link lockBookingInTx}) and re-reads it, so a payment confirming it at
+ * the same moment wins or loses cleanly. Returns whether anything was
+ * released.
+ *
+ * `actorUserId` is the team member who cancelled it; none when the booker
+ * let it go or its time ran out.
  */
 export async function releaseHoldInTx(
     tx: Tx,
     bookingId: string,
     now: Date,
+    actorUserId: string | null = null,
 ): Promise<boolean> {
-    await tx.$queryRaw`SELECT id FROM "Booking" WHERE id = ${bookingId} FOR UPDATE`;
+    await lockBookingInTx(tx, bookingId);
     const booking = await tx.booking.findUnique({
         where: { id: bookingId },
         select: {
@@ -225,13 +246,14 @@ export async function releaseHoldInTx(
             holdExpiresAt: booking.holdExpiresAt ?? now,
         },
     });
-    // No actor: nobody on the team did it. The history reads "cancelled",
-    // and the booking's kept expiry says it was a hold that was let go.
+    // The history reads "cancelled", and the booking's kept expiry says it
+    // was a hold that was let go — by the team when it names who.
     await tx.bookingEvent.create({
         data: {
             bookingId: booking.id,
             organizationId: booking.organizationId,
             type: "CANCELLED",
+            actorUserId,
             fromStartAt: booking.startAt,
         },
         select: { id: true },
