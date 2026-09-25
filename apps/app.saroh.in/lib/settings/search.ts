@@ -70,6 +70,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Financial year", "tax"),
     business("GST on delivery", "tax"),
     business("Delivery SAC", "tax"),
+    business("Opening hours", "hours"),
     business("Registered address", "address"),
     business("PIN code", "address"),
     business("State", "address"),

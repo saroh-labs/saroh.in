@@ -12,6 +12,7 @@ import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { listCommsProviders } from "@/lib/providers/service";
 import { requireSession } from "@/lib/session";
 import { readyChecklist } from "@/lib/settings/ready";
+import { listStorefrontHours } from "@/lib/stores/storefronts";
 
 /**
  * Settings → Organization. The tenant's own identity (name + business profile),
@@ -31,9 +32,12 @@ export const metadata = { title: "Business" };
 export default async function OrganizationSettingsPage() {
     await requireSession();
 
-    const [settings, organization] = await Promise.all([
+    // The Hours tab reads the storefronts, where opening hours are kept; a
+    // refusal there is said on that tab, never the whole page.
+    const [settings, organization, hours] = await Promise.all([
         getOrganizationSettings(),
         resolveActiveOrganization(),
+        listStorefrontHours(),
     ]);
     // From what the API resolved this person may do; the role's name is only
     // the fallback for a response that predates permissions.
@@ -87,6 +91,8 @@ export default async function OrganizationSettingsPage() {
                     key={settings.slug}
                     settings={settings}
                     canEdit={canEdit}
+                    hours={hours}
+                    canEditHours={may("store:write")}
                 />
             ) : (
                 <EmptyState

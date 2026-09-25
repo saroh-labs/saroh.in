@@ -29,6 +29,17 @@ describe("searchSettings", () => {
         expect(
             searchSettings("number format", owner).map((h) => h.href),
         ).toEqual(["/settings/organization?section=tax"]);
+        expect(searchSettings("hours", owner)).toEqual([
+            {
+                label: "Opening hours",
+                where: "Business",
+                href: "/settings/organization?section=hours",
+            },
+        ]);
+        // The tab is "Address" now; the setting keeps its full name.
+        expect(searchSettings("registered address", owner)[0]?.href).toBe(
+            "/settings/organization?section=address",
+        );
     });
 
     it("matches the page's name as well, as the design does", () => {
@@ -128,9 +139,10 @@ describe("isSettingsScreen", () => {
 });
 
 describe("tabFromParam", () => {
-    const keys = ["identity", "contact", "tax", "address"] as const;
+    const keys = ["identity", "contact", "tax", "hours", "address"] as const;
     it("reads a tab the page has", () => {
         expect(tabFromParam("tax", keys, "identity")).toBe("tax");
+        expect(tabFromParam("hours", keys, "identity")).toBe("hours");
     });
     it("falls back on a missing or unknown one", () => {
         expect(tabFromParam(null, keys, "identity")).toBe("identity");
