@@ -17,3 +17,5 @@ export * from "./rls-proxy";
 export * from "./backfill/catalogue-settings";
 // The #510 backfill, exported for the same reason.
 export * from "./backfill/listings-stock-levels";
+// The #530 same-product merge, exported for the same reason.
+export * from "./backfill/merge-same-products";
