@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { AuditModule } from "../audit/audit.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
@@ -12,6 +13,7 @@ import { StoresService } from "./stores.service";
 
 @Module({
     imports: [
+        AuditModule,
         FeatureFlagModule,
         CapabilitiesModule,
         forwardRef(() => OrganizationsModule),

@@ -111,7 +111,14 @@ export class ModuleLifecycleService {
                     disabledByUserId: null,
                 },
             });
-            await this.audit(tx, ctx, "organization.module.enabled", moduleKey);
+            await this.audit(
+                tx,
+                ctx,
+                "organization.module.enabled",
+                moduleKey,
+                undefined,
+                { module: descriptor.label, enabled: true },
+            );
             await alsoInTransaction?.(tx);
         });
 
@@ -128,7 +135,7 @@ export class ModuleLifecycleService {
         alsoInTransaction?: AlsoInTransaction,
     ): Promise<void> {
         authorize(ctx, "module:manage");
-        this.descriptor(moduleKey);
+        const descriptor = this.descriptor(moduleKey);
 
         // Idempotent: only an ENABLED module transitions to DISABLED. Disabling
         // an already-disabled/archived/absent module is a no-op.
@@ -196,6 +203,8 @@ export class ModuleLifecycleService {
                 ctx,
                 "organization.module.disabled",
                 moduleKey,
+                undefined,
+                { module: descriptor.label, enabled: false },
             );
             await alsoInTransaction?.(tx);
         });
@@ -381,6 +390,9 @@ export class ModuleLifecycleService {
         action: string,
         moduleKey: ModuleKey,
         projectId?: string,
+        // Switching on or off names the module as the business reads it
+        // ("Payments"), so Settings › Activity can say which (#509).
+        metadata?: { module: string; enabled: boolean },
     ): Promise<void> {
         await tx.auditEvent.create({
             data: {
@@ -391,6 +403,7 @@ export class ModuleLifecycleService {
                 targetType: "module",
                 targetId: moduleKey,
                 outcome: "SUCCESS",
+                ...(metadata ? { metadata } : {}),
             },
         });
     }

@@ -138,7 +138,13 @@ export class AdminLifecycleService {
         const reason = requireReason(command.reason);
         const plan = await prisma.plan.findUnique({
             where: { id: command.planId },
-            select: { id: true, key: true, version: true, active: true },
+            select: {
+                id: true,
+                key: true,
+                version: true,
+                name: true,
+                active: true,
+            },
         });
         if (!plan) throw new NotFoundException("Plan not found");
         if (!plan.active) {
@@ -154,7 +160,11 @@ export class AdminLifecycleService {
             );
             const existing = await tx.subscription.findUnique({
                 where: { organizationId: organization.id },
-                select: { planId: true, provider: true },
+                select: {
+                    planId: true,
+                    provider: true,
+                    plan: { select: { name: true } },
+                },
             });
             assertNotProviderManaged(existing);
             if (existing?.planId === plan.id)
@@ -179,6 +189,23 @@ export class AdminLifecycleService {
                     fromPlanId: existing?.planId ?? null,
                     toPlanId: plan.id,
                     toPlan: `${plan.key}@${plan.version}`,
+                },
+            });
+            // The business's own history shows the plan it moved to, by the
+            // operator, as its lifecycle changes do (#509).
+            await tx.auditEvent.create({
+                data: {
+                    action: "organization.plan.changed",
+                    actorUserId: command.staff.userId,
+                    organizationId: organization.id,
+                    targetType: "subscription",
+                    targetId: organization.id,
+                    outcome: "SUCCESS",
+                    metadata: {
+                        from: existing?.plan.name ?? null,
+                        to: plan.name,
+                        byOperator: true,
+                    },
                 },
             });
             return { ok: true, changed: true };

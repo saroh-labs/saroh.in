@@ -249,7 +249,9 @@ describe("OrganizationSettingsService", () => {
             expect(record).toHaveBeenCalledWith(
                 expect.objectContaining({
                     action: AuditAction.ProfileUpdate,
-                    metadata: { fields: ["timezone"] },
+                    // The mocked profile reads the same before and after,
+                    // so there is no value to tell.
+                    metadata: { fields: ["timezone"], changes: [] },
                 }),
             );
         });
@@ -291,12 +293,77 @@ describe("OrganizationSettingsService", () => {
                     action: AuditAction.ProfileUpdate,
                     actorUserId: "user_1",
                     organizationId: "org_1",
-                    metadata: { fields: ["name", "taxId", "contactEmail"] },
+                    metadata: {
+                        fields: ["name", "taxId", "contactEmail"],
+                        changes: [],
+                    },
                 }),
             );
             const audited = JSON.stringify(record.mock.calls[0][0]);
             expect(audited).not.toContain("SECRET-TAX");
             expect(audited).not.toContain("cfo@acme.test");
+        });
+
+        it("records business details before and after, and the contact email by name only (#509)", async () => {
+            const was = {
+                id: "org_1",
+                name: "Acme",
+                slug: "acme",
+                businessProfile: {
+                    legalName: "Acme Inc",
+                    contactEmail: "old@acme.test",
+                    website: "https://old.acme.test",
+                    invoicePrefix: "INV",
+                    deliveryGstRate: { toString: () => "18.00" },
+                },
+            };
+            const now = {
+                ...was,
+                name: "Acme Global",
+                businessProfile: {
+                    ...was.businessProfile,
+                    contactEmail: "cfo@acme.test",
+                    website: "https://acme.test",
+                    invoicePrefix: "RC",
+                },
+            };
+            // Read first as it was (inside the transaction), then as saved.
+            orgFindUnique.mockResolvedValueOnce(was).mockResolvedValue(now);
+            profileFindUnique.mockResolvedValue({
+                gstRegistered: false,
+                gstState: null,
+                taxId: null,
+                country: null,
+                invoicePrefix: "INV",
+                invoiceNumberFormat: null,
+                addressLine1: null,
+                addressLine2: null,
+                city: null,
+                postalCode: null,
+            });
+
+            await service.update(ctx(), {
+                name: "Acme Global",
+                profile: {
+                    contactEmail: "cfo@acme.test",
+                    website: "https://acme.test",
+                },
+                tax: { invoicePrefix: "rc" },
+            });
+
+            const metadata = record.mock.calls[0][0].metadata;
+            expect(metadata.fields).toEqual([
+                "name",
+                "contactEmail",
+                "website",
+                "invoicePrefix",
+            ]);
+            expect(metadata.changes).toEqual([
+                { field: "name", before: "Acme", after: "Acme Global" },
+                { field: "invoicePrefix", before: "INV", after: "RC" },
+            ]);
+            const audited = JSON.stringify(record.mock.calls[0][0]);
+            expect(audited).not.toContain("acme.test");
         });
 
         describe("GST (ADR-008)", () => {
@@ -618,7 +685,10 @@ describe("OrganizationSettingsService", () => {
                 );
                 expect(record).toHaveBeenCalledWith(
                     expect.objectContaining({
-                        metadata: { fields: ["invoiceNumberFormat"] },
+                        metadata: {
+                            fields: ["invoiceNumberFormat"],
+                            changes: [],
+                        },
                     }),
                 );
             });
@@ -864,7 +934,15 @@ describe("OrganizationSettingsService", () => {
             expect(settings.logo).toEqual({ url: png.url, mediaId: "media_1" });
             expect(settings.profile).not.toHaveProperty("logoUrl");
             expect(record).toHaveBeenCalledWith(
-                expect.objectContaining({ metadata: { fields: ["logo"] } }),
+                expect.objectContaining({
+                    metadata: {
+                        fields: ["logo"],
+                        // No logo before this one; never its address.
+                        changes: [
+                            { field: "logo", before: null, after: "added" },
+                        ],
+                    },
+                }),
             );
         });
 
