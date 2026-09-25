@@ -1144,6 +1144,12 @@ model ProductListing {
 
   createdAt DateTime @default(now())
 
+  // Marked Sold out by hand at this storefront (#515). Only an untracked
+  // product carries it: it refuses new shop and staff orders here until it
+  // is marked available again. Turning tracking on clears it.
+  soldOutAt       DateTime?
+  soldOutByUserId String?
+
   variants ProductListingVariant[]
 
   @@unique([storeId, productId])
@@ -3805,8 +3811,8 @@ model PaymentRefundLine {
   orderItemId String
   orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
 
-  quantity    Int
-  amountCents Int
+  quantity        Int
+  amountCents     Int
   // Units the refund puts back on the shelf ("Put N back in stock", #511):
   // a Returned entry once the provider confirms the refund, never before.
   putBackQuantity Int @default(0)
