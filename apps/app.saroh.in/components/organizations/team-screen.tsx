@@ -41,7 +41,6 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { navFor } from "@/components/shared/nav-items";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { InviteValues } from "@/lib/organizations/invitations";
 import { invitationMeta, inviteSchema } from "@/lib/organizations/invitations";
@@ -70,13 +69,27 @@ const ROLE_LABEL: Record<OrganizationRole, string> = {
     REVIEWER: "Reviewer",
 };
 
-/** What each role is for, in the words a small business would use. */
+/**
+ * What each role is for, in the words a small business would use — and only
+ * what the API's policy grants (`organization-policy.ts`): a business may
+ * have several owners and never none; an admin lacks only closing the
+ * business, so cannot change or remove an owner either; a member reads the
+ * day and moves kitchen orders, and sees no money.
+ */
 const ROLE_BLURB: Record<OrganizationRole, string> = {
-    OWNER: "Reaches everything, and cannot be locked out. Every business needs one person who can always get back in.",
-    ADMIN: "Everything day to day, with the same reach as Owner. The difference is closing the workspace, which only an Owner can do.",
-    MEMBER: "The read-only floor: the business, its team and its modules, and every website. Changes nothing.",
+    OWNER: "Can open and change everything. A business always has at least one owner, so it can never be locked out.",
+    ADMIN: "Can do everything an owner can, except close the business or change or remove an owner.",
+    MEMBER: "Sees the day — bookings, contacts and the team — and moves kitchen orders along. Sees no money and can't change settings.",
     REVIEWER:
-        "Narrower rather than beneath Member — the websites they are invited to, and nothing about the business around it.",
+        "Can look at the websites they're invited to, comment and sign them off. Nothing else in the business.",
+};
+
+/** The same, in a few words, under a role's name wherever one is picked. */
+const ROLE_PLAIN: Record<OrganizationRole, string> = {
+    OWNER: "can open everything",
+    ADMIN: "everything except removing an owner",
+    MEMBER: "sees the day — no money or settings",
+    REVIEWER: "invited websites, nothing else",
 };
 
 /** A person's name, or their email while they have not given one. */
@@ -101,8 +114,8 @@ interface RoleBook {
     all: Role[];
     labelOf: (key: string) => string;
     blurbOf: (key: string) => string;
-    /** How many destinations the rail offers this role here. */
-    reachOf: (key: string) => { reachable: number; total: number };
+    /** What it opens, in a few words ("can open everything"). */
+    plainOf: (key: string) => string;
     /**
      * False when the role can do something the viewer cannot. The API refuses
      * to hand out, change or remove such a role; the screen says so first.
@@ -121,7 +134,7 @@ const TEAM_TABS = ["roles", "people"] as const;
  * Team (Settings → People), after the "Saroh Team Roles" design.
  *
  * Two tabs over one business. ROLES explains the four roles — who holds each,
- * what it reaches here, and the ring that marks it. PEOPLE is the roster: a
+ * what it opens, and the ring that marks it. PEOPLE is the roster: a
  * neutral monogram ringed in the role's colour, the role in words beside a
  * dot of the same colour, and an Edit drawer that changes the role or removes
  * the person.
@@ -145,7 +158,6 @@ export function TeamScreen({
     roles,
     catalogue,
     myActions,
-    moduleKeys,
 }: {
     organizationName: string;
     members: OrganizationMember[];
@@ -160,8 +172,6 @@ export function TeamScreen({
     catalogue: RoleCatalogue | null;
     /** What the viewer may do here; `null` when unknown, and nothing is held back. */
     myActions: string[] | null;
-    /** `null` = availability unknown; every capability then reads as on. */
-    moduleKeys: string[] | null;
 }) {
     // In the address, so Search settings can open Roles.
     const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
@@ -169,16 +179,6 @@ export function TeamScreen({
     const [inviteOpen, setInviteOpen] = useState(false);
 
     const byKey = new Map(roles.map((r) => [r.key, r]));
-    // What a role reaches in THIS business: the rail's own filtering, fed the
-    // role's own permissions, so the number can never disagree with what the
-    // rail shows the people who hold it.
-    const countNav = (key: string) =>
-        navFor({
-            role: isBuiltIn(key) ? key : "MEMBER",
-            actions: byKey.get(key)?.actions ?? null,
-            moduleKeys,
-            sites: [],
-        }).reduce((n, g) => n + g.items.length, 0);
     const book: RoleBook = {
         all: roles,
         labelOf: (key) =>
@@ -188,10 +188,11 @@ export function TeamScreen({
             const n = byKey.get(key)?.actions.length ?? 0;
             return `Made for ${organizationName}. Whoever holds it can do exactly what was ticked for it — ${n === 1 ? "1 permission" : `${n} permissions`}.`;
         },
-        reachOf: (key) => ({
-            reachable: countNav(key),
-            total: countNav("OWNER"),
-        }),
+        plainOf: (key) => {
+            if (isBuiltIn(key)) return ROLE_PLAIN[key];
+            const n = byKey.get(key)?.actions.length ?? 0;
+            return n === 1 ? "1 permission" : `${n} permissions`;
+        },
         withinReach: (key) => {
             const role = byKey.get(key);
             // Unknown role or unknown viewer: let the API decide, it will.
@@ -221,12 +222,13 @@ export function TeamScreen({
             <div className="space-y-3">
                 <SettingsPanelHeader
                     title="Team"
-                    description={`Everyone in ${organizationName} and what each role can open. It is business-wide — a role isn't held in one shop.`}
+                    description="Everyone here works across the whole business."
                     actions={
-                        canManage ? (
+                        // On People, where the person invited will appear.
+                        canManage && tab === "people" ? (
                             <Button onClick={() => setInviteOpen(true)}>
                                 <Plus className="mr-1.5 size-4" />
-                                Invite to {organizationName}
+                                Invite someone
                             </Button>
                         ) : undefined
                     }
@@ -278,6 +280,7 @@ export function TeamScreen({
                     canEdit={canEditRoles}
                     organizationName={organizationName}
                     builtInBlurb={ROLE_BLURB}
+                    builtInPlain={ROLE_PLAIN}
                 />
             ) : members.length <= 1 && invitations.length === 0 ? (
                 <div className="flex flex-col items-center gap-[9px] rounded-xl border border-dashed border-border-strong px-6 py-12 text-center">
@@ -712,7 +715,6 @@ function MemberDrawer({
                                 >
                                     {book.all.map(({ key: r }) => {
                                         const on = r === role;
-                                        const rr = book.reachOf(r);
                                         const beyond = !book.withinReach(r);
                                         return (
                                             <button
@@ -744,7 +746,7 @@ function MemberDrawer({
                                                     <span className="mt-0.5 block text-[11px] text-muted-foreground">
                                                         {beyond
                                                             ? "Can do more than you can"
-                                                            : `reaches ${rr.reachable} of ${rr.total} destinations here`}
+                                                            : book.plainOf(r)}
                                                     </span>
                                                 </span>
                                                 {on ? (

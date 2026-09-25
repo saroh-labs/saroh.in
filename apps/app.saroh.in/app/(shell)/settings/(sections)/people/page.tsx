@@ -1,6 +1,5 @@
 import { TeamScreen } from "@/components/organizations/team-screen";
 import { SettingsPanel } from "@/components/settings/settings-panel";
-import { listModules } from "@/lib/modules/service";
 import { listInvitations, listMembers } from "@/lib/organizations/members";
 import { getRoleCatalogue, listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -38,29 +37,19 @@ export default async function PeoplePage() {
     const canManage = may("member:invite");
     const canEditRoles = may("member:role:update");
 
-    const [members, invitations, sites, moduleKeys, roles, catalogue] =
-        await Promise.all([
-            listMembers(),
-            // Empty for anyone who may not see them, rather than an error: this is
-            // one page and a member should still get the roster.
-            canManage ? listInvitations() : Promise.resolve([]),
-            // Only to name the sites a reviewer can be invited to.
-            canManage ? listSites() : Promise.resolve([]),
-            // What each role reaches depends on what this business has turned on;
-            // unknown on failure, so every capability reads as on.
-            listModules()
-                .then((modules) =>
-                    modules
-                        .filter((m) => m.readiness !== "DISABLED")
-                        .map((m) => m.key),
-                )
-                .catch(() => null),
-            listRoles(),
-            // The permission list the owner ticks from; `null` renders as "could
-            // not be loaded" rather than as an empty list that looks like a role
-            // with no powers available to it.
-            getRoleCatalogue().catch(() => null),
-        ]);
+    const [members, invitations, sites, roles, catalogue] = await Promise.all([
+        listMembers(),
+        // Empty for anyone who may not see them, rather than an error: this is
+        // one page and a member should still get the roster.
+        canManage ? listInvitations() : Promise.resolve([]),
+        // Only to name the sites a reviewer can be invited to.
+        canManage ? listSites() : Promise.resolve([]),
+        listRoles(),
+        // The permission list the owner ticks from; `null` renders as "could
+        // not be loaded" rather than as an empty list that looks like a role
+        // with no powers available to it.
+        getRoleCatalogue().catch(() => null),
+    ]);
 
     return (
         <SettingsPanel>
@@ -74,7 +63,6 @@ export default async function PeoplePage() {
                 roles={roles}
                 catalogue={catalogue}
                 myActions={organization?.actions ?? null}
-                moduleKeys={moduleKeys}
             />
         </SettingsPanel>
     );
