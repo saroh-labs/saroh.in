@@ -115,6 +115,8 @@ export function ProviderSetupDialog(
               label: string;
               trigger: string;
               urgent: boolean;
+              /** The channel the dialog opens on (Email by default). */
+              channel?: CommsChannel;
               connected: ConnectedCommsProvider[];
           },
 ) {
@@ -138,6 +140,7 @@ export function ProviderSetupDialog(
                     />
                 ) : (
                     <MessagingForm
+                        initialChannel={props.channel ?? "EMAIL"}
                         connected={props.connected}
                         onDone={() => setOpen(false)}
                     />
@@ -303,14 +306,16 @@ function PaymentsForm({
 }
 
 function MessagingForm({
+    initialChannel,
     connected,
     onDone,
 }: {
+    initialChannel: CommsChannel;
     connected: ConnectedCommsProvider[];
     onDone: () => void;
 }) {
     const router = useRouter();
-    const [channel, setChannel] = useState<CommsChannel>("EMAIL");
+    const [channel, setChannel] = useState<CommsChannel>(initialChannel);
     const spec = CHANNELS[channel];
     const current = connected.find(
         (c) => c.channel === channel && c.status === "CONNECTED",
