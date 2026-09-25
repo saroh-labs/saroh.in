@@ -58,6 +58,7 @@ module.exports = {
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
+        "<rootDir>/src/modules/products/merge-report.service.spec.ts",
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",

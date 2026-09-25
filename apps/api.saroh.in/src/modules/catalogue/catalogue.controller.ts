@@ -18,6 +18,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { MergeReportService } from "../products/merge-report.service";
 import { AllergensService } from "./allergens.service";
 import { blankToNull, CatalogueAccess } from "./catalogue-access";
 import { CatalogueService } from "./catalogue.service";
@@ -54,6 +55,7 @@ export class OrganizationCatalogueController {
         private readonly sku: SkuService,
         private readonly fields: FieldsService,
         private readonly allergens: AllergensService,
+        private readonly mergeReports: MergeReportService,
     ) {}
 
     @Get()
@@ -243,5 +245,13 @@ export class OrganizationCatalogueController {
         @Body() dto: SaveSkuPatternDto,
     ) {
         return this.sku.save(this.access.write(ctx), dto);
+    }
+
+    // ---- Same-product merge (#530) ----
+
+    /** What the merge joined, kept apart and dropped. Owner and Admin. */
+    @Get("merge-report")
+    mergeReport(@OrgContext() ctx: OrganizationContext) {
+        return this.mergeReports.list(ctx);
     }
 }

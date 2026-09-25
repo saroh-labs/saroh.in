@@ -3,6 +3,7 @@ import { forwardRef, Module } from "@nestjs/common";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { MergeReportService } from "../products/merge-report.service";
 import { StoresModule } from "../stores/stores.module";
 import { AllergensService } from "./allergens.service";
 import { CatalogueAccess } from "./catalogue-access";
@@ -27,6 +28,7 @@ import { CatalogueController } from "./store-catalogue.controller";
         SkuService,
         FieldsService,
         AllergensService,
+        MergeReportService,
         OrganizationGuard,
     ],
     exports: [CatalogueService, CatalogueAccess],
