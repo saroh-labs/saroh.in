@@ -3,6 +3,8 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import type { ProductPlacement } from "../collections/collections.service";
+import { productPlacement } from "../collections/collections.service";
 import { discountState } from "../discounts/discount-state";
 import type { OrgAction } from "../organizations/organization-policy";
 import type { ProductScope } from "./product-access";
@@ -99,6 +101,13 @@ export interface ProductOverview {
     orders: Panel<OverviewOrders>;
     reviews: Panel<OverviewReviews>;
     discounts: Panel<OverviewDiscount[]>;
+    /**
+     * The collections it is in and the live website pages that show it
+     * (#516). `website.showsProducts` is false until the website has a
+     * block that can show products (#473): "The website doesn't show
+     * products yet."
+     */
+    placement: Panel<ProductPlacement>;
 }
 
 const OPEN_STATUSES = ["PENDING", "PROCESSING"];
@@ -167,7 +176,7 @@ export class ProductOverviewService {
                 ? stockTotals(variantLines, product.inventory)
                 : stockTotals(productLine ? [productLine] : [], null);
 
-        const [orders, reviews, discounts, canStock, canReply] =
+        const [orders, reviews, discounts, placement, canStock, canReply] =
             await Promise.all([
                 this.panel(scope, "order:read", "orders", () =>
                     this.orders(productId, now),
@@ -177,6 +186,9 @@ export class ProductOverviewService {
                 ),
                 this.panel(scope, "discount:read", "discounts", () =>
                     this.discounts(organizationId, storeId, product, now),
+                ),
+                this.panel(scope, "store:read", "collections", () =>
+                    productPlacement(organizationId, productId),
                 ),
                 scope.canStock(),
                 scope.may("product-review:write"),
@@ -199,6 +211,7 @@ export class ProductOverviewService {
             orders,
             reviews,
             discounts,
+            placement,
         };
     }
 

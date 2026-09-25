@@ -146,6 +146,10 @@ model Organization {
   stockLevels            StockLevel[]
   stockEntries           StockEntry[]
 
+  // Collections: hand-picked or automatic by category (#516).
+  collections        Collection[]
+  collectionProducts CollectionProduct[]
+
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
   sites            Site[]
@@ -709,6 +713,9 @@ model Product {
   stockLevels     StockLevel[]
   stockEntries    StockEntry[]
 
+  // The hand-picked collections it is in (#516). Kept while it is archived.
+  collections CollectionProduct[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1002,9 +1009,63 @@ model Category {
   discountReach DiscountCategory[]
   defaults      CatalogueDefaults[]
   fields        ProductFieldCategory[]
+  // Automatic collections that fill themselves from it (#516).
+  collections   Collection[]
 
   @@unique([organizationId, slug])
+  // The target of (categoryId, organizationId) foreign keys.
+  @@unique([id, organizationId])
   @@index([storeId])
+}
+
+/// A collection (#516): hand-picked (its products are stored, in order) or
+/// automatic by category (its products are read from the category when
+/// asked, never stored) — never both. Archived products don't show in
+/// either; a hand-picked membership is kept, so "Sell again" restores it.
+model Collection {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  slug        String
+  description String?
+
+  // Set: automatic — every product in this category that isn't archived.
+  // Null: hand-picked. A category an automatic collection uses can't be
+  // deleted: the categories service says which collection, and the key
+  // refuses it too. NoAction, not Restrict, so deleting the business —
+  // which takes both — still works (checked at the end of the statement).
+  categoryId String?
+  category   Category? @relation(fields: [categoryId, organizationId], references: [id, organizationId], onDelete: NoAction)
+
+  products CollectionProduct[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, slug])
+  // The target of (collectionId, organizationId) foreign keys.
+  @@unique([id, organizationId])
+  @@index([categoryId])
+}
+
+/// A product hand-picked into a collection, at a position (#516).
+model CollectionProduct {
+  collectionId   String
+  collection     Collection   @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  productId      String
+  product        Product      @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  position Int
+
+  createdAt DateTime @default(now())
+
+  @@id([collectionId, productId])
+  @@index([productId])
+  @@index([organizationId])
 }
 
 // Inventory tracking

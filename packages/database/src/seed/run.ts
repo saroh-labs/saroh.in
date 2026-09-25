@@ -1270,6 +1270,14 @@ export async function deleteSeeded(
         () => prisma.productOptionValue.deleteMany({ where }),
         () => prisma.productOption.deleteMany({ where }),
         () => prisma.catalogueDefaults.deleteMany({ where }),
+        // Collections (#516): a seeded one, and any automatic one filled from
+        // a seeded category — the category holds on to it (NoAction).
+        () =>
+            prisma.collection.deleteMany({
+                where: {
+                    OR: [where, { categoryId: { startsWith: prefix } }],
+                },
+            }),
         () => prisma.category.deleteMany({ where }),
         () => prisma.customer.deleteMany({ where }),
         // Posts hang off a Site (ADR-004), so they clear before the sites do —
