@@ -25,7 +25,7 @@
  *   Contact/Lead/Pipeline/Stage/Activity ............ CRM
  *   Service/AvailabilityRule/Booking ................ APPOINTMENTS
  *   Course ........................................... COURSES
- *   Store/Product/Inventory/Cart/Order/Customer ..... COMMERCE
+ *   Store/Product/StockLevel/Cart/Order/Customer .... COMMERCE
  *   MerchantPaymentProvider/PaymentIntent/
  *     PaymentAttempt/WebhookEvent ................... PAYMENTS
  *   CommunicationProvider/Message/Delivery/Consent .. COMMUNICATIONS
@@ -113,7 +113,7 @@ export async function deriveModuleEvidence(
         await anyExists(
             client.store.count({ where }),
             client.product.count({ where }),
-            client.inventory.count({ where }),
+            client.stockLevel.count({ where }),
             client.cart.count({ where }),
             client.order.count({ where }),
             client.customer.count({ where }),

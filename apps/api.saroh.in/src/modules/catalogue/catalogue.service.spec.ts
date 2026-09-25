@@ -358,7 +358,7 @@ describe("Catalogue settings (DB)", () => {
                 ],
                 updateExisting: true,
             });
-            const alerts = await prisma.inventory.findMany({
+            const alerts = await prisma.stockLevel.findMany({
                 where: { productId: { in: serumIds } },
                 select: { productId: true, lowStockAlert: true },
             });
@@ -377,7 +377,7 @@ describe("Catalogue settings (DB)", () => {
                 products: saved.updated.products,
                 stock: saved.updated.stock,
             });
-            const back = await prisma.inventory.findMany({
+            const back = await prisma.stockLevel.findMany({
                 where: { productId: { in: serumIds } },
                 select: { lowStockAlert: true },
             });

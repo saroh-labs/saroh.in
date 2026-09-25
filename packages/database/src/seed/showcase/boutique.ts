@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 
 import { PLAN } from "../data";
 import type { Db } from "../helpers";
-import { at, id } from "../helpers";
+import { at, id, listProductAt, setStockLevel } from "../helpers";
 import type { BoutiqueProduct } from "./boutique-catalog";
 import {
     BOUTIQUE_CATEGORIES,
@@ -296,10 +296,7 @@ export async function seedBoutique(
     }
 
     // --- products, photos, variants, stock
-    const placed: Record<
-        string,
-        { productId: string; variants: Record<string, string> }
-    > = {};
+    const placed: Record<string, Placed> = {};
     for (let i = 0; i < BOUTIQUE_PRODUCTS.length; i++) {
         const p = BOUTIQUE_PRODUCTS[i];
         placed[p.slug] = await upsertProduct(prisma, {
@@ -326,6 +323,17 @@ export async function seedBoutique(
     return { id: orgId, name: BOUTIQUE_NAME, prefix: sid("") };
 }
 
+/**
+ * A product as written: its variants by title, and the storefront shelf rows
+ * its stock sits on — the whole product's, or each variant's by title.
+ */
+interface Placed {
+    productId: string;
+    variants: Record<string, string>;
+    stockLevelId: string | null;
+    variantStock: Record<string, string>;
+}
+
 async function upsertProduct(
     prisma: Db,
     a: {
@@ -338,7 +346,7 @@ async function upsertProduct(
         optionId: Record<string, string>;
         valueId: Record<string, string>;
     },
-): Promise<{ productId: string; variants: Record<string, string> }> {
+): Promise<Placed> {
     const { p, i, storeId, orgId, now } = a;
     const productId = sid("product", i);
     const data = {
@@ -413,30 +421,35 @@ async function upsertProduct(
     });
 
     const variants: Record<string, string> = {};
+    const variantStock: Record<string, string> = {};
+    // Nothing is promised until the open orders below hold it again.
     if (p.variants.length === 0) {
-        await prisma.variantInventory.deleteMany({ where: { productId } });
-        const stock = p.stock ?? { onHand: 0, warnAt: 5 };
-        await prisma.inventory.upsert({
-            where: { productId },
-            update: {
-                quantity: stock.onHand,
-                lowStockAlert: stock.warnAt,
-                reserved: 0,
-            },
-            create: {
-                id: sid("inventory", i),
-                storeId,
-                organizationId: orgId,
-                productId,
-                quantity: stock.onHand,
-                lowStockAlert: stock.warnAt,
-            },
+        await prisma.stockLevel.deleteMany({
+            where: { storeId, productId, variantId: { not: null } },
         });
-        return { productId, variants };
+        await listProductAt(prisma, {
+            id: sid("listing", i),
+            orgId,
+            storeId,
+            productId,
+        });
+        const stock = p.stock ?? { onHand: 0, warnAt: 5 };
+        const stockLevelId = await setStockLevel(prisma, {
+            id: sid("stocklevel", i),
+            orgId,
+            storeId,
+            productId,
+            onHand: stock.onHand,
+            promised: 0,
+            lowStockAlert: stock.warnAt,
+        });
+        return { productId, variants, stockLevelId, variantStock };
     }
 
     // Counted per variant: no product-level row.
-    await prisma.inventory.deleteMany({ where: { productId } });
+    await prisma.stockLevel.deleteMany({
+        where: { storeId, productId, variantId: null },
+    });
     for (let j = 0; j < p.variants.length; j++) {
         const v = p.variants[j];
         const variantId = sid("variant", i, j);
@@ -456,25 +469,33 @@ async function upsertProduct(
             update: vdata,
             create: { id: variantId, productId, ...vdata },
         });
-        await prisma.variantInventory.upsert({
-            where: { variantId },
-            update: {
-                quantity: v.stock.onHand,
-                lowStockAlert: v.stock.warnAt,
-                reserved: 0,
-            },
-            create: {
-                id: sid("vinventory", i, j),
-                variantId,
-                productId,
-                organizationId: orgId,
-                quantity: v.stock.onHand,
-                lowStockAlert: v.stock.warnAt,
-            },
-        });
         variants[v.title] = variantId;
     }
-    return { productId, variants };
+    // Sold at the storefront, every variant with it (#510).
+    await listProductAt(prisma, {
+        id: sid("listing", i),
+        orgId,
+        storeId,
+        productId,
+        variants: p.variants.map((_, j) => ({
+            id: sid("listingvariant", i, j),
+            variantId: sid("variant", i, j),
+        })),
+    });
+    for (let j = 0; j < p.variants.length; j++) {
+        const v = p.variants[j];
+        variantStock[v.title] = await setStockLevel(prisma, {
+            id: sid("stocklevel", i, j),
+            orgId,
+            storeId,
+            productId,
+            variantId: sid("variant", i, j),
+            onHand: v.stock.onHand,
+            promised: 0,
+            lowStockAlert: v.stock.warnAt,
+        });
+    }
+    return { productId, variants, stockLevelId: null, variantStock };
 }
 
 async function writeOrdersAndReviews(
@@ -483,10 +504,7 @@ async function writeOrdersAndReviews(
         storeId: string;
         orgId: string;
         now: Date;
-        placed: Record<
-            string,
-            { productId: string; variants: Record<string, string> }
-        >;
+        placed: Record<string, Placed>;
     },
 ) {
     const { storeId, orgId, now, placed } = a;
@@ -569,6 +587,10 @@ async function writeOrdersAndReviews(
                 createdAt: placedAt,
                 updatedAt: at(now, -(r.daysAgo + 2), 16),
             });
+            // Fulfilled from the storefront's shelf: it holds nothing now.
+            const stockLevelId = r.variantTitle
+                ? (place.variantStock[r.variantTitle] ?? null)
+                : place.stockLevelId;
             items.push({
                 id: itemId,
                 orderId,
@@ -576,6 +598,9 @@ async function writeOrdersAndReviews(
                 variantId,
                 quantity: 1,
                 price,
+                stockRow: stockRowOf(variantId, stockLevelId),
+                stockLevelId,
+                heldQuantity: 0,
             });
             const invitationId = sid("invitation", pi, ri);
             const reviewedAt = at(now, -r.daysAgo, 19);
@@ -651,6 +676,9 @@ async function writeOrdersAndReviews(
             createdAt: at(now, -(open % 3), 10 + open),
             updatedAt: at(now, -(open % 3), 10 + open),
         });
+        const stockLevelId = v
+            ? (place.variantStock[v.title] ?? null)
+            : place.stockLevelId;
         items.push({
             id: sid("openitem", open),
             orderId,
@@ -658,9 +686,12 @@ async function writeOrdersAndReviews(
             variantId,
             quantity: qty,
             price,
+            stockRow: stockRowOf(variantId, stockLevelId),
+            stockLevelId,
+            heldQuantity: stockLevelId ? qty : 0,
         });
-        const holdKey = variantId ? `v:${variantId}` : `p:${place.productId}`;
-        holds.set(holdKey, (holds.get(holdKey) ?? 0) + qty);
+        if (stockLevelId)
+            holds.set(stockLevelId, (holds.get(stockLevelId) ?? 0) + qty);
         open += 1;
     }
 
@@ -669,20 +700,26 @@ async function writeOrdersAndReviews(
     await prisma.reviewInvitation.createMany({ data: invitations });
     await prisma.productReview.createMany({ data: reviews });
 
-    for (const [k, qty] of Array.from(holds.entries())) {
-        const [kind, target] = k.split(":") as ["v" | "p", string];
-        if (kind === "v") {
-            await prisma.variantInventory.update({
-                where: { variantId: target },
-                data: { reserved: qty },
-            });
-        } else {
-            await prisma.inventory.update({
-                where: { productId: target },
-                data: { reserved: qty },
-            });
-        }
+    for (const [stockLevelId, qty] of Array.from(holds.entries())) {
+        await prisma.stockLevel.update({
+            where: { id: stockLevelId },
+            data: { promised: qty },
+        });
     }
+}
+
+/**
+ * Which shelf row a line settles on: its variant's or the product's. A line
+ * naming no variant of a product counted per variant has no row to settle
+ * on, so it reads as a line from before this was recorded (null), not as a
+ * product that counts no stock (NONE).
+ */
+function stockRowOf(
+    variantId: string | null,
+    stockLevelId: string | null,
+): "PRODUCT" | "VARIANT" | null {
+    if (!stockLevelId) return null;
+    return variantId ? "VARIANT" : "PRODUCT";
 }
 
 /**
@@ -890,27 +927,44 @@ export async function checkBoutique(prisma: Db): Promise<void> {
               AND (i.id IS NULL OR o.status <> 'DELIVERED' OR i."productId" <> r."productId")`,
     );
     fail(
-        "variant stock promised that open orders do not hold",
+        "stock promised that open orders do not hold",
         await prisma.$queryRaw<unknown[]>`
-            SELECT vi."variantId", vi.reserved, COALESCE(h.held, 0) AS held
-            FROM "VariantInventory" vi
+            SELECT s.id, s.promised, COALESCE(h.held, 0) AS held
+            FROM "StockLevel" s
             LEFT JOIN (
-                SELECT i."variantId", SUM(i.quantity) AS held FROM "OrderItem" i
+                SELECT i."stockLevelId", SUM(i."heldQuantity") AS held FROM "OrderItem" i
                 JOIN "Order" o ON o.id = i."orderId"
-                WHERE o.status IN ('PENDING', 'PROCESSING') GROUP BY i."variantId"
-            ) h ON h."variantId" = vi."variantId"
-            WHERE vi."organizationId" = ${orgId} AND vi.reserved <> COALESCE(h.held, 0)`,
+                WHERE o.status IN ('PENDING', 'PROCESSING') GROUP BY i."stockLevelId"
+            ) h ON h."stockLevelId" = s.id
+            WHERE s."organizationId" = ${orgId} AND s.promised <> COALESCE(h.held, 0)`,
     );
     fail(
-        "variants holding more than is on hand",
+        "open lines that hold stock on no shelf row",
         await prisma.$queryRaw<unknown[]>`
-            SELECT "variantId" FROM "VariantInventory"
-            WHERE "organizationId" = ${orgId} AND reserved > quantity`,
+            SELECT i.id FROM "OrderItem" i
+            JOIN "Order" o ON o.id = i."orderId"
+            WHERE o."organizationId" = ${orgId}
+              AND o.status IN ('PENDING', 'PROCESSING')
+              AND i."stockRow" IN ('PRODUCT', 'VARIANT')
+              AND (i."stockLevelId" IS NULL OR i."heldQuantity" <> i.quantity)`,
+    );
+    fail(
+        "products not listed at the storefront",
+        await prisma.$queryRaw<unknown[]>`
+            SELECT p.id FROM "Product" p
+            LEFT JOIN "ProductListing" l ON l."productId" = p.id AND l."storeId" = p."storeId"
+            WHERE p."organizationId" = ${orgId} AND l.id IS NULL`,
+    );
+    fail(
+        "stock holding more than is on hand",
+        await prisma.$queryRaw<unknown[]>`
+            SELECT id FROM "StockLevel"
+            WHERE "organizationId" = ${orgId} AND promised > "onHand"`,
     );
     const counts = await prisma.$queryRaw<{ sold_out: bigint; low: bigint }[]>`
-        SELECT COUNT(*) FILTER (WHERE quantity - reserved <= 0) AS sold_out,
-               COUNT(*) FILTER (WHERE quantity - reserved > 0 AND quantity - reserved <= "lowStockAlert") AS low
-        FROM "VariantInventory" WHERE "organizationId" = ${orgId}`;
+        SELECT COUNT(*) FILTER (WHERE "onHand" - promised <= 0) AS sold_out,
+               COUNT(*) FILTER (WHERE "onHand" - promised > 0 AND "onHand" - promised <= "lowStockAlert") AS low
+        FROM "StockLevel" WHERE "organizationId" = ${orgId} AND "variantId" IS NOT NULL`;
     const c = counts.at(0);
     if (!c || Number(c.sold_out) < 1 || Number(c.low) < 1) {
         failures.push(

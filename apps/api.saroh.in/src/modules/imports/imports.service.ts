@@ -7,6 +7,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { listAt } from "../products/listings.service";
 import { sanitizeRichHtml } from "../sites/sanitize";
 import { StoresService } from "../stores/stores.service";
 import { CsvFormatError, parseCsv } from "./csv";
@@ -205,8 +206,9 @@ export class ImportsService {
         entity: ImportEntity,
     ): Promise<Set<string>> {
         if (entity === "products") {
+            // A product's address is unique in its business (#510).
             const rows = await prisma.product.findMany({
-                where: { storeId },
+                where: { organization: { stores: { some: { id: storeId } } } },
                 select: { slug: true },
             });
             return new Set(rows.map((r) => r.slug));
@@ -241,15 +243,26 @@ export class ImportsService {
                 currency: v.currency ?? "USD",
                 status: v.status ?? "DRAFT",
             };
+            // Every storefront belongs to a business; so does every product.
+            if (!organizationId) {
+                throw new BadRequestException(
+                    "This storefront is not attached to a business.",
+                );
+            }
             if (row.outcome === "CREATE") {
-                // organizationId is stamped here for the same reason as #173:
-                // a NULL is invisible to org-scoped queries and to RLS.
-                await tx.product.create({
+                // The business's product, sold at this storefront (#510).
+                const product = await tx.product.create({
                     data: { storeId, organizationId, slug, ...data },
+                    select: { id: true },
+                });
+                await listAt(tx, {
+                    organizationId,
+                    productId: product.id,
+                    storeId,
                 });
             } else {
                 await tx.product.update({
-                    where: { storeId_slug: { storeId, slug } },
+                    where: { organizationId_slug: { organizationId, slug } },
                     data,
                 });
             }

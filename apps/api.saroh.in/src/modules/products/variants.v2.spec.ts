@@ -97,11 +97,22 @@ describe("Variants and stock per variant (DB)", () => {
         await prisma.user.deleteMany({ where: { id: ownerId } });
     });
 
-    const stockOf = async (variantId: string) =>
-        prisma.variantInventory.findUniqueOrThrow({
-            where: { variantId },
-            select: { quantity: true, reserved: true },
+    // A variant's shelf at the storefront (#510: StockLevel).
+    const stockOf = async (variantId: string) => {
+        const row = await prisma.stockLevel.findFirstOrThrow({
+            where: { storeId, variantId },
+            select: { onHand: true, promised: true },
         });
+        return { quantity: row.onHand, reserved: row.promised };
+    };
+    // The product's own shelf at the storefront.
+    const ownRow = async (productId: string) => {
+        const row = await prisma.stockLevel.findFirstOrThrow({
+            where: { storeId, productId, variantId: null },
+            select: { onHand: true, promised: true },
+        });
+        return { quantity: row.onHand, reserved: row.promised };
+    };
 
     it("adds variants with a value of the product's option, in order", async () => {
         for (const size of ["S", "M", "L"]) {
@@ -306,21 +317,13 @@ describe("Variants and stock per variant (DB)", () => {
             customerId,
             items: [{ productId: serum, quantity: 3 }],
         });
-        const own = await prisma.inventory.findUniqueOrThrow({
-            where: { productId: serum },
-            select: { quantity: true, reserved: true },
-        });
-        expect(own).toEqual({ quantity: 10, reserved: 3 });
+        expect(await ownRow(serum)).toEqual({ quantity: 10, reserved: 3 });
     });
 
     describe("switching to a count per variant with orders open", () => {
         let tonerId = "";
         const t: Record<string, string> = {};
-        const own = (productId: string) =>
-            prisma.inventory.findUniqueOrThrow({
-                where: { productId },
-                select: { quantity: true, reserved: true },
-            });
+        const own = ownRow;
 
         beforeAll(async () => {
             tonerId = (
@@ -404,11 +407,7 @@ describe("Variants and stock per variant (DB)", () => {
     });
 
     describe("each line settles on the row it reserved from", () => {
-        const own = (productId: string) =>
-            prisma.inventory.findUniqueOrThrow({
-                where: { productId },
-                select: { quantity: true, reserved: true },
-            });
+        const own = ownRow;
         const stockRowOf = async (orderId: string) =>
             (
                 await prisma.orderItem.findFirstOrThrow({

@@ -94,7 +94,7 @@ export class CatalogueService {
                 },
             }),
             prisma.product.count({
-                where: { store: { organizationId }, categoryId: null },
+                where: { organizationId, categoryId: null },
             }),
             this.options.views(organizationId),
         ]);
@@ -221,13 +221,9 @@ export class CatalogueService {
                         where: { id: u.id },
                         data: u.data,
                     });
-                } else if (u.kind === "productStock") {
-                    await tx.inventory.update({
-                        where: { id: u.id },
-                        data: { lowStockAlert: u.lowStockAlert },
-                    });
                 } else {
-                    await tx.variantInventory.update({
+                    // Either kind is a StockLevel row (#510).
+                    await tx.stockLevel.update({
                         where: { id: u.id },
                         data: { lowStockAlert: u.lowStockAlert },
                     });
@@ -271,7 +267,7 @@ export class CatalogueService {
             }
             for (const p of dto.products) {
                 await tx.product.updateMany({
-                    where: { id: p.id, store: { organizationId } },
+                    where: { id: p.id, organizationId },
                     data: {
                         howToUse: p.howToUse ?? null,
                         returnsMode: p.returnsMode,
@@ -279,18 +275,12 @@ export class CatalogueService {
                     },
                 });
             }
+            // Either kind is a StockLevel row (#510).
             for (const s of dto.stock) {
-                if (s.kind === "product") {
-                    await tx.inventory.updateMany({
-                        where: { id: s.id, store: { organizationId } },
-                        data: { lowStockAlert: s.lowStockAlert },
-                    });
-                } else {
-                    await tx.variantInventory.updateMany({
-                        where: { id: s.id, organizationId },
-                        data: { lowStockAlert: s.lowStockAlert },
-                    });
-                }
+                await tx.stockLevel.updateMany({
+                    where: { id: s.id, organizationId },
+                    data: { lowStockAlert: s.lowStockAlert },
+                });
             }
         });
         return { entries: await this.entries(organizationId) };
@@ -341,27 +331,30 @@ export class CatalogueService {
         })[]
     > {
         const rows = await prisma.product.findMany({
-            where: { store: { organizationId }, status: { not: "ARCHIVED" } },
+            where: { organizationId, status: { not: "ARCHIVED" } },
             select: {
                 id: true,
                 categoryId: true,
                 howToUse: true,
                 returnsMode: true,
                 returnsText: true,
-                inventory: { select: { id: true, lowStockAlert: true } },
-                variants: {
-                    select: {
-                        inventory: {
-                            select: { id: true, lowStockAlert: true },
-                        },
-                    },
+                // Every storefront's shelf (#510).
+                stockLevels: {
+                    select: { id: true, lowStockAlert: true, variantId: true },
+                    orderBy: { id: "asc" },
                 },
             },
         });
         return rows.map((p) => {
-            const variantRows = p.variants.flatMap((v) =>
-                v.inventory
-                    ? [{ kind: "variantStock" as const, ...v.inventory }]
+            const variantRows = p.stockLevels.flatMap((r) =>
+                r.variantId
+                    ? [
+                          {
+                              kind: "variantStock" as const,
+                              id: r.id,
+                              lowStockAlert: r.lowStockAlert,
+                          },
+                      ]
                     : [],
             );
             // Per-variant products warn per variant; their product row holds
@@ -369,9 +362,11 @@ export class CatalogueService {
             const stockRows =
                 variantRows.length > 0
                     ? variantRows
-                    : p.inventory
-                      ? [{ kind: "productStock" as const, ...p.inventory }]
-                      : [];
+                    : p.stockLevels.map((r) => ({
+                          kind: "productStock" as const,
+                          id: r.id,
+                          lowStockAlert: r.lowStockAlert,
+                      }));
             return {
                 id: p.id,
                 categoryId: p.categoryId,

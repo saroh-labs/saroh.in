@@ -488,12 +488,14 @@ async function seedNorthwind(
         products: NORTHWIND_NEW_PRODUCTS,
         productId: (i) => sid(key, "product", i),
         variantId: (i, v) => sid(key, "variant", i, v),
-        inventoryId: (i) => sid(key, "inventory", i),
+        listingId: (i) => sid(key, "listing", i),
+        listingVariantId: (i, v) => sid(key, "listingvariant", i, v),
+        stockLevelId: (i) => sid(key, "stocklevel", i),
         createdAt: (i) => at(now, -(200 - i * 3), 11),
     });
     const baseProducts = await prisma.product.findMany({
         where: {
-            storeId,
+            organizationId: orgId,
             slug: { in: Object.keys(NORTHWIND_BASE_PRODUCT_DEMAND) },
         },
         select: { id: true, slug: true },

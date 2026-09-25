@@ -33,6 +33,21 @@
   `CatalogueAccess` resolves it from an org route (`store:read` /
   `store:write`) or, for the old `stores/:storeId/...` aliases, from the
   storefront under its own access rules.
+- **Current** — **A product belongs to the business; a storefront sells it
+  through a listing and counts it in `StockLevel`** (#510, ADR-010).
+  `Product.organizationId` is required and slugs are unique per business;
+  `Product.storeId` is only where it was first made. `ProductListing` (and
+  `ProductListingVariant` for the variants sold there) says where it sells;
+  store-route reads go through it (`listedAt`). Stock is one `StockLevel` row
+  per storefront × product × variant (variant null: counted as a whole),
+  behind two partial uniques — find it under a row lock and create it, never
+  upsert. An order line records its row (`stockLevelId`) and what it holds
+  (`heldQuantity`). Lock order: Order → Product (a change to how it counts)
+  → StockLevel rows by id (`products/stock-levels.ts`). `Inventory` and
+  `VariantInventory` are no longer written. Every new table pairs its ids
+  with composite keys — (storeId, organizationId), (productId,
+  organizationId), (variantId, productId) — so the database refuses a row
+  mixing two businesses.
 - **Current** — **A backfill that merges rows is a TypeScript script** in
   `packages/database/src/backfill/`, exported so the integration suite can seed
   old-shape rows, run it twice and check the second run changes nothing

@@ -37,7 +37,9 @@ import {
     emailFor,
     hashPassword,
     id,
+    listProductAt,
     publishSeedPost,
+    setStockLevel,
     writeSite,
 } from "./helpers";
 
@@ -528,7 +530,9 @@ async function seedCommerce(
     for (let i = 0; i < PRODUCTS.length; i++) {
         const p = PRODUCTS[i];
         const product = await prisma.product.upsert({
-            where: { storeId_slug: { storeId: store.id, slug: p.slug } },
+            where: {
+                organizationId_slug: { organizationId: orgId, slug: p.slug },
+            },
             update: { name: p.name, price: p.price, status: "PUBLISHED" },
             create: {
                 id: id("product", i),
@@ -545,9 +549,10 @@ async function seedCommerce(
         });
         productIds.push(product.id);
 
+        const variantIds: string[] = [];
         for (let v = 0; v < p.variants.length; v++) {
             const variant = p.variants[v];
-            await prisma.productVariant.upsert({
+            const row = await prisma.productVariant.upsert({
                 where: {
                     productId_sku: { productId: product.id, sku: variant.sku },
                 },
@@ -560,20 +565,30 @@ async function seedCommerce(
                     price: variant.price,
                 },
             });
+            variantIds.push(row.id);
         }
 
-        // Deliberately includes a zero and two near-zero quantities, so the
-        // out-of-stock and low-stock presentations have something to render.
-        await prisma.inventory.upsert({
-            where: { productId: product.id },
-            update: { quantity: p.stock },
-            create: {
-                id: id("inventory", i),
-                productId: product.id,
-                storeId: store.id,
-                organizationId: orgId,
-                quantity: p.stock,
-            },
+        // Sold at the storefront, every variant with it (#510).
+        await listProductAt(prisma, {
+            id: id("listing", i),
+            orgId,
+            storeId: store.id,
+            productId: product.id,
+            variants: variantIds.map((variantId, v) => ({
+                id: id("listingvariant", i, v),
+                variantId,
+            })),
+        });
+
+        // Counted as a whole, not per variant. Deliberately includes a zero
+        // and two near-zero quantities, so the out-of-stock and low-stock
+        // presentations have something to render.
+        await setStockLevel(prisma, {
+            id: id("stocklevel", i),
+            orgId,
+            storeId: store.id,
+            productId: product.id,
+            onHand: p.stock,
         });
     }
 
@@ -1233,6 +1248,12 @@ export async function deleteSeeded(
                 where: { noteId: { startsWith: prefix } },
             }),
         () => prisma.subscriptionSkip.deleteMany({ where }),
+        // Stock and where a product is sold (#510), before the variants and
+        // products they hang off. Inventory and VariantInventory are no longer
+        // written, but rows an older seed left still clear.
+        () => prisma.stockLevel.deleteMany({ where }),
+        () => prisma.productListingVariant.deleteMany({ where }),
+        () => prisma.productListing.deleteMany({ where }),
         () => prisma.inventory.deleteMany({ where }),
         // Products v2: stock per variant and photos before what they hang off;
         // option values after the variants that choose them (Restrict).

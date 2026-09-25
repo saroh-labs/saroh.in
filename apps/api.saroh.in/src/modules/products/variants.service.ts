@@ -9,6 +9,7 @@ import { prisma } from "@saroh/database";
 import { assertMrpAtOrAbovePrice } from "./product-rules";
 import { ProductsService } from "./products.service";
 import { serializeVariant } from "./serialize";
+import { lockProduct, lockProductStock } from "./stock-levels";
 import type {
     CreateVariantDto,
     ReorderVariantsDto,
@@ -29,6 +30,9 @@ const SKU_TAKEN = {
  * one of the product's photos, its own MRP and a position. Once the product
  * counts stock per variant, a new variant starts with its own count of 0, and
  * a variant with stock promised to open orders cannot be removed.
+ *
+ * #510: a new variant is sold wherever its product is listed, and counted
+ * at every storefront that counts the product per variant.
  */
 @Injectable()
 export class VariantsService {
@@ -39,7 +43,20 @@ export class VariantsService {
         const variants = await prisma.productVariant.findMany({
             where: { productId },
             orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-            include: { inventory: true },
+            include: {
+                stockLevels: {
+                    where: { storeId },
+                    select: {
+                        onHand: true,
+                        promised: true,
+                        lowStockAlert: true,
+                    },
+                },
+                listings: {
+                    where: { listing: { storeId } },
+                    select: { id: true },
+                },
+            },
         });
         return variants.map(serializeVariant);
     }
@@ -57,16 +74,15 @@ export class VariantsService {
         );
         await this.assertCoherent(productId, dto);
 
-        const [last, perVariant] = await Promise.all([
-            prisma.productVariant.findFirst({
-                where: { productId },
-                orderBy: { position: "desc" },
-                select: { position: true },
-            }),
-            this.countsPerVariant(productId),
-        ]);
+        const last = await prisma.productVariant.findFirst({
+            where: { productId },
+            orderBy: { position: "desc" },
+            select: { position: true },
+        });
         try {
             const variant = await prisma.$transaction(async (tx) => {
+                // Lock order: the product, then its stock rows.
+                await lockProduct(tx, productId);
                 const created = await tx.productVariant.create({
                     data: {
                         productId,
@@ -80,14 +96,35 @@ export class VariantsService {
                         position: (last?.position ?? -1) + 1,
                     },
                 });
-                // A product counting per variant counts every variant: a new
-                // one starts at nothing on hand rather than untracked.
-                if (perVariant && organizationId) {
-                    await tx.variantInventory.create({
-                        data: {
-                            variantId: created.id,
-                            productId,
+                // Sold wherever the product is listed.
+                const listings = await tx.productListing.findMany({
+                    where: { productId },
+                    select: { id: true },
+                });
+                if (listings.length > 0) {
+                    await tx.productListingVariant.createMany({
+                        data: listings.map((l) => ({
                             organizationId,
+                            listingId: l.id,
+                            productId,
+                            variantId: created.id,
+                        })),
+                    });
+                }
+                // A product counting per variant counts every variant: at
+                // each storefront that counts it so, a new one starts at
+                // nothing on hand rather than untracked.
+                const rows = await lockProductStock(tx, productId);
+                const stores = new Set(
+                    rows.filter((r) => r.variantId).map((r) => r.storeId),
+                );
+                for (const storeId of Array.from(stores)) {
+                    await tx.stockLevel.create({
+                        data: {
+                            organizationId,
+                            storeId,
+                            productId,
+                            variantId: created.id,
                         },
                     });
                 }
@@ -186,74 +223,64 @@ export class VariantsService {
         );
         const variant = await prisma.productVariant.findFirst({
             where: { id: variantId, productId },
-            select: {
-                id: true,
-                title: true,
-                inventory: {
-                    select: {
-                        quantity: true,
-                        reserved: true,
-                        lowStockAlert: true,
-                    },
-                },
-            },
+            select: { id: true, title: true },
         });
         if (!variant) {
             throw new NotFoundException("Variant not found");
         }
-        // Stock promised to an open order is a promise to a customer: the
-        // variant stays until those orders are fulfilled or cancelled.
-        if (variant.inventory && variant.inventory.reserved > 0) {
-            throw new ConflictException({
-                message: `${variant.title} has ${variant.inventory.reserved} promised to open orders, so it can't be removed yet.`,
-                field: "variantId",
-            });
-        }
 
         await prisma.$transaction(async (tx) => {
-            await tx.productVariant.delete({ where: { id: variantId } });
-            // The last variant counting its own stock takes its count back to
-            // the product, so the product does not silently lose its stock.
-            if (variant.inventory) {
-                const others = await tx.variantInventory.count({
-                    where: { productId },
+            // Lock order: the product, then its stock rows.
+            await lockProduct(tx, productId);
+            const rows = await lockProductStock(tx, productId);
+            const own = rows.filter((r) => r.variantId === variantId);
+            // Stock promised to an open order is a promise to a customer:
+            // the variant stays until those orders are fulfilled or
+            // cancelled, at every storefront.
+            const promised = own.reduce((n, r) => n + r.promised, 0);
+            if (promised > 0) {
+                throw new ConflictException({
+                    message: `${variant.title} has ${promised} promised to open orders, so it can't be removed yet.`,
+                    field: "variantId",
                 });
-                if (others === 0) {
-                    const row = await tx.inventory.findUnique({
-                        where: { productId },
-                        select: { id: true },
+            }
+            await tx.productVariant.delete({ where: { id: variantId } });
+            // At each storefront, the last variant counting its own stock
+            // takes its count back to the product, so the product does not
+            // silently lose its stock.
+            for (const row of own) {
+                const others = rows.some(
+                    (r) =>
+                        r.storeId === row.storeId &&
+                        r.variantId !== null &&
+                        r.variantId !== variantId,
+                );
+                if (others) continue;
+                const whole = rows.find(
+                    (r) => r.storeId === row.storeId && r.variantId === null,
+                );
+                if (whole) {
+                    await tx.stockLevel.update({
+                        where: { id: whole.id },
+                        data: {
+                            onHand: { increment: row.onHand },
+                            lowStockAlert: row.lowStockAlert,
+                        },
                     });
-                    const back = {
-                        quantity: { increment: variant.inventory.quantity },
-                        lowStockAlert: variant.inventory.lowStockAlert,
-                    };
-                    if (row) {
-                        await tx.inventory.update({
-                            where: { productId },
-                            data: back,
-                        });
-                    } else {
-                        await tx.inventory.create({
-                            data: {
-                                storeId,
-                                organizationId,
-                                productId,
-                                quantity: variant.inventory.quantity,
-                                lowStockAlert: variant.inventory.lowStockAlert,
-                            },
-                        });
-                    }
+                } else {
+                    await tx.stockLevel.create({
+                        data: {
+                            organizationId,
+                            storeId: row.storeId,
+                            productId,
+                            onHand: row.onHand,
+                            lowStockAlert: row.lowStockAlert,
+                        },
+                    });
                 }
             }
         });
         return { id: variantId };
-    }
-
-    /** Whether the product already counts stock per variant. */
-    private async countsPerVariant(productId: string): Promise<boolean> {
-        return (
-            (await prisma.variantInventory.count({ where: { productId } })) > 0
-        );
     }
 
     /**
