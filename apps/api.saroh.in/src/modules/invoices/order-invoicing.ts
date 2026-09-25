@@ -316,10 +316,17 @@ async function creditable(tx: Tx, original: OriginalRow): Promise<number> {
 async function invoicedLines(
     tx: Tx,
     original: OriginalRow,
+    leaveOut: readonly string[] = [],
 ): Promise<OriginalRow["lines"]> {
     const supplementary = await tx.invoiceLine.findMany({
         where: {
-            invoice: { relatedInvoiceId: original.id, kind: "SUPPLEMENTARY" },
+            invoice: {
+                relatedInvoiceId: original.id,
+                kind: "SUPPLEMENTARY",
+                ...(leaveOut.length > 0
+                    ? { id: { notIn: [...leaveOut] } }
+                    : {}),
+            },
         },
         orderBy: [{ invoice: { createdAt: "asc" } }, { position: "asc" }],
         select: ORIGINAL_SELECT.lines.select,
@@ -584,6 +591,7 @@ async function supersededPaymentInvoice(
 ): Promise<{
     id: string;
     number: string | null;
+    total: Prisma.Decimal;
     lines: OriginalRow["lines"];
 } | null> {
     return tx.invoice.findFirst({
@@ -597,7 +605,12 @@ async function supersededPaymentInvoice(
             ),
         },
         orderBy: { createdAt: "asc" },
-        select: { id: true, number: true, lines: ORIGINAL_SELECT.lines },
+        select: {
+            id: true,
+            number: true,
+            total: true,
+            lines: ORIGINAL_SELECT.lines,
+        },
     });
 }
 
@@ -779,6 +792,11 @@ export async function settleSupplementaryInvoices(
  * The order was refunded in full: whatever of its invoice is left is
  * credited (a refund recorded by hand made no credit note of its own), and
  * the invoice reads CREDITED.
+ *
+ * Except a payment on a replaced charge still owed back: the order's full
+ * refund did not return it, so it is neither credited here nor marked
+ * CREDITED. The refund that hands it back makes its own credit note
+ * ({@link creditNoteForRefund}).
  */
 export async function creditRestOfOrder(
     tx: Tx,
@@ -791,18 +809,80 @@ export async function creditRestOfOrder(
         select: { id: true },
     });
     if (!invoice) return;
-    await issueCreditNote(tx, {
-        invoiceId: invoice.id,
-        amountCents: Number.MAX_SAFE_INTEGER,
-        note,
-        createdByUserId,
-    });
+    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoice.id} FOR UPDATE`;
+    const held = await owedBackPayments(tx, orderId);
+    if (held.length === 0) {
+        await issueCreditNote(tx, {
+            invoiceId: invoice.id,
+            amountCents: Number.MAX_SAFE_INTEGER,
+            note,
+            createdByUserId,
+        });
+    } else {
+        const original = await tx.invoice.findUnique({
+            where: { id: invoice.id },
+            select: ORIGINAL_SELECT,
+        });
+        if (!original) return;
+        const heldCents = held.reduce((s, h) => s + h.heldCents, 0);
+        const rest = (await creditable(tx, original)) - heldCents;
+        if (rest > 0) {
+            await issueCreditNote(tx, {
+                invoiceId: invoice.id,
+                amountCents: rest,
+                note,
+                createdByUserId,
+                spreadOver: await invoicedLines(
+                    tx,
+                    original,
+                    held.map((h) => h.invoiceId),
+                ),
+            });
+        }
+    }
     await tx.invoice.updateMany({
         where: {
             orderId,
             kind: { in: ["INVOICE", "SUPPLEMENTARY"] },
             status: "PAID",
+            id: { notIn: held.map((h) => h.invoiceId) },
         },
         data: { status: "CREDITED" },
     });
+}
+
+/**
+ * The order's payments on replaced charges that are invoiced and not yet
+ * all handed back: each one's supplementary invoice, and what of it no
+ * refund's credit note has offset.
+ */
+async function owedBackPayments(
+    tx: Tx,
+    orderId: string,
+): Promise<{ invoiceId: string; heldCents: number }[]> {
+    const intents = await tx.paymentIntent.findMany({
+        where: {
+            orderId,
+            status: SUPERSEDED_INTENT,
+            attempts: { some: { status: CAPTURED_NEEDS_REFUND } },
+        },
+        select: { id: true },
+    });
+    const held: { invoiceId: string; heldCents: number }[] = [];
+    for (const intent of intents) {
+        const paidOn = await supersededPaymentInvoice(tx, orderId, intent.id);
+        if (!paidOn) continue;
+        const credited = await tx.invoice.aggregate({
+            where: {
+                kind: "CREDIT_NOTE",
+                paymentRefund: { paymentIntentId: intent.id },
+            },
+            _sum: { total: true },
+        });
+        const heldCents =
+            toCents(paidOn.total.toString()) -
+            toCents((credited._sum.total ?? 0).toString());
+        if (heldCents > 0) held.push({ invoiceId: paidOn.id, heldCents });
+    }
+    return held;
 }

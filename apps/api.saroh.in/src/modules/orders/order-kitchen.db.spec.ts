@@ -942,4 +942,68 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
         expect(note.kind).toBe("CREDIT_NOTE");
         expect(note.total.toString()).toBe("360");
     });
+
+    it("paid anyway, then the order refunded in full: the owed-back payment is left for its own refund", async () => {
+        const { order, invoiceId, old, took } = await paidOnReplacedCharge();
+        /** Rupees invoiced less rupees credited, in paise. */
+        const uncredited = async () => {
+            const all = await prisma.invoice.findMany({
+                where: { orderId: order.id },
+                select: { kind: true, total: true },
+            });
+            return all.reduce(
+                (s, i) =>
+                    s +
+                    (i.kind === "CREDIT_NOTE" ? -1 : 1) *
+                        Math.round(Number(i.total) * 100),
+                0,
+            );
+        };
+
+        // The order's ₹610 goes back; the ₹250 on the replaced charge has not.
+        const refund = await payments.initiateRefund(owner, order.id, {
+            idempotencyKey: `took-full-${order.id}`,
+        });
+        expect(refund.amountCents).toBe(61000);
+        await webhook({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: `prov_${order.id}`,
+            providerRefundId: refund.providerRefundId,
+        });
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+                .paymentStatus,
+        ).toBe("REFUNDED");
+        const status = async (id: string) =>
+            (
+                await prisma.invoice.findUniqueOrThrow({
+                    where: { id },
+                    select: { status: true },
+                })
+            ).status;
+        expect(await status(invoiceId)).toBe("CREDITED");
+        // Still received and not returned: not credited, not CREDITED.
+        expect(await status(took.id)).toBe("PAID");
+        expect(await uncredited()).toBe(25000);
+
+        // Handed back: its own credit note offsets it.
+        await webhook({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: `prov_${old.id}`,
+            providerRefundId: `rfnd_took_${order.id}`,
+            refundAmountCents: 25000,
+        });
+        const back = await prisma.paymentRefund.findFirstOrThrow({
+            where: { paymentIntentId: old.id },
+            select: { id: true },
+        });
+        const note = await prisma.invoice.findFirstOrThrow({
+            where: { paymentRefundId: back.id },
+            select: { total: true },
+        });
+        expect(note.total.toString()).toBe("250");
+        expect(await uncredited()).toBe(0);
+    });
 });
