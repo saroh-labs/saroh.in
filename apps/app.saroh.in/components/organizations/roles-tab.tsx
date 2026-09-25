@@ -47,7 +47,10 @@ const GROUP_LABEL: Record<string, string> = {
 /** The built-ins a new role may start from. Owner is not offered: see below. */
 const START_FROM = [
     { key: "", label: "Nothing — I will tick what it needs" },
-    { key: "MEMBER", label: "Member — sees the day, no money or settings" },
+    {
+        key: "MEMBER",
+        label: "Member — runs the day · can see settings, can't change them or see money",
+    },
     { key: "ADMIN", label: "Admin — everything except removing an owner" },
     { key: "REVIEWER", label: "Reviewer — look at websites and sign them off" },
 ] as const;

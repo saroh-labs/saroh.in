@@ -44,6 +44,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { InviteValues } from "@/lib/organizations/invitations";
 import { invitationMeta, inviteSchema } from "@/lib/organizations/invitations";
+import { lastActive } from "@/lib/organizations/last-active";
 import {
     inviteMember,
     removeMember,
@@ -73,13 +74,14 @@ const ROLE_LABEL: Record<OrganizationRole, string> = {
  * What each role is for, in the words a small business would use — and only
  * what the API's policy grants (`organization-policy.ts`): a business may
  * have several owners and never none; an admin lacks only closing the
- * business, so cannot change or remove an owner either; a member reads the
- * day and moves kitchen orders, and sees no money.
+ * business, so cannot change or remove an owner either; a member runs the
+ * day — reads it and moves kitchen orders — sees the business's settings
+ * without changing them, and sees no money.
  */
 const ROLE_BLURB: Record<OrganizationRole, string> = {
     OWNER: "Can open and change everything. A business always has at least one owner, so it can never be locked out.",
     ADMIN: "Can do everything an owner can, except close the business or change or remove an owner.",
-    MEMBER: "Sees the day — bookings, contacts and the team — and moves kitchen orders along. Sees no money and can't change settings.",
+    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves kitchen orders along. Can see settings, but can't change them or see money.",
     REVIEWER:
         "Can look at the websites they're invited to, comment and sign them off. Nothing else in the business.",
 };
@@ -88,7 +90,7 @@ const ROLE_BLURB: Record<OrganizationRole, string> = {
 const ROLE_PLAIN: Record<OrganizationRole, string> = {
     OWNER: "can open everything",
     ADMIN: "everything except removing an owner",
-    MEMBER: "sees the day — no money or settings",
+    MEMBER: "runs the day · can see settings, can't change them or see money",
     REVIEWER: "invited websites, nothing else",
 };
 
@@ -135,9 +137,9 @@ const TEAM_TABS = ["roles", "people"] as const;
  *
  * Two tabs over one business. ROLES explains the four roles — who holds each,
  * what it opens, and the ring that marks it. PEOPLE is the roster: a
- * neutral monogram ringed in the role's colour, the role in words beside a
- * dot of the same colour, and an Edit drawer that changes the role or removes
- * the person.
+ * neutral monogram ringed in the role's colour, when each person was last
+ * active, the role in words beside a dot of the same colour, a Remove on the
+ * row and an Edit drawer that changes the role.
  *
  * Team is business-scoped: there is no storefront anywhere on this screen. A
  * role is held in a business and covers everything that business has, and an
@@ -146,7 +148,9 @@ const TEAM_TABS = ["roles", "people"] as const;
  * Roles a business invents live in `RolesTab`, backed by the API's own
  * catalogue. Still not built, because nothing backs them yet: choosing a
  * role's ring colour (the avatar has one token per built-in, so invented roles
- * wear a neutral ring), and per-person extra permissions.
+ * wear a neutral ring), per-person extra permissions (the column is drawn,
+ * empty), and requiring two-step sign-in (the switch is drawn off and says
+ * so — Saroh has no two-step sign-in).
  */
 export function TeamScreen({
     organizationName,
@@ -176,6 +180,7 @@ export function TeamScreen({
     // In the address, so Search settings can open Roles.
     const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
+    const [removing, setRemoving] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
 
     const byKey = new Map(roles.map((r) => [r.key, r]));
@@ -313,6 +318,7 @@ export function TeamScreen({
                     canManage={canManage}
                     book={book}
                     onEdit={setEditing}
+                    onRemove={setRemoving}
                 />
             )}
 
@@ -322,6 +328,15 @@ export function TeamScreen({
                 organizationName={organizationName}
                 book={book}
                 onClose={() => setEditing(null)}
+                onRemove={(m) => {
+                    setEditing(null);
+                    setRemoving(m);
+                }}
+            />
+            <RemoveMember
+                member={removing}
+                organizationName={organizationName}
+                onClose={() => setRemoving(null)}
             />
             {canManage ? (
                 <InviteDialog
@@ -349,6 +364,7 @@ function PeopleTab({
     canManage,
     book,
     onEdit,
+    onRemove,
 }: {
     organizationName: string;
     members: OrganizationMember[];
@@ -356,12 +372,19 @@ function PeopleTab({
     canManage: boolean;
     book: RoleBook;
     onEdit: (member: OrganizationMember) => void;
+    onRemove: (member: OrganizationMember) => void;
 }) {
+    // The design's four columns need about 600px; the panel is that wide
+    // only once the settings list sits beside it on a wide screen. Narrower,
+    // a row is the person — role under their name — and their buttons.
     const grid =
-        "grid grid-cols-[minmax(190px,1fr)_minmax(0,168px)_92px] items-center";
+        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,1fr)_150px]";
+    const rowButton = "text-[12.5px]";
 
     return (
         <div className="space-y-3.5">
+            {canManage ? <TwoStepRequirement /> : null}
+
             {canManage && invitations.length > 0 ? (
                 <PendingInvites invitations={invitations} book={book} />
             ) : null}
@@ -370,71 +393,127 @@ function PeopleTab({
                 <div
                     className={cn(
                         grid,
-                        "h-[38px] border-b border-muted bg-foreground/[0.03] px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+                        "hidden h-[38px] border-b border-muted bg-foreground/[0.03] px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground xl:grid",
                     )}
                 >
                     <span>Person</span>
                     <span>Role</span>
+                    <span>Extra permissions</span>
                     <span />
                 </div>
                 <ul>
-                    {members.map((m) => (
-                        <li
-                            key={m.userId}
-                            className={cn(
-                                grid,
-                                "border-b border-border px-4 py-[11px] transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035]",
-                            )}
-                        >
-                            <div className="flex min-w-0 items-center gap-[11px]">
-                                <Avatar
-                                    size="row"
-                                    ringTone={roleRingTone(m.roleKey ?? m.role)}
-                                >
-                                    <AvatarFallback>
-                                        {avatarInitials(m.name, m.email)}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="min-w-0">
-                                    <p className="truncate text-[13.5px] font-medium">
-                                        {m.name && m.name.length > 0
-                                            ? m.name
-                                            : m.email}
-                                        {m.isSelf ? (
-                                            <span className="font-normal text-muted-foreground">
-                                                {" "}
-                                                · you
-                                            </span>
-                                        ) : null}
-                                    </p>
-                                    <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
-                                        {m.email}
-                                        {m.role === "REVIEWER"
-                                            ? ` · ${m.siteIds.length} site${m.siteIds.length === 1 ? "" : "s"}`
-                                            : ""}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex min-w-0 items-center gap-2">
-                                <RoleDot role={m.roleKey ?? m.role} size={9} />
-                                <span className="truncate text-[13px]">
-                                    {book.labelOf(m.roleKey ?? m.role)}
-                                </span>
-                            </div>
-                            <div className="flex justify-end">
-                                {canManage ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => onEdit(m)}
-                                        aria-label={`Edit ${nameOf(m)}’s role`}
+                    {members.map((m) => {
+                        const role = m.roleKey ?? m.role;
+                        const seen = lastActive(m.lastActiveAt);
+                        // An owner is moved to another role first (Edit), and
+                        // no one is removed by someone they outrank. Leaving
+                        // is not removing yourself from a row.
+                        const canRemove =
+                            canManage &&
+                            role !== "OWNER" &&
+                            !m.isSelf &&
+                            book.withinReach(role);
+                        return (
+                            <li
+                                key={m.userId}
+                                className={cn(
+                                    grid,
+                                    "border-b border-border px-4 py-[11px] transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035]",
+                                )}
+                            >
+                                <div className="flex min-w-0 items-center gap-[11px]">
+                                    <Avatar
+                                        size="row"
+                                        ringTone={roleRingTone(role)}
                                     >
-                                        Edit
-                                    </Button>
-                                ) : null}
-                            </div>
-                        </li>
-                    ))}
+                                        <AvatarFallback>
+                                            {avatarInitials(m.name, m.email)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="min-w-0">
+                                        <p className="truncate text-[13.5px] font-medium">
+                                            {m.name && m.name.length > 0
+                                                ? m.name
+                                                : m.email}
+                                            {m.isSelf ? (
+                                                <span className="font-normal text-muted-foreground">
+                                                    {" "}
+                                                    · you
+                                                </span>
+                                            ) : null}
+                                        </p>
+                                        <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+                                            {m.email}
+                                            {m.role === "REVIEWER"
+                                                ? ` · ${m.siteIds.length} site${m.siteIds.length === 1 ? "" : "s"}`
+                                                : ""}
+                                        </p>
+                                        {/* The role, where there is no Role
+                                            column to hold it. */}
+                                        <p className="mt-px flex min-w-0 items-center gap-1.5 text-[11.5px] xl:hidden">
+                                            <RoleDot role={role} size={9} />
+                                            <span className="truncate">
+                                                {book.labelOf(role)}
+                                            </span>
+                                        </p>
+                                        {seen ? (
+                                            <p
+                                                className={cn(
+                                                    "mt-px text-[11.5px]",
+                                                    seen.stale
+                                                        ? "text-brand-subtle-foreground"
+                                                        : "text-muted-foreground",
+                                                )}
+                                            >
+                                                {seen.text}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                <div className="hidden min-w-0 items-center gap-2 xl:flex">
+                                    <RoleDot role={role} size={9} />
+                                    <span className="truncate text-[13px]">
+                                        {book.labelOf(role)}
+                                    </span>
+                                </div>
+                                {/* Nothing grants one person more than their
+                                    role yet, so every row says none. */}
+                                <div className="hidden min-w-0 xl:block">
+                                    <span className="text-[13px] text-muted-foreground">
+                                        <span aria-hidden>—</span>
+                                        <span className="sr-only">None</span>
+                                    </span>
+                                </div>
+                                <div className="flex flex-wrap justify-end gap-1.5">
+                                    {canRemove ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => onRemove(m)}
+                                            aria-label={`Remove ${nameOf(m)} from ${organizationName}`}
+                                            className={cn(
+                                                rowButton,
+                                                "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
+                                            )}
+                                        >
+                                            Remove
+                                        </Button>
+                                    ) : null}
+                                    {canManage ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => onEdit(m)}
+                                            aria-label={`Edit ${nameOf(m)}’s role`}
+                                            className={rowButton}
+                                        >
+                                            Edit
+                                        </Button>
+                                    ) : null}
+                                </div>
+                            </li>
+                        );
+                    })}
                 </ul>
             </div>
 
@@ -449,6 +528,40 @@ function PeopleTab({
                     any other.
                 </p>
             </div>
+        </div>
+    );
+}
+
+/**
+ * The design's "Require two-step sign-in for Owners and Admins" row, drawn
+ * off and disabled. Saroh has no two-step sign-in (`your-profile.tsx` leaves
+ * its row out for the same reason), so there is nothing to require: the
+ * switch never moves, and the line under the title says so in place of the
+ * design's "Recommended for a business that takes payments."
+ */
+function TwoStepRequirement() {
+    return (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3">
+            <div className="min-w-0 flex-[1_1_260px]">
+                <p className="text-[13.5px] font-semibold">
+                    Require two-step sign-in for Owners and Admins
+                </p>
+                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                    Coming soon — Saroh doesn&apos;t have two-step sign-in yet.
+                </p>
+            </div>
+            <button
+                type="button"
+                role="switch"
+                aria-checked={false}
+                aria-label="Require two-step sign-in"
+                disabled
+                className="shrink-0 cursor-not-allowed rounded-full p-1 opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                <span className="relative block h-6 w-[42px] rounded-full bg-border">
+                    <span className="absolute left-[3px] top-[3px] size-[18px] rounded-full bg-card" />
+                </span>
+            </button>
         </div>
     );
 }
@@ -592,17 +705,19 @@ function MemberDrawer({
     organizationName,
     book,
     onClose,
+    onRemove,
 }: {
     member: OrganizationMember | null;
     members: OrganizationMember[];
     organizationName: string;
     book: RoleBook;
     onClose: () => void;
+    /** Hands an owner to the one Remove confirmation; see below. */
+    onRemove: (member: OrganizationMember) => void;
 }) {
     const router = useRouter();
     const [draft, setDraft] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
-    const [confirmRemove, setConfirmRemove] = useState(false);
 
     const current = member ? (member.roleKey ?? member.role) : "MEMBER";
     const role = draft ?? current;
@@ -649,166 +764,188 @@ function MemberDrawer({
         router.refresh();
     }
 
+    return (
+        <Sheet
+            open={!!member}
+            onOpenChange={(open) => {
+                if (!open) close();
+            }}
+        >
+            <SheetContent
+                side="right"
+                className="flex w-[396px] max-w-[90vw] flex-col gap-0 p-0 sm:max-w-[396px]"
+            >
+                {member ? (
+                    <>
+                        <div className="flex items-center gap-[11px] border-b border-muted px-[18px] py-4 pr-12">
+                            <Avatar size="panel" ringTone={roleRingTone(role)}>
+                                <AvatarFallback>
+                                    {avatarInitials(member.name, member.email)}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                                <SheetTitle className="font-display text-[17px] font-semibold tracking-[-0.025em]">
+                                    {nameOf(member)}
+                                </SheetTitle>
+                                <SheetDescription className="mt-0.5 truncate text-[11.5px]">
+                                    {member.email}
+                                </SheetDescription>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-[18px]">
+                            <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                                Role in {organizationName}
+                            </p>
+                            <div
+                                role="radiogroup"
+                                aria-label="Role"
+                                className="flex flex-col gap-[5px]"
+                            >
+                                {book.all.map(({ key: r }) => {
+                                    const on = r === role;
+                                    const beyond = !book.withinReach(r);
+                                    return (
+                                        <button
+                                            key={r}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={on}
+                                            disabled={locked || beyond}
+                                            onClick={() => setDraft(r)}
+                                            className={cn(
+                                                "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed",
+                                                on
+                                                    ? "border-border-strong bg-foreground/[0.03]"
+                                                    : "border-muted hover:border-border-strong",
+                                            )}
+                                        >
+                                            <RoleDot role={r} />
+                                            <span className="min-w-0 flex-1">
+                                                <span
+                                                    className={cn(
+                                                        "block text-[13px]",
+                                                        on
+                                                            ? "font-semibold"
+                                                            : "font-medium",
+                                                    )}
+                                                >
+                                                    {book.labelOf(r)}
+                                                </span>
+                                                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                                                    {beyond
+                                                        ? "Can do more than you can"
+                                                        : book.plainOf(r)}
+                                                </span>
+                                            </span>
+                                            {on ? (
+                                                <Check
+                                                    aria-hidden
+                                                    className="size-4 shrink-0"
+                                                />
+                                            ) : null}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="mt-4 flex items-start gap-[9px] rounded-[9px] bg-foreground/[0.03] px-[13px] py-[11px]">
+                                <Info
+                                    aria-hidden
+                                    className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                                />
+                                <p className="text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
+                                    {lastOwner
+                                        ? `${organizationName} keeps at least one owner. Make someone else an owner before changing or removing this one.`
+                                        : outranks
+                                          ? `${nameOf(member)} can do more than you can here, so you cannot change their role or remove them.`
+                                          : `${book.labelOf(role)}: ${book.blurbOf(role)}`}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-[9px] border-t border-muted px-[18px] py-3.5">
+                            <Button
+                                onClick={save}
+                                disabled={!changed || saving || locked}
+                            >
+                                {saving ? "Saving…" : "Save role"}
+                            </Button>
+                            <Button variant="outline" onClick={close}>
+                                Cancel
+                            </Button>
+                            {/* Everyone else is removed from their row.
+                                An owner and the viewer have no Remove
+                                there, so this is the one way to remove a
+                                second owner, or to leave. */}
+                            {!locked &&
+                            (current === "OWNER" || member.isSelf) ? (
+                                <button
+                                    type="button"
+                                    onClick={() => onRemove(member)}
+                                    className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    Remove from {organizationName}
+                                </button>
+                            ) : null}
+                        </div>
+                    </>
+                ) : null}
+            </SheetContent>
+        </Sheet>
+    );
+}
+
+/**
+ * The one confirmation for removing someone, from their row or — for an
+ * owner — from the Edit drawer.
+ *
+ * The design removes at once and offers Undo. The API has no way to put a
+ * membership back (a removed person comes back only through a new
+ * invitation, and the share links revoked with them stay revoked), so an
+ * Undo would be a promise it cannot keep. It asks once instead, and says
+ * plainly that the access goes now.
+ */
+function RemoveMember({
+    member,
+    organizationName,
+    onClose,
+}: {
+    member: OrganizationMember | null;
+    organizationName: string;
+    onClose: () => void;
+}) {
+    const router = useRouter();
+    const name = member ? nameOf(member) : "They";
+
     async function remove() {
         if (!member) return;
-        setSaving(true);
         const res = await removeMember(member.userId);
-        setSaving(false);
-        setConfirmRemove(false);
+        onClose();
         if (!res.ok) {
             showError(res.error);
             return;
         }
+        const links = res.data.revokedLinks;
         showSuccess(
-            res.data.revokedLinks > 0
-                ? `${member.email} was removed, and ${res.data.revokedLinks} share link${res.data.revokedLinks === 1 ? "" : "s"} they made stopped working.`
-                : `${member.email} was removed from ${organizationName}.`,
+            links > 0
+                ? `${name} removed — they can no longer open ${organizationName}, and ${links} share link${links === 1 ? "" : "s"} they made stopped working`
+                : `${name} removed — they can no longer open ${organizationName}`,
         );
-        close();
         router.refresh();
     }
 
     return (
-        <>
-            <Sheet
-                open={!!member}
-                onOpenChange={(open) => {
-                    if (!open) close();
-                }}
-            >
-                <SheetContent
-                    side="right"
-                    className="flex w-[396px] max-w-[90vw] flex-col gap-0 p-0 sm:max-w-[396px]"
-                >
-                    {member ? (
-                        <>
-                            <div className="flex items-center gap-[11px] border-b border-muted px-[18px] py-4 pr-12">
-                                <Avatar
-                                    size="panel"
-                                    ringTone={roleRingTone(role)}
-                                >
-                                    <AvatarFallback>
-                                        {avatarInitials(
-                                            member.name,
-                                            member.email,
-                                        )}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="min-w-0">
-                                    <SheetTitle className="font-display text-[17px] font-semibold tracking-[-0.025em]">
-                                        {nameOf(member)}
-                                    </SheetTitle>
-                                    <SheetDescription className="mt-0.5 truncate text-[11.5px]">
-                                        {member.email}
-                                    </SheetDescription>
-                                </div>
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto p-[18px]">
-                                <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                                    Role in {organizationName}
-                                </p>
-                                <div
-                                    role="radiogroup"
-                                    aria-label="Role"
-                                    className="flex flex-col gap-[5px]"
-                                >
-                                    {book.all.map(({ key: r }) => {
-                                        const on = r === role;
-                                        const beyond = !book.withinReach(r);
-                                        return (
-                                            <button
-                                                key={r}
-                                                type="button"
-                                                role="radio"
-                                                aria-checked={on}
-                                                disabled={locked || beyond}
-                                                onClick={() => setDraft(r)}
-                                                className={cn(
-                                                    "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed",
-                                                    on
-                                                        ? "border-border-strong bg-foreground/[0.03]"
-                                                        : "border-muted hover:border-border-strong",
-                                                )}
-                                            >
-                                                <RoleDot role={r} />
-                                                <span className="min-w-0 flex-1">
-                                                    <span
-                                                        className={cn(
-                                                            "block text-[13px]",
-                                                            on
-                                                                ? "font-semibold"
-                                                                : "font-medium",
-                                                        )}
-                                                    >
-                                                        {book.labelOf(r)}
-                                                    </span>
-                                                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                                                        {beyond
-                                                            ? "Can do more than you can"
-                                                            : book.plainOf(r)}
-                                                    </span>
-                                                </span>
-                                                {on ? (
-                                                    <Check
-                                                        aria-hidden
-                                                        className="size-4 shrink-0"
-                                                    />
-                                                ) : null}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className="mt-4 flex items-start gap-[9px] rounded-[9px] bg-foreground/[0.03] px-[13px] py-[11px]">
-                                    <Info
-                                        aria-hidden
-                                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                                    />
-                                    <p className="text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
-                                        {lastOwner
-                                            ? `${organizationName} keeps at least one owner. Make someone else an owner before changing or removing this one.`
-                                            : outranks
-                                              ? `${nameOf(member)} can do more than you can here, so you cannot change their role or remove them.`
-                                              : `${book.labelOf(role)}: ${book.blurbOf(role)}`}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-[9px] border-t border-muted px-[18px] py-3.5">
-                                <Button
-                                    onClick={save}
-                                    disabled={!changed || saving || locked}
-                                >
-                                    {saving ? "Saving…" : "Save role"}
-                                </Button>
-                                <Button variant="outline" onClick={close}>
-                                    Cancel
-                                </Button>
-                                {!locked ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setConfirmRemove(true)}
-                                        className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    >
-                                        Remove from {organizationName}
-                                    </button>
-                                ) : null}
-                            </div>
-                        </>
-                    ) : null}
-                </SheetContent>
-            </Sheet>
-
-            <ConfirmDialog
-                open={confirmRemove}
-                onOpenChange={setConfirmRemove}
-                title={`Remove ${member ? nameOf(member) : "them"} from ${organizationName}?`}
-                description={`They lose access to ${organizationName} straight away, and any share links they made stop working. Their work stays. Nothing changes in their other businesses. This cannot be undone.`}
-                confirmLabel="Remove from team"
-                onConfirm={remove}
-            />
-        </>
+        <ConfirmDialog
+            open={!!member}
+            onOpenChange={(open) => {
+                if (!open) onClose();
+            }}
+            title={`Remove ${name} from ${organizationName}?`}
+            description={`${name} loses access to ${organizationName} now, and any share links they made stop working. Their work stays, and nothing changes in their other businesses. To bring them back, invite them again.`}
+            confirmLabel="Remove from team"
+            onConfirm={remove}
+        />
     );
 }
 

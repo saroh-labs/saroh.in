@@ -24,6 +24,11 @@ export interface OrganizationMember {
     /** Sites this person may review. Empty for every role but REVIEWER. */
     siteIds: string[];
     isSelf: boolean;
+    /**
+     * Their newest session, anywhere in Saroh — sessions belong to a person,
+     * not a business. `null` when they hold none; absent from an older API.
+     */
+    lastActiveAt?: string | null;
 }
 
 export interface OrganizationInvitation {
