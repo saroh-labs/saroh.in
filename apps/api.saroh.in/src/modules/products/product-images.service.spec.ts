@@ -69,9 +69,17 @@ const media = {
     }),
 } as unknown as MediaService;
 
+const scope = {
+    organizationId: "org_1",
+    storeId: "store_1",
+    canWrite: true,
+    may: () => Promise.resolve(true),
+};
 const products = {
-    assertProductWritable: jest.fn().mockResolvedValue("org_1"),
-    assertProductReadable: jest.fn().mockResolvedValue(undefined),
+    access: {
+        writeViaStore: jest.fn().mockResolvedValue(scope),
+        readViaStore: jest.fn().mockResolvedValue(scope),
+    },
 } as unknown as ProductsService;
 
 const service = new ProductImagesService(products, media);

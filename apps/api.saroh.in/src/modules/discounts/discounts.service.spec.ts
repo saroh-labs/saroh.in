@@ -140,7 +140,7 @@ describe("create", () => {
     // storefront of the business.
     it.each([
         ["COLLECTION", "category", { organizationId: "org_1" }],
-        ["PRODUCT", "product", { store: { organizationId: "org_1" } }],
+        ["PRODUCT", "product", { organizationId: "org_1" }],
     ] as const)(
         "checks %s targets are the business's",
         async (appliesTo, model, scope) => {

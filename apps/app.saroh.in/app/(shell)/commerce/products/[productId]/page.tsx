@@ -14,10 +14,12 @@ import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { isProductTab, productHref } from "@/lib/products/links";
-import { findProductStore, getProductOverview } from "@/lib/products/overview";
+import {
+    getProductOverview,
+    withStorefrontFallback,
+} from "@/lib/products/overview";
 import { listCategories } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
-import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Product" };
 
@@ -46,10 +48,9 @@ export default async function ProductPage({
     }>;
 }) {
     await requireSession();
-    const [{ productId }, query, stores, organization] = await Promise.all([
+    const [{ productId }, query, organization] = await Promise.all([
         params,
         searchParams,
-        listBusinessStores(),
         resolveActiveOrganization(),
     ]);
 
@@ -64,11 +65,13 @@ export default async function ProductPage({
         );
     }
 
-    const store = await findProductStore(stores, productId, query.storefront);
-    const overview = store
-        ? await getProductOverview(store.id, productId)
-        : null;
-    if (!store || !overview) notFound();
+    // The business's product (#531), as the storefront in the address sees
+    // it — or the first that sells it.
+    const overview = await withStorefrontFallback(query.storefront, (at) =>
+        getProductOverview(at, productId),
+    );
+    if (!overview) notFound();
+    const store = overview.storefront;
 
     const tab = isProductTab(query.tab) ? query.tab : "overview";
     const view = query.view === "customer" ? "customer" : "team";

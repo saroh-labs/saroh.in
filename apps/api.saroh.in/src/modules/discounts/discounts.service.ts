@@ -396,7 +396,7 @@ export class DiscountsService {
                         where: { id: { in: ids }, organizationId },
                     })
                   : await prisma.product.count({
-                        where: { id: { in: ids }, store: { organizationId } },
+                        where: { id: { in: ids }, organizationId },
                     });
         if (found !== ids.length) {
             throw new NotFoundException({

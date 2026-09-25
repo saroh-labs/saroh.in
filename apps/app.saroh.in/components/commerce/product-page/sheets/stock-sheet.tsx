@@ -190,7 +190,7 @@ export function StockSheet({
             if (!variant) continue;
             const was = variant.price ? trimMoney(variant.price) : "";
             if (row.price.trim() === was) continue;
-            const res = await updateVariant(storeId, product.id, variant.id, {
+            const res = await updateVariant(product.id, variant.id, {
                 sku: variant.sku,
                 title: variant.title,
                 price: row.price.trim() || null,

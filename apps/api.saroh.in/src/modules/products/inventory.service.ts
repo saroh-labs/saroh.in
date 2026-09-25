@@ -11,6 +11,7 @@ import type {
     UpdateVariantStockDto,
 } from "./inventory.dto";
 import { linesToMove, promisesToMove } from "./open-promises";
+import type { ProductScope } from "./product-access";
 import { ProductsService } from "./products.service";
 import type { StockLevelRow } from "./stock-levels";
 import {
@@ -65,22 +66,48 @@ export class InventoryService {
         productId: string,
         userId: string,
     ): Promise<StockView> {
-        await this.products.assertProductReadable(storeId, productId, userId);
-        return this.view(storeId, productId);
+        return this.getIn(
+            await this.products.access.readViaStore(storeId, userId, productId),
+            productId,
+        );
     }
 
-    /** Set the product's own count here; refused once it counts per variant. */
+    async getIn(scope: ProductScope, productId: string): Promise<StockView> {
+        return this.view(scope.storeId, productId);
+    }
+
+    /** Store-route alias of `upsertIn`. */
     async upsert(
         storeId: string,
         productId: string,
         userId: string,
         dto: UpdateInventoryDto,
     ) {
-        const organizationId = await this.products.assertProductWritable(
-            storeId,
+        return this.upsertIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
             productId,
-            userId,
+            dto,
         );
+    }
+
+    /**
+     * Set the product's own count here; refused once it counts per variant.
+     *
+     * TODO(U4, #513): route this through the stock module so the change
+     * writes a "Counted" StockEntry in the same transaction, and gate it on
+     * `canWriteStock` (inventory:write or store:write). Until the stock log
+     * exists it sets the StockLevel row directly, as it has since #510.
+     */
+    async upsertIn(
+        scope: ProductScope,
+        productId: string,
+        dto: UpdateInventoryDto,
+    ) {
+        const { organizationId, storeId } = scope;
         if (await countsPerVariant(prisma, productId)) {
             throw new ConflictException({
                 message:
@@ -132,11 +159,24 @@ export class InventoryService {
         userId: string,
         dto: UpdateVariantStockDto,
     ): Promise<StockView> {
-        const organizationId = await this.products.assertProductWritable(
-            storeId,
+        return this.setVariantsIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
             productId,
-            userId,
+            dto,
         );
+    }
+
+    /** See `setVariants`. TODO(U4, #513): write stock entries here too. */
+    async setVariantsIn(
+        scope: ProductScope,
+        productId: string,
+        dto: UpdateVariantStockDto,
+    ): Promise<StockView> {
+        const { organizationId, storeId } = scope;
         const variants = await prisma.productVariant.findMany({
             where: { productId },
             orderBy: [{ position: "asc" }, { createdAt: "asc" }],

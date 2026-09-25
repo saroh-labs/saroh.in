@@ -48,7 +48,7 @@ export class SkuService {
                 select: { skuPattern: true, skuSuggest: true },
             }),
             prisma.product.findMany({
-                where: { store: { organizationId } },
+                where: { organizationId },
                 orderBy: [{ createdAt: "asc" }, { id: "asc" }],
                 select: { id: true },
             }),
@@ -114,7 +114,7 @@ export class SkuService {
         pattern: string,
     ): Promise<SkuPreviewRow[]> {
         const products = await prisma.product.findMany({
-            where: { store: { organizationId } },
+            where: { organizationId },
             orderBy: [{ createdAt: "asc" }, { id: "asc" }],
             select: {
                 id: true,

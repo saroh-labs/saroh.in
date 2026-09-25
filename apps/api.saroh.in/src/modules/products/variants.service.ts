@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import type { ProductScope } from "./product-access";
 import { assertMrpAtOrAbovePrice } from "./product-rules";
 import { ProductsService } from "./products.service";
 import { serializeVariant } from "./serialize";
@@ -33,13 +34,23 @@ const SKU_TAKEN = {
  *
  * #510: a new variant is sold wherever its product is listed, and counted
  * at every storefront that counts the product per variant.
+ *
+ * #531: the work takes a `ProductScope`; the storefront-shaped methods are
+ * the old routes' aliases (resolve, then call the scoped one).
  */
 @Injectable()
 export class VariantsService {
     constructor(private readonly products: ProductsService) {}
 
     async list(storeId: string, productId: string, userId: string) {
-        await this.products.assertProductReadable(storeId, productId, userId);
+        return this.listIn(
+            await this.products.access.readViaStore(storeId, userId, productId),
+            productId,
+        );
+    }
+
+    async listIn(scope: ProductScope, productId: string) {
+        const { storeId } = scope;
         const variants = await prisma.productVariant.findMany({
             where: { productId },
             orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -67,11 +78,23 @@ export class VariantsService {
         userId: string,
         dto: CreateVariantDto,
     ) {
-        const organizationId = await this.products.assertProductWritable(
-            storeId,
+        return this.createIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
             productId,
-            userId,
+            dto,
         );
+    }
+
+    async createIn(
+        scope: ProductScope,
+        productId: string,
+        dto: CreateVariantDto,
+    ) {
+        const { organizationId } = scope;
         await this.assertCoherent(productId, dto);
 
         const last = await prisma.productVariant.findFirst({
@@ -145,7 +168,24 @@ export class VariantsService {
         userId: string,
         dto: UpdateVariantDto,
     ) {
-        await this.products.assertProductWritable(storeId, productId, userId);
+        return this.updateIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
+            productId,
+            variantId,
+            dto,
+        );
+    }
+
+    async updateIn(
+        _scope: ProductScope,
+        productId: string,
+        variantId: string,
+        dto: UpdateVariantDto,
+    ) {
         const variant = await prisma.productVariant.findFirst({
             where: { id: variantId, productId },
             select: { id: true },
@@ -182,7 +222,22 @@ export class VariantsService {
         userId: string,
         dto: ReorderVariantsDto,
     ) {
-        await this.products.assertProductWritable(storeId, productId, userId);
+        return this.reorderIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
+            productId,
+            dto,
+        );
+    }
+
+    async reorderIn(
+        scope: ProductScope,
+        productId: string,
+        dto: ReorderVariantsDto,
+    ) {
         const current = await prisma.productVariant.findMany({
             where: { productId },
             select: { id: true },
@@ -207,7 +262,7 @@ export class VariantsService {
                 }),
             ),
         );
-        return this.list(storeId, productId, userId);
+        return this.listIn(scope, productId);
     }
 
     async remove(
@@ -216,11 +271,19 @@ export class VariantsService {
         variantId: string,
         userId: string,
     ) {
-        const organizationId = await this.products.assertProductWritable(
-            storeId,
+        return this.removeIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
             productId,
-            userId,
+            variantId,
         );
+    }
+
+    async removeIn(scope: ProductScope, productId: string, variantId: string) {
+        const { organizationId } = scope;
         const variant = await prisma.productVariant.findFirst({
             where: { id: variantId, productId },
             select: { id: true, title: true },

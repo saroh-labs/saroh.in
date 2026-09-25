@@ -46,7 +46,7 @@ describe("Products v2: sections, photos, overview (DB)", () => {
         }),
     } as unknown as MediaService;
     const images = new ProductImagesService(products, media);
-    const overview = new ProductOverviewService(products, stores);
+    const overview = new ProductOverviewService(products);
 
     let ownerId = "";
     let reviewerId = "";

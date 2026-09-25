@@ -4,7 +4,7 @@ import { prisma } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import { discountState } from "../discounts/discount-state";
 import type { OrgAction } from "../organizations/organization-policy";
-import { StoresService } from "../stores/stores.service";
+import type { ProductScope } from "./product-access";
 import type { RatingSummary, StockLine, StockTotals } from "./product-overview";
 import { ratingSummary, stockLine, stockTotals } from "./product-overview";
 import { savingPercent } from "./product-rules";
@@ -108,21 +108,32 @@ const LATEST_REVIEWS = 20;
 export class ProductOverviewService {
     private readonly logger = new Logger(ProductOverviewService.name);
 
-    constructor(
-        private readonly products: ProductsService,
-        private readonly stores: StoresService,
-    ) {}
+    constructor(private readonly products: ProductsService) {}
 
+    /** Store-route alias of `getIn`. */
     async get(
         storeId: string,
         productId: string,
         userId: string,
         now: Date = new Date(),
     ): Promise<ProductOverview> {
-        const product = await this.products.get(storeId, productId, userId);
+        return this.getIn(
+            await this.products.access.readViaStore(storeId, userId, productId),
+            productId,
+            now,
+        );
+    }
+
+    async getIn(
+        scope: ProductScope,
+        productId: string,
+        now: Date = new Date(),
+    ): Promise<ProductOverview> {
+        const { storeId, organizationId } = scope;
+        const product = await this.products.getIn(scope, productId);
         const store = await prisma.store.findUniqueOrThrow({
             where: { id: storeId },
-            select: { id: true, name: true, organizationId: true },
+            select: { id: true, name: true },
         });
 
         const variantLines = product.variants.flatMap((v) =>
@@ -138,16 +149,15 @@ export class ProductOverviewService {
                 ? stockTotals(variantLines, product.inventory)
                 : stockTotals(productLine ? [productLine] : [], null);
 
-        const [canWrite, orders, reviews, discounts] = await Promise.all([
-            this.stores.canWrite(storeId, userId),
-            this.panel(storeId, userId, "order:read", "orders", () =>
+        const [orders, reviews, discounts] = await Promise.all([
+            this.panel(scope, "order:read", "orders", () =>
                 this.orders(productId, now),
             ),
-            this.panel(storeId, userId, "product-review:read", "reviews", () =>
+            this.panel(scope, "product-review:read", "reviews", () =>
                 this.reviews(productId, product),
             ),
-            this.panel(storeId, userId, "discount:read", "discounts", () =>
-                this.discounts(store.organizationId, storeId, product, now),
+            this.panel(scope, "discount:read", "discounts", () =>
+                this.discounts(organizationId, storeId, product, now),
             ),
         ]);
 
@@ -162,7 +172,7 @@ export class ProductOverviewService {
             price: priceRange(product),
             lastChanged: lastChanged(product),
             storefront: { id: store.id, name: store.name },
-            canWrite,
+            canWrite: scope.canWrite,
             orders,
             reviews,
             discounts,
@@ -170,14 +180,13 @@ export class ProductOverviewService {
     }
 
     private async panel<T>(
-        storeId: string,
-        userId: string,
+        scope: ProductScope,
         action: OrgAction,
         name: string,
         load: () => Promise<T>,
     ): Promise<Panel<T>> {
         try {
-            if (!(await this.stores.memberAllows(storeId, userId, action))) {
+            if (!(await scope.may(action))) {
                 return { status: "forbidden" };
             }
             return { status: "ok", data: await load() };

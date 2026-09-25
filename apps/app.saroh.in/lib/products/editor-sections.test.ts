@@ -179,6 +179,7 @@ describe("the editor's header and Save all", () => {
 function product(over: Partial<ProductDetail> = {}): ProductDetail {
     return {
         id: "p1",
+        storeId: "s1",
         name: "Rose Hydra Serum",
         slug: "rose-hydra-serum",
         description: null,

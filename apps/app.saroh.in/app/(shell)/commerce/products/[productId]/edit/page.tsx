@@ -2,8 +2,7 @@ import { notFound } from "next/navigation";
 
 import { ProductEditorV2 } from "@/components/commerce/product-editor-v2/editor-shell";
 import { loadEditorContext } from "@/lib/products/editor-data";
-import { findProductStore } from "@/lib/products/overview";
-import { getProduct } from "@/lib/products/service";
+import { getProductAt } from "@/lib/products/overview";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
 
@@ -12,7 +11,8 @@ export const metadata = { title: "Edit product" };
 /**
  * Sell → Products → one product → Edit. The full editor (#468, #469): every
  * part of the product, each saved on its own. The product page links here,
- * to the section it names.
+ * to the section it names. The product is the business's (#531); the
+ * storefront in the address is whose shelf the Stock section counts.
  */
 export default async function EditProductPage({
     params,
@@ -28,9 +28,9 @@ export default async function EditProductPage({
         listBusinessStores(),
     ]);
 
-    const store = await findProductStore(stores, productId, storefront);
-    const product = store ? await getProduct(store.id, productId) : null;
-    if (!store || !product) notFound();
+    const product = await getProductAt(storefront, productId);
+    const store = stores.find((s) => s.id === product?.storeId);
+    if (!product || !store) notFound();
 
     const context = await loadEditorContext(store, product);
     return (

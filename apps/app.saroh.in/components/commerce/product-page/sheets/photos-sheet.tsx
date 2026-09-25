@@ -49,11 +49,7 @@ export function PhotosSheet({
 
     async function save() {
         setSaving(true);
-        const res = await replaceProductImages(
-            storeId,
-            product.id,
-            photosInput(draft),
-        );
+        const res = await replaceProductImages(product.id, photosInput(draft));
         setSaving(false);
         if (!res.ok) {
             showError(res.error);
@@ -68,15 +64,13 @@ export function PhotosSheet({
             p.id && survivors.has(p.id) ? p : { ...p, id: undefined },
         );
         showUndo("Photos and videos saved.", () => {
-            void replaceProductImages(
-                storeId,
-                product.id,
-                photosInput(previous),
-            ).then((undo) => {
-                if (!undo.ok)
-                    showError("Couldn't undo. The saved photos stay.");
-                router.refresh();
-            });
+            void replaceProductImages(product.id, photosInput(previous)).then(
+                (undo) => {
+                    if (!undo.ok)
+                        showError("Couldn't undo. The saved photos stay.");
+                    router.refresh();
+                },
+            );
         });
     }
 

@@ -55,7 +55,7 @@ export class FieldsService {
         });
         const counts = await prisma.product.groupBy({
             by: ["categoryId"],
-            where: { store: { organizationId }, categoryId: { not: null } },
+            where: { organizationId, categoryId: { not: null } },
             _count: { _all: true },
         });
         const inCategory = new Map<string, number>();

@@ -25,7 +25,7 @@ describe("products area access by role (DB)", () => {
     } as unknown as FeatureFlagService;
     const stores = new StoresService(flags);
     const products = new ProductsService(stores);
-    const overview = new ProductOverviewService(products, stores);
+    const overview = new ProductOverviewService(products);
     const inventory = new InventoryService(products);
     const options = new OptionsService();
     const catalogue = new CatalogueService(options);
@@ -143,5 +143,29 @@ describe("products area access by role (DB)", () => {
         expect(created.id).toBeTruthy();
         const view = await overview.get(storeId, productId, users.ADMIN);
         expect(view.canWrite).toBe(true);
+    });
+
+    // #531: the organization route asks the same role, and says why.
+    it("on the organization route: a Member reads and is told no; an Admin changes", async () => {
+        const as = (role: "MEMBER" | "ADMIN" | "REVIEWER") => ({
+            organizationId: orgId,
+            userId: users[role] ?? "",
+            role,
+        });
+        const member = await products.access.read(as("MEMBER"), productId);
+        expect((await overview.getIn(member, productId)).canWrite).toBe(false);
+        await expect(
+            products.access.write(as("MEMBER"), productId),
+        ).rejects.toThrow(ForbiddenException);
+        await expect(
+            products.access.read(as("REVIEWER"), productId),
+        ).rejects.toThrow(ForbiddenException);
+        const admin = await products.access.write(as("ADMIN"), productId);
+        const after = await products.patchIn(admin, productId, {
+            howToUse: "Twice a day",
+        });
+        expect(after.howToUse).toBe("Twice a day");
+        await inventory.upsertIn(admin, productId, { quantity: 4 });
+        expect((await inventory.getIn(member, productId)).quantity).toBe(4);
     });
 });
