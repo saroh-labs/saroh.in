@@ -29,6 +29,9 @@ import {
     FakeMerchantProvider,
     FakeProviderFactory,
 } from "../payments/providers/fake.provider";
+import { InventoryService } from "../products/inventory.service";
+import { ProductAccess } from "../products/product-access";
+import { ProductsService } from "../products/products.service";
 import { StoresService } from "../stores/stores.service";
 import {
     FakeWebhookProvider,
@@ -680,6 +683,136 @@ describe("refunds and the shelf", () => {
         expect(
             await prisma.order.findUniqueOrThrow({ where: { id: order } }),
         ).toMatchObject({ paymentStatus: "REFUNDED" });
+    });
+});
+
+describe("switching to per-variant stock", () => {
+    it("moves what open lines hold, not their quantity; a line that never held keeps no row and holds when paid", async () => {
+        const access = new ProductAccess(stores);
+        const inventory = new InventoryService(
+            new ProductsService(stores, undefined, access),
+        );
+        const tee = await prisma.product.create({
+            data: {
+                storeId: hill,
+                organizationId: orgId,
+                name: "Linen tee",
+                slug: `rs-linen-${tag}`,
+                price: "100.00",
+                variants: {
+                    create: [
+                        { sku: `LS-${tag}`, title: "S", position: 0 },
+                        { sku: `LM-${tag}`, title: "M", position: 1 },
+                    ],
+                },
+            },
+            include: { variants: { orderBy: { position: "asc" } } },
+        });
+        const [small, medium] = tee.variants;
+        for (const storeId of [hill, online]) {
+            const listing = await prisma.productListing.create({
+                data: { storeId, organizationId: orgId, productId: tee.id },
+            });
+            await prisma.productListingVariant.createMany({
+                data: tee.variants.map((v) => ({
+                    organizationId: orgId,
+                    listingId: listing.id,
+                    productId: tee.id,
+                    variantId: v.id,
+                })),
+            });
+            await prisma.$transaction((tx) =>
+                count(
+                    tx,
+                    { organizationId: orgId, userId: ownerId },
+                    { target: { storeId, productId: tee.id }, counted: 10 },
+                ),
+            );
+        }
+        // Hill Road: 3 of S ordered, 1 refunded before it went — holds 2.
+        const order = await place(hill, [
+            { productId: tee.id, variantId: small.id, quantity: 3 },
+        ]);
+        await pay(order);
+        const refund = await payments.initiateRefund(owner, order, {
+            lines: [{ itemId: await line(order, tee.id), quantity: 1 }],
+        });
+        await confirmRefund(order, refund.providerRefundId);
+        expect(await shelf(hill, tee.id)).toMatchObject({ promised: 2 });
+        // Online: a checkout for 1 of S, not paid yet — it holds nothing.
+        const web = await prisma.order.create({
+            data: {
+                storeId: online,
+                organizationId: orgId,
+                customerId: customer[online],
+                orderId: `WEB-${Math.random().toString(36).slice(2, 8)}`,
+                currency: "INR",
+                subtotal: "100.00",
+                total: "100.00",
+                items: {
+                    create: [
+                        {
+                            productId: tee.id,
+                            variantId: small.id,
+                            quantity: 1,
+                            price: "100.00",
+                        },
+                    ],
+                },
+            },
+            select: { id: true },
+        });
+        const intent = await prisma.paymentIntent.create({
+            data: {
+                organizationId: orgId,
+                orderId: web.id,
+                provider: "RAZORPAY",
+                providerIntentId: `prov_${web.id}`,
+                amountCents: 10000,
+                currency: "INR",
+                status: "SUCCEEDED",
+            },
+        });
+
+        await inventory.setVariantsIn(
+            await access.stock(owner, tee.id, hill),
+            tee.id,
+            {
+                variants: [
+                    { variantId: small.id, quantity: 5, lowStockAlert: 1 },
+                    { variantId: medium.id, quantity: 5, lowStockAlert: 1 },
+                ],
+            },
+        );
+        const variantRow = (storeId: string, variantId: string) =>
+            prisma.stockLevel.findFirstOrThrow({
+                where: { storeId, variantId },
+                select: { promised: true },
+            });
+        expect(await variantRow(hill, small.id)).toEqual({ promised: 2 });
+        expect(await shelf(hill, tee.id)).toMatchObject({ promised: 0 });
+        expect(await variantRow(online, small.id)).toEqual({ promised: 0 });
+        expect(
+            await prisma.orderItem.findFirstOrThrow({
+                where: { orderId: web.id },
+                select: { stockRow: true, stockLevelId: true },
+            }),
+        ).toEqual({ stockRow: null, stockLevelId: null });
+
+        // Paid now: it holds on the variant's row at Online.
+        expect(
+            await prisma.$transaction((tx) =>
+                reserveOnPayment(tx, {
+                    organizationId: orgId,
+                    orderId: web.id,
+                    paymentIntentId: intent.id,
+                }),
+            ),
+        ).toEqual({ kind: "HELD" });
+        expect(await variantRow(online, small.id)).toEqual({ promised: 1 });
+        await orders.updateStatus(online, web.id, ownerId, {
+            status: "CANCELLED",
+        });
     });
 });
 
