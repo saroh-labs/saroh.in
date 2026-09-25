@@ -67,6 +67,21 @@ each with why it stops there:
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,173), `calendar/calendar.service.ts` (1,051),
   `orders/order-kitchen.service.ts` (831), `staff/staff.service.ts` (744).
+- `organizations/organization-settings-form.tsx` (1,169) — one form holds
+  every Business card (profile, tax and invoices, registered address, number
+  format) and the cross-field rules that re-check them together; the
+  number-format editor already went to `invoice-number-fields.tsx`. Less
+  means a card per file sharing one form context.
+- `organizations/team-screen.tsx` (1,106) — the Roles and People tabs, the
+  member drawer and the invite dialog share the screen's roster and role
+  state. Each piece is its own function already; moving them is a file split
+  with props threaded through, not yet done.
+- `shared/nav-items.tsx` (1,102) — the nav's data (`NAV_GROUPS`,
+  `SETTINGS_PAGES`) and every rule that filters it by role, module and
+  site; half of it is the table itself. Splitting data from rules is a move,
+  not yet made.
+- `modules/module-list.tsx` (430) — one list and its row, switch and state
+  tag; a little over, and the row carries most of it.
 
 ## 7. No `any`, no `@ts-ignore`
 
