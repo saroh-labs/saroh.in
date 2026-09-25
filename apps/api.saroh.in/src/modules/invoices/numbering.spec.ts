@@ -5,6 +5,7 @@ import {
     creditMark,
     defaultNumberFormat,
     financialYear,
+    financialYearShort,
     formatInvoiceNumber,
     invoiceSeriesKeys,
     LEGACY_SERIES,
@@ -420,6 +421,78 @@ describe("a chosen format", () => {
         ).toBe("000003");
     });
 
+    it("prints the financial year short, by the year it starts in", () => {
+        const short: NumberFormat = {
+            parts: ["PREFIX", "FY_SHORT", "MONTH"],
+            separator: "/",
+            digits: 4,
+            restart: "MONTH",
+        };
+        expect(make(short).format(1)).toBe("RC/26/09/0001");
+        expect(make(short, "CREDIT_NOTE").format(1)).toBe("RCCN/26/09/0001");
+        expect(creditMark(short, "RC")).toBe("after");
+        // January to March are still the year that began in April.
+        const march = seriesFor({
+            registered: true,
+            prefix: "RC",
+            kind: "INVOICE",
+            at: new Date("2027-03-10T10:00:00Z"),
+            format: short,
+        });
+        expect(march.format(1)).toBe("RC/26/03/0001");
+        expect(financialYearShort(new Date("2027-03-10T10:00:00Z"))).toBe("26");
+        // In the business's zone: 1 April 00:10 in India is the new year.
+        expect(
+            financialYearShort(
+                new Date("2027-03-31T18:40:00Z"),
+                "Asia/Kolkata",
+            ),
+        ).toBe("27");
+    });
+
+    it("the short financial year counts in the financial year's series", () => {
+        const short: NumberFormat = {
+            parts: ["PREFIX", "FY_SHORT"],
+            separator: "/",
+            digits: 4,
+            restart: "FY",
+        };
+        expect(make(short).key).toBe(make(REGISTERED_DEFAULT).key);
+        expect(make(short).key).toBe("RC/26-27");
+        expect(make(short).format(12)).toBe("RC/26/0012");
+    });
+
+    it("runs its parts together with no separator", () => {
+        const plain: NumberFormat = {
+            parts: ["PREFIX", "FY_SHORT", "MONTH"],
+            separator: "",
+            digits: 4,
+            restart: "MONTH",
+        };
+        expect(readNumberFormat(plain)).toEqual(plain);
+        expect(make(plain).format(1)).toBe("RC26090001");
+        expect(make(plain, "CREDIT_NOTE").format(1)).toBe("RCCN26090001");
+        expect(make(plain).key).toBe("RC/2026-09");
+        expect(longestNumber(plain, "RC")).toBe("RCCN260999999");
+        expect(
+            make(
+                { ...plain, parts: ["FY_SHORT", "MONTH"] },
+                "CREDIT_NOTE",
+            ).format(1),
+        ).toBe("CN26090001");
+        // Where CN after the prefix would pass 16, it takes its place.
+        const long: NumberFormat = {
+            parts: ["PREFIX", "YEAR", "FY", "MONTH"],
+            separator: "",
+            digits: 3,
+            restart: "MONTH",
+        };
+        expect(creditMark(long, "ABC")).toBe("instead");
+        expect(make(long, "CREDIT_NOTE", "ABC").format(1)).toBe(
+            "CN202626-2709001",
+        );
+    });
+
     it("the counter grows past its digits rather than wrap", () => {
         expect(make({ ...REGISTERED_DEFAULT, digits: 3 }).format(1000)).toBe(
             "RC/26-27/1000",
@@ -572,7 +645,7 @@ describe("format rules", () => {
         expect(problem(never, true)?.field).toBe("invoiceNumberRestart");
     });
 
-    it("a yearly restart needs the financial year or the year", () => {
+    it("a yearly restart needs the financial year, long or short", () => {
         const noYear: NumberFormat = {
             parts: ["PREFIX", "MONTH"],
             separator: "/",
@@ -581,10 +654,80 @@ describe("format rules", () => {
         };
         expect(problem(noYear)).toMatchObject({
             field: "invoiceNumberParts",
-            message: expect.stringMatching(/financial year or the year/),
+            message:
+                "Numbers that start again every financial year need the financial year in them, or they would repeat.",
         });
-        expect(problem({ ...noYear, parts: ["PREFIX", "YEAR"] })).toBeNull();
         expect(problem({ ...noYear, parts: ["PREFIX", "FY"] })).toBeNull();
+        expect(
+            problem({ ...noYear, parts: ["PREFIX", "FY_SHORT"] }),
+        ).toBeNull();
+        expect(
+            problem({ ...noYear, parts: ["PREFIX", "YEAR", "FY_SHORT"] }),
+        ).toBeNull();
+    });
+
+    it("the calendar year alone won't do for a yearly restart", () => {
+        // January 2027 is in 26-27 and April 2027 starts 27-28 at 1: both
+        // would print RC/2027/0001.
+        expect(
+            problem({
+                parts: ["PREFIX", "YEAR"],
+                separator: "/",
+                digits: 4,
+                restart: "FY",
+            }),
+        ).toMatchObject({
+            field: "invoiceNumberParts",
+            message:
+                "Numbers that start again every financial year need the financial year in them. The year alone would repeat: January to March share it with the next financial year.",
+        });
+        // Restarting every month, or never, the year is enough.
+        expect(
+            problem({ ...MONTHLY, parts: ["PREFIX", "YEAR", "MONTH"] }),
+        ).toBeNull();
+        expect(
+            problem(
+                {
+                    parts: ["PREFIX", "YEAR"],
+                    separator: "-",
+                    digits: 4,
+                    restart: "NEVER",
+                },
+                false,
+            ),
+        ).toBeNull();
+    });
+
+    it("an old format with only the year still reads and numbers", () => {
+        const old = {
+            parts: ["PREFIX", "YEAR"],
+            separator: "/",
+            digits: 4,
+            restart: "FY",
+        };
+        expect(readNumberFormat(old)).toEqual(old);
+        const s = seriesFor({
+            registered: true,
+            prefix: "RC",
+            kind: "INVOICE",
+            at: new Date("2026-09-23T10:00:00Z"),
+            format: old,
+        });
+        expect(s.key).toBe("RC/26-27");
+        expect(s.format(1)).toBe("RC/2026/0001");
+    });
+
+    it("a monthly restart takes the short financial year as its year", () => {
+        expect(
+            problem({ ...MONTHLY, parts: ["PREFIX", "FY_SHORT", "MONTH"] }),
+        ).toBeNull();
+        expect(
+            problem({
+                ...MONTHLY,
+                parts: ["PREFIX", "FY_SHORT", "MONTH"],
+                separator: "",
+            }),
+        ).toBeNull();
     });
 
     it("a monthly restart needs the month, and the financial year or the year", () => {

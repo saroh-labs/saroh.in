@@ -63,8 +63,9 @@
   an existing invoice. The financial year is April–March for everyone (GST
   sets it; not a setting). A business builds its format
   (`BusinessProfile.invoiceNumberFormat`, `NumberFormat` in `numbering.ts`):
-  parts in its order (prefix, financial year "26-27", year, month), "/" or
-  "-", a 3–6 digit counter last, restarting every financial year, every month
+  parts in its order (prefix, financial year "26-27", financial year short
+  "26" — by the year it starts in, `FY_SHORT` — year, month), "/", "-" or no
+  separator (`""`, RC26090001), a 3–6 digit counter last, restarting every financial year, every month
   or — unregistered only — never. Null is the default, today's numbers:
   RC/26-27/0001 registered, RC-0001 not, the legacy INV series with no prefix.
   `numberFormatProblem` is the rule, mirrored in the app's
@@ -72,14 +73,19 @@
   note, with the counter a digit past its own (it grows rather than wrap,
   and a number past 16 cannot be issued — in a webhook, that fails the
   payment), ≤ 16 characters of A–Z 0–9 - /; a yearly restart needs the financial
-  year or year in the number, a monthly one the month and one of them (the
-  database holds each number once). The series key is prefix + restart period
-  (`RC/26-27`, `RC/2026-09`, `RC`), not the rest of the format, so a mid-year
+  year in the number, long or short — not the calendar year alone, which
+  January–March share with the next financial year's restart — and a monthly
+  one the month and a year of any kind (the database holds each number once).
+  The rules are checked on save only: a stored format that breaks them (an old
+  year-only yearly format) still reads and numbers. The series key is prefix +
+  restart period (`RC/26-27`, `RC/2026-09`, `RC`), not the rest of the format
+  (long and short financial year count in the same series), so a mid-year
   change keeps counting; `nextInvoiceNumber` checks the number is free and
   otherwise jumps past the highest issued one with the same stem. Credit notes
   count on their own series (`RCCN/…`) and print "CN" after the prefix, or
   in its place where that would pass 16 (`CN/26-27/09/001`), or first when
-  the number has no prefix; supplementary invoices share the invoices'.
+  the number has no prefix (with no separator, run together: `RCCN26090001`);
+  supplementary invoices share the invoices'.
 - **Tax settings are Owner/Admin only.**
 - **Where it lives:** the maths is pure — `invoices/gst.ts` (split, spread,
   place of supply), `invoices/gst-states.ts` (state codes, GSTIN checks),

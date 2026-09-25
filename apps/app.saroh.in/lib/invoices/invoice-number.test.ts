@@ -7,6 +7,7 @@ import {
     defaultNumberFormat,
     encodeParts,
     financialYear,
+    financialYearShort,
     formatFields,
     formatNumber,
     formatOf,
@@ -14,8 +15,11 @@ import {
     moveRow,
     nextInvoiceNumber,
     numberFormatProblem,
+    PART_LABEL,
     partRows,
+    partValue,
     prefixOf,
+    SEPARATOR_LABEL,
 } from "./invoice-number";
 
 const now = new Date("2026-09-25T10:00:00Z");
@@ -114,6 +118,25 @@ describe("a chosen format", () => {
         ).toBe("2026-09-RC-000042");
     });
 
+    it("prints the short financial year, and parts run together", () => {
+        const short: NumberFormat = {
+            parts: ["PREFIX", "FY_SHORT", "MONTH"],
+            separator: "/",
+            digits: 4,
+            restart: "MONTH",
+        };
+        const first = (format: NumberFormat, credit = false) =>
+            formatNumber(format, { prefix: "RC", counter: 1, credit, now });
+        expect(first(short)).toBe("RC/26/09/0001");
+        expect(first(short, true)).toBe("RCCN/26/09/0001");
+        const plain = { ...short, separator: "" } as const;
+        expect(first(plain)).toBe("RC26090001");
+        expect(first(plain, true)).toBe("RCCN26090001");
+        expect(longestNumber(plain, "RC")).toBe("RCCN260999999");
+        // January to March are the year that began in April.
+        expect(financialYearShort(new Date("2027-03-10T10:00:00Z"))).toBe("26");
+    });
+
     it("puts CN where the API does", () => {
         expect(creditMark(MONTHLY, "RC")).toBe("instead");
         expect(
@@ -206,7 +229,29 @@ describe("numberFormatProblem mirrors the API", () => {
         ).toMatch(/same month comes round/);
         expect(
             problem({ ...MONTHLY, parts: ["PREFIX"], restart: "FY" })?.message,
-        ).toMatch(/financial year or the year/);
+        ).toMatch(/need the financial year in them, or they would repeat/);
+    });
+
+    it("wants the financial year, long or short, when numbers restart with it", () => {
+        const yearly: NumberFormat = {
+            parts: ["PREFIX", "YEAR"],
+            separator: "/",
+            digits: 4,
+            restart: "FY",
+        };
+        expect(problem(yearly)).toEqual({
+            field: "numberParts",
+            message:
+                "Numbers that start again every financial year need the financial year in them. The year alone would repeat: January to March share it with the next financial year.",
+        });
+        expect(
+            problem({ ...yearly, parts: ["PREFIX", "FY_SHORT"] }),
+        ).toBeNull();
+        // The year is enough for a monthly restart, or none.
+        expect(
+            problem({ ...MONTHLY, parts: ["PREFIX", "YEAR", "MONTH"] }),
+        ).toBeNull();
+        expect(problem({ ...yearly, restart: "NEVER" }, false)).toBeNull();
     });
 
     it("refuses a number past 16 characters", () => {
@@ -229,16 +274,30 @@ describe("the parts list", () => {
             ["PREFIX", true],
             ["FY", true],
             ["MONTH", true],
+            ["FY_SHORT", false],
             ["YEAR", false],
         ]);
-        expect(encodeParts(rows)).toBe("PREFIX,FY,MONTH,!YEAR");
-        expect(decodeParts("PREFIX,FY,MONTH,!YEAR")).toEqual(rows);
+        expect(encodeParts(rows)).toBe("PREFIX,FY,MONTH,!FY_SHORT,!YEAR");
+        expect(decodeParts("PREFIX,FY,MONTH,!FY_SHORT,!YEAR")).toEqual(rows);
+    });
+
+    it("offers the short financial year off, right after the financial year", () => {
+        expect(partRows(defaultNumberFormat(true)).map((r) => r.part)).toEqual([
+            "PREFIX",
+            "FY",
+            "FY_SHORT",
+            "YEAR",
+            "MONTH",
+        ]);
+        expect(PART_LABEL.FY_SHORT).toBe("Financial year, short");
+        expect(partValue("FY_SHORT", "RC", now)).toBe("26");
     });
 
     it("puts a missing or repeated part right", () => {
         expect(decodeParts("FY,FY,junk")).toEqual([
             { part: "FY", on: true },
             { part: "PREFIX", on: false },
+            { part: "FY_SHORT", on: false },
             { part: "YEAR", on: false },
             { part: "MONTH", on: false },
         ]);
@@ -250,16 +309,34 @@ describe("the parts list", () => {
             "PREFIX",
             "MONTH",
             "FY",
+            "FY_SHORT",
             "YEAR",
         ]);
         expect(moveRow(rows, 0, -1)).toBe(rows);
-        expect(moveRow(rows, 3, 1)).toBe(rows);
+        expect(moveRow(rows, 4, 1)).toBe(rows);
+    });
+
+    it("keeps no separator a choice, not an empty field", () => {
+        const plain: NumberFormat = {
+            parts: ["PREFIX", "FY_SHORT", "MONTH"],
+            separator: "",
+            digits: 4,
+            restart: "MONTH",
+        };
+        expect(formatFields(plain).numberSeparator).toBe("");
+        expect(formatOf(formatFields(plain))).toEqual(plain);
+        expect(SEPARATOR_LABEL[""]).toBe("None");
+        // Only something unknown falls back to "/".
+        expect(
+            formatOf({ ...formatFields(plain), numberSeparator: "." })
+                .separator,
+        ).toBe("/");
     });
 
     it("the four fields and a format are the same thing", () => {
         expect(formatOf(formatFields(MONTHLY))).toEqual(MONTHLY);
         expect(formatFields(defaultNumberFormat(false))).toEqual({
-            numberParts: "PREFIX,!FY,!YEAR,!MONTH",
+            numberParts: "PREFIX,!FY,!FY_SHORT,!YEAR,!MONTH",
             numberSeparator: "-",
             numberDigits: "4",
             numberRestart: "NEVER",

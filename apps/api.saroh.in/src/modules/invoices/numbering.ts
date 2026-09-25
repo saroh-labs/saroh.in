@@ -69,17 +69,42 @@ export function financialYear(
 ): string {
     const local = DateTime.fromJSDate(at, { zone: timezone });
     const start = local.month >= 4 ? local.year : local.year - 1;
-    const yy = (y: number) => String(y % 100).padStart(2, "0");
-    return `${yy(start)}-${yy(start + 1)}`;
+    return `${twoDigits(start)}-${twoDigits(start + 1)}`;
 }
+
+/**
+ * The financial year by the year it starts in, two digits: 23 September
+ * 2026 and 10 March 2027 are both in "26" (26-27). The same year as
+ * {@link financialYear}, printed shorter.
+ */
+export function financialYearShort(
+    at: Date,
+    timezone: string = DEFAULT_TIMEZONE,
+): string {
+    const local = DateTime.fromJSDate(at, { zone: timezone });
+    return twoDigits(local.month >= 4 ? local.year : local.year - 1);
+}
+
+const twoDigits = (y: number) => String(y % 100).padStart(2, "0");
 
 // ── The business's number format ────────────────────────────────────────────
 
-/** The parts a number can carry before its counter, in the order chosen. */
-export const NUMBER_PARTS = ["PREFIX", "FY", "YEAR", "MONTH"] as const;
+/**
+ * The parts a number can carry before its counter, in the order chosen:
+ * the prefix, the financial year ("26-27"), the financial year short, by
+ * the year it starts in ("26"), the calendar year ("2026") and the month.
+ */
+export const NUMBER_PARTS = [
+    "PREFIX",
+    "FY",
+    "FY_SHORT",
+    "YEAR",
+    "MONTH",
+] as const;
 export type NumberPart = (typeof NUMBER_PARTS)[number];
 
-export const NUMBER_SEPARATORS = ["/", "-"] as const;
+/** What joins the parts: "/", "-", or nothing at all (RC26090001). */
+export const NUMBER_SEPARATORS = ["/", "-", ""] as const;
 export type NumberSeparator = (typeof NUMBER_SEPARATORS)[number];
 
 /** When the counter starts again at 1. */
@@ -192,6 +217,8 @@ const CREDIT_MARK = "CN";
  *  - "instead": where it would not (RCCN/26-27/09/0001 is 18), "CN" takes
  *    the prefix's place — CN/26-27/09/0001, the invoice's length;
  *  - "first": a number with no prefix leads with "CN" — CN/26-27/0001.
+ *
+ * With no separator it is the same, run together: RCCN26090001.
  */
 export type CreditMark = "after" | "instead" | "first";
 
@@ -234,6 +261,8 @@ function build(
                     : `${printedPrefix(input.prefix)}${CREDIT_MARK}`;
             case "FY":
                 return financialYear(input.at, zone);
+            case "FY_SHORT":
+                return financialYearShort(input.at, zone);
             case "YEAR":
                 return String(local.year);
             case "MONTH":
@@ -271,9 +300,11 @@ export function longestNumber(
  *  - only a business that is not GST-registered may run one counter
  *    forever — GST expects a series per financial year;
  *  - numbers must never repeat, for the business, across every year (the
- *    database holds one number once): a counter that restarts each year
- *    needs the financial year or the year in the number; one that
- *    restarts each month, the month and one of them;
+ *    database holds one number once): a counter that restarts each
+ *    financial year needs the financial year in the number, long or short
+ *    — not the calendar year alone, which January to March share with the
+ *    next financial year's first numbers; one that restarts each month,
+ *    the month and a year of either kind;
  *  - the longest number it can print, invoice or credit note, with the
  *    counter a digit past its own, is at most 16 characters of A–Z, 0–9,
  *    "-" and "/" (rules 46 and 53);
@@ -285,7 +316,8 @@ export function numberFormatProblem(
     business: { registered: boolean; prefix: string | null },
 ): { field: NumberFormatField | "invoicePrefix"; message: string } | null {
     const has = (part: NumberPart) => format.parts.includes(part);
-    const yearly = has("FY") || has("YEAR");
+    const fiscal = has("FY") || has("FY_SHORT");
+    const yearly = fiscal || has("YEAR");
     if (format.restart === "NEVER" && business.registered) {
         return {
             field: "invoiceNumberRestart",
@@ -300,13 +332,19 @@ export function numberFormatProblem(
                 "Numbers that start again every month need the month in them, or they would repeat.",
         };
     }
-    if (format.restart !== "NEVER" && !yearly) {
+    if (format.restart === "MONTH" && !yearly) {
         return {
             field: "invoiceNumberParts",
             message:
-                format.restart === "MONTH"
-                    ? "Add the financial year or the year too: the same month comes round every year, and a number must never repeat."
-                    : "Numbers that start again every financial year need the financial year or the year in them, or they would repeat.",
+                "Add the financial year or the year too: the same month comes round every year, and a number must never repeat.",
+        };
+    }
+    if (format.restart === "FY" && !fiscal) {
+        return {
+            field: "invoiceNumberParts",
+            message: has("YEAR")
+                ? "Numbers that start again every financial year need the financial year in them. The year alone would repeat: January to March share it with the next financial year."
+                : "Numbers that start again every financial year need the financial year in them, or they would repeat.",
         };
     }
     const longest = longestNumber(format, business.prefix);
@@ -346,16 +384,17 @@ export function numberFormatProblem(
  *    INV series (INV-0001; INV/26-27/0001 once registered), credit notes
  *    INVCN-0001 (CN/26-27/0001 once registered);
  *  - a chosen format prints its parts in its order with its separator
- *    and digits (RC-2026-09-0001); credit notes carry "CN" after the
+ *    and digits (RC-2026-09-0001, or run together: RC26090001); credit notes carry "CN" after the
  *    prefix where that fits in 16 characters, else in its place
  *    ({@link creditMark}).
  *
  * A supplementary invoice is an invoice and shares the invoices' series.
  *
  * The series — the counter — is the prefix, "CN" for a credit note, and the
- * period the counter restarts in: RC/26-27 each financial year, RC/2026-09
- * each month, RC for a counter that never restarts. Not the rest of the
- * format: a business that changes its parts, separator or digits mid-year
+ * period the counter restarts in: RC/26-27 each financial year (whether the
+ * number prints that year long, short or not at all), RC/2026-09 each
+ * month, RC for a counter that never restarts. Not the rest of the format:
+ *a business that changes its parts, separator or digits mid-year
  * carries on counting where it was. What is issued is never renumbered;
  * {@link nextInvoiceNumber} steps past a number already taken.
  */

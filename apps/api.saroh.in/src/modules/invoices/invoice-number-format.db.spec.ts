@@ -175,6 +175,54 @@ describe("a business's own number format (real database)", () => {
         });
     });
 
+    it("runs the short financial year and month together, with no separator", async () => {
+        const read = await format({
+            parts: ["PREFIX", "FY_SHORT", "MONTH"],
+            separator: "",
+            digits: 4,
+            restart: "MONTH",
+        });
+        expect(read.tax.invoiceNumber).toMatchObject({
+            parts: ["PREFIX", "FY_SHORT", "MONTH"],
+            separator: "",
+        });
+        expect(await issue("2027-05-10T06:00:00Z")).toBe("KL27050001");
+        expect(await issue("2027-05-11T06:00:00Z")).toBe("KL27050002");
+        // February 2028 is still the financial year that began in 2027.
+        expect(await issue("2028-02-10T06:00:00Z")).toBe("KL27020001");
+    });
+
+    it("refuses the calendar year alone for a yearly restart, but reads one stored before", async () => {
+        await expect(
+            format({
+                parts: ["PREFIX", "YEAR"],
+                separator: "/",
+                digits: 4,
+                restart: "FY",
+            }),
+        ).rejects.toMatchObject({
+            response: { details: { field: "invoiceNumberParts" } },
+        });
+        // Saved before the rule: it still reads, and still numbers.
+        await prisma.businessProfile.update({
+            where: { organizationId: kiln.organizationId },
+            data: {
+                invoiceNumberFormat: {
+                    parts: ["PREFIX", "YEAR"],
+                    separator: "/",
+                    digits: 4,
+                    restart: "FY",
+                },
+            },
+        });
+        const read = await settings.get(kiln);
+        expect(read.tax.invoiceNumber).toMatchObject({
+            parts: ["PREFIX", "YEAR"],
+            restart: "FY",
+        });
+        expect(await issue("2028-06-10T06:00:00Z")).toBe("KL/2028/0001");
+    });
+
     it("says where this month's counter stands, for the next number", async () => {
         const read = await settings.get(kiln);
         // Whatever today is, the counters are the business's own.

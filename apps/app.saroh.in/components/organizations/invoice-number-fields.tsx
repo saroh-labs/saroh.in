@@ -21,6 +21,7 @@ import type {
     NumberFormat,
     NumberPart,
     NumberRestart,
+    NumberSeparator,
 } from "@/lib/invoices/invoice-number";
 import {
     decodeParts,
@@ -31,9 +32,11 @@ import {
     MAX_NUMBER_LENGTH,
     MIN_COUNTER_DIGITS,
     moveRow,
+    NUMBER_SEPARATORS,
     PART_LABEL,
     partValue,
     RESTART_LABEL,
+    SEPARATOR_LABEL,
 } from "@/lib/invoices/invoice-number";
 
 /** The four form values the editor writes. */
@@ -43,6 +46,18 @@ export interface NumberFieldValues {
     numberDigits: string;
     numberRestart: string;
 }
+
+/**
+ * What the separator toggle holds for "no separator": a toggle group reads
+ * "" as nothing chosen, so the field's "" stands in as "none" on screen.
+ */
+const NO_SEPARATOR = "none";
+
+const SEPARATOR_NAME: Record<NumberSeparator, string> = {
+    "/": "Slash",
+    "-": "Hyphen",
+    "": "No separator",
+};
 
 const DIGIT_OPTIONS = Array.from(
     { length: MAX_COUNTER_DIGITS - MIN_COUNTER_DIGITS + 1 },
@@ -84,6 +99,13 @@ export function InvoiceNumberFields({
     // The settings form, which holds these four values among its own.
     const { control } = useFormContext<NumberFieldValues>();
     const hasMonth = format.parts.includes("MONTH");
+    // A count that restarts each financial year needs that year printed:
+    // the calendar year alone repeats, as January to March share it with
+    // the next financial year.
+    const needsFinancialYear =
+        format.restart === "FY" &&
+        !format.parts.includes("FY") &&
+        !format.parts.includes("FY_SHORT");
     const restarts: NumberRestart[] = registered
         ? ["FY", "MONTH"]
         : ["FY", "MONTH", "NEVER"];
@@ -215,28 +237,37 @@ export function InvoiceNumberFields({
                 control={control}
                 name="numberSeparator"
                 render={({ field }) => (
-                    <FormItem {...at("140px", false)}>
+                    <FormItem {...at("160px", false)}>
                         <FormLabel>Separator</FormLabel>
                         <FormControl>
                             <ToggleGroup
                                 type="single"
-                                value={field.value}
+                                value={
+                                    field.value === ""
+                                        ? NO_SEPARATOR
+                                        : field.value
+                                }
                                 onValueChange={(v) => {
-                                    if (v) field.onChange(v);
+                                    if (v) {
+                                        field.onChange(
+                                            v === NO_SEPARATOR ? "" : v,
+                                        );
+                                    }
                                 }}
                                 aria-label="Separator"
                                 className={SEGMENTED}
                             >
-                                {(["/", "-"] as const).map((s) => (
+                                {NUMBER_SEPARATORS.map((s) => (
                                     <ToggleGroupItem
-                                        key={s}
-                                        value={s}
-                                        aria-label={
-                                            s === "/" ? "Slash" : "Hyphen"
-                                        }
-                                        className={cn(SEGMENT, "font-mono")}
+                                        key={s || NO_SEPARATOR}
+                                        value={s || NO_SEPARATOR}
+                                        aria-label={SEPARATOR_NAME[s]}
+                                        className={cn(
+                                            SEGMENT,
+                                            s !== "" && "font-mono",
+                                        )}
                                     >
-                                        {s}
+                                        {SEPARATOR_LABEL[s]}
                                     </ToggleGroupItem>
                                 ))}
                             </ToggleGroup>
@@ -294,11 +325,13 @@ export function InvoiceNumberFields({
                             </ToggleGroup>
                         </FormControl>
                         <FormDescription>
-                            {!hasMonth
-                                ? "Every month needs the month in the number."
-                                : registered
-                                  ? "GST expects numbers to start again at least every financial year."
-                                  : "Never keeps one running count."}
+                            {needsFinancialYear
+                                ? "Every financial year needs the financial year in the number."
+                                : !hasMonth
+                                  ? "Every month needs the month in the number."
+                                  : registered
+                                    ? "GST expects numbers to start again at least every financial year."
+                                    : "Never keeps one running count."}
                         </FormDescription>
                         <FormMessage />
                     </FormItem>

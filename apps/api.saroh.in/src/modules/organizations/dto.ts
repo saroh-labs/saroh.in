@@ -132,7 +132,10 @@ const DIGITS_MESSAGE = `The counter is ${MIN_COUNTER_DIGITS} to ${MAX_COUNTER_DI
  * allows — by the service, which names the field.
  */
 export class InvoiceNumberFormatDto {
-    /** The parts before the counter, in order: PREFIX, FY, YEAR, MONTH. */
+    /**
+     * The parts before the counter, in order: PREFIX, FY ("26-27"),
+     * FY_SHORT ("26"), YEAR, MONTH.
+     */
     @IsArray()
     @ArrayUnique({ message: "Each part can be in the number once." })
     @ArrayMaxSize(NUMBER_PARTS.length)
@@ -142,7 +145,9 @@ export class InvoiceNumberFormatDto {
     })
     parts!: string[];
 
-    @IsIn(NUMBER_SEPARATORS, { message: 'The separator is "/" or "-".' })
+    @IsIn(NUMBER_SEPARATORS, {
+        message: 'The separator is "/", "-" or no separator ("").',
+    })
     separator!: string;
 
     @IsInt({ message: DIGITS_MESSAGE })

@@ -72,8 +72,24 @@ describe("an invoice number format's shape", () => {
         }
     });
 
+    it("takes the short financial year and no separator", async () => {
+        expect(
+            await refusedFormat({
+                ...ok,
+                parts: ["PREFIX", "FY_SHORT", "MONTH"],
+                separator: "",
+            }),
+        ).toEqual([]);
+    });
+
     it("refuses another separator or restart", async () => {
         expect(await refusedFormat({ ...ok, separator: "." })).toEqual([
+            "separator",
+        ]);
+        expect(await refusedFormat({ ...ok, separator: " " })).toEqual([
+            "separator",
+        ]);
+        expect(await refusedFormat({ ...ok, separator: undefined })).toEqual([
             "separator",
         ]);
         expect(await refusedFormat({ ...ok, restart: "WEEK" })).toEqual([

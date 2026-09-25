@@ -4,16 +4,23 @@
  * The API is the authority; this says the same thing first, in the form.
  *
  * A number is its parts in the business's order (prefix, financial year
- * "26-27", year "2026", month "09"), joined by "/" or "-", then a counter
- * padded to 3–6 digits. The counter restarts every financial year, every
+ * "26-27" or short "26", year "2026", month "09"), joined by "/", "-" or
+ * nothing at all, then a counter padded to 3–6 digits. The counter restarts every financial year, every
  * month or — for a business that is not GST-registered — never. The
  * financial year is April–March for everyone: GST law sets it.
  */
 
-export const NUMBER_PARTS = ["PREFIX", "FY", "YEAR", "MONTH"] as const;
+export const NUMBER_PARTS = [
+    "PREFIX",
+    "FY",
+    "FY_SHORT",
+    "YEAR",
+    "MONTH",
+] as const;
 export type NumberPart = (typeof NUMBER_PARTS)[number];
 
-export const NUMBER_SEPARATORS = ["/", "-"] as const;
+/** "" runs the parts together: RC26090001. */
+export const NUMBER_SEPARATORS = ["/", "-", ""] as const;
 export type NumberSeparator = (typeof NUMBER_SEPARATORS)[number];
 
 export const NUMBER_RESTARTS = ["FY", "MONTH", "NEVER"] as const;
@@ -42,8 +49,15 @@ export interface NumberFormat {
 export const PART_LABEL: Record<NumberPart, string> = {
     PREFIX: "Prefix",
     FY: "Financial year",
+    FY_SHORT: "Financial year, short",
     YEAR: "Year",
     MONTH: "Month",
+};
+
+export const SEPARATOR_LABEL: Record<NumberSeparator, string> = {
+    "/": "/",
+    "-": "-",
+    "": "None",
 };
 
 export const RESTART_LABEL: Record<NumberRestart, string> = {
@@ -103,14 +117,30 @@ export function financialYear(
     now: Date,
     zone: string | null = DEFAULT_TIMEZONE,
 ): string {
-    const { year, month } = localParts(now, zone);
-    const start = month >= 4 ? year : year - 1;
-    const two = (y: number) => String(y % 100).padStart(2, "0");
-    return `${two(start)}-${two(start + 1)}`;
+    const start = financialYearStart(now, zone);
+    return `${twoDigits(start)}-${twoDigits(start + 1)}`;
 }
 
 /**
- * What one part prints, today in the business's zone: "RC", "26-27",
+ * The financial year by the year it starts in, two digits: "26" for 26-27,
+ * from 1 April 2026 to 31 March 2027.
+ */
+export function financialYearShort(
+    now: Date,
+    zone: string | null = DEFAULT_TIMEZONE,
+): string {
+    return twoDigits(financialYearStart(now, zone));
+}
+
+function financialYearStart(now: Date, zone: string | null): number {
+    const { year, month } = localParts(now, zone);
+    return month >= 4 ? year : year - 1;
+}
+
+const twoDigits = (y: number) => String(y % 100).padStart(2, "0");
+
+/**
+ * What one part prints, today in the business's zone: "RC", "26-27", "26",
  * "2026", "09".
  */
 export function partValue(
@@ -124,6 +154,8 @@ export function partValue(
             return printedPrefix(prefix);
         case "FY":
             return financialYear(now, zone);
+        case "FY_SHORT":
+            return financialYearShort(now, zone);
         case "YEAR":
             return String(localParts(now, zone).year);
         case "MONTH":
@@ -228,8 +260,9 @@ export type NumberFormatField =
 /**
  * Why a format is refused, or null — the API's rules and words: a
  * registered business restarts; numbers never repeat across years (a yearly
- * restart needs the financial year or the year in the number, a monthly one
- * the month and one of them); the longest number, invoice or credit note,
+ * restart needs the financial year in the number, long or short — January
+ * to March share their calendar year with the next financial year — and a
+ * monthly one the month and a year of either kind); the longest number, invoice or credit note,
  * with the counter a digit past its own, is at most 16 characters of A–Z,
  * 0–9, "-" and "/".
  */
@@ -238,7 +271,8 @@ export function numberFormatProblem(
     business: { registered: boolean; prefix: string | null },
 ): { field: NumberFormatField; message: string } | null {
     const has = (part: NumberPart) => format.parts.includes(part);
-    const yearly = has("FY") || has("YEAR");
+    const fiscal = has("FY") || has("FY_SHORT");
+    const yearly = fiscal || has("YEAR");
     if (format.restart === "NEVER" && business.registered) {
         return {
             field: "numberRestart",
@@ -253,13 +287,19 @@ export function numberFormatProblem(
                 "Numbers that start again every month need the month in them, or they would repeat.",
         };
     }
-    if (format.restart !== "NEVER" && !yearly) {
+    if (format.restart === "MONTH" && !yearly) {
         return {
             field: "numberParts",
             message:
-                format.restart === "MONTH"
-                    ? "Add the financial year or the year too: the same month comes round every year, and a number must never repeat."
-                    : "Numbers that start again every financial year need the financial year or the year in them, or they would repeat.",
+                "Add the financial year or the year too: the same month comes round every year, and a number must never repeat.",
+        };
+    }
+    if (format.restart === "FY" && !fiscal) {
+        return {
+            field: "numberParts",
+            message: has("YEAR")
+                ? "Numbers that start again every financial year need the financial year in them. The year alone would repeat: January to March share it with the next financial year."
+                : "Numbers that start again every financial year need the financial year in them, or they would repeat.",
         };
     }
     const longest = longestNumber(format, business.prefix);
@@ -337,7 +377,10 @@ export function partRows(format: NumberFormat): PartRow[] {
     ];
 }
 
-/** The list as one string a form field holds: "PREFIX,FY,!YEAR,!MONTH". */
+/**
+ * The list as one string a form field holds:
+ * "PREFIX,FY,!FY_SHORT,!YEAR,!MONTH".
+ */
 export function encodeParts(rows: PartRow[]): string {
     return rows.map((r) => (r.on ? r.part : `!${r.part}`)).join(",");
 }
@@ -360,6 +403,9 @@ export function decodeParts(value: string): PartRow[] {
 const isPart = (v: string): v is NumberPart =>
     (NUMBER_PARTS as readonly string[]).includes(v);
 
+const isSeparator = (v: string): v is NumberSeparator =>
+    (NUMBER_SEPARATORS as readonly string[]).includes(v);
+
 /** Move one row up (-1) or down (+1); the list is unchanged at an end. */
 export function moveRow(rows: PartRow[], index: number, by: -1 | 1): PartRow[] {
     const to = index + by;
@@ -380,7 +426,10 @@ export function formatOf(values: {
         parts: decodeParts(values.numberParts)
             .filter((r) => r.on)
             .map((r) => r.part),
-        separator: values.numberSeparator === "-" ? "-" : "/",
+        // "" is a choice — no separator — not an empty field.
+        separator: isSeparator(values.numberSeparator)
+            ? values.numberSeparator
+            : "/",
         digits: Number(values.numberDigits) || 4,
         restart: (NUMBER_RESTARTS as readonly string[]).includes(
             values.numberRestart,
