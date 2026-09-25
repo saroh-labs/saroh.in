@@ -21,9 +21,15 @@ export type {
 export {
     DEFAULT_ALLOWED_CONTENT_TYPES,
     DEFAULT_MAX_UPLOAD_BYTES,
+    DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
+    ISO_BMFF_SNIFF_BYTES,
+    VIDEO_CONTENT_TYPES,
+    VIDEO_UPLOAD_PURPOSE,
     buildUploadInputSchema,
     extensionForContentType,
+    hasIsoBmffSignature,
     isAllowedContentType,
+    isVideoContentType,
 } from "./validation";
 export type {
     UploadInputSchemaOptions,

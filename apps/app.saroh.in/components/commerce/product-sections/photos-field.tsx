@@ -8,17 +8,24 @@ import { showUndo } from "@saroh/ui/toast";
 import { ArrowLeft, ArrowRight, ImagePlus, Link2, Star, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
+import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { listLibrary } from "@/lib/media/actions";
 import type { LibraryItem } from "@/lib/media/service";
 import type { PhotoDraft } from "@/lib/products/editor-sections";
-import { LIMITS } from "@/lib/products/editor-sections";
+import {
+    isVideo,
+    LIMITS,
+    mediaCounter,
+    mediaCounts,
+    mediaFileProblem,
+} from "@/lib/products/editor-sections";
 
 /**
- * A product's photos, in the order customers see them (editor v2 "Photos",
- * and the product page's photo sheet). The first is the cover. Move one
- * earlier or later, make it the cover, write what it shows for people who
- * can't see it, or take it off — which never deletes it from the library.
+ * A product's photos and videos, in the order customers see them (the
+ * product page's photo sheet). The first photo is the cover. Move one
+ * earlier or later, make a photo the cover, write what it shows for people
+ * who can't see it, or take it off — which never deletes it from the library.
  *
  * Browse is the control; nothing here needs a drop target, so it works the
  * same on a phone. Add from the library, upload, or paste an address.
@@ -32,7 +39,12 @@ export function PhotosField({
     onChange: (next: PhotoDraft[]) => void;
     disabled?: boolean;
 }) {
-    const full = value.length >= LIMITS.photos;
+    const counts = mediaCounts(value);
+    // Photos full: the library and an address can't add one; both full:
+    // nothing can be uploaded either.
+    const full = counts.photos >= LIMITS.photos;
+    const allFull = full && counts.videos >= LIMITS.videos;
+    const coverIndex = value.findIndex((p) => !isVideo(p));
     const [adding, setAdding] = useState<"library" | "address" | null>(null);
 
     function move(from: number, to: number) {
@@ -51,114 +63,127 @@ export function PhotosField({
     }
 
     function add(photo: PhotoDraft) {
-        if (value.length >= LIMITS.photos) return;
+        const now = mediaCounts(value);
+        if (
+            isVideo(photo)
+                ? now.videos >= LIMITS.videos
+                : now.photos >= LIMITS.photos
+        )
+            return;
         onChange([...value, photo]);
     }
 
     return (
         <div className="flex flex-col gap-3">
             <p className="text-[12.5px] text-muted-foreground">
-                {value.length} of {LIMITS.photos} photos. The first is the cover
-                — on the shop and in lists. Every variant shows the same photos
-                unless it picks one of its own.
+                {mediaCounter(value)}. The first photo is the cover — on the
+                shop and in lists. Every variant shows the same photos unless it
+                picks one of its own.
             </p>
 
             {value.length > 0 ? (
                 <ol className="flex flex-col gap-2">
-                    {value.map((photo, i) => (
-                        <li
-                            key={photo.id ?? photo.url}
-                            className={cn(
-                                "flex flex-wrap items-start gap-3 rounded-[10px] border p-2",
-                                i === 0 ? "border-foreground" : "border-border",
-                            )}
-                        >
-                            {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */}
-                            <img
-                                src={photo.url}
-                                alt=""
-                                className="h-16 w-20 shrink-0 rounded-md object-cover"
-                            />
-                            <div className="flex min-w-0 flex-1 basis-40 flex-col gap-1.5">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                    {i === 0 ? (
-                                        <Badge variant="neutral">Cover</Badge>
-                                    ) : null}
-                                    {photo.creditName ? (
-                                        <span className="truncate text-[11.5px] text-muted-foreground">
-                                            Photo: {photo.creditName}
-                                        </span>
-                                    ) : null}
+                    {value.map((photo, i) => {
+                        const video = isVideo(photo);
+                        const noun = video ? "video" : "photo";
+                        return (
+                            <li
+                                key={photo.id ?? photo.url}
+                                className={cn(
+                                    "flex flex-wrap items-start gap-3 rounded-[10px] border p-2",
+                                    i === coverIndex
+                                        ? "border-foreground"
+                                        : "border-border",
+                                )}
+                            >
+                                <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-md bg-muted">
+                                    <MediaThumb item={photo} alt="" small />
                                 </div>
-                                <Input
-                                    value={photo.alt}
-                                    maxLength={LIMITS.alt}
-                                    disabled={disabled}
-                                    onChange={(e) =>
-                                        onChange(
-                                            value.map((p, j) =>
-                                                j === i
-                                                    ? {
-                                                          ...p,
-                                                          alt: e.target.value,
-                                                      }
-                                                    : p,
-                                            ),
-                                        )
-                                    }
-                                    placeholder="What it shows, for people who can't see it"
-                                    aria-label={`Description of photo ${i + 1}`}
-                                    className="h-9"
-                                />
-                            </div>
-                            <div className="flex shrink-0 gap-1">
-                                <IconButton
-                                    label={`Move photo ${i + 1} earlier`}
-                                    disabled={disabled || i === 0}
-                                    onClick={() => move(i, i - 1)}
-                                >
-                                    <ArrowLeft />
-                                </IconButton>
-                                <IconButton
-                                    label={`Move photo ${i + 1} later`}
-                                    disabled={
-                                        disabled || i === value.length - 1
-                                    }
-                                    onClick={() => move(i, i + 1)}
-                                >
-                                    <ArrowRight />
-                                </IconButton>
-                                {i > 0 ? (
-                                    <IconButton
-                                        label={`Make photo ${i + 1} the cover`}
+                                <div className="flex min-w-0 flex-1 basis-40 flex-col gap-1.5">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        {i === coverIndex ? (
+                                            <Badge variant="neutral">
+                                                Cover
+                                            </Badge>
+                                        ) : null}
+                                        {photo.creditName ? (
+                                            <span className="truncate text-[11.5px] text-muted-foreground">
+                                                Photo: {photo.creditName}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <Input
+                                        value={photo.alt}
+                                        maxLength={LIMITS.alt}
                                         disabled={disabled}
-                                        onClick={() => move(i, 0)}
+                                        onChange={(e) =>
+                                            onChange(
+                                                value.map((p, j) =>
+                                                    j === i
+                                                        ? {
+                                                              ...p,
+                                                              alt: e.target
+                                                                  .value,
+                                                          }
+                                                        : p,
+                                                ),
+                                            )
+                                        }
+                                        placeholder="What it shows, for people who can't see it"
+                                        aria-label={`Description of ${noun} ${i + 1}`}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="flex shrink-0 gap-1">
+                                    <IconButton
+                                        label={`Move ${noun} ${i + 1} earlier`}
+                                        disabled={disabled || i === 0}
+                                        onClick={() => move(i, i - 1)}
                                     >
-                                        <Star />
+                                        <ArrowLeft />
                                     </IconButton>
-                                ) : null}
-                                <IconButton
-                                    label={`Take photo ${i + 1} off this product`}
-                                    disabled={disabled}
-                                    onClick={() => takeOff(i)}
-                                    danger
-                                >
-                                    <X />
-                                </IconButton>
-                            </div>
-                        </li>
-                    ))}
+                                    <IconButton
+                                        label={`Move ${noun} ${i + 1} later`}
+                                        disabled={
+                                            disabled || i === value.length - 1
+                                        }
+                                        onClick={() => move(i, i + 1)}
+                                    >
+                                        <ArrowRight />
+                                    </IconButton>
+                                    {!video && i !== coverIndex ? (
+                                        <IconButton
+                                            label={`Make photo ${i + 1} the cover`}
+                                            disabled={disabled}
+                                            onClick={() => move(i, 0)}
+                                        >
+                                            <Star />
+                                        </IconButton>
+                                    ) : null}
+                                    <IconButton
+                                        label={`Take ${noun} ${i + 1} off this product`}
+                                        disabled={disabled}
+                                        onClick={() => takeOff(i)}
+                                        danger
+                                    >
+                                        <X />
+                                    </IconButton>
+                                </div>
+                            </li>
+                        );
+                    })}
                 </ol>
             ) : (
                 <div className="rounded-[10px] border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
-                    No photos yet. Add up to {LIMITS.photos}.
+                    No photos yet. Add up to {LIMITS.photos} photos and{" "}
+                    {LIMITS.videos} videos.
                 </div>
             )}
 
-            {full ? (
+            {allFull ? (
                 <p className="text-[12.5px] text-brand-subtle-foreground">
-                    Full: {LIMITS.photos} photos is the most. Take one off to
-                    add another.
+                    Full: {LIMITS.photos} photos and {LIMITS.videos} videos is
+                    the most. Take one off to add another.
                 </p>
             ) : (
                 <div className="flex flex-wrap gap-2">
@@ -166,7 +191,7 @@ export function PhotosField({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={disabled}
+                        disabled={disabled || full}
                         aria-expanded={adding === "library"}
                         onClick={() =>
                             setAdding(adding === "library" ? null : "library")
@@ -179,7 +204,7 @@ export function PhotosField({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={disabled}
+                        disabled={disabled || full}
                         aria-expanded={adding === "address"}
                         onClick={() =>
                             setAdding(adding === "address" ? null : "address")
@@ -189,15 +214,22 @@ export function PhotosField({
                         By address
                     </Button>
                     <MediaPicker
-                        label="Upload a photo"
+                        label="Upload a photo or video"
+                        allowVideo
+                        check={(file) => mediaFileProblem(file, value)}
                         onPick={(img) =>
                             add({
+                                mediaId: img.mediaId ?? null,
                                 url: img.src,
                                 alt: "",
                                 width: img.width ?? null,
                                 height: img.height ?? null,
                                 creditName: null,
                                 creditUrl: null,
+                                kind: img.kind === "video" ? "video" : "photo",
+                                durationSec: img.durationSec ?? null,
+                                posterMediaId: img.posterMediaId ?? null,
+                                posterUrl: img.posterSrc ?? null,
                             })
                         }
                     />

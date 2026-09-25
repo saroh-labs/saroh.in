@@ -169,7 +169,8 @@ export function VariantsSection({
     };
     const mrpNote = (mrp: string | null) =>
         `Above the MRP of ${symbol}${trimMoney(mrp ?? product.mrp ?? "")}. Lower it, or raise the MRP in Basics.`;
-    const photos = product.images;
+    // A variant shows a photo of its own, never a video.
+    const photos = product.images.filter((i) => i.kind !== "video");
 
     const skuCount: Record<string, number> = {};
     for (const r of rows) {

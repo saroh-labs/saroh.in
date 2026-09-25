@@ -274,6 +274,9 @@ export function toShopData(overview: ProductOverview): ProductPageData {
             alt: i.alt,
             width: i.width,
             height: i.height,
+            kind: i.kind,
+            durationSec: i.durationSec,
+            posterUrl: i.posterUrl,
         })),
         optionName: product.option?.name ?? null,
         variants: product.variants.map((v) => {

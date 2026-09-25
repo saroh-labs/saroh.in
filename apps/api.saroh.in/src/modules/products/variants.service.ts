@@ -287,7 +287,7 @@ export class VariantsService {
         }
         if (dto.imageId) {
             const image = await prisma.productImage.findFirst({
-                where: { id: dto.imageId, productId },
+                where: { id: dto.imageId, productId, kind: "photo" },
                 select: { id: true },
             });
             if (!image) {

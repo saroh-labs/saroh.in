@@ -47,6 +47,13 @@ export interface ProductImageDto {
     position: number;
     creditName: string | null;
     creditUrl: string | null;
+    /** "photo" or "video" (#517). */
+    kind: "photo" | "video";
+    /** A video's length in seconds; null for a photo or when unknown. */
+    durationSec: number | null;
+    /** A video's poster, from the library; null when it has none. */
+    posterMediaId: string | null;
+    posterUrl: string | null;
 }
 
 /** Which switches say "on the shop"; a key missing is treated as shown. */
@@ -154,6 +161,10 @@ interface RawImage {
     position: number;
     creditName: string | null;
     creditUrl: string | null;
+    kind?: string;
+    durationSec?: number | null;
+    posterMediaId?: string | null;
+    posterUrl?: string | null;
 }
 
 interface RawProduct {
@@ -228,6 +239,10 @@ export function serializeImage(image: RawImage): ProductImageDto {
         position: image.position,
         creditName: image.creditName,
         creditUrl: image.creditUrl,
+        kind: image.kind === "video" ? "video" : "photo",
+        durationSec: image.durationSec ?? null,
+        posterMediaId: image.posterMediaId ?? null,
+        posterUrl: image.posterUrl ?? null,
     };
 }
 

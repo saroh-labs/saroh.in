@@ -617,7 +617,7 @@ export class ProductsService {
         imageId: string,
     ): Promise<void> {
         const image = await prisma.productImage.findFirst({
-            where: { id: imageId, productId },
+            where: { id: imageId, productId, kind: "photo" },
             select: { id: true },
         });
         if (!image) {

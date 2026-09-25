@@ -67,7 +67,7 @@ export function PhotosSheet({
         const previous = baseline.map((p) =>
             p.id && survivors.has(p.id) ? p : { ...p, id: undefined },
         );
-        showUndo("Photos saved.", () => {
+        showUndo("Photos and videos saved.", () => {
             void replaceProductImages(
                 storeId,
                 product.id,
@@ -88,7 +88,7 @@ export function PhotosSheet({
                 onOpenChange(o);
             }}
             productName={product.name}
-            title="Edit photos"
+            title="Edit photos and videos"
             fullEditorHref={productEditHref(storeId, product.id, "photos")}
             dirty={dirty}
             saving={saving}

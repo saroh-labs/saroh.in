@@ -22,6 +22,7 @@ export interface MemoryStorageConfig {
     publicBaseUrl?: string;
     allowedContentTypes?: ContentTypeAllowlist;
     maxUploadBytes?: number;
+    maxVideoUploadBytes?: number;
     uploadExpirySeconds?: number;
     downloadExpirySeconds?: number;
     /** Injectable id generator for deterministic tests. Defaults to `randomUUID`. */
@@ -47,6 +48,11 @@ export interface MemoryStorage extends ObjectStorage {
     has(key: string): boolean;
     /** Clear all tracked state. */
     reset(): void;
+    /**
+     * Stand in for the client's PUT: record the bytes of a minted key, so
+     * {@link ObjectStorage.readObjectStart} can read them back.
+     */
+    putBytes(key: string, bytes: Uint8Array): void;
 }
 
 const DEFAULT_UPLOAD_EXPIRY_SECONDS = 600;
@@ -73,8 +79,14 @@ export function createMemoryStorage(
     );
     const generateId = config.generateId ?? randomUUID;
 
-    const uploadSchema = buildUploadInputSchema({ allowlist, maxUploadBytes });
+    const uploadSchema = buildUploadInputSchema({
+        allowlist,
+        maxUploadBytes,
+        maxVideoUploadBytes: config.maxVideoUploadBytes,
+    });
     const store = new Map<string, MemoryStoredObject>();
+    // Bytes exist only for keys a test "uploaded" with putBytes.
+    const bytesByKey = new Map<string, Uint8Array>();
 
     return {
         // eslint-disable-next-line @typescript-eslint/require-await -- async so bad input rejects (parse throws) instead of throwing synchronously, matching the port contract.
@@ -131,7 +143,23 @@ export function createMemoryStorage(
 
         deleteObject(key: string): Promise<void> {
             store.delete(key);
+            bytesByKey.delete(key);
             return Promise.resolve();
+        },
+
+        readObjectStart(
+            key: string,
+            length: number,
+        ): Promise<Uint8Array | null> {
+            const bytes = bytesByKey.get(key);
+            return Promise.resolve(bytes ? bytes.slice(0, length) : null);
+        },
+
+        putBytes(key: string, bytes: Uint8Array): void {
+            if (!store.has(key)) {
+                throw new Error(`No upload was minted for ${key}`);
+            }
+            bytesByKey.set(key, bytes);
         },
 
         headObject(key: string): Promise<HeadObjectResult | null> {
@@ -159,6 +187,7 @@ export function createMemoryStorage(
 
         reset(): void {
             store.clear();
+            bytesByKey.clear();
         },
     };
 }

@@ -59,7 +59,7 @@ export function VariantDrawer({
 
     const photo = open
         ? (product.images.find((i) => i.id === open.imageId) ??
-          product.images.at(0))
+          product.images.find((i) => i.kind !== "video"))
         : undefined;
     const mineOrders =
         open && orders

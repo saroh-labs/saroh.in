@@ -470,7 +470,7 @@ model Media {
   sizeBytes   Int
   filename    String
   purpose     String? // logical bucketing, e.g. product-image, avatar
-  status      String  @default("PENDING") // PENDING → READY
+  status      String  @default("PENDING") // PENDING → READY, or FAILED when the bytes are not what the type says
 
   uploadedByUserId String?
 
@@ -478,7 +478,9 @@ model Media {
   updatedAt DateTime @updatedAt
 
   // Products that show this object. Taking it off a product never deletes it.
-  productImages ProductImage[]
+  productImages  ProductImage[] @relation("ProductImageMedia")
+  // Product videos that use it as their poster.
+  productPosters ProductImage[] @relation("ProductImagePoster")
   // The business whose logo it is (at most one: a logo is per business).
   businessLogos BusinessProfile[] @relation("BusinessLogo")
 
@@ -737,11 +739,20 @@ model ProductImage {
 
   url      String
   mediaId  String?
-  media    Media?  @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  media    Media?  @relation("ProductImageMedia", fields: [mediaId], references: [id], onDelete: SetNull)
   alt      String  @default("")
   width    Int?
   height   Int?
   position Int
+
+  // "photo" or "video" (#517). A video always comes from an uploaded MP4 or
+  // MOV (mediaId); its poster is an image from the library, never a free URL.
+  // posterUrl mirrors the poster's address the way url mirrors the media's.
+  kind          String  @default("photo")
+  durationSec   Int?
+  posterMediaId String?
+  poster        Media?  @relation("ProductImagePoster", fields: [posterMediaId], references: [id], onDelete: SetNull)
+  posterUrl     String?
 
   // Photographer credit, for images from a licensed library (e.g. Unsplash).
   creditName String?

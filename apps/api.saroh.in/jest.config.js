@@ -147,6 +147,9 @@ module.exports = {
         // Products v2: MRP, saving, shop switches and detail coherence — pure.
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
+        // #517 photos and videos: limits, kind/type match, posters from the
+        // library, with a jest-mocked Prisma.
+        "<rootDir>/src/modules/products/product-images.service.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",

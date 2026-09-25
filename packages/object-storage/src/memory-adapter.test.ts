@@ -42,6 +42,19 @@ describe("createMemoryStorage", () => {
         expect(head?.contentLength).toBe(2048);
     });
 
+    it("reads back the first bytes of an uploaded object", async () => {
+        const storage = createMemoryStorage({ generateId: () => "id-2" });
+        const { key } = await storage.createSignedUploadUrl(makeInput());
+        expect(await storage.readObjectStart(key, 4)).toBeNull();
+        storage.putBytes(key, new Uint8Array([9, 8, 7, 6, 5]));
+        expect(await storage.readObjectStart(key, 4)).toEqual(
+            new Uint8Array([9, 8, 7, 6]),
+        );
+        expect(() =>
+            storage.putBytes("org/x/never.png", new Uint8Array([1])),
+        ).toThrow();
+    });
+
     it("headObject resolves null for an unknown key", async () => {
         const storage = createMemoryStorage();
         expect(await storage.headObject("org/x/nope.png")).toBeNull();

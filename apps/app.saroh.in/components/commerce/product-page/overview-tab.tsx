@@ -2,8 +2,10 @@ import { Badge } from "@saroh/ui/badge";
 import { Card } from "@saroh/ui/card";
 import Link from "next/link";
 
+import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { mediaCounter } from "@/lib/products/editor-sections";
 import type { EditorSection, ProductTab } from "@/lib/products/links";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
@@ -257,20 +259,18 @@ export function ProductOverviewTab({
                                     className={
                                         i === 0
                                             ? "relative row-span-2 overflow-hidden rounded-[8px]"
-                                            : "overflow-hidden rounded-[6px]"
+                                            : "relative aspect-[4/3] overflow-hidden rounded-[6px]"
                                     }
                                 >
-                                    {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */}
-                                    <img
-                                        src={img.url}
+                                    <MediaThumb
+                                        item={img}
                                         alt={img.alt}
+                                        small={i > 0}
                                         className={
-                                            i === 0
-                                                ? "aspect-[4/3] size-full object-cover"
-                                                : "aspect-[4/3] w-full object-cover"
+                                            i === 0 ? "aspect-[4/3]" : undefined
                                         }
                                     />
-                                    {i === 0 ? (
+                                    {i === 0 && img.kind !== "video" ? (
                                         <span className="absolute left-1.5 top-1.5 rounded-full bg-foreground px-[7px] py-px text-[11px] font-semibold text-background">
                                             Cover
                                         </span>
@@ -280,11 +280,12 @@ export function ProductOverviewTab({
                         </div>
                     ) : (
                         <div className="grid place-items-center rounded-[8px] border border-dashed border-border px-4 py-10 text-center text-[12.5px] text-muted-foreground">
-                            No photos yet — up to 5, the first is the cover.
+                            No photos yet — up to 15 photos and 3 videos; the
+                            first photo is the cover.
                         </div>
                     )}
                     <p className="pb-3 pt-2 text-[11.5px] text-muted-foreground">
-                        {product.images.length} of 5 photos
+                        {mediaCounter(product.images)}
                     </p>
                 </Card>
             </div>

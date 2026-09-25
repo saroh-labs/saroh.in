@@ -162,4 +162,43 @@ describe("ProductPage", () => {
         expect(screen.getByText(/No reviews yet/)).toBeInTheDocument();
         expect(screen.getByText("₹2,499")).toBeInTheDocument();
     });
+
+    it("shows a video with its length, and its poster with Open video when it can't play", () => {
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...dress,
+                    images: [
+                        ...dress.images,
+                        {
+                            id: "v1",
+                            url: "https://img.test/twirl.mov",
+                            alt: "The dress, twirling",
+                            kind: "video",
+                            durationSec: 24,
+                            posterUrl: "https://img.test/twirl.jpg",
+                        },
+                    ],
+                }}
+            />,
+        );
+        const thumb = screen.getByRole("button", {
+            name: "Show video 3: The dress, twirling, 0:24",
+        });
+        expect(thumb).toHaveTextContent("0:24");
+        fireEvent.click(thumb);
+        const video = container.querySelector("video");
+        expect(video).toHaveAttribute("src", "https://img.test/twirl.mov");
+        expect(video).toHaveAttribute("poster", "https://img.test/twirl.jpg");
+
+        if (!video) throw new Error("No video on the page");
+        fireEvent.error(video);
+        expect(container.querySelector("video")).toBeNull();
+        expect(
+            screen.getByRole("img", { name: "The dress, twirling" }),
+        ).toHaveAttribute("src", "https://img.test/twirl.jpg");
+        expect(
+            screen.getByRole("link", { name: "Open video" }),
+        ).toHaveAttribute("href", "https://img.test/twirl.mov");
+    });
 });

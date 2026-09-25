@@ -51,6 +51,13 @@ export interface ProductImage {
     position: number;
     creditName: string | null;
     creditUrl: string | null;
+    /** "photo" or "video" (#517). */
+    kind: "photo" | "video";
+    /** A video's length in seconds. */
+    durationSec: number | null;
+    /** A video's poster, from the library. */
+    posterMediaId: string | null;
+    posterUrl: string | null;
 }
 
 /**
@@ -425,6 +432,10 @@ export interface ProductImageInput {
     height?: number;
     creditName?: string | null;
     creditUrl?: string | null;
+    /** A new video: an uploaded MP4 or MOV (mediaId), with its poster. */
+    kind?: "photo" | "video";
+    durationSec?: number | null;
+    posterMediaId?: string | null;
 }
 
 export function replaceProductImages(

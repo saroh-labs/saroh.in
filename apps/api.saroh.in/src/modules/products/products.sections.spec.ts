@@ -34,7 +34,11 @@ describe("Products v2: sections, photos, overview (DB)", () => {
     const media = {
         readyObject: jest.fn((organizationId: string, mediaId: string) => {
             if (organizationId === orgId && mediaId === mediaRowId) {
-                return Promise.resolve({ id: mediaRowId, url: libraryUrl });
+                return Promise.resolve({
+                    id: mediaRowId,
+                    url: libraryUrl,
+                    contentType: "image/jpeg",
+                });
             }
             return Promise.reject(
                 new NotFoundException("That photo is not in your library"),
@@ -425,7 +429,7 @@ describe("Products v2: sections, photos, overview (DB)", () => {
     describe("the photo set", () => {
         const url = (n: number) => `https://images.example.test/rose-${n}.jpg`;
 
-        it("saves in order, mirrors the cover, and refuses a sixth", async () => {
+        it("saves in order, mirrors the cover, and refuses a sixteenth", async () => {
             const set = await images.replace(storeId, productId, ownerId, {
                 images: [1, 2, 3].map((n) => ({
                     url: url(n),
@@ -441,9 +445,11 @@ describe("Products v2: sections, photos, overview (DB)", () => {
 
             await expect(
                 images.replace(storeId, productId, ownerId, {
-                    images: [1, 2, 3, 4, 5, 6].map((n) => ({ url: url(n) })),
+                    images: Array.from({ length: 16 }, (_, i) => ({
+                        url: url(i + 1),
+                    })),
                 }),
-            ).rejects.toThrow(/5 photos at most/);
+            ).rejects.toThrow("Already 15 photos — take one off first.");
         });
 
         it("moves a photo to the front, keeping its alt text", async () => {

@@ -50,6 +50,8 @@ export interface R2StorageConfig {
     allowedContentTypes?: ContentTypeAllowlist;
     /** Upload byte cap; defaults to {@link DEFAULT_MAX_UPLOAD_BYTES}. */
     maxUploadBytes?: number;
+    /** Video upload byte cap; defaults to 50 MiB. */
+    maxVideoUploadBytes?: number;
     /** Presigned upload (PUT) URL lifetime; defaults to 600s. */
     uploadExpirySeconds?: number;
     /** Presigned download (GET) URL lifetime; defaults to 900s. */
@@ -114,7 +116,11 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
             ? undefined
             : stripTrailingSlashes(config.publicBaseUrl);
 
-    const uploadSchema = buildUploadInputSchema({ allowlist, maxUploadBytes });
+    const uploadSchema = buildUploadInputSchema({
+        allowlist,
+        maxUploadBytes,
+        maxVideoUploadBytes: config.maxVideoUploadBytes,
+    });
 
     const client =
         config.s3Client ??
@@ -223,6 +229,27 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
                     contentLength: out.ContentLength,
                     etag: out.ETag,
                 };
+            } catch (error) {
+                if (isNotFound(error)) return null;
+                throw error;
+            }
+        },
+
+        async readObjectStart(
+            key: string,
+            length: number,
+        ): Promise<Uint8Array | null> {
+            try {
+                const out = await client.send(
+                    new GetObjectCommand({
+                        Bucket: config.bucket,
+                        Key: key,
+                        Range: `bytes=0-${Math.max(0, length - 1)}`,
+                    }),
+                );
+                if (!out.Body) return null;
+                const bytes = await out.Body.transformToByteArray();
+                return bytes.subarray(0, length);
             } catch (error) {
                 if (isNotFound(error)) return null;
                 throw error;

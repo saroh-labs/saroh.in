@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import Link from "next/link";
 
 import { formatMoneyMajor } from "@/lib/format/money";
+import { mediaCounter } from "@/lib/products/editor-sections";
 import type { EditorSection } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 
@@ -42,8 +43,8 @@ export function DraftChecklist({
             title: "Photos",
             sub:
                 product.images.length > 0
-                    ? `${product.images.length} of 5 — the first is the cover.`
-                    : "No photos yet — up to 5.",
+                    ? `${mediaCounter(product.images)} — the first photo is the cover.`
+                    : "No photos yet — up to 15 photos and 3 videos.",
             cta: { label: "Add photos", section: "photos" },
         },
         {

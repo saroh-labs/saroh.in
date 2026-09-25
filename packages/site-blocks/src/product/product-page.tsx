@@ -30,6 +30,19 @@ export interface ProductPageImage {
     alt: string;
     width?: number | null;
     height?: number | null;
+    /** "video" for an MP4 or MOV (#517); a photo otherwise. */
+    kind?: "photo" | "video";
+    /** A video's length in seconds, for its badge. */
+    durationSec?: number | null;
+    /** A video's poster; shown before it plays and when it can't. */
+    posterUrl?: string | null;
+}
+
+/** A video's length as its badge shows it: "0:24". */
+export function videoLength(seconds: number | null | undefined): string {
+    if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "";
+    const whole = Math.round(seconds);
+    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
 export interface ProductPageVariant {
@@ -131,6 +144,73 @@ function Marker({ n, show }: { n: number; show: boolean }) {
     );
 }
 
+/** The play mark and length on a video's thumbnail. */
+function VideoBadge({ length }: { length: string }) {
+    return (
+        <span
+            aria-hidden
+            className="bg-site-fg text-site-bg absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded-full px-1.5 text-[10.5px] font-semibold tabular-nums"
+        >
+            <svg viewBox="0 0 10 10" className="size-2 fill-current">
+                <path d="M2 1l7 4-7 4z" />
+            </svg>
+            {length || "Video"}
+        </span>
+    );
+}
+
+/**
+ * A product video (#517): played as uploaded — MP4 or MOV, no transcoding —
+ * with its poster until it plays. A browser that can't play the file (a MOV
+ * outside Safari, often) falls back to the poster with a link to open the
+ * video itself, rather than an empty black box.
+ */
+function ProductVideo({
+    video,
+    name,
+}: {
+    video: ProductPageImage;
+    name: string;
+}) {
+    const [failed, setFailed] = useState(false);
+    const label = video.alt || `A video of ${name}`;
+    if (failed) {
+        return (
+            <div className="relative">
+                {video.posterUrl ? (
+                    <img
+                        src={video.posterUrl}
+                        alt={label}
+                        className="aspect-[4/5] w-full object-cover"
+                    />
+                ) : (
+                    <div className="aspect-[4/5] w-full" aria-hidden />
+                )}
+                <a
+                    href={video.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-site-fg text-site-bg absolute bottom-3 left-3 rounded-[var(--site-radius,2px)] px-3 py-2 text-sm font-medium"
+                >
+                    Open video
+                </a>
+            </div>
+        );
+    }
+    return (
+        <video
+            src={video.url}
+            poster={video.posterUrl ?? undefined}
+            controls
+            playsInline
+            preload="metadata"
+            aria-label={label}
+            onError={() => setFailed(true)}
+            className="bg-site-surface aspect-[4/5] w-full object-cover"
+        />
+    );
+}
+
 function Stars({ rating, className }: { rating: number; className?: string }) {
     const full = Math.round(rating);
     return (
@@ -224,7 +304,13 @@ export default function ProductPage({
                 {/* 1 — photos */}
                 <div className="min-w-0">
                     <div className="border-site-border bg-site-surface relative overflow-hidden rounded-[var(--site-radius,2px)] border">
-                        {shown ? (
+                        {shown?.kind === "video" ? (
+                            <ProductVideo
+                                key={shown.id}
+                                video={shown}
+                                name={product.name}
+                            />
+                        ) : shown ? (
                             <img
                                 src={shown.url}
                                 alt={shown.alt}
@@ -247,27 +333,44 @@ export default function ProductPage({
                             aria-label="Photos"
                             className="mt-2 grid grid-cols-5 gap-2"
                         >
-                            {product.images.map((img, i) => (
-                                <button
-                                    key={img.id}
-                                    type="button"
-                                    onClick={() => setImageIndex(i)}
-                                    aria-label={`Show photo ${i + 1}: ${img.alt || product.name}`}
-                                    aria-pressed={i === imageIndex}
-                                    className={cn(
-                                        "overflow-hidden rounded-[var(--site-radius,2px)] border",
-                                        i === imageIndex
-                                            ? "border-site-fg"
-                                            : "border-site-border",
-                                    )}
-                                >
-                                    <img
-                                        src={img.url}
-                                        alt=""
-                                        className="aspect-square w-full object-cover"
-                                    />
-                                </button>
-                            ))}
+                            {product.images.map((img, i) => {
+                                const video = img.kind === "video";
+                                const length = video
+                                    ? videoLength(img.durationSec)
+                                    : "";
+                                return (
+                                    <button
+                                        key={img.id}
+                                        type="button"
+                                        onClick={() => setImageIndex(i)}
+                                        aria-label={`Show ${video ? "video" : "photo"} ${i + 1}: ${img.alt || product.name}${length ? `, ${length}` : ""}`}
+                                        aria-pressed={i === imageIndex}
+                                        className={cn(
+                                            "relative overflow-hidden rounded-[var(--site-radius,2px)] border",
+                                            i === imageIndex
+                                                ? "border-site-fg"
+                                                : "border-site-border",
+                                        )}
+                                    >
+                                        {video && !img.posterUrl ? (
+                                            <span className="bg-site-surface block aspect-square w-full" />
+                                        ) : (
+                                            <img
+                                                src={
+                                                    video
+                                                        ? (img.posterUrl ?? "")
+                                                        : img.url
+                                                }
+                                                alt=""
+                                                className="aspect-square w-full object-cover"
+                                            />
+                                        )}
+                                        {video ? (
+                                            <VideoBadge length={length} />
+                                        ) : null}
+                                    </button>
+                                );
+                            })}
                         </div>
                     ) : null}
                 </div>

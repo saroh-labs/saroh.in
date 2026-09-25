@@ -62,7 +62,7 @@ export async function createUpload(input: {
     contentLength: number;
     filename: string;
     /** The library bucket; site images unless said. */
-    purpose?: "site-image" | "business-logo";
+    purpose?: "site-image" | "business-logo" | "product-video";
 }): Promise<MediaResult<UploadTicket>> {
     const base = await mediaBase();
     if (!base) return { ok: false, error: "No active organization." };

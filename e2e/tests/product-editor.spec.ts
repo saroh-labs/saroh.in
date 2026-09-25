@@ -154,7 +154,9 @@ test.describe("product editor", () => {
             await expect(page.getByText("Stock saved.").first()).toBeVisible();
 
             // 8. Three photos by address; the first is the cover.
-            const photos = page.getByRole("region", { name: "Photos" });
+            const photos = page.getByRole("region", {
+                name: "Photos and videos",
+            });
             for (const [i, url] of PHOTOS.entries()) {
                 await photos
                     .getByRole("button", { name: "Or add one by its address" })
@@ -174,8 +176,10 @@ test.describe("product editor", () => {
                     name: /^Make photo \d the cover$/,
                 }),
             ).toHaveCount(2);
-            await photos.getByRole("button", { name: "Save photos" }).click();
-            await expect(page.getByText("Photos saved.").first()).toBeVisible();
+            await photos.getByRole("button", { name: "Save media" }).click();
+            await expect(
+                page.getByText("Photos and videos saved.").first(),
+            ).toBeVisible();
 
             // 9. Publishing is its own step, named for what it does.
             const visibility = page.getByRole("region", { name: "Visibility" });

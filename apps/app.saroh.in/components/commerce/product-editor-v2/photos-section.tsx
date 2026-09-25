@@ -5,6 +5,7 @@ import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
 import { AddressPanel } from "@/components/commerce/product-sections/photos-field";
 import { useImageUpload } from "@/components/sites/media-picker";
 import { listLibrary } from "@/lib/media/actions";
@@ -12,10 +13,17 @@ import type { LibraryItem } from "@/lib/media/service";
 import { replaceProductImages } from "@/lib/products/actions";
 import type { PhotoDraft } from "@/lib/products/editor-sections";
 import {
+    isVideo,
     LIMITS,
+    MEDIA_ACCEPT,
+    mediaCounter,
+    mediaCounts,
+    mediaFileProblem,
+    PHOTOS_FULL_MESSAGE,
     photosFrom,
     photosInput,
     samePhotos,
+    VIDEOS_FULL_MESSAGE,
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
 
@@ -30,11 +38,12 @@ function fileName(photo: PhotoDraft): string {
 }
 
 /**
- * The product's photos, in the order customers see them; the first is the
- * cover, on the shop and in lists. Move one earlier or later, make it the
- * cover, or take it off — which never deletes it from your photos. Add from
- * the library or upload; a drop onto the grid works on a desk, and the tiles
- * are the way on a phone.
+ * The product's photos and videos (up to 15 and 3, #517), in the order
+ * customers see them; the first photo is the cover, on the shop and in lists.
+ * Move one earlier or later, make a photo the cover, or take one off — which
+ * never deletes it from your photos. Add photos from the library or upload a
+ * photo or video; a drop onto the grid works on a desk, and the tiles are the
+ * way on a phone.
  */
 export function PhotosSection({
     product,
@@ -62,11 +71,18 @@ export function PhotosSection({
     const [library, setLibrary] = useState(false);
     const [byAddress, setByAddress] = useState(false);
     const [over, setOver] = useState(false);
-    const { upload, busy, progress, error } = useImageUpload();
+    const { upload, busy, progress, error, setError } = useImageUpload({
+        allowVideo: true,
+    });
     const fileRef = useRef<HTMLInputElement>(null);
 
     const n = draft.length;
-    const full = n >= LIMITS.photos;
+    const counts = mediaCounts(draft);
+    // Photos full: the library and the address can't add one. Both full:
+    // nothing can be uploaded either.
+    const full = counts.photos >= LIMITS.photos;
+    const allFull = full && counts.videos >= LIMITS.videos;
+    const coverIndex = draft.findIndex((p) => !isVideo(p));
     const dirty = !samePhotos(draft, base);
 
     useSection(
@@ -114,33 +130,50 @@ export function PhotosSection({
 
     function takeOff(i: number) {
         const before = draft;
+        const noun = isVideo(draft[i] ?? {}) ? "Video" : "Photo";
         setDraft(draft.filter((_, j) => j !== i));
-        showUndo(`Photo ${i + 1} taken off. It stays in your photos.`, () =>
+        showUndo(`${noun} ${i + 1} taken off. It stays in your photos.`, () =>
             setDraft(before),
         );
     }
 
     async function addFile(file: File) {
-        if (full) return;
+        const problem = mediaFileProblem(file, draft);
+        if (problem) {
+            setError(problem);
+            if (fileRef.current) fileRef.current.value = "";
+            return;
+        }
         const picked = await upload(file);
         if (fileRef.current) fileRef.current.value = "";
         if (!picked) return;
-        setDraft((list) =>
-            list.length >= LIMITS.photos
-                ? list
-                : [
-                      ...list,
-                      {
-                          mediaId: picked.mediaId ?? null,
-                          url: picked.src,
-                          alt: "",
-                          width: picked.width ?? null,
-                          height: picked.height ?? null,
-                          creditName: null,
-                          creditUrl: null,
-                      },
-                  ],
-        );
+        const video = picked.kind === "video";
+        setDraft((list) => {
+            // Checked again: another upload may have filled the set.
+            const now = mediaCounts(list);
+            if (
+                video
+                    ? now.videos >= LIMITS.videos
+                    : now.photos >= LIMITS.photos
+            )
+                return list;
+            return [
+                ...list,
+                {
+                    mediaId: picked.mediaId ?? null,
+                    url: picked.src,
+                    alt: "",
+                    width: picked.width ?? null,
+                    height: picked.height ?? null,
+                    creditName: null,
+                    creditUrl: null,
+                    kind: video ? "video" : "photo",
+                    durationSec: picked.durationSec ?? null,
+                    posterMediaId: picked.posterMediaId ?? null,
+                    posterUrl: picked.posterSrc ?? null,
+                },
+            ];
+        });
     }
 
     function toggleLibrary(item: LibraryItem) {
@@ -173,23 +206,23 @@ export function PhotosSection({
         "flex min-h-[134px] flex-col items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-border-strong p-2 text-center text-[12px] font-semibold disabled:cursor-not-allowed";
 
     return (
-        <SectionCard k="photos" title="Photos">
+        <SectionCard k="photos" title="Photos and videos">
             <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
                 <span className="text-[12.5px] font-medium">
-                    {n} of {LIMITS.photos} photos
+                    {mediaCounter(draft)}
                 </span>
                 <span className="flex-[1_1_200px] text-[11.5px] text-muted-foreground">
-                    The first is the cover — on the shop and in lists. Every
-                    variant shows the same photos unless it picks its own.
+                    The first photo is the cover — on the shop and in lists.
+                    Every variant shows the same photos unless it picks its own.
                 </span>
             </div>
             <input
                 ref={fileRef}
                 type="file"
-                accept="image/*"
+                accept={MEDIA_ACCEPT}
                 className="sr-only"
-                disabled={ro || busy || full}
-                aria-label="Choose a photo"
+                disabled={ro || busy || allFull}
+                aria-label="Choose a photo or video"
                 onChange={(e) => {
                     const file = e.target.files?.item(0);
                     if (file) void addFile(file);
@@ -197,7 +230,7 @@ export function PhotosSection({
             />
             <div
                 onDragOver={(e) => {
-                    if (ro || full) return;
+                    if (ro || allFull) return;
                     e.preventDefault();
                     setOver(true);
                 }}
@@ -205,7 +238,7 @@ export function PhotosSection({
                 onDrop={(e) => {
                     e.preventDefault();
                     setOver(false);
-                    if (ro || full) return;
+                    if (ro || allFull) return;
                     const file = e.dataTransfer.files.item(0);
                     if (file) void addFile(file);
                 }}
@@ -217,27 +250,30 @@ export function PhotosSection({
             >
                 {draft.map((photo, i) => {
                     const name = fileName(photo);
+                    const video = isVideo(photo);
+                    const noun = video ? "video" : "photo";
+                    const cover = i === coverIndex;
                     return (
                         <div
                             key={photo.id ?? photo.url}
                             className={cn(
                                 "min-w-0 overflow-hidden rounded-[10px] bg-card",
-                                i === 0
+                                cover
                                     ? "border-[1.5px] border-foreground"
                                     : "border border-border",
                             )}
                         >
                             <div className="relative aspect-[4/3] bg-muted">
-                                {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */}
-                                <img
-                                    src={photo.url}
+                                <MediaThumb
+                                    item={photo}
                                     alt={
                                         photo.alt ||
-                                        `${name}${i === 0 ? ", the cover" : `, number ${i + 1}`}`
+                                        (video
+                                            ? `${name}, video number ${i + 1}`
+                                            : `${name}${cover ? ", the cover" : `, number ${i + 1}`}`)
                                     }
-                                    className="size-full object-cover"
                                 />
-                                {i === 0 ? (
+                                {cover ? (
                                     <span className="absolute left-1.5 top-1.5 rounded-full bg-foreground px-[7px] py-px text-[11px] font-semibold text-background">
                                         Cover
                                     </span>
@@ -265,7 +301,7 @@ export function PhotosSection({
                                     }
                                     placeholder={name}
                                     title={photo.alt || name}
-                                    aria-label={`What photo ${i + 1} shows, for people who can't see it`}
+                                    aria-label={`What ${noun} ${i + 1} shows, for people who can't see it`}
                                     className="-mx-1 h-6 w-[calc(100%+0.5rem)] truncate rounded-[5px] border border-transparent bg-transparent px-1 text-[11.5px] font-medium placeholder:font-normal placeholder:text-muted-foreground hover:border-border focus-visible:border-border focus-visible:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
                                 />
                                 <div className="mt-1 flex gap-[3px] coarse:flex-wrap">
@@ -273,7 +309,7 @@ export function PhotosSection({
                                         type="button"
                                         className={tileBtn}
                                         disabled={ro || i === 0}
-                                        aria-label={`Move photo ${i + 1} earlier`}
+                                        aria-label={`Move ${noun} ${i + 1} earlier`}
                                         onClick={() => move(i, i - 1)}
                                     >
                                         ‹
@@ -282,12 +318,12 @@ export function PhotosSection({
                                         type="button"
                                         className={tileBtn}
                                         disabled={ro || i === n - 1}
-                                        aria-label={`Move photo ${i + 1} later`}
+                                        aria-label={`Move ${noun} ${i + 1} later`}
                                         onClick={() => move(i, i + 1)}
                                     >
                                         ›
                                     </button>
-                                    {i > 0 && canWrite ? (
+                                    {!video && !cover && canWrite ? (
                                         <button
                                             type="button"
                                             className={tileBtn}
@@ -305,7 +341,7 @@ export function PhotosSection({
                                             "ml-auto text-destructive",
                                         )}
                                         disabled={ro}
-                                        aria-label={`Take photo ${i + 1} off this product`}
+                                        aria-label={`Take ${noun} ${i + 1} off this product`}
                                         onClick={() => takeOff(i)}
                                     >
                                         ×
@@ -332,11 +368,11 @@ export function PhotosSection({
                 </button>
                 <button
                     type="button"
-                    disabled={ro || busy || full}
+                    disabled={ro || busy || allFull}
                     onClick={() => fileRef.current?.click()}
                     className={cn(
                         addTile,
-                        ro || busy || full
+                        ro || busy || allFull
                             ? "text-muted-foreground/60"
                             : "text-foreground/75 hover:bg-muted/50",
                     )}
@@ -349,14 +385,21 @@ export function PhotosSection({
                     <span>
                         {busy
                             ? `Uploading ${progress ?? 0}%`
-                            : "Upload a photo"}
+                            : "Upload a photo or video"}
                     </span>
                 </button>
             </div>
-            <FieldHelp className="mt-2" tone={full ? "warn" : "quiet"}>
-                {full
-                    ? `${LIMITS.photos} photos is the most. Take one off to add another.`
-                    : "Photos up to 8 MB. Drop one onto the grid, or use the tiles."}
+            <FieldHelp
+                className="mt-2"
+                tone={full || allFull ? "warn" : "quiet"}
+            >
+                {allFull
+                    ? `${LIMITS.photos} photos and ${LIMITS.videos} videos is the most. Take one off to add another.`
+                    : full
+                      ? PHOTOS_FULL_MESSAGE
+                      : counts.videos >= LIMITS.videos
+                        ? VIDEOS_FULL_MESSAGE
+                        : "Photos up to 8 MB, videos up to 50 MB (MP4 or MOV). Drop one onto the grid, or use the tiles."}
             </FieldHelp>
             {busy ? (
                 <div
@@ -397,7 +440,7 @@ export function PhotosSection({
                     <AddressPanel
                         onAdd={(url, alt) => {
                             setDraft((list) =>
-                                list.length >= LIMITS.photos
+                                mediaCounts(list).photos >= LIMITS.photos
                                     ? list
                                     : [
                                           ...list,
