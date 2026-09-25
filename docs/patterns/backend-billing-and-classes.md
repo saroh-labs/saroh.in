@@ -43,6 +43,16 @@
   and what was paid covers the order again (its units' credit note offsets
   it). A GST-registered business cannot void an issued invoice
   — discard drafts, credit issued ones; void stays for unregistered receipts.
+- **Money in has an invoice, money out a credit note — even money the order
+  never asked for.** A payment on a superseded edit charge (#508, U8) stays
+  off the order's paid sums and is owed back, but the webhook invoices it
+  there and then: a supplementary invoice PAID (`ONLINE`, filed under the
+  provider's payment id), the amount spread over the invoiced lines
+  (`invoiceSupersededPayment`, under the intent's lock and after the
+  `CAPTURED_NEEDS_REFUND` record that makes it once). Its refund's credit
+  note goes through `creditNoteForRefund` like any other, spread over that
+  invoice's own lines, so the pair mirror each other and takings read the
+  money in on one day and out on another.
 - **GST:** prices include it; tax is derived per line from the inclusive
   amount, rounded per line and frozen. Spread an order discount across lines
   before tax; delivery is a taxed line. Place of supply: bill-to state, else
@@ -79,7 +89,9 @@
   `ensureOrderInvoice` (order row lock, then the partial unique index
   `Invoice_one_per_order`), `creditNoteForRefund` (unique on
   `paymentRefundId`, so the refund path and the refund webhook make one),
-  `correctOrderInvoiceForEdit`, `creditRestOfOrder`. Never write an order's
+  `correctOrderInvoiceForEdit`, `invoiceSupersededPayment`,
+  `creditRestOfOrder`. Lock order: order, intent, invoice — the webhook
+  (intent, then invoice) never takes them the other way. Never write an order's
   `Invoice` rows anywhere else.
 - **Every owed or spent sum over invoices spreads `OWED_WHERE`**
   (`invoice-state.ts`): no order paper, no credit notes.

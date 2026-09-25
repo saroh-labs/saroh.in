@@ -23,18 +23,27 @@ const REFUND = {
 };
 
 describe("creditNoteForRefund", () => {
-    it("credits nothing for money handed back from a superseded edit charge", async () => {
-        // Paid on a charge a later edit replaced: never the order's, never
-        // on its invoice (#508, U8).
+    it("credits money handed back from a superseded edit charge like any other", async () => {
+        // Paid on a charge a later edit replaced, and invoiced when it came
+        // in (#508, U8): its refund looks for the order's invoice to credit,
+        // as every refund does. The note itself is specced against a real
+        // database (order-kitchen.db.spec.ts).
         const tx = txWith({
             ...REFUND,
-            paymentIntent: { orderId: "order_1", status: "SUPERSEDED" },
+            paymentIntent: {
+                id: "pi_old",
+                orderId: "order_1",
+                status: "SUPERSEDED",
+            },
         });
+        tx.invoice.findFirst.mockResolvedValue(null);
         await expect(creditNoteForRefund(tx as never, "rf_1")).resolves.toBe(
             null,
         );
-        expect(tx.invoice.findFirst).not.toHaveBeenCalled();
-        expect(tx.$queryRaw).not.toHaveBeenCalled();
+        expect(tx.invoice.findFirst).toHaveBeenCalledWith({
+            where: { orderId: "order_1", kind: "INVOICE" },
+            select: { id: true },
+        });
     });
 
     it.each([

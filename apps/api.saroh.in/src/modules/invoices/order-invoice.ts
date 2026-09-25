@@ -371,6 +371,21 @@ export function buildCreditNote(
 }
 
 /**
+ * A supplementary invoice for money received with nothing added to the
+ * order: a payment on an edit's difference charge that a later edit
+ * superseded (#508, U8). The amount is spread over the invoiced lines in
+ * proportion, at their rates, exactly as a credit note that names no lines
+ * is — so the credit note that hands the money back, spread over this
+ * document's own lines, mirrors it line for line.
+ */
+export function buildPaymentSupplementary(
+    original: Original,
+    amountCents: number,
+): BuiltDocument {
+    return buildCreditNote(original, amountCents, []);
+}
+
+/**
  * A refunded order line across the invoiced lines of its item. One line
  * takes it whole; an item whose units were added by an edit spreads it
  * over the invoice's line and the supplementary invoice's, in proportion

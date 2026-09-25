@@ -4,6 +4,7 @@ import {
     buildCreditNote,
     buildManualInvoice,
     buildOrderInvoice,
+    buildPaymentSupplementary,
     formatSellerAddress,
     orderBillTo,
 } from "./order-invoice";
@@ -290,6 +291,38 @@ describe("a credit note", () => {
         const cn = buildCreditNote(withChai, 48920 + 10000);
         expect(cn.totalCents).toBe(58920);
         expect(cn.lines.map((l) => l.description)).toContain("Masala chai");
+    });
+
+    it("hands back a payment on a replaced charge line for line, from the invoice that took it", () => {
+        // ₹120 paid on a superseded difference charge (#508, U8): invoiced
+        // over the order's lines, then credited over that invoice's own.
+        const took = buildPaymentSupplementary(original(), 12000);
+        expect(took.totalCents).toBe(12000);
+        expect(took.taxType).toBe("INTRA");
+        const back = buildCreditNote(
+            {
+                ...original(),
+                lines: took.lines.map((l) => ({
+                    description: l.description,
+                    quantity: l.quantity,
+                    unitPrice: (l.unitCents / 100).toFixed(2),
+                    amount: (l.amountCents / 100).toFixed(2),
+                    gstRate:
+                        l.rateBps === null ? null : String(l.rateBps / 100),
+                    hsnSac: l.code,
+                    orderItemId: l.orderItemId ?? null,
+                })),
+            },
+            12000,
+        );
+        const shape = (d: typeof took) =>
+            d.lines.map((l) => [l.description, l.amountCents, l.cgstCents]);
+        expect(shape(back)).toEqual(shape(took));
+        expect([back.totalCents, back.cgstCents, back.sgstCents]).toEqual([
+            took.totalCents,
+            took.cgstCents,
+            took.sgstCents,
+        ]);
     });
 });
 
