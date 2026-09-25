@@ -1,3 +1,5 @@
+import { BadRequestException } from "@nestjs/common";
+
 import type { NumberFormat } from "./numbering";
 import {
     creditMark,
@@ -698,6 +700,21 @@ describe("changing the format mid-year", () => {
             at: sept,
         });
         expect(await issue(plain)).toBe("RC-0011");
+    });
+
+    it("gives up, on the number format, when every step lands on a number taken", async () => {
+        // A format that can only print one number, already issued: stepping
+        // past it never frees one.
+        const { tx, update } = fakeSequencer(["RC-STUCK"]);
+        const stuck = { key: "RC", stem: "RC-", format: () => "RC-STUCK" };
+        await expect(
+            nextInvoiceNumber(tx as never, "org_1", stuck),
+        ).rejects.toMatchObject({
+            constructor: BadRequestException,
+            response: { details: { field: "invoiceNumberParts" } },
+        });
+        // Three steps past it, then no more.
+        expect(update).toHaveBeenCalledTimes(3);
     });
 });
 
