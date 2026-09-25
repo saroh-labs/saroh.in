@@ -87,10 +87,9 @@ export function auditMetadata(
     metadata?: Prisma.InputJsonValue,
 ): Prisma.InputJsonValue | undefined {
     if (actorRoleKey !== PLATFORM_OPERATOR_ROLE_KEY) return metadata;
+    // InputJsonValue has no null (Prisma writes that as JsonNull).
     const base =
-        typeof metadata === "object" &&
-        metadata !== null &&
-        !Array.isArray(metadata)
+        typeof metadata === "object" && !Array.isArray(metadata)
             ? (metadata as Prisma.InputJsonObject)
             : metadata === undefined
               ? {}
