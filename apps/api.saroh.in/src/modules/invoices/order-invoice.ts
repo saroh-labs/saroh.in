@@ -253,6 +253,10 @@ export interface Original {
     taxType: string | null;
     tax: Money;
     total: Money;
+    /**
+     * Every line invoiced against it: its own, then its supplementary
+     * invoices' (units an edit added) — what a credit note can credit.
+     */
     lines: IssuedLine[];
 }
 
@@ -270,11 +274,12 @@ function gstOf(original: Original) {
  * The lines of a credit note for `amountCents` of an issued invoice.
  *
  * Itemised when the refund names order lines that add up to the amount:
- * each credits its own invoice line at that line's rate. Otherwise (a refund
- * in full, one made in the provider's dashboard, part of a refund split
- * across two payments) the amount is spread over the invoice's lines in
- * proportion, so each rate carries its share of the tax. The original's
- * place of supply holds: a credit note is taxed as its invoice was.
+ * each credits its own invoiced line at that line's rate — a line an edit
+ * added, at the supplementary invoice's. Otherwise (a refund in full, one
+ * made in the provider's dashboard, part of a refund split across two
+ * payments) the amount is spread over every invoiced line in proportion, so
+ * each rate carries its share of the tax. The original's place of supply
+ * holds: a credit note is taxed as its invoice was.
  */
 export function buildCreditNote(
     original: Original,
@@ -287,40 +292,43 @@ export function buildCreditNote(
 ): BuiltDocument {
     const registered = original.sellerGstin !== null;
     const taxType = (original.taxType as TaxType | null) ?? "INTRA";
-    const byItem = new Map<string, IssuedLine>();
+    // An item can be on more than one invoiced line: the order's invoice,
+    // and a supplementary invoice for units an edit added.
+    const byItem = new Map<string, IssuedLine[]>();
     for (const l of original.lines) {
-        if (l.orderItemId) byItem.set(l.orderItemId, l);
+        if (!l.orderItemId) continue;
+        byItem.set(l.orderItemId, [...(byItem.get(l.orderItemId) ?? []), l]);
     }
-    const matched = refundLines.flatMap((r) => {
-        const line = byItem.get(r.orderItemId);
-        return line ? [{ r, line }] : [];
-    });
+    const matched = refundLines.map((r) => ({
+        r,
+        lines: byItem.get(r.orderItemId) ?? [],
+    }));
     const itemised =
         refundLines.length > 0 &&
-        matched.length === refundLines.length &&
+        matched.every((m) => m.lines.length > 0) &&
         refundLines.reduce((s, l) => s + l.amountCents, 0) === amountCents;
 
-    const inputs: GstLineInput[] = itemised
-        ? matched.map(({ r, line }) => {
-              return {
-                  description: line.description,
-                  quantity: r.quantity,
-                  unitCents: toCents(line.unitPrice.toString()),
-                  rateBps: rateToBps(line.gstRate),
-                  code: line.hsnSac,
-                  orderItemId: r.orderItemId,
-              };
-          })
-        : [];
+    const inputs: GstLineInput[] = [];
     let discounts: number[] = [];
     if (itemised) {
-        // What the line cost less what comes back: its share of the discount.
-        discounts = refundLines.map((r, i) =>
-            Math.max(
-                0,
-                inputs[i].quantity * inputs[i].unitCents - r.amountCents,
-            ),
-        );
+        for (const { r, lines } of matched) {
+            for (const part of itemParts(r, lines)) {
+                const unitCents = toCents(part.line.unitPrice.toString());
+                inputs.push({
+                    description: part.line.description,
+                    quantity: part.quantity,
+                    unitCents,
+                    rateBps: rateToBps(part.line.gstRate),
+                    code: part.line.hsnSac,
+                    orderItemId: r.orderItemId,
+                });
+                // What the line cost less what comes back: its share of
+                // the discount.
+                discounts.push(
+                    Math.max(0, part.quantity * unitCents - part.amountCents),
+                );
+            }
+        }
     } else {
         const weights = original.lines.map((l) => toCents(l.amount.toString()));
         const shares = allocate(weights, amountCents);
@@ -355,6 +363,40 @@ export function buildCreditNote(
         addOn = Math.min(originalAddOn, Math.max(0, amountCents - lineTotal));
     }
     return finish(taxed, addOn, gstOf(original));
+}
+
+/**
+ * A refunded order line across the invoiced lines of its item. One line
+ * takes it whole; an item whose units were added by an edit spreads it
+ * over the invoice's line and the supplementary invoice's, in proportion
+ * to the units each invoiced — so each part keeps its own line's rate and
+ * HSN — and the money in proportion to those parts' price.
+ */
+function itemParts(
+    refund: { quantity: number; amountCents: number },
+    lines: IssuedLine[],
+): { line: IssuedLine; quantity: number; amountCents: number }[] {
+    if (lines.length === 1) {
+        return [
+            {
+                line: lines[0],
+                quantity: refund.quantity,
+                amountCents: refund.amountCents,
+            },
+        ];
+    }
+    const quantities = allocate(
+        lines.map((l) => l.quantity),
+        refund.quantity,
+    );
+    const parts = lines
+        .map((line, i) => ({ line, quantity: quantities[i] }))
+        .filter((p) => p.quantity > 0);
+    const amounts = allocate(
+        parts.map((p) => p.quantity * toCents(p.line.unitPrice.toString())),
+        refund.amountCents,
+    );
+    return parts.map((p, i) => ({ ...p, amountCents: amounts[i] }));
 }
 
 /**

@@ -321,6 +321,8 @@ export class WebhooksService {
                     return this.applyIntentFailure(tx, intent);
                 case "REFUNDED":
                     return this.settleRefund(tx, intent, event);
+                case "REFUND_FAILED":
+                    return this.failProviderRefund(tx, intent, event);
                 default:
                     return { applied: false };
             }
@@ -335,6 +337,10 @@ export class WebhooksService {
                 return this.applyFailure(tx, intent, orderId);
             case "REFUNDED":
                 return this.applyRefund(tx, intent, orderId, event);
+            // A refund that never went back changes the refund row only:
+            // the order stays as it was, and no credit note is made.
+            case "REFUND_FAILED":
+                return this.failProviderRefund(tx, intent, event);
             default:
                 return { applied: false };
         }
@@ -591,34 +597,184 @@ export class WebhooksService {
         intent: IntentRow,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean; refundId: string | null }> {
-        if (!event.providerRefundId) return { applied: false, refundId: null };
-        const existing = await tx.paymentRefund.findFirst({
-            where: {
-                organizationId: intent.organizationId,
-                providerRefundId: event.providerRefundId,
-            },
-        });
+        if (!event.providerRefundId && !event.refundReference) {
+            return { applied: false, refundId: null };
+        }
+        const existing = await this.matchRefund(tx, intent, event);
         if (existing) {
-            if (existing.status !== "SUCCEEDED") {
-                await tx.paymentRefund.update({
-                    where: { id: existing.id },
-                    data: { status: "SUCCEEDED" },
-                });
-                return { applied: true, refundId: existing.id };
+            if (existing.status === "SUCCEEDED") {
+                return { applied: false, refundId: existing.id };
             }
-            return { applied: false, refundId: existing.id };
+            if (existing.status === "FAILED") {
+                // Saroh freed this money; the provider says it went back.
+                // The provider's word is the ledger's.
+                this.logger.warn(
+                    `Refund ${existing.id} was FAILED but ${intent.provider} reports it refunded; settling it`,
+                );
+            }
+            if (
+                event.refundAmountCents !== undefined &&
+                event.refundAmountCents !== existing.amountCents
+            ) {
+                this.logger.warn(
+                    `Refund ${existing.id}: ${intent.provider} refunded ${event.refundAmountCents}, Saroh asked ${existing.amountCents}`,
+                );
+            }
+            await tx.paymentRefund.update({
+                where: { id: existing.id },
+                data: {
+                    status: "SUCCEEDED",
+                    providerRefundId:
+                        existing.providerRefundId ??
+                        event.providerRefundId ??
+                        null,
+                },
+            });
+            // The refund path writes the REFUND step when it attaches the
+            // provider's id; here the webhook got there first (the call's
+            // answer was lost, or is still on its way), so the step is
+            // written here, once — the refund path's attach now finds the
+            // id set and writes none (DEC-026).
+            if (!existing.providerRefundId && existing.paymentIntent.orderId) {
+                await tx.orderEvent.create({
+                    data: {
+                        organizationId: intent.organizationId,
+                        orderId: existing.paymentIntent.orderId,
+                        kind: "REFUND",
+                        actorUserId: null,
+                        note: existing.reason,
+                        amountCents: existing.amountCents,
+                    },
+                });
+            }
+            return { applied: true, refundId: existing.id };
+        }
+        // Made outside Saroh (the provider's dashboard): recorded at what the
+        // provider refunded. Only an event with no amount falls back to the
+        // whole payment — and says so.
+        if (!event.providerRefundId) return { applied: false, refundId: null };
+        let amountCents = event.refundAmountCents;
+        if (amountCents === undefined) {
+            this.logger.warn(
+                `Refund ${event.providerRefundId} came with no amount; recorded at the payment's ${intent.amountCents}`,
+            );
+            amountCents = intent.amountCents;
         }
         const created = await tx.paymentRefund.create({
             data: {
                 organizationId: intent.organizationId,
                 paymentIntentId: intent.id,
-                amountCents: intent.amountCents,
+                amountCents,
                 currency: intent.currency,
                 status: "SUCCEEDED",
                 providerRefundId: event.providerRefundId,
             },
         });
         return { applied: true, refundId: created.id };
+    }
+
+    /**
+     * The provider definitely made no refund (Razorpay `refund.failed`,
+     * Cashfree CANCELLED): Saroh's PENDING row goes FAILED, so its money and
+     * lines can be refunded again. No credit note, and the order's payment
+     * status is left as it is. A row already settled, or no row at all, is
+     * logged and left alone.
+     */
+    private async failProviderRefund(
+        tx: Tx,
+        intent: IntentRow,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
+        const existing = await this.matchRefund(tx, intent, event);
+        if (existing?.status !== "PENDING") {
+            this.logger.warn(
+                `${intent.provider} reports refund ${event.providerRefundId ?? event.refundReference ?? "?"} failed; ${
+                    existing
+                        ? `refund ${existing.id} is ${existing.status}, left as it is`
+                        : "no refund of Saroh's matches it"
+                }`,
+            );
+            return { applied: false };
+        }
+        await tx.paymentRefund.update({
+            where: { id: existing.id },
+            data: {
+                status: "FAILED",
+                providerRefundId:
+                    existing.providerRefundId ?? event.providerRefundId ?? null,
+            },
+        });
+        return { applied: true };
+    }
+
+    /**
+     * The refund row a refund event is about, under its row lock: by the
+     * provider's refund id, else by Saroh's own reference (DEC-026) on the
+     * same order or invoice — a row whose provider id was never stored, the
+     * call timed out, or its answer is still on the way. Never by amount: a
+     * dashboard refund of the same amount must not settle Saroh's row.
+     *
+     * The reference is matched on the intent's order (or invoice), not the
+     * intent alone: Cashfree names the refund by the merchant order id,
+     * which resolves to the order's latest intent.
+     *
+     * The lock serialises this with the refund path attaching the provider's
+     * id, so exactly one of them sees the id unset — and writes the REFUND
+     * step.
+     */
+    private async matchRefund(
+        tx: Tx,
+        intent: IntentRow,
+        event: NormalizedWebhookEvent,
+    ) {
+        let id: string | null = null;
+        if (event.providerRefundId) {
+            const byProvider = await tx.paymentRefund.findFirst({
+                where: {
+                    organizationId: intent.organizationId,
+                    providerRefundId: event.providerRefundId,
+                },
+                select: { id: true },
+            });
+            id = byProvider?.id ?? null;
+        }
+        const parent = intent.orderId
+            ? { orderId: intent.orderId }
+            : intent.invoiceId
+              ? { invoiceId: intent.invoiceId }
+              : null;
+        if (!id && event.refundReference && parent) {
+            const byReference = await tx.paymentRefund.findFirst({
+                where: {
+                    id: event.refundReference,
+                    organizationId: intent.organizationId,
+                    paymentIntent: parent,
+                },
+                select: { id: true, providerRefundId: true },
+            });
+            // A row already carrying another provider refund is not this one.
+            if (
+                byReference &&
+                (!byReference.providerRefundId ||
+                    !event.providerRefundId ||
+                    byReference.providerRefundId === event.providerRefundId)
+            ) {
+                id = byReference.id;
+            }
+        }
+        if (!id) return null;
+        await tx.$queryRaw`SELECT id FROM "PaymentRefund" WHERE id = ${id} FOR UPDATE`;
+        return tx.paymentRefund.findUniqueOrThrow({
+            where: { id },
+            select: {
+                id: true,
+                status: true,
+                amountCents: true,
+                reason: true,
+                providerRefundId: true,
+                paymentIntent: { select: { orderId: true } },
+            },
+        });
     }
 
     /**

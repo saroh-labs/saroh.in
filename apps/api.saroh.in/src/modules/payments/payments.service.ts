@@ -145,8 +145,15 @@ function refundResult(rows: RefundRow[]): InitiateRefundResult {
     };
 }
 
+/**
+ * What one provider call made of a reserved refund row. `ACCEPTED` says
+ * whether this call attached the provider's refund id — the refund webhook
+ * may have matched the row by Saroh's reference and settled it first, and
+ * then it wrote the REFUND step, not this call.
+ */
 type RefundOutcome =
-    | { kind: "ACCEPTED" | "UNKNOWN"; row: RefundRow }
+    | { kind: "ACCEPTED"; row: RefundRow; attached: boolean }
+    | { kind: "UNKNOWN"; row: RefundRow }
     | { kind: "REFUSED"; row: RefundRow; error: Error };
 
 /**
@@ -651,9 +658,7 @@ export class PaymentsService {
             ? await this.settleFromProvider(row.id, found)
             : await this.sendRefund(ctx.organizationId, row, row.paymentIntent);
         if (outcome.kind === "ACCEPTED") {
-            await this.recordRefundTaken(ctx, order.id, row.reason, [
-                outcome.row,
-            ]);
+            await this.recordRefundTaken(ctx, order.id, row.reason, [outcome]);
         }
         if (outcome.kind === "REFUSED") throw refusal(outcome.error);
         return refundResult([outcome.row]);
@@ -803,7 +808,7 @@ export class PaymentsService {
             );
         }
         const taken = outcomes.flatMap((o) =>
-            o.kind === "ACCEPTED" ? [o.row] : [],
+            o.kind === "ACCEPTED" ? [o] : [],
         );
         if (taken.length > 0) {
             await this.recordRefundTaken(ctx, order.id, opts.reason, taken);
@@ -882,12 +887,18 @@ export class PaymentsService {
                 ),
             };
         }
-        // Only a row still PENDING: the webhook may have settled it first.
-        await prisma.paymentRefund.updateMany({
-            where: { id: refundId, status: "PENDING" },
+        // Only a row still PENDING with no provider id: the webhook may have
+        // matched it by Saroh's reference and settled it first, under the
+        // row's lock — then it wrote the REFUND step, and this call must not.
+        const { count } = await prisma.paymentRefund.updateMany({
+            where: { id: refundId, status: "PENDING", providerRefundId: null },
             data: { providerRefundId: result.providerRefundId },
         });
-        return { kind: "ACCEPTED", row: await this.refundRow(refundId) };
+        return {
+            kind: "ACCEPTED",
+            row: await this.refundRow(refundId),
+            attached: count === 1,
+        };
     }
 
     /**
@@ -897,24 +908,33 @@ export class PaymentsService {
      * already made makes no second. An edit's difference is skipped: the
      * edit wrote its own. A failure here never undoes a refund the provider
      * took — the webhook's reconciliation makes the note instead.
+     *
+     * The REFUND step counts only the rows this call attached: a row the
+     * webhook settled first had its step written there (DEC-026).
      */
     private async recordRefundTaken(
         ctx: OrganizationContext,
         orderId: string,
         reason: string | null,
-        rows: RefundRow[],
+        taken: { row: RefundRow; attached: boolean }[],
     ): Promise<void> {
-        await prisma.orderEvent.create({
-            data: {
-                organizationId: ctx.organizationId,
-                orderId,
-                kind: "REFUND",
-                actorUserId: ctx.userId,
-                note: reason,
-                amountCents: rows.reduce((s, r) => s + r.amountCents, 0),
-            },
-        });
-        for (const row of rows) {
+        const attached = taken.filter((t) => t.attached);
+        if (attached.length > 0) {
+            await prisma.orderEvent.create({
+                data: {
+                    organizationId: ctx.organizationId,
+                    orderId,
+                    kind: "REFUND",
+                    actorUserId: ctx.userId,
+                    note: reason,
+                    amountCents: attached.reduce(
+                        (s, t) => s + t.row.amountCents,
+                        0,
+                    ),
+                },
+            });
+        }
+        for (const { row } of taken) {
             try {
                 await prisma.$transaction((tx) =>
                     creditNoteForRefund(tx, row.id),

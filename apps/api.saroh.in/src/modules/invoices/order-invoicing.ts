@@ -301,6 +301,27 @@ async function creditable(tx: Tx, original: OriginalRow): Promise<number> {
     );
 }
 
+/**
+ * Every line invoiced against an original: its own, then those of its
+ * supplementary invoices (units an edit added), oldest first. A credit
+ * note itemises and spreads over these, so a line an edit added is
+ * credited at its own rate, and the spread can reach all of
+ * {@link creditable}.
+ */
+async function invoicedLines(
+    tx: Tx,
+    original: OriginalRow,
+): Promise<OriginalRow["lines"]> {
+    const supplementary = await tx.invoiceLine.findMany({
+        where: {
+            invoice: { relatedInvoiceId: original.id, kind: "SUPPLEMENTARY" },
+        },
+        orderBy: [{ invoice: { createdAt: "asc" } }, { position: "asc" }],
+        select: ORIGINAL_SELECT.lines.select,
+    });
+    return [...original.lines, ...supplementary];
+}
+
 /** Write a correction (credit note or supplementary invoice) against an original. */
 async function writeCorrection(
     tx: Tx,
@@ -411,7 +432,7 @@ export async function issueCreditNote(
     if (amountCents <= 0) return null;
 
     const doc = buildCreditNote(
-        asOriginal(original),
+        { ...asOriginal(original), lines: await invoicedLines(tx, original) },
         amountCents,
         amountCents === input.amountCents ? input.refundLines : [],
     );

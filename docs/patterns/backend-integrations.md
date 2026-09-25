@@ -66,6 +66,24 @@ a note saying so.
   `UNKNOWN` (network, timeout, 5xx, 429, 409, a duplicate id — the row stays
   PENDING, money held). Try-again asks the provider first (`findRefund`) and
   re-sends only when it has none. Never match a refund by amount alone.
+- **Current** — **The refund webhook settles at the provider's amount**
+  (#508 U2). Adapters normalise the refunded amount in paise, Saroh's
+  reference and a `REFUND_FAILED` outcome (Razorpay `refund.failed`; Cashfree
+  CANCELLED, FAILED or REJECTED). `settleRefund` matches by provider refund
+  id, then by Saroh's reference on the same order or invoice, under the
+  row's lock; only an unmatched success (a dashboard refund) makes a row, at
+  the event's amount. Whichever of the webhook and the refund path attaches
+  the provider's id writes the REFUND step, so it is written once. A failed
+  refund moves a PENDING row to FAILED — no credit note, the order as it
+  was. Razorpay: only `refund.processed` is money back (`refund.created` can
+  still fail). Its docs' `refund.*` payloads carry the refund entity with
+  `amount`, `receipt` and `notes`, and `payload.payment.entity.order_id`;
+  Saroh reads the reference from `receipt`, then `notes.saroh_refund_id`.
+  Not yet confirmed against a live or test-mode delivery — if a delivery
+  lacks both, the row stays PENDING until try-again's lookup settles it.
+  Cashfree reports one refund more than once (PENDING, then SUCCESS or
+  CANCELLED), so its inbox key carries the status; its `order_id` and
+  `refund_amount` (rupees, parsed as decimal text) are on `data.refund`.
 - **Adopted** — **Classify every negative outcome** — genuinely empty, provider
   error, rate limited, not configured — and never let a failed or partial call
   become "nothing found" or "done". Gap: refund calls classify their failures
