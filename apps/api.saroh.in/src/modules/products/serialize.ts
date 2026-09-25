@@ -100,6 +100,17 @@ export interface ProductDto {
 }
 
 /**
+ * A list row's stock: on hand (`quantity`), what open orders have promised
+ * from it, and the warning level — so the list and its quick look show can
+ * sell, on hand and promised without another call (#518).
+ */
+export interface ListStockDto {
+    quantity: number;
+    promised: number;
+    lowStockAlert: number;
+}
+
+/**
  * A catalogue row: what the products table shows without opening a product —
  * how many variants it has, the SKU it is known by, and its stock against its
  * own low-stock threshold (a threshold is per product: five is low for mugs
@@ -116,7 +127,7 @@ export interface ProductListItemDto extends ProductDto {
         title: string;
         price: string | null;
     }[];
-    inventory: { quantity: number; lowStockAlert: number } | null;
+    inventory: ListStockDto | null;
 }
 
 export interface ProductDetailDto extends ProductDto {
@@ -352,19 +363,25 @@ interface RawProductListItem extends RawProduct {
  * stockTotals adds it)
  * warning at the lowest variant's level; otherwise the product's own row.
  */
-function listStock(
-    product: RawProductListItem,
-): { quantity: number; lowStockAlert: number } | null {
+function listStock(product: RawProductListItem): ListStockDto | null {
     const own = firstRow(product.stockLevels);
     const rows = product.variants.flatMap((v) => v.stockLevels ?? []);
     if (rows.length === 0) {
-        return own
-            ? { quantity: own.onHand, lowStockAlert: own.lowStockAlert }
-            : null;
+        return own ? rowStock(own) : null;
     }
     return {
         quantity: rows.reduce((n, r) => n + r.onHand, 0) + (own?.onHand ?? 0),
+        promised:
+            rows.reduce((n, r) => n + r.promised, 0) + (own?.promised ?? 0),
         lowStockAlert: Math.min(...rows.map((r) => r.lowStockAlert)),
+    };
+}
+
+function rowStock(row: StockRowLike): ListStockDto {
+    return {
+        quantity: row.onHand,
+        promised: row.promised,
+        lowStockAlert: row.lowStockAlert,
     };
 }
 
@@ -393,7 +410,17 @@ export function serializeProductListItem(
 export interface CatalogueListingDto {
     storeId: string;
     storeName: string;
-    inventory: { quantity: number; lowStockAlert: number } | null;
+    inventory: ListStockDto | null;
+    /**
+     * Each variant's shelf here (#518), in the product's order: whether this
+     * storefront sells it and its stock, null while it is not counted per
+     * variant here. Empty for a product without variants.
+     */
+    variants: {
+        variantId: string;
+        soldHere: boolean;
+        inventory: ListStockDto | null;
+    }[];
 }
 
 /**
@@ -443,11 +470,22 @@ export function serializeCatalogueItem(
     const listed = new Set(product.listings.map((l) => l.storeId));
     const listings = stores
         .filter((s) => listed.has(s.id))
-        .map((s) => ({
-            storeId: s.id,
-            storeName: s.name,
-            inventory: listStock(at(s.id)),
-        }));
+        .map((s) => {
+            const here = at(s.id);
+            return {
+                storeId: s.id,
+                storeName: s.name,
+                inventory: listStock(here),
+                variants: here.variants.map((v) => {
+                    const row = firstRow(v.stockLevels ?? []);
+                    return {
+                        variantId: v.id,
+                        soldHere: (v.listings ?? []).length > 0,
+                        inventory: row ? rowStock(row) : null,
+                    };
+                }),
+            };
+        });
     if (storefront) {
         return {
             ...serializeProductListItem(at(storefront), storefront),
@@ -478,11 +516,12 @@ export function serializeCatalogueItem(
 /** Summed across the storefronts that count it; null when none do. */
 function sumStock(
     listings: readonly CatalogueListingDto[],
-): { quantity: number; lowStockAlert: number } | null {
+): ListStockDto | null {
     const counted = listings.flatMap((l) => (l.inventory ? [l.inventory] : []));
     if (counted.length === 0) return null;
     return {
         quantity: counted.reduce((n, c) => n + c.quantity, 0),
+        promised: counted.reduce((n, c) => n + c.promised, 0),
         lowStockAlert: Math.min(...counted.map((c) => c.lowStockAlert)),
     };
 }

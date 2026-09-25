@@ -75,6 +75,7 @@ const scope = {
     storeId: "store_1",
     canWrite: true,
     may: () => Promise.resolve(true),
+    canStock: () => Promise.resolve(true),
 };
 const products = {
     access: {

@@ -34,6 +34,12 @@ export interface ProductScope {
     canWrite: boolean;
     /** Whether the caller holds `action` — the product page's panels. */
     may(action: OrgAction): Promise<boolean>;
+    /**
+     * Whether the caller may count and move stock here (#518) — the product
+     * page's `canStock`, by the rule `stock()` enforces: `canWriteStock` on
+     * the organization route, its storefront equivalent on an alias.
+     */
+    canStock(): Promise<boolean>;
 }
 
 /** A missing storefront query picks one, or refuses when that would guess. */
@@ -98,6 +104,7 @@ export class ProductAccess {
             ),
             canWrite,
             may: (action) => Promise.resolve(allows(ctx, action)),
+            canStock: () => Promise.resolve(canWriteStock(ctx)),
         };
     }
 
@@ -122,6 +129,7 @@ export class ProductAccess {
             ),
             canWrite: true,
             may: (action) => Promise.resolve(allows(ctx, action)),
+            canStock: () => Promise.resolve(canWriteStock(ctx)),
         };
     }
 
@@ -139,6 +147,7 @@ export class ProductAccess {
             storeId,
             canWrite: await this.stores.canWrite(storeId, userId),
             may: (action) => this.stores.memberAllows(storeId, userId, action),
+            canStock: () => this.canStockViaStore(storeId, userId),
         };
     }
 
@@ -164,6 +173,8 @@ export class ProductAccess {
             storeId,
             canWrite: true,
             may: (action) => this.stores.memberAllows(storeId, userId, action),
+            // Changing the storefront covers counting it.
+            canStock: () => Promise.resolve(true),
         };
     }
 
@@ -196,6 +207,7 @@ export class ProductAccess {
             ),
             canWrite: allows(ctx, "store:write"),
             may: (action) => Promise.resolve(allows(ctx, action)),
+            canStock: () => Promise.resolve(canWriteStock(ctx)),
         };
     }
 
@@ -211,14 +223,7 @@ export class ProductAccess {
     ): Promise<ProductScope> {
         const store = await this.stores.getForUser(storeId, userId);
         const canWrite = await this.stores.canWrite(storeId, userId);
-        if (
-            !canWrite &&
-            !(await this.stores.memberAllows(
-                storeId,
-                userId,
-                "inventory:write",
-            ))
-        ) {
+        if (!(await this.canStockViaStore(storeId, userId, canWrite))) {
             throw new NotFoundException("Store not found");
         }
         await this.assertListed(storeId, productId);
@@ -228,7 +233,23 @@ export class ProductAccess {
             storeId,
             canWrite,
             may: (action) => this.stores.memberAllows(storeId, userId, action),
+            canStock: () => Promise.resolve(true),
         };
+    }
+
+    /**
+     * `canWriteStock` on a storefront alias: someone who can change the
+     * storefront, or whose membership may count and move stock.
+     */
+    private async canStockViaStore(
+        storeId: string,
+        userId: string,
+        canWrite?: boolean,
+    ): Promise<boolean> {
+        if (canWrite ?? (await this.stores.canWrite(storeId, userId))) {
+            return true;
+        }
+        return this.stores.memberAllows(storeId, userId, "inventory:write");
     }
 
     /**
