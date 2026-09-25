@@ -14,6 +14,7 @@ import { gstInsideOrder } from "../invoices/order-invoice";
 import {
     correctOrderInvoiceForEdit,
     loadTaxProfile,
+    settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
 import { allows, authorize } from "../organizations/organization-policy";
 import {
@@ -596,6 +597,14 @@ export class OrderKitchenService {
                     0,
                 );
                 settleCents = totalCents - kept;
+                // What was paid covers the order now: a supplementary
+                // invoice an earlier edit left waiting on the charge just
+                // superseded is settled by that money, as one written now
+                // would be (its units' credit note, below, offsets it). Left
+                // ISSUED, it would read as a bill nobody is asked to pay.
+                if (settleCents <= 0) {
+                    await settleSupplementaryInvoices(tx, order.id);
+                }
             }
             const event = await tx.orderEvent.create({
                 data: {

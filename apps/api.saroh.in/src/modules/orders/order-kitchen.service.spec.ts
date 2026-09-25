@@ -48,6 +48,7 @@ jest.mock("../invoices/order-invoicing", () => ({
     correctOrderInvoiceForEdit: jest
         .fn()
         .mockResolvedValue({ supplementary: null, creditNote: null }),
+    settleSupplementaryInvoices: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock("@saroh/database", () => {
@@ -218,7 +219,10 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { correctOrderInvoiceForEdit } from "../invoices/order-invoicing";
+import {
+    correctOrderInvoiceForEdit,
+    settleSupplementaryInvoices,
+} from "../invoices/order-invoicing";
 import type { PaymentsService } from "../payments/payments.service";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { UNDO_WINDOW_MS } from "./order-stage";
@@ -567,6 +571,11 @@ describe("editing before preparing", () => {
         expect(payments.createDifferenceIntent).toHaveBeenCalledTimes(1);
         expect(payments.refundOrderDifference).not.toHaveBeenCalled();
         expect(back.charge).toBeNull();
+        // The first edit's supplementary invoice is settled by what was paid.
+        expect(settleSupplementaryInvoices).toHaveBeenCalledWith(
+            expect.anything(),
+            "order_1",
+        );
     });
 
     it("a delivery needs an address", async () => {

@@ -23,9 +23,13 @@ import {
     ForbiddenException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { DateTime } from "luxon";
 import { createHmac } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { CalendarService } from "../calendar/calendar.service";
+import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import { ensureOrderInvoice } from "../invoices/order-invoicing";
 import { PaymentsService } from "../payments/payments.service";
 import {
     FakeMerchantProvider,
@@ -559,6 +563,54 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
             (await differenceIntents(order.id)).map((i) => i.status),
         ).toEqual(["SUPERSEDED"]);
         expect((await kitchen.read(owner, order.id)).money?.due).toBe("0.00");
+    });
+
+    it("edited up then back down: the unpaid supplementary invoice is settled, and takings read what was paid", async () => {
+        const calendar = new CalendarService({
+            listViews: jest.fn().mockResolvedValue(
+                ["COMMERCE", "APPOINTMENTS", "PAYMENTS"].map((key) => ({
+                    key,
+                    readiness: "ACTIVE",
+                })),
+            ),
+        } as unknown as ModuleAvailabilityService);
+        /** Today's takings in India, in rupees. */
+        const takenToday = async () => {
+            const now = new Date();
+            const today = DateTime.fromJSDate(now, {
+                zone: "Asia/Kolkata",
+            }).toISODate();
+            const month = await calendar.month(owner, today!.slice(0, 7), now);
+            const day = month.days.find((d) => d.date === today);
+            return Number(day?.takings?.[0]?.amount ?? 0);
+        };
+        const before = await takenToday();
+
+        // ₹610 paid and invoiced; +₹120 (unpaid), then −₹120.
+        const order = await paidOrder();
+        await prisma.$transaction((tx) => ensureOrderInvoice(tx, order.id));
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 4 }],
+        });
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 3 }],
+        });
+
+        const paper = await prisma.invoice.findMany({
+            where: { orderId: order.id },
+            orderBy: { createdAt: "asc" },
+            select: { kind: true, status: true, total: true },
+        });
+        expect(
+            paper.map((i) => [i.kind, i.status, i.total.toString()]),
+        ).toEqual([
+            ["INVOICE", "PAID", "610"],
+            ["SUPPLEMENTARY", "PAID", "120"],
+            ["CREDIT_NOTE", "ISSUED", "120"],
+        ]);
+        // Nothing is owed, and the day took the ₹610 it was paid.
+        expect((await kitchen.read(owner, order.id)).money?.due).toBe("0.00");
+        expect((await takenToday()) - before).toBe(610);
     });
 
     it("paid anyway: owed back, not counted as paid, once — and cleared by its refund", async () => {

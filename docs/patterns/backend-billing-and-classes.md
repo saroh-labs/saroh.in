@@ -38,7 +38,10 @@
   exclusion counts twice.
 - **An issued invoice and its lines never change and are never deleted.**
   Down is a credit note, up a supplementary invoice, each with
-  `relatedInvoiceId`. A GST-registered business cannot void an issued invoice
+  `relatedInvoiceId`. A supplementary invoice is ISSUED while its difference
+  is unpaid and PAID when it is — or when a later edit supersedes that charge
+  and what was paid covers the order again (its units' credit note offsets
+  it). A GST-registered business cannot void an issued invoice
   — discard drafts, credit issued ones; void stays for unregistered receipts.
 - **GST:** prices include it; tax is derived per line from the inclusive
   amount, rounded per line and frozen. Spread an order discount across lines
