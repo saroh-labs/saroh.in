@@ -20,6 +20,11 @@ export interface OrganizationProfile {
     taxId: string | null;
     contactEmail: string | null;
     website: string | null;
+    /**
+     * The IANA zone the business keeps time in; null until set (invoice
+     * numbers and the calendar then read India's). Absent from an older API.
+     */
+    timezone?: string | null;
 }
 
 /** GST (ADR-008). The GSTIN is the profile's `taxId`. */

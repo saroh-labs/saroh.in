@@ -223,7 +223,7 @@ function build(
     },
 ): string {
     const credit = input.kind === "CREDIT_NOTE";
-    const zone = input.timezone ?? DEFAULT_TIMEZONE;
+    const zone = input.timezone || DEFAULT_TIMEZONE; // "" is no zone
     const local = DateTime.fromJSDate(input.at, { zone });
     const values = format.parts.map((part) => {
         switch (part) {
@@ -399,7 +399,7 @@ function seriesKey(
     at: Date,
     timezone?: string | null,
 ): string {
-    const zone = timezone ?? DEFAULT_TIMEZONE;
+    const zone = timezone || DEFAULT_TIMEZONE; // "" is no zone
     if (restart === "FY") return `${head}/${financialYear(at, zone)}`;
     if (restart === "MONTH") {
         return `${head}/${DateTime.fromJSDate(at, { zone }).toFormat("yyyy-MM")}`;

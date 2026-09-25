@@ -35,6 +35,7 @@ import {
     ADDRESS_KEYS,
     registeredAddressShape,
 } from "@/components/organizations/registered-address-shape";
+import { TimeZoneSelect } from "@/components/organizations/time-zone-select";
 import {
     LeaveDialog,
     useLeaveGuard,
@@ -62,6 +63,7 @@ import {
 import { addressProblems } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { browserZone, zoneLabel } from "@/lib/organizations/time-zones";
 import { BUSINESS_TAB_PARAM } from "@/lib/settings/search";
 import type { StorefrontHoursRead } from "@/lib/stores/storefronts";
 
@@ -78,6 +80,8 @@ const formSchema = z
         taxId: z.string().optional(),
         contactEmail: optionalText(z.string().email("Enter a valid email")),
         website: optionalText(z.string().url("Enter a valid URL")),
+        // An IANA zone, or "" for none; the API checks it's a real one.
+        timezone: z.string(),
         // GST (ADR-008). The API checks the GSTIN's state and check
         // character; here only its shape.
         gstRegistered: z.boolean(),
@@ -138,6 +142,7 @@ const PROFILE_KEYS = [
     "taxId",
     "contactEmail",
     "website",
+    "timezone",
 ] as const;
 
 /** Where the API names a refused field, the form field it belongs on. */
@@ -155,7 +160,7 @@ const FIELD_OF: Record<string, keyof FormValues> = {
     city: "city",
     postalCode: "postalCode",
     name: "name",
-    timezone: "name",
+    timezone: "timezone",
 };
 
 /** Delivery always carries a rate: no "Not set" row. */
@@ -191,6 +196,7 @@ function valuesOf(settings: OrganizationSettings): FormValues {
         taxId: settings.profile?.taxId ?? "",
         contactEmail: settings.profile?.contactEmail ?? "",
         website: settings.profile?.website ?? "",
+        timezone: settings.profile?.timezone ?? "",
         gstRegistered: settings.tax?.registered ?? false,
         gstState: settings.tax?.state ?? "",
         invoicePrefix: settings.tax?.invoicePrefix ?? "",
@@ -214,7 +220,7 @@ const SECTIONS = {
     identity: {
         title: "Identity",
         lead: "How the business is named and registered",
-        fields: ["name", "legalName", "type"],
+        fields: ["name", "legalName", "type", "timezone"],
     },
     contact: {
         title: "Contact",
@@ -352,6 +358,7 @@ export function OrganizationSettingsForm({
     // What the API last said, so the cards read the saved values at once
     // rather than waiting for the page to be fetched again.
     const [settings, setSettings] = useState(initial);
+    const savedZone = settings.profile?.timezone ?? "";
     // In the address, so Search settings can open the tab a setting is on.
     const [tab, setTab] = useTabParam(BUSINESS_TAB_PARAM, TAB_KEYS, "identity");
     const [editing, setEditing] = useState<TabKey | null>(null);
@@ -412,6 +419,11 @@ export function OrganizationSettingsForm({
             return;
         }
         form.reset(valuesOf(settings));
+        // No zone saved: the browser's is offered, as a change to save.
+        const fromBrowser = key === "identity" && !savedZone && browserZone();
+        if (fromBrowser) {
+            form.setValue("timezone", fromBrowser, { shouldDirty: true });
+        }
         setEditing(key);
         setTab(key);
     };
@@ -527,6 +539,8 @@ export function OrganizationSettingsForm({
             last: settings.tax?.invoiceNumber?.counters,
             samePrefix:
                 prefixOf(x.invoicePrefix) === prefixOf(saved.invoicePrefix),
+            // Dated in the zone on screen, so a zone being tried shows.
+            timezone: x.timezone || null,
         });
     const savedState = gstStateOf(saved);
     const restartsRow: BusinessRow = {
@@ -564,6 +578,11 @@ export function OrganizationSettingsForm({
                 value:
                     TYPES.find((t) => t.value && t.value === saved.type)
                         ?.label ?? "",
+            },
+            {
+                label: "Time zone",
+                value: saved.timezone ? zoneLabel(saved.timezone) : "",
+                empty: "Not set — invoice numbers use India time",
             },
             {
                 label: "Trading since",
@@ -864,6 +883,31 @@ export function OrganizationSettingsForm({
                             <FormDescription>
                                 An individual trades in their own name; a
                                 company is registered as one.
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="timezone"
+                    render={({ field }) => (
+                        <FormItem {...at("100%")}>
+                            <FormLabel>Time zone</FormLabel>
+                            <FormControl>
+                                <TimeZoneSelect
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                Invoice numbers, bookings and the calendar use
+                                this time.
+                                {!savedZone &&
+                                field.value &&
+                                field.value === browserZone()
+                                    ? " From your browser — change it if the business runs elsewhere."
+                                    : ""}
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

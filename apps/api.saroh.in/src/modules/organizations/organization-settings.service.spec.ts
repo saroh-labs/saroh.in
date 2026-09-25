@@ -92,6 +92,36 @@ describe("OrganizationSettingsService", () => {
             expect(settings.profile?.legalName).toBe("Acme Inc");
         });
 
+        it("returns the business's time zone with its profile", async () => {
+            orgFindUnique.mockResolvedValue({
+                id: "org_1",
+                name: "Acme",
+                slug: "acme",
+                businessProfile: {
+                    legalName: null,
+                    type: null,
+                    country: "IN",
+                    taxId: null,
+                    contactEmail: null,
+                    website: null,
+                    timezone: "Asia/Dubai",
+                },
+            });
+            const settings = await service.get(ctx());
+            expect(settings.profile?.timezone).toBe("Asia/Dubai");
+            expect(orgFindUnique).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    select: expect.objectContaining({
+                        businessProfile: {
+                            select: expect.objectContaining({
+                                timezone: true,
+                            }),
+                        },
+                    }),
+                }),
+            );
+        });
+
         it("derives trading-since from the first order in the business", async () => {
             expect((await service.get(ctx())).tradingSince).toBeNull();
 
@@ -205,6 +235,40 @@ describe("OrganizationSettingsService", () => {
                     update: { timezone: "Asia/Kolkata" },
                 }),
             );
+        });
+
+        it("stores a zone as sent and audits the field by name", async () => {
+            await service.update(ctx(), {
+                profile: { timezone: "Europe/London" },
+            });
+            expect(profileUpsert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    update: { timezone: "Europe/London" },
+                }),
+            );
+            expect(record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: AuditAction.ProfileUpdate,
+                    metadata: { fields: ["timezone"] },
+                }),
+            );
+        });
+
+        it("clears the zone with an empty string, to null so readers fall back", async () => {
+            await service.update(ctx(), { profile: { timezone: "" } });
+            expect(profileUpsert).toHaveBeenCalledWith(
+                expect.objectContaining({ update: { timezone: null } }),
+            );
+        });
+
+        it("names the time zone field when it refuses one", async () => {
+            const refusal = await service
+                .update(ctx(), { profile: { timezone: "Mars/Olympus" } })
+                .catch((e: BadRequestException) => e.getResponse());
+            expect(refusal).toEqual(
+                expect.objectContaining({ details: { field: "timezone" } }),
+            );
+            expect(record).not.toHaveBeenCalled();
         });
 
         it("writes nothing and emits no audit row when the patch is empty", async () => {

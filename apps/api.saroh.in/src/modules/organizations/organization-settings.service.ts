@@ -42,6 +42,11 @@ export interface OrganizationSettings {
         taxId: string | null;
         contactEmail: string | null;
         website: string | null;
+        /**
+         * The IANA zone the business keeps time in ("Asia/Kolkata"); null
+         * until set, when invoice numbers and the calendar read India's.
+         */
+        timezone: string | null;
     } | null;
     /**
      * When the business first sold something: the earliest order on record,
@@ -236,16 +241,7 @@ export class OrganizationSettingsService {
         authorize(ctx, "org:update");
 
         const profileData = reduceProfile(dto.profile);
-        if (
-            // "" clears it, the way the form clears any field.
-            profileData.timezone &&
-            !IANAZone.isValidZone(profileData.timezone)
-        ) {
-            throw new BadRequestException({
-                message: "That timezone is not one we know",
-                details: { field: "timezone" },
-            });
-        }
+        const timezone = zoneWrite(profileData.timezone);
         const taxSent = {
             tax: dto.tax,
             taxId: profileData.taxId,
@@ -281,7 +277,7 @@ export class OrganizationSettingsService {
                 });
             }
 
-            const written = { ...profileData, ...taxData };
+            const written = { ...profileData, ...timezone, ...taxData };
             if (Object.keys(written).length > 0) {
                 await tx.businessProfile.upsert({
                     where: { organizationId: ctx.organizationId },
@@ -481,4 +477,23 @@ function reduceProfile(profile: ProfileData | undefined): ProfileData {
         }
     }
     return data;
+}
+
+/**
+ * The time zone as it is stored: "" clears it to null — no zone, so every
+ * reader falls back to India's rather than being handed "" — and a zone the
+ * tz database knows is kept as sent. Its spelling is not "canonicalised"
+ * through Intl: ICU answers the old names (Asia/Calcutta for Asia/Kolkata).
+ * Anything else is refused on the field.
+ */
+function zoneWrite(zone: string | undefined): { timezone?: string | null } {
+    if (zone === undefined) return {};
+    if (zone === "") return { timezone: null };
+    if (!IANAZone.isValidZone(zone)) {
+        throw new BadRequestException({
+            message: "That time zone is not one we know",
+            details: { field: "timezone" },
+        });
+    }
+    return { timezone: zone };
 }

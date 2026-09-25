@@ -38,6 +38,29 @@ describe("financialYear", () => {
         expect(financialYear(new Date("2027-03-31T18:40:00Z"))).toBe("27-28");
         expect(financialYear(new Date("2027-03-31T18:20:00Z"))).toBe("26-27");
     });
+
+    it("turns over at midnight in the business's own zone", () => {
+        // 31 March 23:30 in Dubai (19:30 UTC) is 1 April 01:00 in India.
+        const at = new Date("2027-03-31T19:30:00Z");
+        expect(financialYear(at)).toBe("27-28");
+        expect(financialYear(at, "Asia/Dubai")).toBe("26-27");
+        // No zone, or one the browser does not know, reads India's.
+        expect(financialYear(at, null)).toBe("27-28");
+        expect(financialYear(at, "Mars/Olympus")).toBe("27-28");
+    });
+
+    it("dates the next number in the business's zone", () => {
+        const at = new Date("2027-03-31T19:30:00Z");
+        const next = (timezone?: string) =>
+            nextInvoiceNumber(MONTHLY, {
+                prefix: "RC",
+                samePrefix: true,
+                now: at,
+                timezone,
+            });
+        expect(next()).toBe("RC/27-28/04/0001");
+        expect(next("Asia/Dubai")).toBe("RC/26-27/03/0001");
+    });
 });
 
 describe("defaults: the numbers a business always had", () => {

@@ -36,6 +36,15 @@ describe("searchSettings", () => {
                 href: "/settings/organization?section=hours",
             },
         ]);
+        for (const query of ["time zone", "Zone"]) {
+            expect(searchSettings(query, owner)).toEqual([
+                {
+                    label: "Time zone",
+                    where: "Business",
+                    href: "/settings/organization?section=identity",
+                },
+            ]);
+        }
         // The tab is "Address" now; the setting keeps its full name.
         expect(searchSettings("registered address", owner)[0]?.href).toBe(
             "/settings/organization?section=address",

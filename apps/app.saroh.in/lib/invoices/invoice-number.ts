@@ -63,38 +63,71 @@ export function defaultNumberFormat(registered: boolean): NumberFormat {
         : { parts: ["PREFIX"], separator: "-", digits: 4, restart: "NEVER" };
 }
 
-/** India's date parts: IST is UTC+5:30 all year, a fixed offset away. */
-function inIndia(now: Date): { year: number; month: number } {
-    const ist = new Date(now.getTime() + 330 * 60_000);
-    return { year: ist.getUTCFullYear(), month: ist.getUTCMonth() + 1 };
+/**
+ * The zone a business with none set is numbered in — the API's
+ * `DEFAULT_TIMEZONE`.
+ */
+export const DEFAULT_TIMEZONE = "Asia/Kolkata";
+
+/**
+ * The year and month a moment falls in, in the business's zone. No zone, or
+ * one this browser does not know, reads India's, as the API does.
+ */
+function localParts(
+    now: Date,
+    zone: string | null | undefined,
+): { year: number; month: number } {
+    let parts: Intl.DateTimeFormatPart[];
+    try {
+        parts = new Intl.DateTimeFormat("en-US", {
+            timeZone:
+                zone === null || zone === undefined || zone === ""
+                    ? DEFAULT_TIMEZONE
+                    : zone,
+            year: "numeric",
+            month: "numeric",
+        }).formatToParts(now);
+    } catch {
+        return localParts(now, DEFAULT_TIMEZONE);
+    }
+    const part = (type: string) =>
+        Number(parts.find((p) => p.type === type)?.value);
+    return { year: part("year"), month: part("month") };
 }
 
 /**
- * India's financial year, April to March, in India's time: "26-27" runs from
- * 1 April 2026 to 31 March 2027.
+ * India's financial year, April to March, in the business's time (India's
+ * unless another is set): "26-27" runs from 1 April 2026 to 31 March 2027.
  */
-export function financialYear(now: Date): string {
-    const { year, month } = inIndia(now);
+export function financialYear(
+    now: Date,
+    zone: string | null = DEFAULT_TIMEZONE,
+): string {
+    const { year, month } = localParts(now, zone);
     const start = month >= 4 ? year : year - 1;
     const two = (y: number) => String(y % 100).padStart(2, "0");
     return `${two(start)}-${two(start + 1)}`;
 }
 
-/** What one part prints, today: "RC", "26-27", "2026", "09". */
+/**
+ * What one part prints, today in the business's zone: "RC", "26-27",
+ * "2026", "09".
+ */
 export function partValue(
     part: NumberPart,
     prefix: string | null,
     now: Date = new Date(),
+    zone: string | null = DEFAULT_TIMEZONE,
 ): string {
     switch (part) {
         case "PREFIX":
             return printedPrefix(prefix);
         case "FY":
-            return financialYear(now);
+            return financialYear(now, zone);
         case "YEAR":
-            return String(inIndia(now).year);
+            return String(localParts(now, zone).year);
         case "MONTH":
-            return String(inIndia(now).month).padStart(2, "0");
+            return String(localParts(now, zone).month).padStart(2, "0");
     }
 }
 
@@ -133,6 +166,7 @@ function stem(
     credit: boolean,
     now: Date,
     mark: CreditMark,
+    zone: string | null = DEFAULT_TIMEZONE,
 ): string {
     const values = format.parts.map((part) => {
         if (part === "PREFIX" && credit) {
@@ -140,14 +174,17 @@ function stem(
                 ? CREDIT_MARK
                 : `${printedPrefix(prefix)}${CREDIT_MARK}`;
         }
-        return partValue(part, prefix, now);
+        return partValue(part, prefix, now, zone);
     });
     const parts =
         credit && mark === "first" ? [CREDIT_MARK, ...values] : values;
     return parts.map((p) => `${p}${format.separator}`).join("");
 }
 
-/** A number in a format: invoice (or supplementary) or credit note. */
+/**
+ * A number in a format: invoice (or supplementary) or credit note, dated in
+ * the business's zone (India's when none is given).
+ */
 export function formatNumber(
     format: NumberFormat,
     input: {
@@ -155,10 +192,19 @@ export function formatNumber(
         counter: number;
         credit?: boolean;
         now?: Date;
+        timezone?: string | null;
     },
 ): string {
     const mark = creditMark(format, input.prefix);
-    return `${stem(format, input.prefix, input.credit ?? false, input.now ?? new Date(), mark)}${String(input.counter).padStart(format.digits, "0")}`;
+    const head = stem(
+        format,
+        input.prefix,
+        input.credit ?? false,
+        input.now ?? new Date(),
+        mark,
+        input.timezone ?? DEFAULT_TIMEZONE,
+    );
+    return `${head}${String(input.counter).padStart(format.digits, "0")}`;
 }
 
 /**
@@ -257,6 +303,8 @@ export function nextInvoiceNumber(
         last?: Partial<Record<NumberRestart, number>>;
         samePrefix: boolean;
         now?: Date;
+        /** The business's zone, which dates the number; India's if none. */
+        timezone?: string | null;
     },
 ): string {
     const last = input.samePrefix ? (input.last?.[format.restart] ?? 0) : 0;
@@ -264,6 +312,7 @@ export function nextInvoiceNumber(
         prefix: input.prefix,
         counter: last + 1,
         now: input.now,
+        timezone: input.timezone,
     });
 }
 
