@@ -370,7 +370,7 @@ export function AppSidebar({
                         />
                     )}
                     <span className="group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2]">
-                        {collapsed ? "Expand" : "Collapse"}
+                        {collapsed ? "Expand menu" : "Collapse menu"}
                     </span>
                 </button>
             </div>

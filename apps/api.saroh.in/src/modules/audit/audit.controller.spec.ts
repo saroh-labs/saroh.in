@@ -37,6 +37,7 @@ describe("AuditController.list authorization (S1-009)", () => {
         expect(listForOrganization).toHaveBeenCalledWith("org_1", {
             limit: undefined,
             cursor: undefined,
+            actions: undefined,
         });
     });
 
@@ -59,6 +60,21 @@ describe("AuditController.list authorization (S1-009)", () => {
         expect(listForOrganization).toHaveBeenCalledWith("org_1", {
             limit: 25,
             cursor: "evt_9",
+            actions: undefined,
+        });
+    });
+
+    it("narrows to the actions asked for, dropping unknown ones", async () => {
+        await controller.list(
+            ctx("OWNER"),
+            "50",
+            undefined,
+            "profile.update, membership.invite,nonsense",
+        );
+        expect(listForOrganization).toHaveBeenCalledWith("org_1", {
+            limit: 50,
+            cursor: undefined,
+            actions: ["profile.update", "membership.invite"],
         });
     });
 });

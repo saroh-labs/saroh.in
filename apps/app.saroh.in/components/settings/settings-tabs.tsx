@@ -8,14 +8,15 @@ import { SETTINGS_PAGES } from "@/components/shared/nav-items";
 
 /**
  * The settings screen's tabs ("Saroh Settings" design): Business, Team,
- * Modules, Plan and billing, Your profile and Providers in a 232px column on
- * Paper, ruled off from the page.
+ * Modules, Plan and billing, Your profile, Activity and Providers in a 232px
+ * column on Paper, ruled off from the page.
  * Each says in a line what it holds. The current one takes the white surface
  * and the 2px Saffron marker, as the rail's current page does, so the two
  * lists read as one system.
  *
- * Below 760px the column becomes a row above the page that scrolls sideways,
- * and the lines of description drop — there is no width for them.
+ * Below 1100px the lines of description drop, as the design has it: the page
+ * needs the room more than the labels need glossing. Below 760px the column
+ * becomes a row above the page that scrolls sideways.
  *
  * Links, not a client tab state: each tab is its own route, so the address,
  * Back and a shared link all land on the same tab. The layout passes only the
@@ -23,7 +24,7 @@ import { SETTINGS_PAGES } from "@/components/shared/nav-items";
  *
  * `notes` replaces a tab's line while something there needs a person
  * ("Needs you: email is disconnected"), except on that tab itself, whose page
- * says it in full.
+ * says it in full. A note is shown at every width: it is news, not a gloss.
  */
 export function SettingsTabs({
     hrefs,
@@ -80,9 +81,15 @@ export function SettingsTabs({
                             <span className="block text-[13.5px]">
                                 {page.label}
                             </span>
-                            <span className="mt-0.5 hidden text-pretty text-[11.5px] font-normal leading-[1.4] text-muted-foreground min-[760px]:block">
-                                {note ?? page.description}
-                            </span>
+                            {note ? (
+                                <span className="mt-0.5 block text-pretty text-[11.5px] font-normal leading-[1.4] text-muted-foreground">
+                                    {note}
+                                </span>
+                            ) : (
+                                <span className="mt-0.5 hidden text-pretty text-[11.5px] font-normal leading-[1.4] text-muted-foreground min-[1100px]:block">
+                                    {page.description}
+                                </span>
+                            )}
                         </span>
                     </Link>
                 );

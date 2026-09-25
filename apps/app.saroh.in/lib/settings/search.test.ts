@@ -94,6 +94,18 @@ describe("searchSettings", () => {
         }
     });
 
+    it("finds who changed what for those who may read it", () => {
+        expect(searchSettings("who changed", owner)).toEqual([
+            {
+                label: "Activity — who changed what",
+                where: "Activity",
+                href: "/settings/activity",
+            },
+        ]);
+        expect(searchSettings("activity", { role: "ADMIN" })).toHaveLength(1);
+        expect(searchSettings("activity", member)).toEqual([]);
+    });
+
     it("prefers the permissions the API resolved over the role's name", () => {
         const hits = searchSettings("gst", {
             role: "MEMBER",

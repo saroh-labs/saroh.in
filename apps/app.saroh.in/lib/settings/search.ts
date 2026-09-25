@@ -52,7 +52,7 @@ const team = (label: string, value: string): SettingsEntry => ({
 
 /**
  * In the design's order: Business by its tabs, then Team, Modules, Plan and
- * billing, Your profile, Providers.
+ * billing, Your profile, Activity, Providers.
  */
 export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Business name", "identity"),
@@ -91,6 +91,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     { label: "Invoices from Saroh", page: "/settings/billing" },
     { label: "Your profile and password", page: "/settings/profile" },
     { label: "Alerts — email, WhatsApp", page: "/settings/profile" },
+    { label: "Activity — who changed what", page: "/settings/activity" },
     {
         label: "Providers — hosting, email, payments",
         page: "/settings/providers",
