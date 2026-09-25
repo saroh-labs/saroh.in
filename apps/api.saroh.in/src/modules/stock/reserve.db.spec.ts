@@ -538,10 +538,16 @@ describe("refunds and the shelf", () => {
             }),
         ).rejects.toThrow("Put back no more than is being refunded.");
 
+        // The refund sheet offers what was handed over.
+        const returnable = async () =>
+            (await kitchen.read(owner, order)).items[0].returnable;
+        expect(await returnable()).toBe(3);
+
         const withPutBack = await payments.initiateRefund(owner, order, {
             lines: [{ itemId: item, quantity: 2 }],
             putBack: [{ itemId: item, quantity: 2 }],
         });
+        expect(await returnable()).toBe(1);
         expect(await shelf(hill, mug)).toMatchObject({ onHand: 7 });
         await confirmRefund(order, withPutBack.providerRefundId);
         const row = await shelf(hill, mug);

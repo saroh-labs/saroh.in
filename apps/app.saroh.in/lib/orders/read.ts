@@ -38,6 +38,11 @@ export interface OrderReadLine {
     quantity: number;
     /** Units refunded so far (pending or settled). */
     refundedQuantity: number;
+    /**
+     * Units a refund can still put back on the shelf: sold less what was put
+     * back. 0 before it is handed over, and for an untracked product.
+     */
+    returnable?: number;
     /** Unit price — only with a money read. */
     price?: string;
 }

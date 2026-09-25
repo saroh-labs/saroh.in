@@ -22,6 +22,13 @@ interface ProductLite {
     name: string;
     price: string;
     variants?: { id: string; title: string; price: string | null }[];
+    /**
+     * Nothing on the shelf at this storefront (#511): it can't be ordered
+     * here. The API is the one that decides — it counts what is promised to
+     * other orders too, and says "Only N left" when there are fewer than
+     * asked for.
+     */
+    soldOut?: boolean;
 }
 
 /**
@@ -35,6 +42,7 @@ interface Sellable {
     variantId?: string;
     label: string;
     price: string;
+    soldOut: boolean;
 }
 
 function sellablesOf(products: ProductLite[]): Sellable[] {
@@ -46,9 +54,24 @@ function sellablesOf(products: ProductLite[]): Sellable[] {
                   variantId: v.id,
                   label: `${p.name} · ${v.title}`,
                   price: v.price ?? p.price,
+                  soldOut: p.soldOut ?? false,
               }))
-            : [{ key: p.id, productId: p.id, label: p.name, price: p.price }],
+            : [
+                  {
+                      key: p.id,
+                      productId: p.id,
+                      label: p.name,
+                      price: p.price,
+                      soldOut: p.soldOut ?? false,
+                  },
+              ],
     );
+}
+
+/** The line a new row starts on: the first thing that isn't sold out. */
+function firstSellable(products: ProductLite[]): string {
+    const all = sellablesOf(products);
+    return (all.find((s) => !s.soldOut) ?? all.at(0))?.key ?? "";
 }
 /**
  * What the storefront says about checkout (Sell → Storefronts). Defaults, not
@@ -138,9 +161,7 @@ export function OrderForm({
         resolver: zodResolver(formSchema),
         defaultValues: {
             customerId: "",
-            lines: [
-                { productId: sellablesOf(products)[0]?.key ?? "", quantity: 1 },
-            ],
+            lines: [{ productId: firstSellable(products), quantity: 1 }],
             tax: "0",
             shipping: "0",
             discount: "0",
@@ -230,6 +251,10 @@ export function OrderForm({
         if (!res.ok) {
             if (res.field === "discountCode") {
                 form.setError("discountCode", { message: res.error });
+            } else if (res.field === "items") {
+                // "Sourdough — Sold out", "… — Only 2 left at Hill Road":
+                // said under the lines, where it is fixed.
+                form.setError("lines", { type: "server", message: res.error });
             } else {
                 showError(res.error);
             }
@@ -338,7 +363,12 @@ export function OrderForm({
                                         className="flex-1"
                                         options={sellables.map((s) => ({
                                             value: s.key,
-                                            label: `${s.label} — ${show(toCents(s.price))}`,
+                                            label: s.soldOut
+                                                ? `${s.label} — Sold out`
+                                                : `${s.label} — ${show(toCents(s.price))}`,
+                                            disabled:
+                                                s.soldOut &&
+                                                s.key !== field.value,
                                         }))}
                                     />
                                 )}
@@ -371,13 +401,18 @@ export function OrderForm({
                         </div>
                     );
                 })}
+                {form.formState.errors.lines?.type === "server" ? (
+                    <p role="alert" className="text-sm text-destructive">
+                        {form.formState.errors.lines.message}
+                    </p>
+                ) : null}
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() =>
                         append({
-                            productId: sellablesOf(products)[0]?.key ?? "",
+                            productId: firstSellable(products),
                             quantity: 1,
                         })
                     }

@@ -758,7 +758,11 @@ const READ_INCLUDE = {
             },
             refundLines: {
                 where: { paymentRefund: { status: { not: "FAILED" } } },
-                select: { quantity: true, amountCents: true },
+                select: {
+                    quantity: true,
+                    amountCents: true,
+                    putBackQuantity: true,
+                },
             },
         },
     },

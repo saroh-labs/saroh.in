@@ -10,6 +10,7 @@ import {
     isOpen,
     kitchenStanding,
     PAYMENT_TRANSITIONS,
+    putBackOf,
     refundableQuantity,
     standingOf,
     waiting,
@@ -280,5 +281,38 @@ describe("refundableQuantity", () => {
         expect(
             refundableQuantity(line({ quantity: 1, refundedQuantity: 1 })),
         ).toBe(0);
+    });
+});
+
+describe("putBackOf", () => {
+    it("offers what was handed over and not refunded or put back yet", () => {
+        expect(
+            putBackOf([
+                line({
+                    id: "a",
+                    quantity: 3,
+                    refundedQuantity: 1,
+                    returnable: 3,
+                }),
+                line({
+                    id: "b",
+                    quantity: 2,
+                    refundedQuantity: 0,
+                    returnable: 1,
+                }),
+            ]),
+        ).toEqual([
+            { itemId: "a", quantity: 2 },
+            { itemId: "b", quantity: 1 },
+        ]);
+    });
+
+    it("offers nothing for a line not handed over, or untracked", () => {
+        expect(
+            putBackOf([
+                line({ id: "a", quantity: 3, returnable: 0 }),
+                line({ id: "b", quantity: 3 }),
+            ]),
+        ).toEqual([]);
     });
 });
