@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { variantHasHistory } from "../stock/stock-words";
 import { recordEntry } from "../stock/stock.service";
 import { COUNTING_ROWS } from "../stock/tracking";
 import type { ProductScope } from "./product-access";
@@ -306,6 +307,27 @@ export class VariantsService {
             if (promised > 0) {
                 throw new ConflictException({
                     message: `${variant.title} has ${promised} promised to open orders, so it can't be removed yet.`,
+                    field: "variantId",
+                });
+            }
+            // The stock log is never edited (DEC-032): removing the variant
+            // would take its shelves' entries with it, and leave its sold
+            // lines nothing to return to. One with any history stays.
+            const [logged, sold] = await Promise.all([
+                tx.stockEntry.count({ where: { variantId } }),
+                tx.orderItem.count({
+                    where: {
+                        variantId,
+                        OR: [
+                            { soldQuantity: { gt: 0 } },
+                            { heldQuantity: { gt: 0 } },
+                        ],
+                    },
+                }),
+            ]);
+            if (logged > 0 || sold > 0) {
+                throw new ConflictException({
+                    message: variantHasHistory(variant.title),
                     field: "variantId",
                 });
             }

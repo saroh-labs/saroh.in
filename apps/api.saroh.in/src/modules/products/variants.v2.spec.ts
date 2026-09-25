@@ -5,6 +5,7 @@ import { CustomersService } from "../customers/customers.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { OrderStatus } from "../orders/dto";
 import { OrdersService } from "../orders/orders.service";
+import { variantHasHistory } from "../stock/stock-words";
 import { StoresService } from "../stores/stores.service";
 import { InventoryService } from "./inventory.service";
 import { ProductsService } from "./products.service";
@@ -278,7 +279,7 @@ describe("Variants and stock per variant (DB)", () => {
         expect(list.map((x) => x.title)).toEqual(["XL", "L", "M", "S"]);
     });
 
-    it("the last counted variant hands its stock back to the product", async () => {
+    it("a counted variant can't be removed; one never counted or sold can", async () => {
         const shirt = (
             await products.create(storeId, ownerId, {
                 name: "Cotton Kurta",
@@ -292,16 +293,27 @@ describe("Variants and stock per variant (DB)", () => {
                 title: "Free size",
             })
         ).id;
+        const spare = (
+            await variants.create(storeId, shirt, ownerId, {
+                sku: "CK-SPARE",
+                title: "Spare",
+            })
+        ).id;
+        // Nothing counted it, nothing sold it: it goes.
+        await variants.remove(storeId, shirt, spare, ownerId);
         await inventory.setVariants(storeId, shirt, ownerId, {
             variants: [{ variantId: only, quantity: 7, lowStockAlert: 3 }],
         });
-        await variants.remove(storeId, shirt, only, ownerId);
+        await expect(
+            variants.remove(storeId, shirt, only, ownerId),
+        ).rejects.toThrow(
+            new ConflictException(variantHasHistory("Free size")),
+        );
         const view = await inventory.get(storeId, shirt, ownerId);
-        expect(view).toMatchObject({
-            mode: "product",
-            quantity: 7,
-            lowStockAlert: 3,
-        });
+        expect(view).toMatchObject({ mode: "variant" });
+        expect(view.variants).toEqual([
+            expect.objectContaining({ variantId: only, quantity: 7 }),
+        ]);
     });
 
     it("a product still counting as a whole moves its own stock, as before", async () => {

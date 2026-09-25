@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 import { CustomersService } from "../customers/customers.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrdersService } from "../orders/orders.service";
+import { variantHasHistory } from "../stock/stock-words";
 import { StoresService } from "../stores/stores.service";
 import { InventoryService } from "./inventory.service";
 import { ProductsService } from "./products.service";
@@ -265,14 +266,20 @@ describe("Products at one storefront (characterization, DB)", () => {
             withMedium.variants.find((v) => v.variantId === medium.id),
         ).toMatchObject({ quantity: 0, reserved: 0 });
 
-        // Removing the counted variants one by one hands the last count back
-        // to the product.
+        // A variant never counted or sold can be removed; one with a stock
+        // log can't — removing it would erase its history (DEC-032).
         await variants.remove(storeId, id, medium.id, ownerId);
-        await variants.remove(storeId, id, large.id, ownerId);
-        await variants.remove(storeId, id, small.id, ownerId);
-        const back = await inventory.get(storeId, id, ownerId);
-        expect(back.mode).toBe("product");
-        expect(back.quantity).toBe(2);
+        await expect(
+            variants.remove(storeId, id, large.id, ownerId),
+        ).rejects.toThrow(variantHasHistory("Large"));
+        await expect(
+            variants.remove(storeId, id, small.id, ownerId),
+        ).rejects.toThrow(variantHasHistory("Small"));
+        const still = await inventory.get(storeId, id, ownerId);
+        expect(still.mode).toBe("variant");
+        expect(still.variants.map((v) => v.variantId).sort()).toEqual(
+            [small.id, large.id].sort(),
+        );
     });
 
     it("refuses to remove a variant with stock promised to an open order", async () => {

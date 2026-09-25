@@ -140,6 +140,14 @@ export function orderReturnRefusal(returnable: number): string {
         : "Nothing from that order can come back to this shelf — none was sold from it, or it's back already.";
 }
 
+/**
+ * Why a variant with sales or a stock log can't be removed (DEC-032: the log
+ * is never edited). Archiving the product ("Not sold") keeps it all.
+ */
+export function variantHasHistory(title: string): string {
+    return `${title} has been sold or its stock counted, so it can't be removed — that would erase its stock history. Set the product to Not sold (archive it) instead.`;
+}
+
 export const CLOSED_STOREFRONT =
     "This storefront is closed, so its stock can't change.";
 
