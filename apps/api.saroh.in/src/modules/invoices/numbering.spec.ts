@@ -203,23 +203,36 @@ describe("series", () => {
     });
 
     it("the longest number a valid prefix makes stays within 16 characters", () => {
+        // ABCCN/26-27/ leaves no room for the count to grow past 9999, so
+        // CN takes the prefix's place.
         const s = seriesFor({
             registered: true,
             prefix: "ABC",
             kind: "CREDIT_NOTE",
             at,
         });
-        expect(s.format(9999)).toBe("ABCCN/26-27/9999");
-        expect(s.format(9999).length).toBe(16);
+        expect(s.format(1)).toBe("CN/26-27/0001");
+        expect(s.format(99999)).toBe("CN/26-27/99999");
+        expect(
+            seriesFor({
+                registered: true,
+                prefix: "ABC",
+                kind: "INVOICE",
+                at,
+            }).format(99999),
+        ).toBe("ABC/26-27/99999");
     });
 
     it("refuses a number past 16 characters rather than printing it", () => {
+        // A format saving allows, counted ten times past its headroom.
         const s = seriesFor({
             registered: true,
-            prefix: "ABC",
-            kind: "CREDIT_NOTE",
+            prefix: "RC",
+            kind: "INVOICE",
             at,
+            format: { ...MONTHLY, digits: 3 },
         });
+        expect(s.format(9999)).toBe("RC/26-27/09/9999");
         expect(() => s.format(10000)).toThrow(/16 characters/);
     });
 });
@@ -470,13 +483,15 @@ describe("a chosen format", () => {
 
     describe("credit notes can never share an invoice's number", () => {
         it("carry CN after the prefix where it fits, as they always have", () => {
-            expect(creditMark(REGISTERED_DEFAULT, "ABC")).toBe("after");
+            expect(creditMark(REGISTERED_DEFAULT, "RC")).toBe("after");
             expect(make(REGISTERED_DEFAULT, "CREDIT_NOTE").format(1)).toBe(
                 "RCCN/26-27/0001",
             );
         });
 
         it("carry CN in the prefix's place where after it would pass 16", () => {
+            // ABCCN/26-27/99999, the count a digit past its four, is 17.
+            expect(creditMark(REGISTERED_DEFAULT, "ABC")).toBe("instead");
             // RCCN/26-27/09/0001 would be 18.
             expect(creditMark(MONTHLY, "RC")).toBe("instead");
             expect(make(MONTHLY, "CREDIT_NOTE").format(1)).toBe(
@@ -508,9 +523,30 @@ describe("format rules", () => {
         prefix: string | null = "RC",
     ) => numberFormatProblem(format, { registered, prefix });
 
-    it("the approved example is valid: RC/26-27/09/0001, 16 characters", () => {
-        expect(problem(MONTHLY)).toBeNull();
-        expect(longestNumber(MONTHLY, "RC")).toHaveLength(16);
+    it("the defaults leave the count room to grow a digit, for any prefix", () => {
+        // With no prefix, or a three-character one, CN takes its place on
+        // a registered business's credit notes: INVCN/26-27/99999 is 17.
+        expect(longestNumber(REGISTERED_DEFAULT, null)).toBe("INV/26-27/99999");
+        expect(longestNumber(REGISTERED_DEFAULT, "ABC")).toBe(
+            "ABC/26-27/99999",
+        );
+        expect(longestNumber(REGISTERED_DEFAULT, "RC")).toBe(
+            "RCCN/26-27/99999",
+        );
+        expect(problem(REGISTERED_DEFAULT, true, "ABC")).toBeNull();
+    });
+
+    it("keeps a digit of room: a format at 16 with its own digits is refused", () => {
+        // RC/26-27/09/0001 is 16, but its 10,000th number would be 17.
+        expect(problem(MONTHLY)).toMatchObject({
+            field: "invoiceNumberDigits",
+            message: expect.stringMatching(
+                /Once the count passes 9999, numbers like RC\/26-27\/09\/99999 are 17 characters/,
+            ),
+        });
+        // Three digits leave the room: RC/26-27/09/9999 is 16.
+        expect(problem({ ...MONTHLY, digits: 3 })).toBeNull();
+        expect(longestNumber({ ...MONTHLY, digits: 3 }, "RC")).toHaveLength(16);
     });
 
     it("never restarting is only for a business that is not registered", () => {
@@ -556,17 +592,17 @@ describe("format rules", () => {
     });
 
     it("the longest number, invoice or credit note, is at most 16 characters", () => {
-        // RC/26-27/09/00001: 17.
+        // RC/26-27/09/999999: 18.
         expect(problem({ ...MONTHLY, digits: 5 })).toMatchObject({
             field: "invoiceNumberDigits",
-            message: expect.stringMatching(/RC\/26-27\/09\/99999, is 17/),
+            message: expect.stringMatching(/RC\/26-27\/09\/999999 are 18/),
         });
-        // No prefix: CN/26-27/09/000001 is the long one, 18.
+        // No prefix: CN/26-27/09/9999999 is the long one, 19.
         expect(
             problem({ ...MONTHLY, parts: ["FY", "MONTH"], digits: 6 }),
         ).toMatchObject({
             field: "invoiceNumberDigits",
-            message: expect.stringMatching(/CN\/26-27\/09\/999999, is 18/),
+            message: expect.stringMatching(/CN\/26-27\/09\/9999999 are 19/),
         });
         expect(
             problem({
@@ -586,7 +622,7 @@ describe("format rules", () => {
     });
 
     it("CN cannot be the prefix where it takes the prefix's place", () => {
-        expect(problem(MONTHLY, true, "CN")).toMatchObject({
+        expect(problem({ ...MONTHLY, digits: 3 }, true, "CN")).toMatchObject({
             field: "invoicePrefix",
         });
         // Where it follows the prefix, CNCN/26-27/0001 is its own.

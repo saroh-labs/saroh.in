@@ -89,7 +89,7 @@ describe("a business's own number format (real database)", () => {
         const read = await format({
             parts: ["PREFIX", "FY", "MONTH"],
             separator: "/",
-            digits: 4,
+            digits: 3,
             restart: "FY",
         });
         expect(read.tax.invoiceNumber).toMatchObject({
@@ -97,29 +97,29 @@ describe("a business's own number format (real database)", () => {
             restart: "FY",
             custom: true,
         });
-        expect(await issue("2026-09-12T06:00:00Z")).toBe("KL/26-27/09/0003");
-        expect(await issue("2026-09-13T06:00:00Z")).toBe("KL/26-27/09/0004");
+        expect(await issue("2026-09-12T06:00:00Z")).toBe("KL/26-27/09/003");
+        expect(await issue("2026-09-13T06:00:00Z")).toBe("KL/26-27/09/004");
 
         // Now it restarts each month: September's own counter starts at 1,
         // and steps past the 0003 and 0004 already issued.
         await format({
             parts: ["PREFIX", "FY", "MONTH"],
             separator: "/",
-            digits: 4,
+            digits: 3,
             restart: "MONTH",
         });
-        expect(await issue("2026-09-14T06:00:00Z")).toBe("KL/26-27/09/0001");
-        expect(await issue("2026-09-15T06:00:00Z")).toBe("KL/26-27/09/0002");
-        expect(await issue("2026-09-16T06:00:00Z")).toBe("KL/26-27/09/0005");
-        expect(await issue("2026-09-17T06:00:00Z")).toBe("KL/26-27/09/0006");
+        expect(await issue("2026-09-14T06:00:00Z")).toBe("KL/26-27/09/001");
+        expect(await issue("2026-09-15T06:00:00Z")).toBe("KL/26-27/09/002");
+        expect(await issue("2026-09-16T06:00:00Z")).toBe("KL/26-27/09/005");
+        expect(await issue("2026-09-17T06:00:00Z")).toBe("KL/26-27/09/006");
 
         // 23:59 and 00:00 in India, 30 September → 1 October.
-        expect(await issue("2026-09-30T18:29:00Z")).toBe("KL/26-27/09/0007");
-        expect(await issue("2026-09-30T18:30:00Z")).toBe("KL/26-27/10/0001");
+        expect(await issue("2026-09-30T18:29:00Z")).toBe("KL/26-27/09/007");
+        expect(await issue("2026-09-30T18:30:00Z")).toBe("KL/26-27/10/001");
 
         // 31 March → 1 April: a new month and a new financial year.
-        expect(await issue("2027-03-31T18:29:00Z")).toBe("KL/26-27/03/0001");
-        expect(await issue("2027-03-31T18:30:00Z")).toBe("KL/27-28/04/0001");
+        expect(await issue("2027-03-31T18:29:00Z")).toBe("KL/26-27/03/001");
+        expect(await issue("2027-03-31T18:30:00Z")).toBe("KL/27-28/04/001");
 
         // Nothing issued was renumbered, and no number repeats.
         const numbers = (
@@ -132,8 +132,8 @@ describe("a business's own number format (real database)", () => {
         expect(numbers.slice(0, 4)).toEqual([
             "KL/26-27/0001",
             "KL/26-27/0002",
-            "KL/26-27/09/0003",
-            "KL/26-27/09/0004",
+            "KL/26-27/09/003",
+            "KL/26-27/09/004",
         ]);
         expect(new Set(numbers).size).toBe(numbers.length);
     });
@@ -149,8 +149,9 @@ describe("a business's own number format (real database)", () => {
         const note = await invoices.credit(kiln, first.id, {
             reason: "Returned",
         });
-        // KLCN/26-27/09/0001 would be 18 characters.
-        expect(note.number).toMatch(/^CN\/\d{2}-\d{2}\/\d{2}\/0001$/);
+        // KLCN/26-27/09/001, with room for the count to grow a digit, would
+        // pass 16 characters.
+        expect(note.number).toMatch(/^CN\/\d{2}-\d{2}\/\d{2}\/001$/);
     });
 
     it("refuses a format that would repeat numbers, and keeps the one it had", async () => {

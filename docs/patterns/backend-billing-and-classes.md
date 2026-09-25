@@ -56,14 +56,16 @@
   RC/26-27/0001 registered, RC-0001 not, the legacy INV series with no prefix.
   `numberFormatProblem` is the rule, mirrored in the app's
   `lib/invoices/invoice-number.ts`: the longest number, invoice or credit
-  note, ≤ 16 characters of A–Z 0–9 - /; a yearly restart needs the financial
+  note, with the counter a digit past its own (it grows rather than wrap,
+  and a number past 16 cannot be issued — in a webhook, that fails the
+  payment), ≤ 16 characters of A–Z 0–9 - /; a yearly restart needs the financial
   year or year in the number, a monthly one the month and one of them (the
   database holds each number once). The series key is prefix + restart period
   (`RC/26-27`, `RC/2026-09`, `RC`), not the rest of the format, so a mid-year
   change keeps counting; `nextInvoiceNumber` checks the number is free and
   otherwise jumps past the highest issued one with the same stem. Credit notes
   count on their own series (`RCCN/…`) and print "CN" after the prefix, or
-  in its place where that would pass 16 (`CN/26-27/09/0001`), or first when
+  in its place where that would pass 16 (`CN/26-27/09/001`), or first when
   the number has no prefix; supplementary invoices share the invoices'.
 - **Tax settings are Owner/Admin only.**
 - **Where it lives:** the maths is pure — `invoices/gst.ts` (split, spread,

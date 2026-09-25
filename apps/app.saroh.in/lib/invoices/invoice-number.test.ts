@@ -143,11 +143,28 @@ describe("numberFormatProblem mirrors the API", () => {
         prefix: string | null = "RC",
     ) => numberFormatProblem(format, { registered, prefix });
 
-    it("accepts the defaults and the approved example", () => {
-        expect(problem(defaultNumberFormat(true), true, "ABC")).toBeNull();
-        expect(problem(defaultNumberFormat(false), false, "ABC")).toBeNull();
-        expect(problem(MONTHLY)).toBeNull();
-        expect(longestNumber(MONTHLY, "RC")).toHaveLength(16);
+    it("accepts the defaults, for any prefix", () => {
+        for (const prefix of [null, "R", "RC", "ABC"]) {
+            expect(problem(defaultNumberFormat(true), true, prefix)).toBeNull();
+            expect(
+                problem(defaultNumberFormat(false), false, prefix),
+            ).toBeNull();
+        }
+        // ABCCN/26-27/99999 would be 17: CN takes the prefix's place.
+        expect(creditMark(defaultNumberFormat(true), "ABC")).toBe("instead");
+        expect(creditMark(defaultNumberFormat(true), "RC")).toBe("after");
+    });
+
+    it("keeps a digit of room for the count to grow", () => {
+        // RC/26-27/09/0001 is 16, but its 10,000th number would be 17.
+        expect(problem(MONTHLY)).toMatchObject({
+            field: "numberDigits",
+            message: expect.stringMatching(
+                /Once the count passes 9999, numbers like RC\/26-27\/09\/99999 are 17 characters/,
+            ),
+        });
+        expect(problem({ ...MONTHLY, digits: 3 })).toBeNull();
+        expect(longestNumber({ ...MONTHLY, digits: 3 }, "RC")).toHaveLength(16);
     });
 
     it("keeps a registered business restarting", () => {
@@ -172,11 +189,13 @@ describe("numberFormatProblem mirrors the API", () => {
     it("refuses a number past 16 characters", () => {
         const tooLong = problem({ ...MONTHLY, digits: 5 });
         expect(tooLong?.field).toBe("numberDigits");
-        expect(tooLong?.message).toMatch(/is 17 characters/);
+        expect(tooLong?.message).toMatch(/are 18 characters/);
     });
 
     it("refuses CN as the prefix where CN takes its place", () => {
-        expect(problem(MONTHLY, true, "CN")?.field).toBe("invoicePrefix");
+        expect(problem({ ...MONTHLY, digits: 3 }, true, "CN")?.field).toBe(
+            "invoicePrefix",
+        );
     });
 });
 

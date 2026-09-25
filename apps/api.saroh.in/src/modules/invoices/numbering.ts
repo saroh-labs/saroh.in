@@ -90,6 +90,15 @@ export const MIN_COUNTER_DIGITS = 3;
 export const MAX_COUNTER_DIGITS = 6;
 
 /**
+ * The digits a counter is measured with past the ones it is padded to. It
+ * grows rather than wrap, and a number past 16 characters cannot be issued —
+ * inside a payment's webhook, that fails the payment's reconciliation. So a
+ * format is checked with its counter one digit longer: a period that counts
+ * ten times past its digits' last number still fits.
+ */
+const COUNTER_HEADROOM = 1;
+
+/**
  * How a business's invoice numbers are built: the parts in its order, joined
  * by one separator, then the counter, zero-padded to `digits` (it grows past
  * them rather than wrap). Stored as `BusinessProfile.invoiceNumberFormat`;
@@ -178,7 +187,8 @@ const CREDIT_MARK = "CN";
  * How a credit note's number differs from an invoice's in a format:
  *
  *  - "after": "CN" follows the prefix — RCCN/26-27/0001, as credit notes
- *    were always numbered — whenever that fits in 16 characters;
+ *    were always numbered — whenever that fits in 16 characters, with the
+ *    counter's headroom ({@link COUNTER_HEADROOM});
  *  - "instead": where it would not (RCCN/26-27/09/0001 is 18), "CN" takes
  *    the prefix's place — CN/26-27/09/0001, the invoice's length;
  *  - "first": a number with no prefix leads with "CN" — CN/26-27/0001.
@@ -196,7 +206,7 @@ export function creditMark(
         at: new Date(),
         mark: "after",
     });
-    return after.length + format.digits <= MAX_NUMBER_LENGTH
+    return after.length + format.digits + COUNTER_HEADROOM <= MAX_NUMBER_LENGTH
         ? "after"
         : "instead";
 }
@@ -236,16 +246,17 @@ function build(
 }
 
 /**
- * The longest number a format can print, invoice or credit note, with the
- * counter at its most digits. Its length does not depend on the date —
- * every part is fixed-width.
+ * The longest number a format is allowed for, invoice or credit note: the
+ * counter at its digits and one more ({@link COUNTER_HEADROOM}) — 99999 for
+ * a four-digit counter. Its length does not depend on the date — every
+ * part is fixed-width.
  */
 export function longestNumber(
     format: NumberFormat,
     prefix: string | null,
     at: Date = new Date(),
 ): string {
-    const counter = "9".repeat(format.digits);
+    const counter = "9".repeat(format.digits + COUNTER_HEADROOM);
     const mark = creditMark(format, prefix);
     const number = (kind: InvoiceKind) =>
         `${build(format, { prefix, kind, at, mark })}${counter}`;
@@ -263,8 +274,9 @@ export function longestNumber(
  *    database holds one number once): a counter that restarts each year
  *    needs the financial year or the year in the number; one that
  *    restarts each month, the month and one of them;
- *  - the longest number it can print, invoice or credit note, is at most 16
- *    characters of A–Z, 0–9, "-" and "/" (rules 46 and 53);
+ *  - the longest number it can print, invoice or credit note, with the
+ *    counter a digit past its own, is at most 16 characters of A–Z, 0–9,
+ *    "-" and "/" (rules 46 and 53);
  *  - where "CN" takes the prefix's place on credit notes, the prefix is not
  *    "CN" itself.
  */
@@ -308,7 +320,7 @@ export function numberFormatProblem(
     if (longest.length > MAX_NUMBER_LENGTH) {
         return {
             field: "invoiceNumberDigits",
-            message: `The longest number this makes, like ${longest}, is ${longest.length} characters. GST allows ${MAX_NUMBER_LENGTH}: use fewer digits or parts.`,
+            message: `Once the count passes ${"9".repeat(format.digits)}, numbers like ${longest} are ${longest.length} characters. GST allows ${MAX_NUMBER_LENGTH}: use fewer digits or parts.`,
         };
     }
     if (
@@ -328,11 +340,13 @@ export function numberFormatProblem(
  * The series a document is numbered in (ADR-008), in the business's format:
  *
  *  - by default, registered: prefix + financial year — RC/26-27/0001,
- *    credit notes RCCN/26-27/0001; not registered: a plain prefix —
- *    PF-0001, credit notes PFCN-0001; no prefix: the legacy INV series
- *    (INV-0001; INV/26-27/0001 once registered), credit notes INVCN;
+ *    credit notes RCCN/26-27/0001 (CN/26-27/0001 for a three-character
+ *    prefix, which leaves CN after it no room to grow); not registered: a
+ *    plain prefix — PF-0001, credit notes PFCN-0001; no prefix: the legacy
+ *    INV series (INV-0001; INV/26-27/0001 once registered), credit notes
+ *    INVCN-0001 (CN/26-27/0001 once registered);
  *  - a chosen format prints its parts in its order with its separator
- *    and digits (RC-2026-09-000001); credit notes carry "CN" after the
+ *    and digits (RC-2026-09-0001); credit notes carry "CN" after the
  *    prefix where that fits in 16 characters, else in its place
  *    ({@link creditMark}).
  *

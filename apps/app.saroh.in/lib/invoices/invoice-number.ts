@@ -25,6 +25,13 @@ export const MAX_COUNTER_DIGITS = 6;
 /** GST's limit on an invoice or credit note number (rules 46 and 53). */
 export const MAX_NUMBER_LENGTH = 16;
 
+/**
+ * The digits a counter is measured with past its own, as the API does: it
+ * grows rather than wrap, and a number past 16 characters cannot be issued,
+ * so a format keeps room for a period counting ten times past its digits.
+ */
+const COUNTER_HEADROOM = 1;
+
 export interface NumberFormat {
     parts: NumberPart[];
     separator: NumberSeparator;
@@ -103,8 +110,9 @@ const CREDIT_MARK = "CN";
 
 /**
  * Where a credit note's "CN" goes, as the API decides it: after the prefix
- * where that fits in 16 characters (RCCN/26-27/0001), else in its place
- * (CN/26-27/09/0001), or first when the number has no prefix.
+ * where that fits in 16 characters with the counter's headroom
+ * (RCCN/26-27/0001), else in its place (CN/26-27/09/001), or first when the
+ * number has no prefix.
  */
 export type CreditMark = "after" | "instead" | "first";
 
@@ -114,7 +122,7 @@ export function creditMark(
 ): CreditMark {
     if (!format.parts.includes("PREFIX")) return "first";
     const after = stem(format, prefix, true, new Date(), "after");
-    return after.length + format.digits <= MAX_NUMBER_LENGTH
+    return after.length + format.digits + COUNTER_HEADROOM <= MAX_NUMBER_LENGTH
         ? "after"
         : "instead";
 }
@@ -153,12 +161,15 @@ export function formatNumber(
     return `${stem(format, input.prefix, input.credit ?? false, input.now ?? new Date(), mark)}${String(input.counter).padStart(format.digits, "0")}`;
 }
 
-/** The longest number a format prints, invoice or credit note. */
+/**
+ * The longest number a format is allowed for, invoice or credit note: the
+ * counter at its digits and one more — 99999 for a four-digit counter.
+ */
 export function longestNumber(
     format: NumberFormat,
     prefix: string | null,
 ): string {
-    const counter = 10 ** format.digits - 1;
+    const counter = 10 ** (format.digits + COUNTER_HEADROOM) - 1;
     const invoice = formatNumber(format, { prefix, counter });
     const credit = formatNumber(format, { prefix, counter, credit: true });
     return credit.length > invoice.length ? credit : invoice;
@@ -173,7 +184,8 @@ export type NumberFormatField =
  * registered business restarts; numbers never repeat across years (a yearly
  * restart needs the financial year or the year in the number, a monthly one
  * the month and one of them); the longest number, invoice or credit note,
- * is at most 16 characters of A–Z, 0–9, "-" and "/".
+ * with the counter a digit past its own, is at most 16 characters of A–Z,
+ * 0–9, "-" and "/".
  */
 export function numberFormatProblem(
     format: NumberFormat,
@@ -215,7 +227,7 @@ export function numberFormatProblem(
     if (longest.length > MAX_NUMBER_LENGTH) {
         return {
             field: "numberDigits",
-            message: `The longest number this makes, like ${longest}, is ${longest.length} characters. GST allows ${MAX_NUMBER_LENGTH}: use fewer digits or parts.`,
+            message: `Once the count passes ${"9".repeat(format.digits)}, numbers like ${longest} are ${longest.length} characters. GST allows ${MAX_NUMBER_LENGTH}: use fewer digits or parts.`,
         };
     }
     if (

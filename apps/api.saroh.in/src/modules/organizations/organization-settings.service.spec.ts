@@ -521,7 +521,7 @@ describe("OrganizationSettingsService", () => {
             const MONTHLY = {
                 parts: ["PREFIX", "FY", "MONTH"],
                 separator: "/",
-                digits: 4,
+                digits: 3,
                 restart: "MONTH",
             };
             const refused = async (
@@ -669,7 +669,7 @@ describe("OrganizationSettingsService", () => {
 
             it("refuses a format whose longest number passes 16 characters", async () => {
                 profileFindUnique.mockResolvedValue(REGISTERED);
-                // RC/26-27/09/999999: 18.
+                // RC/26-27/09/9999999, the count a digit past its six: 19.
                 await refused(
                     {
                         tax: {
@@ -677,7 +677,21 @@ describe("OrganizationSettingsService", () => {
                         },
                     },
                     "invoiceNumberDigits",
-                    /18 characters\. GST allows 16/,
+                    /19 characters\. GST allows 16/,
+                );
+            });
+
+            it("keeps room for the count to grow a digit past its own", async () => {
+                profileFindUnique.mockResolvedValue(REGISTERED);
+                // RC/26-27/09/0001 is 16, but its 10,000th number would be 17.
+                await refused(
+                    {
+                        tax: {
+                            invoiceNumber: { ...MONTHLY, digits: 4 },
+                        },
+                    },
+                    "invoiceNumberDigits",
+                    /Once the count passes 9999, numbers like RC\/26-27\/09\/99999 are 17 characters/,
                 );
             });
 
