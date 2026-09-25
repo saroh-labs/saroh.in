@@ -875,4 +875,71 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
             [],
         );
     });
+
+    /**
+     * ₹610 paid and invoiced, a second sourdough (+₹250) then back (the
+     * charge superseded), and the ₹250 paid anyway: invoiced as a
+     * supplementary when it came in, spread over every invoiced line.
+     */
+    async function paidOnReplacedCharge() {
+        const order = await paidOrder();
+        const { id: invoiceId } = (await prisma.$transaction((tx) =>
+            ensureOrderInvoice(tx, order.id),
+        ))!;
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.bread, quantity: 2 }],
+        });
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.bread, quantity: 1 }],
+        });
+        await nameApart(order.id);
+        const [old] = await differenceIntents(order.id);
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: `prov_${old!.id}`,
+            providerPaymentRef: `pay_took_${order.id}`,
+        });
+        const took = await prisma.invoice.findFirstOrThrow({
+            where: {
+                orderId: order.id,
+                kind: "SUPPLEMENTARY",
+                paymentMethod: "ONLINE",
+            },
+            select: {
+                id: true,
+                status: true,
+                lines: { select: { orderItemId: true } },
+            },
+        });
+        return { order, invoiceId, old: old!, took };
+    }
+
+    it("paid anyway, then a line refunded: the credit note is the whole refund", async () => {
+        // Three croissants over the invoice's line of three and the
+        // payment's one-unit share of them would give a unit to the share
+        // and credit ₹240 + its ₹104.65, not ₹360.
+        const { order, took } = await paidOnReplacedCharge();
+        // The payment's lines are shares of money, filed under no item.
+        expect(took.lines.every((l) => l.orderItemId === null)).toBe(true);
+
+        const refund = await payments.initiateRefund(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 3 }],
+            idempotencyKey: `took-line-${order.id}`,
+        });
+        expect(refund.amountCents).toBe(36000);
+        await webhook({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: `prov_${order.id}`,
+            providerRefundId: refund.providerRefundId,
+        });
+
+        const note = await prisma.invoice.findFirstOrThrow({
+            where: { paymentRefundId: refund.refundId },
+            select: { kind: true, total: true },
+        });
+        expect(note.kind).toBe("CREDIT_NOTE");
+        expect(note.total.toString()).toBe("360");
+    });
 });

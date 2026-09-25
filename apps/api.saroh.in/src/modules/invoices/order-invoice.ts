@@ -377,12 +377,20 @@ export function buildCreditNote(
  * proportion, at their rates, exactly as a credit note that names no lines
  * is — so the credit note that hands the money back, spread over this
  * document's own lines, mirrors it line for line.
+ *
+ * Its lines name no order line. They are a share of money, not units: were
+ * they filed under an item, a later refund of that item would hand some of
+ * its units to a one-unit share line and credit less than it returned.
  */
 export function buildPaymentSupplementary(
     original: Original,
     amountCents: number,
 ): BuiltDocument {
-    return buildCreditNote(original, amountCents, []);
+    const doc = buildCreditNote(original, amountCents, []);
+    return {
+        ...doc,
+        lines: doc.lines.map((l) => ({ ...l, orderItemId: null })),
+    };
 }
 
 /**
