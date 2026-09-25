@@ -88,7 +88,7 @@ export default async function ProductPage({
         productHref(store.id, productId, t);
 
     return (
-        <PageContainer width="wide">
+        <PageContainer width="full">
             <div className="flex flex-col gap-5">
                 <ProductHeader
                     overview={overview}
