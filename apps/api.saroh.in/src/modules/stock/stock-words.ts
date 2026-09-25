@@ -143,6 +143,18 @@ export function promisedRefusal(promised: number): string {
     return `${promised} ${promised === 1 ? "is" : "are"} promised to open orders — fulfil or cancel them first.`;
 }
 
+/** A product that doesn't track stock is counted only once it does (#515). */
+export const UNTRACKED =
+    "This product doesn't track stock. Turn on Track stock to count it.";
+
+/** A variant's shelf asked of a product counted as a whole (#513). */
+export const COUNTS_AS_A_WHOLE =
+    "This product counts its stock as a whole, not per variant. Count the product itself, or switch it to count each variant in the product's Stock section.";
+
+/** The product's own shelf asked of a product counted per variant. */
+export const COUNTS_PER_VARIANT =
+    "This product counts stock for each variant. Pick the variant to count.";
+
 export const BUSINESS_UNTRACKED =
     "Your business doesn't track stock. Turn on Track stock to count it.";
 

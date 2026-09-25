@@ -29,7 +29,12 @@ import { holdLines, uncommitLines } from "../stock/reserve";
 import { StockChecksService } from "../stock/stock-checks.service";
 import { StockReadsService } from "../stock/stock-reads.service";
 import { StockTrackingService } from "../stock/stock-tracking.service";
-import { BUSINESS_UNTRACKED, TRACKING_OFF_NOTE } from "../stock/stock-words";
+import {
+    BUSINESS_UNTRACKED,
+    COUNTS_AS_A_WHOLE,
+    COUNTS_PER_VARIANT,
+    TRACKING_OFF_NOTE,
+} from "../stock/stock-words";
 import { StockWritesService, UNTRACKED } from "../stock/stock-writes.service";
 import { count } from "../stock/stock.service";
 import { setProductTracking } from "../stock/tracking";
@@ -496,6 +501,58 @@ describe("toggling while an order is being made", () => {
         });
     });
 
+    it("tracking goes off while the Stock API counts a storefront with no shelf: the count waits, then is refused", async () => {
+        const honey = await product("Honey", { hill: 3 });
+        // Listed at Online, with no shelf there yet.
+        expect(
+            await prisma.stockLevel.count({
+                where: { productId: honey, storeId: online },
+            }),
+        ).toBe(0);
+        let locked!: () => void;
+        const gotLocks = new Promise<void>((r) => (locked = r));
+        // Track stock going off has found and emptied the shelves it saw,
+        // and holds its locks a moment before it commits.
+        const toggle = prisma.$transaction(
+            async (tx) => {
+                const off = await setProductTracking(
+                    tx,
+                    { organizationId: orgId, userId: ownerId },
+                    honey,
+                    false,
+                );
+                locked();
+                await sleep(400);
+                return off;
+            },
+            { timeout: 10_000 },
+        );
+        await gotLocks;
+        // Checked before the change: still tracked (the off isn't
+        // committed), so it goes ahead — and waits for the product's lock.
+        const received = writes.adjust(owner(), {
+            storeId: online,
+            productId: honey,
+            units: 5,
+        });
+        const [off, add] = await Promise.allSettled([toggle, received]);
+        expect(off).toMatchObject({
+            status: "fulfilled",
+            value: { tracked: false },
+        });
+        expect(add).toMatchObject({
+            status: "rejected",
+            reason: expect.objectContaining({ message: UNTRACKED }),
+        });
+        // No shelf with stock on it for a product that doesn't count.
+        expect(
+            await prisma.stockLevel.findMany({
+                where: { productId: honey },
+                select: { storeId: true, onHand: true },
+            }),
+        ).toEqual([{ storeId: hill, onHand: 0 }]);
+    });
+
     it("racing freely, either the order holds or tracking goes off — never a hold on an untracked shelf", async () => {
         for (let i = 0; i < 4; i += 1) {
             const roll = await product(`Roll ${i}`, { hill: 3 });
@@ -617,6 +674,113 @@ describe("the Stock API and the readers", () => {
             writes.reverse(owner(), { entryIds: [offEntry.id] }),
         ).rejects.toThrow(UNTRACKED);
         expect(await shelf(hill, oil)).toMatchObject({ onHand: 0 });
+    });
+
+    describe("never changes how a product counts", () => {
+        /** A tracked product with two variants, listed at both storefronts. */
+        async function sized(name: string) {
+            const productId = await product(name, {});
+            await prisma.product.update({
+                where: { id: productId },
+                data: { stockTracked: true },
+            });
+            const [small, large] = await Promise.all(
+                ["S", "L"].map((title) =>
+                    prisma.productVariant.create({
+                        data: {
+                            productId,
+                            title,
+                            sku: `${name}-${title}-${tag}`,
+                        },
+                        select: { id: true },
+                    }),
+                ),
+            );
+            return { productId, small: small.id, large: large.id };
+        }
+
+        it("refuses a variant's count on a product counted as a whole", async () => {
+            const { productId, small } = await sized("Shirt");
+            await writes.counts(owner(), {
+                counts: [{ storeId: hill, productId, counted: 6 }],
+            });
+            await expect(
+                writes.counts(owner(), {
+                    counts: [
+                        {
+                            storeId: online,
+                            productId,
+                            variantId: small,
+                            counted: 2,
+                        },
+                    ],
+                }),
+            ).rejects.toThrow(new ConflictException(COUNTS_AS_A_WHOLE));
+            await expect(
+                writes.adjust(owner(), {
+                    storeId: hill,
+                    productId,
+                    variantId: small,
+                    units: 1,
+                }),
+            ).rejects.toThrow(COUNTS_AS_A_WHOLE);
+            expect(
+                await prisma.stockLevel.count({
+                    where: { productId, variantId: { not: null } },
+                }),
+            ).toBe(0);
+        });
+
+        it("refuses a whole count on a product counted per variant", async () => {
+            const { productId, small, large } = await sized("Scarf");
+            // Its first shelf may be a variant's: nothing counted it before.
+            const first = await writes.counts(owner(), {
+                counts: [
+                    {
+                        storeId: hill,
+                        productId,
+                        variantId: small,
+                        counted: 3,
+                    },
+                ],
+            });
+            expect(first.results[0].shelf).toMatchObject({
+                variantId: small,
+                onHand: 3,
+            });
+            // Another variant, another storefront: the same way it counts.
+            await writes.counts(owner(), {
+                counts: [
+                    {
+                        storeId: online,
+                        productId,
+                        variantId: large,
+                        counted: 1,
+                    },
+                ],
+            });
+            await expect(
+                writes.counts(owner(), {
+                    counts: [{ storeId: online, productId, counted: 4 }],
+                }),
+            ).rejects.toThrow(new ConflictException(COUNTS_PER_VARIANT));
+            expect(
+                await prisma.stockLevel.count({
+                    where: { productId, variantId: null },
+                }),
+            ).toBe(0);
+        });
+
+        it("lets a product's first shelf be a whole one too", async () => {
+            const { productId } = await sized("Hat");
+            const saved = await writes.counts(owner(), {
+                counts: [{ storeId: online, productId, counted: 2 }],
+            });
+            expect(saved.results[0].shelf).toMatchObject({
+                variantId: null,
+                onHand: 2,
+            });
+        });
     });
 
     it("the Stock screen lists untracked products in its footer, and the product reads no stock", async () => {

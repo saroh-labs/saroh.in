@@ -8,20 +8,24 @@ import {
 } from "@nestjs/common";
 import type { Prisma, StockEntryKind } from "@saroh/database";
 
-import { lockStockLevels } from "../products/stock-levels";
+import { lockProduct, lockStockLevels } from "../products/stock-levels";
 import { clearSoldOut } from "./sold-out";
 import type { AdjustKind } from "./stock-words";
 import {
     adjustDelta,
     ALREADY_UNDONE,
     belowZeroRefusal,
+    BUSINESS_UNTRACKED,
     cantReverse,
     CLOSED_STOREFRONT,
     countMismatched,
+    COUNTS_AS_A_WHOLE,
+    COUNTS_PER_VARIANT,
     isHandMade,
     movable,
     moveRefusal,
     shortBy,
+    UNTRACKED,
 } from "./stock-words";
 import { recordProductTracking } from "./tracking-audit";
 
@@ -151,9 +155,42 @@ function shelf(row: Row): ShelfView {
 // ---------------------------------------------------------------------------
 
 /**
+ * Refuse a new shelf for a product that stopped counting stock. Called under
+ * the product's lock, so Track stock going off for the product (which takes
+ * it first) has committed or not started; the business's profile is read
+ * FOR SHARE, so its switch going off (which locks the profile) is waited
+ * for too.
+ */
+async function assertStillTracked(
+    tx: Tx,
+    organizationId: string,
+    productId: string,
+): Promise<void> {
+    const product = await tx.product.findFirst({
+        where: { id: productId, organizationId },
+        select: { stockTracked: true },
+    });
+    if (!product) throw new NotFoundException("Product not found");
+    const [profile] = await tx.$queryRaw<{ stockTracking: boolean }[]>`
+        SELECT "stockTracking" FROM "BusinessProfile"
+        WHERE "organizationId" = ${organizationId} FOR SHARE`;
+    if (profile && !profile.stockTracking) {
+        throw new ConflictException(BUSINESS_UNTRACKED);
+    }
+    if (!product.stockTracked) throw new ConflictException(UNTRACKED);
+}
+
+/**
  * The row a target names, in this business — made (at 0, with no entry: a
  * row at 0 with no entries adds up) when `create` and it is missing. Not
  * locked yet. Anything of another business is not found.
+ *
+ * Making a row takes the product's lock first, and is refused when it would
+ * change how the product counts: a variant's row for a product counted as a
+ * whole, or a whole row for one counted per variant (switching is
+ * `setVariantsIn`, which moves open orders' promises and needs
+ * `store:write`), and for a product whose Track stock went off. A product
+ * with no shelf anywhere may start with either kind.
  */
 async function resolveRowId(
     tx: Tx,
@@ -191,17 +228,48 @@ async function resolveRowId(
     if (!store) throw new NotFoundException("Store not found");
     if (!product) throw new NotFoundException("Product not found");
     if (!variant) throw new NotFoundException("Variant not found");
-    const found = await tx.stockLevel.findFirst({
-        where: { storeId, productId, variantId },
-        select: { id: true },
-    });
+    const findRow = () =>
+        tx.stockLevel.findFirst({
+            where: { storeId, productId, variantId },
+            select: { id: true },
+        });
+    const found = await findRow();
     if (found) return found.id;
     if (!create) throw new NotFoundException("Stock not found");
+    // A new row changes where the product counts: take the product's lock
+    // (Order → Product → StockLevel), so it waits for Track stock going off
+    // or a switch to per-variant stock, and look again under it.
+    await lockProduct(tx, productId);
+    const raced = await findRow();
+    if (raced) return raced.id;
+    const shelves = await tx.stockLevel.findMany({
+        where: { productId },
+        select: { variantId: true },
+    });
+    if (shelves.length > 0) {
+        // Read under the lock: Track stock that went off meanwhile is seen.
+        await assertStillTracked(tx, organizationId, productId);
+        // A product counts as a whole or per variant, never both; switching
+        // is the product's own Stock section (`store:write`).
+        const perVariant = shelves.some((s) => s.variantId !== null);
+        if (variantId !== null && !perVariant) {
+            throw new ConflictException({
+                message: COUNTS_AS_A_WHOLE,
+                field: "variantId",
+            });
+        }
+        if (variantId === null && perVariant) {
+            throw new ConflictException({
+                message: COUNTS_PER_VARIANT,
+                field: "variantId",
+            });
+        }
+    }
     // A product with no shelf anywhere starts counting with its first one
-    // (Track stock on, #515). Callers decide who may start it: the Stock
-    // API never does, the product's own count needs `store:write`.
-    const shelves = await tx.stockLevel.count({ where: { productId } });
-    if (shelves === 0) {
+    // (Track stock on, #515), of either kind. Callers decide who may start
+    // it: the Stock API never does, the product's own count needs
+    // `store:write`.
+    if (shelves.length === 0) {
         const started = await tx.product.updateMany({
             where: { id: productId, stockTracked: false },
             data: { stockTracked: true, stockTrackedAt: new Date() },

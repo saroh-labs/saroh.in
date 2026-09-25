@@ -16,7 +16,7 @@ import type {
     StockEntryDto,
 } from "./dto";
 import { stockWriter } from "./stock-access";
-import { BUSINESS_UNTRACKED, movable } from "./stock-words";
+import { BUSINESS_UNTRACKED, movable, UNTRACKED } from "./stock-words";
 import type { ShelfView, StockActor, StockEntryView } from "./stock.service";
 import { adjust, countAll, move, returnByHand, reverse } from "./stock.service";
 import { businessTracksStock } from "./tracking";
@@ -32,8 +32,7 @@ import { businessTracksStock } from "./tracking";
  * sells (`store:write`, #515 — `tracking.ts`), not a count.
  */
 
-export const UNTRACKED =
-    "This product doesn't track stock. Turn on Track stock to count it.";
+export { UNTRACKED } from "./stock-words";
 
 type Tx = Prisma.TransactionClient;
 
