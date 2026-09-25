@@ -182,6 +182,7 @@ describe("what each role is offered", () => {
             "/settings/modules",
             "/settings/billing",
             "/settings/profile",
+            "/settings/activity",
             "/settings/providers",
         ]);
         expect(offered).toContain("/sites/site_1");
@@ -1032,7 +1033,21 @@ describe("settings tabs — owner only, and everyone's", () => {
             "Modules",
             "Plan and billing",
             "Your profile",
+            "Activity",
             "Providers",
         ]);
+    });
+
+    it("offers Activity to whoever the API lets read the audit stream", () => {
+        expect(tabsFor({ role: "ADMIN" })).toContain("/settings/activity");
+        expect(tabsFor({ role: "MEMBER" })).not.toContain("/settings/activity");
+        // The design gates it on reading settings; the API does not, so
+        // reading settings alone is not enough.
+        expect(
+            tabsFor({ role: "MEMBER", actions: ["org:settings:read"] }),
+        ).not.toContain("/settings/activity");
+        expect(tabsFor({ role: "MEMBER", actions: ["audit:read"] })).toContain(
+            "/settings/activity",
+        );
     });
 });

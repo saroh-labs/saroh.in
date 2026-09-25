@@ -5,6 +5,7 @@ import {
     Building2,
     Calendar,
     CalendarClock,
+    Clock,
     CreditCard,
     Globe,
     Home,
@@ -64,6 +65,9 @@ export type NavAction =
     | "notification:read"
     | "org:settings:read"
     | "provider:read"
+    // Settings › Activity: who changed what. Owner and Admin, as the API
+    // keeps the audit stream.
+    | "audit:read"
     // The business-wide Orders list: customer names, emails and totals across
     // every storefront. Not in the read-only floor, so a Member or Reviewer
     // is not offered a row the API would refuse them.
@@ -122,6 +126,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "notification:read",
         "org:settings:read",
         "provider:read",
+        "audit:read",
         "order:read",
         "order:stage",
         "discount:read",
@@ -147,6 +152,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "notification:read",
         "org:settings:read",
         "provider:read",
+        "audit:read",
         "order:read",
         "order:stage",
         "discount:read",
@@ -982,8 +988,8 @@ export interface SettingsPage {
 
 /**
  * The settings screen's tabs, in the design's order (2026-09-25): the
- * business, who is on it, what it runs, what Saroh costs it, you, and the
- * services behind it. The settings layout draws them as vertical tabs and the
+ * business, who is on it, what it runs, what Saroh costs it, you, who
+ * changed what, and the services behind it. The settings layout draws them as vertical tabs and the
  * command menu lists them, each only for an actor who may open it.
  */
 export const SETTINGS_PAGES = [
@@ -1021,6 +1027,15 @@ export const SETTINGS_PAGES = [
         label: "Your profile",
         description: "Your login and the alerts you get",
         icon: UserRound,
+    },
+    {
+        href: "/settings/activity",
+        label: "Activity",
+        description: "Who changed what, and when",
+        icon: Clock,
+        // The design gates it on reading settings; the API keeps the audit
+        // stream to Owner and Admin, so the tab follows the API.
+        action: "audit:read",
     },
     {
         href: "/settings/providers",
