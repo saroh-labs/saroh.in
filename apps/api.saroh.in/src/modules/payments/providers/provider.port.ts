@@ -96,6 +96,22 @@ export class RefundCallError extends Error {
     }
 }
 
+/**
+ * A refund call's 2xx body. One that cannot be read — cut short, or not
+ * JSON — came after the provider said yes, so the refund may be made:
+ * `UNKNOWN`, never a refusal.
+ */
+export async function readRefundAnswer<T>(
+    res: Response,
+    what: string,
+): Promise<T> {
+    try {
+        return (await res.json()) as T;
+    } catch {
+        throw new RefundCallError(`${what}: unreadable response`, "UNKNOWN");
+    }
+}
+
 export interface MerchantProvider {
     readonly name: string;
     createOrderIntent(

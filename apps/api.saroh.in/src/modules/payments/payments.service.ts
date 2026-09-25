@@ -28,6 +28,7 @@ import { assertOrganizationOpen } from "../organizations/organization-lifecycle.
 import { authorize } from "../organizations/organization-policy";
 import { decryptSecret, encryptSecret } from "./crypto";
 import type {
+    MerchantProvider,
     ProviderCredentials,
     ProviderFactory,
     RefundResult,
@@ -830,8 +831,8 @@ export class PaymentsService {
      *   row stays PENDING until the refund webhook settles it.
      * - `REFUSED` — the provider definitely made no refund (or the call
      *   never left Saroh): the row is FAILED, freeing its money and lines.
-     * - `UNKNOWN` — the provider may have made one: the row stays PENDING
-     *   with its money held. A second real refund cannot be undone; an
+     * - `UNKNOWN` — the provider may have made one (any error from the call
+     *   but its definite refusal): the row stays PENDING with its money held. A second real refund cannot be undone; an
      *   over-held reservation can — by the webhook, or a try-again.
      */
     private async sendRefund(
@@ -844,10 +845,24 @@ export class PaymentsService {
             currency: string;
         },
     ): Promise<RefundOutcome> {
+        // Setting the call up — the business's provider and its keys — sends
+        // nothing: a failure there is a refusal.
+        let call: Awaited<ReturnType<PaymentsService["refundCall"]>>;
+        let provider: MerchantProvider;
+        try {
+            call = await this.refundCall(organizationId, intent);
+            provider = this.factory.get(call.provider);
+        } catch (err) {
+            return {
+                kind: "REFUSED",
+                row: await this.failRefund(row.id),
+                error: err instanceof Error ? err : new Error(String(err)),
+            };
+        }
+
         let result: RefundResult;
         try {
-            const call = await this.refundCall(organizationId, intent);
-            result = await this.factory.get(call.provider).refund({
+            result = await provider.refund({
                 reference: row.id,
                 providerIntentId: intent.providerIntentId ?? "",
                 providerPaymentRef: call.providerPaymentRef,
@@ -857,17 +872,20 @@ export class PaymentsService {
             });
         } catch (err) {
             const error = err instanceof Error ? err : new Error(String(err));
-            if (err instanceof RefundCallError && err.outcome === "UNKNOWN") {
-                this.logger.warn(
-                    `Refund ${row.id}: the provider's answer is unknown (${error.message}); held until it says`,
-                );
-                return { kind: "UNKNOWN", row: await this.refundRow(row.id) };
+            // Only the provider's definite no frees the money. Anything else
+            // from the call — a timeout, an answer we could not read, a
+            // plain bug — may follow a refund it made.
+            if (err instanceof RefundCallError && err.outcome === "REFUSED") {
+                return {
+                    kind: "REFUSED",
+                    row: await this.failRefund(row.id),
+                    error,
+                };
             }
-            return {
-                kind: "REFUSED",
-                row: await this.failRefund(row.id),
-                error,
-            };
+            this.logger.warn(
+                `Refund ${row.id}: the provider's answer is unknown (${error.message}); held until it says`,
+            );
+            return { kind: "UNKNOWN", row: await this.refundRow(row.id) };
         }
         return this.settleFromProvider(row.id, result);
     }

@@ -9,7 +9,7 @@ import type {
     RefundInput,
     RefundResult,
 } from "./provider.port";
-import { RefundCallError } from "./provider.port";
+import { readRefundAnswer, RefundCallError } from "./provider.port";
 
 /**
  * Cashfree adapter (S5-002).
@@ -141,7 +141,13 @@ export class CashfreeProvider implements MerchantProvider {
             );
         }
 
-        return toResult((await res.json()) as CashfreeRefund, reference);
+        return toResult(
+            await readRefundAnswer<CashfreeRefund>(
+                res,
+                "Cashfree refund failed",
+            ),
+            reference,
+        );
     }
 
     /**
@@ -174,7 +180,13 @@ export class CashfreeProvider implements MerchantProvider {
                 "UNKNOWN",
             );
         }
-        return toResult((await res.json()) as CashfreeRefund, reference);
+        return toResult(
+            await readRefundAnswer<CashfreeRefund>(
+                res,
+                "Cashfree refund lookup failed",
+            ),
+            reference,
+        );
     }
 
     private headers(credentials: ProviderCredentials): Record<string, string> {
@@ -201,7 +213,11 @@ function toResult(body: CashfreeRefund, reference: string): RefundResult {
                 ? String(body.cf_refund_id)
                 : (body.refund_id ?? reference),
         status,
-        failed: status === "CANCELLED" || status === "FAILED",
+        // As the refund webhook reads them (cashfree.webhook.ts `outcomeFor`).
+        failed:
+            status === "CANCELLED" ||
+            status === "FAILED" ||
+            status === "REJECTED",
     };
 }
 

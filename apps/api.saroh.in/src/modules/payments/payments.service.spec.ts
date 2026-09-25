@@ -772,6 +772,27 @@ describe("PaymentsService.initiateRefund", () => {
         expect(eventCreate).not.toHaveBeenCalled();
     });
 
+    it.each([
+        ["an unreadable answer", new SyntaxError("Unexpected end of JSON")],
+        ["a plain bug", new TypeError("x is undefined")],
+    ])(
+        "any other error from the provider call (%s) holds the money — never FAILED",
+        async (_what, error) => {
+            const { service, fake } = makeService();
+            jest.spyOn(fake, "refund").mockRejectedValueOnce(error);
+
+            const result = await service.initiateRefund(ctx(), "order_1", {
+                lines: [{ itemId: "li_b", quantity: 1 }],
+            });
+
+            expect(result.beingConfirmed).toBe(true);
+            expect(made.get("rf_1")).toMatchObject({
+                status: "PENDING",
+                providerRefundId: null,
+            });
+        },
+    );
+
     it("a new refund while one is being confirmed is capped by its reservation", async () => {
         const { service, fake } = makeService();
         // ₹15 of the ₹42.50 is held by a refund still being confirmed.

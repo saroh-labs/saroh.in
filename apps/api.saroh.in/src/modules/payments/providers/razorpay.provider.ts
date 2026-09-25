@@ -9,7 +9,7 @@ import type {
     RefundInput,
     RefundResult,
 } from "./provider.port";
-import { RefundCallError } from "./provider.port";
+import { readRefundAnswer, RefundCallError } from "./provider.port";
 
 /**
  * Razorpay adapter (S5-002).
@@ -134,7 +134,10 @@ export class RazorpayProvider implements MerchantProvider {
             );
         }
 
-        const body = (await res.json()) as RazorpayRefund;
+        const body = await readRefundAnswer<RazorpayRefund>(
+            res,
+            "Razorpay refund failed",
+        );
         if (!body.id) {
             // It answered yes without saying to what: it may have refunded.
             throw new RefundCallError(
@@ -181,7 +184,10 @@ export class RazorpayProvider implements MerchantProvider {
             );
         }
 
-        const body = (await res.json()) as { items?: RazorpayRefund[] };
+        const body = await readRefundAnswer<{ items?: RazorpayRefund[] }>(
+            res,
+            "Razorpay refund lookup failed",
+        );
         const found = (body.items ?? []).find(
             (r) =>
                 r.id && (r.receipt === reference || noteRef(r) === reference),

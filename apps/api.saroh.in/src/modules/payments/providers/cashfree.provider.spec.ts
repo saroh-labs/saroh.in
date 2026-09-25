@@ -28,6 +28,16 @@ function answer(status: number, body: unknown = {}) {
     );
 }
 
+/** A 2xx whose body is cut short: not JSON. */
+function unreadable(status = 200) {
+    return Promise.resolve(
+        new Response('{"id": "rfnd_', {
+            status,
+            headers: { "Content-Type": "application/json" },
+        }),
+    );
+}
+
 async function outcomeOf(p: Promise<unknown>) {
     const err = await p.catch((e: unknown) => e);
     expect(err).toBeInstanceOf(RefundCallError);
@@ -97,6 +107,13 @@ describe("CashfreeProvider.refund", () => {
         );
     });
 
+    it("a 2xx whose body cannot be read may have refunded — UNKNOWN", async () => {
+        fetchMock.mockReturnValue(unreadable());
+        expect(await outcomeOf(new CashfreeProvider().refund(INPUT))).toBe(
+            "UNKNOWN",
+        );
+    });
+
     it("any other 400 made no refund — REFUSED", async () => {
         fetchMock.mockReturnValue(
             answer(400, { message: "refund amount is more than order amount" }),
@@ -125,13 +142,23 @@ describe("CashfreeProvider.findRefund", () => {
         });
     });
 
-    it("a cancelled refund reads as failed", async () => {
-        fetchMock.mockReturnValue(
-            answer(200, { cf_refund_id: 991, refund_status: "CANCELLED" }),
+    it.each(["CANCELLED", "FAILED", "REJECTED"])(
+        "a %s refund reads as failed, as the webhook reads it",
+        async (status) => {
+            fetchMock.mockReturnValue(
+                answer(200, { cf_refund_id: 991, refund_status: status }),
+            );
+            await expect(
+                new CashfreeProvider().findRefund(INPUT),
+            ).resolves.toMatchObject({ failed: true });
+        },
+    );
+
+    it("is UNKNOWN when its answer cannot be read", async () => {
+        fetchMock.mockReturnValue(unreadable());
+        expect(await outcomeOf(new CashfreeProvider().findRefund(INPUT))).toBe(
+            "UNKNOWN",
         );
-        await expect(
-            new CashfreeProvider().findRefund(INPUT),
-        ).resolves.toMatchObject({ failed: true });
     });
 
     it("404 means Cashfree has none", async () => {

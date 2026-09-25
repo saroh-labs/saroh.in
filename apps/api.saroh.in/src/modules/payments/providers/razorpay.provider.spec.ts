@@ -28,6 +28,16 @@ function answer(status: number, body: unknown = {}) {
     );
 }
 
+/** A 2xx whose body is cut short: not JSON. */
+function unreadable(status = 200) {
+    return Promise.resolve(
+        new Response('{"id": "rfnd_', {
+            status,
+            headers: { "Content-Type": "application/json" },
+        }),
+    );
+}
+
 async function refused(p: Promise<unknown>) {
     const err = await p.catch((e: unknown) => e);
     expect(err).toBeInstanceOf(RefundCallError);
@@ -85,6 +95,13 @@ describe("RazorpayProvider.refund", () => {
 
     it("a network error may have refunded — UNKNOWN", async () => {
         fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+        expect(await refused(new RazorpayProvider().refund(INPUT))).toBe(
+            "UNKNOWN",
+        );
+    });
+
+    it("a 2xx whose body cannot be read may have refunded — UNKNOWN", async () => {
+        fetchMock.mockReturnValue(unreadable());
         expect(await refused(new RazorpayProvider().refund(INPUT))).toBe(
             "UNKNOWN",
         );
@@ -172,6 +189,13 @@ describe("RazorpayProvider.findRefund", () => {
 
     it("is UNKNOWN when Razorpay cannot answer", async () => {
         fetchMock.mockReturnValue(answer(502));
+        expect(await refused(new RazorpayProvider().findRefund(INPUT))).toBe(
+            "UNKNOWN",
+        );
+    });
+
+    it("is UNKNOWN when its answer cannot be read", async () => {
+        fetchMock.mockReturnValue(unreadable());
         expect(await refused(new RazorpayProvider().findRefund(INPUT))).toBe(
             "UNKNOWN",
         );
