@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * The four scenes, as tests rather than as a review checklist (§18, #178).
@@ -32,6 +32,9 @@ async function signIn(page: Page) {
     await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
         timeout: 30_000,
     });
+    // The owner is in several businesses: with none chosen, `/` is the
+    // chooser, not Home — and every scene below would measure the wrong page.
+    await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
 }
 
 /** Elements that overlap without one containing the other. */
@@ -126,9 +129,22 @@ test.describe("the phone tab bar", () => {
 
             // At the very bottom, the shell's padding has to have lifted the
             // last control clear of the bar.
-            await page.evaluate(() =>
-                window.scrollTo(0, document.documentElement.scrollHeight),
-            );
+            //
+            // Scrolled until the page stops growing: a long list (Northwind's
+            // contacts, with the showcase on) draws more rows as it nears its
+            // end, so one jump lands above a foot that is still arriving.
+            await expect(async () => {
+                const before = await page.evaluate(() => {
+                    window.scrollTo(0, document.documentElement.scrollHeight);
+                    return document.documentElement.scrollHeight;
+                });
+                await page.waitForTimeout(300);
+                const after = await page.evaluate(() => {
+                    window.scrollTo(0, document.documentElement.scrollHeight);
+                    return document.documentElement.scrollHeight;
+                });
+                expect(after).toBe(before);
+            }).toPass({ timeout: 15_000 });
             const hidden = await page.evaluate(() => {
                 const nav = document.querySelector('nav[aria-label="Main"]');
                 if (!nav) return ["no tab bar"];
@@ -185,7 +201,14 @@ test.describe("the phone tab bar", () => {
         await expect(
             sheet.getByRole("button", { name: "Close" }),
         ).toBeFocused();
-        await expect(more).toHaveAttribute("aria-expanded", "true");
+        // While the modal sheet is open Radix hides everything outside it
+        // from assistive tech — the bar included, rightly — so the tab is
+        // found past that to read what it says about the sheet.
+        await expect(
+            page
+                .getByRole("navigation", { name: "Main", includeHidden: true })
+                .getByRole("button", { name: /^More/, includeHidden: true }),
+        ).toHaveAttribute("aria-expanded", "true");
 
         // Tab stays inside: after many presses focus is still in the sheet.
         for (let i = 0; i < 30; i++) await page.keyboard.press("Tab");

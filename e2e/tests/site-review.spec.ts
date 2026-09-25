@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import {
     demoReviewer,
     demoUser,
+    NORTHWIND_ORG,
     REVIEWED_SITE,
     urls,
 } from "../playwright.config";
@@ -187,6 +188,7 @@ test.describe("a shared preview link", () => {
         context,
     }) => {
         await signIn(page, demoUser);
+        await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
         // Website opens on the business's one site (ADR-006), and the Pages
         // tab's action opens it in the editor.
         await page.goto(`${urls.APP_URL}/sites`);

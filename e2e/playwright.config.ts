@@ -97,6 +97,17 @@ export const demoReviewer = {
 /** The site the reviewer was invited to, by name. */
 export const REVIEWED_SITE = "Northwind Supply";
 
+/**
+ * Northwind, the base seed's business, whose site the reviewer was invited to.
+ *
+ * The demo owner is in several businesses (the base seed's site-only ones, and
+ * the showcase's), so a signed-in owner with no business chosen is asked which
+ * one at `/choose` — and org-scoped pages fall back to whichever membership the
+ * list returns first. A spec about Northwind opens it by id first, the way
+ * accounts' "Your businesses" does.
+ */
+export const NORTHWIND_ORG = "seed_org";
+
 export default defineConfig({
     testDir: "./tests",
     // Serial by default: these share one seeded Organization, and a spec that
