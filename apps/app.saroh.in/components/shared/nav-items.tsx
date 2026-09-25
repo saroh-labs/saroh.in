@@ -233,6 +233,13 @@ export interface NavChild {
     /** Any one of several will do, e.g. Orders: `order:read` or `order:stage`. */
     action?: NavAction | readonly NavAction[];
     /**
+     * Withheld from an actor who holds `holds` but not `without`, whatever
+     * `action` says. The API's rule for the store's customers: the kitchen's
+     * roles — `order:stage` without `order:read` — reach the store but are
+     * refused its customer list, which is emails and spend (R7, #508).
+     */
+    refusedTo?: { holds: NavAction; without: NavAction };
+    /**
      * Absent for a row that only NAMES something — a site whose real
      * destinations are the rows beneath it. A label row is not a link, so
      * two children cannot both claim to be "the site" and the current-page
@@ -407,6 +414,11 @@ export const NAV_GROUPS: NavGroup[] = [
                         href: "/commerce/customers",
                         label: "Customers",
                         action: "store:read",
+                        // Emails and spend: not the counter's (R7, #508).
+                        refusedTo: {
+                            holds: "order:stage",
+                            without: "order:read",
+                        },
                     },
                     {
                         href: "/commerce/discounts",
@@ -797,7 +809,9 @@ export function filterNavGroupsByRole(
                 if (item.action && !navCan(actor, item.action)) return [];
                 if (item.children === undefined) return [item];
                 const children = item.children.filter(
-                    (child) => !child.action || navCan(actor, child.action),
+                    (child) =>
+                        (!child.action || navCan(actor, child.action)) &&
+                        !refuses(actor, child.refusedTo),
                 );
                 // A section whose every page is refused is not offered as an
                 // empty heading. Only a section that HAD pages: Website with
@@ -809,6 +823,19 @@ export function filterNavGroupsByRole(
             }),
         }))
         .filter((group) => group.items.length > 0);
+}
+
+/**
+ * Does a child's {@link NavChild.refusedTo} withhold it from this actor?
+ * Fails open like {@link navCan}: an actor we cannot judge holds `without`
+ * too, so nothing is withheld.
+ */
+function refuses(
+    actor: { role: NavRole | null; actions?: readonly string[] | null },
+    rule: NavChild["refusedTo"],
+): boolean {
+    if (!rule) return false;
+    return navCan(actor, rule.holds) && !navCan(actor, rule.without);
 }
 
 /**
