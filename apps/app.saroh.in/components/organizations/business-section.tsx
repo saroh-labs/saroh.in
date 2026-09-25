@@ -21,7 +21,7 @@ export interface BusinessRow {
  */
 export function BusinessSection({
     title,
-    pill,
+    lead,
     rows,
     note,
     editing,
@@ -33,8 +33,10 @@ export function BusinessSection({
     saveWhy,
     children,
 }: {
+    /** Names the card for a screen reader and the Edit button. */
     title: string;
-    pill?: { label: string; on: boolean };
+    /** What the card holds, in a line — the tab already names it. */
+    lead: string;
     rows: BusinessRow[];
     note?: string;
     editing: boolean;
@@ -53,17 +55,9 @@ export function BusinessSection({
             className="overflow-hidden rounded-xl border border-border bg-card"
         >
             <div className="flex min-h-[58px] flex-wrap items-center gap-2.5 border-b border-border/70 px-[18px] py-3">
-                <h3 className="font-display text-[15px] font-semibold tracking-[-0.01em]">
-                    {title}
-                </h3>
-                {pill ? (
-                    <Badge
-                        variant={pill.on ? "success" : "neutral"}
-                        className="uppercase tracking-[0.04em]"
-                    >
-                        {pill.label}
-                    </Badge>
-                ) : null}
+                <span className="text-[12.5px] text-muted-foreground">
+                    {lead}
+                </span>
                 {canEdit && !editing ? (
                     <Button
                         type="button"

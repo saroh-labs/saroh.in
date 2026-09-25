@@ -28,6 +28,10 @@ import {
     ADDRESS_KEYS,
     registeredAddressShape,
 } from "@/components/organizations/registered-address-fields";
+import {
+    LeaveDialog,
+    useLeaveGuard,
+} from "@/components/organizations/use-leave-guard";
 import { countryName, CountrySelect } from "@/components/shared/country-select";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
@@ -159,12 +163,18 @@ function valuesOf(settings: OrganizationSettings): FormValues {
  */
 const SECTIONS = {
     identity: {
-        title: "Business",
+        title: "Identity",
+        lead: "How the business is named and registered",
         fields: ["name", "legalName", "type", "country"],
     },
-    contact: { title: "Contact", fields: ["contactEmail", "website"] },
+    contact: {
+        title: "Contact",
+        lead: "How customers reach you",
+        fields: ["contactEmail", "website"],
+    },
     tax: {
         title: "Tax and invoices",
+        lead: "What every invoice carries",
         fields: [
             "gstRegistered",
             "taxId",
@@ -176,11 +186,12 @@ const SECTIONS = {
     },
     address: {
         title: "Registered address",
+        lead: "Printed under your legal name",
         fields: ["addressLine1", "addressLine2", "city", "postalCode"],
     },
 } as const satisfies Record<
     string,
-    { title: string; fields: readonly (keyof FormValues)[] }
+    { title: string; lead: string; fields: readonly (keyof FormValues)[] }
 >;
 type SectionKey = keyof typeof SECTIONS;
 const SECTION_KEYS = Object.keys(SECTIONS) as SectionKey[];
@@ -189,6 +200,17 @@ const sectionOf = (field: string): SectionKey =>
     SECTION_KEYS.find((key) =>
         (SECTIONS[key].fields as readonly string[]).includes(field),
     ) ?? "identity";
+
+/**
+ * India's financial year, which the API numbers invoices by (`numbering.ts`).
+ * The design lets a business choose the month it starts; the API has one
+ * year, April to March, so it is said here rather than offered.
+ */
+const FINANCIAL_YEAR_ROW: BusinessRow = {
+    label: "Financial year",
+    value: "April – March",
+    tag: "Invoice numbers restart each April",
+};
 
 const stateName = (code: string) =>
     GST_STATES.find((s) => s.value === code)?.label ?? "";
@@ -254,6 +276,8 @@ export function OrganizationSettingsForm({
     // preview reads it either way.
     const v = useWatch({ control: form.control }) as FormValues;
     const registered = v.gstRegistered;
+    // An open edit with changes holds the way off this page.
+    const { leaveTo, stay } = useLeaveGuard(editing !== null && isDirty);
 
     const startEditing = (key: SectionKey) => {
         if (editing && editing !== key && isDirty) {
@@ -385,7 +409,7 @@ export function OrganizationSettingsForm({
                 label: "Workspace address",
                 value: settings.slug,
                 mono: true,
-                tag: "Stays the same",
+                tag: "Can't be changed",
             },
         ],
         contact: [
@@ -398,6 +422,7 @@ export function OrganizationSettingsForm({
         ],
         tax: saved.gstRegistered
             ? [
+                  { label: "GST", value: "Registered" },
                   { label: "GSTIN", value: saved.taxId ?? "", mono: true },
                   {
                       label: "State",
@@ -405,6 +430,7 @@ export function OrganizationSettingsForm({
                           ? `${savedState.name}${savedState.fromGstin ? " · from the GSTIN" : ""}`
                           : "",
                   },
+                  FINANCIAL_YEAR_ROW,
                   {
                       label: "Invoice numbers",
                       value: number(saved),
@@ -421,12 +447,14 @@ export function OrganizationSettingsForm({
                   },
               ]
             : [
+                  { label: "GST", value: "Not registered" },
                   {
                       label: "Tax ID",
                       value: saved.taxId ?? "",
                       empty: "None",
                       mono: true,
                   },
+                  FINANCIAL_YEAR_ROW,
                   {
                       label: "Invoice numbers",
                       value: number(saved),
@@ -443,7 +471,7 @@ export function OrganizationSettingsForm({
     };
     const notes: Partial<Record<SectionKey, string>> = {
         identity:
-            "The business name shows on receipts and in the switcher. The legal name, if it differs, is what invoices are issued in.",
+            "Invoices are issued in the legal name, if you've set one. Your links keep working if you rename the business.",
         address:
             "Printed under your legal name on every invoice and receipt. Invoices already issued keep the address they went out with.",
     };
@@ -882,23 +910,7 @@ export function OrganizationSettingsForm({
                 >
                     <BusinessSection
                         title={SECTIONS[tab].title}
-                        pill={
-                            tab === "tax"
-                                ? {
-                                      label: (
-                                          editing === "tax"
-                                              ? registered
-                                              : saved.gstRegistered
-                                      )
-                                          ? "GST-registered"
-                                          : "Not GST-registered",
-                                      on:
-                                          editing === "tax"
-                                              ? registered
-                                              : saved.gstRegistered,
-                                  }
-                                : undefined
-                        }
+                        lead={SECTIONS[tab].lead}
                         rows={rows[tab]}
                         note={notes[tab]}
                         editing={editing === tab}
@@ -911,12 +923,6 @@ export function OrganizationSettingsForm({
                     >
                         {fieldsOf[tab]}
                     </BusinessSection>
-                    {!canEdit ? (
-                        <p className="text-[11.5px] text-muted-foreground">
-                            Your role can see the business details but not
-                            change them.
-                        </p>
-                    ) : null}
                 </form>
 
                 <BusinessPrintPreview
@@ -941,6 +947,18 @@ export function OrganizationSettingsForm({
                     deliveryRate={rateOption(v.deliveryRate) || "18"}
                 />
             </div>
+            <LeaveDialog
+                to={leaveTo}
+                section={editing ? SECTIONS[editing].title : "Business"}
+                onKeep={() => {
+                    stay();
+                    if (editing) setTab(editing);
+                }}
+                onDiscard={() => {
+                    stay();
+                    cancel();
+                }}
+            />
         </Form>
     );
 }

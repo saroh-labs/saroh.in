@@ -26,8 +26,9 @@ import { rememberRail } from "@/lib/nav/rail-cookie";
  * Primary navigation: a calm, goal-grouped rail.
  *
  * Three widths, as the workspace design sets them (brand file §21):
- * above 1100px the full 238px rail; from 760 to 1100 a 64px icon rail, where
- * labels, group headings and counts are announced but not drawn; below 760 no
+ * above 1100px the full 238px rail; from 760 to 1100 a 76px icon rail, each
+ * icon over a small label, where group headings and counts are announced but
+ * not drawn (the collapse button draws the same rail wider); below 760 no
  * rail at all — the phone `TabBar` and its sheet carry the same nav.
  *
  * A section's children are REMOVED on the icon rail rather than hidden, which
@@ -115,7 +116,7 @@ export function AppSidebar({
             // twin keyed on this attribute.
             data-collapsed={collapsed}
             // Below the 61px top bar, which carries the mark now.
-            className="group/rail sticky top-[61px] hidden h-[calc(100vh-61px)] w-[238px] shrink-0 flex-col border-r data-[collapsed=true]:w-16 max-[1100px]:w-16 min-[760px]:flex print:hidden"
+            className="group/rail sticky top-[61px] hidden h-[calc(100vh-61px)] w-[238px] shrink-0 flex-col border-r data-[collapsed=true]:w-[76px] max-[1100px]:w-[76px] min-[760px]:flex print:hidden"
         >
             {/*
              * `gap-0.5` on the nav, and space bought back only where it means
@@ -129,7 +130,7 @@ export function AppSidebar({
              */}
             <nav
                 aria-label="Primary"
-                className="flex flex-1 flex-col gap-px overflow-y-auto overscroll-contain px-2.5 py-3 group-data-[collapsed=true]/rail:px-2 max-[1100px]:px-2"
+                className="flex flex-1 flex-col gap-px overflow-y-auto overscroll-contain px-2.5 py-3 group-data-[collapsed=true]/rail:px-1.5 max-[1100px]:px-1.5"
             >
                 {groups.map((group, index) => (
                     <Fragment key={group.label ?? `group-${index}`}>
@@ -266,10 +267,12 @@ export function AppSidebar({
                                                         // fading, so changing page reads as the
                                                         // marker travelling down the rail.
                                                         "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast",
-                                                        // The icon rail centres the glyph and
-                                                        // drops the marker's gutter.
-                                                        "max-[1100px]:justify-center max-[1100px]:px-0 max-[1100px]:before:hidden",
-                                                        "group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:px-0 group-data-[collapsed=true]/rail:before:hidden",
+                                                        // The icon rail stacks the glyph over
+                                                        // a small label ("Saroh Settings"
+                                                        // design, 2026-09-25) and drops the
+                                                        // marker's gutter.
+                                                        "max-[1100px]:flex-col max-[1100px]:justify-center max-[1100px]:gap-[3px] max-[1100px]:px-0.5 max-[1100px]:py-[7px] max-[1100px]:before:hidden",
+                                                        "group-data-[collapsed=true]/rail:flex-col group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:gap-[3px] group-data-[collapsed=true]/rail:px-0.5 group-data-[collapsed=true]/rail:py-[7px] group-data-[collapsed=true]/rail:before:hidden",
                                                         // The design system's ring, not
                                                         // Chrome's default blue: the focus ring
                                                         // is a keyboard user's cursor, and it
@@ -290,7 +293,7 @@ export function AppSidebar({
                                                         className="size-[19px] shrink-0"
                                                         strokeWidth={1.9}
                                                     />
-                                                    <span className="flex-1 group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only">
+                                                    <span className="flex-1 group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2] max-[1100px]:w-full max-[1100px]:flex-none max-[1100px]:text-center max-[1100px]:text-[10.5px] max-[1100px]:leading-[1.2]">
                                                         {item.label}
                                                     </span>
                                                     {waiting > 0 ? (
@@ -347,13 +350,13 @@ export function AppSidebar({
              * rail is drawn: below 1100px the rail is icons already, and a
              * button that did nothing would be a promise the rail can't keep.
              */}
-            <div className="shrink-0 border-t border-border px-2.5 py-2 group-data-[collapsed=true]/rail:px-2 max-[1100px]:hidden">
+            <div className="shrink-0 border-t border-border px-2.5 py-2 group-data-[collapsed=true]/rail:px-1.5 max-[1100px]:hidden">
                 <button
                     type="button"
                     onClick={toggleCollapsed}
                     aria-label={collapsed ? "Expand menu" : "Collapse menu"}
                     title={collapsed ? "Expand menu" : "Collapse menu"}
-                    className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:px-0"
+                    className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsed=true]/rail:h-auto group-data-[collapsed=true]/rail:flex-col group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:gap-[3px] group-data-[collapsed=true]/rail:px-0.5 group-data-[collapsed=true]/rail:py-[7px]"
                 >
                     {collapsed ? (
                         <PanelLeftOpen
@@ -366,7 +369,7 @@ export function AppSidebar({
                             className="size-4 shrink-0"
                         />
                     )}
-                    <span className="group-data-[collapsed=true]/rail:sr-only">
+                    <span className="group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2]">
                         {collapsed ? "Expand" : "Collapse"}
                     </span>
                 </button>

@@ -1,21 +1,25 @@
 import { cn } from "@saroh/ui/lib/utils";
+import { Lock } from "lucide-react";
 
 /**
  * One settings tab's page, beside the tabs ("Saroh Settings" design).
  *
- * The screen's title is "Settings", in the band above both columns, so a
- * tab's own name is the panel's heading: an h2 at 22px on the display face,
- * its line of description under it, and its main action on the heading's
- * line.
+ * "Settings" heads the tab column, so a tab's own name is the panel's
+ * heading: an h2 at 22px on the display face, its line of description under
+ * it, its main action on the heading's line, and — for someone who may only
+ * look — a note saying who can change it.
  */
 export function SettingsPanelHeader({
     title,
     description,
     actions,
+    readOnlyNote,
 }: {
     title: string;
     description?: React.ReactNode;
     actions?: React.ReactNode;
+    /** For someone who may look but not change: who can. */
+    readOnlyNote?: string;
 }) {
     return (
         <div>
@@ -34,13 +38,22 @@ export function SettingsPanelHeader({
                     {description}
                 </p>
             ) : null}
+            {readOnlyNote ? (
+                <p
+                    role="note"
+                    className="mt-2 flex items-center gap-2 text-[12.5px] text-foreground/80"
+                >
+                    <Lock aria-hidden className="size-3.5 shrink-0" />
+                    {readOnlyNote}
+                </p>
+            ) : null}
         </div>
     );
 }
 
 /**
- * The panel itself: the page's `<main>` (the layout draws the band and the
- * tabs around it), padded 20px 26px as the design's panel is. `width` keeps
+ * The panel itself: the page's `<main>` (the layout draws the tabs beside
+ * it), padded 20px 26px as the design's panel is. `width` keeps
  * each page at the measure it had on its own — a form stays form-wide.
  */
 export function SettingsPanel({

@@ -43,6 +43,11 @@ export default async function OrganizationSettingsPage() {
                             ? "Everything customers see on receipts and invoices. Edit one section at a time — the preview shows how it prints."
                             : "What customers see on receipts and invoices."
                     }
+                    readOnlyNote={
+                        canEdit
+                            ? undefined
+                            : "Only owners and admins can change this."
+                    }
                 />
             }
         >
