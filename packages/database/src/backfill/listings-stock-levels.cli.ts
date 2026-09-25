@@ -5,7 +5,8 @@
  *
  * Run it before `20261002100000_catalogue_listings_stock_levels` when that
  * migration stops (a product with no business, or two sharing an address),
- * and once right after it. Safe to run more than once; see
+ * and once right after the migrations (the rollout's step 3,
+ * docs/architecture/PRODUCTS_STOCK_ROLLOUT.md). Safe to run more than once; see
  * listings-stock-levels.ts. The report lists every address it changed, and
  * every row whose promised its open lines did not match (step 6).
  */

@@ -4,9 +4,10 @@
  * A product belonged to one storefront and counted its stock in Inventory (a
  * product counted as a whole) or VariantInventory (per variant). It now
  * belongs to the business: a storefront sells it through a ProductListing
- * and counts it in StockLevel. This script, like the migration
- * `20261002100000_catalogue_listings_stock_levels` that does the same copy in
- * SQL, gives the old rows their new shape:
+ * and counts it in StockLevel. This script, like the migrations
+ * `20261002100000_catalogue_listings_stock_levels` (the schema) and
+ * `20261002100001_listings_stock_levels_copy` (the same copy in SQL), gives
+ * the old rows their new shape:
  *
  * 1. every product carries its business — taken from its storefront; a
  *    product with neither stops the run, loudly, before anything changes;
