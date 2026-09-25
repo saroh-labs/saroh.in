@@ -12,6 +12,7 @@
  *   finds nothing;
  * - the #510 backfill runs the repair after linking lines, and reports it.
  */
+import { Logger } from "@nestjs/common";
 import {
     backfillListingsStockLevels,
     heldStockMismatches,
@@ -23,6 +24,7 @@ import {
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrdersService } from "../orders/orders.service";
 import { StoresService } from "../stores/stores.service";
+import { HeldStockWatch } from "./held-stock-watch";
 
 const tag = `${process.pid}-${Date.now()}`;
 const at = (days: number) => new Date(Date.UTC(2026, 0, 1 + days));
@@ -558,5 +560,30 @@ describe("the #510 backfill reports and repairs held stock", () => {
         const again = await backfillListingsStockLevels(prisma);
         expect(again.orderLines).toBe(0);
         expect(again.heldStock?.capped).toEqual([]);
+    });
+});
+
+describe("the API's start-up watch (HeldStockWatch)", () => {
+    it("logs every row whose promised open orders don't hold, and what to run", async () => {
+        const errors: string[] = [];
+        const spy = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation((message: unknown) => {
+                errors.push(String(message));
+            });
+        try {
+            const found = await heldStockMismatches(prisma);
+            const n = await new HeldStockWatch().check();
+            // The repair left the gloves row: it promises more than it holds.
+            expect(n).toBe(found.rows.length + found.lines.length);
+            expect(n).toBeGreaterThan(0);
+            expect(errors[0]).toContain("Held stock doesn't add up");
+            expect(errors[0]).toContain("held-stock.cli.ts");
+            expect(errors.slice(1).join("\n")).toContain(
+                found.rows[0].stockLevelId,
+            );
+        } finally {
+            spy.mockRestore();
+        }
     });
 });

@@ -4,6 +4,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { HeldStockWatch } from "./held-stock-watch";
 import { StockChecksService } from "./stock-checks.service";
 import { StockReadsService } from "./stock-reads.service";
 import { StockTrackingService } from "./stock-tracking.service";
@@ -18,7 +19,8 @@ import { StockService } from "./stock.service";
  * code that is injected. The API reads levels, the log and the checks, and
  * writes counts, entries, moves and undos through those rules — behind the
  * organization guard and the COMMERCE module guard, as the products
- * module's organization routes are.
+ * module's organization routes are. `HeldStockWatch` logs, when the API
+ * starts, any row whose promised its open orders don't hold.
  */
 @Module({
     imports: [CapabilitiesModule, forwardRef(() => OrganizationsModule)],
@@ -29,6 +31,7 @@ import { StockService } from "./stock.service";
         StockWritesService,
         StockChecksService,
         StockTrackingService,
+        HeldStockWatch,
         IdempotencyService,
         OrganizationGuard,
     ],
