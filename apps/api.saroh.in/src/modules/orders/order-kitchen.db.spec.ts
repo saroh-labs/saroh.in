@@ -805,4 +805,74 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
         });
         expect(row.paymentStatus).toBe("PAID");
     });
+
+    it("paid anyway before payments on replaced charges were invoiced: its refund credits nothing", async () => {
+        // ₹610 paid and invoiced; +₹120 (unpaid), then back to ₹610.
+        const order = await paidOrder();
+        const { id: invoiceId } = (await prisma.$transaction((tx) =>
+            ensureOrderInvoice(tx, order.id),
+        ))!;
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 4 }],
+        });
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 3 }],
+        });
+        await nameApart(order.id);
+        const [old] = await differenceIntents(order.id);
+        expect(old!.status).toBe("SUPERSEDED");
+
+        // The capture as it was recorded before its payment was invoiced:
+        // owed back, and no supplementary invoice for it.
+        await prisma.paymentAttempt.create({
+            data: {
+                organizationId: owner.organizationId,
+                paymentIntentId: old!.id,
+                provider: "RAZORPAY",
+                providerRef: `pay_early_${order.id}`,
+                status: "CAPTURED_NEEDS_REFUND",
+                rawResponse: { intentStatus: "SUPERSEDED" },
+            },
+        });
+        const before = await prisma.invoice.findUniqueOrThrow({
+            where: { id: invoiceId },
+            select: { status: true, total: true },
+        });
+        // The edit back down already credited its own unpaid supplementary.
+        const paperBefore = await prisma.invoice.count({
+            where: { orderId: order.id },
+        });
+
+        await webhook({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: `prov_${old!.id}`,
+            providerRefundId: `rfnd_early_${order.id}`,
+            refundAmountCents: 12000,
+        });
+
+        const refunds = await prisma.paymentRefund.findMany({
+            where: { paymentIntentId: old!.id },
+        });
+        expect(refunds).toHaveLength(1);
+        // Nothing of it was invoiced, so nothing is credited — least of all
+        // the sale the customer kept.
+        expect(
+            await prisma.invoice.count({
+                where: { paymentRefundId: refunds[0]!.id },
+            }),
+        ).toBe(0);
+        expect(
+            await prisma.invoice.count({ where: { orderId: order.id } }),
+        ).toBe(paperBefore);
+        const after = await prisma.invoice.findUniqueOrThrow({
+            where: { id: invoiceId },
+            select: { status: true, total: true },
+        });
+        expect(after.status).toBe(before.status);
+        expect(after.total.toString()).toBe(before.total.toString());
+        expect((await kitchen.read(owner, order.id)).money?.owedBack).toEqual(
+            [],
+        );
+    });
 });

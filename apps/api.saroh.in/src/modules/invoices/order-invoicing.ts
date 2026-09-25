@@ -487,7 +487,8 @@ export async function issueCreditNote(
  * Money handed back from a superseded edit charge is credited like any
  * other: its payment was invoiced when it came in
  * ({@link invoiceSupersededPayment}), and the credit note is spread over
- * that invoice's own lines, so the two mirror each other (#508, U8).
+ * that invoice's own lines, so the two mirror each other (#508, U8). One
+ * captured before that — no supplementary invoice — gets no credit note.
  */
 export async function creditNoteForRefund(
     tx: Tx,
@@ -526,6 +527,10 @@ export async function creditNoteForRefund(
     const paidOn = superseded
         ? await supersededPaymentInvoice(tx, orderId, refund.paymentIntent.id)
         : null;
+    // A superseded charge captured before its payments were invoiced has no
+    // supplementary to mirror: nothing of it was invoiced, so nothing is
+    // credited — not the order's own invoice, which never held it.
+    if (superseded && !paidOn) return null;
     return issueCreditNote(tx, {
         invoiceId: invoice.id,
         amountCents: refund.amountCents,
