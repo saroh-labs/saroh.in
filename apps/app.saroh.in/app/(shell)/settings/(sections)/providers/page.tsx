@@ -55,7 +55,7 @@ export default async function ProvidersSettingsPage() {
             header={
                 <SettingsPanelHeader
                     title="Providers"
-                    description="Checkout for each storefront is chosen under Sell."
+                    description="The services that keep your site, email and payments running."
                 />
             }
         >

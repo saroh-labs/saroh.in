@@ -10,8 +10,9 @@ import type {
 
 /**
  * Settings → Providers as rows ("Saroh Settings" design): one per service
- * behind the business, each saying whether it is connected, what it is
- * called at the provider's end, who uses it, and what can be done about it.
+ * behind the business, each saying what it does for the business, whether
+ * it is connected, what it is called at the provider's end, and what can be
+ * done about it.
  *
  * Built from what the page already reads — provider health, the connected
  * payment and messaging providers, the business's domains and which
@@ -62,7 +63,6 @@ export interface ProviderRow {
     note: string;
     state: ProviderRowState;
     refs: ProviderRef[];
-    usedBy: string | null;
     connections: ProviderConnection[];
     setup: ProviderSetup;
     /** What stops when it is disconnected, for the confirmation. */
@@ -157,24 +157,17 @@ function paymentsRow(h: ProviderHealth, input: ProviderRowsInput): ProviderRow {
     const live = (list ?? []).filter((p) => p.status === "CONNECTED");
     const names = live.map((p) => providerName(p.provider));
     const several = live.length > 1;
-
-    const usedBy = live
-        .map((p) => {
-            const stores = input.checkout
-                .filter((s) => s.provider === p.provider)
-                .map((s) => s.name);
-            if (stores.length === 0) return null;
-            const line = `${words(stores)} checkout`;
-            return several ? `${providerName(p.provider)}: ${line}` : line;
-        })
-        .filter((x): x is string => x !== null);
+    // The storefronts whose checkout really charges through one of them.
+    const stores = input.checkout
+        .filter((s) => live.some((p) => p.provider === s.provider))
+        .map((s) => s.name);
 
     return {
         key: "PAYMENTS",
         label: "Payments",
         note:
             state === "CONNECTED"
-                ? `Card and UPI payments at checkout, through ${words(names)}.`
+                ? `Takes card and UPI payments at ${stores.length > 0 ? words(stores) : "checkout"}, through ${words(names)}.`
                 : state === "DISCONNECTED"
                   ? "Disconnected — checkout can't take card or UPI payments until a provider is connected again."
                   : h.message,
@@ -191,7 +184,6 @@ function paymentsRow(h: ProviderHealth, input: ProviderRowsInput): ProviderRow {
                   ]
                 : [],
         ),
-        usedBy: usedBy.length > 0 ? `Used by ${usedBy.join(" · ")}` : null,
         connections: live.map((p) => ({
             name: providerName(p.provider),
             manageHref: dashboardFor(p.provider),
@@ -246,7 +238,6 @@ function messagingRow(
         refs: live.flatMap((c) =>
             c.fromAddress ? [{ label: "Sends from", code: c.fromAddress }] : [],
         ),
-        usedBy: null,
         connections: live.map((c) => ({
             name: commsProviderName(c.provider),
             manageHref: dashboardFor(c.provider),
@@ -265,16 +256,24 @@ const DOMAIN_STATUS: Record<string, string> = {
 
 function domainsRow(h: ProviderHealth, input: ProviderRowsInput): ProviderRow {
     const state = stateOfHealth(h);
+    const verified = (input.domains ?? []).filter(
+        (d) => d.status === "VERIFIED",
+    );
     return {
         key: "DOMAINS",
         label: "Domains",
-        note: h.message,
+        // What it does once it works; until then, the API's own next step.
+        note:
+            state !== "CONNECTED"
+                ? h.message
+                : verified.length === 1
+                  ? `Points ${verified[0].hostname} at your site.`
+                  : "Points your domains at your sites.",
         state,
         refs: (input.domains ?? []).map((d) => ({
             label: DOMAIN_STATUS[d.status] ?? d.status,
             code: d.hostname,
         })),
-        usedBy: null,
         // A domain belongs to a site and is removed there, with its DNS
         // record beside it — not disconnected from here.
         connections: [],
