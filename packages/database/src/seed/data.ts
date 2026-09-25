@@ -628,7 +628,12 @@ export const PLAN = {
     /** Paise, matching the schema's minor-unit convention — ₹1,499 a month. */
     priceCents: 149900,
     interval: "month",
-    entitlements: { sites: 5, teamMembers: 10, customDomain: true },
+    entitlements: {
+        sites: 5,
+        storefronts: 5,
+        teamMembers: 10,
+        customDomain: true,
+    },
 } as const;
 
 // --- Providers -----------------------------------------------------------

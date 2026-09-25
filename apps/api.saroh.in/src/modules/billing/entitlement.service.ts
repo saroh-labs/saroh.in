@@ -16,6 +16,9 @@ export type EntitlementMap = Record<string, number | boolean>;
  */
 export const FREE_ENTITLEMENTS: EntitlementMap = {
     sites: 1,
+    // Places to sell from (ADR-010): a counter and an online shop, and room
+    // to grow, before a plan is chosen.
+    storefronts: 5,
     teamMembers: 2,
     customDomain: false,
 };

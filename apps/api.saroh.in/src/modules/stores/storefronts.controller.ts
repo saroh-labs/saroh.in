@@ -40,6 +40,13 @@ export class StorefrontsController {
         return this.storefronts.list(ctx.organizationId);
     }
 
+    /** How many storefronts there are, and how many the plan allows. */
+    @Get("allowance")
+    allowance(@OrgContext() ctx: OrganizationContext) {
+        authorize(ctx, "store:read");
+        return this.storefronts.allowance(ctx.organizationId);
+    }
+
     @Get(":storeId")
     get(
         @OrgContext() ctx: OrganizationContext,
