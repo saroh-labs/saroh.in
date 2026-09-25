@@ -1,3 +1,4 @@
+import { holdOpenLines } from "../backfill/held-stock";
 import { assertDatabaseTarget } from "../database-target";
 import {
     ANALYTICS_DAYS,
@@ -32,6 +33,7 @@ import {
 } from "./data";
 import type { Db } from "./helpers";
 import {
+    assertHeldStock,
     at,
     balanceStockLog,
     buildAnalyticsRows,
@@ -252,6 +254,7 @@ export async function seed(): Promise<void> {
 
     // Every shelf the seed set opens its stock log (#513).
     await balanceStockLog(prisma, org.id);
+    await assertHeldStock(prisma, org.id);
     await report(prisma, org.id);
 }
 
@@ -585,13 +588,16 @@ async function seedCommerce(
 
         // Counted as a whole, not per variant. Deliberately includes a zero
         // and two near-zero quantities, so the out-of-stock and low-stock
-        // presentations have something to render.
+        // presentations have something to render. `stock` is what the
+        // storefront can sell: the open orders below hold their units on
+        // top of it (holdOpenLines), so a zero stays sold out, not short.
         await setStockLevel(prisma, {
             id: id("stocklevel", i),
             orgId,
             storeId: store.id,
             productId: product.id,
             onHand: p.stock,
+            promised: 0,
         });
     }
 
@@ -672,6 +678,14 @@ async function seedCommerce(
             },
         });
     }
+
+    // Open orders hold their units, as the order form's reserve does, and
+    // closed ones hold nothing (#511) — every seeded order in the business,
+    // the showcase's included, so a re-seed never leaves a stale hold.
+    await holdOpenLines(prisma, {
+        organizationId: orgId,
+        orderIdPrefix: SEED_PREFIX,
+    });
 
     return store.id;
 }

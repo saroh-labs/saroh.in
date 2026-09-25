@@ -115,12 +115,15 @@ export async function upsertCatalog(
                     })),
                 });
                 // Counted as a whole, as the base seed counts its products.
+                // `stock` is what the storefront can sell; the caller's open
+                // orders hold on top of it (holdOpenLines).
                 await setStockLevel(prisma, {
                     id: options.stockLevelId(i),
                     orgId,
                     storeId,
                     productId: product.id,
                     onHand: p.stock,
+                    promised: 0,
                 });
                 return {
                     id: product.id,

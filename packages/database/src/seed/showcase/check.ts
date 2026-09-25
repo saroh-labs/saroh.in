@@ -1,3 +1,4 @@
+import { heldStockMismatches } from "../../backfill/held-stock";
 import type { Db } from "../helpers";
 import {
     gstin as gstinFor,
@@ -431,6 +432,33 @@ export async function checkShowcase(
             wrong.map((s) => ({ id: s.id })),
         );
     }
+
+    // Stock (#511, #513): each shelf row promises exactly what its open
+    // orders' lines hold, a closed order's line holds nothing, and each
+    // row's stock log adds up to what is on it. A row promising units no
+    // line holds is the state that made a cancel give back, or a fulfilment
+    // sell, units nobody promised.
+    const held = await heldStockMismatches(prisma, orgs);
+    fail(
+        "shelf rows whose promised is not what open orders hold",
+        held.rows as unknown as Row[],
+    );
+    fail(
+        "order lines holding stock they can't (closed, or on no row)",
+        held.lines as unknown as Row[],
+    );
+    fail(
+        "shelf rows whose stock log does not add up to on hand",
+        await prisma.$queryRaw<Row[]>`
+            SELECT s.id, s."onHand", COALESCE(e.total, 0) AS logged
+            FROM "StockLevel" s
+            LEFT JOIN (
+                SELECT "stockLevelId", SUM(quantity)::int AS total
+                FROM "StockEntry" GROUP BY "stockLevelId"
+            ) e ON e."stockLevelId" = s.id
+            WHERE s."organizationId" = ANY(${orgs})
+              AND COALESCE(e.total, 0) <> s."onHand"`,
+    );
 
     if (failures.length > 0) {
         throw new Error(

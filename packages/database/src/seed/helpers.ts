@@ -2,6 +2,10 @@ import type { Prisma } from "@prisma/client";
 import { hashPassword as hashPasswordUntyped } from "better-auth/crypto";
 
 import { parseSectionContentOrThrow } from "@saroh/block-contract";
+import {
+    describeHeldStockMismatches,
+    heldStockMismatches,
+} from "../backfill/held-stock";
 import type { SeedSection, SeedSite } from "./data";
 import { SEED_PREFIX, SEEDED_STYLE_VARIABLES } from "./data";
 
@@ -665,6 +669,24 @@ export async function setStockLevel(
         },
     });
     return a.id;
+}
+
+/**
+ * Stop the seed when a shelf row's promised is not what its open lines hold,
+ * or a closed order's line still holds units (#511) — the state that made a
+ * cancel release, or a fulfilment sell, units nobody promised.
+ */
+export async function assertHeldStock(
+    prisma: Db,
+    organizationId: string,
+): Promise<void> {
+    const found = await heldStockMismatches(prisma, [organizationId]);
+    const said = describeHeldStockMismatches(found);
+    if (said.length > 0) {
+        throw new Error(
+            `${said.length} shelf row(s) or line(s) in ${organizationId} don't match what open orders hold:\n  - ${said.slice(0, 10).join("\n  - ")}`,
+        );
+    }
 }
 
 /**

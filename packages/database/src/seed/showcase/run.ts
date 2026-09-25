@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { holdOpenLines } from "../../backfill/held-stock";
 import { assertDatabaseTarget } from "../../database-target";
 import {
     ANALYTICS_DAYS,
@@ -7,6 +8,7 @@ import {
     CONTACTS as BASE_CONTACTS,
     OWNER_EMAIL,
     PLAN,
+    SEED_PREFIX,
 } from "../data";
 import type { Db } from "../helpers";
 import {
@@ -581,6 +583,12 @@ async function seedNorthwind(
         customerCreatedAt,
     );
     await writeOrders(ctx, key, planned);
+    // The open ones hold their units, as the order form's reserve does
+    // (#511); what each product can sell stays its catalogue `stock`.
+    await holdOpenLines(prisma, {
+        organizationId: orgId,
+        orderIdPrefix: SEED_PREFIX,
+    });
 
     // CRM: the best customers are contacts too, plus prospects not yet buying.
     const prospects = makePeople(
