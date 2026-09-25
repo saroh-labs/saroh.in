@@ -38,10 +38,11 @@
  *
  * Run: `pnpm --filter @saroh/database exec tsx src/backfill/merge-same-products.cli.ts`
  */
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 
 import type { TransactionClient } from "../transaction";
-import { mergeProductInto, type Discarded } from "./merge-same-products.move";
+import type { Discarded } from "./merge-same-products.move";
+import { mergeProductInto } from "./merge-same-products.move";
 
 /** The audit action the report is written under, and the notice's type. */
 export const MERGE_REPORT_ACTION = "catalogue.products.merged";
@@ -403,7 +404,9 @@ async function writeReport(
             organizationId: report.organizationId,
             targetType: "catalogue",
             outcome: "SUCCESS",
-            metadata: JSON.parse(JSON.stringify(report)),
+            metadata: JSON.parse(
+                JSON.stringify(report),
+            ) as Prisma.InputJsonValue,
         },
     });
     await tx.notification.create({

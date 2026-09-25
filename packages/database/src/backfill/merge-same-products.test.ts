@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-    type Candidate,
-    clusters,
-    noticeText,
-    whyApart,
-} from "./merge-same-products";
+import type { Candidate } from "./merge-same-products";
+import { clusters, noticeText, whyApart } from "./merge-same-products";
 
 const m = (s: string) => ({ toFixed: (d: number) => Number(s).toFixed(d) });
 

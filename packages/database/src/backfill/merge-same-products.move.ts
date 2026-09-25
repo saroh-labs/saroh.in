@@ -21,7 +21,6 @@
  * removing it cascades nothing away, and removes it. Every value that did
  * not survive comes back for the report.
  */
-import type { Prisma } from "@prisma/client";
 
 import type { TransactionClient } from "../transaction";
 
@@ -124,7 +123,7 @@ export async function mergeProductInto(
     if (Object.keys(fill).length > 0) {
         await tx.product.update({
             where: { id: survivorId },
-            data: fill as Prisma.ProductUncheckedUpdateInput,
+            data: fill,
         });
     }
     for (const v of loser.variants) {
@@ -301,7 +300,7 @@ async function movePhotos(
         const same = kept.find(
             (k) =>
                 k.kind === image.kind &&
-                ((image.mediaId && k.mediaId === image.mediaId) ||
+                ((!!image.mediaId && k.mediaId === image.mediaId) ||
                     k.url === image.url),
         );
         if (same) {

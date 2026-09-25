@@ -150,7 +150,7 @@ Products v2 (#481) shipped from earlier versions of the four product designs. Th
 ### Deferred to Implementation
 
 - Exact index and constraint names; whether each backfill fits one script or two after timing it on a production-sized copy.
-- Whether the merge report is a one-off banner or an Activity entry (U20, with real seed data); either way Owner/Admin only.
+- ~~Whether the merge report is a one-off banner or an Activity entry (U20, with real seed data); either way Owner/Admin only.~~ Resolved in U20: an entry, not a banner — the full report in the audit stream (`catalogue.products.merged`, read at `GET /organizations/:id/catalogue/merge-report` with `audit:read`) and one notice in the Owner/Admin inbox (`notification:read`), which the header's bell badge shows on every page. No banner state to build or dismiss.
 - Poster capture on browsers without frame access: fall back to a generic poster.
 - Whether legacy StoreOwner/StoreMember grants carry `inventory:write` on organization routes or are migrated to memberships first.
 

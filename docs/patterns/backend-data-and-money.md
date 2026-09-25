@@ -53,6 +53,15 @@
   old-shape rows, run it twice and check the second run changes nothing
   (`catalogue-settings.ts`). The migration that depends on it refuses to run,
   before changing anything, while its precondition fails.
+- **Current** — **Joining two rows re-points everything first, then proves
+  nothing is left** (#530, `merge-same-products.ts`): a product merge moves
+  order lines, shelves, listings, reviews, photos, codes, field values and
+  allergens onto the survivor, counts what still names the loser, and throws
+  — rolling back the business — rather than let a cascade delete it. A merge
+  that would widen a live discount's reach is skipped. What a backfill tells
+  a business goes in the audit stream (the full report, read with
+  `audit:read`) plus one notice in the Owner/Admin inbox, so it is seen
+  without a banner to build and dismiss.
 
 ## Money — **Current**
 
