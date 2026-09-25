@@ -35,9 +35,12 @@ export const ACTIVITY_ACTIONS = [
 /** Someone an event names, as they are now; `null` when they are gone. */
 export interface AuditPerson {
     name: string | null;
-    email: string;
+    /** Null for Saroh support, whose operator is not named. */
+    email: string | null;
     /** Their role key here now; null when they left. Absent from an older API. */
     role?: string | null;
+    /** A change Saroh support made for the business. */
+    operator?: true;
 }
 
 /** One row of `GET /organizations/:id/audit`. */

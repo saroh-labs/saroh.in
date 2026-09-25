@@ -69,6 +69,28 @@ describe("activityDetail — who", () => {
         ).toBe("Floor staff");
     });
 
+    it("names Saroh support for an operator's change, with no email and not as someone who left", () => {
+        expect(
+            activityDetail(
+                event({
+                    action: "organization.plan.changed",
+                    actor: {
+                        name: "Saroh support",
+                        email: null,
+                        role: null,
+                        operator: true,
+                    },
+                }),
+                KOLKATA,
+            ).who,
+        ).toEqual({
+            name: "Saroh support",
+            email: null,
+            role: null,
+            gone: false,
+        });
+    });
+
     it("does not repeat an email that is the name, nor call an older row's actor gone", () => {
         expect(
             activityDetail(

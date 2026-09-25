@@ -247,6 +247,57 @@ describe("AuditService.listForOrganization — who each event names", () => {
     });
 });
 
+describe("AuditService.listForOrganization — a Saroh operator's change", () => {
+    it("is Saroh support's: the operator's name and email are never read or returned", async () => {
+        jest.clearAllMocks();
+        findMany.mockResolvedValue([
+            {
+                id: "e1",
+                action: "organization.plan.changed",
+                actorUserId: "u_staff",
+                targetType: "organization",
+                targetId: "org_1",
+                metadata: { from: "Free", to: "Pro", byOperator: true },
+            },
+            {
+                id: "e2",
+                action: "profile.update",
+                actorUserId: "u_priya",
+                targetType: "organization",
+                targetId: "org_1",
+                metadata: { fields: ["name"] },
+            },
+        ]);
+        findUsers.mockResolvedValue([
+            { id: "u_staff", name: "Staff Person", email: "ops@saroh.in" },
+            { id: "u_priya", name: "Priya", email: "priya@rye.in" },
+        ]);
+        findMemberships.mockResolvedValue([
+            { userId: "u_priya", role: "OWNER" },
+        ]);
+
+        const { events } = await new AuditService().listForOrganization(
+            "org_1",
+        );
+
+        // The operator is not even looked up.
+        expect(findUsers.mock.calls[0][0].where.id.in).toEqual(["u_priya"]);
+        expect(events[0].actor).toEqual({
+            name: "Saroh support",
+            email: null,
+            role: null,
+            operator: true,
+        });
+        expect(JSON.stringify(events)).not.toContain("ops@saroh.in");
+        expect(JSON.stringify(events)).not.toContain("Staff Person");
+        expect(events[1].actor).toEqual({
+            name: "Priya",
+            email: "priya@rye.in",
+            role: "OWNER",
+        });
+    });
+});
+
 describe("AuditService.listForOrganization — what a change recorded", () => {
     it("returns the metadata as recorded: the fields and their values", async () => {
         jest.clearAllMocks();

@@ -198,8 +198,9 @@ export function activityDetail(
             name: name ?? "Someone no longer here",
             email: actor && actor.email !== name ? actor.email : null,
             role: roleName(actor?.role, roleLabels),
-            // An older API sends no role at all: that is not having left.
-            gone: !actor || actor.role === null,
+            // An older API sends no role at all: that is not having left;
+            // nor is Saroh support, which was never on the team.
+            gone: !actor || (actor.role === null && !actor.operator),
         },
         changes: rows,
         withoutValues,
