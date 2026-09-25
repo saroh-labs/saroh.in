@@ -131,8 +131,10 @@ export function YourProfile({
                         role="row"
                         className="grid grid-cols-[minmax(0,1fr)_repeat(3,56px)] items-center px-[18px] py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:grid-cols-[minmax(0,1fr)_repeat(3,76px)]"
                     >
-                        <span role="columnheader" className="sr-only">
-                            Alert
+                        {/* In the grid's flow, so the channel headings sit over
+                            their switches; only the word is hidden. */}
+                        <span role="columnheader">
+                            <span className="sr-only">Alert</span>
                         </span>
                         {ALERT_CHANNELS.map((channel) => (
                             <span
