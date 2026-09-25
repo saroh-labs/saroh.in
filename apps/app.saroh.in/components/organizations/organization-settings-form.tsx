@@ -30,7 +30,7 @@ import {
     ADDRESS_API_KEY,
     ADDRESS_KEYS,
     registeredAddressShape,
-} from "@/components/organizations/registered-address-fields";
+} from "@/components/organizations/registered-address-shape";
 import {
     LeaveDialog,
     useLeaveGuard,
@@ -288,6 +288,11 @@ function gstStateOf(v: Pick<FormValues, "gstState" | "taxId">): {
     return { name: stateName(v.gstState), fromGstin: false };
 }
 
+/** A business's state as printed: none for an address outside India. */
+function indianState(v: Pick<FormValues, "gstState" | "country">): string {
+    return ["", "IN"].includes(v.country ?? "") ? stateName(v.gstState) : "";
+}
+
 function addressText(v: FormValues): string {
     // As the API prints it: no first line, no address.
     if (!v.addressLine1.trim()) return "";
@@ -295,7 +300,7 @@ function addressText(v: FormValues): string {
         v.addressLine1,
         v.addressLine2,
         [v.city, v.postalCode].filter((x) => x.trim()).join(" "),
-        v.gstRegistered ? gstStateOf(v).name : stateName(v.gstState),
+        v.gstRegistered ? gstStateOf(v).name : indianState(v),
     ]
         .map((x) => x.trim())
         .filter((x) => x !== "")
@@ -642,7 +647,7 @@ export function OrganizationSettingsForm({
 
     const liveState = registered
         ? gstStateOf(v)
-        : { name: stateName(v.gstState), fromGstin: false };
+        : { name: indianState(v), fromGstin: false };
     const tabIndex = SECTION_KEYS.indexOf(tab);
     const onTabKeys = (e: React.KeyboardEvent) => {
         const n = SECTION_KEYS.length;
