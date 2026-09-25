@@ -24,6 +24,7 @@ import type { PaymentStatus } from "../orders/dto";
 import { assertPaymentTransition } from "../orders/order-state";
 import { SUPERSEDED_INTENT } from "../payments/intent-state";
 import { PaymentsService } from "../payments/payments.service";
+import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
 import type {
     NormalizedWebhookEvent,
     WebhookHeaders,
@@ -536,6 +537,13 @@ export class WebhooksService {
         orderId: string,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
+        // Lock order (#511): Order → its StockLevel rows → PaymentRefund →
+        // intent → Invoice, the order a cancel and a refund request take
+        // too. The order id came from the intent, read without a lock; the
+        // refund row is locked only after these (matchRefund), so a refund
+        // settling and a cancel on one order take turns, never deadlock.
+        await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+        await lockOrderShelves(tx, orderId);
         // Guard FIRST: a refund on an order that was never paid (UNPAID→
         // REFUNDED) is illegal and throws before any refund write. PAID and
         // already-REFUNDED orders pass.
@@ -548,11 +556,20 @@ export class WebhooksService {
         if (current !== "REFUNDED" && current !== "PAID") {
             assertPaymentTransition(current, "REFUNDED");
         }
-        const { applied, refundId } = await this.settleRefund(
+        const { applied, refundId, settledNow } = await this.settleRefund(
             tx,
             intent,
             event,
         );
+        const full = await this.fullyRefunded(tx, orderId);
+        // Stock follows a refund only in the transaction that moves it into
+        // SUCCEEDED (DEC-026): its lines give back what they still hold and
+        // put back what was asked. A redelivery finds it settled already.
+        if (refundId && settledNow) {
+            await settleRefundStock(tx, refundId, {
+                orderFullyRefunded: full,
+            });
+        }
         // The refund's credit note on the order's invoice (ADR-008) — made
         // here when the refund started outside Saroh, or when the refund
         // path could not make it; keyed on the refund, so never twice.
@@ -561,7 +578,7 @@ export class WebhooksService {
         // REFUNDED only once every rupee taken has gone back. Until then it
         // stays PAID and reads "partly refunded", derived from the sums.
         const moved =
-            current === "PAID" && (await this.fullyRefunded(tx, orderId))
+            current === "PAID" && full
                 ? await this.moveOrderPayment(tx, orderId, "REFUNDED")
                 : false;
         // Refunded in full: whatever of the invoice no refund credited is
@@ -605,14 +622,23 @@ export class WebhooksService {
         tx: Tx,
         intent: IntentRow,
         event: NormalizedWebhookEvent,
-    ): Promise<{ applied: boolean; refundId: string | null }> {
+    ): Promise<{
+        applied: boolean;
+        refundId: string | null;
+        /** This call moved the refund into SUCCEEDED (or recorded it so). */
+        settledNow: boolean;
+    }> {
         if (!event.providerRefundId && !event.refundReference) {
-            return { applied: false, refundId: null };
+            return { applied: false, refundId: null, settledNow: false };
         }
         const existing = await this.matchRefund(tx, intent, event);
         if (existing) {
             if (existing.status === "SUCCEEDED") {
-                return { applied: false, refundId: existing.id };
+                return {
+                    applied: false,
+                    refundId: existing.id,
+                    settledNow: false,
+                };
             }
             if (existing.status === "FAILED") {
                 // Saroh freed this money; the provider says it went back.
@@ -656,12 +682,14 @@ export class WebhooksService {
                     },
                 });
             }
-            return { applied: true, refundId: existing.id };
+            return { applied: true, refundId: existing.id, settledNow: true };
         }
         // Made outside Saroh (the provider's dashboard): recorded at what the
         // provider refunded. Only an event with no amount falls back to the
         // whole payment — and says so.
-        if (!event.providerRefundId) return { applied: false, refundId: null };
+        if (!event.providerRefundId) {
+            return { applied: false, refundId: null, settledNow: false };
+        }
         let amountCents = event.refundAmountCents;
         if (amountCents === undefined) {
             this.logger.warn(
@@ -679,7 +707,7 @@ export class WebhooksService {
                 providerRefundId: event.providerRefundId,
             },
         });
-        return { applied: true, refundId: created.id };
+        return { applied: true, refundId: created.id, settledNow: true };
     }
 
     /**

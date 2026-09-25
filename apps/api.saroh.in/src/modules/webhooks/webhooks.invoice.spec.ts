@@ -10,6 +10,13 @@ jest.mock("../../env", () => ({
     },
 }));
 
+// The shelf a confirmed refund moves (#511) is specced against a real
+// database (stock/reserve.db.spec.ts); here each call is recorded.
+jest.mock("../stock/reserve", () => ({
+    lockOrderShelves: jest.fn().mockResolvedValue(undefined),
+    settleRefundStock: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {

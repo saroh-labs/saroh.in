@@ -101,6 +101,18 @@ export class RefundLineInput {
     quantity!: number;
 }
 
+/** Units of a line a refund puts back on the shelf (#511). */
+export class RefundPutBackInput {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    itemId!: string;
+
+    @IsInt({ message: "Quantity must be a whole number" })
+    @Min(1, { message: "Put back at least one" })
+    quantity!: number;
+}
+
 /**
  * Initiate a refund against an Order's successful payment (S5-003), by line
  * (ADR-008, U6).
@@ -124,6 +136,17 @@ export class RefundOrderDto {
     @ValidateNested({ each: true })
     @Type(() => RefundLineInput)
     lines?: RefundLineInput[];
+
+    /**
+     * "Put N back in stock" (#511), off unless sent: units of refunded lines
+     * that go back on the shelf once the provider confirms the refund. Each
+     * is capped at what the line sold less what went back already.
+     */
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => RefundPutBackInput)
+    putBack?: RefundPutBackInput[];
 
     @IsOptional()
     @Transform(trim)

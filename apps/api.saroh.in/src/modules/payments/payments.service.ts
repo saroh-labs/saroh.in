@@ -26,6 +26,7 @@ import {
 } from "../orders/order-refunds";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
+import { assertPutBack, returnableUnits } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
 import type {
     MerchantProvider,
@@ -54,6 +55,11 @@ export interface RefundRequest {
     reason?: string;
     /** Lines and how many of each; none means everything left. */
     lines?: LineRefundRequest[];
+    /**
+     * "Put N back in stock" (#511): units of the refunded lines that go back
+     * on the shelf when the provider confirms the refund. Off unless sent.
+     */
+    putBack?: { itemId: string; quantity: number }[];
     /** A retry with the same key returns the first refund. */
     idempotencyKey?: string;
 }
@@ -197,6 +203,53 @@ async function refundableLines(
         unitCents: totalToCents(i.price),
         refundedQuantity: i.refundLines.reduce((s, r) => s + r.quantity, 0),
         refundedCents: i.refundLines.reduce((s, r) => s + r.amountCents, 0),
+    }));
+}
+
+/**
+ * "Put N back in stock" on a refund's lines (#511): each put-back names a
+ * line this refund covers, no more units than it refunds of it, and no more
+ * than the line sold less what refunds already put back — checked under the
+ * order's row lock, like the money.
+ */
+async function planPutBack(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    planned: PlannedLineRefund[],
+    putBack: readonly { itemId: string; quantity: number }[],
+): Promise<(PlannedLineRefund & { putBackQuantity: number })[]> {
+    const asked = new Map<string, number>();
+    for (const p of putBack) {
+        if (asked.has(p.itemId)) {
+            throw new BadRequestException({
+                message: "Name each line once.",
+                field: "putBack",
+            });
+        }
+        const line = planned.find((l) => l.itemId === p.itemId);
+        if (!line) {
+            throw new BadRequestException({
+                message: "Only a line being refunded can go back in stock.",
+                field: "putBack",
+            });
+        }
+        if (p.quantity > line.quantity) {
+            throw new BadRequestException({
+                message: "Put back no more than is being refunded.",
+                field: "putBack",
+            });
+        }
+        asked.set(p.itemId, p.quantity);
+    }
+    if (asked.size > 0) {
+        assertPutBack(
+            await returnableUnits(tx, orderId),
+            Array.from(asked, ([itemId, quantity]) => ({ itemId, quantity })),
+        );
+    }
+    return planned.map((l) => ({
+        ...l,
+        putBackQuantity: asked.get(l.itemId) ?? 0,
     }));
 }
 
@@ -501,6 +554,7 @@ export class PaymentsService {
         authorize(ctx, "payment:manage");
         const order = await this.requireOwnedOrder(ctx, orderId);
         const lines = input.lines;
+        const putBack = (input.putBack ?? []).filter((p) => p.quantity > 0);
         return this.refundOrder(ctx, order, {
             idempotencyKey: input.idempotencyKey,
             reason: input.reason ?? null,
@@ -508,26 +562,28 @@ export class PaymentsService {
             plan: async (tx) => {
                 const refundable = await refundableLines(tx, order.id);
                 const discountCents = totalToCents(order.discount);
-                if (lines && lines.length > 0) {
-                    const planned = planLineRefund(
-                        refundable,
-                        discountCents,
-                        lines,
-                    );
-                    return {
-                        amountCents: planned.reduce(
-                            (s, l) => s + l.amountCents,
-                            0,
-                        ),
-                        lines: planned,
-                    };
-                }
-                // In full: whatever is left of the payments, recorded
-                // against whatever is left of the lines.
-                return {
-                    amountCents: "REMAINING",
-                    lines: planRemainingLines(refundable, discountCents),
-                };
+                const planned =
+                    lines && lines.length > 0
+                        ? planLineRefund(refundable, discountCents, lines)
+                        : // In full: whatever is left of the lines.
+                          planRemainingLines(refundable, discountCents);
+                const withPutBack = await planPutBack(
+                    tx,
+                    order.id,
+                    planned,
+                    putBack,
+                );
+                return lines && lines.length > 0
+                    ? {
+                          amountCents: planned.reduce(
+                              (s, l) => s + l.amountCents,
+                              0,
+                          ),
+                          lines: withPutBack,
+                      }
+                    : // Whatever is left of the payments, recorded against
+                      // whatever is left of the lines.
+                      { amountCents: "REMAINING", lines: withPutBack };
             },
         });
     }
@@ -665,6 +721,54 @@ export class PaymentsService {
         return refundResult([outcome.row]);
     }
 
+    /**
+     * Send the automatic refund `reserveOnPayment` recorded when a payment
+     * lost the last unit (#511, DEC-032): the whole payment, under the
+     * refund row's id as Saroh's reference — the row is unique per intent
+     * (`sold-out:<intent>`), so a repeat sends the same refund, which the
+     * provider makes once. Only a PENDING row not yet taken is sent; the
+     * refund webhook confirms it (DEC-026). No person asked for it, so no
+     * permission — the caller is the payment webhook.
+     */
+    async sendAutomaticRefund(
+        organizationId: string,
+        refundId: string,
+    ): Promise<InitiateRefundResult> {
+        const row = await prisma.paymentRefund.findFirst({
+            where: { id: refundId, organizationId },
+            include: {
+                ...REFUND_ROW_INCLUDE,
+                paymentIntent: {
+                    select: {
+                        id: true,
+                        orderId: true,
+                        provider: true,
+                        providerIntentId: true,
+                        currency: true,
+                    },
+                },
+            },
+        });
+        if (!row) throw new NotFoundException("Refund not found");
+        if (row.status !== "PENDING" || row.providerRefundId) {
+            return refundResult([row]);
+        }
+        const outcome = await this.sendRefund(
+            organizationId,
+            row,
+            row.paymentIntent,
+        );
+        if (outcome.kind === "ACCEPTED" && row.paymentIntent.orderId) {
+            await this.recordRefundTaken(
+                { organizationId, userId: null },
+                row.paymentIntent.orderId,
+                row.reason,
+                [outcome],
+            );
+        }
+        return refundResult([outcome.row]);
+    }
+
     /** The shared two-phase refund core — see {@link initiateRefund}. */
     private async refundOrder(
         ctx: OrganizationContext,
@@ -675,7 +779,7 @@ export class PaymentsService {
             forEdit: boolean;
             plan: (tx: Prisma.TransactionClient) => Promise<{
                 amountCents: number | "REMAINING";
-                lines: PlannedLineRefund[];
+                lines: (PlannedLineRefund & { putBackQuantity?: number })[];
             }>;
         },
     ): Promise<InitiateRefundResult> {
@@ -782,6 +886,8 @@ export class PaymentsService {
                                               orderItemId: l.itemId,
                                               quantity: l.quantity,
                                               amountCents: l.amountCents,
+                                              putBackQuantity:
+                                                  l.putBackQuantity ?? 0,
                                           })),
                                       },
                                   }
@@ -931,7 +1037,7 @@ export class PaymentsService {
      * webhook settled first had its step written there (DEC-026).
      */
     private async recordRefundTaken(
-        ctx: OrganizationContext,
+        ctx: { organizationId: string; userId: string | null },
         orderId: string,
         reason: string | null,
         taken: { row: RefundRow; attached: boolean }[],
