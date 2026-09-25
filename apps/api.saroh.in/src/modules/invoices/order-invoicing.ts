@@ -1,5 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
+import { SUPERSEDED_INTENT } from "../payments/intent-state";
 import { bpsToRate, rateToBps } from "./gst";
 import { stateName } from "./gst-states";
 import type { InvoiceKind } from "./numbering";
@@ -452,7 +453,7 @@ export async function creditNoteForRefund(
             forEdit: true,
             reason: true,
             status: true,
-            paymentIntent: { select: { orderId: true } },
+            paymentIntent: { select: { orderId: true, status: true } },
             lines: {
                 select: {
                     orderItemId: true,
@@ -463,6 +464,9 @@ export async function creditNoteForRefund(
         },
     });
     if (!refund || refund.forEdit || refund.status === "FAILED") return null;
+    // Money paid on a superseded edit charge was never the order's, nor on
+    // its invoice: handing it back credits nothing (#508, U8).
+    if (refund.paymentIntent.status === SUPERSEDED_INTENT) return null;
     const orderId = refund.paymentIntent.orderId;
     if (!orderId) return null;
     const invoice = await tx.invoice.findFirst({

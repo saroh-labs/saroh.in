@@ -88,6 +88,12 @@ export interface OrderReadMoney {
      * API asks the provider first, so nothing is sent twice.
      */
     refundsBeingConfirmed: { id: string; amount: string }[];
+    /**
+     * Paid on an edit's charge that a later edit replaced: not counted in
+     * `paid`, and owed back to the customer until a refund for it is on
+     * record. Absent from an API older than #508.
+     */
+    owedBack?: { id: string; amount: string }[];
 }
 
 export interface OrderReadInvoice {

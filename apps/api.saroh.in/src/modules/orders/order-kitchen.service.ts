@@ -16,6 +16,11 @@ import {
     loadTaxProfile,
 } from "../invoices/order-invoicing";
 import { allows, authorize } from "../organizations/organization-policy";
+import {
+    DIFFERENCE_KEY_PREFIX,
+    owedBackOn,
+    supersedeOpenDifferenceIntents,
+} from "../payments/intent-state";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
 import type { EditOrderDto, MoveStageDto } from "./dto";
@@ -93,8 +98,12 @@ export class OrderKitchenService {
                       select: { id: true, name: true },
                   })
                 : [];
+        const money = allows(ctx, "payment:read");
         return serializeOrderRead(order, {
-            money: allows(ctx, "payment:read"),
+            money,
+            owedBack: money
+                ? await owedBackOn(prisma, ctx.organizationId, order.id)
+                : [],
             fullRead: allows(ctx, "order:read"),
             invoiceRead: allows(ctx, "invoice:read"),
             actors: new Map(actors.map((a) => [a.id, a.name])),
@@ -253,8 +262,9 @@ export class OrderKitchenService {
      * cancelled. Stock follows each line on the row it recorded. When the
      * total changes on an order that was paid, the difference is taken (a
      * payment on the order for exactly that amount) or handed back (a refund
-     * marked as for the edit), which also needs `payment:manage`. An unpaid
-     * order just costs the new total.
+     * marked as for the edit), which also needs `payment:manage`. An earlier
+     * edit's charge still unpaid is superseded, so one charge at most is ever
+     * open for the difference. An unpaid order just costs the new total.
      *
      * The order and its stock change in one transaction; the money moves
      * after it commits, because a provider call does not belong inside a row
@@ -556,6 +566,14 @@ export class OrderKitchenService {
             // was paid for, not the total), so only edit refunds count.
             let settleCents = 0;
             if (touchesItems && paid) {
+                // An earlier edit's charge still open asks for a difference
+                // this edit replaces: superseded first, so only the charge
+                // made below (if any) is left to pay.
+                await supersedeOpenDifferenceIntents(
+                    tx,
+                    ctx.organizationId,
+                    order.id,
+                );
                 const ledger = await tx.paymentIntent.findMany({
                     where: {
                         orderId: order.id,
@@ -622,7 +640,7 @@ export class OrderKitchenService {
         } | null = null;
         let moneyError: string | null = null;
         if (result.settleCents !== 0) {
-            const key = `order-edit:${result.eventId}`;
+            const key = `${DIFFERENCE_KEY_PREFIX}${result.eventId}`;
             try {
                 if (!this.payments) {
                     throw new Error("Payments are not available");

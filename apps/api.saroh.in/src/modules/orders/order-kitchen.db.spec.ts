@@ -500,3 +500,118 @@ describe("editing before preparing (real database)", () => {
         ).rejects.toThrow(/before the order starts preparing/);
     });
 });
+
+describe("a later edit supersedes an unpaid difference (real database)", () => {
+    /** The order's edit charges, oldest first. */
+    async function differenceIntents(orderId: string) {
+        return prisma.paymentIntent.findMany({
+            where: { orderId, idempotencyKey: { startsWith: "order-edit:" } },
+            orderBy: { createdAt: "asc" },
+            select: { id: true, amountCents: true, status: true },
+        });
+    }
+
+    /**
+     * The fake provider names every intent of an order alike; a real one
+     * does not, and the webhook finds an intent by that name.
+     */
+    async function nameApart(orderId: string) {
+        for (const i of await differenceIntents(orderId)) {
+            await prisma.paymentIntent.update({
+                where: { id: i.id },
+                data: { providerIntentId: `prov_${i.id}` },
+            });
+        }
+    }
+
+    it("edited up twice: only the latest charge is open, for the whole difference", async () => {
+        const order = await paidOrder();
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 4 }],
+        });
+        const second = await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 5 }],
+        });
+        expect(second.charge?.amountCents).toBe(24000);
+        expect(
+            (await differenceIntents(order.id)).map((i) => [
+                i.amountCents,
+                i.status,
+            ]),
+        ).toEqual([
+            [12000, "SUPERSEDED"],
+            [24000, "REQUIRES_PAYMENT"],
+        ]);
+    });
+
+    it("edited up then back down: no charge is left open, and none is made", async () => {
+        const order = await paidOrder();
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 4 }],
+        });
+        const back = await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 3 }],
+        });
+        expect(back.settleCents).toBe(0);
+        expect(back.charge).toBeNull();
+        expect(back.refund).toBeNull();
+        expect(
+            (await differenceIntents(order.id)).map((i) => i.status),
+        ).toEqual(["SUPERSEDED"]);
+        expect((await kitchen.read(owner, order.id)).money?.due).toBe("0.00");
+    });
+
+    it("paid anyway: owed back, not counted as paid, once — and cleared by its refund", async () => {
+        const order = await paidOrder();
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 4 }],
+        });
+        await kitchen.edit(owner, order.id, {
+            lines: [{ itemId: order.lines.pastry, quantity: 5 }],
+        });
+        await nameApart(order.id);
+        const [old] = await differenceIntents(order.id);
+
+        // The customer was still on the first checkout; Razorpay sends two
+        // events for the one payment.
+        for (const eventType of ["payment.captured", "order.paid"]) {
+            await webhook({
+                eventType,
+                outcome: "SUCCEEDED",
+                providerIntentId: `prov_${old!.id}`,
+                providerPaymentRef: `pay_late_${order.id}`,
+            });
+        }
+
+        const intent = await prisma.paymentIntent.findUniqueOrThrow({
+            where: { id: old!.id },
+            include: { attempts: true },
+        });
+        expect(intent.status).toBe("SUPERSEDED");
+        expect(
+            intent.attempts.filter((a) => a.status === "CAPTURED_NEEDS_REFUND"),
+        ).toHaveLength(1);
+
+        const money = (await kitchen.read(owner, order.id)).money;
+        expect(money?.paid).toBe("610.00");
+        // The latest charge is still what the order is owed.
+        expect(money?.due).toBe("240.00");
+        expect(money?.owedBack).toEqual([{ id: old!.id, amount: "120.00" }]);
+
+        // Handed back from the provider's dashboard: the webhook records the
+        // refund, and nothing is owed any more.
+        await webhook({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: `prov_${old!.id}`,
+            providerRefundId: `rfnd_late_${order.id}`,
+        });
+        const after = (await kitchen.read(owner, order.id)).money;
+        expect(after?.owedBack).toEqual([]);
+        expect(after?.refunded).toBe("0.00");
+        const row = await prisma.order.findUniqueOrThrow({
+            where: { id: order.id },
+        });
+        expect(row.paymentStatus).toBe("PAID");
+    });
+});

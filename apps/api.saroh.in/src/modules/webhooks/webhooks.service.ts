@@ -21,6 +21,7 @@ import {
 } from "../invoices/order-invoicing";
 import type { PaymentStatus } from "../orders/dto";
 import { assertPaymentTransition } from "../orders/order-state";
+import { SUPERSEDED_INTENT } from "../payments/intent-state";
 import { PaymentsService } from "../payments/payments.service";
 import type {
     NormalizedWebhookEvent,
@@ -379,10 +380,18 @@ export class WebhooksService {
 
     private async applySuccess(
         tx: Tx,
-        intent: IntentRow,
+        found: IntentRow,
         orderId: string,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
+        // The intent's status as it stands under its row lock: an edit
+        // supersedes a difference charge under the order's lock, and must not
+        // be overwritten by a payment read a moment before (#508, U8).
+        const intent = { ...found, status: await lockIntent(tx, found) };
+        if (intent.status === SUPERSEDED_INTENT) {
+            return this.applySupersededSuccess(tx, intent, orderId, event);
+        }
+
         // Order.paymentStatus → PAID FIRST, ROUTED through the state machine; an
         // illegal move throws BEFORE any intent/attempt write. A same→same
         // target (already PAID) is a guard-free no-op.
@@ -424,6 +433,48 @@ export class WebhooksService {
             }
         }
         return { applied };
+    }
+
+    /**
+     * Money arrived on an edit's difference charge that a later edit
+     * superseded (#508, U8). There is no provider cancel, so a customer
+     * still on its checkout could pay it. It is not the order's money: the
+     * intent stays SUPERSEDED — every paid sum counts SUCCEEDED intents
+     * only — the order and its invoices are left alone, and the capture is
+     * recorded as needing a refund, as an invoice paid twice is. Order
+     * Detail shows it as owed back until a refund for it is on record.
+     *
+     * A second event for the same payment (Razorpay sends `payment.captured`
+     * and `order.paid`) finds that record and changes nothing.
+     */
+    private async applySupersededSuccess(
+        tx: Tx,
+        intent: IntentRow,
+        orderId: string,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
+        const recorded = await tx.paymentAttempt.findFirst({
+            where: {
+                paymentIntentId: intent.id,
+                status: CAPTURED_NEEDS_REFUND,
+            },
+            select: { id: true },
+        });
+        if (recorded) return { applied: false };
+        await tx.paymentAttempt.create({
+            data: {
+                organizationId: intent.organizationId,
+                paymentIntentId: intent.id,
+                provider: intent.provider,
+                providerRef: event.providerPaymentRef ?? null,
+                status: CAPTURED_NEEDS_REFUND,
+                rawResponse: { intentStatus: SUPERSEDED_INTENT },
+            },
+        });
+        this.logger.warn(
+            `Payment captured on superseded charge ${intent.id} of order ${orderId}; recorded as needing a refund`,
+        );
+        return { applied: true };
     }
 
     private async applyFailure(
@@ -696,6 +747,18 @@ export class WebhooksService {
         });
         return true;
     }
+}
+
+/**
+ * Take the intent's row lock and read its status afresh. NO KEY UPDATE: it
+ * waits on an edit superseding the row, not on a refund row being inserted
+ * against it (a foreign key's KEY SHARE) under the order's lock. Falls back
+ * to the status already read when the row is gone.
+ */
+async function lockIntent(tx: Tx, intent: IntentRow): Promise<string> {
+    const rows = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM "PaymentIntent" WHERE id = ${intent.id} FOR NO KEY UPDATE`;
+    return rows[0]?.status ?? intent.status;
 }
 
 /** True for a Prisma unique-constraint violation (P2002). */

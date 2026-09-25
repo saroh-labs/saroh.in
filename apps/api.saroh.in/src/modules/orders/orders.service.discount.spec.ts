@@ -134,6 +134,28 @@ describe("OrdersService.create — a GST-registered business (ADR-008)", () => {
         });
     });
 
+    it("totals subtotal + shipping − discount, the sum the order form shows", async () => {
+        (loadTaxProfile as jest.Mock).mockResolvedValueOnce({
+            registered: true,
+            gstin: "29AAGCR4375J1ZU",
+            state: "29",
+            prefix: "RC",
+            timezone: "Asia/Kolkata",
+            deliveryRateBps: 1800,
+            deliverySac: null,
+        });
+        db.product!.findMany!.mockResolvedValue([
+            { id: "p_1", gstRate: "18.00" },
+        ]);
+        await makeService().create("st_1", "u_1", {
+            ...DTO,
+            tax: "7.20",
+            shipping: "5.00",
+            discount: "3.00",
+        });
+        expect(createData()).toMatchObject({ total: "42.00" });
+    });
+
     it("an unregistered business still adds the tax typed at checkout", async () => {
         await makeService().create("st_1", "u_1", { ...DTO, tax: "7.20" });
         expect(createData()).toMatchObject({
@@ -141,6 +163,42 @@ describe("OrdersService.create — a GST-registered business (ADR-008)", () => {
             tax: "7.20",
             total: "47.20",
         });
+    });
+});
+
+describe("OrdersService.create — delivery", () => {
+    it("refuses a delivery without an address, on the address field, creating nothing", async () => {
+        const err = await makeService()
+            .create("st_1", "u_1", { ...DTO, fulfilment: "DELIVERY" })
+            .catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect((err as BadRequestException).getResponse()).toMatchObject({
+            message: "A delivery needs an address.",
+            field: "address",
+        });
+        expect(db.order!.create).not.toHaveBeenCalled();
+    });
+
+    it("takes a delivery with an address, and a collection without one", async () => {
+        await makeService().create("st_1", "u_1", {
+            ...DTO,
+            fulfilment: "DELIVERY",
+            address: {
+                line1: "12 Church Street",
+                city: "Bengaluru",
+                state: "Karnataka",
+                postalCode: "560001",
+            },
+        });
+        expect(createData()).toMatchObject({
+            fulfilment: "DELIVERY",
+            deliveryLine1: "12 Church Street",
+        });
+        await makeService().create("st_1", "u_1", {
+            ...DTO,
+            fulfilment: "COLLECT",
+        });
+        expect(db.order!.create).toHaveBeenCalledTimes(2);
     });
 });
 

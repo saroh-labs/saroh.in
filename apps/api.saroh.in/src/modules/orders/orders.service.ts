@@ -151,6 +151,13 @@ export class OrdersService {
                 field: "customerId",
             });
         }
+        // The same rule an edit keeps: there is nowhere to deliver to.
+        if (dto.fulfilment === "DELIVERY" && !dto.address) {
+            throw new BadRequestException({
+                message: "A delivery needs an address.",
+                field: "address",
+            });
+        }
 
         const lines = await priceOrderLines(storeId, dto.items);
 
