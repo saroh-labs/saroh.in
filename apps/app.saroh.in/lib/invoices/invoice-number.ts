@@ -439,6 +439,44 @@ export function formatOf(values: {
     };
 }
 
+/**
+ * The form fields whose change re-checks the number format: the format's
+ * own, the prefix and the registration — what can make a number wrong.
+ */
+export const NUMBER_RECHECK_FIELDS = [
+    "numberParts",
+    "numberSeparator",
+    "numberDigits",
+    "numberRestart",
+    "invoicePrefix",
+    "gstRegistered",
+] as const;
+
+/**
+ * Why a save would be refused for its number format, or null. As the API
+ * does (DEC-028), the stored format is re-checked only when the save
+ * changes the format, the prefix or the registration: one saved under
+ * older, looser rules keeps numbering and never blocks a GSTIN, address or
+ * name save. `dirty` is the form's `dirtyFields`.
+ */
+export function numberFormatProblemOnSave(
+    values: {
+        numberParts: string;
+        numberSeparator: string;
+        numberDigits: string;
+        numberRestart: string;
+        invoicePrefix: string;
+        gstRegistered: boolean;
+    },
+    dirty: Readonly<Partial<Record<string, unknown>>>,
+): ReturnType<typeof numberFormatProblem> {
+    if (!NUMBER_RECHECK_FIELDS.some((key) => dirty[key])) return null;
+    return numberFormatProblem(formatOf(values), {
+        registered: values.gstRegistered,
+        prefix: prefixOf(values.invoicePrefix),
+    });
+}
+
 /** The editor's four fields for a format. */
 export function formatFields(format: NumberFormat) {
     return {

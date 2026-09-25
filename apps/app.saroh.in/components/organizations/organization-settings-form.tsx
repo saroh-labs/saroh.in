@@ -56,7 +56,7 @@ import {
     formatFields,
     formatOf,
     nextInvoiceNumber,
-    numberFormatProblem,
+    numberFormatProblemOnSave,
     prefixOf,
     RESTART_LABEL,
 } from "@/lib/invoices/invoice-number";
@@ -119,18 +119,9 @@ const formSchema = z
         for (const { path, message } of addressProblems(v)) {
             ctx.addIssue({ code: "custom", path: [path], message });
         }
-        // The API's rules for the number format, said before Save.
-        const problem = numberFormatProblem(formatOf(v), {
-            registered: v.gstRegistered,
-            prefix: prefixOf(v.invoicePrefix),
-        });
-        if (problem) {
-            ctx.addIssue({
-                code: "custom",
-                path: [problem.field],
-                message: problem.message,
-            });
-        }
+        // The number format's rules are not here: they apply only when the
+        // save changes it, the prefix or the registration, which the schema
+        // cannot see (`numberFormatProblemOnSave`, in the component).
     });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -391,14 +382,11 @@ export function OrganizationSettingsForm({
     // The number-format rules span four fields (and the prefix and GST
     // switch), but the form re-checks only the field that changed, so the
     // rule is worked out here from what is on screen: a part ticked in shows
-    // the 16-character problem and turns Save off at once.
+    // the 16-character problem and turns Save off at once. Only once the
+    // format, prefix or registration is changed, as the API re-checks it: a
+    // format saved under older rules does not hold up a GSTIN save (DEC-028).
     const numberProblem =
-        editing === "tax"
-            ? numberFormatProblem(formatOf(v), {
-                  registered: v.gstRegistered,
-                  prefix: prefixOf(v.invoicePrefix),
-              })
-            : null;
+        editing === "tax" ? numberFormatProblemOnSave(v, dirtyFields) : null;
     // Turning GST on needs a registered address, which lives on another
     // tab. When the saved one is short, its fields join the Tax card, so
     // one Save covers both rather than neither card being able to.
@@ -447,6 +435,14 @@ export function OrganizationSettingsForm({
     async function onSubmit(values: FormValues) {
         // Hours save through their own card's form.
         if (!editing || editing === "hours") return;
+        // The number format's rules, said on its field before the API would.
+        const numberRefusal = numberFormatProblemOnSave(values, dirtyFields);
+        if (numberRefusal) {
+            form.setError(numberRefusal.field, {
+                message: numberRefusal.message,
+            });
+            return;
+        }
         const profile = Object.fromEntries(
             PROFILE_KEYS.filter((key) => dirtyFields[key]).map((key) => [
                 key,
