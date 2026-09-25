@@ -296,17 +296,16 @@ export interface NavGroup {
      */
     moduleKey?: string;
     /**
-     * Set the group off from the ones above it with a rule.
+     * Rule the group off and pin it to the foot of the rail.
      *
-     * This used to be `pinToBottom`, and `mt-auto` really did glue Settings to
-     * the foot of a full-height rail. With twelve destinations that left a
-     * vertical hole in the middle of the navigation big enough to read as a
-     * rendering fault — the rail looked broken rather than organised. A hairline
-     * says "configuration is a different kind of thing" in two pixels instead of
-     * two hundred, and Settings is still always last, which is what muscle
-     * memory actually keys on.
+     * It was pinned once before, then only ruled, because the gap above it
+     * read as a rendering fault on a rail with twelve destinations. It is
+     * pinned again by choice (2026-09-25): Workspace sits at the bottom, where
+     * account-level things live, apart from running the business. The space
+     * above it is a flexible spacer, never less than the old 10px, so a rail
+     * too long for the window scrolls with the rule still in place.
      */
-    separated?: boolean;
+    pinToBottom?: boolean;
     items: NavItem[];
 }
 
@@ -556,7 +555,7 @@ export const NAV_GROUPS: NavGroup[] = [
     },
     {
         label: "Workspace",
-        separated: true,
+        pinToBottom: true,
         items: [
             /*
              * Never module-gated — Settings → Modules is where a capability
