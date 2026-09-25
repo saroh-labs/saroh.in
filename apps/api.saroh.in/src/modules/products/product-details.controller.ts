@@ -27,8 +27,12 @@ import {
 import { VariantsService } from "./variants.service";
 
 /**
- * Variants + inventory for a product. Both are scoped to a product within a
- * store; the services delegate authorization (read/write) to ProductsService.
+ * The old per-storefront addresses of a product's variants and stock, kept
+ * for one release (#531): `OrganizationProductsController` serves the same
+ * under organizations/:organizationId/products/:productId. Each resolves the
+ * product through the storefront, under the storefront's own access rules
+ * (counts under Count and move stock, `stockViaStore`), and calls the same
+ * service.
  */
 @Controller("stores/:storeId/products/:productId")
 @UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
