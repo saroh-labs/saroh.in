@@ -463,3 +463,63 @@ a POST whose `Origin` is not in `BETTER_AUTH_TRUSTED_ORIGINS` with a 403
 `API_URL` for its own API). No code change; reads work either way, which is
 why it looks like a bug in the screen.
 **Category**: local dev · `packages/auth/src/middleware.ts`
+
+## Site — a merchant's home and booking page answered 500 in production only
+
+**Problem**: After a deploy, a merchant's home page and booking page on
+`saroh.app` answered 500, while `next dev` showed them fine.
+**Root cause**: `apps/saroh.app/app/[domain]/layout.tsx` exported a
+`generateStaticParams` returning `[]` as a placeholder. An empty list is not
+harmless: it makes every tenant route an on-demand static page, and the
+renderer reads the publication with `no-store` so a publish shows at once.
+In a production build that pair is a hard error ("Page changed from static
+to dynamic at runtime"); `next dev` renders everything dynamically, so it
+never showed.
+**Fix**: No `generateStaticParams` in the tenant layout, not even an empty
+one (`d6d3672a`); tenant pages render per request. Pre-rendering, if it
+comes, needs a list of hosts and a cached read together. Check a routing
+change with `next build && next start`, not only `next dev`.
+**Category**: frontend · `apps/saroh.app/app/[domain]/layout.tsx`
+
+## CI — browser specs set in the showcase failed with a 404 or a sign-in that never landed
+
+**Problem**: The bookings, subscriptions, order, customer and product-editor
+e2e specs passed locally and failed in CI on a 404, or on signing in as
+Rye's Member.
+**Root cause**: They are set in the showcase businesses (Pulse Fitness,
+Rye & Co., Leela & Loom — `seed_sc_*`), and the CI job ran only the base
+seed, which has Northwind alone.
+**Fix**: CI runs `db:seed:showcase` (`8603c9d9`), which runs the base seed
+first so Northwind is unchanged; it is a turbo task with `^build`, like
+`db:seed`, so the block contract is built before it runs. A spec that needs
+a showcase business needs that seed wherever it runs.
+**Category**: CI · `.github/workflows/ci.yml` · `turbo.json`
+
+## E2E — a spec found the wrong order, or a customer with nothing upcoming
+
+**Problem**: e2e specs that opened a showcase order or customer by a seeded
+id passed one day and failed the next — `seed_sc_rc_order_62` was Sana's
+order, not Priya's; Meera's bookings opened on Past.
+**Root cause**: The showcase lays its diary, orders and memberships out
+relative to today, so which id holds which scene moves with the date the
+seed ran.
+**Fix**: Specs find showcase records by what they are, through the API —
+Priya's latest order from the org's orders list; a Pulse member with an
+active membership, a late cancel and a class to come (`5cfe427a`). Never
+hard-code a showcase id or date in a spec; Northwind's fixed ids are fine.
+**Category**: e2e · `e2e/tests/order-detail.spec.ts` · `e2e/tests/customer-detail.spec.ts`
+
+## Forms — Save stayed off after every field was filled in
+
+**Problem**: On Business → Tax and invoices, turning GST on with a GSTIN
+that was fixed, then the registered address filled in, left the earlier
+refusal showing and Save off, though nothing was wrong any more.
+**Root cause**: React Hook Form re-validates only the field that changed. A
+rule that spans fields (a registration needs a GSTIN and an address) put
+its error on another field, which nothing re-checked when the field it
+depends on changed.
+**Fix**: While any refusal shows, each change re-checks the whole form with
+`form.trigger()` (`e890237c`); a cross-field rule needs `trigger()` on the
+dependent field (or the lot) when the field it reads changes. The invoice
+number fields do the same with `form.trigger(NUMBER_FIELDS)`.
+**Category**: frontend · `apps/app.saroh.in/components/organizations/organization-settings-form.tsx` · `frontend-forms.md`
