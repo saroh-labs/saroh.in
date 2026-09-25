@@ -41,9 +41,12 @@
   store-route reads go through it (`listedAt`). Stock is one `StockLevel` row
   per storefront × product × variant (variant null: counted as a whole),
   behind two partial uniques — find it under a row lock and create it, never
-  upsert. An order line records its row (`stockLevelId`) and what it holds
-  (`heldQuantity`). Lock order: Order → Product (a change to how it counts)
-  → StockLevel rows by id (`products/stock-levels.ts`). `Inventory` and
+  upsert. An order line records its row (`stockLevelId`), what it holds
+  (`heldQuantity`) and what it took off the shelf when fulfilled
+  (`soldQuantity`); every hold, sale, release and return reads those under
+  the row's lock (`stock/reserve.ts`, #511 — see
+  `backend-billing-and-classes.md`). Lock order: Order → Product (a change
+  to how it counts) → StockLevel rows by id (`products/stock-levels.ts`). `Inventory` and
   `VariantInventory` are no longer written. Every new table pairs its ids
   with composite keys — (storeId, organizationId), (productId,
   organizationId), (variantId, productId) — so the database refuses a row

@@ -60,6 +60,7 @@ export async function refundLines(
     orderId: string,
     input: {
         lines: { itemId: string; quantity: number }[] | null;
+        putBack?: { itemId: string; quantity: number }[];
         idempotencyKey: string;
     },
 ) {

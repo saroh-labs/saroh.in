@@ -285,3 +285,18 @@ export function eventText(
 export function refundableQuantity(line: OrderReadLine): number {
     return Math.max(0, line.quantity - line.refundedQuantity);
 }
+
+/**
+ * What a refund of these lines could put back on the shelf ("Put N back in
+ * stock", #511): each line's refundable units, up to what it sold and hasn't
+ * had back. Nothing for a line not handed over yet — refunding it gives its
+ * units back to the shelf on its own.
+ */
+export function putBackOf(
+    lines: readonly OrderReadLine[],
+): { itemId: string; quantity: number }[] {
+    return lines.flatMap((l) => {
+        const quantity = Math.min(refundableQuantity(l), l.returnable ?? 0);
+        return quantity > 0 ? [{ itemId: l.id, quantity }] : [];
+    });
+}

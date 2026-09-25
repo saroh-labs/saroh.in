@@ -147,6 +147,7 @@ export class OrderKitchenService {
                 order.items,
                 phaseOf(move.fromStatus),
                 phaseOf(move.toStatus),
+                ctx.userId,
             );
             await tx.order.update({
                 where: { id: order.id },
@@ -224,6 +225,7 @@ export class OrderKitchenService {
                 order.items,
                 phaseOf(order.status),
                 phaseOf(back.status),
+                ctx.userId,
             );
             await tx.order.update({
                 where: { id: order.id },
@@ -756,7 +758,11 @@ const READ_INCLUDE = {
             },
             refundLines: {
                 where: { paymentRefund: { status: { not: "FAILED" } } },
-                select: { quantity: true, amountCents: true },
+                select: {
+                    quantity: true,
+                    amountCents: true,
+                    putBackQuantity: true,
+                },
             },
         },
     },

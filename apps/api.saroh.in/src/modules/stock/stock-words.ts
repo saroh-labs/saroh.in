@@ -95,6 +95,44 @@ export function belowZeroRefusal(storefront: string): string {
     return `That would leave less than none on hand at ${storefront}.`;
 }
 
+/** A storefront has none of it left to sell. */
+export const SOLD_OUT = "Sold out";
+
+/** "Only 2 left at Hill Road" — fewer than asked for, but some. */
+export function onlyLeft(available: number, storefront: string): string {
+    return `Only ${available} left at ${storefront}`;
+}
+
+/**
+ * Why an order can't take a line (#511): "Sourdough — Sold out", or
+ * "Sourdough — Only 2 left at Hill Road". A storefront sells what is on hand
+ * and not promised.
+ */
+export function sellRefusal(
+    product: string,
+    available: number,
+    storefront: string,
+): string {
+    return `${product} — ${
+        available > 0 ? onlyLeft(available, storefront) : SOLD_OUT
+    }`;
+}
+
+/** The customer's words when two payments raced for the last unit (DEC-032). */
+export const SOLD_OUT_WHILE_PAYING =
+    "Sorry, it sold out while you were paying — your money is on its way back.";
+
+/** Why a kitchen undo can't take a fulfilment back. */
+export const RETURNED_CANT_UNDO =
+    "Money or items have come back on this order, so it can't be taken back to before it was handed over.";
+
+/** Why a refund can't put that many back on the shelf. */
+export function putBackRefusal(returnable: number): string {
+    return returnable > 0
+        ? `Only ${returnable} of that line can go back in stock.`
+        : "None of that line can go back in stock — it wasn't handed over, or it's back already.";
+}
+
 export const CLOSED_STOREFRONT =
     "This storefront is closed, so its stock can't change.";
 
