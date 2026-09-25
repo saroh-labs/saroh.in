@@ -9,6 +9,7 @@ import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { EntitlementService } from "../billing/entitlement.service";
 import { backfillOneOrganization } from "../capabilities/module-backfill";
 import { ModuleLifecycleService } from "../capabilities/module-lifecycle.service";
@@ -628,15 +629,17 @@ export class AdminLifecycleService {
 
 /**
  * The context an operator's module change runs under. It carries the one
- * action the change needs and the operator's own user id, so the business's
- * audit stream names the operator — never one of the business's members.
+ * action the change needs and the operator's own user id, so the change is
+ * never put down to one of the business's members; its role key marks the
+ * business's audit row `byOperator`, which Activity shows as Saroh support
+ * (DEC-035).
  */
 function operatorContext(command: OperatorCommand): OrganizationContext {
     return {
         organizationId: command.organizationId,
         userId: command.staff.userId,
         role: "MEMBER",
-        roleKey: "platform-operator",
+        roleKey: PLATFORM_OPERATOR_ROLE_KEY,
         actions: new Set(["module:manage"]),
     };
 }

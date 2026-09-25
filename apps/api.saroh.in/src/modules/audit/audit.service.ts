@@ -62,6 +62,40 @@ export interface AuditEventInput {
     outcome: AuditOutcome;
     /** Redacted, non-sensitive context. MUST NOT contain secrets or PII. */
     metadata?: Prisma.InputJsonValue;
+    /**
+     * The acting context's role key (`ctx.roleKey`). A Saroh operator's
+     * (`platform-operator`) row is marked `byOperator`, so the business's
+     * Activity shows it as Saroh support, never by the operator's name.
+     */
+    actorRoleKey?: string;
+}
+
+/**
+ * The role key every context an operator acts through carries — the admin
+ * console's people, module and domain changes (DEC-035).
+ */
+export const PLATFORM_OPERATOR_ROLE_KEY = "platform-operator";
+
+/**
+ * The metadata an audit row is written with. A change a Saroh operator
+ * made gains `byOperator: true` — whichever service writes the row, through
+ * `record` or its own transaction — which is what the Activity read goes by
+ * to show Saroh support instead of the operator (DEC-035).
+ */
+export function auditMetadata(
+    actorRoleKey: string | undefined,
+    metadata?: Prisma.InputJsonValue,
+): Prisma.InputJsonValue | undefined {
+    if (actorRoleKey !== PLATFORM_OPERATOR_ROLE_KEY) return metadata;
+    const base =
+        typeof metadata === "object" &&
+        metadata !== null &&
+        !Array.isArray(metadata)
+            ? (metadata as Prisma.InputJsonObject)
+            : metadata === undefined
+              ? {}
+              : { value: metadata };
+    return { ...base, byOperator: true };
 }
 
 /**
@@ -93,7 +127,7 @@ export class AuditService {
                     targetType: event.targetType,
                     targetId: event.targetId,
                     outcome: event.outcome,
-                    metadata: event.metadata,
+                    metadata: auditMetadata(event.actorRoleKey, event.metadata),
                 },
             });
         } catch (error) {
@@ -126,7 +160,7 @@ export class AuditService {
      *
      * A change a Saroh operator made (`metadata.byOperator`) is Saroh
      * support's: the operator's own name and login email are never looked
-     * up, so they never reach the business.
+     * up, and their user id is left out, so none of it reaches the business.
      */
     async listForOrganization(
         organizationId: string,
@@ -212,6 +246,9 @@ export class AuditService {
         }
         return events.map((event) => ({
             ...event,
+            // An operator's own user id would tell the business which staff
+            // member it was, and tie their changes together across tenants.
+            actorUserId: byOperator(event) ? null : event.actorUserId,
             actor: byOperator(event)
                 ? SAROH_SUPPORT
                 : (people.get(event.actorUserId) ?? null),
@@ -247,7 +284,7 @@ const SAROH_SUPPORT: AuditPerson = {
     operator: true,
 };
 
-/** Whether a Saroh operator made the change (admin-lifecycle writes it). */
+/** Whether a Saroh operator made the change (`auditMetadata` marks it). */
 function byOperator(event: AuditEvent): boolean {
     const meta = event.metadata;
     return (
@@ -258,8 +295,12 @@ function byOperator(event: AuditEvent): boolean {
     );
 }
 
-/** An audit row as the read endpoint returns it: the row, and who it names. */
-export type AuditEventView = AuditEvent & {
+/**
+ * An audit row as the read endpoint returns it: the row, and who it names.
+ * `actorUserId` is null for a Saroh operator's change.
+ */
+export type AuditEventView = Omit<AuditEvent, "actorUserId"> & {
+    actorUserId: string | null;
     actor: AuditPerson | null;
     target: AuditPerson | null;
 };

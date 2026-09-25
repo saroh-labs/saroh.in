@@ -57,7 +57,8 @@ export interface AuditPerson {
 export interface AuditEventRow {
     id: string;
     action: string;
-    actorUserId: string;
+    /** Null for a change Saroh support made: the operator is not named. */
+    actorUserId: string | null;
     targetType: string | null;
     targetId: string | null;
     outcome: string;

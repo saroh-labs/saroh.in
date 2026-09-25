@@ -319,6 +319,7 @@ export class OrganizationSettingsService {
         await this.audit.record({
             action: AuditAction.ProfileUpdate,
             actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
             organizationId: ctx.organizationId,
             targetType: "organization",
             targetId: ctx.organizationId,
@@ -416,6 +417,7 @@ export class OrganizationSettingsService {
         return this.audit.record({
             action: AuditAction.ProfileUpdate,
             actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
             organizationId: ctx.organizationId,
             targetType: "organization",
             targetId: ctx.organizationId,

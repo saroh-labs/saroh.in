@@ -26,6 +26,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
+import { auditMetadata } from "../audit/audit.service";
 import { authorize } from "../organizations/organization-policy";
 import type { ModuleKey } from "./module-registry";
 import { MODULE_BY_KEY, MODULES } from "./module-registry";
@@ -403,7 +404,8 @@ export class ModuleLifecycleService {
                 targetType: "module",
                 targetId: moduleKey,
                 outcome: "SUCCESS",
-                ...(metadata ? { metadata } : {}),
+                // An operator's switch is Saroh support's in Activity.
+                metadata: auditMetadata(ctx.roleKey, metadata),
             },
         });
     }

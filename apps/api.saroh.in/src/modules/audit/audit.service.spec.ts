@@ -76,6 +76,41 @@ describe("AuditService.record", () => {
         expect(deleteMany).not.toHaveBeenCalled();
     });
 
+    it("marks a Saroh operator's change byOperator, keeping its metadata", async () => {
+        await service.record({
+            action: AuditAction.MembershipRoleUpdate,
+            actorUserId: "u_staff",
+            actorRoleKey: "platform-operator",
+            organizationId: "org_1",
+            targetType: "membership",
+            targetId: "u_aditya",
+            outcome: AuditOutcome.Success,
+            metadata: { from: "MEMBER", to: "ADMIN" },
+        });
+        await service.record({
+            action: AuditAction.MembershipRemove,
+            actorUserId: "u_staff",
+            actorRoleKey: "platform-operator",
+            organizationId: "org_1",
+            outcome: AuditOutcome.Success,
+        });
+        await service.record({
+            action: AuditAction.MembershipRoleUpdate,
+            actorUserId: "u_priya",
+            actorRoleKey: "OWNER",
+            organizationId: "org_1",
+            outcome: AuditOutcome.Success,
+            metadata: { from: "MEMBER", to: "ADMIN" },
+        });
+
+        expect(create.mock.calls.map((c) => c[0].data.metadata)).toEqual([
+            { from: "MEMBER", to: "ADMIN", byOperator: true },
+            { byOperator: true },
+            // A member of the business is never marked.
+            { from: "MEMBER", to: "ADMIN" },
+        ]);
+    });
+
     it("swallows a prisma failure and does not throw into the caller", async () => {
         const boom = new Error("connection reset");
         create.mockRejectedValueOnce(boom);
@@ -290,6 +325,10 @@ describe("AuditService.listForOrganization — a Saroh operator's change", () =>
         });
         expect(JSON.stringify(events)).not.toContain("ops@saroh.in");
         expect(JSON.stringify(events)).not.toContain("Staff Person");
+        // Nor their user id, which would tell one operator from another.
+        expect(events[0].actorUserId).toBeNull();
+        expect(JSON.stringify(events)).not.toContain("u_staff");
+        expect(events[1].actorUserId).toBe("u_priya");
         expect(events[1].actor).toEqual({
             name: "Priya",
             email: "priya@rye.in",

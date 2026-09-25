@@ -262,6 +262,7 @@ export class OrganizationMembersService {
         await this.audit.record({
             action: AuditAction.MembershipInvite,
             actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
             organizationId: ctx.organizationId,
             targetType: "invitation",
             targetId: invitation.id,
@@ -555,6 +556,7 @@ export class OrganizationMembersService {
         await this.audit.record({
             action: AuditAction.MembershipRoleUpdate,
             actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
             organizationId: ctx.organizationId,
             targetType: "membership",
             targetId: userId,
@@ -619,6 +621,7 @@ export class OrganizationMembersService {
         await this.audit.record({
             action: AuditAction.MembershipRemove,
             actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
             organizationId: ctx.organizationId,
             targetType: "membership",
             targetId: userId,
