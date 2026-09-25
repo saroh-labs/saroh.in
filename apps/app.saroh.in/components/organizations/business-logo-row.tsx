@@ -106,7 +106,7 @@ export function BusinessLogoRow({
                 <div className="mt-0.5 text-pretty text-[12px] leading-[1.45] text-muted-foreground">
                     {logoUrl
                         ? "On your invoices and receipts."
-                        : "PNG, JPG or WebP, square, under 1 MB. It prints on your invoices and receipts."}
+                        : "Goes on your invoices and receipts. Square, under 1 MB."}
                 </div>
                 {said ? (
                     <div

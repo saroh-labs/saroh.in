@@ -9,7 +9,7 @@ import {
 } from "@saroh/ui/popover";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import type { SettingsActor } from "@/lib/settings/search";
 import { searchSettings } from "@/lib/settings/search";
@@ -21,8 +21,14 @@ import { searchSettings } from "@/lib/settings/search";
  * to go. A result opens the tab that holds it — for Business, the right one
  * of its four (`?section=tax`).
  *
+ * "/" opens it from anywhere on the settings screen — unless someone is
+ * typing in a field, where "/" is a character. The box shows the key, so the
+ * shortcut is found by using the button once.
+ *
  * ⌘K is untouched and still opens the command menu from here, which finds
- * the same settings by name (`searchSettings`).
+ * the same settings by name (`searchSettings`). The design hints "⌘K" in this
+ * box; here that would name the other box, so the hint is the key that opens
+ * this one.
  */
 export function SettingsSearch({
     actor,
@@ -61,6 +67,19 @@ export function SettingsSearch({
         setQuery("");
         setActive(0);
     };
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+            if (e.defaultPrevented || isTyping(e.target)) return;
+            e.preventDefault();
+            setOpen(true);
+            setQuery("");
+            setActive(0);
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
     const go = (href: string) => {
         toggle(false);
         router.push(href);
@@ -88,7 +107,8 @@ export function SettingsSearch({
                     ref={trigger}
                     type="button"
                     aria-label="Search settings"
-                    title="Search settings"
+                    aria-keyshortcuts="/"
+                    title="Search settings  /"
                     className={className}
                 >
                     <Search className="size-4" />
@@ -102,24 +122,34 @@ export function SettingsSearch({
                 onKeyDown={onKeyDown}
                 className="w-[340px] max-w-[calc(100vw-32px)] rounded-xl p-2 shadow-[0_8px_24px_rgba(28,28,26,0.16)]"
             >
-                <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => {
-                        setQuery(e.target.value);
-                        setActive(0);
-                    }}
-                    placeholder="Find a setting — GSTIN, invoice prefix…"
-                    aria-label="Find a setting"
-                    role="combobox"
-                    aria-expanded
-                    aria-controls={listId}
-                    aria-autocomplete="list"
-                    aria-activedescendant={
-                        hits[hi] ? `${listId}-${hi}` : undefined
-                    }
-                    className="h-[38px] w-full rounded-lg border border-input bg-card px-[11px] text-[13.5px] text-foreground placeholder:text-muted-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={query}
+                        onChange={(e) => {
+                            setQuery(e.target.value);
+                            setActive(0);
+                        }}
+                        placeholder="Find a setting — GSTIN, invoice prefix…"
+                        aria-label="Find a setting"
+                        role="combobox"
+                        aria-expanded
+                        aria-controls={listId}
+                        aria-autocomplete="list"
+                        aria-activedescendant={
+                            hits[hi] ? `${listId}-${hi}` : undefined
+                        }
+                        className="h-[38px] w-full rounded-lg border border-input bg-card pl-[11px] pr-9 text-[13.5px] text-foreground placeholder:text-muted-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    {query === "" ? (
+                        <kbd
+                            aria-hidden
+                            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-border px-1.5 font-mono text-[11px] leading-[18px] text-muted-foreground"
+                        >
+                            /
+                        </kbd>
+                    ) : null}
+                </div>
                 <div
                     id={listId}
                     role="listbox"
@@ -156,5 +186,14 @@ export function SettingsSearch({
                 </div>
             </PopoverContent>
         </Popover>
+    );
+}
+
+/** Is this keypress going into a field, where "/" is a character? */
+function isTyping(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    return (
+        target.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
     );
 }

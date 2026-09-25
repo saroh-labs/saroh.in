@@ -56,8 +56,10 @@ const PILL: Record<ProviderRowState, { label: string; tone: string }> = {
 
 /**
  * Settings → Providers ("Saroh Settings" design): one bordered list, a row
- * per service, its state on the right where the eye can run down it, and
- * Details to see what it is called at the provider's end.
+ * per service — its name with its state beside it, a line on what it does
+ * for the business, and on the right what can be done: the fix or Connect,
+ * Manage, Disconnect, and Details to see what it is called at the
+ * provider's end.
  *
  * Never renders a credential — the rows carry only what the API sends as
  * public (see `lib/providers/rows.ts`).
@@ -86,9 +88,8 @@ export function ProviderList({
                 ))}
             </div>
             <p className="mt-2.5 text-pretty text-[11.5px] leading-normal text-muted-foreground">
-                Providers are per business. A storefront can point its checkout
-                at a different payment provider, and that choice lives under
-                Sell rather than here.
+                These belong to the whole business. Each storefront can pick its
+                own payment provider under Sell.
             </p>
         </div>
     );
@@ -151,94 +152,104 @@ function ProviderRowView({
     return (
         <div
             className={cn(
-                "flex flex-wrap items-center gap-3 px-[18px] py-[13px]",
+                "px-[18px] py-[13px]",
                 !first && "border-t border-border/70",
             )}
         >
-            <div className="min-w-0 flex-[1_1_260px]">
-                <div className="text-[13.5px] font-medium">{row.label}</div>
-                <p className="mt-[3px] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
-                    {row.note}
-                </p>
-                {open ? (
-                    <div id={detailsId} className="mt-2 space-y-2">
-                        {row.refs.map((ref) => (
-                            <RefLine key={ref.code} {...ref} />
-                        ))}
-                        {connected && row.setup.kind !== "link" ? (
-                            <div>{setupDialog("Change keys", false)}</div>
-                        ) : null}
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-[1_1_200px]">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[13.5px] font-semibold">
+                            {row.label}
+                        </span>
+                        <span
+                            className={cn(
+                                "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
+                                pill.tone,
+                            )}
+                        >
+                            {pill.label}
+                        </span>
                     </div>
-                ) : null}
+                    <p className="mt-[3px] text-pretty text-[12px] leading-[1.45] text-muted-foreground">
+                        {row.note}
+                    </p>
+                </div>
+
+                <div className="ml-auto flex flex-[0_1_auto] flex-wrap items-center justify-end gap-1.5">
+                    {/* The fix, first and solid: for a domain, the page that
+                        adds one or checks its DNS. Nothing else here has a
+                        fix of its own to offer — a disconnected provider is
+                        connected again. */}
+                    {row.setup.kind === "link" && !connected ? (
+                        <Button asChild size="sm">
+                            <Link href={row.setup.href}>{row.setup.label}</Link>
+                        </Button>
+                    ) : null}
+                    {!connected && row.setup.kind !== "link"
+                        ? setupDialog("Connect", true)
+                        : null}
+                    {row.connections.map((c) =>
+                        c.manageHref ? (
+                            <Button
+                                key={`m-${c.name}`}
+                                asChild
+                                variant="outline"
+                                size="sm"
+                            >
+                                <a
+                                    href={c.manageHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label={`Manage ${c.name} (opens in a new tab)`}
+                                >
+                                    {several ? `Manage ${c.name}` : "Manage"}
+                                </a>
+                            </Button>
+                        ) : null,
+                    )}
+                    {row.connections.map((c) => (
+                        <Button
+                            key={`d-${c.name}`}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
+                            aria-label={`Disconnect ${c.name}`}
+                            onClick={() => setConfirming(c)}
+                        >
+                            {several ? `Disconnect ${c.name}` : "Disconnect"}
+                        </Button>
+                    ))}
+                    {hasDetails ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="px-2.5 text-foreground/80"
+                            aria-expanded={open}
+                            aria-controls={open ? detailsId : undefined}
+                            onClick={() => setOpen((o) => !o)}
+                        >
+                            {open ? "Hide details" : "Details"}
+                            <span className="sr-only"> for {row.label}</span>
+                        </Button>
+                    ) : null}
+                </div>
             </div>
 
-            {row.usedBy ? (
-                <p className="order-last -mt-1 flex-[1_1_100%] text-[12px] text-muted-foreground">
-                    {row.usedBy}
-                </p>
-            ) : null}
-
-            {row.connections.map((c) =>
-                c.manageHref ? (
-                    <Button
-                        key={`m-${c.name}`}
-                        asChild
-                        variant="outline"
-                        size="sm"
-                    >
-                        <a
-                            href={c.manageHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label={`Manage ${c.name} (opens in a new tab)`}
-                        >
-                            {several ? `Manage ${c.name}` : "Manage"}
-                        </a>
-                    </Button>
-                ) : null,
-            )}
-            {row.connections.map((c) => (
-                <Button
-                    key={`d-${c.name}`}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
-                    aria-label={`Disconnect ${c.name}`}
-                    onClick={() => setConfirming(c)}
+            {open ? (
+                <div
+                    id={detailsId}
+                    className="mt-2.5 space-y-2 border-t border-dashed border-border pt-2.5"
                 >
-                    {several ? `Disconnect ${c.name}` : "Disconnect"}
-                </Button>
-            ))}
-            {!connected && row.setup.kind !== "link"
-                ? setupDialog("Connect", true)
-                : null}
-            {hasDetails ? (
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="px-2.5 text-foreground/80"
-                    aria-expanded={open}
-                    aria-controls={open ? detailsId : undefined}
-                    onClick={() => setOpen((o) => !o)}
-                >
-                    {open ? "Hide details" : "Details"}
-                    <span className="sr-only"> for {row.label}</span>
-                </Button>
-            ) : null}
-            <span
-                className={cn(
-                    "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                    pill.tone,
-                )}
-            >
-                {pill.label}
-            </span>
-            {row.setup.kind === "link" && !connected ? (
-                <Button asChild variant="outline" size="sm">
-                    <Link href={row.setup.href}>{row.setup.label}</Link>
-                </Button>
+                    {row.refs.map((ref) => (
+                        <RefLine key={ref.code} {...ref} />
+                    ))}
+                    {connected && row.setup.kind !== "link" ? (
+                        <div>{setupDialog("Change keys", false)}</div>
+                    ) : null}
+                </div>
             ) : null}
 
             {confirming ? (

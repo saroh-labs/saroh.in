@@ -85,10 +85,10 @@ describe("what turning it off says", () => {
                 dependents: ["Courses"],
             }),
         ).toBe(
-            "If you turn it off: Courses turns off with it, and Calendar, Services and Courses leave the rail. Nothing is deleted.",
+            "Courses turns off with it, and Calendar, Services and Courses leave the rail. Nothing is deleted.",
         );
         expect(offImpact({ rows: ["Insights"], dependents: [] })).toBe(
-            "If you turn it off: Insights leaves the rail. Nothing is deleted.",
+            "Insights leaves the rail. Nothing is deleted.",
         );
     });
 

@@ -83,11 +83,12 @@ describe("provider rows", () => {
         );
         const pay = byKey(rows, "PAYMENTS");
         expect(pay.state).toBe("CONNECTED");
-        expect(pay.note).toContain("through Razorpay");
+        expect(pay.note).toBe(
+            "Takes card and UPI payments at Rye & Co., through Razorpay.",
+        );
         expect(pay.refs).toEqual([
             { label: "Public key", code: "rzp_live_abc" },
         ]);
-        expect(pay.usedBy).toBe("Used by Rye & Co. checkout");
         expect(pay.connections).toEqual([
             {
                 name: "Razorpay",

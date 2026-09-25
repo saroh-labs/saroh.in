@@ -26,7 +26,7 @@ export default async function ModulesSettingsPage() {
             header={
                 <SettingsPanelHeader
                     title="Modules"
-                    description="Turning one off hides it from the rail. Nothing is deleted."
+                    description="Turn on what you use. Turning one off hides it — nothing is deleted."
                     readOnlyNote={
                         canManage || modules.length === 0
                             ? undefined
