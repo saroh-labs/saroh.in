@@ -160,7 +160,15 @@
   product that no longer counts moves no stock. Readers spread
   `COUNTING_ROWS`, so an untracked product's rows (kept at 0 for the log)
   read as untracked, never Sold out. The switches need `store:write`,
-  never `inventory:write` alone.
+  never `inventory:write` alone. Each real change writes one audit row on
+  the switch's own transaction (`stock/tracking-audit.ts`, Settings →
+  Activity): `product.stock-tracking.on` / `.off` (the product's name; off
+  adds the units counted to 0 and at how many storefronts; on adds the
+  hand-marked Sold outs it cleared — never separate `.clear` rows — and
+  `startedWithCount` when a first count turned it on) and
+  `business.stock-tracking.on` / `.off` (how many products). No change, no
+  row. Pass the context's `roleKey` on the `StockActor` so an operator's
+  row is marked `byOperator`.
 - **Sold out by hand (#515, `stock/sold-out.ts`)** — an untracked product
   sells unless a storefront marked it sold out (`ProductListing.soldOutAt`,
   `PUT …/products/:id/sold-out`, `inventory:write` or `store:write`; a
