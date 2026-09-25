@@ -1,5 +1,5 @@
 import { TeamScreen } from "@/components/organizations/team-screen";
-import { PageContainer } from "@/components/shared/page-container";
+import { SettingsPanel } from "@/components/settings/settings-panel";
 import { listModules } from "@/lib/modules/service";
 import { listInvitations, listMembers } from "@/lib/organizations/members";
 import { getRoleCatalogue, listRoles } from "@/lib/organizations/roles";
@@ -63,7 +63,7 @@ export default async function PeoplePage() {
         ]);
 
     return (
-        <PageContainer width="full">
+        <SettingsPanel>
             <TeamScreen
                 organizationName={organization?.name ?? "this business"}
                 members={members}
@@ -76,6 +76,6 @@ export default async function PeoplePage() {
                 myActions={organization?.actions ?? null}
                 moduleKeys={moduleKeys}
             />
-        </PageContainer>
+        </SettingsPanel>
     );
 }

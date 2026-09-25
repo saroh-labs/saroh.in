@@ -1,8 +1,10 @@
 import { EmptyState } from "@saroh/ui/empty-state";
-import { PageHeader } from "@saroh/ui/page-header";
 
 import { OrganizationSettingsForm } from "@/components/organizations/organization-settings-form";
-import { PageContainer } from "@/components/shared/page-container";
+import {
+    SettingsPanel,
+    SettingsPanelHeader,
+} from "@/components/settings/settings-panel";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
@@ -32,11 +34,19 @@ export default async function OrganizationSettingsPage() {
         : organization?.role === "OWNER" || organization?.role === "ADMIN";
 
     return (
-        <PageContainer width="form">
-            <PageHeader
-                breadcrumb={["Settings", "Business"]}
-                title="Business"
-            />
+        <SettingsPanel
+            width="form"
+            header={
+                <SettingsPanelHeader
+                    title="Business"
+                    description={
+                        canEdit
+                            ? "Shown on receipts, invoices and in the business switcher."
+                            : "What customers see on receipts and invoices."
+                    }
+                />
+            }
+        >
             {settings ? (
                 <OrganizationSettingsForm
                     settings={settings}
@@ -48,6 +58,6 @@ export default async function OrganizationSettingsPage() {
                     description="Choose an organization to view its settings."
                 />
             )}
-        </PageContainer>
+        </SettingsPanel>
     );
 }

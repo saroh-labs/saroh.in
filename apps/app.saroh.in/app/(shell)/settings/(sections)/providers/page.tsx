@@ -1,9 +1,11 @@
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
-import { PageHeader } from "@saroh/ui/page-header";
 
 import { ProviderHealthList } from "@/components/providers/provider-health-list";
 import { ProviderSetupDialog } from "@/components/providers/provider-setup-dialog";
-import { PageContainer } from "@/components/shared/page-container";
+import {
+    SettingsPanel,
+    SettingsPanelHeader,
+} from "@/components/settings/settings-panel";
 import { listProviderHealth } from "@/lib/provider-health/service";
 import {
     listCommsProviders,
@@ -30,11 +32,15 @@ export default async function ProvidersSettingsPage() {
             : await Promise.all([listPaymentProviders(), listCommsProviders()]);
 
     return (
-        <PageContainer width="form">
-            <PageHeader
-                breadcrumb={["Settings", "Providers"]}
-                title="Providers"
-            />
+        <SettingsPanel
+            width="form"
+            header={
+                <SettingsPanelHeader
+                    title="Providers"
+                    description="The services behind this business. Checkout for each storefront is chosen under Sell."
+                />
+            }
+        >
             {/* Three outcomes, three states. "Nothing to show" was previously
                 rendered for both a denial and an empty list, which are
                 different facts about the same screen (#177, §30). */}
@@ -72,6 +78,6 @@ export default async function ProvidersSettingsPage() {
                     }
                 />
             )}
-        </PageContainer>
+        </SettingsPanel>
     );
 }

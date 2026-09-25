@@ -1,7 +1,8 @@
-import { PageHeader } from "@saroh/ui/page-header";
-
 import { ModuleCatalog } from "@/components/modules/module-catalog";
-import { PageContainer } from "@/components/shared/page-container";
+import {
+    SettingsPanel,
+    SettingsPanelHeader,
+} from "@/components/settings/settings-panel";
 import { listModules } from "@/lib/modules/service";
 import { requireSession } from "@/lib/session";
 
@@ -18,9 +19,16 @@ export default async function ModulesSettingsPage() {
     const modules = await listModules();
 
     return (
-        <PageContainer>
-            <PageHeader breadcrumb={["Settings", "Modules"]} title="Modules" />
+        <SettingsPanel
+            width="default"
+            header={
+                <SettingsPanelHeader
+                    title="Modules"
+                    description="Each module adds a section to the rail. Turning one off hides it; nothing is deleted."
+                />
+            }
+        >
             <ModuleCatalog modules={modules} />
-        </PageContainer>
+        </SettingsPanel>
     );
 }

@@ -7,14 +7,14 @@ import { usePathname } from "next/navigation";
 import { SETTINGS_PAGES } from "@/components/shared/nav-items";
 
 /**
- * The settings screen's tabs (2026-09-25): Business, Team, Modules and
- * Providers down the left, the page you picked on the right.
+ * The settings screen's tabs ("Saroh Settings" design): Business, Team,
+ * Modules and Providers in a 232px column on Paper, ruled off from the page.
+ * Each says in a line what it holds. The current one takes the white surface
+ * and the 2px Saffron marker, as the rail's current page does, so the two
+ * lists read as one system.
  *
- * Drawn like the storefront list on Storefronts — a bordered card, a small
- * heading, rows that take the muted surface when current — so the two
- * "pick one, see it beside the list" screens read alike. Below 760px there
- * is no room beside the page, so the tabs sit above it in a row that
- * scrolls sideways.
+ * Below 760px the column becomes a row above the page that scrolls sideways,
+ * and the lines of description drop — there is no width for them.
  *
  * Links, not a client tab state: each tab is its own route, so the address,
  * Back and a shared link all land on the same tab. The layout passes only the
@@ -26,36 +26,49 @@ export function SettingsTabs({ hrefs }: { hrefs: readonly string[] }) {
     return (
         <nav
             aria-label="Settings"
-            className="min-[760px]:w-[236px] min-[760px]:shrink-0 min-[760px]:self-start min-[760px]:overflow-hidden min-[760px]:rounded-xl min-[760px]:border min-[760px]:border-border"
+            className={cn(
+                "flex gap-1 overflow-x-auto border-b border-border bg-background px-3 py-2.5",
+                "min-[760px]:w-[232px] min-[760px]:shrink-0 min-[760px]:flex-col min-[760px]:gap-0.5 min-[760px]:overflow-visible min-[760px]:border-b-0 min-[760px]:border-r min-[760px]:px-2.5 min-[760px]:py-3.5",
+            )}
         >
-            <p className="hidden border-b border-border px-[15px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground min-[760px]:block">
-                Settings
-            </p>
-            <ul className="flex gap-1 overflow-x-auto p-1.5 min-[760px]:flex-col min-[760px]:gap-0.5 min-[760px]:overflow-visible">
-                {pages.map((page) => {
-                    const on =
-                        pathname === page.href ||
-                        pathname.startsWith(`${page.href}/`);
-                    const Icon = page.icon;
-                    return (
-                        <li key={page.href} className="shrink-0">
-                            <Link
-                                href={page.href}
-                                aria-current={on ? "page" : undefined}
-                                className={cn(
-                                    "flex min-h-11 items-center gap-[9px] rounded-lg px-[9px] py-[7px] text-[13.5px] font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                    on
-                                        ? "bg-muted text-foreground"
-                                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                                )}
-                            >
-                                <Icon className="size-4 shrink-0" />
+            {pages.map((page) => {
+                const on =
+                    pathname === page.href ||
+                    pathname.startsWith(`${page.href}/`);
+                const Icon = page.icon;
+                return (
+                    <Link
+                        key={page.href}
+                        href={page.href}
+                        aria-current={on ? "page" : undefined}
+                        className={cn(
+                            "relative flex shrink-0 items-start gap-2.5 rounded-lg px-2.5 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            on
+                                ? "bg-card font-semibold text-foreground shadow-[0_1px_2px_rgba(28,28,26,0.08)]"
+                                : "font-medium text-foreground/80 hover:bg-muted",
+                        )}
+                    >
+                        {on ? (
+                            <span
+                                aria-hidden
+                                className="absolute -left-1.5 top-1/2 hidden h-[17px] w-0.5 -translate-y-1/2 rounded-[1px] bg-highlight min-[760px]:block"
+                            />
+                        ) : null}
+                        <Icon
+                            className="mt-px size-[18px] shrink-0"
+                            strokeWidth={1.9}
+                        />
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-[13.5px]">
                                 {page.label}
-                            </Link>
-                        </li>
-                    );
-                })}
-            </ul>
+                            </span>
+                            <span className="mt-0.5 hidden text-pretty text-[11.5px] font-normal leading-[1.4] text-muted-foreground min-[760px]:block">
+                                {page.description}
+                            </span>
+                        </span>
+                    </Link>
+                );
+            })}
         </nav>
     );
 }

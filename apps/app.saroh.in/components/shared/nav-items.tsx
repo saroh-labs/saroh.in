@@ -2,16 +2,16 @@ import type { LucideIcon } from "lucide-react";
 import {
     BarChart3,
     Bell,
-    Blocks,
     Building2,
     Calendar,
     CalendarClock,
     Globe,
     Home,
     KanbanSquare,
-    Plug,
+    LayoutGrid,
+    Link2,
     ReceiptText,
-    Settings,
+    SlidersHorizontal,
     Store,
     Target,
     Users,
@@ -583,7 +583,7 @@ export const NAV_GROUPS: NavGroup[] = [
             {
                 href: "/settings",
                 label: "Settings",
-                icon: Settings,
+                icon: SlidersHorizontal,
                 action: [
                     "org:settings:read",
                     "member:read",
@@ -969,31 +969,35 @@ export const SETTINGS_PAGES = [
     {
         href: "/settings/organization",
         label: "Business",
+        description: "Name, address and the details on receipts",
         icon: Building2,
         action: "org:settings:read",
     },
     {
         href: "/settings/people",
         label: "Team",
+        description: "Who works here and what each role opens",
         icon: Users,
         action: "member:read",
     },
     {
         href: "/settings/modules",
         label: "Modules",
-        icon: Blocks,
+        description: "What this business runs on",
+        icon: LayoutGrid,
         action: "module:read",
     },
     {
         href: "/settings/providers",
         label: "Providers",
-        icon: Plug,
+        description: "Hosting, email and payments behind it",
+        icon: Link2,
         action: "provider:read",
     },
-] as const satisfies readonly Pick<
+] as const satisfies readonly (Pick<
     NavItem,
     "href" | "label" | "icon" | "action"
->[];
+> & { description: string })[];
 
 /** The settings pages this actor may open, in tab order. */
 export function settingsPagesFor(actor: {

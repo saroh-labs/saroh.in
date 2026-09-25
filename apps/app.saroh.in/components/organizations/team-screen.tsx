@@ -1,5 +1,6 @@
 "use client";
 
+import { SettingsPanelHeader } from "@/components/settings/settings-panel";
 import {
     Avatar,
     AvatarFallback,
@@ -19,7 +20,6 @@ import {
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
-import { PageHeader } from "@saroh/ui/page-header";
 import {
     Sheet,
     SheetContent,
@@ -193,11 +193,9 @@ export function TeamScreen({
             {/* 12px from the title row to the tabs, then 18px to the
                 content, as the design spaces them. */}
             <div className="space-y-3">
-                <PageHeader
-                    breadcrumb={["Settings", "Team"]}
+                <SettingsPanelHeader
                     title="Team"
-                    description="Who can reach this business, and what each role may open."
-                    className="mb-0"
+                    description={`Everyone in ${organizationName} and what each role can open. It is business-wide — a role isn't held in one shop.`}
                     actions={
                         canManage ? (
                             <Button onClick={() => setInviteOpen(true)}>
