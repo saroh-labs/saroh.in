@@ -62,6 +62,19 @@ describe("finding example text left in a block", () => {
         );
     });
 
+    it("stays linear on a run of unclosed tags", () => {
+        // The old /<[^>]*>/ split took ~350 ms on 32,000 of these, on the
+        // API, from a signed-in merchant's block content.
+        const started = performance.now();
+        expect(
+            exampleTextIn("hero", {
+                heading: "Ours",
+                subheading: "<".repeat(100_000),
+            }),
+        ).toBeNull();
+        expect(performance.now() - started).toBeLessThan(100);
+    });
+
     it("says nothing once the merchant has written their own", () => {
         expect(
             exampleTextIn("hero", {

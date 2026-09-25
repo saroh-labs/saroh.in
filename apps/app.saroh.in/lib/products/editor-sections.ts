@@ -476,7 +476,10 @@ export function splitLines(value: string): string[] {
 export function stripHtml(html: string): string {
     return (
         html
-            .replace(/<[^>]*>/g, " ")
+            // `[^<>]`, not `[^>]`: a run of "<" with no ">" is then linear
+            // rather than quadratic (js/polynomial-redos). The merchant's
+            // own description, in their own browser, so never an attack.
+            .replace(/<[^<>]*>/g, " ")
             .replace(/&nbsp;/g, " ")
             .replace(/&lt;/g, "<")
             .replace(/&gt;/g, ">")

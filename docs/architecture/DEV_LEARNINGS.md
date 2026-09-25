@@ -523,3 +523,36 @@ depends on changed.
 dependent field (or the lot) when the field it reads changes. The invoice
 number fields do the same with `form.trigger(NUMBER_FIELDS)`.
 **Category**: frontend · `apps/app.saroh.in/components/organizations/organization-settings-form.tsx` · `frontend-forms.md`
+
+## Security — a CodeQL ReDoS alert: fixed without knowing whether it mattered
+
+**Problem**: CodeQL raised `js/polynomial-redos` (and, alongside it,
+`js/type-confusion-through-parameter-tampering` and `js/double-escaping`)
+on regexes that look harmless — `/<[^>]*>/`, `/\s*\n\s*/`, `/\/+$/`. The
+first round of fixes in `dcd778ab` rewrote them, but said nothing about
+whether any of them could actually be abused, so a reviewer could not tell
+a real hole from a quiet cleanup.
+**Root cause**: A regex with an unbounded repeat that can restart at every
+position (`<[^>]*>` on a run of "<" with no ">") is quadratic: 8 KB takes
+~25 ms, 32 KB ~350 ms. Whether that matters depends on who writes the input
+and how long it can be — a 500-character merchant field never hurts; a
+public, uncapped enquiry field does.
+**Fix**: The method `3c20713d` set down, now for every such alert:
+
+1. Find who reaches the input (a visitor, a signed-in merchant, a developer's
+   config) and what caps its length (a contract `max()`, the 100 KB JSON
+   body).
+2. Benchmark the old form at growing sizes (8/16/32/64 KB) to see the curve.
+3. Prefer a linear form — a character class that excludes its own opener
+   (`<[^<>]*>`), a split and trim, an index scan — that accepts exactly what
+   the old one did.
+4. Say in the comment and the commit whether it was exploitable and by whom,
+   or that it was a false positive and why; never imply a hole that wasn't.
+5. Add a regression test on the pathological input (a run of "<", of
+   spaces) with a time bound the old form fails.
+   In #532 (`dcd778ab` and its follow-up): the block-contract `piecesOf` was
+   reachable by a signed-in merchant on the API (a hero subheading has no cap
+   below the body limit, ~3 s at 100 KB); the contact block's address (500
+   characters) and the product editor's `stripHtml` (the merchant's own
+   browser) were not.
+   **Category**: security · CodeQL · `packages/block-contract/src/examples.ts` · `packages/site-blocks/src/blocks/contact.tsx`

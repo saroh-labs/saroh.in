@@ -17,6 +17,10 @@ function mapHref(content: RenderedContact): string | null {
     if (url && /^https?:\/\//i.test(url) && isSafeHref(url)) return url;
     const address = content.address?.trim();
     if (!address) return null;
+    // Lines split and trimmed rather than /\s*\n\s*/, which is quadratic
+    // on a long run of spaces (CodeQL js/polynomial-redos). Not exploitable:
+    // the address is the merchant's own, capped at 500 characters by the
+    // contract (~0.3 ms the old way), but this is linear whatever its length.
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         address
             .split("\n")

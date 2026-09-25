@@ -440,4 +440,13 @@ describe("a description's plain text", () => {
             "Salt &lt;3 & pepper",
         );
     });
+
+    it("stays linear on a run of unclosed tags", () => {
+        // The old /<[^>]*>/ took ~350 ms on 32,000 of these.
+        const started = performance.now();
+        expect(stripHtml(`${"<".repeat(100_000)}ok`)).toBe(
+            `${"<".repeat(100_000)}ok`,
+        );
+        expect(performance.now() - started).toBeLessThan(100);
+    });
 });
