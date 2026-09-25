@@ -145,6 +145,7 @@ model Organization {
   productListingVariants ProductListingVariant[]
   stockLevels            StockLevel[]
   stockEntries           StockEntry[]
+  stockCheckResolutions  StockCheckResolution[]
 
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
@@ -1118,8 +1119,9 @@ model StockLevel {
 
   updatedAt DateTime @updatedAt
 
-  orderItems OrderItem[]
-  entries    StockEntry[]
+  orderItems       OrderItem[]
+  entries          StockEntry[]
+  checkResolutions StockCheckResolution[]
 
   @@unique([id, organizationId])
   @@unique([storeId, productId], map: "StockLevel_storeId_productId_whole_key", where: raw("\"variantId\" IS NULL"))
@@ -1265,6 +1267,42 @@ model Cart {
 // ============================================================================
 // E-COMMERCE: ORDERS
 // ============================================================================
+
+// A stock check someone has looked at and resolved (#514). The checks
+// themselves are computed when read (GET organizations/:org/stock/checks):
+// a shelf short of what is promised, a count that didn't match the log, a
+// sale not taken from stock, and promised not adding up to what open order
+// lines hold. `key` names one check ("short:<stockLevelId>", …);
+// `fingerprint` is what it read when it was resolved, so a check whose
+// numbers move on opens again. Never deleted by the app.
+enum StockCheckKind {
+  SHORT
+  COUNT_MISMATCH
+  SALE_NOT_TAKEN
+  PROMISED_MISMATCH
+}
+
+model StockCheckResolution {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  key         String
+  kind        StockCheckKind
+  fingerprint String
+
+  // The shelf the check is about, when it is about one.
+  stockLevelId String?
+  stockLevel   StockLevel? @relation(fields: [stockLevelId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // Who resolved it. Not a foreign key, like StockEntry.actorUserId.
+  resolvedByUserId String?
+  note             String?
+  resolvedAt       DateTime @default(now())
+
+  @@unique([organizationId, key])
+  @@index([stockLevelId])
+}
 
 model Order {
   id             String        @id @default(cuid())
