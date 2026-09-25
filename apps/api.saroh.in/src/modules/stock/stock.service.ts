@@ -570,9 +570,9 @@ export async function reverse(
         }
     }
     // A move is undone whole.
-    const pairIds = named
-        .filter((e) => e.kind === "MOVED" && e.pairId)
-        .map((e) => e.pairId as string);
+    const pairIds = named.flatMap((e) =>
+        e.kind === "MOVED" && e.pairId ? [e.pairId] : [],
+    );
     const entries = await tx.stockEntry.findMany({
         where: {
             organizationId: actor.organizationId,

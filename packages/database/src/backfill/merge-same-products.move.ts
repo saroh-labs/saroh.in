@@ -242,9 +242,9 @@ async function moveStock(
 
 /** Whether the stock log (#513) exists yet: this runs before and after it. */
 async function hasStockLog(tx: TransactionClient): Promise<boolean> {
-    const [row] = await tx.$queryRaw<{ present: boolean }[]>`
+    const [{ present }] = await tx.$queryRaw<{ present: boolean }[]>`
         SELECT to_regclass('"StockEntry"') IS NOT NULL AS present`;
-    return Boolean(row?.present);
+    return present;
 }
 
 async function moveListings(
