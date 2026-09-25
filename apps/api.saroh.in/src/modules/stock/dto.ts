@@ -224,3 +224,23 @@ export class SetStockTrackingDto {
     @IsBoolean({ message: "Say whether to track stock." })
     tracked!: boolean;
 }
+
+/**
+ * Mark an untracked product Sold out at one storefront, or available again
+ * (#515).
+ */
+export class SetSoldOutDto {
+    @IsString({ message: "Pick the storefront." })
+    @MinLength(1, { message: "Pick the storefront." })
+    @MaxLength(64)
+    storefrontId!: string;
+
+    @IsBoolean({ message: "Say whether it is sold out." })
+    soldOut!: boolean;
+}
+
+/** The storefront-route alias: the storefront is the route's. */
+export class SetStoreSoldOutDto {
+    @IsBoolean({ message: "Say whether it is sold out." })
+    soldOut!: boolean;
+}

@@ -15,9 +15,10 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { SetStockTrackingDto } from "../stock/dto";
+import { SetStockTrackingDto, SetStoreSoldOutDto } from "../stock/dto";
 import { UpdateInventoryDto, UpdateVariantStockDto } from "./inventory.dto";
 import { InventoryService } from "./inventory.service";
+import { SoldOutService } from "./sold-out.service";
 import {
     CreateVariantDto,
     ReorderVariantsDto,
@@ -36,6 +37,7 @@ export class ProductDetailsController {
     constructor(
         private readonly variants: VariantsService,
         private readonly inventory: InventoryService,
+        private readonly soldOut: SoldOutService,
     ) {}
 
     @Get("variants")
@@ -139,6 +141,22 @@ export class ProductDetailsController {
             productId,
             user.id,
             dto.tracked,
+        );
+    }
+
+    /** Sold out by hand at this storefront, or available again (#515). */
+    @Put("sold-out")
+    setSoldOut(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body() dto: SetStoreSoldOutDto,
+    ) {
+        return this.soldOut.setViaStore(
+            storeId,
+            productId,
+            user.id,
+            dto.soldOut,
         );
     }
 }

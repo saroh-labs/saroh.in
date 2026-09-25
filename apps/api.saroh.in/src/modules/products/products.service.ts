@@ -84,6 +84,16 @@ export const productDetailInclude = (storeId: string) =>
             where: { storeId, variantId: null, ...COUNTING_ROWS },
             ...STOCK_ROW,
         },
+        // Where it sells, and where it is marked Sold out by hand (#515).
+        listings: {
+            where: { store: { deletedAt: null } },
+            orderBy: [{ store: { createdAt: "asc" } }, { storeId: "asc" }],
+            select: {
+                storeId: true,
+                soldOutAt: true,
+                store: { select: { name: true } },
+            },
+        },
         option: {
             select: {
                 id: true,
@@ -198,7 +208,7 @@ export class ProductsService {
                 _count: { select: { variants: true } },
                 listings: {
                     where: { storeId: { in: open } },
-                    select: { storeId: true },
+                    select: { storeId: true, soldOutAt: true },
                 },
                 variants: {
                     select: {
@@ -274,6 +284,11 @@ export class ProductsService {
                 stockLevels: {
                     where: { storeId, variantId: null, ...COUNTING_ROWS },
                     ...STOCK_ROW,
+                },
+                // Marked Sold out by hand here (#515).
+                listings: {
+                    where: { storeId },
+                    select: { storeId: true, soldOutAt: true },
                 },
             },
         });

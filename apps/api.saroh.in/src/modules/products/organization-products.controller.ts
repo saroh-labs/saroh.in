@@ -18,7 +18,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { SetStockTrackingDto } from "../stock/dto";
+import { SetSoldOutDto, SetStockTrackingDto } from "../stock/dto";
 import type { ProductStatus } from "./dto";
 import {
     CreateProductDto,
@@ -32,6 +32,7 @@ import { ProductAccess } from "./product-access";
 import { ProductImagesService } from "./product-images.service";
 import { ProductOverviewService } from "./product-overview.service";
 import { ProductsService } from "./products.service";
+import { SoldOutService } from "./sold-out.service";
 import {
     CreateVariantDto,
     ReorderVariantsDto,
@@ -61,6 +62,7 @@ export class OrganizationProductsController {
         private readonly images: ProductImagesService,
         private readonly variants: VariantsService,
         private readonly inventory: InventoryService,
+        private readonly soldOut: SoldOutService,
     ) {}
 
     /** One row per catalogue product, with where it is sold. */
@@ -329,5 +331,19 @@ export class OrganizationProductsController {
             productId,
             dto.tracked,
         );
+    }
+
+    /**
+     * Mark an untracked product Sold out at a storefront, or available again
+     * (#515): whoever may count and move stock. A product that counts stock
+     * is refused (409); a storefront that doesn't sell it is not found.
+     */
+    @Put(":productId/sold-out")
+    setSoldOut(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("productId") productId: string,
+        @Body() dto: SetSoldOutDto,
+    ) {
+        return this.soldOut.set(ctx, productId, dto.storefrontId, dto.soldOut);
     }
 }

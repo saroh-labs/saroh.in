@@ -31,6 +31,10 @@ export const AuditAction = {
     ModuleDisable: "organization.module.disabled",
     PlanChange: "organization.plan.changed",
     StorefrontHoursUpdate: "storefront.hours.update",
+    // An untracked product marked Sold out by hand at a storefront, or
+    // available again (#515); metadata names the product and storefront.
+    ProductSoldOutMark: "product.sold-out.mark",
+    ProductSoldOutClear: "product.sold-out.clear",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

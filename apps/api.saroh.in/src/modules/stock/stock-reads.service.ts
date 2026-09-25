@@ -65,9 +65,15 @@ export interface StockLevelsView {
     rows: StockLevelRow[];
     /**
      * Products that don't track stock (#515) — Track stock off for the
-     * product, or for the whole business: they always sell.
+     * product, or for the whole business: they sell unless a storefront
+     * marked them Sold out by hand (`soldOutAt`, its storefront ids).
      */
-    untracked: { productId: string; name: string; status: string }[];
+    untracked: {
+        productId: string;
+        name: string;
+        status: string;
+        soldOutAt: string[];
+    }[];
     /** The business's Track stock switch; off, every product is untracked. */
     tracking: boolean;
     canWrite: boolean;
@@ -209,6 +215,7 @@ export class StockReadsService {
                     listings: {
                         select: {
                             storeId: true,
+                            soldOutAt: true,
                             variants: { select: { variantId: true } },
                         },
                     },
@@ -251,6 +258,9 @@ export class StockReadsService {
                     productId: product.id,
                     name: product.name,
                     status: product.status,
+                    soldOutAt: product.listings.flatMap((l) =>
+                        l.soldOutAt ? [l.storeId] : [],
+                    ),
                 });
                 continue;
             }

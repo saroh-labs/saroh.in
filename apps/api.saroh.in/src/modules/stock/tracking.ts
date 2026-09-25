@@ -7,6 +7,7 @@ import {
     lockProductStock,
     lockStockLevels,
 } from "../products/stock-levels";
+import { clearSoldOut } from "./sold-out";
 import { promisedRefusal, TRACKING_OFF_NOTE } from "./stock-words";
 import type { StockActor } from "./stock.service";
 import { recordEntry } from "./stock.service";
@@ -15,8 +16,9 @@ import { recordEntry } from "./stock.service";
  * Track stock on and off (#515): a product (`Product.stockTracked`) and the
  * whole business (`BusinessProfile.stockTracking`, on when there is no
  * profile). A product counts stock only while both are on; otherwise it
- * always sells, no order holds or sells from its shelves, and nothing
- * writes an entry for it.
+ * sells unless a storefront marked it Sold out by hand
+ * (`ProductListing.soldOutAt`, `sold-out.ts`), no order holds or sells from
+ * its shelves, and nothing writes an entry for it.
  *
  * The rules, the same for one product and for the business:
  * - Off locks the shelves (StockLevel rows, by id), is refused while any of
@@ -25,6 +27,7 @@ import { recordEntry } from "./stock.service";
  *   the shelf. The rows stay, at 0, for the log.
  * - On writes nothing: the shelves are at 0 (made at 0 where missing, at
  *   each storefront that sells it), so it reads Sold out until counted.
+ *   Its hand-marked Sold out is cleared everywhere: the count says it now.
  * - An order line placed while its product was untracked stays untracked
  *   for life (`stockRow` NONE); reserve re-reads tracking after taking its
  *   row locks, so a hold never lands on a shelf that just stopped counting
@@ -227,6 +230,7 @@ export async function setProductTracking(
             where: { id: productId },
             data: { stockTracked: true, stockTrackedAt: new Date() },
         });
+        await clearSoldOut(tx, { productId });
         return result;
     }
     const rows = await lockProductStock(tx, productId);
@@ -280,6 +284,12 @@ export async function setBusinessTracking(
         await tx.product.updateMany({
             where: { organizationId, stockTracked: true },
             data: { stockTrackedAt: new Date() },
+        });
+        // Those products count again: their count says Sold out now. One
+        // whose own switch is off keeps its hand-marked Sold out.
+        await clearSoldOut(tx, {
+            organizationId,
+            product: { stockTracked: true },
         });
         return result;
     }

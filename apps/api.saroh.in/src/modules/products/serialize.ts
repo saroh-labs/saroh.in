@@ -130,6 +130,19 @@ export interface ProductListItemDto extends ProductDto {
         price: string | null;
     }[];
     inventory: ListStockDto | null;
+    /**
+     * Marked Sold out by hand at the storefront read from (#515): an
+     * untracked product the storefront refuses orders for.
+     */
+    soldOut: boolean;
+}
+
+/** One storefront that sells the product, and whether it is marked Sold out there. */
+export interface SoldOutPlaceDto {
+    storefrontId: string;
+    name: string;
+    /** Marked Sold out by hand here (#515); only an untracked product is. */
+    soldOut: boolean;
 }
 
 export interface ProductDetailDto extends ProductDto {
@@ -151,6 +164,10 @@ export interface ProductDetailDto extends ProductDto {
         name: string;
         values: { id: string; value: string }[];
     } | null;
+    /** Marked Sold out by hand at the storefront read from (#515). */
+    soldOut: boolean;
+    /** Every open storefront that sells it, and whether it is marked there. */
+    storefronts: SoldOutPlaceDto[];
 }
 
 interface RawVariant {
@@ -229,9 +246,16 @@ interface RawProduct {
     category?: { id: string; name: string } | null;
 }
 
+interface RawListingLike {
+    storeId: string;
+    soldOutAt: Date | null;
+}
+
 interface RawProductDetail extends RawProduct {
     variants: RawVariant[];
     images: RawImage[];
+    /** Its listings at open storefronts, in the storefronts' order. */
+    listings?: (RawListingLike & { store: { name: string } })[];
     /** The product's own row at the storefront read from (variant null). */
     stockLevels: StockRowLike[];
     option: {
@@ -359,6 +383,18 @@ interface RawProductListItem extends RawProduct {
     }[];
     /** The product's own row at the storefront read from (variant null). */
     stockLevels: StockRowLike[];
+    /** Its listing at the storefront read from, for the hand-marked Sold out. */
+    listings?: RawListingLike[];
+}
+
+/** Whether a listing at `storeId` is marked Sold out by hand (#515). */
+function soldOutAt(
+    listings: readonly RawListingLike[] | undefined,
+    storeId: string,
+): boolean {
+    return (listings ?? []).some(
+        (l) => l.storeId === storeId && l.soldOutAt !== null,
+    );
 }
 
 /**
@@ -407,6 +443,7 @@ export function serializeProductListItem(
                 price: v.price ? toMoneyString(v.price) : null,
             })),
         inventory: listStock(product),
+        soldOut: soldOutAt(product.listings, storeId),
     };
 }
 
@@ -415,6 +452,8 @@ export interface CatalogueListingDto {
     storeId: string;
     storeName: string;
     inventory: ListStockDto | null;
+    /** Marked Sold out by hand here (#515). */
+    soldOut: boolean;
     /**
      * Each variant's shelf here (#518), in the product's order: whether this
      * storefront sells it and its stock, null while it is not counted per
@@ -444,7 +483,7 @@ interface StoreStockRowLike extends StockRowLike {
 
 interface RawCatalogueItem extends RawProduct {
     _count: { variants: number };
-    listings: { storeId: string }[];
+    listings: RawListingLike[];
     variants: {
         id: string;
         sku: string;
@@ -480,6 +519,7 @@ export function serializeCatalogueItem(
                 storeId: s.id,
                 storeName: s.name,
                 inventory: listStock(here),
+                soldOut: soldOutAt(product.listings, s.id),
                 variants: here.variants.map((v) => {
                     const row = firstRow(v.stockLevels ?? []);
                     return {
@@ -513,6 +553,8 @@ export function serializeCatalogueItem(
             home,
         ),
         inventory: sumStock(listings),
+        // Across the business: Sold out only where every storefront says so.
+        soldOut: listings.length > 0 && listings.every((l) => l.soldOut),
         listings,
     };
 }
@@ -544,5 +586,11 @@ export function serializeProductDetail(
             : "product",
         option: product.option,
         inventory: own ? asCounts(own) : null,
+        soldOut: soldOutAt(product.listings, storeId),
+        storefronts: (product.listings ?? []).map((l) => ({
+            storefrontId: l.storeId,
+            name: l.store.name,
+            soldOut: l.soldOutAt !== null,
+        })),
     };
 }

@@ -9,6 +9,7 @@ import {
 import type { Prisma, StockEntryKind } from "@saroh/database";
 
 import { lockStockLevels } from "../products/stock-levels";
+import { clearSoldOut } from "./sold-out";
 import type { AdjustKind } from "./stock-words";
 import {
     adjustDelta,
@@ -192,10 +193,11 @@ async function resolveRowId(
     // API never does, the product's own count needs `store:write`.
     const shelves = await tx.stockLevel.count({ where: { productId } });
     if (shelves === 0) {
-        await tx.product.updateMany({
+        const started = await tx.product.updateMany({
             where: { id: productId, stockTracked: false },
             data: { stockTracked: true, stockTrackedAt: new Date() },
         });
+        if (started.count > 0) await clearSoldOut(tx, { productId });
     }
     const made = await tx.stockLevel.create({
         data: { organizationId, storeId, productId, variantId },

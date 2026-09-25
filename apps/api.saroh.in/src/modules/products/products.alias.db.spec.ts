@@ -214,6 +214,7 @@ describe("Products: organization routes and storefront aliases (DB)", () => {
             {
                 storeId: hill,
                 storeName: "Hill Road",
+                soldOut: false,
                 inventory: { quantity: 10, promised: 2, lowStockAlert: 2 },
                 variants: [
                     {
@@ -239,6 +240,7 @@ describe("Products: organization routes and storefront aliases (DB)", () => {
             {
                 storeId: online,
                 storeName: "Online",
+                soldOut: false,
                 inventory: { quantity: 5, promised: 1, lowStockAlert: 1 },
                 variants: [
                     { variantId: small.id, soldHere: false, inventory: null },

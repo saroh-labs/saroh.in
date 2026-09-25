@@ -3,6 +3,7 @@ import type { Prisma, StockRow } from "@saroh/database";
 
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { lockStockLevels } from "../products/stock-levels";
+import { markedSoldOut, soldOutKey } from "./sold-out";
 import {
     putBackRefusal,
     RETURNED_CANT_UNDO,
@@ -38,7 +39,9 @@ import { untrackedAmong } from "./tracking";
  * product counts stock (Track stock, #515 — `tracking.ts`) is read after the
  * row locks are taken, so a hold never lands on a shelf whose product just
  * stopped counting, and a kitchen undo or a return on a product that no
- * longer counts moves no stock.
+ * longer counts moves no stock. An untracked product marked Sold out by hand
+ * at the order's storefront (`sold-out.ts`) is refused like a counted one
+ * with nothing left; lines that held before are never re-judged.
  *
  * Lock order, every flow (docs/patterns/backend-billing-and-classes.md):
  * Order → StockLevel rows (by id) → PaymentRefund → payment intent →
@@ -195,6 +198,25 @@ async function tryHold(
         if (untracked.has(line.productId)) {
             chosen[i] = { kind: "NONE", id: null };
         }
+    }
+    // An untracked product marked Sold out by hand at the line's storefront
+    // (#515) is refused as a counted one is: "Sourdough — Sold out".
+    const marked = await markedSoldOut(
+        tx,
+        fresh.filter((l) => untracked.has(l.productId)),
+    );
+    const soldOut = fresh.find(
+        (l) => untracked.has(l.productId) && marked.has(soldOutKey(l)),
+    );
+    if (soldOut) {
+        const storefront = await storefrontName(tx, soldOut.storeId);
+        return {
+            productId: soldOut.productId,
+            variantId: soldOut.variantId,
+            available: 0,
+            storefront,
+            message: sellRefusal(soldOut.productName, 0, storefront),
+        };
     }
 
     // What each row is asked for, over every line on it.

@@ -2,6 +2,7 @@ import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
+import { AuditModule } from "../audit/audit.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { MediaModule } from "../media/media.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
@@ -16,6 +17,7 @@ import { ProductImagesService } from "./product-images.service";
 import { ProductOverviewService } from "./product-overview.service";
 import { ProductsController } from "./products.controller";
 import { ProductsService } from "./products.service";
+import { SoldOutService } from "./sold-out.service";
 import { VariantsService } from "./variants.service";
 
 @Module({
@@ -23,6 +25,7 @@ import { VariantsService } from "./variants.service";
         StoresModule,
         CapabilitiesModule,
         AnalyticsCoreModule,
+        AuditModule,
         MediaModule,
         forwardRef(() => OrganizationsModule),
     ],
@@ -40,6 +43,7 @@ import { VariantsService } from "./variants.service";
         ProductImagesService,
         ProductOverviewService,
         ListingsService,
+        SoldOutService,
         OrganizationGuard,
     ],
     exports: [ProductsService],
