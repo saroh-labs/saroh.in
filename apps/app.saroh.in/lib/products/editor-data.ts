@@ -1,7 +1,7 @@
 import { unstable_rethrow } from "next/navigation";
 
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { canWriteProducts } from "@/lib/products/access";
+import { canStockProducts, canWriteProducts } from "@/lib/products/access";
 import { listCategories, listOptions } from "@/lib/products/service";
 import {
     getEffectiveDefaults,
@@ -9,6 +9,7 @@ import {
     listAllergens,
 } from "@/lib/products/settings";
 import { DEFAULT_SKU_PATTERN } from "@/lib/products/sku-pattern";
+import { getStockTracking } from "@/lib/stock/service";
 import { productCategoriesHref } from "@/lib/stores/links";
 import { getStorefront } from "@/lib/stores/storefronts";
 
@@ -33,6 +34,7 @@ export async function loadEditorContext(
         sku,
         allergens,
         defaults,
+        business,
     ] = await Promise.all([
         getStorefront(store.id).catch(() => null),
         listCategories(),
@@ -48,6 +50,9 @@ export async function loadEditorContext(
                 return null;
             },
         ),
+        // The business's Track stock switch (#515); unknown reads as on, and
+        // the product's own switch decides.
+        getStockTracking().catch(() => null),
     ]);
     return {
         storeId: store.id,
@@ -57,6 +62,8 @@ export async function loadEditorContext(
         categoriesHref: productCategoriesHref(),
         options,
         canWrite: canWriteProducts(organization),
+        canStock: canStockProducts(organization),
+        businessTracks: business?.tracked ?? true,
         sku: sku ?? { pattern: DEFAULT_SKU_PATTERN, suggest: true, n: 1 },
         allergens: (allergens ?? []).map((a) => ({ id: a.id, name: a.name })),
         defaults,
