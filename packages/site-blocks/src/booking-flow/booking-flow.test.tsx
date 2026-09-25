@@ -456,6 +456,78 @@ describe("the booking page (U19)", () => {
         expect(retry.idempotencyKey).toBe(first.idempotencyKey);
     });
 
+    it("another time or way of paying after a failed try sends a new key; the same choice keeps it", async () => {
+        const KARAN_AT_7 = {
+            startAt: "2026-09-20T01:30:00.000Z",
+            endAt: "2026-09-20T02:30:00.000Z",
+            staffId: "staff_karan",
+            staffName: "Karan Mehta",
+            placesLeft: null,
+        };
+        const TWO_STARTS = {
+            ...ONE_DAYS,
+            days: [
+                {
+                    date: "2026-09-20",
+                    open: true,
+                    starts: [
+                        KARAN_AT_7,
+                        {
+                            ...KARAN_AT_7,
+                            startAt: "2026-09-20T02:30:00.000Z",
+                            endAt: "2026-09-20T03:30:00.000Z",
+                        },
+                    ],
+                },
+            ],
+        };
+        // Every try fails on the way back: it may or may not have booked.
+        serve((url) =>
+            url.endsWith("/days") ? json(TWO_STARTS) : json({}, 502),
+        );
+        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        await chooseOneToOne();
+        const keys = () =>
+            calls
+                .filter((c) => c.url.endsWith("/book"))
+                .map(
+                    (c) =>
+                        (
+                            JSON.parse(c.init?.body as string) as {
+                                idempotencyKey: string;
+                            }
+                        ).idempotencyKey,
+                );
+        const tryIt = async (name: string) => {
+            const before = keys().length;
+            fireEvent.click(screen.getByRole("button", { name }));
+            await waitFor(() => expect(keys()).toHaveLength(before + 1));
+            await screen.findByText(
+                "Something went wrong on our side. Please try again.",
+            );
+        };
+
+        await tryIt("Pay ₹1,200 and book");
+        // The same choice again: the same key.
+        fireEvent.click(
+            screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
+        );
+        await tryIt("Pay ₹1,200 and book");
+        // Paying at the desk instead: a new key.
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        await tryIt("Book — pay at the desk");
+        // Another time: a new key.
+        fireEvent.click(
+            screen.getByRole("radio", { name: "08:00 with Karan Mehta" }),
+        );
+        await tryIt("Book — pay at the desk");
+
+        const [first, same, desk, later] = keys();
+        expect(same).toBe(first);
+        expect(desk).not.toBe(first);
+        expect(later).not.toBe(desk);
+    });
+
     it("lists a class's sessions with places left, and a full one cannot be picked", async () => {
         serve(() => json(CLASS_DAYS));
         render(<BookingFlow page={PAGE} apiUrl={API} />);

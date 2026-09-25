@@ -409,17 +409,30 @@ export class PublicBookingsService {
     }
 
     /**
-     * An idempotent replay, to the same booker only. A hold still inside its
-     * time gets a fresh pay token (only the first one's hash was kept).
+     * An idempotent replay, to the same booker for the same booking only: the
+     * same email, time, person (when one was asked for) and way of paying.
+     * A retry that changed any of them is not the request that booked — the
+     * page would show the new time over the old booking. A hold still inside
+     * its time gets a fresh pay token (only the first one's hash was kept).
      */
     private async replay(
         existing: Booking,
         input: BookInput,
         now: Date = new Date(),
     ): Promise<{ booking: Booking; payToken: string | null }> {
+        const paidAs =
+            existing.paidWith === "DESK"
+                ? "DESK"
+                : existing.paidWith === "PAID" || existing.holdExpiresAt
+                  ? "NOW"
+                  : undefined;
         if (
             (existing.bookerEmail ?? "").toLowerCase() !==
-            input.bookerEmail.trim().toLowerCase()
+                input.bookerEmail.trim().toLowerCase() ||
+            existing.startAt.getTime() !== new Date(input.startAt).getTime() ||
+            (input.staffId !== undefined &&
+                existing.staffId !== input.staffId) ||
+            (input.pay !== undefined && paidAs !== input.pay)
         ) {
             throw new ConflictException(
                 "That booking was already made. Refresh the page and book again.",

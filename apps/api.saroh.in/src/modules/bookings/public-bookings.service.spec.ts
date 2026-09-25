@@ -262,7 +262,11 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
             ...SERVICE,
             availabilityRules: RULES,
         });
-        const prev = { id: "bk_prev", bookerEmail: "jane@example.com" };
+        const prev = {
+            id: "bk_prev",
+            bookerEmail: "jane@example.com",
+            startAt: new Date(START),
+        };
         bookingFindUnique.mockResolvedValue(prev);
 
         const res = await service.book(
@@ -296,6 +300,46 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
         expect(bookingCreate).not.toHaveBeenCalled();
     });
 
+    it.each([
+        ["another time", { startAt: "2026-07-20T10:00:00.000Z" }, {}],
+        ["another person", { staffId: "staff_2" }, { staffId: "staff_1" }],
+        ["paying at the desk", { pay: "DESK" as const }, { paidWith: "PAID" }],
+        [
+            "paying now",
+            { pay: "NOW" as const },
+            { paidWith: "DESK", holdExpiresAt: null },
+        ],
+    ])(
+        "refuses a replay for %s: it is not the request that booked",
+        async (_what, over, stored) => {
+            // Straight to the replay: the new time or person need not be
+            // bookable for the key's booking to be refused.
+            const service = new PublicBookingsService() as unknown as {
+                replay: (b: unknown, i: BookInput) => Promise<unknown>;
+            };
+            const existing = {
+                id: "bk_prev",
+                bookerEmail: "jane@example.com",
+                startAt: new Date(START),
+                staffId: null,
+                paidWith: null,
+                holdExpiresAt: null,
+                ...stored,
+            };
+            const input = baseInput({ idempotencyKey: "idem_1" });
+            await expect(
+                service.replay(existing, { ...input, ...over }),
+            ).rejects.toBeInstanceOf(ConflictException);
+            // The same request is still replayed.
+            await expect(
+                service.replay(existing, {
+                    ...input,
+                    ...("staffId" in stored ? { staffId: stored.staffId } : {}),
+                }),
+            ).resolves.toMatchObject({ booking: existing });
+        },
+    );
+
     it("counts a replay against the rate limit, so keys cannot be probed freely", async () => {
         const service = new PublicBookingsService(
             new FixedWindowRateLimiter(1, 60_000),
@@ -307,6 +351,7 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
         bookingFindUnique.mockResolvedValue({
             id: "bk_prev",
             bookerEmail: "jane@example.com",
+            startAt: new Date(START),
         });
         const input = baseInput({ idempotencyKey: "idem_1" });
         await service.book("svc_1", input, "same_ip");
@@ -323,10 +368,14 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
         });
         // Pre-check finds nothing; the tx loses the unique race; re-read wins
         // — replayed only to the same booker, like any replay.
-        bookingFindUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        const winner = {
             id: "bk_win",
             bookerEmail: "jane@example.com",
-        });
+            startAt: new Date(START),
+        };
+        bookingFindUnique
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(winner);
         bookingCount.mockResolvedValue(0);
         contactUpsert.mockResolvedValue({ id: "contact_1" });
         bookingCreate.mockRejectedValue({ code: "P2002" });
@@ -337,10 +386,7 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
             "iphash",
         );
 
-        expect(res).toEqual({
-            id: "bk_win",
-            bookerEmail: "jane@example.com",
-        });
+        expect(res).toEqual(winner);
     });
 
     it("400s an off-grid startAt (not an aligned slot) — no tx", async () => {

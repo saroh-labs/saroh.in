@@ -154,6 +154,23 @@ export default function BookingFlow({
         loadDays(id);
     };
 
+    // Another time, person or way of paying is another request: its own key,
+    // so a retry never answers with what the first try booked (#508). The
+    // same choice again keeps it.
+    const pickStart = (next: BookingStart | null) => {
+        if (
+            next?.startAt !== start?.startAt ||
+            next?.staffId !== start?.staffId
+        ) {
+            attemptKey.current = null;
+        }
+        setStart(next);
+    };
+    const pickPay = (next: "NOW" | "DESK") => {
+        if (next !== pay) attemptKey.current = null;
+        setPayChoice(next);
+    };
+
     // ── What is chosen ──────────────────────────────────────────────────
 
     const days =
@@ -525,9 +542,9 @@ export default function BookingFlow({
                                     }}
                                     onDay={(d) => {
                                         setDate(d);
-                                        setStart(null);
+                                        pickStart(null);
                                     }}
-                                    onStart={setStart}
+                                    onStart={pickStart}
                                     onMore={() =>
                                         setSessionsShown(
                                             (n) => n + SESSIONS_SHOWN,
@@ -558,7 +575,7 @@ export default function BookingFlow({
                                     pay={pay}
                                     price={price}
                                     isClass={isClass}
-                                    onPick={setPayChoice}
+                                    onPick={pickPay}
                                 />
                             ) : null}
 
