@@ -59,6 +59,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Logo", "identity"),
     business("Legal name", "identity"),
     business("Type of business", "identity"),
+    business("Time zone", "identity"),
     business("Trading since", "identity"),
     business("Workspace address", "identity"),
     business("Contact email", "contact"),
