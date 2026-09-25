@@ -2,6 +2,7 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverAnchor, PopoverContent } from "@saroh/ui/popover";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useCallback, useState, useSyncExternalStore } from "react";
@@ -19,6 +20,7 @@ import {
     navPathname,
     showsGroupLabel,
 } from "@/components/shared/nav-items";
+import { rememberRail } from "@/lib/nav/rail-cookie";
 
 /**
  * Primary navigation: a calm, goal-grouped rail.
@@ -64,7 +66,10 @@ export function AppSidebar({
     role = null,
     actions = null,
     counts,
+    collapsed: collapsedAtLoad = false,
 }: {
+    /** The person collapsed the rail to icons; read from `RAIL_COOKIE`. */
+    collapsed?: boolean;
     unread?: number;
     /** `null` = availability unknown; see `filterNavGroups`. */
     moduleKeys?: string[] | null;
@@ -80,8 +85,18 @@ export function AppSidebar({
 }) {
     const groups = navFor({ role, actions, moduleKeys });
     const pathname = navPathname(usePathname(), groups);
-    const iconRail = useIconRail();
+    const [collapsed, setCollapsed] = useState(collapsedAtLoad);
     const [flyoutFor, setFlyoutFor] = useState<string | null>(null);
+    // Icons, either because the window is narrow or because they asked.
+    const iconRail = useIconRail() || collapsed;
+
+    /** Collapse or expand, and remember it for this browser. */
+    const toggleCollapsed = () => {
+        const next = !collapsed;
+        setCollapsed(next);
+        setFlyoutFor(null);
+        rememberRail(next);
+    };
 
     // Derived, not stored: a flyout only exists on the icon rail, so widening
     // the window closes it without a second render.
@@ -95,8 +110,12 @@ export function AppSidebar({
         // keeps that scroll from running on into the page.
         <aside
             aria-label="Workspace"
+            // Collapsed by choice draws exactly what the narrow window does:
+            // every `max-[1100px]:` below has a `group-data-[collapsed]`
+            // twin keyed on this attribute.
+            data-collapsed={collapsed}
             // Below the 61px top bar, which carries the mark now.
-            className="sticky top-[61px] hidden h-[calc(100vh-61px)] w-[238px] shrink-0 flex-col border-r max-[1100px]:w-16 min-[760px]:flex print:hidden"
+            className="group/rail sticky top-[61px] hidden h-[calc(100vh-61px)] w-[238px] shrink-0 flex-col border-r data-[collapsed=true]:w-16 max-[1100px]:w-16 min-[760px]:flex print:hidden"
         >
             {/*
              * `gap-0.5` on the nav, and space bought back only where it means
@@ -110,7 +129,7 @@ export function AppSidebar({
              */}
             <nav
                 aria-label="Primary"
-                className="flex flex-1 flex-col gap-px overflow-y-auto overscroll-contain px-2.5 py-3 max-[1100px]:px-2"
+                className="flex flex-1 flex-col gap-px overflow-y-auto overscroll-contain px-2.5 py-3 group-data-[collapsed=true]/rail:px-2 max-[1100px]:px-2"
             >
                 {groups.map((group, index) => (
                     <Fragment key={group.label ?? `group-${index}`}>
@@ -133,7 +152,7 @@ export function AppSidebar({
                             )}
                         >
                             {showsGroupLabel(group) && (
-                                <p className="px-2.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground max-[1100px]:sr-only">
+                                <p className="px-2.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only">
                                     {group.label}
                                 </p>
                             )}
@@ -250,6 +269,7 @@ export function AppSidebar({
                                                         // The icon rail centres the glyph and
                                                         // drops the marker's gutter.
                                                         "max-[1100px]:justify-center max-[1100px]:px-0 max-[1100px]:before:hidden",
+                                                        "group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:px-0 group-data-[collapsed=true]/rail:before:hidden",
                                                         // The design system's ring, not
                                                         // Chrome's default blue: the focus ring
                                                         // is a keyboard user's cursor, and it
@@ -270,7 +290,7 @@ export function AppSidebar({
                                                         className="size-[19px] shrink-0"
                                                         strokeWidth={1.9}
                                                     />
-                                                    <span className="flex-1 max-[1100px]:sr-only">
+                                                    <span className="flex-1 group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only">
                                                         {item.label}
                                                     </span>
                                                     {waiting > 0 ? (
@@ -280,7 +300,7 @@ export function AppSidebar({
                                                does not borrow Warning's hue. */
                                                         <span
                                                             aria-label={`${waiting} waiting`}
-                                                            className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground max-[1100px]:sr-only"
+                                                            className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only"
                                                         >
                                                             {waiting}
                                                         </span>
@@ -322,6 +342,35 @@ export function AppSidebar({
                     </Fragment>
                 ))}
             </nav>
+            {/*
+             * Collapse to icons and back (2026-09-25). Only where the full
+             * rail is drawn: below 1100px the rail is icons already, and a
+             * button that did nothing would be a promise the rail can't keep.
+             */}
+            <div className="shrink-0 border-t border-border px-2.5 py-2 group-data-[collapsed=true]/rail:px-2 max-[1100px]:hidden">
+                <button
+                    type="button"
+                    onClick={toggleCollapsed}
+                    aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+                    title={collapsed ? "Expand menu" : "Collapse menu"}
+                    className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:px-0"
+                >
+                    {collapsed ? (
+                        <PanelLeftOpen
+                            aria-hidden
+                            className="size-4 shrink-0"
+                        />
+                    ) : (
+                        <PanelLeftClose
+                            aria-hidden
+                            className="size-4 shrink-0"
+                        />
+                    )}
+                    <span className="group-data-[collapsed=true]/rail:sr-only">
+                        {collapsed ? "Expand" : "Collapse"}
+                    </span>
+                </button>
+            </div>
         </aside>
     );
 }

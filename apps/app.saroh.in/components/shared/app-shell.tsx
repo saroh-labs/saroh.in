@@ -1,5 +1,5 @@
 import { getServerSession } from "@saroh/auth/next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
@@ -9,6 +9,7 @@ import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
 import { TabBar } from "@/components/shared/tab-bar";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
+import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
 import {
     listOrganizations,
@@ -169,6 +170,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             />
             <div className="flex min-h-0 flex-1">
                 <AppSidebar
+                    collapsed={
+                        (await cookies()).get(RAIL_COOKIE)?.value ===
+                        RAIL_COLLAPSED
+                    }
                     unread={unread}
                     moduleKeys={moduleKeys}
                     role={role}
