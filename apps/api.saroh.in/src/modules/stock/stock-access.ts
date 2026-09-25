@@ -48,5 +48,9 @@ export const CANT_WRITE_STOCK = "Your role can't count or move stock.";
 export function stockWriter(ctx: OrganizationContext): StockActor {
     authorize(ctx, "store:read");
     if (!canWriteStock(ctx)) throw new ForbiddenException(CANT_WRITE_STOCK);
-    return { organizationId: ctx.organizationId, userId: ctx.userId };
+    return {
+        organizationId: ctx.organizationId,
+        userId: ctx.userId,
+        roleKey: ctx.roleKey,
+    };
 }

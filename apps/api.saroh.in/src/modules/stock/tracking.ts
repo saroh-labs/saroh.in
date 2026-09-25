@@ -11,6 +11,10 @@ import { clearSoldOut } from "./sold-out";
 import { promisedRefusal, TRACKING_OFF_NOTE } from "./stock-words";
 import type { StockActor } from "./stock.service";
 import { recordEntry } from "./stock.service";
+import {
+    recordBusinessTracking,
+    recordProductTracking,
+} from "./tracking-audit";
 
 /**
  * Track stock on and off (#515): a product (`Product.stockTracked`) and the
@@ -35,6 +39,12 @@ import { recordEntry } from "./stock.service";
  *
  * Lock order: Product (or the business's profile) → StockLevel rows by id,
  * after whatever the caller holds — the same as every other stock flow.
+ *
+ * Each real change writes one row to the business's audit stream
+ * (Settings → Activity) on the same transaction (`tracking-audit.ts`):
+ * off says how many units were counted to 0 and at how many storefronts,
+ * on says how many hand-marked Sold outs it cleared. Turning a switch to
+ * what it already is records nothing.
  */
 
 type Tx = Prisma.TransactionClient;
@@ -103,16 +113,30 @@ export async function tracksStock(db: Db, productId: string): Promise<boolean> {
     return !(await untrackedAmong(db, [productId])).has(productId);
 }
 
+/** What emptying the shelves did, for the result and the audit row. */
+interface Emptied {
+    /** Shelves counted to 0. */
+    counted: number;
+    /** Units that were on them (a shelf sold below 0 adds none). */
+    unitsZeroed: number;
+    /** Storefronts with a shelf counted. */
+    storefronts: number;
+}
+
 /**
  * Empty locked shelves for Track stock going off: refused while any is
- * promised; every shelf with stock on it is counted to 0. Returns how many
- * were counted.
+ * promised; every shelf with stock on it is counted to 0.
  */
 async function emptyShelves(
     tx: Tx,
     actor: StockActor,
-    rows: readonly { id: string; onHand: number; promised: number }[],
-): Promise<number> {
+    rows: readonly {
+        id: string;
+        storeId: string;
+        onHand: number;
+        promised: number;
+    }[],
+): Promise<Emptied> {
     const promised = rows.reduce((n, r) => n + r.promised, 0);
     if (promised > 0) {
         throw new ConflictException({
@@ -121,6 +145,8 @@ async function emptyShelves(
         });
     }
     let counted = 0;
+    let unitsZeroed = 0;
+    const stores = new Set<string>();
     for (const row of rows) {
         if (row.onHand === 0) continue;
         await recordEntry(tx, {
@@ -134,8 +160,10 @@ async function emptyShelves(
             allowNegative: true,
         });
         counted += 1;
+        unitsZeroed += Math.max(0, row.onHand);
+        stores.add(row.storeId);
     }
-    return counted;
+    return { counted, unitsZeroed, storefronts: stores.size };
 }
 
 /**
@@ -203,19 +231,21 @@ export interface ProductTracking {
  * The caller has checked the actor may change products (`store:write`).
  * `makeShelves: false` leaves making the shelves to a caller that is about
  * to count the product per variant (it calls `ensureShelves` after).
+ * `startedWithCount` says a first count turned it on, not the switch — the
+ * audit row says so.
  */
 export async function setProductTracking(
     tx: Tx,
     actor: StockActor,
     productId: string,
     tracked: boolean,
-    opts: { makeShelves?: boolean } = {},
+    opts: { makeShelves?: boolean; startedWithCount?: boolean } = {},
 ): Promise<ProductTracking> {
     const { organizationId } = actor;
     await lockProduct(tx, productId);
     const product = await tx.product.findFirst({
         where: { id: productId, organizationId },
-        select: { stockTracked: true },
+        select: { stockTracked: true, name: true },
     });
     if (!product) throw new NotFoundException("Product not found");
     const businessTracks = await businessTracksStock(tx, organizationId);
@@ -230,14 +260,27 @@ export async function setProductTracking(
             where: { id: productId },
             data: { stockTracked: true, stockTrackedAt: new Date() },
         });
-        await clearSoldOut(tx, { productId });
+        const soldOutCleared = await clearSoldOut(tx, { productId });
+        await recordProductTracking(tx, actor, productId, {
+            tracked: true,
+            product: product.name,
+            ...(opts.startedWithCount ? { startedWithCount: true } : {}),
+            soldOutCleared,
+        });
         return result;
     }
     const rows = await lockProductStock(tx, productId);
-    result.counted = await emptyShelves(tx, actor, rows);
+    const emptied = await emptyShelves(tx, actor, rows);
+    result.counted = emptied.counted;
     await tx.product.update({
         where: { id: productId },
         data: { stockTracked: false },
+    });
+    await recordProductTracking(tx, actor, productId, {
+        tracked: false,
+        product: product.name,
+        unitsZeroed: emptied.unitsZeroed,
+        storefronts: emptied.storefronts,
     });
     return result;
 }
@@ -281,15 +324,20 @@ export async function setBusinessTracking(
         });
         // Counting starts again now: a sale made while it was off isn't a
         // sale the shelf missed.
-        await tx.product.updateMany({
+        const restarted = await tx.product.updateMany({
             where: { organizationId, stockTracked: true },
             data: { stockTrackedAt: new Date() },
         });
         // Those products count again: their count says Sold out now. One
         // whose own switch is off keeps its hand-marked Sold out.
-        await clearSoldOut(tx, {
+        const soldOutCleared = await clearSoldOut(tx, {
             organizationId,
             product: { stockTracked: true },
+        });
+        await recordBusinessTracking(tx, actor, {
+            tracked: true,
+            products: restarted.count,
+            soldOutCleared,
         });
         return result;
     }
@@ -303,13 +351,24 @@ export async function setBusinessTracking(
     );
     const rows = await tx.stockLevel.findMany({
         where: { organizationId },
-        select: { id: true, onHand: true, promised: true },
+        select: { id: true, storeId: true, onHand: true, promised: true },
         orderBy: { id: "asc" },
     });
-    result.counted = await emptyShelves(tx, actor, rows);
+    const emptied = await emptyShelves(tx, actor, rows);
+    result.counted = emptied.counted;
     await tx.businessProfile.update({
         where: { organizationId },
         data: { stockTracking: false },
+    });
+    // The products that stop counting: those whose own switch is on.
+    const products = await tx.product.count({
+        where: { organizationId, stockTracked: true },
+    });
+    await recordBusinessTracking(tx, actor, {
+        tracked: false,
+        products,
+        unitsZeroed: emptied.unitsZeroed,
+        storefronts: emptied.storefronts,
     });
     return result;
 }

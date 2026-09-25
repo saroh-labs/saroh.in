@@ -736,3 +736,225 @@ describe("the business's Track stock switch", () => {
         });
     });
 });
+
+describe("Track stock in Settings → Activity", () => {
+    /** The Track stock rows about one product or the business, oldest first. */
+    const trackingRows = (targetId: string) =>
+        prisma.auditEvent.findMany({
+            where: {
+                organizationId: orgId,
+                action: { contains: "stock-tracking" },
+                targetId,
+            },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: {
+                action: true,
+                actorUserId: true,
+                targetType: true,
+                targetId: true,
+                outcome: true,
+                metadata: true,
+            },
+        });
+
+    /** A Saroh operator acting on the business from the admin console. */
+    const operator = (): OrganizationContext => ({
+        organizationId: orgId,
+        userId: ownerId,
+        role: "OWNER",
+        roleKey: "platform-operator",
+    });
+
+    const markSoldOut = (productId: string, storeId: string) =>
+        prisma.productListing.update({
+            where: { storeId_productId: { storeId, productId } },
+            data: { soldOutAt: new Date(), soldOutByUserId: ownerId },
+        });
+
+    it("off and on each write one row, naming the product and what changed", async () => {
+        const film = await product("Stretch Film Hand Dispenser", {
+            hill: 30,
+            online: 8,
+        });
+        const started = await trackingRows(film);
+        await setTracking(owner(), film, false);
+        await setTracking(owner(), film, true);
+        const rows = (await trackingRows(film)).slice(started.length);
+        expect(rows).toEqual([
+            {
+                action: "product.stock-tracking.off",
+                actorUserId: ownerId,
+                targetType: "product",
+                targetId: film,
+                outcome: "SUCCESS",
+                metadata: {
+                    product: "Stretch Film Hand Dispenser",
+                    unitsZeroed: 38,
+                    storefronts: 2,
+                },
+            },
+            {
+                action: "product.stock-tracking.on",
+                actorUserId: ownerId,
+                targetType: "product",
+                targetId: film,
+                outcome: "SUCCESS",
+                metadata: {
+                    product: "Stretch Film Hand Dispenser",
+                    soldOutCleared: 0,
+                },
+            },
+        ]);
+    });
+
+    it("turning it to what it already is records nothing", async () => {
+        const pen = await product("Pen", { hill: 1 });
+        const before = await trackingRows(pen);
+        await setTracking(owner(), pen, true);
+        await setTracking(owner(), pen, false);
+        await setTracking(owner(), pen, false);
+        expect((await trackingRows(pen)).map((r) => r.action)).toEqual([
+            ...before.map((r) => r.action),
+            "product.stock-tracking.off",
+        ]);
+    });
+
+    it("a refused off records nothing", async () => {
+        const mug = await product("Mug", { hill: 2 });
+        const before = await trackingRows(mug);
+        const order = await place(hill, mug, 1);
+        await expect(setTracking(owner(), mug, false)).rejects.toThrow(
+            ConflictException,
+        );
+        expect(await trackingRows(mug)).toEqual(before);
+        await orders.updateStatus(hill, order, ownerId, {
+            status: "CANCELLED",
+        });
+    });
+
+    it("on says the Sold out marks it cleared, in its one row", async () => {
+        const ink = await product("Ink", { hill: 2 });
+        await setTracking(owner(), ink, false);
+        await markSoldOut(ink, hill);
+        await markSoldOut(ink, online);
+        await setTracking(owner(), ink, true);
+        expect((await trackingRows(ink)).at(-1)).toMatchObject({
+            action: "product.stock-tracking.on",
+            metadata: { product: "Ink", soldOutCleared: 2 },
+        });
+        // Not as separate "available again" rows.
+        expect(
+            await prisma.auditEvent.count({
+                where: {
+                    organizationId: orgId,
+                    targetId: ink,
+                    action: "product.sold-out.clear",
+                },
+            }),
+        ).toBe(0);
+    });
+
+    it("a first count that starts a product counting says it started with a count", async () => {
+        // The Stock flow's own start: a product with no shelf, counted.
+        const lamp = await product("Lamp", { hill: 4 });
+        expect(await trackingRows(lamp)).toEqual([
+            {
+                action: "product.stock-tracking.on",
+                actorUserId: ownerId,
+                targetType: "product",
+                targetId: lamp,
+                outcome: "SUCCESS",
+                metadata: {
+                    product: "Lamp",
+                    startedWithCount: true,
+                    soldOutCleared: 0,
+                },
+            },
+        ]);
+
+        // The product's own stock editor: marked Sold out while untracked,
+        // then counted — one row, the mark cleared in it.
+        const rug = await product("Rug", {});
+        await markSoldOut(rug, online);
+        await inventory.upsertIn(await access.write(owner(), rug, hill), rug, {
+            quantity: 3,
+            lowStockAlert: 1,
+        });
+        expect(await trackingRows(rug)).toEqual([
+            expect.objectContaining({
+                action: "product.stock-tracking.on",
+                actorUserId: ownerId,
+                metadata: {
+                    product: "Rug",
+                    startedWithCount: true,
+                    soldOutCleared: 1,
+                },
+            }),
+        ]);
+    });
+
+    it("the business's switch writes a row each way, with the products it touched", async () => {
+        await product("Shelf", { hill: 5, online: 2 });
+        const counting = await prisma.product.count({
+            where: { organizationId: orgId, stockTracked: true },
+        });
+        const stocked = await prisma.stockLevel.findMany({
+            where: { organizationId: orgId, onHand: { gt: 0 } },
+            select: { onHand: true, storeId: true },
+        });
+        const before = await trackingRows(orgId);
+
+        await business.set(owner(), false);
+        await business.set(owner(), false);
+        await business.set(owner(), true);
+        await business.set(owner(), true);
+
+        expect((await trackingRows(orgId)).slice(before.length)).toEqual([
+            {
+                action: "business.stock-tracking.off",
+                actorUserId: ownerId,
+                targetType: "organization",
+                targetId: orgId,
+                outcome: "SUCCESS",
+                metadata: {
+                    products: counting,
+                    unitsZeroed: stocked.reduce((n, r) => n + r.onHand, 0),
+                    storefronts: new Set(stocked.map((r) => r.storeId)).size,
+                },
+            },
+            {
+                action: "business.stock-tracking.on",
+                actorUserId: ownerId,
+                targetType: "organization",
+                targetId: orgId,
+                outcome: "SUCCESS",
+                metadata: { products: counting, soldOutCleared: 0 },
+            },
+        ]);
+    });
+
+    it("an operator's change is marked, so it reads as Saroh support", async () => {
+        const kite = await product("Kite", { hill: 1 });
+        await setTracking(operator(), kite, false);
+        expect((await trackingRows(kite)).at(-1)).toMatchObject({
+            action: "product.stock-tracking.off",
+            metadata: { product: "Kite", byOperator: true },
+        });
+        const before = await trackingRows(orgId);
+        await business.set(operator(), false);
+        await business.set(operator(), true);
+        const rows = (await trackingRows(orgId)).slice(before.length);
+        expect(rows.map((r) => r.action)).toEqual([
+            "business.stock-tracking.off",
+            "business.stock-tracking.on",
+        ]);
+        for (const row of rows) {
+            expect(row.metadata).toMatchObject({ byOperator: true });
+        }
+        // A merchant's own change carries no mark.
+        await setTracking(owner(), kite, true);
+        expect((await trackingRows(kite)).at(-1)?.metadata).not.toHaveProperty(
+            "byOperator",
+        );
+    });
+});

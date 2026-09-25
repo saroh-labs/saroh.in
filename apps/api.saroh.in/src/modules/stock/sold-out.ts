@@ -17,15 +17,18 @@ type Tx = Prisma.TransactionClient;
 /**
  * Clear the hand-marked Sold out on the listings `where` names: those
  * products count stock now, so their count says whether they sell.
+ * Returns how many listings (product × storefront) it cleared, which the
+ * Track stock on row in Activity says.
  */
 export async function clearSoldOut(
     tx: Pick<Tx, "productListing">,
     where: Prisma.ProductListingWhereInput,
-): Promise<void> {
-    await tx.productListing.updateMany({
+): Promise<number> {
+    const cleared = await tx.productListing.updateMany({
         where: { ...where, soldOutAt: { not: null } },
         data: { soldOutAt: null, soldOutByUserId: null },
     });
+    return cleared.count;
 }
 
 /**

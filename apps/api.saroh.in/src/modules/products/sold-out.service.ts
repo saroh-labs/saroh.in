@@ -84,7 +84,7 @@ export class SoldOutService {
         productId: string,
         soldOut: boolean,
     ): Promise<SoldOutView> {
-        const { organizationId, storeId, userId } = scope;
+        const { organizationId, storeId, userId, roleKey } = scope;
         const result = await prisma.$transaction(async (tx) => {
             await lockProduct(tx, productId);
             const product = await tx.product.findFirst({
@@ -133,6 +133,7 @@ export class SoldOutService {
                     ? AuditAction.ProductSoldOutMark
                     : AuditAction.ProductSoldOutClear,
                 actorUserId: userId,
+                actorRoleKey: roleKey,
                 organizationId,
                 targetType: "product",
                 targetId: productId,

@@ -28,6 +28,12 @@ export interface ProductScope {
     organizationId: string;
     /** Who is asking — recorded on the stock entries they write. */
     userId: string;
+    /**
+     * Their role key on an organization route (`ctx.roleKey`), for the
+     * audit rows a change writes: an operator's reads as Saroh support.
+     * Absent on a storefront alias, which no operator acts through.
+     */
+    roleKey?: string;
     /** The storefront whose shelf and listing are read or written. */
     storeId: string;
     /** The caller may change products (`store:write`). */
@@ -96,6 +102,7 @@ export class ProductAccess {
         return {
             organizationId,
             userId: ctx.userId,
+            roleKey: ctx.roleKey,
             storeId: await this.storefrontFor(
                 organizationId,
                 productId,
@@ -121,6 +128,7 @@ export class ProductAccess {
         return {
             organizationId,
             userId: ctx.userId,
+            roleKey: ctx.roleKey,
             storeId: await this.storefrontFor(
                 organizationId,
                 productId,
@@ -199,6 +207,7 @@ export class ProductAccess {
         return {
             organizationId,
             userId: ctx.userId,
+            roleKey: ctx.roleKey,
             storeId: await this.storefrontFor(
                 organizationId,
                 productId,

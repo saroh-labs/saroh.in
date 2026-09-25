@@ -9,6 +9,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { BUSINESS_UNTRACKED, CANT_CHANGE_TRACKING } from "../stock/stock-words";
+import type { StockActor } from "../stock/stock.service";
 import { count, recordEntry } from "../stock/stock.service";
 import type { ProductTracking } from "../stock/tracking";
 import {
@@ -32,6 +33,15 @@ import {
     lockProductStock,
     lockStockLevels,
 } from "./stock-levels";
+
+/** The caller as the stock flows take it: who, where, and as what role. */
+function stockActor(scope: ProductScope): StockActor {
+    return {
+        organizationId: scope.organizationId,
+        userId: scope.userId,
+        roleKey: scope.roleKey,
+    };
+}
 
 /** Why a count was written when the product switched to per-variant stock. */
 const SWITCH_NOTE = "Now counted per variant";
@@ -136,7 +146,7 @@ export class InventoryService {
             await this.startTracking(tx, scope, productId);
             return count(
                 tx,
-                { organizationId, userId },
+                { organizationId, userId, roleKey: scope.roleKey },
                 {
                     target: { storeId, productId, variantId: null },
                     counted: dto.quantity,
@@ -359,12 +369,7 @@ export class InventoryService {
             throw new ForbiddenException(CANT_CHANGE_TRACKING);
         }
         return prisma.$transaction((tx) =>
-            setProductTracking(
-                tx,
-                { organizationId: scope.organizationId, userId: scope.userId },
-                productId,
-                tracked,
-            ),
+            setProductTracking(tx, stockActor(scope), productId, tracked),
         );
     }
 
@@ -398,13 +403,11 @@ export class InventoryService {
         if (!scope.canWrite) {
             throw new ForbiddenException(CANT_CHANGE_TRACKING);
         }
-        await setProductTracking(
-            tx,
-            { organizationId: scope.organizationId, userId: scope.userId },
-            productId,
-            true,
-            opts,
-        );
+        // A first count turned it on: the Activity row says so.
+        await setProductTracking(tx, stockActor(scope), productId, true, {
+            ...opts,
+            startedWithCount: true,
+        });
         return true;
     }
 

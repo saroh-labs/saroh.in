@@ -36,7 +36,11 @@ export class StockTrackingService {
         return prisma.$transaction((tx) =>
             setBusinessTracking(
                 tx,
-                { organizationId: ctx.organizationId, userId: ctx.userId },
+                {
+                    organizationId: ctx.organizationId,
+                    userId: ctx.userId,
+                    roleKey: ctx.roleKey,
+                },
                 tracked,
             ),
         );

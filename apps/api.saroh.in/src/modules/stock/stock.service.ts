@@ -23,6 +23,7 @@ import {
     moveRefusal,
     shortBy,
 } from "./stock-words";
+import { recordProductTracking } from "./tracking-audit";
 
 /**
  * The stock module (#513): every change to what is on a shelf goes through
@@ -56,6 +57,12 @@ export interface StockActor {
     organizationId: string;
     /** The person, recorded on the entry; null for the system. */
     userId: string | null;
+    /**
+     * The acting context's role key (`ctx.roleKey`), for the audit rows a
+     * stock flow writes (Track stock, #515): an operator's reads as Saroh
+     * support.
+     */
+    roleKey?: string;
 }
 
 /** A shelf: by its row, or by storefront × product × variant. */
@@ -149,10 +156,11 @@ function shelf(row: Row): ShelfView {
  */
 async function resolveRowId(
     tx: Tx,
-    organizationId: string,
+    actor: StockActor,
     target: StockTarget,
     create: boolean,
 ): Promise<string> {
+    const { organizationId } = actor;
     if ("stockLevelId" in target) {
         const row = await tx.stockLevel.findFirst({
             where: { id: target.stockLevelId, organizationId },
@@ -197,7 +205,20 @@ async function resolveRowId(
             where: { id: productId, stockTracked: false },
             data: { stockTracked: true, stockTrackedAt: new Date() },
         });
-        if (started.count > 0) await clearSoldOut(tx, { productId });
+        if (started.count > 0) {
+            // Started by a count, not the switch: Activity says so.
+            const soldOutCleared = await clearSoldOut(tx, { productId });
+            const named = await tx.product.findUniqueOrThrow({
+                where: { id: productId },
+                select: { name: true },
+            });
+            await recordProductTracking(tx, actor, productId, {
+                tracked: true,
+                product: named.name,
+                startedWithCount: true,
+                soldOutCleared,
+            });
+        }
     }
     const made = await tx.stockLevel.create({
         data: { organizationId, storeId, productId, variantId },
@@ -231,11 +252,11 @@ async function lockRows(
 /** Find (or make) and lock one shelf. */
 async function lockTarget(
     tx: Tx,
-    organizationId: string,
+    actor: StockActor,
     target: StockTarget,
     create: boolean,
 ): Promise<Row> {
-    const id = await resolveRowId(tx, organizationId, target, create);
+    const id = await resolveRowId(tx, actor, target, create);
     const row = (await lockRows(tx, [id])).get(id);
     if (!row) throw new NotFoundException("Stock not found");
     return row;
@@ -366,7 +387,7 @@ export async function countAll(
     }
     const ids: string[] = [];
     for (const c of counts) {
-        ids.push(await resolveRowId(tx, actor.organizationId, c.target, true));
+        ids.push(await resolveRowId(tx, actor, c.target, true));
     }
     if (new Set(ids).size !== ids.length) {
         throw new BadRequestException("Count each shelf once.");
@@ -443,7 +464,7 @@ export async function adjust(
     }
     const row = await lockTarget(
         tx,
-        actor.organizationId,
+        actor,
         input.target,
         input.kind !== "WASTED",
     );
@@ -490,7 +511,7 @@ export async function returnByHand(
         });
         if (!order) throw new NotFoundException("Order not found");
     }
-    const row = await lockTarget(tx, actor.organizationId, input.target, true);
+    const row = await lockTarget(tx, actor, input.target, true);
     const entry = await recordEntry(tx, {
         stockLevelId: row.id,
         kind: "RETURNED",
@@ -535,12 +556,7 @@ export async function move(
             field: "units",
         });
     }
-    const fromId = await resolveRowId(
-        tx,
-        actor.organizationId,
-        input.from,
-        false,
-    );
+    const fromId = await resolveRowId(tx, actor, input.from, false);
     const source = await tx.stockLevel.findUniqueOrThrow({
         where: { id: fromId },
         select: { storeId: true, productId: true, variantId: true },
@@ -553,7 +569,7 @@ export async function move(
     }
     const toId = await resolveRowId(
         tx,
-        actor.organizationId,
+        actor,
         {
             storeId: input.toStoreId,
             productId: source.productId,
