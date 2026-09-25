@@ -943,22 +943,33 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
         expect(note.total.toString()).toBe("360");
     });
 
+    /** An order's rupees invoiced less rupees credited, in paise. */
+    async function uncreditedOn(orderId: string) {
+        const all = await prisma.invoice.findMany({
+            where: { orderId },
+            select: { kind: true, total: true },
+        });
+        return all.reduce(
+            (s, i) =>
+                s +
+                (i.kind === "CREDIT_NOTE" ? -1 : 1) *
+                    Math.round(Number(i.total) * 100),
+            0,
+        );
+    }
+
+    async function invoiceStatus(id: string) {
+        return (
+            await prisma.invoice.findUniqueOrThrow({
+                where: { id },
+                select: { status: true },
+            })
+        ).status;
+    }
+
     it("paid anyway, then the order refunded in full: the owed-back payment is left for its own refund", async () => {
         const { order, invoiceId, old, took } = await paidOnReplacedCharge();
-        /** Rupees invoiced less rupees credited, in paise. */
-        const uncredited = async () => {
-            const all = await prisma.invoice.findMany({
-                where: { orderId: order.id },
-                select: { kind: true, total: true },
-            });
-            return all.reduce(
-                (s, i) =>
-                    s +
-                    (i.kind === "CREDIT_NOTE" ? -1 : 1) *
-                        Math.round(Number(i.total) * 100),
-                0,
-            );
-        };
+        const uncredited = () => uncreditedOn(order.id);
 
         // The order's ₹610 goes back; the ₹250 on the replaced charge has not.
         const refund = await payments.initiateRefund(owner, order.id, {
@@ -975,13 +986,7 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
             (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
                 .paymentStatus,
         ).toBe("REFUNDED");
-        const status = async (id: string) =>
-            (
-                await prisma.invoice.findUniqueOrThrow({
-                    where: { id },
-                    select: { status: true },
-                })
-            ).status;
+        const status = invoiceStatus;
         expect(await status(invoiceId)).toBe("CREDITED");
         // Still received and not returned: not credited, not CREDITED.
         expect(await status(took.id)).toBe("PAID");
@@ -1005,5 +1010,46 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
         });
         expect(note.total.toString()).toBe("250");
         expect(await uncredited()).toBe(0);
+        // Offset in full, after the order's own refund: it reads CREDITED.
+        expect(await status(took.id)).toBe("CREDITED");
+    });
+
+    it("the owed-back payment handed back in two parts, around the order's full refund: CREDITED only once all of it is back", async () => {
+        const { order, invoiceId, old, took } = await paidOnReplacedCharge();
+
+        // ₹100 of the ₹250 goes back first.
+        await webhook({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: `prov_${old.id}`,
+            providerRefundId: `rfnd_took_a_${order.id}`,
+            refundAmountCents: 10000,
+        });
+        expect(await invoiceStatus(took.id)).toBe("PAID");
+
+        // The order's ₹610: the ₹150 still owed back is held out of it.
+        const refund = await payments.initiateRefund(owner, order.id, {
+            idempotencyKey: `took-parts-${order.id}`,
+        });
+        await webhook({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: `prov_${order.id}`,
+            providerRefundId: refund.providerRefundId,
+        });
+        expect(await invoiceStatus(invoiceId)).toBe("CREDITED");
+        expect(await invoiceStatus(took.id)).toBe("PAID");
+        expect(await uncreditedOn(order.id)).toBe(15000);
+
+        // The last ₹150: all of it is back.
+        await webhook({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: `prov_${old.id}`,
+            providerRefundId: `rfnd_took_b_${order.id}`,
+            refundAmountCents: 15000,
+        });
+        expect(await uncreditedOn(order.id)).toBe(0);
+        expect(await invoiceStatus(took.id)).toBe("CREDITED");
     });
 });
