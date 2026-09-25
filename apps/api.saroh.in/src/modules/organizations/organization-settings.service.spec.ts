@@ -19,6 +19,7 @@ jest.mock("@saroh/database", () => {
             count: jest.fn(),
         },
         order: { findFirst: jest.fn() },
+        invoiceSequence: { findMany: jest.fn().mockResolvedValue([]) },
     };
     return {
         prisma: {
@@ -35,6 +36,7 @@ import { prisma } from "@saroh/database";
 import type { OrgRole } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
 import { AuditAction } from "../audit/audit.service";
+import { invoiceSeriesKeys } from "../invoices/numbering";
 import type { MediaService } from "../media/media.service";
 import type { UpdateOrganizationDto } from "./dto";
 import { OrganizationSettingsService } from "./organization-settings.service";
@@ -47,6 +49,7 @@ const profileUpdateMany = prisma.businessProfile.updateMany as jest.Mock;
 const membershipFindMany = prisma.membership.findMany as jest.Mock;
 const membershipCount = prisma.membership.count as jest.Mock;
 const orderFindFirst = prisma.order.findFirst as jest.Mock;
+const sequenceFindMany = prisma.invoiceSequence.findMany as jest.Mock;
 
 const ctx = (role: OrgRole = "OWNER") => ({
     organizationId: "org_1",
@@ -64,6 +67,7 @@ describe("OrganizationSettingsService", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         orderFindFirst.mockResolvedValue(null);
+        sequenceFindMany.mockResolvedValue([]);
         // Unregistered until a test registers it.
         profileFindUnique.mockResolvedValue(null);
         orgFindUnique.mockResolvedValue({
@@ -456,6 +460,17 @@ describe("OrganizationSettingsService", () => {
                         postalCode: "560038",
                     },
                 });
+                // 57 invoices out this financial year.
+                sequenceFindMany.mockResolvedValue([
+                    {
+                        series: invoiceSeriesKeys(
+                            "RC",
+                            new Date(),
+                            "Asia/Kolkata",
+                        ).FY,
+                        lastNumber: 57,
+                    },
+                ]);
                 const settings = await service.get(ctx());
                 expect(settings.registeredAddress).toEqual({
                     line1: "14 Hill Road",
@@ -473,63 +488,251 @@ describe("OrganizationSettingsService", () => {
                     invoicePrefix: "RC",
                     deliveryRate: "18",
                     deliverySac: "996813",
-                    // Not stored on this row: April, as every business was.
-                    financialYearStart: 4,
+                    // Never chosen: the numbers it always had.
+                    invoiceNumber: {
+                        parts: ["PREFIX", "FY"],
+                        separator: "/",
+                        digits: 4,
+                        restart: "FY",
+                        custom: false,
+                        counters: { FY: 57, MONTH: 0, NEVER: 0 },
+                    },
                 });
                 expect(settings.profile).not.toHaveProperty("gstRegistered");
+                expect(settings.profile).not.toHaveProperty(
+                    "invoiceNumberFormat",
+                );
             });
         });
 
-        describe("financial year start", () => {
-            it("stores the month the year starts, as a tax setting", async () => {
+        describe("invoice number format", () => {
+            const REGISTERED = {
+                gstRegistered: true,
+                gstState: "29",
+                taxId: "29AAGCR4375J1ZU",
+                country: "IN",
+                invoicePrefix: "RC",
+                invoiceNumberFormat: null,
+                addressLine1: "14 Hill Road",
+                addressLine2: null,
+                city: "Bengaluru",
+                postalCode: "560038",
+            };
+            const MONTHLY = {
+                parts: ["PREFIX", "FY", "MONTH"],
+                separator: "/",
+                digits: 4,
+                restart: "MONTH",
+            };
+            const refused = async (
+                dto: UpdateOrganizationDto,
+                field: string,
+                message?: RegExp,
+            ) => {
+                const attempt = service.update(ctx(), dto);
+                await expect(attempt).rejects.toBeInstanceOf(
+                    BadRequestException,
+                );
+                await expect(attempt).rejects.toMatchObject({
+                    response: {
+                        details: { field },
+                        ...(message ? { message } : {}),
+                    },
+                });
+                expect(profileUpsert).not.toHaveBeenCalled();
+            };
+
+            it("stores the format a business builds, as a tax setting", async () => {
+                profileFindUnique.mockResolvedValue(REGISTERED);
                 await service.update(ctx(), {
-                    tax: { financialYearStart: 7 },
+                    tax: { invoiceNumber: MONTHLY },
                 });
                 expect(profileUpsert).toHaveBeenCalledWith(
                     expect.objectContaining({
-                        update: { financialYearStartMonth: 7 },
+                        update: { invoiceNumberFormat: MONTHLY },
                     }),
                 );
                 expect(record).toHaveBeenCalledWith(
                     expect.objectContaining({
-                        metadata: { fields: ["financialYearStartMonth"] },
+                        metadata: { fields: ["invoiceNumberFormat"] },
                     }),
                 );
             });
 
-            it("refuses a month that is not one, and writes nothing", async () => {
-                await expect(
-                    service.update(ctx(), { tax: { financialYearStart: 13 } }),
-                ).rejects.toMatchObject({
-                    response: { details: { field: "financialYearStart" } },
+            it("lets a business that is not registered run one counter forever", async () => {
+                await service.update(ctx(), {
+                    tax: {
+                        invoiceNumber: {
+                            parts: ["PREFIX"],
+                            separator: "/",
+                            digits: 5,
+                            restart: "NEVER",
+                        },
+                    },
                 });
-                expect(profileUpsert).not.toHaveBeenCalled();
+                expect(profileUpsert).toHaveBeenCalled();
+            });
+
+            it("refuses a counter that never restarts to a registered business", async () => {
+                profileFindUnique.mockResolvedValue(REGISTERED);
+                await refused(
+                    {
+                        tax: {
+                            invoiceNumber: {
+                                parts: ["PREFIX"],
+                                separator: "-",
+                                digits: 4,
+                                restart: "NEVER",
+                            },
+                        },
+                    },
+                    "invoiceNumberRestart",
+                    /every financial year or every month/,
+                );
+            });
+
+            it("refuses registering while the stored format never restarts", async () => {
+                profileFindUnique.mockResolvedValue({
+                    ...REGISTERED,
+                    gstRegistered: false,
+                    invoiceNumberFormat: {
+                        parts: ["PREFIX"],
+                        separator: "-",
+                        digits: 4,
+                        restart: "NEVER",
+                    },
+                });
+                await refused(
+                    { tax: { registered: true } },
+                    "invoiceNumberRestart",
+                );
+            });
+
+            it("registering with no format chosen moves to the registered default", async () => {
+                profileFindUnique.mockResolvedValue({
+                    ...REGISTERED,
+                    gstRegistered: false,
+                });
+                await service.update(ctx(), { tax: { registered: true } });
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        update: { gstRegistered: true },
+                    }),
+                );
+            });
+
+            it("refuses a yearly restart without a year in the number: numbers would repeat", async () => {
+                profileFindUnique.mockResolvedValue(REGISTERED);
+                await refused(
+                    {
+                        tax: {
+                            invoiceNumber: {
+                                parts: ["PREFIX", "MONTH"],
+                                separator: "/",
+                                digits: 4,
+                                restart: "FY",
+                            },
+                        },
+                    },
+                    "invoiceNumberParts",
+                    /financial year or the year/,
+                );
+            });
+
+            it("refuses a monthly restart without the month, or without a year", async () => {
+                profileFindUnique.mockResolvedValue(REGISTERED);
+                await refused(
+                    {
+                        tax: {
+                            invoiceNumber: {
+                                ...MONTHLY,
+                                parts: ["PREFIX", "FY"],
+                            },
+                        },
+                    },
+                    "invoiceNumberParts",
+                    /month in them/,
+                );
+                await refused(
+                    {
+                        tax: {
+                            invoiceNumber: {
+                                ...MONTHLY,
+                                parts: ["PREFIX", "MONTH"],
+                            },
+                        },
+                    },
+                    "invoiceNumberParts",
+                    /same month comes round every year/,
+                );
+            });
+
+            it("refuses a format whose longest number passes 16 characters", async () => {
+                profileFindUnique.mockResolvedValue(REGISTERED);
+                // RC/26-27/09/999999: 18.
+                await refused(
+                    {
+                        tax: {
+                            invoiceNumber: { ...MONTHLY, digits: 6 },
+                        },
+                    },
+                    "invoiceNumberDigits",
+                    /18 characters\. GST allows 16/,
+                );
+            });
+
+            it("says it on the prefix when a longer prefix alone is what passes 16", async () => {
+                profileFindUnique.mockResolvedValue({
+                    ...REGISTERED,
+                    invoiceNumberFormat: MONTHLY,
+                });
+                // RC/26-27/09/9999 is 16; RYE/26-27/09/9999, 17.
+                await refused(
+                    { tax: { invoicePrefix: "RYE" } },
+                    "invoicePrefix",
+                    /17 characters/,
+                );
+            });
+
+            it("refuses CN as the prefix where CN takes the prefix's place on credit notes", async () => {
+                profileFindUnique.mockResolvedValue({
+                    ...REGISTERED,
+                    invoiceNumberFormat: MONTHLY,
+                });
+                await refused(
+                    { tax: { invoicePrefix: "CN" } },
+                    "invoicePrefix",
+                    /CN marks credit notes/,
+                );
             });
 
             it("is Owner/Admin: a Member is refused", async () => {
                 await expect(
                     service.update(ctx("MEMBER"), {
-                        tax: { financialYearStart: 1 },
+                        tax: { invoiceNumber: MONTHLY },
                     }),
                 ).rejects.toBeInstanceOf(ForbiddenException);
                 expect(profileUpsert).not.toHaveBeenCalled();
             });
 
-            it("reads back the stored month", async () => {
+            it("reads a chosen format back as chosen", async () => {
                 orgFindUnique.mockResolvedValue({
                     id: "org_1",
                     name: "Acme",
                     slug: "acme",
                     businessProfile: {
                         legalName: null,
-                        gstRegistered: false,
+                        gstRegistered: true,
+                        invoicePrefix: "RC",
+                        invoiceNumberFormat: MONTHLY,
                         deliveryGstRate: { toString: () => "18.00" },
-                        financialYearStartMonth: 1,
                     },
                 });
-                expect((await service.get(ctx())).tax.financialYearStart).toBe(
-                    1,
-                );
+                expect((await service.get(ctx())).tax.invoiceNumber).toEqual({
+                    ...MONTHLY,
+                    custom: true,
+                    counters: { FY: 0, MONTH: 0, NEVER: 0 },
+                });
             });
         });
 

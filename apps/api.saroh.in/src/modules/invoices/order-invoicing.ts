@@ -4,11 +4,7 @@ import { SUPERSEDED_INTENT } from "../payments/intent-state";
 import { bpsToRate, rateToBps } from "./gst";
 import { stateName } from "./gst-states";
 import type { InvoiceKind } from "./numbering";
-import {
-    DEFAULT_FY_START_MONTH,
-    nextInvoiceNumber,
-    seriesFor,
-} from "./numbering";
+import { nextInvoiceNumber, seriesFor } from "./numbering";
 import type {
     BillTo,
     BuiltDocument,
@@ -54,8 +50,8 @@ export async function loadTaxProfile(
             gstState: true,
             taxId: true,
             invoicePrefix: true,
+            invoiceNumberFormat: true,
             timezone: true,
-            financialYearStartMonth: true,
             deliveryGstRate: true,
             deliverySacCode: true,
             addressLine1: true,
@@ -70,7 +66,7 @@ export async function loadTaxProfile(
         state: p?.gstState ?? null,
         prefix: p?.invoicePrefix ?? null,
         timezone: p?.timezone ?? null,
-        fyStartMonth: p?.financialYearStartMonth ?? DEFAULT_FY_START_MONTH,
+        numberFormat: p?.invoiceNumberFormat ?? null,
         deliveryRateBps: rateToBps(p?.deliveryGstRate ?? "18") ?? 1800,
         deliverySac: p?.deliverySacCode ?? null,
         address: p
@@ -89,7 +85,7 @@ export async function isGstRegistered(
 
 /** The number a new document takes, in its kind's series. */
 export async function numberFor(
-    tx: Pick<Tx, "invoiceSequence">,
+    tx: Pick<Tx, "invoiceSequence" | "invoice">,
     organizationId: string,
     profile: TaxProfile,
     kind: InvoiceKind,
@@ -104,7 +100,7 @@ export async function numberFor(
             kind,
             at,
             timezone: profile.timezone,
-            fyStartMonth: profile.fyStartMonth,
+            format: profile.numberFormat,
         }),
     );
 }

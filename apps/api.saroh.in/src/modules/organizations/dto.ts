@@ -1,5 +1,8 @@
 import { Transform, Type } from "class-transformer";
 import {
+    ArrayMaxSize,
+    ArrayUnique,
+    IsArray,
     IsBoolean,
     IsEmail,
     IsIn,
@@ -15,6 +18,14 @@ import {
     ValidateIf,
     ValidateNested,
 } from "class-validator";
+
+import {
+    MAX_COUNTER_DIGITS,
+    MIN_COUNTER_DIGITS,
+    NUMBER_PARTS,
+    NUMBER_RESTARTS,
+    NUMBER_SEPARATORS,
+} from "../invoices/numbering";
 
 /** Recognized business-profile types. Free-form-ish but constrained for hygiene. */
 export const BUSINESS_TYPES = ["individual", "company"] as const;
@@ -112,6 +123,40 @@ export class OnboardOrganizationDto {
     address?: string;
 }
 
+const DIGITS_MESSAGE = `The counter is ${MIN_COUNTER_DIGITS} to ${MAX_COUNTER_DIGITS} digits.`;
+
+/**
+ * How the business's invoice numbers are built (`numbering.ts`,
+ * NumberFormat), sent whole. Its shape is checked here; whether it suits the
+ * business — unique across years, within 16 characters, a restart GST
+ * allows — by the service, which names the field.
+ */
+export class InvoiceNumberFormatDto {
+    /** The parts before the counter, in order: PREFIX, FY, YEAR, MONTH. */
+    @IsArray()
+    @ArrayUnique({ message: "Each part can be in the number once." })
+    @ArrayMaxSize(NUMBER_PARTS.length)
+    @IsIn(NUMBER_PARTS, {
+        each: true,
+        message: "That is not a part a number can carry.",
+    })
+    parts!: string[];
+
+    @IsIn(NUMBER_SEPARATORS, { message: 'The separator is "/" or "-".' })
+    separator!: string;
+
+    @IsInt({ message: DIGITS_MESSAGE })
+    @Min(MIN_COUNTER_DIGITS, { message: DIGITS_MESSAGE })
+    @Max(MAX_COUNTER_DIGITS, { message: DIGITS_MESSAGE })
+    digits!: number;
+
+    /** FY: every financial year; MONTH: every month; NEVER: one counter. */
+    @IsIn(NUMBER_RESTARTS, {
+        message: "Numbers restart every financial year, every month or never.",
+    })
+    restart!: string;
+}
+
 /**
  * The business's GST settings (ADR-008). Owner/Admin, like the rest of the
  * profile (`org:update`). The GSTIN is the profile's `taxId`; switching
@@ -151,12 +196,11 @@ export class TaxSettingsDto {
     @Matches(/^(\d{4,8})?$/, { message: "A SAC code is 4 to 8 digits" })
     deliverySac?: string;
 
-    /** The month the financial year starts, 1–12 (4: April). */
+    /** How invoice numbers are built; absent, unchanged. */
     @IsOptional()
-    @IsInt({ message: "A financial year starts in a month, 1 to 12." })
-    @Min(1, { message: "A financial year starts in a month, 1 to 12." })
-    @Max(12, { message: "A financial year starts in a month, 1 to 12." })
-    financialYearStart?: number;
+    @ValidateNested()
+    @Type(() => InvoiceNumberFormatDto)
+    invoiceNumber?: InvoiceNumberFormatDto;
 }
 
 /**
