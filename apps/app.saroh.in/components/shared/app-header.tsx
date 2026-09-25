@@ -3,10 +3,8 @@ import Link from "next/link";
 
 import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
 import { CommandTrigger } from "@/components/shared/command-trigger";
-import { HelpLink } from "@/components/shared/help-link";
 import { NotificationsLink } from "@/components/shared/notifications-link";
 import { SkinSwitcher } from "@/components/shared/skin-switcher";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { UserMenu } from "@/components/shared/user-menu";
 import type { Organization } from "@/lib/organizations/service";
 
@@ -14,8 +12,9 @@ import type { Organization } from "@/lib/organizations/service";
  * The top bar, across the full width above the rail (the "Saroh Products
  * Screen" design). Left: the mark, a slash, and the business switcher — the
  * business is the one scope above a screen, so it is said once, here. Right:
- * search, notifications, help, and your account. Everything else is the
- * rail's job.
+ * search, notifications and your account (the "Saroh Settings" design,
+ * 2026-09-25). Help and appearance moved into the account menu. Everything
+ * else is the rail's job.
  *
  * It sits on Paper with the rail, so the working area below is the one white
  * surface. Presentational: `AppShell` fetches session, organization and
@@ -51,7 +50,6 @@ export function AppHeader(props: AppHeaderProps) {
                     <Wordmark />
                 </Link>
                 <div className="flex items-center gap-1.5">
-                    <ThemeToggle />
                     <SkinSwitcher />
                     <UserMenu name={props.user.name} email={props.user.email} />
                 </div>
@@ -91,8 +89,6 @@ export function AppHeader(props: AppHeaderProps) {
                     }}
                 />
                 {unread !== null ? <NotificationsLink unread={unread} /> : null}
-                <HelpLink />
-                <ThemeToggle />
                 {/* Renders nothing while only one skin is offered. */}
                 <SkinSwitcher />
                 <UserMenu
