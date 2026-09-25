@@ -59,6 +59,31 @@
   with composite keys — (storeId, organizationId), (productId,
   organizationId), (variantId, productId) — so the database refuses a row
   mixing two businesses.
+- **Current** — **A new shelf never changes how a product counts** (#513,
+  PR #533 review). `stock.service` makes a missing row only under the
+  product's lock, re-reads Track stock there, and refuses (409) a variant's
+  row for a product counted as a whole, or a whole row for one counted per
+  variant. A product with no shelf yet may start with either kind. Switching
+  to per-variant stock is `setVariantsIn` alone: it moves open lines'
+  `heldQuantity` (never their quantity) and needs `store:write`. **The log
+  keeps its history:** a variant with any stock entry, or a line that sold
+  or holds it, can't be removed (archive the product instead). A COUNTED
+  entry Saroh wrote (`StockEntry.system`: Track stock off, the per-variant
+  switch, a removed variant) is never undone. A return recorded by hand
+  that names an order counts against that order's refund put-backs
+  (`orderReturnableOnRow`).
+- **Current** — **A collection is the business's, hand-picked or automatic,
+  never both** (#516, DEC-031). `Collection` carries a required
+  `organizationId`. A hand-picked one lists its products in
+  `CollectionProduct` rows ordered by `position`, 500 at most
+  (`COLLECTION_PRODUCTS_MAX`, checked on every add). An automatic one sets
+  `categoryId`, and its products are read from that category and the ones
+  below it when asked, never stored, so it can't be edited by hand. A
+  category an automatic collection uses can't be deleted: the service
+  names the collection, and the `NoAction` key refuses it too. Composite
+  keys tie a membership's collection and product, and a collection's
+  category, to one business. Archived products show in neither kind. A
+  product merge (#530) moves its memberships.
 - **Current** — **A backfill that merges rows is a TypeScript script** in
   `packages/database/src/backfill/`, exported so the integration suite can seed
   old-shape rows, run it twice and check the second run changes nothing
@@ -78,7 +103,8 @@
   backfill runs it last; `held-stock.cli.ts [--dry-run]` runs it alone.
 - **Current** — **Joining two rows re-points everything first, then proves
   nothing is left** (#530, `merge-same-products.ts`): a product merge moves
-  order lines, shelves, listings, reviews, photos, codes, field values and
+  order lines, shelves, listings (with a hand-marked Sold out), hand-picked
+  collections, reviews, photos, codes, field values and
   allergens onto the survivor, counts what still names the loser, and throws
   — rolling back the business — rather than let a cascade delete it. A merge
   that would widen a live discount's reach is skipped. What a backfill tells

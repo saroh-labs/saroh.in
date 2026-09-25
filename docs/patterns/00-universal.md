@@ -85,6 +85,45 @@ each with why it stops there:
 - `modules/module-list.tsx` (430) — one list and its row, switch and state
   tag; a little over, and the row carries most of it.
 
+Added or grown past 400 by the Products and Stock release (#510–#531), each
+with why it stops there:
+
+- `stock/stock.service.ts` (1,023) — the stock module's one writer: every
+  shelf change (count, received, wasted, returned, move, undo, and the
+  order flows' sale and return) goes through `recordEntry` or the batched
+  count and undo, under one set of lock and below-zero rules. It also finds
+  and creates rows under the product's lock. Row resolution, the batch
+  writers and the order flows' writers are each a seam. Splitting them
+  means exporting the private `Row` and lock helpers across files, and it
+  hasn't been done yet.
+- `stock/reserve.ts` (822) — every hold, release, sale, kitchen undo and
+  refund put-back an order makes, plus `reserveOnPayment`. They share one
+  line loader, one lock order and the invariant (promised = sum of held).
+  Online payment (`reserveOnPayment`) is the natural cut once the online
+  checkout calls it.
+- `collections/collections.service.ts` (767) — hand-picked and automatic
+  collections, their products and a product's collections, around the one
+  category tree. The product page's reads (`forProduct`, `setForProduct`)
+  could move to their own service, as the controller's product routes
+  already are.
+- `stock/stock-reads.service.ts` (486) and `stock/stock-checks.service.ts`
+  (418) — the Stock screen's levels and log, and its four checks. Each is
+  one reader. A little over, and cutting one splits a query from the words
+  it builds.
+- `products/serialize.ts` (596), `products/inventory.service.ts` (536) and
+  `products/variants.service.ts` (442) — grew with listings, stock per
+  storefront, Track stock and the per-variant switch. `inventory.service`'s
+  first switch (`switchStore`) and `serialize`'s stock words are the seams.
+  Moving them is a file split with nothing to gain until they change again.
+- `backfill/catalogue-settings.ts` (624), `backfill/merge-same-products.ts`
+  (493), `backfill/merge-same-products.move.ts` (513),
+  `backfill/listings-stock-levels.ts` (491) and `backfill/held-stock.ts`
+  (469) — one-off backfills, each one exported unit that the integration
+  suite runs twice. The merge is already split, into deciding and moving.
+- `sites/media-picker.tsx` (509) — the media library dialog. Photos and
+  videos (#517) added the video rules and the poster frame to its one
+  upload state. Less means an upload hook, which is new logic.
+
 ## 7. No `any`, no `@ts-ignore`
 
 **Adopted** — Gap: one `any` (`payments/crypto.ts`); no `@ts-ignore`. Suppress
