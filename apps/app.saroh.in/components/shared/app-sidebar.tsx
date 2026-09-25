@@ -67,8 +67,11 @@ export function AppSidebar({
     role = null,
     actions = null,
     counts,
+    storefronts = null,
     collapsed: collapsedAtLoad = false,
 }: {
+    /** How many storefronts; with several the row reads "Storefronts". */
+    storefronts?: number | null;
     /** The person collapsed the rail to icons; read from `RAIL_COOKIE`. */
     collapsed?: boolean;
     unread?: number;
@@ -84,7 +87,7 @@ export function AppSidebar({
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
 }) {
-    const groups = navFor({ role, actions, moduleKeys });
+    const groups = navFor({ role, actions, moduleKeys, storefronts });
     const pathname = navPathname(usePathname(), groups);
     const [collapsed, setCollapsed] = useState(collapsedAtLoad);
     const [flyoutFor, setFlyoutFor] = useState<string | null>(null);

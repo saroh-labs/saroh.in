@@ -9,6 +9,7 @@ import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { newOrderHref } from "@/lib/orders/links";
 import { listProducts } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
+import { pickStorefront } from "@/lib/stores/pick";
 import { listBusinessStores } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";
 
@@ -28,9 +29,7 @@ export default async function NewOrderPage({
         searchParams,
         listBusinessStores(),
     ]);
-    const store =
-        stores.find((s) => s.id === storefront) ??
-        (stores.length === 1 ? stores[0] : undefined);
+    const store = pickStorefront(stores, storefront);
 
     if (!store) {
         return (

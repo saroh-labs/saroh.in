@@ -16,7 +16,7 @@ import {
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
 import { listSites } from "@/lib/sites/service";
-import { listStorefronts } from "@/lib/stores/storefronts";
+import { getStorefrontAllowance } from "@/lib/stores/storefronts";
 
 /**
  * The authenticated app shell, rendered once in the root layout. It is the
@@ -63,38 +63,37 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // a transient API error never blanks the shell; a successful fetch that
     // returns nothing is "nothing is enabled yet", which a new Organization
     // should see reflected in its nav rather than papered over.
-    const [unread, moduleKeys, home, sites, storefrontCount] =
-        await Promise.all([
-            unreadNotificationCount(),
-            listModules()
-                .then((modules) =>
-                    modules
-                        .filter((m) => m.readiness !== "DISABLED")
-                        .map((m) => m.key),
-                )
-                .catch(() => null),
-            // The rail's work counts come from the same ranked read model Home uses,
-            // so the two can never disagree. Non-fatal: a rail without badges is a
-            // working rail, and this renders on every page.
-            getHome().catch(() => null),
-            /*
-             * The merchant's own sites, for the command palette's jump to one.
-             *
-             * Non-fatal like the counts: a palette without them still works, and
-             * this renders on every screen in the app. It joins the same
-             * Promise.all rather than being awaited after, so it costs the slowest
-             * of four round trips instead of adding a fifth in series.
-             */
-            listSites().catch(() => []),
-            /*
-             * How many storefronts, so the palette stops offering "New storefront"
-             * once the business has its one (ADR-006). `null` on failure: the
-             * palette then offers it, and the page says there is one already.
-             */
-            listStorefronts()
-                .then((list) => list.length)
-                .catch(() => null),
-        ]);
+    const [unread, moduleKeys, home, sites, storefronts] = await Promise.all([
+        unreadNotificationCount(),
+        listModules()
+            .then((modules) =>
+                modules
+                    .filter((m) => m.readiness !== "DISABLED")
+                    .map((m) => m.key),
+            )
+            .catch(() => null),
+        // The rail's work counts come from the same ranked read model Home uses,
+        // so the two can never disagree. Non-fatal: a rail without badges is a
+        // working rail, and this renders on every page.
+        getHome().catch(() => null),
+        /*
+         * The merchant's own sites, for the command palette's jump to one.
+         *
+         * Non-fatal like the counts: a palette without them still works, and
+         * this renders on every screen in the app. It joins the same
+         * Promise.all rather than being awaited after, so it costs the slowest
+         * of four round trips instead of adding a fifth in series.
+         */
+        listSites().catch(() => []),
+        /*
+         * How many storefronts, and how many the plan allows (ADR-010):
+         * the palette stops offering "New storefront" at the limit, and
+         * the rail names the row "Storefronts" once there are several.
+         * `null` on failure: the palette then offers it, and the page
+         * says whether another can be made.
+         */
+        getStorefrontAllowance().catch(() => null),
+    ]);
 
     /*
      * Only actions that represent OUTSTANDING WORK become badges.
@@ -154,7 +153,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 role={role}
                 actions={actions}
                 sites={navSites}
-                storefrontCount={storefrontCount}
+                storefronts={storefronts}
             />
             {/* The top bar runs the full width; the rail and the working
                 area sit below it. */}
@@ -179,6 +178,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     role={role}
                     actions={actions}
                     counts={counts}
+                    storefronts={storefronts?.used ?? null}
                 />
                 {/* The working area is white and the rail sits on Paper: the
                 product spends white surfaces, and the page you work on is
@@ -213,6 +213,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 role={role}
                 actions={actions}
                 counts={counts}
+                storefronts={storefronts?.used ?? null}
             />
         </div>
     );

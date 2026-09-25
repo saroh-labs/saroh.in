@@ -6,6 +6,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { CustomerForm } from "@/components/stores/customer-form";
 import { newCustomerHref } from "@/lib/customers/links";
 import { requireSession } from "@/lib/session";
+import { pickStorefront } from "@/lib/stores/pick";
 import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Add customer" };
@@ -24,9 +25,7 @@ export default async function NewCustomerPage({
         searchParams,
         listBusinessStores(),
     ]);
-    const store =
-        stores.find((s) => s.id === storefront) ??
-        (stores.length === 1 ? stores[0] : undefined);
+    const store = pickStorefront(stores, storefront);
 
     return (
         <PageContainer width="form">

@@ -1,5 +1,6 @@
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
+import type { StorefrontAllowance } from "@/lib/business-limits";
 
 /**
  * Sell → Storefronts: every storefront in the business and the settings that
@@ -49,6 +50,11 @@ export interface StorefrontSettings extends StorefrontSummary {
     freeShippingThreshold: string | null;
     /** Orders still waiting to go out — closing is refused while any are. */
     unfulfilled: number;
+    /**
+     * Units on the shelf here and promised from it — closing is refused
+     * while either is above 0. Absent from an API that predates it.
+     */
+    stock?: { onHand: number; promised: number };
     address: string | null;
     openingHours: OpeningHoursDay[] | null;
     collectionEnabled: boolean;
@@ -79,6 +85,17 @@ export type StorefrontInput = Partial<
         | "checkoutProvider"
     > & { paused: boolean }
 >;
+
+/**
+ * How many storefronts the business has and how many its plan allows
+ * (ADR-010). `null` when it cannot be read — Sell switched off, or the API
+ * down — which offers "New storefront" and leaves the refusal to the API.
+ */
+export async function getStorefrontAllowance(): Promise<StorefrontAllowance | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return getJson<StorefrontAllowance>(`${base}/storefronts/allowance`);
+}
 
 export async function listStorefronts(): Promise<StorefrontSummary[]> {
     const base = await orgBase();
