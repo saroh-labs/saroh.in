@@ -1366,6 +1366,10 @@ model OrderItem {
   stockLevelId String?
   stockLevel   StockLevel? @relation(fields: [stockLevelId], references: [id], onDelete: SetNull)
   heldQuantity Int         @default(0)
+  // How many units the line took off that shelf when it was fulfilled
+  // (#511): a kitchen undo holds them again, and a return puts back at most
+  // this many less what was already put back.
+  soldQuantity Int         @default(0)
 
   review ProductReview?
 
@@ -3688,6 +3692,9 @@ model PaymentRefundLine {
 
   quantity    Int
   amountCents Int
+  // Units the refund puts back on the shelf ("Put N back in stock", #511):
+  // a Returned entry once the provider confirms the refund, never before.
+  putBackQuantity Int @default(0)
 
   createdAt DateTime @default(now())
 
