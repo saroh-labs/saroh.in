@@ -17,7 +17,13 @@ function mapHref(content: RenderedContact): string | null {
     if (url && /^https?:\/\//i.test(url) && isSafeHref(url)) return url;
     const address = content.address?.trim();
     if (!address) return null;
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.replace(/\s*\n\s*/g, ", "))}`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        address
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .join(", "),
+    )}`;
 }
 
 const noPage = () => undefined;

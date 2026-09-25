@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -33,6 +34,15 @@ import {
 import { FieldsService } from "./fields.service";
 import { OptionsService } from "./options.service";
 import { SkuService } from "./sku.service";
+
+/**
+ * A query value given once. `?pattern=a&pattern=b` arrives as an array, which
+ * would otherwise reach string code and fail as a 500.
+ */
+function single(name: string, value: unknown): string | undefined {
+    if (value === undefined || typeof value === "string") return value;
+    throw new BadRequestException(`Give ${name} once.`);
+}
 
 /**
  * Store-wide catalogue settings: the settings page's one read, the options
@@ -136,9 +146,9 @@ export class CatalogueController {
     skuPattern(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,
-        @Query("productId") productId?: string,
+        @Query("productId") productId?: unknown,
     ) {
-        return this.sku.get(storeId, user.id, productId);
+        return this.sku.get(storeId, user.id, single("productId", productId));
     }
 
     /** Every variant's SKU today and under this pattern, with any clash. */
@@ -146,9 +156,13 @@ export class CatalogueController {
     skuPreview(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,
-        @Query("pattern") pattern = "",
+        @Query("pattern") pattern?: unknown,
     ) {
-        return this.sku.preview(storeId, user.id, pattern);
+        return this.sku.preview(
+            storeId,
+            user.id,
+            single("pattern", pattern) ?? "",
+        );
     }
 
     @Put("sku-pattern")

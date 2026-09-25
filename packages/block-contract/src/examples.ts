@@ -139,7 +139,7 @@ export function blockExample(
  */
 function piecesOf(value: string): string[] {
     return value
-        .split(/<[^>]*>/)
+        .split(/<[^<>]*>/)
         .map((piece) => piece.replace(/\s+/g, " ").trim())
         .filter((piece) => piece !== "");
 }
