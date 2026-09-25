@@ -45,17 +45,10 @@ export function isSettingsTab(value: string | undefined): value is SettingsTab {
     return (SETTINGS_TABS as readonly string[]).includes(value ?? "");
 }
 
-/** Product settings for one storefront's catalogue, at a tab. */
-export function productSettingsHref(
-    storeId?: string,
-    tab?: SettingsTab,
-): string {
-    const params = new URLSearchParams();
-    if (storeId) params.set("storefront", storeId);
-    if (tab && tab !== "categories") params.set("tab", tab);
-    const q = params.toString();
-    return q
-        ? `/commerce/products/settings?${q}`
+/** Product settings — the business's (#529), whatever storefront — at a tab. */
+export function productSettingsHref(tab?: SettingsTab): string {
+    return tab && tab !== "categories"
+        ? `/commerce/products/settings?tab=${tab}`
         : "/commerce/products/settings";
 }
 

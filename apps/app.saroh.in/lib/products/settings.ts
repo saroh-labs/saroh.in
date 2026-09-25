@@ -1,13 +1,21 @@
 import { toFailure } from "@/lib/api/failure";
-import { apiFetch, getJson } from "@/lib/api/http";
+import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 import type { Result } from "@/lib/products/service";
 import { resultField } from "@/lib/products/service";
 
 /**
- * Product settings (#470) — one storefront's categories, options and
- * defaults, read in one call so the page never adds anything up itself.
- * Server-only; the writes are in `settings-actions.ts`.
+ * Product settings (#470) — the business's categories, options and defaults
+ * (#529: one set, whatever storefront sells the product), read in one call
+ * so the page never adds anything up itself. Read and written through the
+ * org-nested `/organizations/:id/catalogue` routes. Server-only; the writes
+ * are in `settings-actions.ts`.
  */
+
+/** The business's catalogue settings address; null with no active business. */
+export async function catalogueBase(): Promise<string | null> {
+    const base = await orgBase();
+    return base ? `${base}/catalogue` : null;
+}
 
 export type DefaultField = "howToUse" | "lowStockAlert" | "returns";
 
@@ -51,8 +59,9 @@ export interface CatalogueView {
     canWrite: boolean;
 }
 
-export function getCatalogue(storeId: string): Promise<CatalogueView | null> {
-    return getJson<CatalogueView>(`/stores/${storeId}/catalogue`);
+export async function getCatalogue(): Promise<CatalogueView | null> {
+    const base = await catalogueBase();
+    return base ? getJson<CatalogueView>(base) : null;
 }
 
 /** What a category took with it when it went, for Undo. */
@@ -92,12 +101,20 @@ export interface DefaultsSaveResult {
     };
 }
 
+/**
+ * A write to the business's catalogue settings; `path` is under
+ * `/organizations/:id/catalogue`.
+ */
 export async function send<T>(
     path: string,
     method: "POST" | "PUT" | "PATCH" | "DELETE",
     body?: unknown,
 ): Promise<Result<T>> {
-    const res = await apiFetch(path, {
+    const base = await catalogueBase();
+    if (!base) {
+        return { ok: false, error: "Pick a business first, then try again." };
+    }
+    const res = await apiFetch(`${base}${path}`, {
         method,
         ...(body ? { body: JSON.stringify(body) } : {}),
     });
@@ -116,14 +133,13 @@ export interface EffectiveDefaults {
     returns: { mode: "STOREFRONT" | "OWN"; text: string | null };
 }
 
-export function getEffectiveDefaults(
-    storeId: string,
+export async function getEffectiveDefaults(
     categoryId: string | null,
 ): Promise<EffectiveDefaults | null> {
+    const base = await catalogueBase();
+    if (!base) return null;
     const q = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : "";
-    return getJson<EffectiveDefaults>(
-        `/stores/${storeId}/catalogue/defaults/effective${q}`,
-    );
+    return getJson<EffectiveDefaults>(`${base}/defaults/effective${q}`);
 }
 
 // ---- SKU pattern (#484) ----
@@ -148,20 +164,22 @@ export interface SkuPreview {
     problem: string;
 }
 
-export function getSkuSettings(
-    storeId: string,
+export async function getSkuSettings(
     productId?: string,
 ): Promise<SkuSettings | null> {
+    const base = await catalogueBase();
+    if (!base) return null;
     const q = productId ? `?productId=${encodeURIComponent(productId)}` : "";
-    return getJson<SkuSettings>(`/stores/${storeId}/sku-pattern${q}`);
+    return getJson<SkuSettings>(`${base}/sku-pattern${q}`);
 }
 
-export function getSkuPreview(
-    storeId: string,
+export async function getSkuPreview(
     pattern: string,
 ): Promise<SkuPreview | null> {
+    const base = await catalogueBase();
+    if (!base) return null;
     return getJson<SkuPreview>(
-        `/stores/${storeId}/sku-pattern/preview?pattern=${encodeURIComponent(pattern)}`,
+        `${base}/sku-pattern/preview?pattern=${encodeURIComponent(pattern)}`,
     );
 }
 
@@ -179,8 +197,9 @@ export interface FieldView {
     productCount: number;
 }
 
-export function listFields(storeId: string): Promise<FieldView[] | null> {
-    return getJson<FieldView[]>(`/stores/${storeId}/fields`);
+export async function listFields(): Promise<FieldView[] | null> {
+    const base = await catalogueBase();
+    return base ? getJson<FieldView[]>(`${base}/fields`) : null;
 }
 
 // ---- Allergens (#483) ----
@@ -192,6 +211,7 @@ export interface AllergenView {
     mayContain: number;
 }
 
-export function listAllergens(storeId: string): Promise<AllergenView[] | null> {
-    return getJson<AllergenView[]>(`/stores/${storeId}/allergens`);
+export async function listAllergens(): Promise<AllergenView[] | null> {
+    const base = await catalogueBase();
+    return base ? getJson<AllergenView[]>(`${base}/allergens`) : null;
 }

@@ -40,12 +40,10 @@ export function useUnsaved(): Unsaved {
  * with a save bar, and leaving either with changes asks first.
  */
 export function ProductSettings({
-    storeId,
     tab,
     tabs,
     children,
 }: {
-    storeId: string;
     tab: SettingsTab;
     /** Each tab with its count, when it has one. */
     tabs: { key: SettingsTab; count?: number }[];
@@ -64,7 +62,7 @@ export function ProductSettings({
             >
                 {tabs.map(({ key, count }) => {
                     const on = key === tab;
-                    const href = productSettingsHref(storeId, key);
+                    const href = productSettingsHref(key);
                     return (
                         <Link
                             key={key}

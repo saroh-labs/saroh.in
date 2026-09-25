@@ -11,7 +11,6 @@ import { OptionsTab } from "@/components/commerce/product-settings/options-tab";
 import { ProductSettings } from "@/components/commerce/product-settings/product-settings";
 import { SkuTab } from "@/components/commerce/product-settings/sku-tab";
 import { sellCrumbs } from "@/components/commerce/sell-crumbs";
-import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
 import type { SettingsTab } from "@/lib/products/links";
 import { isSettingsTab, productSettingsHref } from "@/lib/products/links";
@@ -23,7 +22,6 @@ import {
     listFields,
 } from "@/lib/products/settings";
 import { requireSession } from "@/lib/session";
-import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Product settings" };
 
@@ -38,50 +36,29 @@ const BUILT: SettingsTab[] = [
 ];
 
 /**
- * Sell → Products → Settings (#470): one storefront's categories, the
- * options its variants choose by, and what a new product starts with.
+ * Sell → Products → Settings (#470): the business's categories, the options
+ * variants choose by, and what a new product starts with. One set for the
+ * business (#529), whatever storefront sells the product — so no storefront
+ * is picked here, and an old `?storefront=` link opens the same page.
  */
 export default async function ProductSettingsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ storefront?: string; tab?: string }>;
+    searchParams: Promise<{ tab?: string }>;
 }) {
     await requireSession();
-    const [{ storefront, tab: rawTab }, stores] = await Promise.all([
-        searchParams,
-        listBusinessStores(),
-    ]);
-    const store =
-        stores.find((s) => s.id === storefront) ??
-        (stores.length === 1 ? stores[0] : undefined);
-
-    if (!store) {
-        return (
-            <PageContainer width="form">
-                <StorefrontChooser
-                    section="Products"
-                    sectionHref="/commerce/products"
-                    crumb="Settings"
-                    title="Whose settings?"
-                    description="Each storefront keeps its own categories, options and defaults."
-                    stores={stores}
-                    hrefFor={(id) => productSettingsHref(id)}
-                />
-            </PageContainer>
-        );
-    }
+    const { tab: rawTab } = await searchParams;
 
     const tab: SettingsTab =
         isSettingsTab(rawTab) && BUILT.includes(rawTab) ? rawTab : "categories";
     const [catalogue, fields, allergens] = await Promise.all([
-        getCatalogue(store.id).catch(() => null),
-        listFields(store.id).catch(() => null),
-        listAllergens(store.id).catch(() => null),
+        getCatalogue().catch(() => null),
+        listFields().catch(() => null),
+        listAllergens().catch(() => null),
     ]);
-    const sku =
-        tab === "sku" ? await getSkuSettings(store.id).catch(() => null) : null;
+    const sku = tab === "sku" ? await getSkuSettings().catch(() => null) : null;
     const skuPreview = sku
-        ? await getSkuPreview(store.id, sku.pattern).catch(() => null)
+        ? await getSkuPreview(sku.pattern).catch(() => null)
         : null;
 
     return (
@@ -93,7 +70,6 @@ export default async function ProductSettingsPage({
                     "Settings",
                 )}
                 title="Product settings"
-                description={stores.length > 1 ? store.name : undefined}
                 actions={
                     <Link
                         href="/commerce/products"
@@ -105,7 +81,6 @@ export default async function ProductSettingsPage({
             />
             {catalogue ? (
                 <ProductSettings
-                    storeId={store.id}
                     tab={tab}
                     tabs={[
                         {
@@ -120,27 +95,21 @@ export default async function ProductSettingsPage({
                     ]}
                 >
                     {tab === "categories" ? (
-                        <CategoriesTab
-                            storeId={store.id}
-                            catalogue={catalogue}
-                        />
+                        <CategoriesTab catalogue={catalogue} />
                     ) : tab === "options" ? (
-                        <OptionsTab storeId={store.id} catalogue={catalogue} />
+                        <OptionsTab catalogue={catalogue} />
                     ) : tab === "fields" ? (
                         <FieldsTab
-                            storeId={store.id}
                             catalogue={catalogue}
                             fields={fields ?? []}
                         />
                     ) : tab === "allergens" ? (
                         <AllergensTab
-                            storeId={store.id}
                             allergens={allergens ?? []}
                             canWrite={catalogue.canWrite}
                         />
                     ) : tab === "sku" ? (
                         <SkuTab
-                            storeId={store.id}
                             settings={
                                 sku ?? {
                                     pattern: "{NAME3}{N}-{VALUE}",
@@ -152,7 +121,7 @@ export default async function ProductSettingsPage({
                             canWrite={catalogue.canWrite}
                         />
                     ) : (
-                        <DefaultsTab storeId={store.id} catalogue={catalogue} />
+                        <DefaultsTab catalogue={catalogue} />
                     )}
                 </ProductSettings>
             ) : (
@@ -161,7 +130,7 @@ export default async function ProductSettingsPage({
                     description="Nothing has been changed. Try again in a moment."
                     action={
                         <Button asChild variant="outline">
-                            <Link href={productSettingsHref(store.id, tab)}>
+                            <Link href={productSettingsHref(tab)}>
                                 Try again
                             </Link>
                         </Button>

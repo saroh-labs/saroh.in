@@ -38,13 +38,7 @@ type Mode =
  * effect at once, and every one can be undone: a rename, a merge (its
  * products move and it goes), a delete (its products go to Uncategorized).
  */
-export function CategoriesTab({
-    storeId,
-    catalogue,
-}: {
-    storeId: string;
-    catalogue: CatalogueView;
-}) {
+export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
     const router = useRouter();
     const { categories, uncategorizedCount, canWrite } = catalogue;
     const [pending, start] = useTransition();
@@ -79,12 +73,12 @@ export function CategoriesTab({
     function add() {
         if (!nn || newErr) return;
         run(async () => {
-            const res = await addCategory(storeId, nn);
+            const res = await addCategory(nn);
             if (!res.ok) return showError(res.error);
             setNewName("");
             showUndo(`${nn} added.`, () =>
                 run(async () => {
-                    const undo = await removeCategory(storeId, res.data.id);
+                    const undo = await removeCategory(res.data.id);
                     if (!undo.ok) showError(undo.error);
                 }),
             );
@@ -241,7 +235,6 @@ export function CategoriesTab({
                                         if (dn === c.name) return cancel();
                                         run(async () => {
                                             const res = await renameCategory(
-                                                storeId,
                                                 c.id,
                                                 dn,
                                             );
@@ -254,7 +247,6 @@ export function CategoriesTab({
                                                     run(async () => {
                                                         const undo =
                                                             await renameCategory(
-                                                                storeId,
                                                                 c.id,
                                                                 c.name,
                                                             );
@@ -359,7 +351,6 @@ export function CategoriesTab({
                                                 run(async () => {
                                                     const res =
                                                         await mergeCategory(
-                                                            storeId,
                                                             c.id,
                                                             mergeTo === ""
                                                                 ? null
@@ -376,7 +367,6 @@ export function CategoriesTab({
                                                             run(async () => {
                                                                 const undo =
                                                                     await restoreCategory(
-                                                                        storeId,
                                                                         res.data,
                                                                     );
                                                                 if (!undo.ok)
@@ -418,10 +408,7 @@ export function CategoriesTab({
                                         onClick={() =>
                                             run(async () => {
                                                 const res =
-                                                    await removeCategory(
-                                                        storeId,
-                                                        c.id,
-                                                    );
+                                                    await removeCategory(c.id);
                                                 if (!res.ok)
                                                     return showError(res.error);
                                                 cancel();
@@ -431,7 +418,6 @@ export function CategoriesTab({
                                                         run(async () => {
                                                             const undo =
                                                                 await restoreCategory(
-                                                                    storeId,
                                                                     res.data,
                                                                 );
                                                             if (!undo.ok)

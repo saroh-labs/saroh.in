@@ -34,13 +34,7 @@ const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
  * variant uses can't go, and an option a product chooses by can't either;
  * both say so rather than failing.
  */
-export function OptionsTab({
-    storeId,
-    catalogue,
-}: {
-    storeId: string;
-    catalogue: CatalogueView;
-}) {
+export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
     const router = useRouter();
     const { options, canWrite } = catalogue;
     const [pending, start] = useTransition();
@@ -89,7 +83,7 @@ export function OptionsTab({
             return;
         }
         run(async () => {
-            const res = await addOptionValue(storeId, optionId, v);
+            const res = await addOptionValue(optionId, v);
             if (!res.ok) {
                 setValueErr({ ...valueErr, [optionId]: res.error });
                 return;
@@ -137,7 +131,6 @@ export function OptionsTab({
                                         }
                                         run(async () => {
                                             const res = await renameOption(
-                                                storeId,
                                                 o.id,
                                                 nd,
                                             );
@@ -150,7 +143,6 @@ export function OptionsTab({
                                                     run(async () => {
                                                         const undo =
                                                             await renameOption(
-                                                                storeId,
                                                                 o.id,
                                                                 o.name,
                                                             );
@@ -243,7 +235,6 @@ export function OptionsTab({
                                                         run(async () => {
                                                             const res =
                                                                 await removeOption(
-                                                                    storeId,
                                                                     o.id,
                                                                 );
                                                             if (!res.ok)
@@ -257,7 +248,6 @@ export function OptionsTab({
                                                                         async () => {
                                                                             const undo =
                                                                                 await addOption(
-                                                                                    storeId,
                                                                                     res
                                                                                         .data
                                                                                         .name,
@@ -318,7 +308,6 @@ export function OptionsTab({
                                                         run(async () => {
                                                             const res =
                                                                 await removeOptionValue(
-                                                                    storeId,
                                                                     o.id,
                                                                     v.id,
                                                                 );
@@ -333,7 +322,6 @@ export function OptionsTab({
                                                                         async () => {
                                                                             const undo =
                                                                                 await addOptionValue(
-                                                                                    storeId,
                                                                                     o.id,
                                                                                     v.value,
                                                                                 );
@@ -415,7 +403,7 @@ export function OptionsTab({
                             e.preventDefault();
                             if (!no || newErr) return;
                             run(async () => {
-                                const res = await addOption(storeId, no);
+                                const res = await addOption(no);
                                 if (!res.ok) return showError(res.error);
                                 setNewOpt("");
                                 showUndo(
@@ -423,7 +411,6 @@ export function OptionsTab({
                                     () =>
                                         run(async () => {
                                             const undo = await removeOption(
-                                                storeId,
                                                 res.data.id,
                                             );
                                             if (!undo.ok) showError(undo.error);

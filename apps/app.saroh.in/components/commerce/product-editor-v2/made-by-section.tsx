@@ -334,7 +334,7 @@ export function MadeBySection({
                         setCustom((c) => ({ ...c, [id]: value }))
                     }
                     categoryName={product.category?.name ?? ""}
-                    manageHref={productSettingsHref(storeId, "fields")}
+                    manageHref={productSettingsHref("fields")}
                     disabled={ro}
                 />
             ) : null}
