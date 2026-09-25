@@ -23,7 +23,7 @@ describe("Product overview (DB)", () => {
     const variants = new VariantsService(products);
     const customers = new CustomersService(stores);
     const orders = new OrdersService(stores);
-    const overview = new ProductOverviewService(products, stores);
+    const overview = new ProductOverviewService(products);
 
     let ownerId = "";
     let orgId = "";

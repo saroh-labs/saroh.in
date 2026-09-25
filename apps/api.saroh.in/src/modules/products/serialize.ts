@@ -389,6 +389,103 @@ export function serializeProductListItem(
     };
 }
 
+/** One storefront that sells a catalogue product, and its stock there. */
+export interface CatalogueListingDto {
+    storeId: string;
+    storeName: string;
+    inventory: { quantity: number; lowStockAlert: number } | null;
+}
+
+/**
+ * A row of the business's catalogue (#531): one per product, whatever
+ * storefronts sell it. `storeId`, `variants` and `inventory` are as the
+ * storefront filtered by sees them, or — unfiltered — the first storefront
+ * that sells it, every variant, and the stock summed across storefronts
+ * that count it (warning at the tightest level).
+ */
+export interface CatalogueItemDto extends ProductListItemDto {
+    listings: CatalogueListingDto[];
+}
+
+interface StoreStockRowLike extends StockRowLike {
+    storeId: string;
+}
+
+interface RawCatalogueItem extends RawProduct {
+    _count: { variants: number };
+    listings: { storeId: string }[];
+    variants: {
+        id: string;
+        sku: string;
+        title: string;
+        price: DecimalLike | null;
+        stockLevels: StoreStockRowLike[];
+        listings: { listing: { storeId: string } }[];
+    }[];
+    stockLevels: StoreStockRowLike[];
+}
+
+export function serializeCatalogueItem(
+    product: RawCatalogueItem,
+    stores: readonly { id: string; name: string }[],
+    storefront?: string,
+): CatalogueItemDto {
+    // The product as one storefront sees it: the list-row shape.
+    const at = (storeId: string): RawProductListItem => ({
+        ...product,
+        variants: product.variants.map((v) => ({
+            ...v,
+            stockLevels: v.stockLevels.filter((r) => r.storeId === storeId),
+            listings: v.listings.filter((l) => l.listing.storeId === storeId),
+        })),
+        stockLevels: product.stockLevels.filter((r) => r.storeId === storeId),
+    });
+    const listed = new Set(product.listings.map((l) => l.storeId));
+    const listings = stores
+        .filter((s) => listed.has(s.id))
+        .map((s) => ({
+            storeId: s.id,
+            storeName: s.name,
+            inventory: listStock(at(s.id)),
+        }));
+    if (storefront) {
+        return {
+            ...serializeProductListItem(at(storefront), storefront),
+            listings,
+        };
+    }
+    // The whole catalogue: every variant, and the shelves added up.
+    const home = listings[0]?.storeId ?? product.storeId ?? "";
+    return {
+        ...serializeProductListItem(
+            {
+                ...product,
+                variants: product.variants.map((v) => ({
+                    ...v,
+                    stockLevels: undefined,
+                    listings: undefined,
+                })),
+                stockLevels: [],
+            },
+            home,
+        ),
+        inventory: sumStock(listings),
+        listings,
+    };
+}
+
+/** Summed across the storefronts that count it; null when none do. */
+function sumStock(
+    listings: readonly CatalogueListingDto[],
+): { quantity: number; lowStockAlert: number } | null {
+    const counted = listings.flatMap((l) => (l.inventory ? [l.inventory] : []));
+    if (counted.length === 0) return null;
+    return {
+        quantity: counted.reduce((n, c) => n + c.quantity, 0),
+        lowStockAlert: Math.min(...counted.map((c) => c.lowStockAlert)),
+    };
+}
+
 export function serializeProductDetail(
     product: RawProductDetail,
     storeId: string,

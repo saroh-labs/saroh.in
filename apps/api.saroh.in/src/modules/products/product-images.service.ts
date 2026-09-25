@@ -17,6 +17,7 @@ import {
     PRODUCT_VIDEO_LIMIT,
     VIDEO_LIMIT_MESSAGE,
 } from "./dto";
+import type { ProductScope } from "./product-access";
 import { ProductsService } from "./products.service";
 import type { ProductImageDto } from "./serialize";
 import { serializeImage } from "./serialize";
@@ -84,7 +85,16 @@ export class ProductImagesService {
         productId: string,
         userId: string,
     ): Promise<ProductImageDto[]> {
-        await this.products.assertProductReadable(storeId, productId, userId);
+        return this.listIn(
+            await this.products.access.readViaStore(storeId, userId, productId),
+            productId,
+        );
+    }
+
+    async listIn(
+        _scope: ProductScope,
+        productId: string,
+    ): Promise<ProductImageDto[]> {
         const rows = await prisma.productImage.findMany({
             where: { productId },
             orderBy: { position: "asc" },
@@ -98,17 +108,23 @@ export class ProductImagesService {
         userId: string,
         dto: ReplaceProductImagesDto,
     ): Promise<ProductImageDto[]> {
-        const organizationId = await this.products.assertProductWritable(
-            storeId,
+        return this.replaceIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
             productId,
-            userId,
+            dto,
         );
-        if (!organizationId) {
-            // Legacy org-less stores predate the photo set; nothing to scope by.
-            throw new BadRequestException(
-                "This storefront is not attached to a business, so it can't hold photos.",
-            );
-        }
+    }
+
+    async replaceIn(
+        scope: ProductScope,
+        productId: string,
+        dto: ReplaceProductImagesDto,
+    ): Promise<ProductImageDto[]> {
+        const { organizationId } = scope;
 
         const existing = await prisma.productImage.findMany({
             where: { productId },
@@ -191,7 +207,7 @@ export class ProductImagesService {
             });
         });
 
-        return this.list(storeId, productId, userId);
+        return this.listIn(scope, productId);
     }
 
     /** Turn one input into a row to write, checking where it comes from. */

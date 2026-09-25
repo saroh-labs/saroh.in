@@ -25,7 +25,7 @@ describe("products area access by role (DB)", () => {
     } as unknown as FeatureFlagService;
     const stores = new StoresService(flags);
     const products = new ProductsService(stores);
-    const overview = new ProductOverviewService(products, stores);
+    const overview = new ProductOverviewService(products);
     const inventory = new InventoryService(products);
     const options = new OptionsService();
     const catalogue = new CatalogueService(options);

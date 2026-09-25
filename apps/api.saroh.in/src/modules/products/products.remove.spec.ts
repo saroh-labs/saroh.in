@@ -4,6 +4,9 @@ jest.mock("@saroh/database", () => ({
     prisma: {
         product: { findFirst: jest.fn(), delete: jest.fn() },
         orderItem: { count: jest.fn() },
+        productListing: {
+            findUnique: jest.fn().mockResolvedValue({ id: "l_1" }),
+        },
     },
 }));
 
