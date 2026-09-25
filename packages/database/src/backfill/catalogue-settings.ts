@@ -24,7 +24,7 @@
  * nothing. Each business runs in its own transaction.
  *
  * It reads and writes only columns that exist before and after
- * `20261001100000_catalogue_settings_to_business`, so it can run on either
+ * `20261001110000_catalogue_settings_to_business`, so it can run on either
  * side of that migration (the migration refuses to run while duplicates
  * remain).
  *
