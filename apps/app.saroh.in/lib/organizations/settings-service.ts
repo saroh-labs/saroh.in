@@ -28,6 +28,8 @@ export interface TaxSettings {
     /** Percent, e.g. "18". */
     deliveryRate: string;
     deliverySac: string | null;
+    /** The month the financial year starts, 1–12; absent from an older API: April. */
+    financialYearStart?: number;
 }
 
 /**
@@ -72,6 +74,7 @@ export interface TaxSettingsInput {
     invoicePrefix?: string;
     deliveryRate?: string;
     deliverySac?: string;
+    financialYearStart?: number;
 }
 
 export interface OrganizationSettingsInput {

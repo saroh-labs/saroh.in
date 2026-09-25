@@ -27,6 +27,8 @@ export interface TaxProfile {
     state: string | null;
     prefix: string | null;
     timezone: string | null;
+    /** The month the financial year starts, 1–12; absent, April. */
+    fyStartMonth?: number;
     deliveryRateBps: number;
     deliverySac: string | null;
     /**

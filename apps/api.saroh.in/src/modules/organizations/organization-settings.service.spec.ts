@@ -473,8 +473,63 @@ describe("OrganizationSettingsService", () => {
                     invoicePrefix: "RC",
                     deliveryRate: "18",
                     deliverySac: "996813",
+                    // Not stored on this row: April, as every business was.
+                    financialYearStart: 4,
                 });
                 expect(settings.profile).not.toHaveProperty("gstRegistered");
+            });
+        });
+
+        describe("financial year start", () => {
+            it("stores the month the year starts, as a tax setting", async () => {
+                await service.update(ctx(), {
+                    tax: { financialYearStart: 7 },
+                });
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        update: { financialYearStartMonth: 7 },
+                    }),
+                );
+                expect(record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        metadata: { fields: ["financialYearStartMonth"] },
+                    }),
+                );
+            });
+
+            it("refuses a month that is not one, and writes nothing", async () => {
+                await expect(
+                    service.update(ctx(), { tax: { financialYearStart: 13 } }),
+                ).rejects.toMatchObject({
+                    response: { details: { field: "financialYearStart" } },
+                });
+                expect(profileUpsert).not.toHaveBeenCalled();
+            });
+
+            it("is Owner/Admin: a Member is refused", async () => {
+                await expect(
+                    service.update(ctx("MEMBER"), {
+                        tax: { financialYearStart: 1 },
+                    }),
+                ).rejects.toBeInstanceOf(ForbiddenException);
+                expect(profileUpsert).not.toHaveBeenCalled();
+            });
+
+            it("reads back the stored month", async () => {
+                orgFindUnique.mockResolvedValue({
+                    id: "org_1",
+                    name: "Acme",
+                    slug: "acme",
+                    businessProfile: {
+                        legalName: null,
+                        gstRegistered: false,
+                        deliveryGstRate: { toString: () => "18.00" },
+                        financialYearStartMonth: 1,
+                    },
+                });
+                expect((await service.get(ctx())).tax.financialYearStart).toBe(
+                    1,
+                );
             });
         });
 

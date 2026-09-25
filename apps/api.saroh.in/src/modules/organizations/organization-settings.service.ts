@@ -74,6 +74,7 @@ const PROFILE_SELECT = {
     invoicePrefix: true,
     deliveryGstRate: true,
     deliverySacCode: true,
+    financialYearStartMonth: true,
     logoMediaId: true,
     logoUrl: true,
     addressLine1: true,
@@ -95,6 +96,7 @@ interface ProfileRow {
     invoicePrefix: string | null;
     deliveryGstRate: { toString(): string };
     deliverySacCode: string | null;
+    financialYearStartMonth: number;
     logoMediaId: string | null;
     logoUrl: string | null;
     addressLine1: string | null;
@@ -118,6 +120,7 @@ function splitProfile(p: ProfileRow | null) {
         invoicePrefix: _p,
         deliveryGstRate: _d,
         deliverySacCode: _c,
+        financialYearStartMonth: _f,
         logoMediaId,
         logoUrl,
         addressLine1: _a1,

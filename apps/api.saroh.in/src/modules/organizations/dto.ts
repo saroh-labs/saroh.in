@@ -3,11 +3,14 @@ import {
     IsBoolean,
     IsEmail,
     IsIn,
+    IsInt,
     IsOptional,
     IsString,
     IsUrl,
     Matches,
+    Max,
     MaxLength,
+    Min,
     MinLength,
     ValidateIf,
     ValidateNested,
@@ -147,6 +150,13 @@ export class TaxSettingsDto {
     @Transform(trim)
     @Matches(/^(\d{4,8})?$/, { message: "A SAC code is 4 to 8 digits" })
     deliverySac?: string;
+
+    /** The month the financial year starts, 1–12 (4: April). */
+    @IsOptional()
+    @IsInt({ message: "A financial year starts in a month, 1 to 12." })
+    @Min(1, { message: "A financial year starts in a month, 1 to 12." })
+    @Max(12, { message: "A financial year starts in a month, 1 to 12." })
+    financialYearStart?: number;
 }
 
 /**

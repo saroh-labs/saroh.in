@@ -2,7 +2,11 @@ import { BadRequestException } from "@nestjs/common";
 
 import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
-import { prefixProblem } from "../invoices/numbering";
+import {
+    DEFAULT_FY_START_MONTH,
+    isFyStartMonth,
+    prefixProblem,
+} from "../invoices/numbering";
 import type { UpdateOrganizationDto } from "./dto";
 
 /**
@@ -20,6 +24,8 @@ export interface TaxSettingsView {
     /** The GST rate on delivery, in percent ("18"). */
     deliveryRate: string;
     deliverySac: string | null;
+    /** The month the financial year starts, 1–12 (4: April). */
+    financialYearStart: number;
 }
 
 export interface RegisteredAddressView {
@@ -43,6 +49,7 @@ export type TaxData = Partial<{
     invoicePrefix: string | null;
     deliveryGstRate: string;
     deliverySacCode: string | null;
+    financialYearStartMonth: number;
 }>;
 
 /** The stored profile, as far as the tax and address read it. */
@@ -52,6 +59,8 @@ export interface TaxProfileColumns {
     invoicePrefix: string | null;
     deliveryGstRate: { toString(): string };
     deliverySacCode: string | null;
+    /** Absent on a profile read without it: April. */
+    financialYearStartMonth?: number;
     addressLine1: string | null;
     addressLine2: string | null;
     city: string | null;
@@ -90,6 +99,8 @@ export function taxView(p: TaxProfileColumns | null): TaxSettingsView {
         invoicePrefix: p?.invoicePrefix ?? null,
         deliveryRate: bpsToRate(bps),
         deliverySac: p?.deliverySacCode ?? null,
+        financialYearStart:
+            p?.financialYearStartMonth ?? DEFAULT_FY_START_MONTH,
     };
 }
 
@@ -248,6 +259,17 @@ export function taxChanges(current: TaxCurrent | null, sent: TaxSent): TaxData {
     }
     if (tax?.deliverySac !== undefined) {
         data.deliverySacCode = tax.deliverySac === "" ? null : tax.deliverySac;
+    }
+    // Where the year starts decides only which series the next number is
+    // taken in (`seriesFor`); nothing already issued is renumbered.
+    if (tax?.financialYearStart !== undefined) {
+        if (!isFyStartMonth(tax.financialYearStart)) {
+            taxError(
+                "A financial year starts in a month, 1 to 12.",
+                "financialYearStart",
+            );
+        }
+        data.financialYearStartMonth = tax.financialYearStart;
     }
     return data;
 }
