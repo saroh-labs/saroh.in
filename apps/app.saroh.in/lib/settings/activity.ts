@@ -20,6 +20,10 @@ import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
  * Pure: the page reads the events (`lib/settings/activity-service.ts`) and
  * this turns each into a line, or drops it. The sheet a row opens, with
  * the whole of what changed, is `activity-detail.ts`.
+ *
+ * Track stock turned on or off (#515), for a product or the business, says
+ * what it did in the same voice: "turned Track stock off for Plum jam — 38
+ * set to 0", "turned Track stock on for Plum jam with its first count".
  */
 
 /**
@@ -40,6 +44,10 @@ export const ACTIVITY_ACTIONS = [
     "membership.remove",
     "product.sold-out.mark",
     "product.sold-out.clear",
+    "product.stock-tracking.on",
+    "product.stock-tracking.off",
+    "business.stock-tracking.on",
+    "business.stock-tracking.off",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -193,6 +201,7 @@ const TEAM = (view: "people" | "roles" = "people") => ({
     href: `/settings/people?${TEAM_TAB_PARAM}=${view}`,
 });
 const MODULES = { label: "Modules", href: "/settings/modules" };
+const PRODUCTS = { label: "Products", href: "/commerce/products" };
 const PLAN = { label: "Plan and billing", href: "/settings/billing" };
 
 const business = (tab?: BusinessTab) => ({
@@ -235,6 +244,32 @@ export const record = (value: unknown): Record<string, unknown> =>
 
 export const text = (value: unknown): string | null =>
     typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+
+/** A whole count the stream recorded, or `null`. */
+export const countOf = (value: unknown): number | null =>
+    typeof value === "number" && Number.isInteger(value) && value >= 0
+        ? value
+        : null;
+
+/** "1 storefront", "2 storefronts", with Indian digit grouping. */
+export const counted = (n: number, one: string, many = `${one}s`): string =>
+    `${n.toLocaleString("en-IN")} ${n === 1 ? one : many}`;
+
+/**
+ * What turning Track stock on or off did, as the tail of a sentence:
+ * " — 38 set to 0", " — cleared Sold out at 2 storefronts". Empty when it
+ * did nothing worth saying.
+ */
+function trackingTail(on: boolean, meta: Record<string, unknown>): string {
+    if (on) {
+        const cleared = countOf(meta.soldOutCleared) ?? 0;
+        return cleared > 0
+            ? ` — cleared Sold out at ${counted(cleared, "storefront")}`
+            : "";
+    }
+    const units = countOf(meta.unitsZeroed) ?? 0;
+    return units > 0 ? ` — ${units.toLocaleString("en-IN")} set to 0` : "";
+}
 
 /** A value as recorded: plain, or nothing. */
 export type ChangeValue = string | number | boolean | null;
@@ -457,6 +492,27 @@ export function activityLine(
                     ? `marked ${product} sold out${where}`
                     : `marked ${product} available again${where}`,
                 productPlace(event.targetId, meta),
+            );
+        }
+        case "product.stock-tracking.on":
+        case "product.stock-tracking.off": {
+            const on = event.action === "product.stock-tracking.on";
+            const product = text(meta.product) ?? "a product";
+            const how =
+                on && meta.startedWithCount === true
+                    ? " with its first count"
+                    : "";
+            return line(
+                `turned Track stock ${on ? "on" : "off"} for ${product}${how}${trackingTail(on, meta)}`,
+                productPlace(event.targetId, meta),
+            );
+        }
+        case "business.stock-tracking.on":
+        case "business.stock-tracking.off": {
+            const on = event.action === "business.stock-tracking.on";
+            return line(
+                `turned Track stock ${on ? "on" : "off"} for the business`,
+                PRODUCTS,
             );
         }
         default:

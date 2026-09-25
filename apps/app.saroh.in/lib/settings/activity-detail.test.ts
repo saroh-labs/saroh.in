@@ -209,6 +209,85 @@ describe("activityDetail — what changed", () => {
         });
         expect(
             rows({
+                action: "product.stock-tracking.off",
+                targetId: "p1",
+                metadata: {
+                    product: "Stretch Film Hand Dispenser",
+                    unitsZeroed: 38,
+                    storefronts: 2,
+                },
+            }),
+        ).toEqual([
+            {
+                label: "Product",
+                before: null,
+                after: "Stretch Film Hand Dispenser",
+            },
+            { label: "Track stock", before: "On", after: "Off" },
+            {
+                label: "Stock",
+                before: null,
+                after: "38 units set to 0 at 2 storefronts",
+            },
+        ]);
+        expect(
+            rows({
+                action: "product.stock-tracking.on",
+                targetId: "p1",
+                metadata: {
+                    product: "Rye loaf",
+                    startedWithCount: true,
+                    soldOutCleared: 1,
+                },
+            }),
+        ).toEqual([
+            { label: "Product", before: null, after: "Rye loaf" },
+            { label: "Track stock", before: "Off", after: "On" },
+            { label: "Started by", before: null, after: "Its first count" },
+            {
+                label: "Sold out by hand",
+                before: null,
+                after: "Cleared at 1 storefront",
+            },
+        ]);
+        expect(
+            rows({
+                action: "business.stock-tracking.off",
+                metadata: { products: 12, unitsZeroed: 1400, storefronts: 1 },
+            }),
+        ).toEqual([
+            { label: "Track stock", before: "On", after: "Off" },
+            {
+                label: "Products",
+                before: null,
+                after: "12 products stopped counting",
+            },
+            {
+                label: "Stock",
+                before: null,
+                after: "1,400 units set to 0 at 1 storefront",
+            },
+        ]);
+        expect(
+            rows({
+                action: "business.stock-tracking.on",
+                metadata: { products: 1, soldOutCleared: 3 },
+            }),
+        ).toEqual([
+            { label: "Track stock", before: "Off", after: "On" },
+            {
+                label: "Products",
+                before: null,
+                after: "1 product counting again, from 0",
+            },
+            {
+                label: "Sold out by hand",
+                before: null,
+                after: "Cleared 3 marks",
+            },
+        ]);
+        expect(
+            rows({
                 action: "organization.module.enabled",
                 targetId: "PAYMENTS",
                 metadata: { module: "Payments", enabled: true },
