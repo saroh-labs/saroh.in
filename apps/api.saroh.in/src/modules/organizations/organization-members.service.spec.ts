@@ -145,6 +145,38 @@ describe("inviting", () => {
         expect(written.create.tokenHash).not.toContain(token);
     });
 
+    // Team → People's Resend is this: inviting an address that already has
+    // an invitation. It must be a fresh link and a fresh week, with the old
+    // link dead, not a second row.
+    it("sending again refreshes the invitation's link and week in place", async () => {
+        const before = Date.now();
+        await service.invite(ctx(), {
+            email: "reviewer@example.test",
+            role: "REVIEWER",
+            siteIds: ["site_1"],
+        });
+
+        const [[, url]] = (sendOrganizationInvitationEmail as jest.Mock).mock
+            .calls;
+        const token = url.split("/join/")[1];
+        const written = db.organizationInvitation.upsert.mock.calls[0][0];
+        expect(written.where).toEqual({
+            organizationId_email: {
+                organizationId: "org_1",
+                email: "reviewer@example.test",
+            },
+        });
+        expect(written.update).toMatchObject({
+            tokenHash: hashInviteToken(token),
+            status: "PENDING",
+            acceptedAt: null,
+        });
+        const week = 7 * 24 * 60 * 60 * 1000;
+        expect(written.update.expiresAt.getTime()).toBeGreaterThanOrEqual(
+            before + week,
+        );
+    });
+
     it("never returns a token to the inviter or the roster screen", async () => {
         const invitation = await service.invite(ctx(), {
             email: "reviewer@example.test",
