@@ -341,6 +341,17 @@ export function OrganizationSettingsForm({
     const registered = v.gstRegistered;
     // An open edit with changes holds the way off this page.
     const { leaveTo, stay } = useLeaveGuard(editing !== null && isDirty);
+    // The number-format rules span four fields (and the prefix and GST
+    // switch), but the form re-checks only the field that changed, so the
+    // rule is worked out here from what is on screen: a part ticked in shows
+    // the 16-character problem and turns Save off at once.
+    const numberProblem =
+        editing === "tax"
+            ? numberFormatProblem(formatOf(v), {
+                  registered: v.gstRegistered,
+                  prefix: prefixOf(v.invoicePrefix),
+              })
+            : null;
 
     const startEditing = (key: SectionKey) => {
         if (editing && editing !== key && isDirty) {
@@ -575,10 +586,14 @@ export function OrganizationSettingsForm({
     };
 
     // Why Save is off, in the footer's words.
-    const sectionErrors = editing
-        ? Object.keys(errors).filter((field) => sectionOf(field) === editing)
-              .length
-        : 0;
+    const sectionErrors =
+        (editing
+            ? Object.keys(errors).filter(
+                  (field) => sectionOf(field) === editing,
+              ).length
+            : 0) +
+        // The live number-format problem, until Save puts it on a field.
+        (numberProblem && !NUMBER_FIELDS.some((key) => errors[key]) ? 1 : 0);
     const saveWhy = !isDirty
         ? "No changes yet"
         : sectionErrors === 1
@@ -854,7 +869,7 @@ export function OrganizationSettingsForm({
                     prefix={prefixOf(v.invoicePrefix)}
                     registered={registered}
                     next={number(v)}
-                    problem={NUMBER_FIELDS.some((key) => errors[key])}
+                    problem={numberProblem?.message ?? null}
                     at={at}
                 />
                 {registered ? (

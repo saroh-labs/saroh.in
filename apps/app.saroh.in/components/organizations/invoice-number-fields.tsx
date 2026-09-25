@@ -74,7 +74,8 @@ export function InvoiceNumberFields({
     /** The next invoice's number in it. */
     next: string;
     /** Whether the format is refused (the message is on its field). */
-    problem: boolean;
+    /** Why the format is refused, worked out from what is on screen; null when it is fine. */
+    problem: string | null;
     at: (
         basis: string,
         grow?: boolean,
@@ -324,6 +325,14 @@ export function InvoiceNumberFields({
                     )}
                     {`${longest.length} of ${MAX_NUMBER_LENGTH} characters at most`}
                 </span>
+                {problem ? (
+                    <span
+                        role="alert"
+                        className="basis-full text-[12px] text-destructive"
+                    >
+                        {problem}
+                    </span>
+                ) : null}
                 <span className="basis-full text-[11.5px] text-muted-foreground">
                     Credit notes read like{" "}
                     <span className="font-mono">{credit}</span>
