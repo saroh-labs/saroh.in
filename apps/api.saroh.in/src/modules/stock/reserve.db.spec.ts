@@ -39,7 +39,10 @@ import {
 } from "../webhooks/providers/fake.webhook";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { reserveOnPayment, soldOutRefundKey, uncommitLines } from "./reserve";
-import { SOLD_OUT_WHILE_PAYING } from "./stock-words";
+import {
+    ORDER_CLOSED_WHILE_PAYING,
+    SOLD_OUT_WHILE_PAYING,
+} from "./stock-words";
 import { count, returnByHand } from "./stock.service";
 
 const WEBHOOK_SECRET = "whsec_reserve_test";
@@ -999,6 +1002,81 @@ describe("online orders: reserveOnPayment", () => {
         });
         return { orderId: order.id, paymentIntentId: intent.id };
     }
+
+    it("two payments for the last unit at once: one holds, the other is refused and refunded", async () => {
+        const last = await product("Last lamp", { online: 1 });
+        const a = await onlineOrder(last, 1);
+        const b = await onlineOrder(last, 1);
+        const results = await Promise.allSettled(
+            [a, b].map((x) =>
+                prisma.$transaction((tx) =>
+                    reserveOnPayment(tx, { organizationId: orgId, ...x }),
+                ),
+            ),
+        );
+        const values = results.map((r) =>
+            r.status === "fulfilled" ? r.value : null,
+        );
+        expect(values.filter((v) => v?.kind === "HELD")).toHaveLength(1);
+        const refused = values.filter((v) => v?.kind === "REFUSED");
+        expect(refused).toHaveLength(1);
+        expect(refused[0]).toMatchObject({
+            created: true,
+            message: SOLD_OUT_WHILE_PAYING,
+        });
+        const loser = values[0]?.kind === "REFUSED" ? a : b;
+        expect(
+            await prisma.paymentRefund.findMany({
+                where: { paymentIntentId: loser.paymentIntentId },
+                select: { amountCents: true, status: true },
+            }),
+        ).toEqual([{ amountCents: 10000, status: "PENDING" }]);
+        expect(await shelf(online, last)).toMatchObject({
+            onHand: 1,
+            promised: 1,
+        });
+    });
+
+    it("a payment reaching an order already cancelled holds nothing and is refunded", async () => {
+        const vase = await product("Blue vase", { online: 5 });
+        const x = await onlineOrder(vase, 2);
+        await prisma.order.update({
+            where: { id: x.orderId },
+            data: { status: "CANCELLED" },
+        });
+        const reserve = () =>
+            prisma.$transaction((tx) =>
+                reserveOnPayment(tx, { organizationId: orgId, ...x }),
+            );
+        const first = await reserve();
+        expect(first).toMatchObject({
+            kind: "REFUSED",
+            created: true,
+            refusal: null,
+            message: ORDER_CLOSED_WHILE_PAYING,
+        });
+        // Delivered again: the same refusal, the same refund.
+        const again = await reserve();
+        expect(again).toMatchObject({
+            kind: "REFUSED",
+            created: false,
+            message: ORDER_CLOSED_WHILE_PAYING,
+        });
+        if (first.kind !== "REFUSED" || again.kind !== "REFUSED") {
+            throw new Error("expected refusals");
+        }
+        expect(again.refundId).toBe(first.refundId);
+        expect(await shelf(online, vase)).toMatchObject({
+            onHand: 5,
+            promised: 0,
+        });
+        expect(
+            await prisma.orderItem.findFirstOrThrow({
+                where: { orderId: x.orderId },
+                select: { stockRow: true, heldQuantity: true },
+            }),
+        ).toEqual({ stockRow: null, heldQuantity: 0 });
+    });
 
     it("the winner holds once; the loser's refusal is recorded once with one refund, sent once", async () => {
         const last = await product("Last candle", { online: 1 });

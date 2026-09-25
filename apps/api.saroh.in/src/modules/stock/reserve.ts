@@ -5,6 +5,7 @@ import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { lockStockLevels } from "../products/stock-levels";
 import { markedSoldOut, soldOutKey } from "./sold-out";
 import {
+    ORDER_CLOSED_WHILE_PAYING,
     putBackRefusal,
     RETURNED_CANT_UNDO,
     sellRefusal,
@@ -57,6 +58,9 @@ import { untrackedAmong } from "./tracking";
  */
 
 type Tx = Prisma.TransactionClient;
+
+/** An order that still holds stock (orders' RESERVING_STATUSES). */
+const OPEN_STATUSES: readonly string[] = ["PENDING", "PROCESSING"];
 
 interface Line {
     id: string;
@@ -724,8 +728,10 @@ export type ReserveOnPaymentResult =
 
 /**
  * An online order is paid (R5): hold its units now, or — when another
- * payment took the last of them — record the refusal and the automatic
- * refund of the whole payment (DEC-032). Idempotent per payment intent: a
+ * payment took the last of them, or the order was closed (cancelled,
+ * expired, fulfilled) before the payment arrived — record the refusal and
+ * the automatic refund of the whole payment (DEC-032). A closed order never
+ * holds: nothing would ever release it. Idempotent per payment intent: a
  * second call for a held order changes nothing, and for a refused one
  * returns the same refusal and the same refund, never a second.
  *
@@ -752,12 +758,13 @@ export async function reserveOnPayment(
         throw new ConflictException("That payment is not this order's.");
     }
     const [intent] = intents;
-    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
+    const [order] = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status::text AS status FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
 
     const key = soldOutRefundKey(input.paymentIntentId);
     const refused = await tx.paymentRefund.findFirst({
         where: { paymentIntentId: input.paymentIntentId, idempotencyKey: key },
-        select: { id: true },
+        select: { id: true, reason: true },
     });
     if (refused) {
         return {
@@ -765,13 +772,17 @@ export async function reserveOnPayment(
             refundId: refused.id,
             created: false,
             refusal: null,
-            message: SOLD_OUT_WHILE_PAYING,
+            message: refused.reason ?? SOLD_OUT_WHILE_PAYING,
         };
     }
 
-    const lines = await loadLines(tx, { orderId: input.orderId });
-    const refusal = await tryHold(tx, lines);
-    if (!refusal) return { kind: "HELD" };
+    // Only an open order holds: a cancelled or expired one would keep the
+    // units promised for good, since nothing releases a closed order.
+    const open = OPEN_STATUSES.includes(order?.status ?? "");
+    const lines = open ? await loadLines(tx, { orderId: input.orderId }) : [];
+    const refusal = open ? await tryHold(tx, lines) : null;
+    if (open && !refusal) return { kind: "HELD" };
+    const message = open ? SOLD_OUT_WHILE_PAYING : ORDER_CLOSED_WHILE_PAYING;
 
     await tx.paymentAttempt.create({
         data: {
@@ -779,12 +790,14 @@ export async function reserveOnPayment(
             paymentIntentId: input.paymentIntentId,
             provider: intent.provider,
             status: CAPTURED_NEEDS_REFUND,
-            rawResponse: {
-                reason: "SOLD_OUT",
-                productId: refusal.productId,
-                variantId: refusal.variantId,
-                available: refusal.available,
-            },
+            rawResponse: refusal
+                ? {
+                      reason: "SOLD_OUT",
+                      productId: refusal.productId,
+                      variantId: refusal.variantId,
+                      available: refusal.available,
+                  }
+                : { reason: "ORDER_CLOSED", status: order?.status ?? null },
         },
     });
     const refund = await tx.paymentRefund.create({
@@ -794,7 +807,7 @@ export async function reserveOnPayment(
             amountCents: intent.amountCents,
             currency: intent.currency,
             status: "PENDING",
-            reason: SOLD_OUT_WHILE_PAYING,
+            reason: message,
             idempotencyKey: key,
         },
         select: { id: true },
@@ -804,6 +817,6 @@ export async function reserveOnPayment(
         refundId: refund.id,
         created: true,
         refusal,
-        message: SOLD_OUT_WHILE_PAYING,
+        message,
     };
 }

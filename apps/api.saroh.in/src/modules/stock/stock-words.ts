@@ -147,6 +147,10 @@ export function sellRefusal(
 export const SOLD_OUT_WHILE_PAYING =
     "Sorry, it sold out while you were paying — your money is on its way back.";
 
+/** The customer's words when their payment reached an order already closed. */
+export const ORDER_CLOSED_WHILE_PAYING =
+    "Sorry, this order was closed before your payment reached us — your money is on its way back.";
+
 /** Why a kitchen undo can't take a fulfilment back. */
 export const RETURNED_CANT_UNDO =
     "Money or items have come back on this order, so it can't be taken back to before it was handed over.";
