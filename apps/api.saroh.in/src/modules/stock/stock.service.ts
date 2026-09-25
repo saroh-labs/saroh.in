@@ -436,6 +436,76 @@ export async function recordEntry(
 }
 
 // ---------------------------------------------------------------------------
+// Writing many at once (a count of many shelves, an undo of many entries)
+// ---------------------------------------------------------------------------
+
+type EntryData = Prisma.StockEntryCreateManyInput;
+
+/** An entry for a locked row whose on hand was `row.onHand` before it. */
+function entryData(
+    row: Row,
+    input: Omit<RecordEntryInput, "stockLevelId" | "promisedDelta">,
+): EntryData {
+    return {
+        organizationId: row.organizationId,
+        stockLevelId: row.id,
+        storeId: row.storeId,
+        productId: row.productId,
+        variantId: row.variantId,
+        kind: input.kind,
+        quantity: input.quantity,
+        before: row.onHand,
+        after: row.onHand + input.quantity,
+        expected: input.expected ?? null,
+        counted: input.counted ?? null,
+        orderId: input.orderId ?? null,
+        pairId: input.pairId ?? null,
+        reversesId: input.reversesId ?? null,
+        actorUserId: input.actorUserId ?? null,
+        note: input.note ?? null,
+        system: input.system ?? null,
+    };
+}
+
+/**
+ * Write entries in one statement, returned in the order given — matched by
+ * `key`, which is unique within the batch (the shelf of a count, the entry
+ * an undo reverses), so the order never depends on the database's.
+ */
+async function writeEntries(
+    tx: Tx,
+    data: readonly EntryData[],
+    key: (e: { stockLevelId: string; reversesId?: string | null }) => string,
+): Promise<StockEntryView[]> {
+    if (data.length === 0) return [];
+    const made = await tx.stockEntry.createManyAndReturn({ data: [...data] });
+    const byKey = new Map(made.map((e) => [key(e), e] as const));
+    return data.map((d) => {
+        const entry = byKey.get(key(d));
+        if (!entry) throw new Error("A stock entry was not written.");
+        return entry;
+    });
+}
+
+/** Set locked rows' on hand and warning level in one statement. */
+async function setShelves(
+    tx: Tx,
+    rows: readonly Pick<Row, "id" | "onHand" | "lowStockAlert">[],
+): Promise<void> {
+    if (rows.length === 0) return;
+    const ids = rows.map((r) => r.id);
+    const onHand = rows.map((r) => r.onHand);
+    const warn = rows.map((r) => r.lowStockAlert);
+    await tx.$executeRaw`
+        UPDATE "StockLevel" AS s
+        SET "onHand" = v."onHand", "lowStockAlert" = v."warn",
+            "updatedAt" = CURRENT_TIMESTAMP
+        FROM unnest(${ids}::text[], ${onHand}::int[], ${warn}::int[])
+            AS v(id, "onHand", "warn")
+        WHERE s.id = v.id`;
+}
+
+// ---------------------------------------------------------------------------
 // Counts
 // ---------------------------------------------------------------------------
 
@@ -476,40 +546,43 @@ export async function countAll(
     if (new Set(ids).size !== ids.length) {
         throw new BadRequestException("Count each shelf once.");
     }
-    await lockRows(tx, ids);
-    const out: CountResult[] = [];
-    for (const [i, c] of counts.entries()) {
-        const id = ids[i];
-        if (c.lowStockAlert != null) {
-            await tx.stockLevel.update({
-                where: { id },
-                data: { lowStockAlert: c.lowStockAlert },
-            });
-        }
-        const current = await tx.stockLevel.findUniqueOrThrow({
-            where: { id },
-            select: { onHand: true },
-        });
-        const entry = await recordEntry(tx, {
-            stockLevelId: id,
-            kind: "COUNTED",
-            quantity: c.counted - current.onHand,
-            expected: c.expected ?? null,
-            counted: c.counted,
-            actorUserId: actor.userId,
-            note: c.note ?? null,
-        });
-        const row = await tx.stockLevel.findUniqueOrThrow({
-            where: { id },
-            select: ROW_SELECT,
-        });
-        out.push({
-            entry,
-            shelf: shelf(row),
-            mismatch: countMismatched(entry.expected, entry.before),
-        });
-    }
-    return out;
+    // Under the locks, one read of every shelf, one write of every entry
+    // and one of every shelf: a stock take of hundreds of shelves holds its
+    // locks for three round trips, not five per shelf.
+    const rows = await lockRows(tx, ids);
+    const counted = counts.map((c, i) => {
+        const row = rows.get(ids[i]);
+        if (!row) throw new NotFoundException("Stock not found");
+        return {
+            row: {
+                ...row,
+                onHand: c.counted,
+                lowStockAlert: c.lowStockAlert ?? row.lowStockAlert,
+            },
+            entry: entryData(row, {
+                kind: "COUNTED",
+                quantity: c.counted - row.onHand,
+                expected: c.expected ?? null,
+                counted: c.counted,
+                actorUserId: actor.userId,
+                note: c.note ?? null,
+            }),
+        };
+    });
+    const entries = await writeEntries(
+        tx,
+        counted.map((c) => c.entry),
+        (e) => e.stockLevelId,
+    );
+    await setShelves(
+        tx,
+        counted.map((c) => c.row),
+    );
+    return counted.map((c, i) => ({
+        entry: entries[i],
+        shelf: shelf(c.row),
+        mismatch: countMismatched(entries[i].expected, entries[i].before),
+    }));
 }
 
 /** Count one shelf. */
@@ -802,31 +875,31 @@ export async function reverse(
     });
     if (undone > 0) throw new ConflictException(ALREADY_UNDONE);
 
-    const onHand = new Map(
-        Array.from(rows.values()).map((r) => [r.id, r.onHand] as const),
+    // Each undo in turn, in memory: a shelf named twice reads the first
+    // undo's result as the second's before. Then one write of the entries
+    // and one of the shelves.
+    const now = new Map<string, Row>(
+        Array.from(rows.values()).map((r) => [r.id, { ...r }]),
     );
+    const newPair = new Map<string, string>();
+    const data: EntryData[] = [];
     for (const e of entries) {
-        const next = (onHand.get(e.stockLevelId) ?? 0) - e.quantity;
+        const row = now.get(e.stockLevelId);
+        if (!row) throw new NotFoundException("Stock not found");
+        const next = row.onHand - e.quantity;
         // Refused only where the undo takes units away (as recordEntry).
         if (next < 0 && -e.quantity < 0) {
             throw new ConflictException(
                 belowZeroRefusal(await storefrontName(tx, e.storeId)),
             );
         }
-        onHand.set(e.stockLevelId, next);
-    }
-
-    const newPair = new Map<string, string>();
-    const written: StockEntryView[] = [];
-    for (const e of entries) {
         let pairId: string | null = null;
         if (e.pairId) {
             pairId = newPair.get(e.pairId) ?? randomUUID();
             newPair.set(e.pairId, pairId);
         }
-        written.push(
-            await recordEntry(tx, {
-                stockLevelId: e.stockLevelId,
+        data.push(
+            entryData(row, {
                 kind: "REVERSED",
                 quantity: -e.quantity,
                 reversesId: e.id,
@@ -835,7 +908,10 @@ export async function reverse(
                 note: input.note ?? null,
             }),
         );
+        row.onHand = next;
     }
+    const written = await writeEntries(tx, data, (e) => e.reversesId ?? "");
+    await setShelves(tx, Array.from(now.values()));
     return written;
 }
 
