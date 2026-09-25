@@ -1047,6 +1047,7 @@ export function OrganizationSettingsForm({
                     registered={registered}
                     next={number(v)}
                     problem={numberProblem?.message ?? null}
+                    timezone={v.timezone || null}
                     at={at}
                 />
                 {registered ? (

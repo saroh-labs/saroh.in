@@ -176,7 +176,7 @@ const CREDIT_MARK = "CN";
 /**
  * Where a credit note's "CN" goes, as the API decides it: after the prefix
  * where that fits in 16 characters with the counter's headroom
- * (RCCN/26-27/0001), else in its place (CN/26-27/09/001), or first when the
+ * (RCCN/26-27/0001), else in its place (CN/26-27/09/0001), or first when the
  * number has no prefix.
  */
 export type CreditMark = "after" | "instead" | "first";
