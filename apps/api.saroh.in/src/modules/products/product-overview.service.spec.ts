@@ -244,4 +244,129 @@ describe("Product overview (DB)", () => {
             allows.mockRestore();
         }
     });
+
+    it("lists reviews waiting for a reply first, then the rest, newest first", async () => {
+        const order = await orders.create(storeId, ownerId, {
+            customerId,
+            items: [{ productId: otherId, quantity: 1 }],
+        });
+        const invitation = await prisma.reviewInvitation.create({
+            data: {
+                organizationId: orgId,
+                orderId: order.id,
+                tokenHash: `ov-${tag}`,
+                toAddress: `ov-buyer-${tag}@example.com`,
+                expiresAt: new Date(Date.now() + DAY),
+            },
+        });
+        const at = (daysAgo: number) => new Date(Date.now() - daysAgo * DAY);
+        const review = async (
+            name: string,
+            daysAgo: number,
+            extra: { reply?: string; status?: string } = {},
+        ) =>
+            (
+                await prisma.productReview.create({
+                    data: {
+                        organizationId: orgId,
+                        storeId,
+                        invitationId: invitation.id,
+                        productId: otherId,
+                        productName: "Lip Balm",
+                        invitedTo: invitation.toAddress,
+                        rating: 4,
+                        displayName: name,
+                        createdAt: at(daysAgo),
+                        ...extra,
+                    },
+                })
+            ).id;
+        await review("Answered, newest", 1, { reply: "Thank you!" });
+        await review("Waiting, older", 5);
+        await review("Answered, older", 6, { reply: "Glad you liked it" });
+        await review("Waiting, newer", 2);
+        // Hidden: not on the shop, so not waiting for an answer there.
+        await review("Hidden", 3, { status: "HIDDEN" });
+
+        const view = await overview.get(storeId, otherId, ownerId);
+        if (view.reviews.status !== "ok") throw new Error("reviews panel");
+        expect(view.reviews.data.toAnswer).toBe(2);
+        expect(view.reviews.data.latest.map((r) => r.displayName)).toEqual([
+            "Waiting, newer",
+            "Waiting, older",
+            "Answered, newest",
+            "Hidden",
+            "Answered, older",
+        ]);
+    });
+
+    it("says whether the caller may count stock and reply to reviews", async () => {
+        const owner = await overview.get(storeId, kajalId, ownerId);
+        expect(owner).toMatchObject({
+            canWrite: true,
+            canStock: true,
+            canReply: true,
+        });
+
+        // On the organization route: a role that counts stock but changes
+        // nothing else, and cannot answer reviews.
+        const counter = await overview.getIn(
+            await products.access.read(
+                {
+                    organizationId: orgId,
+                    userId: ownerId,
+                    role: "MEMBER",
+                    actions: new Set([
+                        "store:read",
+                        "inventory:write",
+                        "product-review:read",
+                    ]),
+                },
+                kajalId,
+                storeId,
+            ),
+            kajalId,
+        );
+        expect(counter).toMatchObject({
+            canWrite: false,
+            canStock: true,
+            canReply: false,
+        });
+
+        // A read-only floor: neither.
+        const member = await overview.getIn(
+            await products.access.read(
+                { organizationId: orgId, userId: ownerId, role: "MEMBER" },
+                kajalId,
+                storeId,
+            ),
+            kajalId,
+        );
+        expect(member).toMatchObject({
+            canWrite: false,
+            canStock: false,
+            canReply: false,
+        });
+
+        // On the storefront alias, by the membership's own actions.
+        const canWrite = jest
+            .spyOn(stores, "canWrite")
+            .mockResolvedValue(false);
+        const allows = jest
+            .spyOn(stores, "memberAllows")
+            .mockImplementation((_storeId, _userId, action) =>
+                Promise.resolve(action === "inventory:write"),
+            );
+        try {
+            const alias = await overview.get(storeId, kajalId, ownerId);
+            expect(alias).toMatchObject({
+                canWrite: false,
+                canStock: true,
+                canReply: false,
+            });
+        } finally {
+            canWrite.mockRestore();
+            allows.mockRestore();
+        }
+    });
 });

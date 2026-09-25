@@ -169,6 +169,102 @@ describe("Products: organization routes and storefront aliases (DB)", () => {
         ).rejects.toThrow(NotFoundException);
     });
 
+    it("a list row carries promised and each variant's shelf per storefront (#518)", async () => {
+        const owner = ctx("OWNER");
+        const { id } = await products.createIn(
+            await access.write(owner, undefined, hill),
+            { name: "Linen Apron", price: "700.00" },
+        );
+        const small = await variants.createIn(
+            await access.write(owner, id),
+            id,
+            { sku: `APRON-S-${tag}`, title: "Small" },
+        );
+        const large = await variants.createIn(
+            await access.write(owner, id),
+            id,
+            { sku: `APRON-L-${tag}`, title: "Large" },
+        );
+        await inventory.setVariantsIn(await access.write(owner, id, hill), id, {
+            variants: [
+                { variantId: small.id, quantity: 6, lowStockAlert: 2 },
+                { variantId: large.id, quantity: 4, lowStockAlert: 3 },
+            ],
+        });
+        // Online sells only Large.
+        await listings.list(orgId, id, online, [large.id]);
+        // Shelves set directly — this is about the read: 5 Large online,
+        // and what open orders have promised at each storefront.
+        await prisma.stockLevel.updateMany({
+            where: { storeId: online, variantId: large.id },
+            data: { onHand: 5, promised: 1, lowStockAlert: 1 },
+        });
+        await prisma.stockLevel.updateMany({
+            where: { storeId: hill, variantId: small.id },
+            data: { promised: 2 },
+        });
+
+        const row = (await products.catalogue(orgId)).find((p) => p.id === id);
+        expect(row?.inventory).toEqual({
+            quantity: 15,
+            promised: 3,
+            lowStockAlert: 1,
+        });
+        expect(row?.listings).toEqual([
+            {
+                storeId: hill,
+                storeName: "Hill Road",
+                inventory: { quantity: 10, promised: 2, lowStockAlert: 2 },
+                variants: [
+                    {
+                        variantId: small.id,
+                        soldHere: true,
+                        inventory: {
+                            quantity: 6,
+                            promised: 2,
+                            lowStockAlert: 2,
+                        },
+                    },
+                    {
+                        variantId: large.id,
+                        soldHere: true,
+                        inventory: {
+                            quantity: 4,
+                            promised: 0,
+                            lowStockAlert: 3,
+                        },
+                    },
+                ],
+            },
+            {
+                storeId: online,
+                storeName: "Online",
+                inventory: { quantity: 5, promised: 1, lowStockAlert: 1 },
+                variants: [
+                    { variantId: small.id, soldHere: false, inventory: null },
+                    {
+                        variantId: large.id,
+                        soldHere: true,
+                        inventory: {
+                            quantity: 5,
+                            promised: 1,
+                            lowStockAlert: 1,
+                        },
+                    },
+                ],
+            },
+        ]);
+        // Filtered to one storefront, the row reads that shelf.
+        const atOnline = (
+            await products.catalogue(orgId, { storefront: online })
+        ).find((p) => p.id === id);
+        expect(atOnline?.inventory).toEqual({
+            quantity: 5,
+            promised: 1,
+            lowStockAlert: 1,
+        });
+    });
+
     it("a one-storefront view reads the same through the alias and the organization route", async () => {
         const { id } = await products.create(hill, users.OWNER, {
             name: "Seeded batch",
