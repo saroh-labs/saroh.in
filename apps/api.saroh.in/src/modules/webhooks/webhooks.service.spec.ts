@@ -42,7 +42,6 @@ jest.mock("@saroh/database", () => {
         },
         order: { findUnique: jest.fn(), update: jest.fn() },
         orderEvent: { create: jest.fn() },
-        $queryRaw: jest.fn(),
     };
     return {
         ...actual,
