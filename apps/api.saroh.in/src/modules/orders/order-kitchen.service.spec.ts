@@ -81,6 +81,14 @@ jest.mock("@saroh/database", () => {
         };
     };
     const client = {
+        // A hold growing (#511): only when the shelf can sell it.
+        $executeRaw: jest.fn((_sql: TemplateStringsArray, units: number) => {
+            if (mockDb.inventory.quantity - mockDb.inventory.reserved < units) {
+                return Promise.resolve(0);
+            }
+            mockDb.inventory.reserved += units;
+            return Promise.resolve(1);
+        }),
         $queryRaw: jest.fn((sql: TemplateStringsArray) => {
             // Count the order's row lock, not the stock rows' locks.
             if (sql[0].includes('FROM "Order"')) mockDb.locks += 1;
@@ -153,26 +161,68 @@ jest.mock("@saroh/database", () => {
         orderItem: {
             // What each line records about its stock, and its order's
             // storefront (#510).
+            // (#511: with what it holds and sold, by id or by order).
             findMany: jest.fn(
-                ({ where }: { where: { id: { in: string[] } } }) =>
+                ({
+                    where,
+                }: {
+                    where: { id?: string | { in: string[] }; orderId?: string };
+                }) =>
                     Promise.resolve(
                         mockDb.items
-                            .filter((x) => where.id.in.includes(x.id as string))
+                            .filter((x) =>
+                                typeof where.id === "string"
+                                    ? x.id === where.id
+                                    : where.id
+                                      ? where.id.in.includes(x.id as string)
+                                      : x.orderId === where.orderId,
+                            )
                             .map((i) => ({
                                 id: i.id,
                                 orderId: mockDb.order.id,
                                 productId: i.productId,
                                 variantId: null,
+                                quantity: i.quantity,
                                 stockRow: i.stockRow ?? null,
                                 stockLevelId: i.stockLevelId ?? null,
+                                heldQuantity: i.heldQuantity ?? 0,
+                                soldQuantity: i.soldQuantity ?? 0,
+                                product: { name: i.name },
                                 order: { storeId: "store_1" },
                             })),
                     ),
             ),
             update: jest.fn(
-                ({ where, data }: { where: { id: string }; data: object }) => {
+                ({
+                    where,
+                    data,
+                }: {
+                    where: { id: string };
+                    data: Record<string, unknown>;
+                }) => {
                     const i = mockDb.items.find((x) => x.id === where.id);
-                    Object.assign(i ?? {}, data);
+                    for (const [k, v] of Object.entries(data)) {
+                        if (!i) break;
+                        const by = v as {
+                            increment?: number;
+                            decrement?: number;
+                        };
+                        if (
+                            typeof v === "object" &&
+                            v !== null &&
+                            "increment" in by
+                        ) {
+                            i[k] = (i[k] as number) + (by.increment ?? 0);
+                        } else if (
+                            typeof v === "object" &&
+                            v !== null &&
+                            "decrement" in by
+                        ) {
+                            i[k] = (i[k] as number) - (by.decrement ?? 0);
+                        } else {
+                            i[k] = v;
+                        }
+                    }
                     return Promise.resolve(i);
                 },
             ),
@@ -217,13 +267,15 @@ jest.mock("@saroh/database", () => {
                 }: {
                     data: {
                         onHand?: number;
-                        promised?: number | { increment: number };
+                        promised?:
+                            number | { increment?: number; decrement?: number };
                     };
                 }) => {
                     const promised =
                         typeof data.promised === "object"
                             ? mockDb.inventory.reserved +
-                              data.promised.increment
+                              (data.promised.increment ?? 0) -
+                              (data.promised.decrement ?? 0)
                             : (data.promised ?? mockDb.inventory.reserved);
                     mockDb.inventory = {
                         quantity: data.onHand ?? mockDb.inventory.quantity,
@@ -233,8 +285,15 @@ jest.mock("@saroh/database", () => {
                 },
             ),
         },
+        // A refund confirmed on a line (#511): none here.
+        paymentRefundLine: { count: jest.fn(() => Promise.resolve(0)) },
         // The stock log (#513): what the order flows wrote to it.
         stockEntry: {
+            count: jest.fn(() =>
+                Promise.resolve(
+                    mockDb.entries.filter((e) => e.kind === "RETURNED").length,
+                ),
+            ),
             findFirst: jest.fn(() =>
                 Promise.resolve(
                     [...mockDb.entries]
@@ -354,6 +413,8 @@ function reset(over: Record<string, unknown> = {}) {
             price: "120.00",
             stockRow: "PRODUCT",
             stockLevelId: "sl_1",
+            heldQuantity: 3,
+            soldQuantity: 0,
             name: "Croissant",
         },
     ];

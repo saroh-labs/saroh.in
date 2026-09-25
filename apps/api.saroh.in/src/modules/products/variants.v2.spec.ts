@@ -242,7 +242,7 @@ describe("Variants and stock per variant (DB)", () => {
                 customerId,
                 items: [{ productId: dressId, variantId: v.L, quantity: 4 }],
             }),
-        ).rejects.toThrow(/Not enough stock/);
+        ).rejects.toThrow(/Only 3 left at Variants Store/);
     });
 
     it("won't remove a variant with stock promised to an open order", async () => {
