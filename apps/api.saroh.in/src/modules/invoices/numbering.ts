@@ -9,6 +9,11 @@ export type InvoiceKind = "INVOICE" | "CREDIT_NOTE" | "SUPPLEMENTARY";
 /** GST's limit on an invoice number (CGST Rules, rule 46). */
 export const MAX_NUMBER_LENGTH = 16;
 
+/** The business's zone, or India's when it has none ("" included, as older rows stored it). */
+function zoneOrDefault(zone: string | null | undefined): string {
+    return zone?.trim() ? zone : DEFAULT_TIMEZONE;
+}
+
 /** What rule 46 lets an invoice number carry: capitals, digits, "-" and "/". */
 const NUMBER_CHARS = /^[A-Z0-9/-]+$/;
 
@@ -250,7 +255,7 @@ function build(
     },
 ): string {
     const credit = input.kind === "CREDIT_NOTE";
-    const zone = input.timezone || DEFAULT_TIMEZONE; // "" is no zone
+    const zone = zoneOrDefault(input.timezone);
     const local = DateTime.fromJSDate(input.at, { zone });
     const values = format.parts.map((part) => {
         switch (part) {
@@ -438,7 +443,7 @@ function seriesKey(
     at: Date,
     timezone?: string | null,
 ): string {
-    const zone = timezone || DEFAULT_TIMEZONE; // "" is no zone
+    const zone = zoneOrDefault(timezone);
     if (restart === "FY") return `${head}/${financialYear(at, zone)}`;
     if (restart === "MONTH") {
         return `${head}/${DateTime.fromJSDate(at, { zone }).toFormat("yyyy-MM")}`;

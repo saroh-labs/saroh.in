@@ -203,12 +203,11 @@ describe("numberFormatProblem mirrors the API", () => {
 
     it("keeps a digit of room for the count to grow", () => {
         // RC/26-27/09/0001 is 16, but its 10,000th number would be 17.
-        expect(problem(MONTHLY)).toMatchObject({
-            field: "numberDigits",
-            message: expect.stringMatching(
-                /Once the count passes 9999, numbers like RC\/26-27\/09\/99999 are 17 characters/,
-            ),
-        });
+        const refused = problem(MONTHLY);
+        expect(refused?.field).toBe("numberDigits");
+        expect(refused?.message).toMatch(
+            /Once the count passes 9999, numbers like RC\/26-27\/09\/99999 are 17 characters/,
+        );
         expect(problem({ ...MONTHLY, digits: 3 })).toBeNull();
         expect(longestNumber({ ...MONTHLY, digits: 3 }, "RC")).toHaveLength(16);
     });
